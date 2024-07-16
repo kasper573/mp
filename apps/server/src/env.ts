@@ -1,11 +1,9 @@
-import { z, mode, numeric } from "@mp/validate";
+import { z, numeric } from "@mp/validate";
 
 const schema = z.object({
-  mode: mode.default("development"),
   port: numeric.default(2000),
 });
 
 export const env = schema.parse({
-  mode: process.env.NODE_ENV,
-  port: process.env.WS_PORT,
+  port: process.env.MP_SERVER_PORT,
 });

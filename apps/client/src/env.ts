@@ -7,5 +7,5 @@ const schema = z.object({
 
 export const env = schema.parse({
   mode: process.env.NODE_ENV,
-  serverUrl: process.env.SERVER_URL,
+  serverUrl: process.env.MP_SERVER_URL,
 });

@@ -9,9 +9,7 @@ import { defineEnv } from "./defineEnv.mjs";
 export function defineConfig(projectRoot) {
   return defineViteConfig({
     plugins: [react(), checker({ typescript: true })],
-
-    // We use define to opt-out of vite env convention in favor of our own (see @mp/env).
-    envPrefix: "_SOMETHING_RIDICULOUS_TO_DISABLE_VITE_ENV_VARS",
+    envPrefix: "MP_",
     define: defineEnv(projectRoot),
   });
 }
