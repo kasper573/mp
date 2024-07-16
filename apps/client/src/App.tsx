@@ -4,7 +4,7 @@ export function App() {
   const query = api.example.greeting.useQuery("Hello there");
   return (
     <>
-      <h1>Hello World</h1>
+      <h1>Hi Mom!</h1>
       <p>{query.data}</p>
     </>
   );
