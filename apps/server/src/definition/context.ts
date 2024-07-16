@@ -1,16 +1,14 @@
-import type * as trpcExpress from "@trpc/server/adapters/express";
+import type { CreateWSSContextFnOptions } from "@trpc/server/adapters/ws";
 
-export function createContext({
-  req,
-}: trpcExpress.CreateExpressContextOptions) {
-  const headers = req.headers as unknown as TrpcServerHeaders;
+export function createContext({ req }: CreateWSSContextFnOptions) {
+  const headers = req.headers as unknown as ServerConnectionParams;
   return {
     clientId: headers["client-id"],
   };
 }
 
-export type ApiContext = Awaited<ReturnType<typeof createContext>>;
+export type ServerContext = Awaited<ReturnType<typeof createContext>>;
 
-export interface TrpcServerHeaders {
+export type ServerConnectionParams = {
   "client-id": string;
-}
+};

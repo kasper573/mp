@@ -1,1 +1,1 @@
-export type { TrpcServerHeaders } from "./definition/context";
+export type { ServerConnectionParams as TrpcServerHeaders } from "./definition/context";

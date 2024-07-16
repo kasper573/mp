@@ -1,12 +1,15 @@
-import type { CreateTRPCReact, HTTPHeaders } from "@trpc/react-query";
-import { createTRPCReact, httpBatchLink } from "@trpc/react-query";
+import type { CreateTRPCReact } from "@trpc/react-query";
+import {
+  createTRPCReact,
+  createWSClient,
+  wsLink,
+} from "@trpc/react-query";
 import transformer from "superjson";
-import type { ApiRouter, types } from "@mp/server";
+import type { ApiRouter, types as ServerTypes } from "@mp/server";
 import type { PropsWithChildren } from "react";
 import { createContext, useContext } from "react";
 import type { QueryClientConfig } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-export type { types } from "@mp/server";
 
 /**
  * Convenience proxy for accessing the client interface
@@ -42,26 +45,19 @@ export interface ApiClient {
 
 export interface ApiClientOptions extends QueryClientOptions {
   url: string;
-  headers: () => types.TrpcServerHeaders;
+  connectionParams: () => ServerTypes.TrpcServerHeaders;
 }
 
 export function createApiClient({
   url,
-  headers,
+  connectionParams,
   ...queryClientOptions
 }: ApiClientOptions): ApiClient {
   const query = createQueryClient(queryClientOptions);
   const react = createTRPCReact<ApiRouter>();
+  const client = createWSClient({ url, connectionParams });
+  const trpc = react.createClient({ links: [wsLink({ client, transformer })] });
 
-  const trpc = react.createClient({
-    links: [
-      httpBatchLink({
-        url,
-        transformer,
-        headers: () => headers() as unknown as HTTPHeaders,
-      }),
-    ],
-  });
   return { react, trpc, query };
 }
 
