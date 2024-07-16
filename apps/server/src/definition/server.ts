@@ -1,4 +1,3 @@
-import http from "http";
 import ws from "ws";
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
 import { env } from "../env";
@@ -6,7 +5,7 @@ import { createContext } from "./context";
 import { createTrpcRouter } from "./router";
 
 export function startServer() {
-  const wss = new ws.Server({ port: env.wsPort });
+  const wss = new ws.Server({ port: env.port });
 
   const handler = applyWSSHandler({
     wss,
@@ -19,34 +18,27 @@ export function startServer() {
     },
   });
 
-  wss.on("connection", (ws) => {
+  function handleConnection(ws: ws.WebSocket) {
     console.log(`➕➕ Connection (${wss.clients.size})`);
     ws.once("close", () => {
       console.log(`➖➖ Connection (${wss.clients.size})`);
     });
-  });
+  }
 
-  process.on("SIGTERM", () => {
+  function sigterm() {
     console.log("SIGTERM");
     handler.broadcastReconnectNotification();
     wss.close();
-  });
+  }
 
-  const httpServer = http
-    .createServer((req, res) => {
-      if (req.url === "/healthz") {
-        res.writeHead(200);
-        res.end("ok");
-        return;
-      }
-    })
-    .listen(env.httpPort);
+  wss.on("connection", handleConnection);
+  process.on("SIGTERM", sigterm);
 
-  console.log(`✅ WebSocket Server listening on port ${env.wsPort}`);
-  console.log(`✅ HTTP Server listening on port ${env.httpPort}`);
+  console.log(`✅ WebSocket Server listening on port ${env.port}`);
 
   return function close() {
+    wss.off("connection", handleConnection);
     wss.close();
-    httpServer.close();
+    process.off("SIGTERM", sigterm);
   };
 }
