@@ -6,7 +6,8 @@
   "scripts": {
     "build": "mp-env vite build",
     "dev": "mp-env vite --host 0.0.0.0 --port 3002 --clearScreen false",
-    "preview": "vite preview"
+    "preview": "mp-env vite preview",
+    "start": "http-server dist -p 80"
   },
   "dependencies": {
     "@mp/api-client": "workspace:*",
@@ -19,6 +20,7 @@
     "@types/react-dom": "^18.3.0",
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "http-server": "14.1.1"
   }
 }
