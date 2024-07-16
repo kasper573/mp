@@ -13,7 +13,7 @@ export function createExampleRouter() {
     greeting: t.procedure
       .input(z.string())
       .output(z.string())
-      .query(({ input: name }) => (name.trim() ? `Hello there, ${name}!` : "")),
+      .query(({ input: name }) => (name.trim() ? `HI, ${name}!` : "")),
     count: t.procedure
       .output(z.number())
       .query(({ ctx }) => countsPerClient.get(ctx.clientId) ?? 0),

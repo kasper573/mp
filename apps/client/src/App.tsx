@@ -1,7 +1,7 @@
 import { api } from "@mp/api-client/react";
 
 export function App() {
-  const query = api.example.greeting.useQuery("Hello there");
+  const query = api.example.greeting.useQuery("Hello there 123");
   return (
     <>
       <h1>Hi Mom!</h1>
