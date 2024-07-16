@@ -1,4 +1,4 @@
-import { loadEnv } from "@yas/env/utils.mjs";
+import { loadEnv } from "@mp/env/utils.mjs";
 
 /**
  * @param {string} projectRoot

@@ -1,5 +1,5 @@
 {
-  "extends": "@yas/tsconfig/node.json",
+  "extends": "@mp/tsconfig/node.json",
   "compilerOptions": {
     "allowJs": true,
     "module": "ESNext"
