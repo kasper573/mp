@@ -6,6 +6,6 @@ const schema = z.object({
 });
 
 export const env = schema.parse({
-  mode: import.meta.env.NODE_ENV,
-  serverUrl: import.meta.env.VITE_SERVER_URL,
+  mode: process.env.NODE_ENV,
+  serverUrl: process.env.SERVER_URL,
 });

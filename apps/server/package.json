@@ -10,21 +10,21 @@
     }
   },
   "scripts": {
-    "build": "tsup",
-    "dev": "NODE_ENV=development tsx watch src/entrypoint.ts --clear-screen=false"
+    "build": "mp-env tsup",
+    "dev": "mp-env tsx watch src/entrypoint.ts --clear-screen=false"
   },
   "dependencies": {
     "@trpc/server": "11.0.0-next-beta.316",
     "@mp/validate": "workspace:*",
     "express": "4.18.3",
-    "superjson": "1.13.3",
-    "dotenv-flow": "4.1.0"
+    "superjson": "1.13.3"
   },
   "devDependencies": {
     "@types/cors": "2.8.17",
     "@types/express": "4.17.21",
     "@types/morgan": "1.9.9",
     "@mp/build": "workspace:*",
+    "@mp/env": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "cors": "2.8.5",
     "morgan": "1.10.0"

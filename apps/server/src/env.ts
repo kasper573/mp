@@ -1,5 +1,4 @@
 import { z, mode, numeric } from "@mp/validate";
-import * as dotenv from "dotenv-flow";
 
 const canNeverHappen = "^(?=a)b";
 
@@ -17,15 +16,13 @@ const schema = z.object({
   ]),
 });
 
-const { parsed: realEnv = {} } = dotenv.config();
-
 export const env = schema.parse({
-  mode: realEnv.NODE_ENV,
-  corsOrigin: realEnv.CORS_ORIGIN_REGEX,
-  trpcPath: realEnv.TRPC_PATH,
-  logFormat: realEnv.LOG_FORMAT,
+  mode: process.env.NODE_ENV,
+  corsOrigin: process.env.CORS_ORIGIN_REGEX,
+  trpcPath: process.env.TRPC_PATH,
+  logFormat: process.env.LOG_FORMAT,
   runtime:
-    realEnv.SERVE_ON_PORT !== undefined
-      ? { type: "server", port: realEnv.SERVE_ON_PORT }
+    process.env.SERVE_ON_PORT !== undefined
+      ? { type: "server", port: process.env.SERVE_ON_PORT }
       : { type: "lambda" },
 });
