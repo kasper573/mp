@@ -134,7 +134,7 @@ importers:
         specifier: 1.13.3
         version: 1.13.3
     devDependencies:
-      '@mp/trpc-server':
+      '@mp/server':
         specifier: workspace:*
         version: link:../../apps/server
       '@mp/tsconfig':
