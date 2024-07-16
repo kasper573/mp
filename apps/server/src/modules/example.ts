@@ -14,7 +14,7 @@ export function createExampleRouter() {
       .input(z.string())
       .output(z.string())
       .query(({ input: name }) =>
-        name.trim() ? `Hello, ${name}! I am the testing branch!` : "",
+        name.trim() ? `Hello, ${name} from the main branch!` : "",
       ),
     count: t.procedure
       .output(z.number())
