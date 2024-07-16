@@ -146,6 +146,9 @@ importers:
 
   packages/build:
     devDependencies:
+      '@mp/env':
+        specifier: workspace:*
+        version: link:../env
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
