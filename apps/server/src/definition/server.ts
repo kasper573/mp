@@ -11,7 +11,7 @@ morgan.token("url", urlFormatter);
 export function createServer(): Express {
   const app: Express = express();
   app.use(morgan(env.logFormat));
-  app.use(cors({ origin: env.corsOrigin }));
+  app.use(cors());
   app.use(
     env.trpcPath,
     trpcExpress.createExpressMiddleware({
