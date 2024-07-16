@@ -1,14 +1,12 @@
-import express, { type Express } from "express";
+import http from "http";
 import ws from "ws";
 import { applyWSSHandler } from "@trpc/server/adapters/ws";
 import { env } from "../env";
 import { createContext } from "./context";
 import { createTrpcRouter } from "./router";
 
-export function startServer(): Express {
-  const app: Express = express();
-
-  const wss = new ws.Server({ port: env.port });
+export function startServer() {
+  const wss = new ws.Server({ port: env.wsPort });
 
   const handler = applyWSSHandler({
     wss,
@@ -28,12 +26,27 @@ export function startServer(): Express {
     });
   });
 
-  console.log(`✅ WebSocket Server listening on ws://localhost:${env.port}`);
   process.on("SIGTERM", () => {
     console.log("SIGTERM");
     handler.broadcastReconnectNotification();
     wss.close();
   });
 
-  return app;
+  const httpServer = http
+    .createServer((req, res) => {
+      if (req.url === "/healthz") {
+        res.writeHead(200);
+        res.end("ok");
+        return;
+      }
+    })
+    .listen(env.httpPort);
+
+  console.log(`✅ WebSocket Server listening on port ${env.wsPort}`);
+  console.log(`✅ HTTP Server listening on port ${env.httpPort}`);
+
+  return function close() {
+    wss.close();
+    httpServer.close();
+  };
 }
