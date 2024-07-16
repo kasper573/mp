@@ -2,6 +2,7 @@
   "name": "mp",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "license": "MIT",
   "workspaces": [
     "apps/*",
@@ -11,11 +12,10 @@
     "clean": "find . -type d \\( -path \"./*/dist\" -o -path \"./*/.cache\" -o -path \"./*/.turbo\" \\) -not -path \"*/node_modules/*\" -prune -exec rm -r {} +",
     "build": "turbo run build",
     "dev": "turbo run dev",
-    "lint": "pnpm eslint . --max-warnings=0 && pnpm -r lint",
-    "lint:fix": "pnpm eslint . --fix",
+    "lint": "eslint . --max-warnings=0",
+    "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
-    "eslint": "cross-env NODE_OPTIONS=--max_old_space_size=8000 eslint",
     "prepare": "husky"
   },
   "devDependencies": {

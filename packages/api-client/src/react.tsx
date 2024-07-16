@@ -5,11 +5,7 @@ import type { ApiRouter, types } from "@mp/trpc-server";
 import type { PropsWithChildren } from "react";
 import { createContext, useContext } from "react";
 import type { QueryClientConfig } from "@tanstack/react-query";
-import {
-  QueryClient,
-  QueryClientProvider,
-  useQueryClient as useQueryClientImpl,
-} from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 export type { types } from "@mp/trpc-server";
 
 /**
@@ -109,10 +105,6 @@ function createQueryClient({ mode }: QueryClientOptions): QueryClient {
   });
 
   return client;
-}
-
-function useQueryClient(): QueryClientWithEvents {
-  return useQueryClientImpl() as QueryClientWithEvents;
 }
 
 class QueryClientWithEvents extends QueryClient {

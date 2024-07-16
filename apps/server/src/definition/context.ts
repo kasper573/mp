@@ -2,7 +2,6 @@ import type * as trpcExpress from "@trpc/server/adapters/express";
 
 export function createContext({
   req,
-  res,
 }: trpcExpress.CreateExpressContextOptions) {
   const headers = req.headers as unknown as TrpcServerHeaders;
   return {
