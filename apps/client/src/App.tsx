@@ -1,7 +1,7 @@
 import { api } from "@mp/api-client/react";
 
 export function App() {
-  const query = api.example.greeting.useQuery("Main client");
+  const query = api.example.greeting.useQuery("Client 2");
   const count = api.example.count.useQuery();
   const increment = api.example.increaseCount.useMutation();
 
