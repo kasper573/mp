@@ -1,5 +1,5 @@
 {
-  "name": "@mp/trpc-server",
+  "name": "@mp/server",
   "version": "0.0.0",
   "private": true,
   "types": "./src/package.ts",

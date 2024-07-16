@@ -1,12 +1,12 @@
 import type { CreateTRPCReact, HTTPHeaders } from "@trpc/react-query";
 import { createTRPCReact, httpBatchLink } from "@trpc/react-query";
 import transformer from "superjson";
-import type { ApiRouter, types } from "@mp/trpc-server";
+import type { ApiRouter, types } from "@mp/server";
 import type { PropsWithChildren } from "react";
 import { createContext, useContext } from "react";
 import type { QueryClientConfig } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-export type { types } from "@mp/trpc-server";
+export type { types } from "@mp/server";
 
 /**
  * Convenience proxy for accessing the client interface

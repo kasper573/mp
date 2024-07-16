@@ -30,6 +30,6 @@
   "devDependencies": {
     "@types/react": "^18.3.3",
     "@mp/tsconfig": "workspace:*",
-    "@mp/trpc-server": "workspace:*"
+    "@mp/server": "workspace:*"
   }
 }
