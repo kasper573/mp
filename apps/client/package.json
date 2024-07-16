@@ -13,7 +13,8 @@
     "@mp/api-client": "workspace:*",
     "@mp/validate": "workspace:*",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "usehooks-ts": "3.1.0"
   },
   "devDependencies": {
     "@types/react": "^18.3.3",

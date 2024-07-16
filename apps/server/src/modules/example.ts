@@ -1,9 +1,28 @@
+import { EventEmitter } from "events";
 import { z } from "@mp/validate";
+import { observable } from "@trpc/server/observable";
 import { t } from "../definition/trpc";
 
 export function createExampleRouter() {
   const countsPerClient = new Map<string, number>();
+
+  const events = new EventEmitter();
+  let counter = 0;
+
+  setInterval(() => events.emit("tick", counter++), 1000);
+
   return t.router({
+    onAdd: t.procedure.input(z.string()).subscription(({ input }) =>
+      observable<[number, string]>((emit) => {
+        console.log("subscribed to onAdd", { input });
+        const e = (n: number) => emit.next([n, input + ": " + n]);
+        events.on("tick", e);
+        return () => {
+          console.log("unsubscribed from onAdd", { input });
+          events.off("tick", e);
+        };
+      }),
+    ),
     error: t.procedure.query(() => {
       throw new Error("Manually triggered server side query error");
     }),
