@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "build": "mp-env tsup",
+    "start": "NODE_ENV=production mp-env tsx src/entrypoint.ts",
     "dev": "mp-env tsx watch src/entrypoint.ts --clear-screen=false"
   },
   "dependencies": {
