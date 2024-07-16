@@ -2,7 +2,7 @@ import { mode, z } from "@mp/validate";
 
 const schema = z.object({
   mode: mode.default("development"),
-  serverUrl: z.string().url(),
+  serverUrl: z.string().url().default("http://localhost/server-url-missing"),
 });
 
 export const env = schema.parse({
