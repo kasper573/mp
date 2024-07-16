@@ -1,0 +1,33 @@
+name: Conventional Commits
+on:
+  push:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: ./.github/workflows/composites/install/
+
+      - name: Determine if merge commit
+        id: merge
+        run: |
+          isMerge=$(git show --pretty=%P -s HEAD | grep -q ' ' && echo true || echo false)
+          echo "isMerge=$isMerge" >> $GITHUB_OUTPUT
+
+      - name: Lint all commits in push event
+        if: github.event_name == 'push' && steps.merge.outputs.isMerge == 'false'
+        env:
+          commitsJson: ${{ toJson(github.event.commits) }}
+        run: |
+          commitCount=$(echo "$commitsJson" | jq length)
+          pnpm exec commitlint --from HEAD~$commitCount --to HEAD --verbose
+
+      - name: Lint all commits in pull request
+        if: github.event_name == 'pull_request'
+        run: pnpm exec commitlint --from ${{ github.event.pull_request.head.sha }}~${{ github.event.pull_request.commits }} --to ${{ github.event.pull_request.head.sha }} --verbose

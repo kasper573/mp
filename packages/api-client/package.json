@@ -1,0 +1,35 @@
+{
+  "name": "@mp/api-client",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    "./react": {
+      "import": "./dist/react.js",
+      "types": "./dist/react.d.ts"
+    },
+    "./react-devtools": {
+      "import": "./dist/react-devtools.js",
+      "types": "./dist/react-devtools.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput"
+  },
+  "dependencies": {
+    "@trpc/client": "11.0.0-next-beta.316",
+    "@trpc/react-query": "11.0.0-next-beta.316",
+    "@tanstack/react-query": "5.51.1",
+    "@tanstack/react-query-devtools": "5.51.1",
+    "react": "^18.3.1",
+    "superjson": "1.13.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.3",
+    "@mp/tsconfig": "workspace:*",
+    "@mp/trpc-server": "workspace:*"
+  }
+}

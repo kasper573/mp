@@ -1,0 +1,3 @@
+{
+  "extends": ["@mp/tsconfig/react.json", "@mp/tsconfig/tsc.json"]
+}
