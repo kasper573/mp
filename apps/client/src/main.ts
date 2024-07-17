@@ -10,9 +10,10 @@ const api = new ApiClient({
 
 const chat = document.querySelector("textarea")!;
 const input = document.querySelector("input")!;
-const send = document.querySelector("button")!;
+const form = document.querySelector("form")!;
 
-send.addEventListener("click", () => {
+form.addEventListener("submit", (e) => {
+  e.preventDefault();
   api.send("example.say", input.value);
   input.value = "";
 });
