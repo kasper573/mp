@@ -4,13 +4,22 @@
   "private": true,
   "exports": {
     "./client": {
-      "main": "./src/client.ts",
-      "types": "./src/client.ts"
+      "import": "./dist/client.js",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
     },
     "./server": {
-      "main": "./src/server.ts",
-      "types": "./src/server.ts"
+      "import": "./dist/server.js",
+      "require": "./dist/server.js",
+      "types": "./dist/server.d.ts"
     }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
