@@ -1,4 +1,4 @@
-import type { CreateContextOptions } from "@mp/tsock";
+import type { CreateContextOptions } from "@mp/tsock/server";
 
 export function createContext({
   clientContext,

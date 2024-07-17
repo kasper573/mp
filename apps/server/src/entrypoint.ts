@@ -1,4 +1,4 @@
-import { createServer } from "@mp/tsock";
+import { createServer } from "@mp/tsock/server";
 import { createRouter } from "./definition/router";
 import { createContext } from "./definition/context";
 import { env } from "./env";

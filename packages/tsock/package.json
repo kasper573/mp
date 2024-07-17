@@ -2,8 +2,16 @@
   "name": "@mp/tsock",
   "version": "0.0.0",
   "private": true,
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "exports": {
+    "./client": {
+      "main": "./src/client.ts",
+      "types": "./src/client.ts"
+    },
+    "./server": {
+      "main": "./src/server.ts",
+      "types": "./src/server.ts"
+    }
+  },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
   }

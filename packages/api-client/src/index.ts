@@ -1,6 +1,6 @@
 import type { ServerContext } from "@mp/server";
 import { type ServerRouter } from "@mp/server";
-import { type Client, createClient } from "@mp/tsock";
+import { type Client, createClient } from "@mp/tsock/client";
 
 export type * from "@mp/server";
 
