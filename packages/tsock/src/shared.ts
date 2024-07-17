@@ -61,27 +61,13 @@ export interface OperationEmitter<Input> {
 
 // We need to be able to use this as a generic constraint, and using "any" is the only way
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyOperationDefinition<Context> = OperationDefinition<Context, any>;
+export type AnyOperationDefinition<Context> = OperationDefinition<Context, any>;
 
 export type OperationDefinition<Context, Input> = (
   args: OperationHandlerArgs<Context, Input>,
 ) => OperationResolution;
 
-export type OperationInterfaceMap<Definition> = {
-  [K in keyof Definition]: Definition[K] extends OperationDefinition<
-    infer _,
-    infer Input
-  >
-    ? OperationInterface<Input>
-    : OperationInterfaceMap<Definition[K]>;
-};
-
-interface OperationInterface<Input> {
-  (input: Input): OperationResolution;
-  subscribe(callback: (input: Input) => void): Unsubscribe;
-}
-
-type OperationResolution = void;
+export type OperationResolution = void;
 
 interface Transformer {
   stringify(object: unknown): string;

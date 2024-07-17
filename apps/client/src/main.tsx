@@ -12,11 +12,11 @@ const input = document.querySelector("input")!;
 const send = document.querySelector("button")!;
 
 send.addEventListener("click", () => {
-  api.events.example.say(input.value);
+  api.send("example.say", input.value);
   input.value = "";
 });
 
-api.events.example.chat.subscribe((message) => {
+api.subscribe("example.chat", (message) => {
   chat.value += `${message.from}: ${message.contents}\n`;
 });
 
