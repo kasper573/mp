@@ -16,9 +16,6 @@
       ]
     },
     "dev": {
-      // The only reason this task is specifying the build task as a dependency is to
-      // avoid race conditions for first time runs when first cloning the repo.
-      "dependsOn": ["^build"],
       "cache": false,
       "persistent": true
     },

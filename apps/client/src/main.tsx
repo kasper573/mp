@@ -1,16 +1,24 @@
-import { createApiClient } from "@mp/api-client";
 import { v4 as uuid } from "uuid";
+import { createApiClient } from "@mp/api-client";
 import { env } from "./env";
 
-const apiClient = createApiClient({
+const api = createApiClient({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
 });
 
-const root = document.getElementById("root");
-if (root) {
-  root.innerHTML = "Hello World";
-}
+const chat = document.querySelector("textarea")!;
+const input = document.querySelector("input")!;
+const send = document.querySelector("button")!;
+
+send.addEventListener("click", () => {
+  api.events.example.say(input.value);
+  input.value = "";
+});
+
+api.events.example.chat.subscribe((message) => {
+  chat.value += `${message.from}: ${message.contents}\n`;
+});
 
 function getClientId() {
   let id = localStorage.getItem("client-id");

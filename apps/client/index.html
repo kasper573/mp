@@ -14,6 +14,17 @@
   </head>
   <body>
     <script type="module" src="/src/main.tsx"></script>
-    <div id="root"></div>
+    <textarea
+      id="chat"
+      cols="60"
+      rows="10"
+      style="background: white; color: black"
+    >
+    </textarea>
+    <label>
+      Message:
+      <input type="text" id="input" />
+    </label>
+    <button id="send">Send message</button>
   </body>
 </html>

@@ -15,14 +15,12 @@
   },
   "dependencies": {
     "@mp/validate": "workspace:*",
-    "@trpc/server": "11.0.0-rc.461",
-    "superjson": "1.13.3",
-    "ws": "8.18.0"
+    "@mp/tsock": "workspace:*",
+    "superjson": "1.13.3"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/tsconfig": "workspace:*",
-    "@types/ws": "8.5.11"
+    "@mp/tsconfig": "workspace:*"
   }
 }

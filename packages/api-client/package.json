@@ -2,21 +2,10 @@
   "name": "@mp/api-client",
   "version": "0.0.0",
   "private": true,
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsc --build",
-    "dev": "tsc --build --watch --preserveWatchOutput"
-  },
+  "main": "src/index.ts",
+  "types": "src/index.ts",
   "dependencies": {
-    "superjson": "1.13.3"
+    "@mp/tsock": "workspace:*"
   },
   "devDependencies": {
     "@mp/server": "workspace:*",

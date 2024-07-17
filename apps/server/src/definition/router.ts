@@ -1,9 +1,9 @@
 import { createExampleRouter } from "../modules/example";
-import { t } from "./trpc";
+import { t } from "./tsock";
 
-export type ServerRouter = ReturnType<typeof createTrpcRouter>;
+export type ServerRouter = ReturnType<typeof createRouter>;
 
-export function createTrpcRouter() {
+export function createRouter() {
   return t.router({
     example: createExampleRouter(),
   });

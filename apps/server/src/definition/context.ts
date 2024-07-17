@@ -1,11 +1,11 @@
-import type { CreateWSSContextFnOptions } from "@trpc/server/adapters/ws";
+import type { CreateContextOptions } from "@mp/tsock";
 
 export function createContext({
-  info,
-}: CreateWSSContextFnOptions): ServerContext {
-  return info.connectionParams as ServerContext;
+  clientContext,
+}: CreateContextOptions<ServerContext>): ServerContext {
+  return clientContext;
 }
 
-export type ServerContext = {
+export interface ServerContext {
   clientId: string;
-};
+}

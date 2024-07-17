@@ -5,6 +5,6 @@
     "esModuleInterop": false,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"]
   }
 }
