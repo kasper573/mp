@@ -1,2 +1,3 @@
-export type { TrpcRouter as ApiRouter } from "./definition/router";
-export type * as types from "./types";
+export type { ServerRouter } from "./definition/router";
+export type { ServerContext } from "./definition/context";
+export type * from "./modules/example";

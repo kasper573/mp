@@ -1,42 +1,61 @@
 import { api } from "@mp/api-client/react";
+import type { FormEvent } from "react";
 import { useReducer, useState } from "react";
-import { useDebounceValue } from "usehooks-ts";
+import { type Message } from "@mp/api-client/react";
 
 export function App() {
-  const [input, setInput] = useState("Client");
-  const [debouncedInput] = useDebounceValue(input, 500);
-  const query = api.example.greeting.useQuery(debouncedInput);
+  const [input, setInput] = useState("");
+  const query = api.example.greeting.useQuery("Client");
   const count = api.example.count.useQuery();
   const increment = api.example.increaseCount.useMutation();
   const [enabled, toggle] = useReducer((b) => !b, false);
-  const [events, addEvent] = useReducer(
-    (arr: unknown[], e: unknown) => [...arr, e],
+  const [chatMessages, addChatMessage] = useReducer(
+    (arr: Message[], msg: Message) => [...arr, msg],
     [],
   );
+  const say = api.example.say.useMutation();
 
-  api.example.onAdd.useSubscription(debouncedInput, {
+  api.example.chat.useSubscription(void 0, {
     enabled,
-    onData: addEvent,
+    onData: addChatMessage,
   });
+
+  function submit(e: FormEvent) {
+    e.preventDefault();
+    say.mutate(input);
+    setInput("");
+  }
 
   return (
     <>
       <h1>Hi Mom!</h1>
-      <input
-        type="text"
-        value={input}
-        onChange={(e) => setInput(e.currentTarget.value)}
-      />
       <p>{query.data}</p>
-      <p>Count: {count.data}</p>
 
+      <h2>Counter</h2>
+
+      <p>Count: {count.data}</p>
       <button onClick={() => increment.mutate({ amount: 1 })}>Increment</button>
-      <pre style={{ maxHeight: 200, overflowY: "auto" }}>
-        {JSON.stringify({ events }, null, 2)}
-      </pre>
+
+      <h2>Chat</h2>
+
+      <textarea readOnly value={renderChat(chatMessages)} cols={50} rows={10} />
+      <form onSubmit={submit}>
+        <label>
+          <input
+            type="text"
+            value={input}
+            onChange={(e) => setInput(e.currentTarget.value)}
+          />
+        </label>
+      </form>
+
       <button onClick={toggle}>
         {enabled ? "Disable subscription" : "Enable subscription"}
       </button>
     </>
   );
+}
+
+function renderChat(messages: Message[]): string {
+  return messages.map((msg) => `${msg.from}: ${msg.contents}`).join("\n");
 }

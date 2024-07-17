@@ -1,11 +1,14 @@
 import type { CreateTRPCReact } from "@trpc/react-query";
-import { createTRPCReact, createWSClient, wsLink } from "@trpc/react-query";
+import { createTRPCReact } from "@trpc/react-query";
+import { createWSClient, wsLink } from "@trpc/client";
 import transformer from "superjson";
-import type { ApiRouter, types as ServerTypes } from "@mp/server";
+import type { ServerRouter, ServerContext } from "@mp/server";
 import type { PropsWithChildren } from "react";
 import { createContext, useContext } from "react";
 import type { QueryClientConfig } from "@tanstack/react-query";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+
+export type * from "@mp/server";
 
 /**
  * Convenience proxy for accessing the client interface
@@ -34,14 +37,14 @@ export function ApiClientProvider({
 }
 
 export interface ApiClient {
-  react: CreateTRPCReact<ApiRouter, unknown>;
-  trpc: ReturnType<CreateTRPCReact<ApiRouter, unknown>["createClient"]>;
+  react: CreateTRPCReact<ServerRouter, unknown>;
+  trpc: ReturnType<CreateTRPCReact<ServerRouter, unknown>["createClient"]>;
   query: ReturnType<typeof createQueryClient>;
 }
 
 export interface ApiClientOptions extends QueryClientOptions {
   url: string;
-  connectionParams: () => ServerTypes.TrpcServerHeaders;
+  connectionParams: () => ServerContext;
 }
 
 export function createApiClient({
@@ -50,7 +53,7 @@ export function createApiClient({
   ...queryClientOptions
 }: ApiClientOptions): ApiClient {
   const query = createQueryClient(queryClientOptions);
-  const react = createTRPCReact<ApiRouter>();
+  const react = createTRPCReact<ServerRouter>();
   const client = createWSClient({ url, connectionParams });
   const trpc = react.createClient({ links: [wsLink({ client, transformer })] });
 
