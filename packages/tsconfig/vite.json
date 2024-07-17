@@ -3,7 +3,6 @@
   "extends": "./base.json",
   "compilerOptions": {
     "esModuleInterop": false,
-    "jsx": "react-jsx",
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "types": ["vite/client"]

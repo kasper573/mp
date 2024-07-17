@@ -4,7 +4,6 @@
   "private": true,
   "license": "MIT",
   "devDependencies": {
-    "@vitejs/plugin-react-swc": "3.7.0",
     "@mp/tsconfig": "workspace:*",
     "@mp/env": "workspace:*",
     "tsup": "8.1.0",

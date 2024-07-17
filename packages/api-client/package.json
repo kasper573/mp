@@ -20,7 +20,6 @@
   },
   "devDependencies": {
     "@mp/server": "workspace:*",
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "^18.3.3"
+    "@mp/tsconfig": "workspace:*"
   }
 }

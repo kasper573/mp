@@ -56,15 +56,6 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
-      react-dom:
-        specifier: ^18.3.1
-        version: 18.3.1(react@18.3.1)
-      usehooks-ts:
-        specifier: 3.1.0
-        version: 3.1.0(react@18.3.1)
       uuid:
         specifier: 10.0.0
         version: 10.0.0
@@ -78,12 +69,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
-      '@types/react':
-        specifier: ^18.3.3
-        version: 18.3.3
-      '@types/react-dom':
-        specifier: ^18.3.0
-        version: 18.3.0
       '@types/uuid':
         specifier: 10.0.0
         version: 10.0.0
@@ -121,21 +106,6 @@ importers:
 
   packages/api-client:
     dependencies:
-      '@tanstack/react-query':
-        specifier: 5.51.1
-        version: 5.51.1(react@18.3.1)
-      '@tanstack/react-query-devtools':
-        specifier: 5.51.1
-        version: 5.51.1(@tanstack/react-query@5.51.1(react@18.3.1))(react@18.3.1)
-      '@trpc/client':
-        specifier: 11.0.0-rc.461
-        version: 11.0.0-rc.461(@trpc/server@11.0.0-rc.461)
-      '@trpc/react-query':
-        specifier: 11.0.0-rc.461
-        version: 11.0.0-rc.461(@tanstack/react-query@5.51.1(react@18.3.1))(@trpc/client@11.0.0-rc.461(@trpc/server@11.0.0-rc.461))(@trpc/server@11.0.0-rc.461)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)
-      react:
-        specifier: ^18.3.1
-        version: 18.3.1
       superjson:
         specifier: 1.13.3
         version: 1.13.3
@@ -146,9 +116,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      '@types/react':
-        specifier: ^18.3.3
-        version: 18.3.3
 
   packages/build:
     devDependencies:
@@ -158,9 +125,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      '@vitejs/plugin-react-swc':
-        specifier: 3.7.0
-        version: 3.7.0(vite@5.2.13(@types/node@20.14.10))
       tsup:
         specifier: 8.1.0
         version: 8.1.0(@swc/core@1.6.13)(postcss@8.4.39)(typescript@5.5.3)
@@ -800,37 +764,6 @@ packages:
   '@swc/types@0.1.9':
     resolution: {integrity: sha512-qKnCno++jzcJ4lM4NTfYifm1EFSCeIfKiAHAfkENZAV5Kl9PjJIyd2yeeVv6c/2CckuLyv2NmRC5pv6pm2WQBg==}
 
-  '@tanstack/query-core@5.51.1':
-    resolution: {integrity: sha512-fJBMQMpo8/KSsWW5ratJR5+IFr7YNJ3K2kfP9l5XObYHsgfVy1w3FJUWU4FT2fj7+JMaEg33zOcNDBo0LMwHnw==}
-
-  '@tanstack/query-devtools@5.51.1':
-    resolution: {integrity: sha512-rehG0WmL3EXER6MAI2uHQia/n0b5c3ZROohpYm7u3G7yg4q+HsfQy6nuAo6uy40NzHUe3FmnfWCZQ0Vb/3lE6g==}
-
-  '@tanstack/react-query-devtools@5.51.1':
-    resolution: {integrity: sha512-bRShIVKGpUOHpwziGKT8Aq1Ty0lIlGmNI7E0KbGYtmyOaImErpdElTdxfES1bRaI7i/j+mf2hLy+E6q7SrCwPg==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.51.1
-      react: ^18 || ^19
-
-  '@tanstack/react-query@5.51.1':
-    resolution: {integrity: sha512-s47HKFnQ4HOJAHoIiXcpna/roMMPZJPy6fJ6p4ZNVn8+/onlLBEDd1+xc8OnDuwgvecqkZD7Z2mnSRbcWefrKw==}
-    peerDependencies:
-      react: ^18.0.0
-
-  '@trpc/client@11.0.0-rc.461':
-    resolution: {integrity: sha512-9Hfg3LfXi7Cw+oczcEQ7uAumlMX/bqS1RxJR+kOg7mhguvrzXq50U0QGqS4ENgrOBIaUzs8n60wMy+1MueydCg==}
-    peerDependencies:
-      '@trpc/server': 11.0.0-rc.461+f178d3fed
-
-  '@trpc/react-query@11.0.0-rc.461':
-    resolution: {integrity: sha512-YHkvngwTx5FEcC2lLJQY4+lH62TPaHQzI7XPYMLjrRrPhN4TomMHDM3ASyYEHUBDAciXs2hGZ0h3FNMLSCa7+Q==}
-    peerDependencies:
-      '@tanstack/react-query': ^5.49.2
-      '@trpc/client': 11.0.0-rc.461+f178d3fed
-      '@trpc/server': 11.0.0-rc.461+f178d3fed
-      react: '>=18.2.0'
-      react-dom: '>=18.2.0'
-
   '@trpc/server@11.0.0-rc.461':
     resolution: {integrity: sha512-hsO6yx3dwhZQ2Nnmr6yMmbykGZh5hgF+Lb7pnbdKI6nm53xFszz2MfTp3/XZAGeMkiX7I9WiXGquSbrIR/+SgQ==}
 
@@ -860,15 +793,6 @@ packages:
 
   '@types/node@20.8.10':
     resolution: {integrity: sha512-TlgT8JntpcbmKUFzjhsyhGfP2fsiz1Mv56im6enJ905xG1DAYesxJaeSbGqQmAw8OWPdhyJGhGSQGKRNJ45u9w==}
-
-  '@types/prop-types@15.7.12':
-    resolution: {integrity: sha512-5zvhXYtRNRluoE/jAp4GVsSduVUzNWKkOZrCDBWYtE7biZywwdC2AcEzg+cSMLFRfVgeAFqpfNabiPjxFddV1Q==}
-
-  '@types/react-dom@18.3.0':
-    resolution: {integrity: sha512-EhwApuTmMBmXuFOikhQLIBUn6uFg81SwLMOAUgodJF14SOBOCMdU04gDoYi0WOJJHD144TL32z4yDqCW3dnkQg==}
-
-  '@types/react@18.3.3':
-    resolution: {integrity: sha512-hti/R0pS0q1/xx+TsI73XIqk26eBsISZ2R0wUijXIngRK9R/e7Xw/cXVxQK7R5JjW+SV4zGcn5hXjudkN/pLIw==}
 
   '@types/uuid@10.0.0':
     resolution: {integrity: sha512-7gqG38EyHgyP1S+7+xomFtL+ZNHcKv6DwNaCZmJmo1vgMugyF3TCnXVg4t1uk89mLNwnLtnY3TpOpCOyp1/xHQ==}
@@ -933,11 +857,6 @@ packages:
   '@typescript-eslint/visitor-keys@7.16.1':
     resolution: {integrity: sha512-Qlzzx4sE4u3FsHTPQAAQFJFNOuqtuY0LFrZHwQ8IHK705XxBiWOFkfKRWu6niB7hwfgnwIpO4jTC75ozW1PHWg==}
     engines: {node: ^18.18.0 || >=20.0.0}
-
-  '@vitejs/plugin-react-swc@3.7.0':
-    resolution: {integrity: sha512-yrknSb3Dci6svCd/qhHqhFPDSw0QtjumcqdKMoNNzmOl5lMXTTiqzjWtG4Qask2HdvvzaNgSunbQGet8/GrKdA==}
-    peerDependencies:
-      vite: ^4 || ^5
 
   JSONStream@1.3.5:
     resolution: {integrity: sha512-E+iruNOY8VV9s4JEbe1aNEm6MiszPRr/UfcHMz0TQh1BXSxHK+ASV1R6W4HpjBhSeS+54PIsAMCBmwD06LLsqQ==}
@@ -1163,9 +1082,6 @@ packages:
   cross-spawn@7.0.3:
     resolution: {integrity: sha512-iRDPJKUPVEND7dHPO8rkbOnPpyDygcDFtWjpeWNCgy8WP2rXcxXL8TskReQl6OrB2G7+UJrags1q15Fudc7G6w==}
     engines: {node: '>= 8'}
-
-  csstype@3.1.3:
-    resolution: {integrity: sha512-M1uQkMl8rQK/szD0LNhtqxIPLpimGm8sOBwU7lLnCpSbTyY3yeU1Vc7l4KT5zT4s/yOxHH5O7tIuuLOCnLADRw==}
 
   dargs@8.1.0:
     resolution: {integrity: sha512-wAV9QHOsNbwnWdNW2FYvE1P56wtgSbM+3SZcdGiWQILwVjACCXDCI3Ai8QlCjMDB8YK5zySiXZYBiwGmNY3lnw==}
@@ -1809,9 +1725,6 @@ packages:
   lodash.camelcase@4.3.0:
     resolution: {integrity: sha512-TwuEnCnxbc3rAvhf/LbG7tJUDzhqXyFnv3dtzLOPgCG/hODL7WFnsbwktkD7yUV0RrreP/l1PALq/YSg6VvjlA==}
 
-  lodash.debounce@4.0.8:
-    resolution: {integrity: sha512-FT1yDzDYEoYWhnSGnpE/4Kj1fLZkDFyqRb7fNt6FdYOSxlUWAtp42Eh6Wb0rGIv/m9Bgo7x4GhQbm5Ys4SG5ow==}
-
   lodash.isplainobject@4.0.6:
     resolution: {integrity: sha512-oSXzaWypCMHkPC3NvBEaPHf0KsA5mvPrOPgQWDsbg8n7orZ290M0BmC/jgRZ4vcJ6DTAhjrsSYgdsW/F+MFOBA==}
 
@@ -1841,10 +1754,6 @@ packages:
 
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
-
-  loose-envify@1.4.0:
-    resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
-    hasBin: true
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
@@ -2077,15 +1986,6 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
-  react-dom@18.3.1:
-    resolution: {integrity: sha512-5m4nQKp+rZRb09LNH59GM4BxTh9251/ylbKIbpe7TpGxfJ+9kv6BLkLBXIjjspbgbnIBNqlI23tRnTWT0snUIw==}
-    peerDependencies:
-      react: ^18.3.1
-
-  react@18.3.1:
-    resolution: {integrity: sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==}
-    engines: {node: '>=0.10.0'}
-
   readdirp@3.6.0:
     resolution: {integrity: sha512-hOS089on8RduqdbhvQ5Z37A0ESjsqz6qnRcffsMU3495FuTdqSm+7bhJ29JvIOsBDEEnan5DPu9t3To9VRlMzA==}
     engines: {node: '>=8.10.0'}
@@ -2145,9 +2045,6 @@ packages:
 
   safer-buffer@2.1.2:
     resolution: {integrity: sha512-YZo3K82SD7Riyi0E1EQPojLz7kpepnSQI9IyPbHHg1XXXevb5dJI7tpyN2ADxGcQbHG7vcyRHk0cbwqcQriUtg==}
-
-  scheduler@0.23.2:
-    resolution: {integrity: sha512-UOShsPwz7NrMUqhR6t0hWjFduvOzbtv7toDH1/hIrfRNIDBnnBWd0CwJTGvTpngVlmwGCdP9/Zl/tVrDqcuYzQ==}
 
   secure-compare@3.0.1:
     resolution: {integrity: sha512-AckIIV90rPDcBcglUwXPF3kg0P0qmPsPXAj6BBEENQE1p5yA1xfmDJzfi1Tappj37Pv2mVbKpL3Z1T+Nn7k1Qw==}
@@ -2431,12 +2328,6 @@ packages:
 
   url-join@4.0.1:
     resolution: {integrity: sha512-jk1+QP6ZJqyOiuEI9AEWQfju/nB2Pw466kbA0LEZljHwKeMgd9WrAEgEGxjPDD2+TNbbb37rTyhEfrCXfuKXnA==}
-
-  usehooks-ts@3.1.0:
-    resolution: {integrity: sha512-bBIa7yUyPhE1BCc0GmR96VU/15l/9gP1Ch5mYdLcFBaFGQsdmXkvjV0TtOqW1yUd6VjIwDunm+flSciCQXujiw==}
-    engines: {node: '>=16.15.0'}
-    peerDependencies:
-      react: ^16.8.0  || ^17 || ^18
 
   uuid@10.0.0:
     resolution: {integrity: sha512-8XkAphELsDnEGrDxUOHB3RGvXz6TeuYSGEZBOjtTtPm2lwhGBjLgOzLHB63IUWfBpNucQjND6d3AOudO+H3RWQ==}
@@ -3035,39 +2926,15 @@ snapshots:
       '@swc/core-win32-arm64-msvc': 1.6.13
       '@swc/core-win32-ia32-msvc': 1.6.13
       '@swc/core-win32-x64-msvc': 1.6.13
+    optional: true
 
-  '@swc/counter@0.1.3': {}
+  '@swc/counter@0.1.3':
+    optional: true
 
   '@swc/types@0.1.9':
     dependencies:
       '@swc/counter': 0.1.3
-
-  '@tanstack/query-core@5.51.1': {}
-
-  '@tanstack/query-devtools@5.51.1': {}
-
-  '@tanstack/react-query-devtools@5.51.1(@tanstack/react-query@5.51.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@tanstack/query-devtools': 5.51.1
-      '@tanstack/react-query': 5.51.1(react@18.3.1)
-      react: 18.3.1
-
-  '@tanstack/react-query@5.51.1(react@18.3.1)':
-    dependencies:
-      '@tanstack/query-core': 5.51.1
-      react: 18.3.1
-
-  '@trpc/client@11.0.0-rc.461(@trpc/server@11.0.0-rc.461)':
-    dependencies:
-      '@trpc/server': 11.0.0-rc.461
-
-  '@trpc/react-query@11.0.0-rc.461(@tanstack/react-query@5.51.1(react@18.3.1))(@trpc/client@11.0.0-rc.461(@trpc/server@11.0.0-rc.461))(@trpc/server@11.0.0-rc.461)(react-dom@18.3.1(react@18.3.1))(react@18.3.1)':
-    dependencies:
-      '@tanstack/react-query': 5.51.1(react@18.3.1)
-      '@trpc/client': 11.0.0-rc.461(@trpc/server@11.0.0-rc.461)
-      '@trpc/server': 11.0.0-rc.461
-      react: 18.3.1
-      react-dom: 18.3.1(react@18.3.1)
+    optional: true
 
   '@trpc/server@11.0.0-rc.461': {}
 
@@ -3099,17 +2966,6 @@ snapshots:
   '@types/node@20.8.10':
     dependencies:
       undici-types: 5.26.5
-
-  '@types/prop-types@15.7.12': {}
-
-  '@types/react-dom@18.3.0':
-    dependencies:
-      '@types/react': 18.3.3
-
-  '@types/react@18.3.3':
-    dependencies:
-      '@types/prop-types': 15.7.12
-      csstype: 3.1.3
 
   '@types/uuid@10.0.0': {}
 
@@ -3197,13 +3053,6 @@ snapshots:
     dependencies:
       '@typescript-eslint/types': 7.16.1
       eslint-visitor-keys: 3.4.3
-
-  '@vitejs/plugin-react-swc@3.7.0(vite@5.2.13(@types/node@20.14.10))':
-    dependencies:
-      '@swc/core': 1.6.13
-      vite: 5.2.13(@types/node@20.14.10)
-    transitivePeerDependencies:
-      - '@swc/helpers'
 
   JSONStream@1.3.5:
     dependencies:
@@ -3455,8 +3304,6 @@ snapshots:
       path-key: 3.1.1
       shebang-command: 2.0.0
       which: 2.0.2
-
-  csstype@3.1.3: {}
 
   dargs@8.1.0: {}
 
@@ -4203,8 +4050,6 @@ snapshots:
 
   lodash.camelcase@4.3.0: {}
 
-  lodash.debounce@4.0.8: {}
-
   lodash.isplainobject@4.0.6: {}
 
   lodash.kebabcase@4.1.1: {}
@@ -4224,10 +4069,6 @@ snapshots:
   lodash.upperfirst@4.3.1: {}
 
   lodash@4.17.21: {}
-
-  loose-envify@1.4.0:
-    dependencies:
-      js-tokens: 4.0.0
 
   lru-cache@10.4.3: {}
 
@@ -4426,16 +4267,6 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  react-dom@18.3.1(react@18.3.1):
-    dependencies:
-      loose-envify: 1.4.0
-      react: 18.3.1
-      scheduler: 0.23.2
-
-  react@18.3.1:
-    dependencies:
-      loose-envify: 1.4.0
-
   readdirp@3.6.0:
     dependencies:
       picomatch: 2.3.1
@@ -4509,10 +4340,6 @@ snapshots:
       is-regex: 1.1.4
 
   safer-buffer@2.1.2: {}
-
-  scheduler@0.23.2:
-    dependencies:
-      loose-envify: 1.4.0
 
   secure-compare@3.0.1: {}
 
@@ -4804,11 +4631,6 @@ snapshots:
       punycode: 2.3.1
 
   url-join@4.0.1: {}
-
-  usehooks-ts@3.1.0(react@18.3.1):
-    dependencies:
-      lodash.debounce: 4.0.8
-      react: 18.3.1
 
   uuid@10.0.0: {}
 
