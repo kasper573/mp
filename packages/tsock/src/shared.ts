@@ -31,7 +31,7 @@ export type RouterDefinition<Context> = {
   [K: PropertyKey]: AnyRouterOrOperationDefinition<Context>;
 };
 
-type AnyRouterOrOperationDefinition<Context> =
+export type AnyRouterOrOperationDefinition<Context> =
   | RouterDefinition<Context>
   | AnyOperationDefinition<Context>;
 
@@ -53,7 +53,7 @@ interface OperationHandlerArgs<Context, Input> {
   emit: OperationEmitter<Input>;
 }
 
-interface OperationEmitter<Input> {
+export interface OperationEmitter<Input> {
   next: (value: Input) => void;
   error: (error: Error) => void;
   complete: () => void;
@@ -63,7 +63,7 @@ interface OperationEmitter<Input> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyOperationDefinition<Context> = OperationDefinition<Context, any>;
 
-type OperationDefinition<Context, Input> = (
+export type OperationDefinition<Context, Input> = (
   args: OperationHandlerArgs<Context, Input>,
 ) => OperationResolution;
 

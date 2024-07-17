@@ -9,3 +9,4 @@ const server = new Server({
 });
 
 server.listen(env.port);
+console.log(`Server listening on port ${env.port}`);
