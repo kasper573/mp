@@ -9,11 +9,11 @@ export { CreateContextOptions };
 
 export function createServer<Context, Router extends RouterDefinition<Context>>(
   options: CreateServerOptions<Context, Router>,
-): Server<Context, Router> {
-  return {} as Server<Context, Router>;
+): Server {
+  return {} as Server;
 }
 
-export interface Server<Context, Router extends RouterDefinition<Context>> {
+export interface Server {
   listen(port: number): Unsubscribe;
 }
 
