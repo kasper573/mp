@@ -22,7 +22,8 @@
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "socket.io": "4.7.5"
+    "socket.io": "4.7.5",
+    "socket.io-client": "4.7.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
