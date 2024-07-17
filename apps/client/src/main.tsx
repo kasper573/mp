@@ -1,8 +1,8 @@
 import { v4 as uuid } from "uuid";
-import { createApiClient } from "@mp/api-client";
+import { ApiClient } from "@mp/api-client";
 import { env } from "./env";
 
-const api = createApiClient({
+const api = new ApiClient({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
 });
