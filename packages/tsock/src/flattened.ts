@@ -5,7 +5,10 @@ export type Flattened<T> = {
 };
 
 type IsLeaf<O, K> =
-  Extract<Exclude<Path<O>, K>, `${K & string}.${string}`> extends never
+  Extract<
+    Exclude<Path<O>, K>,
+    `${K & string}${typeof separator}${string}`
+  > extends never
     ? true
     : false;
 
@@ -31,3 +34,5 @@ type PathValue<T, P extends Path<T>> = P extends `${infer Key}.${infer Rest}`
   : P extends keyof T
     ? T[P]
     : never;
+
+export const separator = "." as const;

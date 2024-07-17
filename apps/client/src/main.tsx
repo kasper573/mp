@@ -5,6 +5,7 @@ import { env } from "./env";
 const api = new ApiClient({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
+  log: console.log,
 });
 
 const chat = document.querySelector("textarea")!;
