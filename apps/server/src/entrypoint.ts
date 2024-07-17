@@ -6,6 +6,7 @@ import { env } from "./env";
 const server = new Server({
   router: createRouter(),
   createContext,
+  log: console.log,
 });
 
 server.listen(env.port);
