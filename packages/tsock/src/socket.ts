@@ -1,8 +1,4 @@
-export interface ServerToClientEvents {
-  noArg: () => void;
-  basicEmit: (a: number, b: string, c: Buffer) => void;
-  withAck: (d: string, callback: (e: number) => void) => void;
-}
+export interface ServerToClientEvents {}
 
 export interface ClientToServerEvents<ClientContext> {
   operation: (
@@ -12,13 +8,8 @@ export interface ClientToServerEvents<ClientContext> {
   ) => void;
 }
 
-export interface InterServerEvents {
-  ping: () => void;
-}
+export interface InterServerEvents {}
 
-export interface SocketData {
-  name: string;
-  age: number;
-}
+export interface SocketData {}
 
 export type RouterPath = string[];
