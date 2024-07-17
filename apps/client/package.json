@@ -12,15 +12,11 @@
   "dependencies": {
     "@mp/api-client": "workspace:*",
     "@mp/validate": "workspace:*",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
     "usehooks-ts": "3.1.0",
     "uuid": "10.0.0"
   },
   "devDependencies": {
     "@types/uuid": "10.0.0",
-    "@types/react": "^18.3.3",
-    "@types/react-dom": "^18.3.0",
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/tsconfig": "workspace:*",

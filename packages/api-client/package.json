@@ -3,13 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "exports": {
-    "./react": {
-      "import": "./dist/react.js",
-      "types": "./dist/react.d.ts"
-    },
-    "./react-devtools": {
-      "import": "./dist/react-devtools.js",
-      "types": "./dist/react-devtools.d.ts"
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
     }
   },
   "files": [
@@ -20,11 +16,6 @@
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@tanstack/react-query": "5.51.1",
-    "@tanstack/react-query-devtools": "5.51.1",
-    "@trpc/client": "11.0.0-rc.461",
-    "@trpc/react-query": "11.0.0-rc.461",
-    "react": "^18.3.1",
     "superjson": "1.13.3"
   },
   "devDependencies": {
