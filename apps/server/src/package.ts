@@ -1,3 +1,2 @@
-export type { ServerRouter } from "./definition/router";
-export type { ServerContext, ClientContext } from "./definition/context";
-export type * from "./modules/example";
+// This module should never export runtime code. Only use type exports
+export type * from "./definition";

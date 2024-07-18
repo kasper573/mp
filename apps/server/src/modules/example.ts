@@ -1,28 +1,24 @@
-import { EventEmitter } from "events";
-import { t } from "../definition/tsock";
+import { t } from "../definition";
+import type { ServerContext } from "../package";
+import type { OtherModule } from "./other";
 
 export interface Message {
-  from: string;
+  from: ServerContext["clientId"];
   contents: string;
 }
 
-export function createExampleRouter() {
-  const bus = new EventEmitter();
-
-  function broadcast(message: Message) {
-    console.log("Broadcasting message", message);
-    bus.emit("message", message);
-  }
-
-  return t.router({
+export function createExampleModule(other: OtherModule) {
+  const example = t.module({
     say: t.event.payload<string>().create(({ context, payload }) => {
-      broadcast({ from: context.clientId, contents: payload });
+      example.invoke(
+        "chat",
+        { from: context.clientId, contents: payload },
+        context,
+      );
+      other.invoke("do", payload, context);
     }),
-    chat: t.event.payload<Message>().create(({ context }) => {
-      broadcast({ from: context.clientId, contents: "connected" });
-      return () => {
-        broadcast({ from: context.clientId, contents: "disconnected" });
-      };
-    }),
+    chat: t.event.payload<Message>().create(() => {}),
   });
+
+  return example;
 }

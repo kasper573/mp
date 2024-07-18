@@ -1,50 +1,50 @@
 import { Server as SocketServer } from "socket.io";
-import type {
-  EventHandler,
-  EventPath,
-  EventPayload,
-  SocketIO_ClientToServerEvents,
-  SocketIO_ServerToClientEvents,
-} from "./shared";
-import { Initializer, transports } from "./shared";
-import { flattened } from "./flattened";
+import { transports } from "./shared";
+import type { AnyModules } from "./module";
 
-export function createServer<Router, ServerContext, ClientContext>({
-  createContext,
-  router,
-}: CreateServerOptions<Router, ServerContext, ClientContext>): Server<
-  Router,
-  ClientContext
+export { Factory } from "./factory";
+
+export interface CreateServerOptions<
+  Modules extends AnyModules<ServerContext>,
+  ServerContext,
+  ClientContext,
 > {
-  const handlers = flattened(router);
-  const server = new SocketServer({ transports });
-  server.on("connection", (socket) => {
-    socket.onAny(
-      <Path extends EventPath<Router>>(
-        path: Path,
-        payload: EventPayload<Path, Router>,
-        clientContext: ClientContext,
-      ) => {
-        const context = createContext(clientContext);
-        const handler = handlers[path] as
-          | EventHandler<EventPayload<Path, Router>, ServerContext>
-          | undefined;
-
-        handler?.({ payload, context });
-      },
-    );
-  });
-  return server;
-}
-
-export interface CreateServerOptions<Router, ServerContext, ClientContext> {
-  router: Router;
+  modules: Modules;
   createContext: (clientContext: ClientContext) => ServerContext;
 }
 
-export const init = new Initializer();
+export class Server<
+  Modules extends AnyModules<ServerContext>,
+  ServerContext,
+  ClientContext,
+> {
+  private wss: SocketServer;
 
-export type Server<Router, ClientContext> = SocketServer<
-  SocketIO_ClientToServerEvents<Router, ClientContext>,
-  SocketIO_ServerToClientEvents<Router>
->;
+  constructor(
+    private options: CreateServerOptions<Modules, ServerContext, ClientContext>,
+  ) {
+    this.wss = new SocketServer({ transports });
+    this.wss.on("connection", (socket) => {
+      socket.on("message", (moduleName, eventName, payload, clientContext) => {
+        console.log("received", moduleName, eventName, payload, clientContext);
+        const context = this.options.createContext(clientContext);
+        options.modules[moduleName].invoke(eventName, payload, context);
+      });
+    });
+
+    for (const [moduleName, mod] of Object.entries(options.modules)) {
+      mod.subscribeAny((eventName, payload, context) => {
+        console.log("emitting", moduleName, eventName, payload, context);
+        this.wss.emit(moduleName, eventName, payload, context);
+      });
+    }
+  }
+
+  listen(port: number) {
+    this.wss.listen(port);
+  }
+
+  close() {
+    this.wss.close();
+  }
+}

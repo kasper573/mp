@@ -6,10 +6,10 @@ const form = document.querySelector("form")!;
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  api.emit("example.say", input.value);
+  api.send("example", "say", input.value);
   input.value = "";
 });
 
-api.on("example.chat", (message) => {
+api.subscribe("example", "chat", (message) => {
   chat.value += `${message.from}: ${message.contents}\n`;
 });

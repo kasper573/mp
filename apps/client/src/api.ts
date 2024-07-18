@@ -1,11 +1,11 @@
-import { createClient } from "@mp/tsock/client";
+import { Client } from "@mp/tsock/client";
 import { v4 as uuid } from "uuid";
-import type { ServerContext, ServerRouter } from "@mp/server";
+import type { ServerContext, ServerModules } from "@mp/server";
 import { env } from "./env";
 
-export type * from "@mp/server";
+export type * as types from "@mp/server";
 
-export const api = createClient<ServerRouter, ServerContext>({
+export const api = new Client<ServerModules, ServerContext>({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
 });
