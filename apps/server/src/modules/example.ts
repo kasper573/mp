@@ -17,7 +17,7 @@ export function createExampleModule(other: OtherModule) {
       );
       other.invoke("do", payload, context);
     }),
-    chat: t.event.payload<Message>().create(() => {}),
+    chat: t.event.payload<Message>().create(),
   });
 
   return example;

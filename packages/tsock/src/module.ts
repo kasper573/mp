@@ -4,7 +4,7 @@ import type { Unsubscribe } from "./shared";
  * A server module is a collection of event handlers that can be invoked and
  * subscribed to.
  */
-export class Module<Definition extends EventHandlers<Context>, Context> {
+export class Module<Definition extends ModuleDefinition<Context>, Context> {
   private eventSubscriptions = new Map<
     AnyEventName<this>,
     Set<(payload: AnyEventPayload<this>, context: Context) => void>
@@ -28,7 +28,7 @@ export class Module<Definition extends EventHandlers<Context>, Context> {
     payload: EventPayload<this, EventName>,
     context: Context,
   ): void {
-    this.definition[eventName]({ payload, context });
+    this.definition[eventName].handler({ payload, context });
 
     this.emit(eventName, payload, context);
   }
@@ -78,9 +78,24 @@ export class Module<Definition extends EventHandlers<Context>, Context> {
   }
 }
 
-export type EventHandlers<Context> = {
+export type ModuleDefinition<Context> = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [K: PropertyKey]: EventHandler<any, Context>;
+  [K: PropertyKey]: EventDefinition<any, any, Context>;
+};
+
+export type EventType =
+  | "client-to-server"
+  | "server-to-client"
+  | "bidirectional";
+
+export type EventDefinition<Type extends EventType, Payload, Context> = {
+  type: Type;
+  handler: EventHandler<Payload, Context>;
+
+  /**
+   * Don't use this field at runtime. It only exists for type inference.
+   */
+  __payloadType__: Payload;
 };
 
 export type EventHandler<Payload, Context> = (args: {
@@ -91,10 +106,7 @@ export type EventHandler<Payload, Context> = (args: {
 export type EventPayload<
   Module extends AnyModule,
   EventName extends AnyEventName<Module> = AnyEventName<Module>,
-> =
-  Module["definition"][EventName] extends EventHandler<infer Payload, infer _>
-    ? Payload
-    : never;
+> = Module["definition"][EventName]["__payloadType__"];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyModule = Module<any, any>;
