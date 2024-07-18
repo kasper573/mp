@@ -50,9 +50,9 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp/api-client':
+      '@mp/tsock':
         specifier: workspace:*
-        version: link:../../packages/api-client
+        version: link:../../packages/tsock
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -66,6 +66,9 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
+      '@mp/server':
+        specifier: workspace:*
+        version: link:../server
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -97,19 +100,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
-
-  packages/api-client:
-    dependencies:
-      '@mp/tsock':
-        specifier: workspace:*
-        version: link:../tsock
-    devDependencies:
-      '@mp/server':
-        specifier: workspace:*
-        version: link:../../apps/server
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
 
   packages/build:
     devDependencies:

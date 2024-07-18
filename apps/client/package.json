@@ -10,7 +10,7 @@
     "start": "http-server dist -p 80"
   },
   "dependencies": {
-    "@mp/api-client": "workspace:*",
+    "@mp/tsock": "workspace:*",
     "@mp/validate": "workspace:*",
     "uuid": "10.0.0"
   },
@@ -19,6 +19,7 @@
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/tsconfig": "workspace:*",
+    "@mp/server": "workspace:*",
     "http-server": "14.1.1"
   }
 }

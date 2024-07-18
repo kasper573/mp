@@ -1,11 +1,4 @@
-import { v4 as uuid } from "uuid";
-import { createClient } from "@mp/api-client";
-import { env } from "./env";
-
-const api = createClient({
-  url: env.serverUrl,
-  context: () => ({ clientId: getClientId() }),
-});
+import { api } from "./api";
 
 const chat = document.querySelector("textarea")!;
 const input = document.querySelector("input")!;
@@ -20,12 +13,3 @@ form.addEventListener("submit", (e) => {
 api.on("example.chat", (message) => {
   chat.value += `${message.from}: ${message.contents}\n`;
 });
-
-function getClientId() {
-  let id = localStorage.getItem("client-id");
-  if (id === null) {
-    id = uuid();
-    localStorage.setItem("client-id", id);
-  }
-  return id;
-}
