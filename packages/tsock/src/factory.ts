@@ -2,12 +2,12 @@ import type {
   EventDefinition,
   EventHandler,
   EventType,
-  ModuleDefinition,
+  EventDefinitionRecord,
 } from "./module";
 import { Module } from "./module";
 
 export class Factory<Context> {
-  module<Definition extends ModuleDefinition<Context>>(
+  module<Definition extends EventDefinitionRecord<Context>>(
     definition: Definition,
   ): Module<Definition, Context> {
     return new Module(definition);

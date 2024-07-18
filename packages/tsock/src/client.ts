@@ -3,8 +3,9 @@ import { io } from "socket.io-client";
 import type { Unsubscribe } from "./shared";
 import { id, transports } from "./shared";
 import type {
+  AnyEventDefinition,
   AnyEventName,
-  AnyModule,
+  AnyEventPayload,
   AnyModuleName,
   AnyModules,
   EventPayload,
@@ -23,13 +24,18 @@ export class Client<Modules extends AnyModules<Context>, Context> {
     this.socket = io(options.url, { transports });
   }
 
+  modules: ModuleInterface<Modules, Context> = {} as ModuleInterface<
+    Modules,
+    Context
+  >;
+
   send<
     ModuleName extends AnyModuleName<Modules>,
     EventName extends AnyEventName<Modules[ModuleName]>,
   >(
     moduleName: ModuleName,
     eventName: EventName,
-    payload: EventPayload<Modules[ModuleName], EventName>,
+    payload: EventPayload<Modules[ModuleName]["events"][EventName]>,
   ): void {
     const context = this.options.context();
     this.options.log?.("send", id(moduleName, eventName), { payload, context });
@@ -42,16 +48,32 @@ export class Client<Modules extends AnyModules<Context>, Context> {
   >(
     moduleName: ModuleName,
     eventName: EventName,
-    handler: (payload: EventPayload<Modules[ModuleName], EventName>) => void,
+    handler: (
+      payload: EventPayload<Modules[ModuleName]["events"][EventName]>,
+    ) => void,
   ): Unsubscribe {
     const { log } = this.options;
-    function filter(m: string, e: string, p: EventPayload<AnyModule, string>) {
+    function filter(m: string, e: string, p: AnyEventPayload) {
       log?.("receive", id(m, e), p);
       if (m === moduleName && e === eventName) {
-        handler(p as EventPayload<Modules[ModuleName], EventName>);
+        handler(p as EventPayload<Modules[ModuleName]["events"][EventName]>);
       }
     }
     this.socket.onAny(filter);
     return () => this.socket.offAny(filter);
   }
 }
+
+type ModuleInterface<Modules extends AnyModules<Context>, Context> = {
+  [ModuleName in AnyModuleName<Modules>]: {
+    [EventName in AnyEventName<Modules[ModuleName]>]: EventInterface<
+      Modules[ModuleName]["events"][EventName],
+      Context
+    >;
+  };
+};
+
+type EventInterface<Event extends AnyEventDefinition<Context>, Context> = {
+  (payload: EventPayload<Event>): void;
+  subscribe(handler: (payload: EventPayload<Event>) => void): Unsubscribe;
+};

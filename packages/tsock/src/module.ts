@@ -1,34 +1,35 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import type { Unsubscribe } from "./shared";
 
 /**
  * A server module is a collection of event handlers that can be invoked and
  * subscribed to.
  */
-export class Module<Definition extends ModuleDefinition<Context>, Context> {
+export class Module<Events extends EventDefinitionRecord<Context>, Context> {
   private eventSubscriptions = new Map<
     AnyEventName<this>,
-    Set<(payload: AnyEventPayload<this>, context: Context) => void>
+    Set<(payload: AnyEventPayload, context: Context) => void>
   >();
 
   private anySubscriptions = new Set<
     (
       eventName: AnyEventName<this>,
-      payload: AnyEventPayload<this>,
+      payload: AnyEventPayload,
       context: Context,
     ) => void
   >();
 
-  constructor(public definition: Definition) {}
+  constructor(public events: Events) {}
 
   /**
    * Invoke the built-in event handler and emit the event to all subscribers.
    */
   invoke<EventName extends AnyEventName<this>>(
     eventName: EventName,
-    payload: EventPayload<this, EventName>,
+    payload: EventPayload<this["events"][EventName]>,
     context: Context,
   ): void {
-    this.definition[eventName].handler({ payload, context });
+    this.events[eventName].handler({ payload, context });
 
     this.emit(eventName, payload, context);
   }
@@ -38,7 +39,7 @@ export class Module<Definition extends ModuleDefinition<Context>, Context> {
    */
   emit<EventName extends AnyEventName<this>>(
     eventName: EventName,
-    payload: EventPayload<this, EventName>,
+    payload: EventPayload<this["events"][EventName]>,
     context: Context,
   ): void {
     const handlersForEvent = this.eventSubscriptions.get(eventName);
@@ -55,7 +56,10 @@ export class Module<Definition extends ModuleDefinition<Context>, Context> {
 
   subscribe<EventName extends AnyEventName<this>>(
     eventName: EventName,
-    handler: (payload: EventPayload<this, EventName>, context: Context) => void,
+    handler: (
+      payload: EventPayload<this["events"][EventName]>,
+      context: Context,
+    ) => void,
   ): Unsubscribe {
     let handlersForEvent = this.eventSubscriptions.get(eventName);
     if (!handlersForEvent) {
@@ -69,7 +73,7 @@ export class Module<Definition extends ModuleDefinition<Context>, Context> {
   subscribeAny(
     handler: <EventName extends AnyEventName<this>>(
       eventName: EventName,
-      payload: EventPayload<this, EventName>,
+      payload: EventPayload<this["events"][EventName]>,
       context: Context,
     ) => void,
   ): Unsubscribe {
@@ -78,8 +82,7 @@ export class Module<Definition extends ModuleDefinition<Context>, Context> {
   }
 }
 
-export type ModuleDefinition<Context> = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type EventDefinitionRecord<Context> = {
   [K: PropertyKey]: EventDefinition<any, any, Context>;
 };
 
@@ -87,6 +90,12 @@ export type EventType =
   | "client-to-server"
   | "server-to-client"
   | "bidirectional";
+
+export type AnyEventDefinition<Context = any> = EventDefinition<
+  EventType,
+  any,
+  Context
+>;
 
 export type EventDefinition<Type extends EventType, Payload, Context> = {
   type: Type;
@@ -103,23 +112,17 @@ export type EventHandler<Payload, Context> = (args: {
   context: Context;
 }) => void;
 
-export type EventPayload<
-  Module extends AnyModule,
-  EventName extends AnyEventName<Module> = AnyEventName<Module>,
-> = Module["definition"][EventName]["__payloadType__"];
+export type EventPayload<Event extends AnyEventDefinition> =
+  Event["__payloadType__"];
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyModule = Module<any, any>;
 
-export type AnyEventName<M extends AnyModule> = keyof M["definition"];
+export type AnyEventName<M extends AnyModule> = keyof M["events"];
 
-export type AnyEventPayload<Module extends AnyModule = AnyModule> =
-  EventPayload<Module, AnyEventName<Module>>;
+export type AnyEventPayload = EventPayload<AnyEventDefinition>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyModules<Context = any> = Record<
   PropertyKey,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   Module<any, Context>
 >;
 

@@ -7,14 +7,14 @@ const cheatButton = document.querySelector("button#try-to-cheat")!;
 
 form.addEventListener("submit", (e) => {
   e.preventDefault();
-  api.send("example", "say", input.value);
+  api.example.say(input.value);
   input.value = "";
 });
 
-api.subscribe("example", "chat", (message) => {
+api.example.chat.subscribe((message) => {
   chat.value += `${message.from}: ${message.contents}\n`;
 });
 
 cheatButton.addEventListener("click", () => {
-  api.send("example", "chat", { from: "server", contents: "I'm cheating!" });
+  api.example.chat({ from: "server", contents: "I'm cheating!" });
 });

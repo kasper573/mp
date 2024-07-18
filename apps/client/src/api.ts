@@ -5,11 +5,13 @@ import { env } from "./env";
 
 export type * as types from "@mp/server";
 
-export const api = new Client<ServerModules, ServerContext>({
+const client = new Client<ServerModules, ServerContext>({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
   log: console.log,
 });
+
+export const api = client.modules;
 
 function getClientId() {
   let id = localStorage.getItem("client-id");
