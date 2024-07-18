@@ -8,6 +8,7 @@ export function createServer() {
   return new Server({
     modules: createModules(),
     createContext,
+    log: console.log,
   });
 }
 

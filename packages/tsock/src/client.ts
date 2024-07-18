@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import type { Unsubscribe } from "./shared";
-import { transports } from "./shared";
+import { id, transports } from "./shared";
 import type {
   AnyEventName,
   AnyModule,
@@ -13,6 +13,7 @@ import type {
 export interface CreateClientOptions<Context> {
   url: string;
   context: () => Context;
+  log?: typeof console.log;
 }
 
 export class Client<Modules extends AnyModules<Context>, Context> {
@@ -30,7 +31,9 @@ export class Client<Modules extends AnyModules<Context>, Context> {
     eventName: EventName,
     payload: EventPayload<Modules[ModuleName], EventName>,
   ): void {
-    this.socket.send(moduleName, eventName, payload, this.options.context());
+    const context = this.options.context();
+    this.options.log?.("send", id(moduleName, eventName), { payload, context });
+    this.socket.send(moduleName, eventName, payload, context);
   }
 
   subscribe<
@@ -41,7 +44,9 @@ export class Client<Modules extends AnyModules<Context>, Context> {
     eventName: EventName,
     handler: (payload: EventPayload<Modules[ModuleName], EventName>) => void,
   ): Unsubscribe {
+    const { log } = this.options;
     function filter(m: string, e: string, p: EventPayload<AnyModule, string>) {
+      log?.("receive", id(m, e), p);
       if (m === moduleName && e === eventName) {
         handler(p as EventPayload<Modules[ModuleName], EventName>);
       }

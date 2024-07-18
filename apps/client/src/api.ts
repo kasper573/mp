@@ -8,6 +8,7 @@ export type * as types from "@mp/server";
 export const api = new Client<ServerModules, ServerContext>({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
+  log: console.log,
 });
 
 function getClientId() {
