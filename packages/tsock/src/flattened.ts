@@ -1,3 +1,29 @@
+export function flattened<Values>(values: Values): Flattened<Values> {
+  const flattened = {} as Flattened<Values>;
+  flattenImpl(values as object, flattened);
+  return flattened;
+}
+
+function flattenImpl(
+  source: object,
+  target: Record<string, unknown>,
+  prefix = "",
+): void {
+  for (const [key, value] of Object.entries(source)) {
+    const path = prefix + key;
+    if (isPlainObject(value)) {
+      flattenImpl(value, target, path + separator);
+    } else {
+      target[path] = value;
+    }
+  }
+}
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  value !== null && !Array.isArray(value) && typeof value === "object";
+
+export const separator = "." as const;
+
 export type Flattened<T> = {
   [K in Path<T> as `${IsLeaf<T, K> extends true
     ? `${string & K}`
@@ -34,5 +60,3 @@ type PathValue<T, P extends Path<T>> = P extends `${infer Key}.${infer Rest}`
   : P extends keyof T
     ? T[P]
     : never;
-
-export const separator = "." as const;

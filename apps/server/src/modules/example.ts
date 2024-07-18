@@ -15,15 +15,13 @@ export function createExampleRouter() {
   }
 
   return t.router({
-    say: t.operation.input<string>().create(({ context, input }) => {
-      broadcast({ from: context.clientId, contents: input });
+    say: t.event.payload<string>().create(({ context, payload }) => {
+      broadcast({ from: context.clientId, contents: payload });
     }),
-    chat: t.operation.input<Message>().create(({ context, emit }) => {
-      bus.on("message", emit.next);
+    chat: t.event.payload<Message>().create(({ context }) => {
       broadcast({ from: context.clientId, contents: "connected" });
       return () => {
         broadcast({ from: context.clientId, contents: "disconnected" });
-        bus.off("message", emit.next);
       };
     }),
   });

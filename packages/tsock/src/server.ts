@@ -1,118 +1,50 @@
 import { Server as SocketServer } from "socket.io";
 import type {
-  AnyRouterOrOperationDefinition,
-  CreateContextOptions,
-  OperationDefinition,
-  OperationEmitter,
-  RouterDefinition,
-  Unsubscribe,
+  EventHandler,
+  EventPath,
+  EventPayload,
+  SocketIO_ClientToServerEvents,
+  SocketIO_ServerToClientEvents,
 } from "./shared";
-import { Initializer } from "./shared";
-import type {
-  ClientToServerEvents,
-  InterServerEvents,
-  RouterPath,
-  ServerToClientEvents,
-  SocketData,
-} from "./socket";
+import { Initializer, transports } from "./shared";
+import { flattened } from "./flattened";
 
-export { CreateContextOptions };
-
-export class Server<
-  ClientContext,
-  ServerContext,
-  Router extends RouterDefinition<ServerContext>,
+export function createServer<Router, ServerContext, ClientContext>({
+  createContext,
+  router,
+}: CreateServerOptions<Router, ServerContext, ClientContext>): Server<
+  Router,
+  ClientContext
 > {
-  private socketServer = new SocketServer<
-    ClientToServerEvents<ClientContext>,
-    ServerToClientEvents,
-    InterServerEvents,
-    SocketData
-  >();
+  const handlers = flattened(router);
+  const server = new SocketServer({ transports });
+  server.on("connection", (socket) => {
+    socket.onAny(
+      <Path extends EventPath<Router>>(
+        path: Path,
+        payload: EventPayload<Path, Router>,
+        clientContext: ClientContext,
+      ) => {
+        const context = createContext(clientContext);
+        const handler = handlers[path] as
+          | EventHandler<EventPayload<Path, Router>, ServerContext>
+          | undefined;
 
-  constructor(
-    private options: CreateServerOptions<ClientContext, ServerContext, Router>,
-  ) {}
-
-  listen(port: number): Unsubscribe {
-    this.socketServer.on("connection", (socket) => {
-      this.logClientCount();
-      socket.on("operation", this.handleOperation.bind(this));
-      socket.on("disconnect", this.logClientCount.bind(this));
-    });
-    this.socketServer.listen(port);
-    return () => this.socketServer.close();
-  }
-
-  private async handleOperation(
-    clientContext: ClientContext,
-    path: RouterPath,
-    input: unknown,
-  ) {
-    const serverContext = this.options.createContext({ clientContext });
-    const handlerResult = this.unsafelySelectHandler(path);
-    if (!handlerResult.ok) {
-      // TODO send error ack to client
-      this.log(handlerResult.error);
-      return;
-    }
-
-    this.log("handling operation", path, {
-      clientContext,
-      input,
-    });
-
-    const emit: OperationEmitter<unknown> = {
-      complete: () => this.log("emitter complete"),
-      error: (error) => this.log("emitter error", error),
-      next: (value) => this.log("emitter next", value),
-    };
-
-    handlerResult.value({ context: serverContext, input, emit });
-  }
-
-  private unsafelySelectHandler(
-    path: RouterPath,
-  ): Result<OperationDefinition<ServerContext, unknown>, string> {
-    const handler = path.reduce(
-      (current, key: string) => current?.[key as keyof typeof current],
-      this.options.router as AnyRouterOrOperationDefinition<ServerContext>,
+        handler?.({ payload, context });
+      },
     );
-
-    if (!handler) {
-      return {
-        ok: false,
-        error: `No handler found for path: ${path.join(".")}`,
-      };
-    }
-
-    return {
-      ok: true,
-      value: handler as OperationDefinition<ServerContext, unknown>,
-    };
-  }
-
-  private logClientCount() {
-    this.log("clients", this.socketServer.sockets.sockets.size);
-  }
-
-  private log(...args: unknown[]) {
-    this.options.log?.("[tsock server]", ...args);
-  }
+  });
+  return server;
 }
 
-export interface CreateServerOptions<
-  ClientContext,
-  ServerContext,
-  Router extends RouterDefinition<ServerContext>,
-> {
+export interface CreateServerOptions<Router, ServerContext, ClientContext> {
   router: Router;
-  createContext: (
-    options: CreateContextOptions<ClientContext>,
-  ) => ServerContext;
-  log?: typeof console.log;
+  createContext: (clientContext: ClientContext) => ServerContext;
 }
 
 export const init = new Initializer();
 
-type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
+export type Server<Router, ClientContext> = SocketServer<
+  SocketIO_ClientToServerEvents<Router, ClientContext>,
+  SocketIO_ServerToClientEvents<Router>
+>;

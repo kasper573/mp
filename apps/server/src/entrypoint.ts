@@ -1,12 +1,10 @@
-import { Server } from "@mp/tsock/server";
+import { createServer } from "@mp/tsock/server";
 import { createRouter } from "./definition/router";
-import { createContext } from "./definition/context";
 import { env } from "./env";
 
-const server = new Server({
+const server = createServer({
   router: createRouter(),
-  createContext,
-  log: console.log,
+  createContext: (clientContext) => clientContext,
 });
 
 server.listen(env.port);

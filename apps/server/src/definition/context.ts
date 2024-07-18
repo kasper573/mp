@@ -1,11 +1,5 @@
-import type { CreateContextOptions } from "@mp/tsock/server";
+export interface ServerContext extends ClientContext {}
 
-export function createContext({
-  clientContext,
-}: CreateContextOptions<ServerContext>): ServerContext {
-  return clientContext;
-}
-
-export interface ServerContext {
+export interface ClientContext {
   clientId: string;
 }

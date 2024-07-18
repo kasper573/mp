@@ -1,7 +1,6 @@
-import type { ServerContext } from "@mp/server";
-import { type ServerRouter } from "@mp/server";
-import { Client } from "@mp/tsock/client";
+import type { ServerRouter, ClientContext } from "@mp/server";
+import { createClient as createClientImpl } from "@mp/tsock/client";
 
 export type * from "@mp/server";
 
-export class ApiClient extends Client<ServerContext, ServerRouter> {}
+export const createClient = createClientImpl<ServerRouter, ClientContext>;

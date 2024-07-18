@@ -1,3 +1,5 @@
+import type { Flattened } from "./flattened";
+
 export class Initializer<Context> {
   context<Context>() {
     return new Initializer<Context>();
@@ -5,10 +7,6 @@ export class Initializer<Context> {
   create(options?: FactoryOptions): Factory<Context> {
     return new Factory<Context>(options);
   }
-}
-
-export interface CreateContextOptions<ClientContext> {
-  clientContext: ClientContext;
 }
 
 interface FactoryOptions {
@@ -24,50 +22,57 @@ class Factory<Context> {
     return def;
   }
 
-  operation = new OperationFactory<Context, void>();
+  event = new EventHandlerFactory<void, Context>();
 }
 
 export type RouterDefinition<Context> = {
-  [K: PropertyKey]: AnyRouterOrOperationDefinition<Context>;
+  [K: PropertyKey]: AnyRouterOrEventDefinition<Context>;
 };
 
-export type AnyRouterOrOperationDefinition<Context> =
+export type AnyRouterOrEventDefinition<Context> =
   | RouterDefinition<Context>
-  | AnyOperationDefinition<Context>;
+  | AnyEventDefinition<Context>;
 
-class OperationFactory<Context, Input> {
-  input<Input>() {
-    return new OperationFactory<Context, Input>();
+class EventHandlerFactory<Payload, Context> {
+  payload<Payload>() {
+    return new EventHandlerFactory<Payload, Context>();
   }
 
   create(
-    handler: OperationDefinition<Context, Input>,
-  ): OperationDefinition<Context, Input> {
+    handler: EventHandler<Payload, Context>,
+  ): EventHandler<Payload, Context> {
     return handler;
   }
 }
 
-interface OperationHandlerArgs<Context, Input> {
-  context: Context;
-  input: Input;
-  emit: OperationEmitter<Input>;
-}
-
-export interface OperationEmitter<Input> {
-  next: (value: Input) => void;
-  error: (error: Error) => void;
-  complete: () => void;
-}
-
 // We need to be able to use this as a generic constraint, and using "any" is the only way
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyOperationDefinition<Context> = OperationDefinition<Context, any>;
+export type AnyEventDefinition<Context> = EventHandler<any, Context>;
 
-export type OperationDefinition<Context, Input> = (
-  args: OperationHandlerArgs<Context, Input>,
-) => OperationResolution;
+export type EventHandler<Payload, Context> = (args: {
+  payload: Payload;
+  context: Context;
+}) => EventResolution;
 
-export type OperationResolution = void;
+export type EventResolution = void;
+
+export type EventPayload<Path extends EventPath<Router>, Router> =
+  Flattened<Router>[Path] extends EventHandler<infer Payload, infer _>
+    ? Payload
+    : never;
+
+export type EventPath<Router> = keyof Flattened<Router>;
+
+export type SocketIO_ClientToServerEvents<Router, ClientContext> = {
+  [Path in EventPath<Router>]: (
+    payload: EventPayload<Path, Router>,
+    clientContext: ClientContext,
+  ) => void;
+};
+
+export type SocketIO_ServerToClientEvents<Router> = {
+  [Path in EventPath<Router>]: (payload: EventPayload<Path, Router>) => void;
+};
 
 interface Transformer {
   stringify(object: unknown): string;
@@ -75,3 +80,5 @@ interface Transformer {
 }
 
 export type Unsubscribe = () => void;
+
+export const transports = ["websocket"] as ["websocket"];
