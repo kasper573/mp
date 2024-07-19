@@ -4,25 +4,31 @@ export function createEventBus<
   OutgoingEvents extends AnyEvents,
   IncomingEvents extends AnyEvents,
 >(
-  outgoingEventHandlers: OutgoingEvents,
-  incomingEventSubscribers = {} as Subscribers<IncomingEvents>,
+  emitOutgoingEvent: EmitFnFor<OutgoingEvents>,
+  subscribeToAllIncomingEvents = noop as SubscribeFnFor<IncomingEvents>,
 ): EventBus<OutgoingEvents, IncomingEvents> {
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
-    get(_, eventName) {
-      function send(...args: unknown[]): void {
-        outgoingEventHandlers[eventName](...args);
+    get(_, calledEventName: string) {
+      function event(
+        ...args: Parameters<OutgoingEvents[keyof OutgoingEvents]>
+      ): void {
+        emitOutgoingEvent(calledEventName, ...args);
       }
 
-      send.subscribe = (receive: (...args: unknown[]) => void) =>
-        incomingEventSubscribers[eventName](receive as never);
+      event.subscribe = (handler: IncomingEvents[keyof IncomingEvents]) =>
+        subscribeToAllIncomingEvents((receivedEventName, ...args) => {
+          if (receivedEventName === calledEventName) {
+            handler(...args);
+          }
+        });
 
-      return send;
+      return event;
     },
   });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyEvents = { [K: PropertyKey]: (...args: any[]) => void };
+type AnyEvents = { [K: string]: (...args: any[]) => void };
 
 export type EventBus<
   OutgoingEvents extends AnyEvents,
@@ -35,8 +41,15 @@ export type EventBus<
   };
 };
 
-export type Subscribers<IncomingEvents extends AnyEvents> = {
-  [EventName in keyof IncomingEvents]: (
-    receive: IncomingEvents[EventName],
-  ) => Unsubscribe;
-};
+export type EmitFnFor<Events extends AnyEvents> = {
+  [EventName in keyof Events]: (
+    eventName: EventName,
+    ...args: Parameters<Events[EventName]>
+  ) => void;
+}[keyof Events];
+
+export type SubscribeFnFor<Events extends AnyEvents> = (
+  handler: EmitFnFor<Events>,
+) => Unsubscribe;
+
+const noop = () => () => {};
