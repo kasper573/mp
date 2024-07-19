@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import { createEventBus } from "../src/EventBus";
+import { createEventBus } from "../src/event";
 
 it("it can send events", () => {
   const handler = vi.fn();

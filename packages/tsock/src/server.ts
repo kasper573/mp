@@ -5,7 +5,7 @@ import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 export { Factory } from "./factory";
 
 export type { inferModuleDefinitions } from "./module";
-export type { EventResult } from "./EventBus";
+export type { EventResult } from "./event";
 
 export interface CreateServerOptions<
   ModuleDefinitions extends AnyModuleDefinitionRecord,

@@ -9,7 +9,7 @@ import type {
   ModuleEvents,
   ModuleRecord,
 } from "./module";
-import { createEventBus } from "./EventBus";
+import { createEventBus } from "./event";
 
 export interface ClientOptions<Context> {
   url: string;

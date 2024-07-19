@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import type { EventBus, EventResult } from "./EventBus";
-import { createEventBus } from "./EventBus";
+import type { EventBus, EventResult } from "./event";
+import { createEventBus } from "./event";
 
 export function createModule<Events extends AnyEventRecord>(
   events: Events,
