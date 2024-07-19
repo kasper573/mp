@@ -1,4 +1,4 @@
-import { Client } from "@mp/tsock/client";
+import { Client, Logger } from "@mp/tsock/client";
 import { v4 as uuid } from "uuid";
 import type { ClientContext, ServerModules } from "@mp/server";
 import { env } from "./env";
@@ -8,7 +8,7 @@ export type * as types from "@mp/server";
 const client = new Client<ServerModules, ClientContext>({
   url: env.serverUrl,
   context: () => ({ clientId: getClientId() }),
-  log: console.log,
+  logger: new Logger(console),
 });
 
 export const api = client.modules;

@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { id } from "./shared";
+import { Logger } from "./logger";
 import type {
   AnyEventDefinition,
   AnyEventRecord,
@@ -11,10 +11,12 @@ import type {
 } from "./module";
 import { createEventBus } from "./event";
 
+export { Logger };
+
 export interface ClientOptions<Context> {
   url: string;
   context: () => Context;
-  log?: typeof console.log;
+  logger?: Logger;
 }
 
 export class Client<
@@ -50,25 +52,22 @@ function createModuleEventBus<Context>(
   socket: Socket,
   options: ClientOptions<Context>,
 ) {
+  const logger = options.logger?.chain(moduleName);
   return createEventBus<
     ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>,
     ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>
   >(
     (eventName, payload) => {
-      const context = options.context();
-      options.log?.("send", id(moduleName, eventName), {
-        payload,
-        context,
-      });
-      socket.send(moduleName, eventName, payload, context);
+      logger?.chain(eventName).info(">>", payload);
+      socket.send(moduleName, eventName, payload, options.context());
     },
     (handler) => {
       function handlerWithLogging(
-        moduleName: string,
+        _: string,
         eventName: string,
         payload: unknown,
       ) {
-        options.log?.("receive", id(moduleName, eventName), payload);
+        logger?.chain(eventName).info("<<", payload);
         return handler(eventName, payload);
       }
       socket.onAny(handlerWithLogging);

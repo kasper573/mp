@@ -1,15 +1,16 @@
 import type { inferModuleDefinitions } from "@mp/tsock/server";
+import { Logger } from "@mp/tsock/server";
 import { Factory, Server } from "@mp/tsock/server";
 
 import { createExampleModule } from "./modules/example";
 import { createOtherModule } from "./modules/other";
 export type * from "./modules/example";
 
-export function createServer() {
+export function createServer(logger = new Logger(console)) {
   return new Server({
     modules: createModules(),
     createContext,
-    log: console.log,
+    logger,
   });
 }
 

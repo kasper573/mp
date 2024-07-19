@@ -1,8 +1,9 @@
 import { Server as SocketServer } from "socket.io";
-import { id } from "./shared";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
+import { Logger } from "./logger";
 
 export { Factory } from "./factory";
+export { Logger };
 
 export type { inferModuleDefinitions } from "./module";
 export type { EventResult } from "./event";
@@ -14,7 +15,7 @@ export interface CreateServerOptions<
 > {
   modules: ModuleRecord<ModuleDefinitions>;
   createContext: (clientContext: ClientContext) => ServerContext;
-  log?: typeof console.log;
+  logger?: Logger;
 }
 
 export class Server<
@@ -23,6 +24,10 @@ export class Server<
   ClientContext,
 > {
   private wss: SocketServer;
+
+  private get logger() {
+    return this.options.logger?.chain("Server");
+  }
 
   constructor(
     private options: CreateServerOptions<
@@ -33,39 +38,35 @@ export class Server<
   ) {
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
-      socket.on("message", (moduleName, eventName, payload, clientContext) => {
-        const context = this.options.createContext(clientContext);
+      socket.on("message", (moduleName, eventName, payload, context) => {
         const module = options.modules[moduleName];
+        const log = this.logger?.chain(moduleName, eventName);
 
         if (module.$getEventType(eventName) === "private") {
-          this.options.log?.(
-            `Event "${id(moduleName, eventName)}" is private and may not be triggered by clients`,
-            { payload, context: clientContext },
-          );
+          log?.warn(`event is private and may not be triggered by clients`, {
+            payload,
+            context,
+          });
           return;
         }
 
-        this.options.log?.("triggering", id(moduleName, eventName), {
-          payload,
-          clientContext,
-          context,
-        });
+        log?.info(`<<`, { payload, context });
 
         try {
-          module[eventName]({ payload, context });
+          module[eventName]({
+            payload,
+            context: options.createContext(context),
+          });
         } catch (e) {
-          this.options.log?.(
-            `Error while triggering event "${id(moduleName, eventName)}"`,
-            e,
-          );
+          log?.error(`error while triggering event`, e);
         }
       });
     });
 
     for (const moduleName in options.modules) {
       const module = options.modules[moduleName];
-      module.$subscribe(({ name, args: [{ payload }] }) => {
-        this.options.log?.("emitting", id(moduleName, name), payload);
+      module.$subscribe(({ name, args: [{ payload, context }] }) => {
+        this.logger?.chain(moduleName, name).info(">>", { payload, context });
         this.wss.emit(moduleName, name, payload);
       });
     }
@@ -73,9 +74,11 @@ export class Server<
 
   listen(port: number) {
     this.wss.listen(port);
+    this.logger?.info(`listening on port ${port}`);
   }
 
   close() {
     this.wss.close();
+    this.logger?.info(`closed`);
   }
 }
