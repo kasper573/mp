@@ -35,7 +35,7 @@ export type EventBus<
   };
 };
 
-type Subscribers<IncomingEvents extends AnyEvents> = {
+export type Subscribers<IncomingEvents extends AnyEvents> = {
   [EventName in keyof IncomingEvents]: (
     receive: IncomingEvents[EventName],
   ) => Unsubscribe;
