@@ -1,5 +1,5 @@
 import { Server as SocketServer } from "socket.io";
-import { id, transports } from "./shared";
+import { id } from "./shared";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 
 export { Factory } from "./factory";
@@ -31,7 +31,7 @@ export class Server<
       ClientContext
     >,
   ) {
-    this.wss = new SocketServer({ transports });
+    this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
       socket.on("message", (moduleName, eventName, payload, clientContext) => {
         const context = this.options.createContext(clientContext);

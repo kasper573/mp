@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { id, transports } from "./shared";
+import { id } from "./shared";
 import type {
   AnyEventDefinition,
   AnyEventRecord,
@@ -25,7 +25,7 @@ export class Client<
   modules: ModuleRecord<ClientModuleDefinitionRecord<ModuleDefinitions>>;
 
   constructor(private options: ClientOptions<Context>) {
-    this.socket = io(options.url, { transports });
+    this.socket = io(options.url, { transports: ["websocket"] });
     this.modules = createModuleInterface<ModuleDefinitions, Context>(
       this.socket,
       this.options,
