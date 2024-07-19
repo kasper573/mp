@@ -46,12 +46,12 @@ export type EventBus<
   [subscribeAllProperty](handler: EmitFnFor<IncomingEvents>): Unsubscribe;
 };
 
-export type EmitFnFor<Events extends AnyEvents> = {
-  [EventName in keyof Events]: (
-    eventName: EventName,
-    ...args: Parameters<Events[EventName]>
-  ) => void;
-}[keyof Events];
+export type EmitFnFor<Events extends AnyEvents> = <
+  EventName extends keyof Events,
+>(
+  eventName: EventName,
+  ...args: Parameters<Events[EventName]>
+) => void;
 
 export type SubscribeFnFor<Events extends AnyEvents> = (
   handler: EmitFnFor<Events>,
