@@ -13,21 +13,21 @@ export function createEventBus<
         return (
           handleDiscriminatedEvent: DiscriminatedEventHandler<IncomingEvents>,
         ) =>
-          subscribeToAllIncomingEvents((eventName, ...args) => {
-            handleDiscriminatedEvent({ name: eventName, args });
-          });
+          subscribeToAllIncomingEvents((eventName, ...args) =>
+            handleDiscriminatedEvent({ name: eventName, args }),
+          );
       }
 
       function event(
         ...args: Parameters<OutgoingEvents[keyof OutgoingEvents]>
-      ): void {
-        emitOutgoingEvent(propertyName, ...args);
+      ): EventResult {
+        return emitOutgoingEvent(propertyName, ...args);
       }
 
       event.subscribe = (handler: IncomingEvents[keyof IncomingEvents]) =>
         subscribeToAllIncomingEvents((receivedEventName, ...args) => {
           if (receivedEventName === propertyName) {
-            handler(...args);
+            return handler(...args);
           }
         });
 
@@ -36,8 +36,12 @@ export function createEventBus<
   });
 }
 
+export type EventError = string;
+
+export type EventResult = void;
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyEvents = { [K: string]: (...args: any[]) => void };
+type AnyEvents = { [K: string]: (...args: any[]) => EventResult };
 
 export type EventBus<
   OutgoingEvents extends AnyEvents,
@@ -56,7 +60,7 @@ export type EventBus<
 
 export type DiscriminatedEventHandler<Events extends AnyEvents> = (
   event: DiscriminatedEvent<Events>,
-) => void;
+) => EventResult;
 
 export type DiscriminatedEvent<Events extends AnyEvents> = {
   [EventName in keyof Events]: {
@@ -70,7 +74,7 @@ export type EmitFnFor<Events extends AnyEvents> = <
 >(
   eventName: EventName,
   ...args: Parameters<Events[EventName]>
-) => void;
+) => EventResult;
 
 export type SubscribeFnFor<Events extends AnyEvents> = (
   handler: EmitFnFor<Events>,

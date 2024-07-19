@@ -22,13 +22,10 @@ it("can send arbitrary number of event arguments", () => {
 it("can subscribe to incoming events", () => {
   let send: (eventName: string, ...args: unknown[]) => void = () => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {};
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {};
+  });
 
   const receiver = vi.fn();
   bus.foo.subscribe(receiver);
@@ -39,13 +36,10 @@ it("can subscribe to incoming events", () => {
 it("does not trigger callback for events not suscribed to", () => {
   let send: (eventName: string, ...args: unknown[]) => void = () => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {};
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {};
+  });
 
   const receiver = vi.fn();
   bus.foo.subscribe(receiver);
@@ -61,13 +55,10 @@ it("can receive arbitrary number of event arguments from incoming events", () =>
     b: boolean,
   ) => void = () => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {};
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {};
+  });
 
   const receiver = vi.fn();
   bus.message.subscribe(receiver);
@@ -78,15 +69,12 @@ it("can receive arbitrary number of event arguments from incoming events", () =>
 it("can unsubscribe from incoming event", () => {
   let send: (eventName: string) => void = () => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {
-        send = () => {};
-      };
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {
+      send = () => {};
+    };
+  });
 
   const receiver = vi.fn();
   const unsub = bus.foo.subscribe(receiver);
@@ -98,13 +86,10 @@ it("can unsubscribe from incoming event", () => {
 it("using the same incoming event handler multiple times still becomes multiple subscriptions", () => {
   const callbacks = new Array<(eventName: string) => void>();
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      callbacks.push(fn);
-      return () => {};
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    callbacks.push(fn);
+    return () => {};
+  });
 
   const receiver = vi.fn();
   bus.foo.subscribe(receiver);
@@ -119,13 +104,10 @@ it("using the same incoming event handler multiple times still becomes multiple 
 it("can subscribe to all incoming events", () => {
   let send = (eventName: string, ...args: unknown[]) => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {};
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {};
+  });
 
   const receiver = vi.fn();
   bus.$subscribe(receiver);
@@ -143,15 +125,12 @@ it("can subscribe to all incoming events", () => {
 it("can unsubscribe after subscribing to all incoming events", () => {
   let send = (eventName: string, ...args: unknown[]) => {};
 
-  const bus = createEventBus(
-    () => {},
-    (fn) => {
-      send = fn;
-      return () => {
-        send = () => {};
-      };
-    },
-  );
+  const bus = createEventBus(noop, (fn) => {
+    send = fn;
+    return () => {
+      send = () => {};
+    };
+  });
 
   const receiver = vi.fn();
   const stop = bus.$subscribe(receiver);
@@ -160,3 +139,5 @@ it("can unsubscribe after subscribing to all incoming events", () => {
   send("bar");
   expect(receiver).not.toHaveBeenCalled();
 });
+
+const noop = () => {};

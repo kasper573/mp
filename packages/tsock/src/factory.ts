@@ -13,9 +13,7 @@ export class Factory<Context> {
     return createModule(events);
   }
 
-  event = new ModuleEventFactory<"bidirectional", void, Context>(
-    "bidirectional",
-  );
+  event = new ModuleEventFactory<"public", void, Context>("public");
 }
 
 class ModuleEventFactory<Type extends EventType, Payload, Context> {
@@ -30,8 +28,10 @@ class ModuleEventFactory<Type extends EventType, Payload, Context> {
   }
 
   create(
-    handler: EventHandler<EventHandlerArg<Payload, Context>> = () => {},
+    handler: EventHandler<EventHandlerArg<Payload, Context>> = noop,
   ): EventDefinition<Type, EventHandlerArg<Payload, Context>> {
-    return { type: this._type, handler };
+    return { type: this._type, handler: handler };
   }
 }
+
+const noop = () => {};

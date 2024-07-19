@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { EventEmitter } from "events";
-import type { EventBus } from "./EventBus";
+import type { EventBus, EventResult } from "./EventBus";
 import { createEventBus } from "./EventBus";
 
 export function createModule<Events extends AnyEventRecord>(
@@ -16,42 +16,27 @@ export function createModule<Events extends AnyEventRecord>(
     },
   );
 
-  Object.entries(events).forEach(([name, { handler, type }]) => {
-    bus[name].subscribe((arg) => {
-      const result = isEventAllowed(arg.origin, type);
-      if (!result.ok) {
-        throw new Error(result.error);
+  Object.entries(events).forEach(([name, { handler }]) =>
+    bus[name].subscribe(handler),
+  );
+
+  return new Proxy(bus as Module<Events>, {
+    get(target, prop) {
+      if (prop === "getEventType") {
+        return (eventName: keyof Events) => events[eventName].type;
+      } else {
+        return target[prop];
       }
-      handler(arg);
-    });
+    },
   });
-
-  return bus;
-}
-
-function isEventAllowed(origin: EventOrigin, type: EventType) {
-  if (type === "client-to-server" && origin === "client") {
-    return { ok: true };
-  }
-
-  if (type === "server-to-client" && origin === "server") {
-    return { ok: true };
-  }
-
-  if (type === "bidirectional") {
-    return { ok: true };
-  }
-
-  return {
-    ok: false,
-    error: `Event type ${type} is not allowed from origin ${origin}`,
-  };
 }
 
 export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
   ModuleEvents<Events>,
   ModuleEvents<Events>
->;
+> & {
+  getEventType(eventName: keyof Events): EventType;
+};
 
 export type ModuleRecord<Events extends AnyModuleDefinitionRecord> = {
   [K in keyof Events]: Module<Events[K]>;
@@ -69,18 +54,12 @@ export type AnyEventRecord<Arg extends EventHandlerArg = EventHandlerArg> = {
 export type AnyEventDefinition<Arg extends EventHandlerArg = EventHandlerArg> =
   EventDefinition<EventType, Arg>;
 
-export type EventOrigin = "client" | "server";
-
 export interface EventHandlerArg<Payload = any, Context = any> {
   payload: Payload;
   context: Context;
-  origin: EventOrigin;
 }
 
-export type EventType =
-  | "client-to-server"
-  | "server-to-client"
-  | "bidirectional";
+export type EventType = "public" | "private";
 
 export type EventDefinition<
   Type extends EventType,
@@ -92,7 +71,7 @@ export type EventDefinition<
 
 export type EventHandler<Arg extends EventHandlerArg> = (
   arg: MakePayloadOptional<Arg>,
-) => void;
+) => EventResult;
 
 export type ModuleEvents<Events extends AnyEventRecord> = {
   [EventName in keyof Events]: Events[EventName]["handler"];
