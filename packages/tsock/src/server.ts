@@ -1,12 +1,6 @@
 import { Server as SocketServer } from "socket.io";
 import { id, transports } from "./shared";
-import type {
-  AnyEventRecord,
-  AnyModuleDefinitionRecord,
-  ModuleEvents,
-  ModuleRecord,
-} from "./module";
-import type { DiscriminatedEvent } from "./EventBus";
+import type { AnyModuleDefinitionRecord, ModuleRecord } from "./module";
 
 export { Factory } from "./factory";
 
@@ -52,17 +46,12 @@ export class Server<
       });
     });
 
-    for (const [moduleName, mod] of Object.entries(options.modules)) {
-      mod.$subscribe(
-        (event: DiscriminatedEvent<ModuleEvents<AnyEventRecord>>) => {
-          this.options.log?.(
-            "emitting",
-            id(moduleName, event.name),
-            ...event.args,
-          );
-          this.wss.emit(moduleName, event.name, ...event.args);
-        },
-      );
+    for (const moduleName in options.modules) {
+      const mod = options.modules[moduleName];
+      mod.$subscribe(({ name, args: [{ payload }] }) => {
+        this.options.log?.("emitting", id(moduleName, name), payload);
+        this.wss.emit(moduleName, name, payload);
+      });
     }
   }
 

@@ -28,8 +28,8 @@ export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
   ModuleEvents<Events>
 >;
 
-export type ModuleRecord<Definitions extends AnyModuleDefinitionRecord> = {
-  [K in keyof Definitions]: Module<Definitions[K]>;
+export type ModuleRecord<Events extends AnyModuleDefinitionRecord> = {
+  [K in keyof Events]: Module<Events[K]>;
 };
 
 export type inferModuleDefinitions<T> =
@@ -37,24 +37,44 @@ export type inferModuleDefinitions<T> =
 
 export type AnyModuleDefinitionRecord = Record<PropertyKey, AnyEventRecord>;
 
-export type AnyEventRecord = {
-  [K: PropertyKey]: AnyEventDefinition;
+export type AnyEventRecord<
+  Arg extends AnyEventHandlerArg = AnyEventHandlerArg,
+> = {
+  [K: PropertyKey]: AnyEventDefinition<Arg>;
 };
 
-export type AnyEventDefinition = EventDefinition<EventType, any>;
+export type AnyEventDefinition<
+  Arg extends AnyEventHandlerArg = AnyEventHandlerArg,
+> = EventDefinition<EventType, Arg>;
+
+export type AnyEventHandlerArg = { payload: any; context: any };
 
 export type EventType =
   | "client-to-server"
   | "server-to-client"
   | "bidirectional";
 
-export type EventDefinition<Type extends EventType, Payload> = {
+export type EventDefinition<
+  Type extends EventType,
+  Arg extends AnyEventHandlerArg,
+> = {
   type: Type;
-  handler: EventHandler<Payload>;
+  handler: EventHandler<Arg>;
 };
 
-export type EventHandler<Payload> = (payload: Payload) => void;
+export type EventHandler<Arg extends AnyEventHandlerArg> = (
+  arg: MakePayloadOptional<Arg>,
+) => void;
 
 export type ModuleEvents<Events extends AnyEventRecord> = {
   [EventName in keyof Events]: Events[EventName]["handler"];
 };
+
+type MakePayloadOptional<Arg extends AnyEventHandlerArg> =
+  isExactlyVoid<Arg["payload"]> extends true ? Pick<Arg, "context"> : Arg;
+
+type isExactlyVoid<T> = void extends T
+  ? T extends void
+    ? true
+    : false
+  : false;

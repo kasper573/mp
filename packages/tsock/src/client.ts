@@ -3,12 +3,13 @@ import { io } from "socket.io-client";
 import { id, transports } from "./shared";
 import type {
   AnyEventDefinition,
+  AnyEventRecord,
   AnyModuleDefinitionRecord,
   EventDefinition,
+  ModuleEvents,
   ModuleRecord,
 } from "./module";
 import { createEventBus } from "./EventBus";
-import type { PayloadHolder } from "./factory";
 
 export interface ClientOptions<Context> {
   url: string;
@@ -21,7 +22,7 @@ export class Client<
   Context,
 > {
   private socket: Socket;
-  modules: ModuleRecord<HideServerContext<ModuleDefinitions>>;
+  modules: ModuleRecord<ClientModuleDefinitionRecord<ModuleDefinitions>>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports });
@@ -49,9 +50,11 @@ function createModuleEventBus<Context>(
   socket: Socket,
   options: ClientOptions<Context>,
 ) {
-  return createEventBus(
-    (...args) => {
-      const [eventName, payload] = args;
+  return createEventBus<
+    ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>,
+    ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>
+  >(
+    (eventName, payload) => {
       const context = options.context();
       options.log?.("send", id(moduleName, eventName), {
         payload,
@@ -74,15 +77,19 @@ function createModuleEventBus<Context>(
   );
 }
 
-type HideServerContext<ModuleDefinitions extends AnyModuleDefinitionRecord> = {
-  [ModuleName in keyof ModuleDefinitions]: {
-    [EventName in keyof ModuleDefinitions[ModuleName]]: ClientEventDefinition<
-      ModuleDefinitions[ModuleName][EventName]
-    >;
-  };
+type ClientModuleDefinitionRecord<
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
+> = {
+  [ModuleName in keyof ModuleDefinitions]: ClientEventDefinitionRecord<
+    ModuleDefinitions[ModuleName]
+  >;
+};
+
+type ClientEventDefinitionRecord<Events extends AnyEventRecord> = {
+  [EventName in keyof Events]: ClientEventDefinition<Events[EventName]>;
 };
 
 type ClientEventDefinition<Event extends AnyEventDefinition> =
-  Event extends EventDefinition<infer Type, infer Payload>
-    ? EventDefinition<Type, Extract<Payload, PayloadHolder<unknown>>["payload"]>
+  Event extends EventDefinition<infer Type, infer Arg>
+    ? EventDefinition<Type, Arg["payload"]>
     : never;
