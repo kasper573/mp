@@ -29,8 +29,21 @@ class ModuleEventFactory<Type extends EventType, Payload, Context> {
   }
 
   create(
-    handler: EventHandler<[Payload, Context]> = () => {},
-  ): EventDefinition<Type, [payload: Payload, context: Context]> {
+    handler: EventHandler<PayloadWithContext<Payload, Context>> = () => {},
+  ): EventDefinition<Type, PayloadWithContext<Payload, Context>> {
     return { type: this._type, handler };
   }
 }
+
+export type PayloadWithContext<Payload, Context> =
+  isExactlyVoid<Payload> extends true
+    ? { context: Context }
+    : PayloadHolder<Payload> & { context: Context };
+
+export type PayloadHolder<Payload> = { payload: Payload };
+
+type isExactlyVoid<T> = void extends T
+  ? T extends void
+    ? true
+    : false
+  : false;

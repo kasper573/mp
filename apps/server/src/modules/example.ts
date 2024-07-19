@@ -9,17 +9,18 @@ export interface Message {
 
 export function createExampleModule(other: OtherModule) {
   const example = t.module({
-    say: t.event.payload<string>().create((payload, context) => {
-      example.chat(
-        {
-          from: context.clientId,
-          contents: payload,
-        },
+    say: t.event.payload<string>().create(({ payload, context }) => {
+      example.chat({
+        payload: { from: context.clientId, contents: payload },
         context,
-      );
-      other.do(payload, context);
+      });
     }),
-    chat: t.event.type("server-to-client").payload<Message>().create(),
+    chat: t.event
+      .type("server-to-client")
+      .payload<Message>()
+      .create(({ context }) => {
+        other.do({ context });
+      }),
   });
 
   return example;

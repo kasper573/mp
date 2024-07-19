@@ -48,7 +48,7 @@ export class Server<
 
         const mod = options.modules[moduleName];
         const event = mod[eventName];
-        event(payload, context);
+        event({ payload, context });
       });
     });
 

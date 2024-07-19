@@ -4,10 +4,11 @@ import { id, transports } from "./shared";
 import type {
   AnyEventDefinition,
   AnyModuleDefinitionRecord,
-  EventHandler,
+  EventDefinition,
   ModuleRecord,
 } from "./module";
 import { createEventBus } from "./EventBus";
+import type { PayloadHolder } from "./factory";
 
 export interface ClientOptions<Context> {
   url: string;
@@ -81,12 +82,7 @@ type HideServerContext<ModuleDefinitions extends AnyModuleDefinitionRecord> = {
   };
 };
 
-type ClientEventDefinition<Event extends AnyEventDefinition> = {
-  type: Event["type"];
-  handler: EventHandler<OmitContext<Parameters<Event["handler"]>>>;
-};
-
-// Context is the last parameter
-type OmitContext<T extends unknown[]> = T extends [...infer Head, unknown]
-  ? Head
-  : never;
+type ClientEventDefinition<Event extends AnyEventDefinition> =
+  Event extends EventDefinition<infer Type, infer Payload>
+    ? EventDefinition<Type, Extract<Payload, PayloadHolder<unknown>>["payload"]>
+    : never;

@@ -41,19 +41,19 @@ export type AnyEventRecord = {
   [K: PropertyKey]: AnyEventDefinition;
 };
 
-export type AnyEventDefinition = EventDefinition<EventType, any[]>;
+export type AnyEventDefinition = EventDefinition<EventType, any>;
 
 export type EventType =
   | "client-to-server"
   | "server-to-client"
   | "bidirectional";
 
-export type EventDefinition<Type extends EventType, Args extends any[]> = {
+export type EventDefinition<Type extends EventType, Payload> = {
   type: Type;
-  handler: EventHandler<Args>;
+  handler: EventHandler<Payload>;
 };
 
-export type EventHandler<Args extends any[]> = (...args: Args) => void;
+export type EventHandler<Payload> = (payload: Payload) => void;
 
 export type ModuleEvents<Events extends AnyEventRecord> = {
   [EventName in keyof Events]: Events[EventName]["handler"];

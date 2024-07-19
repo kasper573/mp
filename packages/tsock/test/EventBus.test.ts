@@ -19,7 +19,7 @@ it("can send arbitrary number of event arguments", () => {
   expect(handler).toHaveBeenCalledWith("message", "foo", 123, false);
 });
 
-it("can subscribe to event", () => {
+it("can subscribe to incoming events", () => {
   let send: (eventName: string, ...args: unknown[]) => void = () => {};
 
   const bus = createEventBus(
@@ -53,7 +53,7 @@ it("does not trigger callback for events not suscribed to", () => {
   expect(receiver).not.toHaveBeenCalled();
 });
 
-it("can receive arbitrary number of event arguments from subscription", () => {
+it("can receive arbitrary number of event arguments from incoming events", () => {
   let send: (
     eventName: string,
     str: string,
@@ -75,7 +75,7 @@ it("can receive arbitrary number of event arguments from subscription", () => {
   expect(receiver).toHaveBeenCalledWith("foo", 123, false);
 });
 
-it("can unsubscribe from event", () => {
+it("can unsubscribe from incoming event", () => {
   let send: (eventName: string) => void = () => {};
 
   const bus = createEventBus(
@@ -95,7 +95,7 @@ it("can unsubscribe from event", () => {
   expect(receiver).not.toHaveBeenCalled();
 });
 
-it("using the same subscription handler multiple times still becomes multiple subscriptions", () => {
+it("using the same incoming event handler multiple times still becomes multiple subscriptions", () => {
   const callbacks = new Array<(eventName: string) => void>();
 
   const bus = createEventBus(
@@ -116,7 +116,7 @@ it("using the same subscription handler multiple times still becomes multiple su
   expect(receiver).toBeCalledTimes(3);
 });
 
-it("can subscribe to all events", () => {
+it("can subscribe to all incoming events", () => {
   let send = (eventName: string, ...args: unknown[]) => {};
 
   const bus = createEventBus(
@@ -140,7 +140,7 @@ it("can subscribe to all events", () => {
   });
 });
 
-it("can unsubscribe after subscribing to all events", () => {
+it("can unsubscribe after subscribing to all incoming events", () => {
   let send = (eventName: string, ...args: unknown[]) => {};
 
   const bus = createEventBus(
