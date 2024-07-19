@@ -1,5 +1,3 @@
-import type { Unsubscribe } from "./shared";
-
 export function createEventBus<
   OutgoingEvents extends AnyEvents,
   IncomingEvents extends AnyEvents,
@@ -83,3 +81,5 @@ export type SubscribeFnFor<Events extends AnyEvents> = (
 const noop = () => () => {};
 
 const subscribeAllProperty = "$subscribe" as const;
+
+type Unsubscribe = () => void;
