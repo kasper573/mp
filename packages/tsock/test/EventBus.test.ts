@@ -6,8 +6,17 @@ it("it can send events", () => {
 
   const bus = createEventBus({ message });
 
-  bus.message("hello");
-  expect(message).toHaveBeenCalledWith("hello");
+  bus.message();
+  expect(message).toBeCalled();
+});
+
+it("can send arbitrary number of event arguments", () => {
+  const message = vi.fn();
+
+  const bus = createEventBus({ message });
+
+  bus.message("foo", 123, false);
+  expect(message).toHaveBeenCalledWith("foo", 123, false);
 });
 
 it("it does not send events to the wrong target", () => {
@@ -21,7 +30,7 @@ it("it does not send events to the wrong target", () => {
 });
 
 it("can subscribe to event", () => {
-  let send: (payload: number) => void = () => {};
+  let send: () => void = () => {};
 
   const bus = createEventBus(
     {},
@@ -35,8 +44,27 @@ it("can subscribe to event", () => {
 
   const receiver = vi.fn();
   bus.foo.subscribe(receiver);
-  send(123);
-  expect(receiver).toHaveBeenCalledWith(123);
+  send();
+  expect(receiver).toHaveBeenCalled();
+});
+
+it("can receive arbitrary number of event arguments from subscription", () => {
+  let send: (str: string, n: number, b: boolean) => void = () => {};
+
+  const bus = createEventBus(
+    {},
+    {
+      foo: (fn) => {
+        send = fn;
+        return () => {};
+      },
+    },
+  );
+
+  const receiver = vi.fn();
+  bus.foo.subscribe(receiver);
+  send("foo", 123, false);
+  expect(receiver).toHaveBeenCalledWith("foo", 123, false);
 });
 
 it("can unsubscribe from event", () => {

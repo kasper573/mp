@@ -9,11 +9,11 @@ export function createEventBus<
 ): EventBus<OutgoingEvents, IncomingEvents> {
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
     get(_, eventName) {
-      function send(payload: unknown): void {
-        outgoingEventHandlers[eventName](payload);
+      function send(...args: unknown[]): void {
+        outgoingEventHandlers[eventName](...args);
       }
 
-      send.subscribe = (receive: (payload: unknown) => void) =>
+      send.subscribe = (receive: (...args: unknown[]) => void) =>
         incomingEventSubscribers[eventName](receive as never);
 
       return send;
@@ -22,7 +22,7 @@ export function createEventBus<
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyEvents = { [K: PropertyKey]: (payload: any) => void };
+type AnyEvents = { [K: PropertyKey]: (...args: any[]) => void };
 
 export type EventBus<
   OutgoingEvents extends AnyEvents,
