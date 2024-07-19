@@ -11,8 +11,8 @@ form.addEventListener("submit", (e) => {
   input.value = "";
 });
 
-api.example.chat.subscribe((message) => {
-  chat.value += `${message.from}: ${message.contents}\n`;
+api.example.chat.subscribe(({ from, contents }) => {
+  chat.value += `${from}: ${contents}\n`;
 });
 
 cheatButton.addEventListener("click", () => {

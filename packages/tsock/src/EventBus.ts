@@ -10,8 +10,14 @@ export function createEventBus<
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
     get(_, propertyName: string) {
       if (propertyName === subscribeAllProperty) {
-        return subscribeToAllIncomingEvents;
+        return (
+          handleDiscriminatedEvent: DiscriminatedEventHandler<IncomingEvents>,
+        ) =>
+          subscribeToAllIncomingEvents((eventName, ...args) => {
+            handleDiscriminatedEvent({ name: eventName, args });
+          });
       }
+
       function event(
         ...args: Parameters<OutgoingEvents[keyof OutgoingEvents]>
       ): void {
@@ -43,8 +49,21 @@ export type EventBus<
     subscribe(handler: IncomingEvents[EventName]): Unsubscribe;
   };
 } & {
-  [subscribeAllProperty](handler: EmitFnFor<IncomingEvents>): Unsubscribe;
+  [subscribeAllProperty](
+    handler: DiscriminatedEventHandler<IncomingEvents>,
+  ): Unsubscribe;
 };
+
+export type DiscriminatedEventHandler<Events extends AnyEvents> = (
+  event: DiscriminatedEvent<Events>,
+) => void;
+
+export type DiscriminatedEvent<Events extends AnyEvents> = {
+  [EventName in keyof Events]: {
+    name: EventName;
+    args: Parameters<Events[EventName]>;
+  };
+}[keyof Events];
 
 export type EmitFnFor<Events extends AnyEvents> = <
   EventName extends keyof Events,

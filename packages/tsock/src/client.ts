@@ -8,7 +8,6 @@ import type {
   AnyModules,
   EventPayload,
 } from "./module";
-import type { Subscribers } from "./EventBus";
 import { createEventBus, type EventBus } from "./EventBus";
 
 export interface ClientOptions<Context> {
@@ -44,30 +43,27 @@ function createModuleEventBus<Context>(
   socket: Socket,
   options: ClientOptions<Context>,
 ): ModuleEventBus<AnyModule> {
-  return createEventBus(
-    new Proxy({} as ModuleEvents<AnyModule>, {
-      get: (_, eventName) => (payload: unknown) => {
-        const context = options.context();
-        options.log?.("send", id(moduleName, eventName), {
-          payload,
-          context,
-        });
-        socket.send(moduleName, eventName, payload, context);
-      },
-    }),
-    new Proxy({} as Subscribers<ModuleEvents<AnyModule>>, {
-      get: (_, eventName) => (handler: (payload: unknown) => void) => {
-        const { log } = options;
-        function filter(m: string, e: string, p: unknown) {
-          log?.("receive", id(m, e), p);
-          if (m === moduleName && e === eventName) {
-            handler(p);
-          }
-        }
-        socket.onAny(filter);
-        return () => socket.offAny(filter);
-      },
-    }),
+  return createEventBus<ModuleEvents<AnyModule>, ModuleEvents<AnyModule>>(
+    (eventName, payload) => {
+      const context = options.context();
+      options.log?.("send", id(moduleName, eventName), {
+        payload,
+        context,
+      });
+      socket.send(moduleName, eventName, payload, context);
+    },
+    (handler) => {
+      function handlerWithLogging(
+        moduleName: string,
+        eventName: string,
+        payload: unknown,
+      ) {
+        options.log?.("receive", id(moduleName, eventName), payload);
+        return handler(eventName, payload);
+      }
+      socket.onAny(handlerWithLogging);
+      return () => socket.offAny(handlerWithLogging);
+    },
   );
 }
 

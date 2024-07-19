@@ -129,12 +129,15 @@ it("can subscribe to all events", () => {
 
   const receiver = vi.fn();
   bus.$subscribe(receiver);
-  send("foo");
+  send("foo", 1);
   expect(receiver).toHaveBeenCalledTimes(1);
-  expect(receiver).toHaveBeenLastCalledWith("foo");
-  send("bar");
+  expect(receiver).toHaveBeenLastCalledWith({ name: "foo", args: [1] });
+  send("bar", false);
   expect(receiver).toHaveBeenCalledTimes(2);
-  expect(receiver).toHaveBeenLastCalledWith("bar");
+  expect(receiver).toHaveBeenLastCalledWith({
+    name: "bar",
+    args: [false],
+  });
 });
 
 it("can unsubscribe after subscribing to all events", () => {
