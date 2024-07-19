@@ -12,6 +12,7 @@
     "clean": "find . -type d \\( -path \"./*/dist\" -o -path \"./*/.cache\" -o -path \"./*/.turbo\" \\) -not -path \"*/node_modules/*\" -prune -exec rm -r {} +",
     "build": "turbo run build",
     "start": "turbo run start",
+    "test": "turbo run test",
     "dev": "turbo run dev",
     "lint": "eslint . --max-warnings=0",
     "lint:fix": "eslint . --fix",

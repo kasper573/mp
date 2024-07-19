@@ -1,4 +1,4 @@
-name: Build
+name: Build and Test
 on: [push]
 
 env:
@@ -13,6 +13,13 @@ jobs:
       - uses: ./.github/workflows/composites/install/
       - run: pnpm lint
       - run: pnpm format
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/composites/install/
+      - run: pnpm test
 
   build:
     runs-on: ubuntu-latest
