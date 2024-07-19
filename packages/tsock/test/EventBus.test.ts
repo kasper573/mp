@@ -128,11 +128,32 @@ it("can subscribe to all events", () => {
   );
 
   const receiver = vi.fn();
-  bus.subscribe(receiver);
+  bus.$subscribe(receiver);
   send("foo");
   expect(receiver).toHaveBeenCalledTimes(1);
   expect(receiver).toHaveBeenLastCalledWith("foo");
   send("bar");
   expect(receiver).toHaveBeenCalledTimes(2);
   expect(receiver).toHaveBeenLastCalledWith("bar");
+});
+
+it("can unsubscribe after subscribing to all events", () => {
+  let send = (eventName: string, ...args: unknown[]) => {};
+
+  const bus = createEventBus(
+    () => {},
+    (fn) => {
+      send = fn;
+      return () => {
+        send = () => {};
+      };
+    },
+  );
+
+  const receiver = vi.fn();
+  const stop = bus.$subscribe(receiver);
+  stop();
+  send("foo");
+  send("bar");
+  expect(receiver).not.toHaveBeenCalled();
 });

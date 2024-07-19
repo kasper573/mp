@@ -8,16 +8,19 @@ export function createEventBus<
   subscribeToAllIncomingEvents = noop as SubscribeFnFor<IncomingEvents>,
 ): EventBus<OutgoingEvents, IncomingEvents> {
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
-    get(_, calledEventName: string) {
+    get(_, propertyName: string) {
+      if (propertyName === subscribeAllProperty) {
+        return subscribeToAllIncomingEvents;
+      }
       function event(
         ...args: Parameters<OutgoingEvents[keyof OutgoingEvents]>
       ): void {
-        emitOutgoingEvent(calledEventName, ...args);
+        emitOutgoingEvent(propertyName, ...args);
       }
 
       event.subscribe = (handler: IncomingEvents[keyof IncomingEvents]) =>
         subscribeToAllIncomingEvents((receivedEventName, ...args) => {
-          if (receivedEventName === calledEventName) {
+          if (receivedEventName === propertyName) {
             handler(...args);
           }
         });
@@ -39,6 +42,8 @@ export type EventBus<
   [EventName in keyof IncomingEvents]: {
     subscribe(handler: IncomingEvents[EventName]): Unsubscribe;
   };
+} & {
+  [subscribeAllProperty](handler: EmitFnFor<IncomingEvents>): Unsubscribe;
 };
 
 export type EmitFnFor<Events extends AnyEvents> = {
@@ -53,3 +58,5 @@ export type SubscribeFnFor<Events extends AnyEvents> = (
 ) => Unsubscribe;
 
 const noop = () => () => {};
+
+const subscribeAllProperty = "$subscribe" as const;
