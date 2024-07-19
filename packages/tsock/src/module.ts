@@ -8,7 +8,7 @@ export function createModule<Events extends AnyEventRecord>(
 ): Module<Events> {
   const emitter = new EventEmitter();
 
-  const bus = createEventBus<ModuleEvents<Events>, ModuleEvents<Events>>(
+  const bus = createEventBus(
     (...args) => emitter.emit("event", ...args),
     (handler) => {
       emitter.on("event", handler);
@@ -22,7 +22,7 @@ export function createModule<Events extends AnyEventRecord>(
 
   return new Proxy(bus as Module<Events>, {
     get(target, prop) {
-      if (prop === "getEventType") {
+      if (prop === eventTypeGetter) {
         return (eventName: keyof Events) => events[eventName].type;
       } else {
         return target[prop];
@@ -31,11 +31,13 @@ export function createModule<Events extends AnyEventRecord>(
   });
 }
 
+const eventTypeGetter = "$getEventType" as const;
+
 export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
   ModuleEvents<Events>,
   ModuleEvents<Events>
 > & {
-  getEventType(eventName: keyof Events): EventType;
+  [eventTypeGetter](eventName: keyof Events): EventType;
 };
 
 export type ModuleRecord<Events extends AnyModuleDefinitionRecord> = {

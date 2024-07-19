@@ -1,6 +1,6 @@
 import { Server as SocketServer } from "socket.io";
 import { id, transports } from "./shared";
-import type { AnyModuleDefinitionRecord, ModuleRecord } from "./module";
+import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 
 export { Factory } from "./factory";
 
@@ -35,10 +35,9 @@ export class Server<
     this.wss.on("connection", (socket) => {
       socket.on("message", (moduleName, eventName, payload, clientContext) => {
         const context = this.options.createContext(clientContext);
-
         const module = options.modules[moduleName];
 
-        if (module.getEventType(eventName) === "private") {
+        if (module.$getEventType(eventName) === "private") {
           this.options.log?.(
             `Event "${id(moduleName, eventName)}" is private and may not be triggered by clients`,
             { payload, context: clientContext },
