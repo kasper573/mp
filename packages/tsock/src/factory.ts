@@ -4,6 +4,7 @@ import type {
   EventType,
   AnyEventRecord,
   Module,
+  EventHandlerArg,
 } from "./module";
 import { createModule } from "./module";
 
@@ -29,8 +30,8 @@ class ModuleEventFactory<Type extends EventType, Payload, Context> {
   }
 
   create(
-    handler: EventHandler<{ payload: Payload; context: Context }> = () => {},
-  ): EventDefinition<Type, { payload: Payload; context: Context }> {
+    handler: EventHandler<EventHandlerArg<Payload, Context>> = () => {},
+  ): EventDefinition<Type, EventHandlerArg<Payload, Context>> {
     return { type: this._type, handler };
   }
 }

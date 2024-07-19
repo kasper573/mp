@@ -16,11 +16,36 @@ export function createModule<Events extends AnyEventRecord>(
     },
   );
 
-  for (const [name, { handler }] of Object.entries(events)) {
-    bus[name].subscribe(handler);
-  }
+  Object.entries(events).forEach(([name, { handler, type }]) => {
+    bus[name].subscribe((arg) => {
+      const result = isEventAllowed(arg.origin, type);
+      if (!result.ok) {
+        throw new Error(result.error);
+      }
+      handler(arg);
+    });
+  });
 
   return bus;
+}
+
+function isEventAllowed(origin: EventOrigin, type: EventType) {
+  if (type === "client-to-server" && origin === "client") {
+    return { ok: true };
+  }
+
+  if (type === "server-to-client" && origin === "server") {
+    return { ok: true };
+  }
+
+  if (type === "bidirectional") {
+    return { ok: true };
+  }
+
+  return {
+    ok: false,
+    error: `Event type ${type} is not allowed from origin ${origin}`,
+  };
 }
 
 export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
@@ -37,17 +62,20 @@ export type inferModuleDefinitions<T> =
 
 export type AnyModuleDefinitionRecord = Record<PropertyKey, AnyEventRecord>;
 
-export type AnyEventRecord<
-  Arg extends AnyEventHandlerArg = AnyEventHandlerArg,
-> = {
+export type AnyEventRecord<Arg extends EventHandlerArg = EventHandlerArg> = {
   [K: PropertyKey]: AnyEventDefinition<Arg>;
 };
 
-export type AnyEventDefinition<
-  Arg extends AnyEventHandlerArg = AnyEventHandlerArg,
-> = EventDefinition<EventType, Arg>;
+export type AnyEventDefinition<Arg extends EventHandlerArg = EventHandlerArg> =
+  EventDefinition<EventType, Arg>;
 
-export type AnyEventHandlerArg = { payload: any; context: any };
+export type EventOrigin = "client" | "server";
+
+export interface EventHandlerArg<Payload = any, Context = any> {
+  payload: Payload;
+  context: Context;
+  origin: EventOrigin;
+}
 
 export type EventType =
   | "client-to-server"
@@ -56,13 +84,13 @@ export type EventType =
 
 export type EventDefinition<
   Type extends EventType,
-  Arg extends AnyEventHandlerArg,
+  Arg extends EventHandlerArg,
 > = {
   type: Type;
   handler: EventHandler<Arg>;
 };
 
-export type EventHandler<Arg extends AnyEventHandlerArg> = (
+export type EventHandler<Arg extends EventHandlerArg> = (
   arg: MakePayloadOptional<Arg>,
 ) => void;
 
@@ -70,7 +98,7 @@ export type ModuleEvents<Events extends AnyEventRecord> = {
   [EventName in keyof Events]: Events[EventName]["handler"];
 };
 
-type MakePayloadOptional<Arg extends AnyEventHandlerArg> =
+type MakePayloadOptional<Arg extends EventHandlerArg> =
   isExactlyVoid<Arg["payload"]> extends true ? Pick<Arg, "context"> : Arg;
 
 type isExactlyVoid<T> = void extends T

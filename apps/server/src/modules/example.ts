@@ -13,6 +13,7 @@ export function createExampleModule(other: OtherModule) {
       example.chat({
         payload: { from: context.clientId, contents: payload },
         context,
+        origin: "server",
       });
     }),
     chat: t.event
