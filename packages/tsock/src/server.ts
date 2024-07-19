@@ -52,7 +52,14 @@ export class Server<
           context,
         });
 
-        module[eventName]({ payload, context });
+        try {
+          module[eventName]({ payload, context });
+        } catch (e) {
+          this.options.log?.(
+            `Error while triggering event "${id(moduleName, eventName)}"`,
+            e,
+          );
+        }
       });
     });
 
