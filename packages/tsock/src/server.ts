@@ -1,28 +1,40 @@
 import { Server as SocketServer } from "socket.io";
 import { id, transports } from "./shared";
-import type { AnyModules } from "./module";
+import type {
+  AnyEventRecord,
+  AnyModuleDefinitionRecord,
+  ModuleEvents,
+  ModuleRecord,
+} from "./module";
+import type { DiscriminatedEvent } from "./EventBus";
 
 export { Factory } from "./factory";
 
+export type { inferModuleDefinitions } from "./module";
+
 export interface CreateServerOptions<
-  Modules extends AnyModules<ServerContext>,
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
   ClientContext,
 > {
-  modules: Modules;
+  modules: ModuleRecord<ModuleDefinitions>;
   createContext: (clientContext: ClientContext) => ServerContext;
   log?: typeof console.log;
 }
 
 export class Server<
-  Modules extends AnyModules<ServerContext>,
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
   ClientContext,
 > {
   private wss: SocketServer;
 
   constructor(
-    private options: CreateServerOptions<Modules, ServerContext, ClientContext>,
+    private options: CreateServerOptions<
+      ModuleDefinitions,
+      ServerContext,
+      ClientContext
+    >,
   ) {
     this.wss = new SocketServer({ transports });
     this.wss.on("connection", (socket) => {
@@ -34,18 +46,23 @@ export class Server<
           context,
         });
 
-        options.modules[moduleName].invoke(eventName, payload, context);
+        const mod = options.modules[moduleName];
+        const event = mod[eventName];
+        event(payload, context);
       });
     });
 
     for (const [moduleName, mod] of Object.entries(options.modules)) {
-      mod.subscribeAny((eventName, payload, context) => {
-        this.options.log?.("emitting", id(moduleName, eventName), {
-          payload,
-          context,
-        });
-        this.wss.emit(moduleName, eventName, payload, context);
-      });
+      mod.$subscribe(
+        (event: DiscriminatedEvent<ModuleEvents<AnyEventRecord>>) => {
+          this.options.log?.(
+            "emitting",
+            id(moduleName, event.name),
+            ...event.args,
+          );
+          this.wss.emit(moduleName, event.name, ...event.args);
+        },
+      );
     }
   }
 

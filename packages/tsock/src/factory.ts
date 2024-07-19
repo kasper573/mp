@@ -2,34 +2,35 @@ import type {
   EventDefinition,
   EventHandler,
   EventType,
-  EventDefinitionRecord,
+  AnyEventRecord,
+  Module,
 } from "./module";
-import { Module } from "./module";
+import { createModule } from "./module";
 
 export class Factory<Context> {
-  module<Definition extends EventDefinitionRecord<Context>>(
-    definition: Definition,
-  ): Module<Definition, Context> {
-    return new Module(definition);
+  module<Events extends AnyEventRecord>(events: Events): Module<Events> {
+    return createModule(events);
   }
 
-  event = new EventFactory<"bidirectional", void, Context>("bidirectional");
+  event = new ModuleEventFactory<"bidirectional", void, Context>(
+    "bidirectional",
+  );
 }
 
-class EventFactory<Type extends EventType, Payload, Context> {
+class ModuleEventFactory<Type extends EventType, Payload, Context> {
   constructor(private _type: Type) {}
 
   payload<Payload>() {
-    return new EventFactory<Type, Payload, Context>(this._type);
+    return new ModuleEventFactory<Type, Payload, Context>(this._type);
   }
 
   type<NewType extends EventType>(newType: NewType) {
-    return new EventFactory<NewType, Payload, Context>(newType);
+    return new ModuleEventFactory<NewType, Payload, Context>(newType);
   }
 
   create(
-    handler: EventHandler<Payload, Context> = () => {},
-  ): EventDefinition<Type, Payload, Context> {
-    return { type: this._type, handler, __payloadType__: null as Payload };
+    handler: EventHandler<[Payload, Context]> = () => {},
+  ): EventDefinition<Type, [payload: Payload, context: Context]> {
+    return { type: this._type, handler };
   }
 }

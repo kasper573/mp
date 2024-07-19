@@ -1,3 +1,4 @@
+import type { inferModuleDefinitions } from "@mp/tsock/server";
 import { Factory, Server } from "@mp/tsock/server";
 
 import { createExampleModule } from "./modules/example";
@@ -21,7 +22,9 @@ function createModules() {
   };
 }
 
-export type ServerModules = ReturnType<typeof createModules>;
+export type ServerModules = inferModuleDefinitions<
+  ReturnType<typeof createModules>
+>;
 
 function createContext(clientContext: ClientContext): ServerContext {
   return clientContext;

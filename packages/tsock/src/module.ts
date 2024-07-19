@@ -1,129 +1,60 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { Unsubscribe } from "./shared";
+import { EventEmitter } from "events";
+import type { EventBus } from "./EventBus";
+import { createEventBus } from "./EventBus";
 
-/**
- * A server module is a collection of event handlers that can be invoked and
- * subscribed to.
- */
-export class Module<Events extends EventDefinitionRecord<Context>, Context> {
-  private eventSubscriptions = new Map<
-    AnyEventName<this>,
-    Set<(payload: AnyEventPayload, context: Context) => void>
-  >();
+export function createModule<Events extends AnyEventRecord>(
+  events: Events,
+): Module<Events> {
+  const emitter = new EventEmitter();
 
-  private anySubscriptions = new Set<
-    (
-      eventName: AnyEventName<this>,
-      payload: AnyEventPayload,
-      context: Context,
-    ) => void
-  >();
+  const bus = createEventBus<ModuleEvents<Events>, ModuleEvents<Events>>(
+    (...args) => emitter.emit("event", ...args),
+    (handler) => {
+      emitter.on("event", handler);
+      return () => emitter.off("event", handler);
+    },
+  );
 
-  constructor(public events: Events) {}
-
-  /**
-   * Invoke the built-in event handler and emit the event to all subscribers.
-   */
-  invoke<EventName extends AnyEventName<this>>(
-    eventName: EventName,
-    payload: EventPayload<this["events"][EventName]>,
-    context: Context,
-  ): void {
-    this.events[eventName].handler({ payload, context });
-
-    this.emit(eventName, payload, context);
+  for (const [name, { handler }] of Object.entries(events)) {
+    bus[name].subscribe(handler);
   }
 
-  /**
-   * Emit an event to all subscribers of this module.
-   */
-  emit<EventName extends AnyEventName<this>>(
-    eventName: EventName,
-    payload: EventPayload<this["events"][EventName]>,
-    context: Context,
-  ): void {
-    const handlersForEvent = this.eventSubscriptions.get(eventName);
-    if (handlersForEvent) {
-      for (const handler of handlersForEvent) {
-        handler(payload, context);
-      }
-    }
-
-    for (const handler of this.anySubscriptions) {
-      handler(eventName, payload, context);
-    }
-  }
-
-  subscribe<EventName extends AnyEventName<this>>(
-    eventName: EventName,
-    handler: (
-      payload: EventPayload<this["events"][EventName]>,
-      context: Context,
-    ) => void,
-  ): Unsubscribe {
-    let handlersForEvent = this.eventSubscriptions.get(eventName);
-    if (!handlersForEvent) {
-      handlersForEvent = new Set();
-      this.eventSubscriptions.set(eventName, handlersForEvent);
-    }
-    handlersForEvent.add(handler);
-    return () => handlersForEvent.delete(handler);
-  }
-
-  subscribeAny(
-    handler: <EventName extends AnyEventName<this>>(
-      eventName: EventName,
-      payload: EventPayload<this["events"][EventName]>,
-      context: Context,
-    ) => void,
-  ): Unsubscribe {
-    this.anySubscriptions.add(handler);
-    return () => this.anySubscriptions.delete(handler);
-  }
+  return bus;
 }
 
-export type EventDefinitionRecord<Context> = {
-  [K: PropertyKey]: EventDefinition<any, any, Context>;
+export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
+  ModuleEvents<Events>,
+  ModuleEvents<Events>
+>;
+
+export type ModuleRecord<Definitions extends AnyModuleDefinitionRecord> = {
+  [K in keyof Definitions]: Module<Definitions[K]>;
 };
+
+export type inferModuleDefinitions<T> =
+  T extends ModuleRecord<infer Definitions> ? Definitions : never;
+
+export type AnyModuleDefinitionRecord = Record<PropertyKey, AnyEventRecord>;
+
+export type AnyEventRecord = {
+  [K: PropertyKey]: AnyEventDefinition;
+};
+
+export type AnyEventDefinition = EventDefinition<EventType, any[]>;
 
 export type EventType =
   | "client-to-server"
   | "server-to-client"
   | "bidirectional";
 
-export type AnyEventDefinition<Context = any> = EventDefinition<
-  EventType,
-  any,
-  Context
->;
-
-export type EventDefinition<Type extends EventType, Payload, Context> = {
+export type EventDefinition<Type extends EventType, Args extends any[]> = {
   type: Type;
-  handler: EventHandler<Payload, Context>;
-
-  /**
-   * Don't use this field at runtime. It only exists for type inference.
-   */
-  __payloadType__: Payload;
+  handler: EventHandler<Args>;
 };
 
-export type EventHandler<Payload, Context> = (args: {
-  payload: Payload;
-  context: Context;
-}) => void;
+export type EventHandler<Args extends any[]> = (...args: Args) => void;
 
-export type EventPayload<Event extends AnyEventDefinition> =
-  Event["__payloadType__"];
-
-export type AnyModule = Module<any, any>;
-
-export type AnyEventName<M extends AnyModule> = keyof M["events"];
-
-export type AnyEventPayload = EventPayload<AnyEventDefinition>;
-
-export type AnyModules<Context = any> = Record<
-  PropertyKey,
-  Module<any, Context>
->;
-
-export type AnyModuleName<Modules extends AnyModules> = keyof Modules;
+export type ModuleEvents<Events extends AnyEventRecord> = {
+  [EventName in keyof Events]: Events[EventName]["handler"];
+};

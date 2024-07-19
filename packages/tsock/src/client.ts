@@ -2,13 +2,12 @@ import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import { id, transports } from "./shared";
 import type {
-  AnyEventName,
-  AnyModule,
-  AnyModuleName,
-  AnyModules,
-  EventPayload,
+  AnyEventDefinition,
+  AnyModuleDefinitionRecord,
+  EventHandler,
+  ModuleRecord,
 } from "./module";
-import { createEventBus, type EventBus } from "./EventBus";
+import { createEventBus } from "./EventBus";
 
 export interface ClientOptions<Context> {
   url: string;
@@ -16,24 +15,30 @@ export interface ClientOptions<Context> {
   log?: typeof console.log;
 }
 
-export class Client<Modules extends AnyModules<Context>, Context> {
+export class Client<
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
+  Context,
+> {
   private socket: Socket;
-  modules: ModuleInterface<Modules>;
+  modules: ModuleRecord<HideServerContext<ModuleDefinitions>>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports });
-    this.modules = createModuleInterface<Modules, Context>(
+    this.modules = createModuleInterface<ModuleDefinitions, Context>(
       this.socket,
       this.options,
     );
   }
 }
 
-function createModuleInterface<Modules extends AnyModules<Context>, Context>(
+function createModuleInterface<
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
+  Context,
+>(
   socket: Socket,
   options: ClientOptions<Context>,
-): ModuleInterface<Modules> {
-  return new Proxy({} as ModuleInterface<Modules>, {
+): ModuleRecord<ModuleDefinitions> {
+  return new Proxy({} as ModuleRecord<ModuleDefinitions>, {
     get: (_, moduleName) => createModuleEventBus(moduleName, socket, options),
   });
 }
@@ -42,9 +47,10 @@ function createModuleEventBus<Context>(
   moduleName: PropertyKey,
   socket: Socket,
   options: ClientOptions<Context>,
-): ModuleEventBus<AnyModule> {
-  return createEventBus<ModuleEvents<AnyModule>, ModuleEvents<AnyModule>>(
-    (eventName, payload) => {
+) {
+  return createEventBus(
+    (...args) => {
+      const [eventName, payload] = args;
       const context = options.context();
       options.log?.("send", id(moduleName, eventName), {
         payload,
@@ -67,17 +73,20 @@ function createModuleEventBus<Context>(
   );
 }
 
-type ModuleInterface<Modules extends AnyModules> = {
-  [ModuleName in AnyModuleName<Modules>]: ModuleEventBus<Modules[ModuleName]>;
+type HideServerContext<ModuleDefinitions extends AnyModuleDefinitionRecord> = {
+  [ModuleName in keyof ModuleDefinitions]: {
+    [EventName in keyof ModuleDefinitions[ModuleName]]: ClientEventDefinition<
+      ModuleDefinitions[ModuleName][EventName]
+    >;
+  };
 };
 
-type ModuleEventBus<Module extends AnyModule> = EventBus<
-  ModuleEvents<Module>,
-  ModuleEvents<Module>
->;
-
-type ModuleEvents<Module extends AnyModule> = {
-  [EventName in AnyEventName<Module>]: (
-    payload: EventPayload<Module["events"][EventName]>,
-  ) => void;
+type ClientEventDefinition<Event extends AnyEventDefinition> = {
+  type: Event["type"];
+  handler: EventHandler<OmitContext<Parameters<Event["handler"]>>>;
 };
+
+// Context is the last parameter
+type OmitContext<T extends unknown[]> = T extends [...infer Head, unknown]
+  ? Head
+  : never;
