@@ -60,3 +60,50 @@ it("can unsubscribe from event", () => {
   send(123);
   expect(receiver).not.toHaveBeenCalled();
 });
+
+it("using the same subscription handler multiple times still becomes multiple subscriptions", () => {
+  const callbacks = new Array<(payload: number) => void>();
+
+  const bus = createEventBus(
+    {},
+    {
+      foo: (fn) => {
+        callbacks.push(fn);
+        return () => {};
+      },
+    },
+  );
+
+  const receiver = vi.fn();
+  bus.foo.subscribe(receiver);
+  bus.foo.subscribe(receiver);
+  bus.foo.subscribe(receiver);
+  for (const send of callbacks) {
+    send(123);
+  }
+  expect(receiver).toBeCalledTimes(3);
+});
+
+it("does not send subscriptions to the wrong target", () => {
+  const callbacks = new Map<string, (payload: number) => void>();
+
+  const bus = createEventBus(
+    {},
+    {
+      foo: (fn) => {
+        callbacks.set("foo", fn);
+        return () => {};
+      },
+      bar: (fn) => {
+        callbacks.set("bar", fn);
+        return () => {};
+      },
+    },
+  );
+
+  const receiver = vi.fn();
+  bus.foo.subscribe(receiver);
+
+  expect(callbacks.has("foo")).toBeTruthy();
+  expect(callbacks.has("bar")).toBeFalsy();
+});
