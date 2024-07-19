@@ -2,13 +2,10 @@ import type { Unsubscribe } from "./shared";
 
 export function createEventBus<
   OutgoingEvents extends AnyEvents,
-  IncomingEvents extends AnyEvents = OutgoingEvents,
+  IncomingEvents extends AnyEvents,
 >(
   outgoingEventHandlers: OutgoingEvents,
-  subscribe: <EventName extends keyof IncomingEvents>(
-    name: EventName,
-    handler: IncomingEvents[EventName],
-  ) => Unsubscribe,
+  incomingEventSubscribers = {} as Subscribers<IncomingEvents>,
 ): EventBus<OutgoingEvents, IncomingEvents> {
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
     get(_, eventName) {
@@ -17,7 +14,7 @@ export function createEventBus<
       }
 
       send.subscribe = (receive: (payload: unknown) => void) =>
-        subscribe(eventName, receive as never);
+        incomingEventSubscribers[eventName](receive as never);
 
       return send;
     },
@@ -36,4 +33,10 @@ export type EventBus<
   [EventName in keyof IncomingEvents]: {
     subscribe(handler: IncomingEvents[EventName]): Unsubscribe;
   };
+};
+
+type Subscribers<IncomingEvents extends AnyEvents> = {
+  [EventName in keyof IncomingEvents]: (
+    receive: IncomingEvents[EventName],
+  ) => Unsubscribe;
 };
