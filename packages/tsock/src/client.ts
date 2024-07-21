@@ -7,7 +7,7 @@ import type {
   AnyModuleDefinitionRecord,
   EventDefinition,
   EventHandler,
-  EventOrigin,
+  EventType,
 } from "./module";
 import type { EventBus } from "./event";
 import { createEventBus } from "./event";
@@ -63,7 +63,7 @@ function createModuleEventBus<Context>(
   return createEventBus(
     (eventName, ...args) => {
       const [payload] = args;
-      logger?.chain(eventName).info(">>", payload);
+      logger?.chain(eventName).info(payload);
       socket.emit(
         "message",
         transformer.serialize({
@@ -80,7 +80,6 @@ function createModuleEventBus<Context>(
       ) => {
         const msg = transformer.parse(serializedData);
         if (msg.moduleName === moduleName) {
-          logger?.chain(msg.eventName).info("<<", msg.payload);
           sendToBus(msg.eventName, msg.payload);
         }
       };
@@ -105,32 +104,34 @@ type ClientModule<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
 >;
 
 type ClientToServerEvents<Events extends AnyEventRecord> = {
-  [EventName in EventNamesForOrigin<Events, "client">]: ClientEventHandler<
-    Events[EventName]
-  >;
+  [EventName in EventNamesForType<
+    Events,
+    "client-to-server"
+  >]: ClientEventHandler<Events[EventName]>;
 };
 
 type ServerToClientEvents<Events extends AnyEventRecord> = {
-  [EventName in EventNamesForOrigin<Events, "server">]: ClientEventHandler<
-    Events[EventName]
-  >;
+  [EventName in EventNamesForType<
+    Events,
+    "server-to-client"
+  >]: ClientEventHandler<Events[EventName]>;
 };
 
 type ClientEventHandler<
   Event extends AnyEventDefinition,
-  Origin extends EventOrigin = EventOrigin,
+  Type extends EventType = EventType,
 > =
-  Event extends EventDefinition<Origin, infer Arg>
+  Event extends EventDefinition<Type, infer Arg>
     ? EventHandler<Arg["payload"]>
     : never;
 
 // This seems to cause the language service to fail to go to definition
 // on module events even though it resolves to the correct types
-type EventNamesForOrigin<
+type EventNamesForType<
   Events extends AnyEventRecord,
-  Origin extends EventOrigin,
+  Type extends EventType,
 > = {
-  [Key in keyof Events]: Events[Key] extends EventDefinition<Origin>
+  [Key in keyof Events]: Events[Key] extends EventDefinition<Type>
     ? Key
     : never;
 }[keyof Events];

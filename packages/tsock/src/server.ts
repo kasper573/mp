@@ -2,7 +2,7 @@ import { Server as SocketServer } from "socket.io";
 import type {
   EventDefinition,
   EventHandlerArg,
-  EventOrigin,
+  EventType,
   Module,
 } from "./module";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
@@ -89,7 +89,7 @@ export class Server<
         const module = modules[moduleName];
         const log = this.logger?.chain(moduleName, eventName);
 
-        if (module.$getEventOrigin(eventName) !== "client") {
+        if (module.$getEventType(eventName) !== "client-to-server") {
           log?.warn(`event may not be triggered by clients`, {
             payload,
             clientContext,
@@ -98,7 +98,7 @@ export class Server<
           return;
         }
 
-        log?.info(`<<`, { payload, clientContext });
+        log?.info({ payload, clientContext });
 
         try {
           module[eventName]({
@@ -114,7 +114,10 @@ export class Server<
     for (const moduleName in options.modules) {
       const module = options.modules[moduleName];
       module.$subscribe((event) => {
-        this.logger?.chain(moduleName, event.name).info(">>", ...event.args);
+        if (module.$getEventType(event.name) !== "server-to-client") {
+          return;
+        }
+
         this.wss.emit(
           "message",
           transformer.serialize({
@@ -147,9 +150,6 @@ export interface CreateServerContextOptions<ClientContext> {
  * An optional module that can be used to handle server connection events.
  */
 export type ServerConnectionModule<ServerContext> = Module<{
-  connect: EventDefinition<EventOrigin, EventHandlerArg<void, ServerContext>>;
-  disconnect: EventDefinition<
-    EventOrigin,
-    EventHandlerArg<void, ServerContext>
-  >;
+  connect: EventDefinition<EventType, EventHandlerArg<void, ServerContext>>;
+  disconnect: EventDefinition<EventType, EventHandlerArg<void, ServerContext>>;
 }>;

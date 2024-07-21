@@ -23,7 +23,7 @@ export function createModule<Events extends AnyEventRecord>(
   return new Proxy(bus as Module<Events>, {
     get(target, prop) {
       if (prop === eventTypeGetter) {
-        return (eventName: keyof Events) => events[eventName].origin;
+        return (eventName: keyof Events) => events[eventName].type;
       } else {
         return target[prop];
       }
@@ -31,13 +31,13 @@ export function createModule<Events extends AnyEventRecord>(
   });
 }
 
-const eventTypeGetter = "$getEventOrigin" as const;
+const eventTypeGetter = "$getEventType" as const;
 
 export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
   ModuleEvents<Events>,
   ModuleEvents<Events>
 > & {
-  [eventTypeGetter](eventName: keyof Events): EventOrigin;
+  [eventTypeGetter](eventName: keyof Events): EventType;
 };
 
 export type ModuleRecord<Events extends AnyModuleDefinitionRecord> = {
@@ -54,20 +54,20 @@ export type AnyEventRecord<Arg extends EventHandlerArg = EventHandlerArg> = {
 };
 
 export type AnyEventDefinition<Arg extends EventHandlerArg = EventHandlerArg> =
-  EventDefinition<EventOrigin, Arg>;
+  EventDefinition<EventType, Arg>;
 
 export interface EventHandlerArg<Payload = any, Context = any> {
   payload: Payload;
   context: Context;
 }
 
-export type EventOrigin = "client" | "server";
+export type EventType = "client-to-server" | "server-to-client" | "server-only";
 
 export type EventDefinition<
-  Origin extends EventOrigin,
+  Type extends EventType,
   Arg extends EventHandlerArg = EventHandlerArg,
 > = {
-  origin: Origin;
+  type: Type;
   handler: EventHandler<Arg>;
 };
 

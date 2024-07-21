@@ -1,7 +1,7 @@
 import type {
   EventDefinition,
   EventHandler,
-  EventOrigin,
+  EventType,
   AnyEventRecord,
   Module,
   EventHandlerArg,
@@ -13,24 +13,26 @@ export class Factory<Context> {
     return createModule(events);
   }
 
-  event = new ModuleEventFactory<"client", void, Context>("client");
+  event = new ModuleEventFactory<"client-to-server", void, Context>(
+    "client-to-server",
+  );
 }
 
-class ModuleEventFactory<Origin extends EventOrigin, Payload, Context> {
-  constructor(private _origin: Origin) {}
+class ModuleEventFactory<Type extends EventType, Payload, Context> {
+  constructor(private _type: Type) {}
 
   payload<Payload>() {
-    return new ModuleEventFactory<Origin, Payload, Context>(this._origin);
+    return new ModuleEventFactory<Type, Payload, Context>(this._type);
   }
 
-  origin<NewOrigin extends EventOrigin>(newOrigin: NewOrigin) {
-    return new ModuleEventFactory<NewOrigin, Payload, Context>(newOrigin);
+  type<NewType extends EventType>(newType: NewType) {
+    return new ModuleEventFactory<NewType, Payload, Context>(newType);
   }
 
   create(
     handler: EventHandler<EventHandlerArg<Payload, Context>> = noop,
-  ): EventDefinition<Origin, EventHandlerArg<Payload, Context>> {
-    return { origin: this._origin, handler: handler };
+  ): EventDefinition<Type, EventHandlerArg<Payload, Context>> {
+    return { type: this._type, handler: handler };
   }
 }
 
