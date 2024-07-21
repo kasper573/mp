@@ -5,6 +5,13 @@ const entities = new Map<Entity["id"], EntityView>();
 
 api.player.state.subscribe(renderPlayerState);
 
+document.addEventListener("mousemove", (e) => {
+  const { clientX, clientY } = e;
+  const x = clientX / window.innerWidth;
+  const y = clientY / window.innerHeight;
+  api.player.move({ x, y });
+});
+
 function renderPlayerState(scene: PlayerState) {
   const remainingEntityIds = new Set(entities.keys());
   for (const entityState of scene.currentScene.entities.values()) {

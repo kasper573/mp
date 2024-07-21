@@ -32,7 +32,13 @@ export function createPlayerModule(connection: ConnectionModule) {
   });
 
   const player = t.module({
-    move: t.event.payload<Position>().create(({ payload, context }) => {}),
+    move: t.event.payload<Position>().create(({ payload, context }) => {
+      const entity = state.currentScene.entities.get(context.clientId);
+      if (entity) {
+        entity.position = payload;
+        player.state({ payload: state, context });
+      }
+    }),
     state: t.event
       .origin("server")
       .payload<PlayerState>()
