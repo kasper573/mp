@@ -1,6 +1,6 @@
 import type { Entity, PlayerState } from "@mp/server";
 import uniqolor from "uniqolor";
-import { Vec2 } from "@mp/data";
+import { v2 } from "@mp/data";
 import { api } from "./api";
 
 const canvas = document.querySelector("canvas")!;
@@ -19,7 +19,7 @@ canvas.addEventListener("click", (e) => {
   const { clientX, clientY } = e;
   const x = clientX / canvas.width;
   const y = clientY / canvas.height;
-  api.player.move(new Vec2(x, y));
+  api.player.move(v2(x, y));
 });
 
 function renderWorld({ currentScene }: PlayerState) {

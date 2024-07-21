@@ -1,27 +1,29 @@
-export class Vec2 {
-  constructor(
-    public readonly x: number,
-    public readonly y: number,
-  ) {}
+export interface Vec2 {
+  x: number;
+  y: number;
+}
 
-  distance(b: Vec2): number {
-    return Math.sqrt((this.x - b.x) ** 2 + (this.y - b.y) ** 2);
-  }
+export function v2(x: number, y: number): Vec2 {
+  return { x, y };
+}
 
-  angle(b: Vec2): number {
-    return Math.atan2(b.y - this.y, b.x - this.x);
-  }
+export function v2_distance(a: Vec2, b: Vec2): number {
+  return Math.sqrt((a.x - b.x) ** 2 + (a.y - b.y) ** 2);
+}
 
-  direction(b: Vec2): Vec2 {
-    const angle = this.angle(b);
-    return new Vec2(Math.cos(angle), Math.sin(angle));
-  }
+export function v2_angle(a: Vec2, b: Vec2): number {
+  return Math.atan2(b.y - a.y, b.x - a.x);
+}
 
-  mult(s: number): Vec2 {
-    return new Vec2(this.x * s, this.y * s);
-  }
+export function v2_direction(a: Vec2, b: Vec2): Vec2 {
+  const angle = v2_angle(a, b);
+  return v2(Math.cos(angle), Math.sin(angle));
+}
 
-  add(b: Vec2): Vec2 {
-    return new Vec2(this.x + b.x, this.y + b.y);
-  }
+export function v2_mult(a: Vec2, s: number): Vec2 {
+  return v2(a.x * s, a.y * s);
+}
+
+export function v2_add(a: Vec2, b: Vec2): Vec2 {
+  return v2(a.x + b.x, a.y + b.y);
 }

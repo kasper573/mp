@@ -1,4 +1,5 @@
-import { Vec2 } from "@mp/data";
+import type { Vec2 } from "@mp/data";
+import { v2, v2_add, v2_direction, v2_distance, v2_mult } from "@mp/data";
 import { clamp } from "@mp/data";
 import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
@@ -19,7 +20,7 @@ export function createPlayerModule(connection: ConnectionModule) {
   connection.$subscribe(({ name, args: [{ context }] }) => {
     switch (name) {
       case "connect": {
-        const position = new Vec2(Math.random(), Math.random());
+        const position = v2(Math.random(), Math.random());
         state.currentScene.entities.set(context.clientId, {
           id: context.clientId,
           name: context.clientId,
@@ -69,14 +70,15 @@ export function createPlayerModule(connection: ConnectionModule) {
 function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
   const { position, targetPosition, speed } = entity;
 
-  const distanceRemaining = position.distance(targetPosition);
+  const distanceRemaining = v2_distance(position, targetPosition);
   const distanceTraversedThisTick = speed * deltaTime;
   const distance = clamp(distanceTraversedThisTick, 0, distanceRemaining);
   if (distance === 0) {
     return;
   }
 
-  entity.position = entity.position.add(
-    position.direction(targetPosition).mult(distance),
+  entity.position = v2_add(
+    entity.position,
+    v2_mult(v2_direction(position, targetPosition), distance),
   );
 }
