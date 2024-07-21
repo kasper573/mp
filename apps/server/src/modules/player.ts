@@ -47,14 +47,14 @@ export function createPlayerModule(connection: ConnectionModule) {
       }
     }),
     state: t.event
-      .origin("server")
+      .type("server-to-client")
       .payload<PlayerState>()
       .create(() => {
         return state;
       }),
 
-    // TODO .origin("internal") and remove context from event handler
     tick: t.event
+      .type("server-only")
       .payload<{ deltaTime: number }>()
       .create(({ payload: { deltaTime } }) => {
         state.currentScene.entities.forEach((entity) =>
