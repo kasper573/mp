@@ -1,30 +1,34 @@
 import type { inferModuleDefinitions } from "@mp/tsock/server";
 import { Logger } from "@mp/tsock/server";
 import { Factory, Server } from "@mp/tsock/server";
+import { createPlayerModule } from "./modules/player";
+import type { ConnectionModule } from "./modules/connection";
+import { createConnectionModule } from "./modules/connection";
 
-import { createExampleModule } from "./modules/example";
-import { createOtherModule } from "./modules/other";
-export type * from "./modules/example";
+export type * from "./modules/scene";
+export type * from "./modules/player";
+export type * from "./modules/entity";
 
 export function createServer(logger = new Logger(console)) {
-  return new Server({
-    modules: createModules(),
+  const connection = createConnectionModule();
+  const server = new Server({
+    modules: createExposedModules(connection),
+    connection,
     createContext,
     logger,
   });
+
+  return server;
 }
 
-function createModules() {
-  const other = createOtherModule();
-  const example = createExampleModule(other);
+function createExposedModules(connection: ConnectionModule) {
   return {
-    example,
-    other,
+    player: createPlayerModule(connection),
   };
 }
 
 export type ServerModules = inferModuleDefinitions<
-  ReturnType<typeof createModules>
+  ReturnType<typeof createExposedModules>
 >;
 
 function createContext(clientContext: ClientContext): ServerContext {
