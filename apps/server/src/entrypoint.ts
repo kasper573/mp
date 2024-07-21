@@ -12,4 +12,4 @@ setInterval(() => {
   const deltaTime = now - last;
   last = now;
   server.tick({ deltaTime });
-}, 500);
+}, env.tickInterval);
