@@ -1,12 +1,11 @@
 import type { Entity, PlayerState } from "@mp/server";
 import uniqolor from "uniqolor";
+import { Vec2 } from "@mp/data";
 import { api } from "./api";
 
 const canvas = document.querySelector("canvas")!;
-const canvasContext = canvas.getContext("2d")!;
-const entities = new Map<Entity["id"], EntityView>();
 
-api.player.state.subscribe(renderPlayerState);
+api.player.state.subscribe(renderWorld);
 window.addEventListener("resize", resizeCanvas);
 
 resizeCanvas();
@@ -16,71 +15,30 @@ function resizeCanvas() {
   canvas.height = window.innerHeight;
 }
 
-canvas.addEventListener("mousemove", (e) => {
+canvas.addEventListener("click", (e) => {
   const { clientX, clientY } = e;
   const x = clientX / canvas.width;
   const y = clientY / canvas.height;
-  api.player.move({ x, y });
+  api.player.move(new Vec2(x, y));
 });
 
-document.addEventListener("mousedown", (e) => {
-  canvasContext.clearRect(0, 0, canvas.width, canvas.height);
-});
-
-function renderPlayerState(scene: PlayerState) {
-  const remainingEntityIds = new Set(entities.keys());
-  for (const entity of scene.currentScene.entities.values()) {
-    const entityColor = uniqolor(entity.id).color;
-    remainingEntityIds.delete(entity.id);
-    let view = entities.get(entity.id);
-    if (!view) {
-      view = new EntityView(entity);
-      document.body.appendChild(view.element);
-      entities.set(entity.id, view);
-    } else {
-      view.update(entity);
-    }
-
-    canvasContext.fillStyle = entityColor;
-    canvasContext.fillRect(
-      entity.position.x * canvas.width,
-      entity.position.y * canvas.height,
-      5,
-      5,
-    );
-  }
-
-  for (const id of remainingEntityIds) {
-    const entity = entities.get(id);
-    if (entity) {
-      entity.element.remove();
-      entities.delete(id);
-    }
+function renderWorld({ currentScene }: PlayerState) {
+  const ctx = canvas.getContext("2d")!;
+  ctx.reset();
+  for (const entity of currentScene.entities.values()) {
+    drawEntity(ctx, entity);
   }
 }
 
-class EntityView {
-  readonly element = document.createElement("div");
-  constructor(private state: Entity) {
-    this.render();
-  }
+function drawEntity(ctx: CanvasRenderingContext2D, entity: Entity) {
+  const { position, targetPosition } = entity;
+  const x = position.x * canvas.width;
+  const y = position.y * canvas.height;
 
-  update(newState: Entity) {
-    this.state = newState;
-    this.render();
-  }
+  ctx.fillStyle = uniqolor(entity.id).color;
+  ctx.fillRect(x, y, 10, 10);
 
-  private render() {
-    const { x, y } = this.state.position;
-    Object.assign(this.element.style, {
-      position: "absolute",
-      width: "5px",
-      height: "5px",
-      borderRadius: "50%",
-      background: "white",
-      left: `${x * 100}%`,
-      top: `${y * 100}%`,
-      transform: `translate(-50%, -50%)`,
-    } satisfies Partial<CSSStyleDeclaration>);
-  }
+  const x2 = targetPosition.x * canvas.width;
+  const y2 = targetPosition.y * canvas.height;
+  ctx.fillRect(x2, y2, 2, 2);
 }

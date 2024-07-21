@@ -1,27 +1,32 @@
-import type {
-  CreateServerContextOptions,
-  inferModuleDefinitions,
-} from "@mp/tsock/server";
+import type { inferModuleDefinitions } from "@mp/tsock/server";
 import { Logger } from "@mp/tsock/server";
-import { Factory, Server } from "@mp/tsock/server";
+import { Server } from "@mp/tsock/server";
 import { createPlayerModule } from "./modules/player";
 import type { ConnectionModule } from "./modules/connection";
 import { createConnectionModule } from "./modules/connection";
-
-export type * from "./modules/scene";
-export type * from "./modules/player";
-export type * from "./modules/entity";
+import type { ServerContext } from "./context";
+import { createContext } from "./context";
 
 export function createServer(logger = new Logger(console)) {
   const connection = createConnectionModule();
+  const modules = createExposedModules(connection);
   const server = new Server({
-    modules: createExposedModules(connection),
+    modules,
     connection,
     createContext,
     logger,
   });
 
-  return server;
+  const context: ServerContext = { clientId: "server" };
+
+  function tick(payload: { deltaTime: number }) {
+    modules.player.tick({ payload, context });
+  }
+
+  return {
+    listen: (port: number) => server.listen(port),
+    tick,
+  };
 }
 
 function createExposedModules(connection: ConnectionModule) {
@@ -33,17 +38,3 @@ function createExposedModules(connection: ConnectionModule) {
 export type ServerModules = inferModuleDefinitions<
   ReturnType<typeof createExposedModules>
 >;
-
-function createContext({
-  clientId,
-}: CreateServerContextOptions<ClientContext>): ServerContext {
-  return { clientId };
-}
-
-export interface ServerContext {
-  clientId: string;
-}
-
-export interface ClientContext {}
-
-export const t = new Factory<ServerContext>();

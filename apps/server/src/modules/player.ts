@@ -1,7 +1,9 @@
-import type { Scene } from "../definition";
-import { t } from "../definition";
+import { Vec2 } from "@mp/data";
+import { clamp } from "@mp/data";
+import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
-import type { Position } from "./entity";
+import type { Entity } from "./entity";
+import type { Scene } from "./scene";
 
 export interface PlayerState {
   currentScene: Scene;
@@ -16,13 +18,17 @@ export function createPlayerModule(connection: ConnectionModule) {
 
   connection.$subscribe(({ name, args: [{ context }] }) => {
     switch (name) {
-      case "connect":
+      case "connect": {
+        const position = new Vec2(Math.random(), Math.random());
         state.currentScene.entities.set(context.clientId, {
           id: context.clientId,
           name: context.clientId,
-          position: { x: Math.random(), y: Math.random() },
+          position,
+          targetPosition: position,
+          speed: (10 + 10 * Math.random()) / 100,
         });
         break;
+      }
       case "disconnect":
         state.currentScene.entities.delete(context.clientId);
         break;
@@ -32,10 +38,10 @@ export function createPlayerModule(connection: ConnectionModule) {
   });
 
   const player = t.module({
-    move: t.event.payload<Position>().create(({ payload, context }) => {
+    move: t.event.payload<Vec2>().create(({ payload, context }) => {
       const entity = state.currentScene.entities.get(context.clientId);
       if (entity) {
-        entity.position = payload;
+        entity.targetPosition = payload;
         player.state({ payload: state, context });
       }
     }),
@@ -45,7 +51,32 @@ export function createPlayerModule(connection: ConnectionModule) {
       .create(() => {
         return state;
       }),
+
+    // TODO .origin("internal") and remove context from event handler
+    tick: t.event
+      .payload<{ deltaTime: number }>()
+      .create(({ payload: { deltaTime } }) => {
+        state.currentScene.entities.forEach((entity) =>
+          moveEntityTowardsTarget(entity, deltaTime),
+        );
+        player.state({ payload: state, context: { clientId: "server" } });
+      }),
   });
 
   return player;
+}
+
+function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
+  const { position, targetPosition, speed } = entity;
+
+  const distanceRemaining = position.distance(targetPosition);
+  const distanceTraversedThisTick = speed * deltaTime;
+  const distance = clamp(distanceTraversedThisTick, 0, distanceRemaining);
+  if (distance === 0) {
+    return;
+  }
+
+  entity.position = entity.position.add(
+    position.direction(targetPosition).mult(distance),
+  );
 }

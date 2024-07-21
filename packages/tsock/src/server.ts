@@ -50,7 +50,7 @@ export class Server<
   }
 
   constructor(
-    private options: CreateServerOptions<
+    protected readonly options: CreateServerOptions<
       ModuleDefinitions,
       ServerContext,
       ClientContext

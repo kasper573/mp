@@ -1,4 +1,4 @@
-import { t } from "../definition";
+import { t } from "../tsock";
 
 export type ConnectionModule = ReturnType<typeof createConnectionModule>;
 export function createConnectionModule() {

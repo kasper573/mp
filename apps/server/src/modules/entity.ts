@@ -1,10 +1,9 @@
+import type { Vec2 } from "@mp/data";
+
 export interface Entity {
   id: string;
   name: string;
-  position: Position;
-}
-
-export interface Position {
-  x: number;
-  y: number;
+  position: Vec2;
+  targetPosition: Vec2;
+  speed: number;
 }
