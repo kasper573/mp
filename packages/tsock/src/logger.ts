@@ -50,6 +50,6 @@ function decoratePrefix(prefix: unknown) {
 
 const logLevelColors = {
   error: chalk.red,
-  info: chalk.blueBright,
+  info: (v) => v,
   warn: chalk.yellow,
 } satisfies Record<LogLevel, (s: string) => string>;
