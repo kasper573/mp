@@ -1,10 +1,10 @@
-import type { Entity, PlayerState } from "@mp/server";
+import type { Entity, World } from "@mp/data";
 import uniqolor from "uniqolor";
 import { v2 } from "@mp/data";
 import { api } from "./api";
 
 const canvas = document.querySelector("canvas")!;
-let state: PlayerState | undefined;
+let world: World | undefined;
 renderNextFrame();
 
 api.player.state.subscribe(renderWorld);
@@ -26,17 +26,17 @@ canvas.addEventListener("click", (e) => {
 
 function renderNextFrame() {
   requestAnimationFrame(() => {
-    if (state) {
-      renderWorld(state);
+    if (world) {
+      renderWorld(world);
     }
     renderNextFrame();
   });
 }
 
-function renderWorld({ currentScene }: PlayerState) {
+function renderWorld({ entities }: World) {
   const ctx = canvas.getContext("2d")!;
   ctx.reset();
-  for (const entity of currentScene.entities.values()) {
+  for (const entity of entities.values()) {
     drawEntity(ctx, entity);
   }
 }

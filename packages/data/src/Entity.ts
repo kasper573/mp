@@ -1,4 +1,4 @@
-import type { Vec2 } from "@mp/data";
+import type { Vec2 } from "./Vec2";
 
 export interface Entity {
   id: string;

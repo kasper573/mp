@@ -1,65 +1,50 @@
-import type { Vec2 } from "@mp/data";
+import type { Entity, Vec2, World } from "@mp/data";
 import { v2, v2_moveTowards } from "@mp/data";
 import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
-import type { Entity } from "./entity";
-import type { Scene } from "./scene";
-
-export interface PlayerState {
-  currentScene: Scene;
-}
 
 export function createPlayerModule(connection: ConnectionModule) {
-  const state: PlayerState = {
-    currentScene: {
-      entities: new Map(),
-    },
+  const world: World = {
+    entities: new Map(),
   };
 
   connection.$subscribe(({ name, args: [{ context }] }) => {
     switch (name) {
       case "connect": {
-        const position = v2(Math.random(), Math.random());
-        state.currentScene.entities.set(context.clientId, {
-          id: context.clientId,
-          name: context.clientId,
-          position,
-          targetPosition: position,
-          speed: (10 + 10 * Math.random()) / 100,
-        });
+        const entity = createRandomEntity(context.clientId);
+        world.entities.set(entity.id, entity);
         break;
       }
       case "disconnect":
-        state.currentScene.entities.delete(context.clientId);
+        world.entities.delete(context.clientId);
         break;
     }
 
-    player.state({ payload: state, context });
+    player.state({ payload: world, context });
   });
 
   const player = t.module({
     move: t.event.payload<Vec2>().create(({ payload, context }) => {
-      const entity = state.currentScene.entities.get(context.clientId);
+      const entity = world.entities.get(context.clientId);
       if (entity) {
         entity.targetPosition = payload;
-        player.state({ payload: state, context });
+        player.state({ payload: world, context });
       }
     }),
+
     state: t.event
       .type("server-to-client")
-      .payload<PlayerState>()
-      .create(() => {
-        return state;
-      }),
+      .payload<World>()
+      .create(() => world),
 
     tick: t.event
       .type("server-only")
       .payload<{ deltaTime: number }>()
       .create(({ payload: { deltaTime } }) => {
-        state.currentScene.entities.forEach((entity) =>
+        world.entities.forEach((entity) =>
           moveEntityTowardsTarget(entity, deltaTime),
         );
-        player.state({ payload: state, context: { clientId: "server" } });
+        player.state({ payload: world, context: { clientId: "server" } });
       }),
   });
 
@@ -72,4 +57,15 @@ function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
     entity.targetPosition,
     entity.speed * deltaTime,
   );
+}
+
+function createRandomEntity(clientId: string): Entity {
+  const position = v2(Math.random(), Math.random());
+  return {
+    id: clientId,
+    name: clientId,
+    position,
+    targetPosition: position,
+    speed: (10 + 10 * Math.random()) / 100,
+  };
 }
