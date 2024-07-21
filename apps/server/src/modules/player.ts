@@ -1,14 +1,11 @@
-import type { Entity, Vec2, World } from "@mp/data";
-import { v2, v2_moveTowards } from "@mp/data";
+import type { Entity, Vec2 } from "@mp/data";
+import { setTemporalTarget, temporal, v2 } from "@mp/data";
 import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
 
 export function createPlayerModule(connection: ConnectionModule) {
-  const world: World = {
-    entities: new Map(),
-  };
-
   connection.$subscribe(({ name, args: [{ context }] }) => {
+    const { world } = context;
     switch (name) {
       case "connect": {
         const entity = createRandomEntity(context.clientId);
@@ -19,44 +16,17 @@ export function createPlayerModule(connection: ConnectionModule) {
         world.entities.delete(context.clientId);
         break;
     }
-
-    player.state({ payload: world, context });
   });
 
-  const player = t.module({
+  return t.module({
     move: t.event.payload<Vec2>().create(({ payload, context }) => {
+      const { world, time } = context;
       const entity = world.entities.get(context.clientId);
       if (entity) {
-        entity.targetPosition = payload;
-        player.state({ payload: world, context });
+        setTemporalTarget(entity.position, payload, time);
       }
     }),
-
-    state: t.event
-      .type("server-to-client")
-      .payload<World>()
-      .create(() => world),
-
-    tick: t.event
-      .type("server-only")
-      .payload<{ deltaTime: number }>()
-      .create(({ payload: { deltaTime } }) => {
-        world.entities.forEach((entity) =>
-          moveEntityTowardsTarget(entity, deltaTime),
-        );
-        player.state({ payload: world, context: { clientId: "server" } });
-      }),
   });
-
-  return player;
-}
-
-function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
-  entity.position = v2_moveTowards(
-    entity.position,
-    entity.targetPosition,
-    entity.speed * deltaTime,
-  );
 }
 
 function createRandomEntity(clientId: string): Entity {
@@ -64,8 +34,7 @@ function createRandomEntity(clientId: string): Entity {
   return {
     id: clientId,
     name: clientId,
-    position,
-    targetPosition: position,
+    position: temporal(position),
     speed: (10 + 10 * Math.random()) / 100,
   };
 }

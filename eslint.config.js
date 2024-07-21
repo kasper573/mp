@@ -32,6 +32,9 @@ export default tseslint.config(
 
       // Automatically enforces type-only imports. Reduces need for tree shaking in builds.
       "@typescript-eslint/consistent-type-imports": "warn",
+
+      // {} is useful as empty set
+      "@typescript-eslint/ban-types": "off",
     },
   },
 );

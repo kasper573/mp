@@ -37,10 +37,11 @@ export class Server<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
   ClientContext,
+  ClientState,
 > {
   private wss: SocketServer<
     SocketIO_ClientToServerEvents<ClientContext>,
-    SocketIO_ServerToClientEvents,
+    SocketIO_ServerToClientEvents<ClientState>,
     object,
     SocketIO_Data<ClientContext>
   >;
@@ -110,24 +111,11 @@ export class Server<
         }
       });
     });
+  }
 
-    for (const moduleName in options.modules) {
-      const module = options.modules[moduleName];
-      module.$subscribe((event) => {
-        if (module.$getEventType(event.name) !== "server-to-client") {
-          return;
-        }
-
-        this.wss.emit(
-          "message",
-          transformer.serialize({
-            moduleName: String(moduleName),
-            eventName: String(event.name),
-            payload: event.args[0].payload,
-          }),
-        );
-      });
-    }
+  sendClientState(clientId: string, clientState: ClientState) {
+    const socket = this.wss.sockets.sockets.get(clientId);
+    socket?.emit("clientState", transformer.serialize(clientState));
   }
 
   listen(port: number) {

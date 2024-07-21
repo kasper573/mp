@@ -30,6 +30,14 @@ export function v2_add(a: Vec2, b: Vec2): Vec2 {
   return v2(a.x + b.x, a.y + b.y);
 }
 
+export function v2_lerp(a: Vec2, b: Vec2, t: number): Vec2 {
+  return v2(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+}
+
+export function v2_equals(a: Vec2, b: Vec2): boolean {
+  return float_equals(a.x, b.x) && float_equals(a.y, b.y);
+}
+
 export function v2_moveTowards(
   v: Vec2,
   target: Vec2,
@@ -38,9 +46,13 @@ export function v2_moveTowards(
   const distanceRemaining = v2_distance(v, target);
   const distanceTraversedThisTick = desiredDistance;
   const distance = clamp(distanceTraversedThisTick, 0, distanceRemaining);
-  if (distance === 0) {
-    return v;
-  }
 
   return v2_add(v, v2_mult(v2_direction(v, target), distance));
 }
+
+function float_equals(a: number, b: number) {
+  const diff = Math.abs(b - a);
+  return diff < EPSILON;
+}
+
+const EPSILON = 0.000000001;

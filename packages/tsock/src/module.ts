@@ -61,7 +61,7 @@ export interface EventHandlerArg<Payload = any, Context = any> {
   context: Context;
 }
 
-export type EventType = "client-to-server" | "server-to-client" | "server-only";
+export type EventType = "client-to-server" | "server-only";
 
 export type EventDefinition<
   Type extends EventType,

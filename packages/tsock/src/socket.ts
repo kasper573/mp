@@ -14,12 +14,6 @@ export interface SocketIO_ClientToServerEvents<ClientContext> {
   context: (clientContext: Serialized<ClientContext>) => void;
 }
 
-export interface SocketIO_ServerToClientEvents {
-  message: (
-    data: Serialized<{
-      moduleName: string;
-      eventName: string;
-      payload: unknown;
-    }>,
-  ) => void;
+export interface SocketIO_ServerToClientEvents<ClientState> {
+  clientState: (data: Serialized<ClientState>) => void;
 }

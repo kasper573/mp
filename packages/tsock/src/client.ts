@@ -9,12 +9,13 @@ import type {
   EventHandler,
   EventType,
 } from "./module";
-import type { EventBus } from "./event";
+import type { EventBus, Unsubscribe } from "./event";
 import { createEventBus } from "./event";
 import type {
   SocketIO_ClientToServerEvents,
   SocketIO_ServerToClientEvents,
 } from "./socket";
+import type { Serialized } from "./transformer";
 import { transformer } from "./transformer";
 
 export { Logger };
@@ -28,25 +29,36 @@ export interface ClientOptions<Context> {
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   Context,
+  State,
 > {
-  private socket: ClientSocket<Context>;
+  private socket: ClientSocket<Context, State>;
   modules: ClientModuleRecord<ModuleDefinitions>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports: ["websocket"] });
     this.socket.emit("context", transformer.serialize(options.context()));
-    this.modules = createModuleInterface<ModuleDefinitions, Context>(
+    this.modules = createModuleInterface<ModuleDefinitions, Context, State>(
       this.socket,
       this.options,
     );
   }
+
+  subscribeToState = (
+    handleStateChange: (state: State) => void,
+  ): Unsubscribe => {
+    const handler = (serializedState: Serialized<State>) =>
+      handleStateChange(transformer.parse(serializedState));
+    this.socket.on("clientState", handler);
+    return () => this.socket.off("clientState", handler);
+  };
 }
 
 function createModuleInterface<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   Context,
+  State,
 >(
-  socket: ClientSocket<Context>,
+  socket: ClientSocket<Context, State>,
   options: ClientOptions<Context>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
@@ -54,43 +66,29 @@ function createModuleInterface<
   });
 }
 
-function createModuleEventBus<Context>(
+function createModuleEventBus<Context, State>(
   moduleName: PropertyKey,
-  socket: ClientSocket<Context>,
+  socket: ClientSocket<Context, State>,
   options: ClientOptions<Context>,
 ) {
   const logger = options.logger?.chain(moduleName);
-  return createEventBus(
-    (eventName, ...args) => {
-      const [payload] = args;
-      logger?.chain(eventName).info(payload);
-      socket.emit(
-        "message",
-        transformer.serialize({
-          moduleName: String(moduleName),
-          eventName: String(eventName),
-          payload,
-          clientContext: options.context(),
-        }),
-      );
-    },
-    (sendToBus) => {
-      const handler: SocketIO_ServerToClientEvents["message"] = (
-        serializedData,
-      ) => {
-        const msg = transformer.parse(serializedData);
-        if (msg.moduleName === moduleName) {
-          sendToBus(msg.eventName, msg.payload);
-        }
-      };
-      socket.on("message", handler);
-      return () => socket.off("message", handler);
-    },
-  );
+  return createEventBus((eventName, ...args) => {
+    const [payload] = args;
+    logger?.chain(eventName).info(payload);
+    socket.emit(
+      "message",
+      transformer.serialize({
+        moduleName: String(moduleName),
+        eventName: String(eventName),
+        payload,
+        clientContext: options.context(),
+      }),
+    );
+  });
 }
 
-type ClientSocket<Context> = Socket<
-  SocketIO_ServerToClientEvents,
+type ClientSocket<Context, State> = Socket<
+  SocketIO_ServerToClientEvents<State>,
   SocketIO_ClientToServerEvents<Context>
 >;
 
@@ -100,20 +98,13 @@ type ClientModuleRecord<Events extends AnyModuleDefinitionRecord> = {
 
 type ClientModule<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
   ClientToServerEvents<Events>,
-  ServerToClientEvents<Events>
+  {}
 >;
 
 type ClientToServerEvents<Events extends AnyEventRecord> = {
   [EventName in EventNamesForType<
     Events,
     "client-to-server"
-  >]: ClientEventHandler<Events[EventName]>;
-};
-
-type ServerToClientEvents<Events extends AnyEventRecord> = {
-  [EventName in EventNamesForType<
-    Events,
-    "server-to-client"
   >]: ClientEventHandler<Events[EventName]>;
 };
 

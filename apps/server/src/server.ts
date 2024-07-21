@@ -1,26 +1,42 @@
 import type { inferModuleDefinitions } from "@mp/tsock/server";
 import { Logger } from "@mp/tsock/server";
 import { Server } from "@mp/tsock/server";
+import {
+  derivePlayerState as derivePlayerState,
+  updateWorld,
+  type World,
+} from "@mp/data";
 import { createPlayerModule } from "./modules/player";
 import type { ConnectionModule } from "./modules/connection";
 import { createConnectionModule } from "./modules/connection";
-import type { ServerContext } from "./context";
-import { createContext } from "./context";
+import type { ClientContext, ClientState, ServerContext } from "./context";
 
 export function createServer(logger = new Logger(console)) {
+  const world: World = {
+    entities: new Map(),
+  };
+
   const connection = createConnectionModule();
-  const modules = createExposedModules(connection);
-  const server = new Server({
-    modules,
-    connection,
-    createContext,
+  const server = new Server<
+    ServerModules,
+    ServerContext,
+    ClientContext,
+    ClientState
+  >({
     logger,
+    modules: createModules(connection),
+    connection,
+    createContext({ clientId }): ServerContext {
+      return { clientId, world, time: new Date() };
+    },
   });
 
-  const context: ServerContext = { clientId: "server" };
+  function tick({ time }: { time: Date }) {
+    updateWorld(world, time);
 
-  function tick(payload: { deltaTime: number }) {
-    modules.player.tick({ payload, context });
+    for (const { id } of world.entities.values()) {
+      server.sendClientState(id, derivePlayerState(world, id));
+    }
   }
 
   return {
@@ -29,12 +45,12 @@ export function createServer(logger = new Logger(console)) {
   };
 }
 
-function createExposedModules(connection: ConnectionModule) {
+function createModules(connection: ConnectionModule) {
   return {
     player: createPlayerModule(connection),
   };
 }
 
 export type ServerModules = inferModuleDefinitions<
-  ReturnType<typeof createExposedModules>
+  ReturnType<typeof createModules>
 >;

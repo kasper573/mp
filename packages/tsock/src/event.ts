@@ -82,4 +82,4 @@ const noop = () => () => {};
 
 const subscribeAllProperty = "$subscribe" as const;
 
-type Unsubscribe = () => void;
+export type Unsubscribe = () => void;
