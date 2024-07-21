@@ -1,3 +1,5 @@
+import chalk from "chalk";
+
 export class Logger {
   constructor(
     private impl: Pick<typeof console, LogLevel>,
@@ -15,9 +17,13 @@ export class Logger {
   }
 
   private log(level: LogLevel, ...args: unknown[]) {
+    const color = logLevelColors[level];
     this.impl[level](
-      ...this.prefixes.map(decoratePrefix),
-      ...args.map(stringify),
+      color(
+        [...this.prefixes.map(decoratePrefix), ...args.map(stringify)].join(
+          " ",
+        ),
+      ),
     );
   }
 }
@@ -38,3 +44,9 @@ function isPrimitive(value: unknown) {
 function decoratePrefix(prefix: unknown) {
   return `[${prefix}]`;
 }
+
+const logLevelColors = {
+  error: chalk.red,
+  info: chalk.blueBright,
+  warn: chalk.yellow,
+} satisfies Record<LogLevel, (s: string) => string>;
