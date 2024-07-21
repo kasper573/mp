@@ -1,16 +1,25 @@
+import type { Serialized } from "./transformer";
+
 export type SocketIO_Data<ClientContext> = ClientContext;
 
 export interface SocketIO_ClientToServerEvents<ClientContext> {
   message: (
-    moduleName: string,
-    eventName: string,
-    payload: unknown,
-    clientContext: ClientContext,
+    data: Serialized<{
+      moduleName: string;
+      eventName: string;
+      payload: unknown;
+      clientContext: ClientContext;
+    }>,
   ) => void;
-  context: (clientContext: ClientContext) => void;
+  context: (clientContext: Serialized<ClientContext>) => void;
 }
 
-export type SocketIO_ServerToClientEvents = Record<
-  string,
-  (...args: unknown[]) => void
->;
+export interface SocketIO_ServerToClientEvents {
+  message: (
+    data: Serialized<{
+      moduleName: string;
+      eventName: string;
+      payload: unknown;
+    }>,
+  ) => void;
+}

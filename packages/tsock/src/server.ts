@@ -12,6 +12,7 @@ import type {
   SocketIO_Data,
   SocketIO_ServerToClientEvents,
 } from "./socket";
+import { transformer } from "./transformer";
 
 export { Factory } from "./factory";
 export { Logger };
@@ -56,10 +57,10 @@ export class Server<
     const { modules, connection, createContext } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
-      socket.once("context", (clientContext) => {
-        socket.data = clientContext;
-        this.logger?.info(`connected`, { clientContext });
-        connection?.connect({ context: createContext(clientContext) });
+      socket.once("context", (serializedClientContext) => {
+        socket.data = transformer.parse(serializedClientContext);
+        this.logger?.info(`connected`, { clientContext: socket.data });
+        connection?.connect({ context: createContext(socket.data) });
       });
 
       socket.once("disconnect", () => {
@@ -67,7 +68,10 @@ export class Server<
         connection?.disconnect({ context: createContext(socket.data) });
       });
 
-      socket.on("message", (moduleName, eventName, payload, clientContext) => {
+      socket.on("message", (serializedData) => {
+        const { moduleName, eventName, payload, clientContext } =
+          transformer.parse(serializedData);
+
         socket.data = clientContext;
 
         const module = modules[moduleName];
@@ -94,9 +98,16 @@ export class Server<
 
     for (const moduleName in options.modules) {
       const module = options.modules[moduleName];
-      module.$subscribe(({ name, args: [{ payload, context }] }) => {
-        this.logger?.chain(moduleName, name).info(">>", { payload, context });
-        this.wss.emit(moduleName, name, payload);
+      module.$subscribe((event) => {
+        this.logger?.chain(moduleName, event.name).info(">>", ...event.args);
+        this.wss.emit(
+          "message",
+          transformer.serialize({
+            moduleName: String(moduleName),
+            eventName: String(event.name),
+            payload: event.args[0].payload,
+          }),
+        );
       });
     }
   }

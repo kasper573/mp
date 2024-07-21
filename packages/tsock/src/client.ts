@@ -15,6 +15,7 @@ import type {
   SocketIO_ClientToServerEvents,
   SocketIO_ServerToClientEvents,
 } from "./socket";
+import { transformer } from "./transformer";
 
 export { Logger };
 
@@ -28,15 +29,12 @@ export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   Context,
 > {
-  private socket: Socket<
-    SocketIO_ServerToClientEvents,
-    SocketIO_ClientToServerEvents<Context>
-  >;
+  private socket: ClientSocket<Context>;
   modules: ClientModuleRecord<ModuleDefinitions>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports: ["websocket"] });
-    this.socket.emit("context", options.context());
+    this.socket.emit("context", transformer.serialize(options.context()));
     this.modules = createModuleInterface<ModuleDefinitions, Context>(
       this.socket,
       this.options,
@@ -48,7 +46,7 @@ function createModuleInterface<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   Context,
 >(
-  socket: Socket,
+  socket: ClientSocket<Context>,
   options: ClientOptions<Context>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
@@ -58,7 +56,7 @@ function createModuleInterface<
 
 function createModuleEventBus<Context>(
   moduleName: PropertyKey,
-  socket: Socket,
+  socket: ClientSocket<Context>,
   options: ClientOptions<Context>,
 ) {
   const logger = options.logger?.chain(moduleName);
@@ -66,22 +64,36 @@ function createModuleEventBus<Context>(
     (eventName, ...args) => {
       const [payload] = args;
       logger?.chain(eventName).info(">>", payload);
-      socket.send(moduleName, eventName, payload, options.context());
+      socket.emit(
+        "message",
+        transformer.serialize({
+          moduleName: String(moduleName),
+          eventName: String(eventName),
+          payload,
+          clientContext: options.context(),
+        }),
+      );
     },
-    (handler) => {
-      function handlerWithLogging(
-        _: string,
-        eventName: string,
-        payload: unknown,
-      ) {
-        logger?.chain(eventName).info("<<", payload);
-        return handler(eventName, payload);
-      }
-      socket.onAny(handlerWithLogging);
-      return () => socket.offAny(handlerWithLogging);
+    (sendToBus) => {
+      const handler: SocketIO_ServerToClientEvents["message"] = (
+        serializedData,
+      ) => {
+        const msg = transformer.parse(serializedData);
+        if (msg.moduleName === moduleName) {
+          logger?.chain(msg.eventName).info("<<", msg.payload);
+          sendToBus(msg.eventName, msg.payload);
+        }
+      };
+      socket.on("message", handler);
+      return () => socket.off("message", handler);
     },
   );
 }
+
+type ClientSocket<Context> = Socket<
+  SocketIO_ServerToClientEvents,
+  SocketIO_ClientToServerEvents<Context>
+>;
 
 type ClientModuleRecord<Events extends AnyModuleDefinitionRecord> = {
   [K in keyof Events]: ClientModule<Events[K]>;
