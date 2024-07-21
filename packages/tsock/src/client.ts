@@ -20,56 +20,57 @@ import { transformer } from "./transformer";
 
 export { Logger };
 
-export interface ClientOptions<Context> {
+export interface ClientOptions {
   url: string;
-  context: () => Context;
   logger?: Logger;
 }
 
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
-  Context,
   State,
 > {
-  private socket: ClientSocket<Context, State>;
+  private socket: ClientSocket<State>;
   modules: ClientModuleRecord<ModuleDefinitions>;
 
-  constructor(private options: ClientOptions<Context>) {
+  constructor(private options: ClientOptions) {
     this.socket = io(options.url, { transports: ["websocket"] });
-    this.socket.emit("context", transformer.serialize(options.context()));
-    this.modules = createModuleInterface<ModuleDefinitions, Context, State>(
+    this.modules = createModuleInterface<ModuleDefinitions, State>(
       this.socket,
       this.options,
     );
   }
 
   subscribeToState = (
-    handleStateChange: (state: State) => void,
+    handleStateChange: (state?: State) => void,
   ): Unsubscribe => {
+    const unset = () => handleStateChange(undefined);
     const handler = (serializedState: Serialized<State>) =>
       handleStateChange(transformer.parse(serializedState));
     this.socket.on("clientState", handler);
-    return () => this.socket.off("clientState", handler);
+    this.socket.on("disconnect", unset);
+    return () => {
+      this.socket.off("clientState", handler);
+      this.socket.off("disconnect", unset);
+    };
   };
 }
 
 function createModuleInterface<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
-  Context,
   State,
 >(
-  socket: ClientSocket<Context, State>,
-  options: ClientOptions<Context>,
+  socket: ClientSocket<State>,
+  options: ClientOptions,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
     get: (_, moduleName) => createModuleEventBus(moduleName, socket, options),
   });
 }
 
-function createModuleEventBus<Context, State>(
+function createModuleEventBus<State>(
   moduleName: PropertyKey,
-  socket: ClientSocket<Context, State>,
-  options: ClientOptions<Context>,
+  socket: ClientSocket<State>,
+  options: ClientOptions,
 ) {
   const logger = options.logger?.chain(moduleName);
   return createEventBus((eventName, ...args) => {
@@ -81,15 +82,14 @@ function createModuleEventBus<Context, State>(
         moduleName: String(moduleName),
         eventName: String(eventName),
         payload,
-        clientContext: options.context(),
       }),
     );
   });
 }
 
-type ClientSocket<Context, State> = Socket<
+type ClientSocket<State> = Socket<
   SocketIO_ServerToClientEvents<State>,
-  SocketIO_ClientToServerEvents<Context>
+  SocketIO_ClientToServerEvents
 >;
 
 type ClientModuleRecord<Events extends AnyModuleDefinitionRecord> = {

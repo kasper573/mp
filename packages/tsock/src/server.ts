@@ -26,9 +26,7 @@ export interface CreateServerOptions<
   ClientContext,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (
-    options: CreateServerContextOptions<ClientContext>,
-  ) => ServerContext;
+  createContext: (options: CreateContextOptions) => ServerContext;
   connection?: ServerConnectionModule<ServerContext>;
   logger?: Logger;
 }
@@ -40,7 +38,7 @@ export class Server<
   ClientState,
 > {
   private wss: SocketServer<
-    SocketIO_ClientToServerEvents<ClientContext>,
+    SocketIO_ClientToServerEvents,
     SocketIO_ServerToClientEvents<ClientState>,
     object,
     SocketIO_Data<ClientContext>
@@ -60,32 +58,22 @@ export class Server<
     const { modules, connection, createContext } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
-      socket.once("context", (serializedClientContext) => {
-        socket.data = transformer.parse(serializedClientContext);
-        this.logger?.info(`connected`, { clientContext: socket.data });
-        connection?.connect({
-          context: createContext({
-            clientContext: socket.data,
-            clientId: socket.id,
-          }),
-        });
+      this.logger?.info(`connected`, { clientId: socket.id });
+
+      connection?.connect({
+        context: createContext({ clientId: socket.id }),
       });
 
       socket.once("disconnect", () => {
         this.logger?.info(`disconnected`, { clientContext: socket.data });
         connection?.disconnect({
-          context: createContext({
-            clientContext: socket.data,
-            clientId: socket.id,
-          }),
+          context: createContext({ clientId: socket.id }),
         });
       });
 
       socket.on("message", (serializedData) => {
-        const { moduleName, eventName, payload, clientContext } =
+        const { moduleName, eventName, payload } =
           transformer.parse(serializedData);
-
-        socket.data = clientContext;
 
         const module = modules[moduleName];
         const log = this.logger?.chain(moduleName, eventName);
@@ -93,18 +81,17 @@ export class Server<
         if (module.$getEventType(eventName) !== "client-to-server") {
           log?.warn(`event may not be triggered by clients`, {
             payload,
-            clientContext,
             socketId: socket.id,
           });
           return;
         }
 
-        log?.info({ payload, clientContext });
+        log?.info({ clientId: socket.id, payload });
 
         try {
           module[eventName]({
             payload,
-            context: createContext({ clientContext, clientId: socket.id }),
+            context: createContext({ clientId: socket.id }),
           });
         } catch (e) {
           log?.error(`error while triggering event`, e);
@@ -129,8 +116,7 @@ export class Server<
   }
 }
 
-export interface CreateServerContextOptions<ClientContext> {
-  clientContext: ClientContext;
+export interface CreateContextOptions {
   clientId: string;
 }
 

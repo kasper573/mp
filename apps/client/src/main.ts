@@ -29,17 +29,19 @@ function renderNextFrame() {
   requestAnimationFrame(() => {
     if (world) {
       updateWorld(world, new Date());
-      renderWorld(world);
     }
+    renderWorld(world);
     renderNextFrame();
   });
 }
 
-function renderWorld({ entities }: World) {
+function renderWorld(world?: World) {
   const ctx = canvas.getContext("2d")!;
   ctx.reset();
-  for (const entity of entities.values()) {
-    drawEntity(ctx, entity);
+  if (world) {
+    for (const entity of world.entities.values()) {
+      drawEntity(ctx, entity);
+    }
   }
 }
 
