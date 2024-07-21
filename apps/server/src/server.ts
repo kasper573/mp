@@ -24,11 +24,9 @@ export function createServer(logger = new Logger(console)) {
     ClientState
   >({
     logger,
-    modules: createModules(connection),
     connection,
-    createContext({ clientId }): ServerContext {
-      return { clientId, world, time: new Date() };
-    },
+    modules: createModules(connection),
+    createContext: ({ clientId }) => ({ clientId, world, time: new Date() }),
   });
 
   function tick({ time }: { time: Date }) {

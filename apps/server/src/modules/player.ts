@@ -20,10 +20,10 @@ export function createPlayerModule(connection: ConnectionModule) {
 
   return t.module({
     move: t.event.payload<Vec2>().create(({ payload, context }) => {
-      const { world, time } = context;
+      const { world } = context;
       const entity = world.entities.get(context.clientId);
       if (entity) {
-        setTemporalTarget(entity.position, payload, time);
+        setTemporalTarget(entity.position, payload);
       }
     }),
   });

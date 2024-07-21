@@ -10,10 +10,8 @@ export function temporal<Value>(value: Value): Temporal<Value> {
 export function setTemporalTarget<Value>(
   temporal: Temporal<Value>,
   newTargetValue: Value,
-  now: Date,
 ): void {
   temporal.interpolation = {
-    startTime: now,
     startValue: temporal.value,
     targetValue: newTargetValue,
   };
@@ -25,6 +23,7 @@ export function updateTemporal<Value>(
   impl: TemporalImpl<Value>,
 ): Value {
   if (temporal.interpolation) {
+    temporal.interpolation.startTime ??= now;
     const { startTime, startValue, targetValue } = temporal.interpolation;
     const deltaTime = (now.getTime() - startTime.getTime()) / 1000;
     temporal.value = impl.update(startValue, targetValue, deltaTime);
@@ -36,7 +35,7 @@ export function updateTemporal<Value>(
 }
 
 export interface Interpolation<Value> {
-  startTime: Date;
+  startTime?: Date;
   startValue: Value;
   targetValue: Value;
 }

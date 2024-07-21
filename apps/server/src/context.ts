@@ -8,7 +8,4 @@ export interface ServerContext {
 
 export interface ClientContext {}
 
-/**
- * The subset of world state required by a single client
- */
 export type ClientState = World;

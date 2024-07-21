@@ -2,7 +2,7 @@ import { z, numeric } from "@mp/validate";
 
 const schema = z.object({
   port: numeric.default(2000),
-  tickInterval: numeric.default(1000 / 60),
+  tickInterval: numeric.default(16),
 });
 
 export const env = schema.parse({
