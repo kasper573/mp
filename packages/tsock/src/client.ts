@@ -11,6 +11,10 @@ import type {
 } from "./module";
 import type { EventBus } from "./event";
 import { createEventBus } from "./event";
+import type {
+  SocketIO_ClientToServerEvents,
+  SocketIO_ServerToClientEvents,
+} from "./socket";
 
 export { Logger };
 
@@ -24,11 +28,15 @@ export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   Context,
 > {
-  private socket: Socket;
+  private socket: Socket<
+    SocketIO_ServerToClientEvents,
+    SocketIO_ClientToServerEvents<Context>
+  >;
   modules: ClientModuleRecord<ModuleDefinitions>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports: ["websocket"] });
+    this.socket.emit("context", options.context());
     this.modules = createModuleInterface<ModuleDefinitions, Context>(
       this.socket,
       this.options,
