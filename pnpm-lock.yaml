@@ -56,6 +56,9 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
+      uniqolor:
+        specifier: 1.1.1
+        version: 1.1.1
     devDependencies:
       '@mp/build':
         specifier: workspace:*
@@ -2457,6 +2460,9 @@ packages:
   union@0.5.0:
     resolution: {integrity: sha512-N6uOhuW6zO95P3Mel2I2zMsbsanvvtgn6jVqJv4vbVcz/JN0OkL9suomjQGmWtxJQXOCqUJvquc1sMeNz/IwlA==}
     engines: {node: '>= 0.8.0'}
+
+  uniqolor@1.1.1:
+    resolution: {integrity: sha512-HUwezlXCwm5bzsEXW7AP7ybezH13uWENRgYT+3dOdhJPvpYucSqvIGckMiLn+Uy2j0NVf3fPp43uZ4aun3t4Ww==}
 
   universalify@2.0.1:
     resolution: {integrity: sha512-gptHNQghINnc/vTGIk0SOFGFNXw7JVrlRUtConJRlvaw6DuX0wO5Jeko9sWrMBhh+PsYAZ7oXAiOnf/UKogyiw==}
@@ -4983,6 +4989,8 @@ snapshots:
   union@0.5.0:
     dependencies:
       qs: 6.12.3
+
+  uniqolor@1.1.1: {}
 
   universalify@2.0.1: {}
 

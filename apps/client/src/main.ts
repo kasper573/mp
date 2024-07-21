@@ -1,29 +1,53 @@
 import type { Entity, PlayerState } from "@mp/server";
+import uniqolor from "uniqolor";
 import { api } from "./api";
 
+const canvas = document.querySelector("canvas")!;
+const canvasContext = canvas.getContext("2d")!;
 const entities = new Map<Entity["id"], EntityView>();
 
 api.player.state.subscribe(renderPlayerState);
+window.addEventListener("resize", resizeCanvas);
 
-document.addEventListener("mousemove", (e) => {
+resizeCanvas();
+
+function resizeCanvas() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+}
+
+canvas.addEventListener("mousemove", (e) => {
   const { clientX, clientY } = e;
-  const x = clientX / window.innerWidth;
-  const y = clientY / window.innerHeight;
+  const x = clientX / canvas.width;
+  const y = clientY / canvas.height;
   api.player.move({ x, y });
+});
+
+document.addEventListener("mousedown", (e) => {
+  canvasContext.clearRect(0, 0, canvas.width, canvas.height);
 });
 
 function renderPlayerState(scene: PlayerState) {
   const remainingEntityIds = new Set(entities.keys());
-  for (const entityState of scene.currentScene.entities.values()) {
-    remainingEntityIds.delete(entityState.id);
-    let entity = entities.get(entityState.id);
-    if (!entity) {
-      entity = new EntityView(entityState);
-      document.body.appendChild(entity.element);
-      entities.set(entityState.id, entity);
+  for (const entity of scene.currentScene.entities.values()) {
+    const entityColor = uniqolor(entity.id).color;
+    remainingEntityIds.delete(entity.id);
+    let view = entities.get(entity.id);
+    if (!view) {
+      view = new EntityView(entity);
+      document.body.appendChild(view.element);
+      entities.set(entity.id, view);
     } else {
-      entity.update(entityState);
+      view.update(entity);
     }
+
+    canvasContext.fillStyle = entityColor;
+    canvasContext.fillRect(
+      entity.position.x * canvas.width,
+      entity.position.y * canvas.height,
+      5,
+      5,
+    );
   }
 
   for (const id of remainingEntityIds) {
