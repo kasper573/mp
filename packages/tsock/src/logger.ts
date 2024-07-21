@@ -34,6 +34,9 @@ function stringify(value: unknown) {
   if (isPrimitive(value)) {
     return value;
   }
+  if (value instanceof Error) {
+    return value.stack;
+  }
   return JSON.stringify(value, null, 2);
 }
 
