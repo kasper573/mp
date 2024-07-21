@@ -26,7 +26,9 @@ export interface CreateServerOptions<
   ClientContext,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (clientContext: ClientContext) => ServerContext;
+  createContext: (
+    options: CreateServerContextOptions<ClientContext>,
+  ) => ServerContext;
   connection?: ServerConnectionModule<ServerContext>;
   logger?: Logger;
 }
@@ -60,12 +62,22 @@ export class Server<
       socket.once("context", (serializedClientContext) => {
         socket.data = transformer.parse(serializedClientContext);
         this.logger?.info(`connected`, { clientContext: socket.data });
-        connection?.connect({ context: createContext(socket.data) });
+        connection?.connect({
+          context: createContext({
+            clientContext: socket.data,
+            clientId: socket.id,
+          }),
+        });
       });
 
       socket.once("disconnect", () => {
         this.logger?.info(`disconnected`, { clientContext: socket.data });
-        connection?.disconnect({ context: createContext(socket.data) });
+        connection?.disconnect({
+          context: createContext({
+            clientContext: socket.data,
+            clientId: socket.id,
+          }),
+        });
       });
 
       socket.on("message", (serializedData) => {
@@ -81,6 +93,7 @@ export class Server<
           log?.warn(`event may not be triggered by clients`, {
             payload,
             clientContext,
+            socketId: socket.id,
           });
           return;
         }
@@ -88,8 +101,10 @@ export class Server<
         log?.info(`<<`, { payload, clientContext });
 
         try {
-          const context = createContext(clientContext);
-          module[eventName]({ payload, context });
+          module[eventName]({
+            payload,
+            context: createContext({ clientContext, clientId: socket.id }),
+          });
         } catch (e) {
           log?.error(`error while triggering event`, e);
         }
@@ -121,6 +136,11 @@ export class Server<
     this.wss.close();
     this.logger?.info(`closed`);
   }
+}
+
+export interface CreateServerContextOptions<ClientContext> {
+  clientContext: ClientContext;
+  clientId: string;
 }
 
 /**

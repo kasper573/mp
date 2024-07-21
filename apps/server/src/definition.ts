@@ -1,4 +1,7 @@
-import type { inferModuleDefinitions } from "@mp/tsock/server";
+import type {
+  CreateServerContextOptions,
+  inferModuleDefinitions,
+} from "@mp/tsock/server";
 import { Logger } from "@mp/tsock/server";
 import { Factory, Server } from "@mp/tsock/server";
 import { createPlayerModule } from "./modules/player";
@@ -31,14 +34,16 @@ export type ServerModules = inferModuleDefinitions<
   ReturnType<typeof createExposedModules>
 >;
 
-function createContext(clientContext: ClientContext): ServerContext {
-  return clientContext;
+function createContext({
+  clientId,
+}: CreateServerContextOptions<ClientContext>): ServerContext {
+  return { clientId };
 }
 
-export interface ServerContext extends ClientContext {}
-
-export interface ClientContext {
+export interface ServerContext {
   clientId: string;
 }
+
+export interface ClientContext {}
 
 export const t = new Factory<ServerContext>();

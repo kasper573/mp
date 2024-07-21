@@ -11,11 +11,9 @@
   },
   "dependencies": {
     "@mp/tsock": "workspace:*",
-    "@mp/validate": "workspace:*",
-    "uuid": "10.0.0"
+    "@mp/validate": "workspace:*"
   },
   "devDependencies": {
-    "@types/uuid": "10.0.0",
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/tsconfig": "workspace:*",
