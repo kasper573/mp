@@ -6,9 +6,10 @@ import type {
   AnyEventRecord,
   AnyModuleDefinitionRecord,
   EventDefinition,
-  ModuleEvents,
-  ModuleRecord,
+  EventHandler,
+  EventOrigin,
 } from "./module";
+import type { EventBus } from "./event";
 import { createEventBus } from "./event";
 
 export { Logger };
@@ -24,7 +25,7 @@ export class Client<
   Context,
 > {
   private socket: Socket;
-  modules: ModuleRecord<ClientModuleDefinitionRecord<ModuleDefinitions>>;
+  modules: ClientModuleRecord<ModuleDefinitions>;
 
   constructor(private options: ClientOptions<Context>) {
     this.socket = io(options.url, { transports: ["websocket"] });
@@ -41,8 +42,8 @@ function createModuleInterface<
 >(
   socket: Socket,
   options: ClientOptions<Context>,
-): ModuleRecord<ModuleDefinitions> {
-  return new Proxy({} as ModuleRecord<ModuleDefinitions>, {
+): ClientModuleRecord<ModuleDefinitions> {
+  return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
     get: (_, moduleName) => createModuleEventBus(moduleName, socket, options),
   });
 }
@@ -53,11 +54,9 @@ function createModuleEventBus<Context>(
   options: ClientOptions<Context>,
 ) {
   const logger = options.logger?.chain(moduleName);
-  return createEventBus<
-    ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>,
-    ModuleEvents<ClientEventDefinitionRecord<AnyEventRecord>>
-  >(
-    (eventName, payload) => {
+  return createEventBus(
+    (eventName, ...args) => {
+      const [payload] = args;
       logger?.chain(eventName).info(">>", payload);
       socket.send(moduleName, eventName, payload, options.context());
     },
@@ -76,19 +75,42 @@ function createModuleEventBus<Context>(
   );
 }
 
-type ClientModuleDefinitionRecord<
-  ModuleDefinitions extends AnyModuleDefinitionRecord,
-> = {
-  [ModuleName in keyof ModuleDefinitions]: ClientEventDefinitionRecord<
-    ModuleDefinitions[ModuleName]
+type ClientModuleRecord<Events extends AnyModuleDefinitionRecord> = {
+  [K in keyof Events]: ClientModule<Events[K]>;
+};
+
+type ClientModule<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
+  ClientToServerEvents<Events>,
+  ServerToClientEvents<Events>
+>;
+
+type ClientToServerEvents<Events extends AnyEventRecord> = {
+  [EventName in EventNamesForOrigin<Events, "client">]: ClientEventHandler<
+    Events[EventName]
   >;
 };
 
-type ClientEventDefinitionRecord<Events extends AnyEventRecord> = {
-  [EventName in keyof Events]: ClientEventDefinition<Events[EventName]>;
+type ServerToClientEvents<Events extends AnyEventRecord> = {
+  [EventName in EventNamesForOrigin<Events, "server">]: ClientEventHandler<
+    Events[EventName]
+  >;
 };
 
-type ClientEventDefinition<Event extends AnyEventDefinition> =
-  Event extends EventDefinition<infer Type, infer Arg>
-    ? EventDefinition<Type, Arg["payload"]>
+type ClientEventHandler<
+  Event extends AnyEventDefinition,
+  Origin extends EventOrigin = EventOrigin,
+> =
+  Event extends EventDefinition<Origin, infer Arg>
+    ? EventHandler<Arg["payload"]>
     : never;
+
+// This seems to cause the language service to fail to go to definition
+// on module events even though it resolves to the correct types
+type EventNamesForOrigin<
+  Events extends AnyEventRecord,
+  Origin extends EventOrigin,
+> = {
+  [Key in keyof Events]: Events[Key] extends EventDefinition<Origin>
+    ? Key
+    : never;
+}[keyof Events];

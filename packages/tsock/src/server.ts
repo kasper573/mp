@@ -42,8 +42,8 @@ export class Server<
         const module = options.modules[moduleName];
         const log = this.logger?.chain(moduleName, eventName);
 
-        if (module.$getEventType(eventName) === "private") {
-          log?.warn(`event is private and may not be triggered by clients`, {
+        if (module.$getEventOrigin(eventName) !== "client") {
+          log?.warn(`event may not be triggered by clients`, {
             payload,
             context,
           });

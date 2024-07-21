@@ -16,7 +16,7 @@ export function createExampleModule(other: OtherModule) {
       });
     }),
     chat: t.event
-      .type("private")
+      .origin("server")
       .payload<Message>()
       .create(({ context }) => {
         other.do({ context });
