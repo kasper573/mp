@@ -4,6 +4,8 @@ import { v2 } from "@mp/data";
 import { api } from "./api";
 
 const canvas = document.querySelector("canvas")!;
+let state: PlayerState | undefined;
+renderNextFrame();
 
 api.player.state.subscribe(renderWorld);
 window.addEventListener("resize", resizeCanvas);
@@ -21,6 +23,15 @@ canvas.addEventListener("click", (e) => {
   const y = clientY / canvas.height;
   api.player.move(v2(x, y));
 });
+
+function renderNextFrame() {
+  requestAnimationFrame(() => {
+    if (state) {
+      renderWorld(state);
+    }
+    renderNextFrame();
+  });
+}
 
 function renderWorld({ currentScene }: PlayerState) {
   const ctx = canvas.getContext("2d")!;

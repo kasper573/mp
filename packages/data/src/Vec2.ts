@@ -1,3 +1,5 @@
+import { clamp } from "./clamp";
+
 export interface Vec2 {
   x: number;
   y: number;
@@ -26,4 +28,19 @@ export function v2_mult(a: Vec2, s: number): Vec2 {
 
 export function v2_add(a: Vec2, b: Vec2): Vec2 {
   return v2(a.x + b.x, a.y + b.y);
+}
+
+export function v2_moveInDirection(
+  v: Vec2,
+  target: Vec2,
+  desiredDistance: number,
+): Vec2 {
+  const distanceRemaining = v2_distance(v, target);
+  const distanceTraversedThisTick = desiredDistance;
+  const distance = clamp(distanceTraversedThisTick, 0, distanceRemaining);
+  if (distance === 0) {
+    return v;
+  }
+
+  return v2_add(v, v2_mult(v2_direction(v, target), distance));
 }

@@ -1,6 +1,5 @@
 import type { Vec2 } from "@mp/data";
-import { v2, v2_add, v2_direction, v2_distance, v2_mult } from "@mp/data";
-import { clamp } from "@mp/data";
+import { v2, v2_moveInDirection } from "@mp/data";
 import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
 import type { Entity } from "./entity";
@@ -68,17 +67,9 @@ export function createPlayerModule(connection: ConnectionModule) {
 }
 
 function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
-  const { position, targetPosition, speed } = entity;
-
-  const distanceRemaining = v2_distance(position, targetPosition);
-  const distanceTraversedThisTick = speed * deltaTime;
-  const distance = clamp(distanceTraversedThisTick, 0, distanceRemaining);
-  if (distance === 0) {
-    return;
-  }
-
-  entity.position = v2_add(
+  entity.position = v2_moveInDirection(
     entity.position,
-    v2_mult(v2_direction(position, targetPosition), distance),
+    entity.targetPosition,
+    entity.speed * deltaTime,
   );
 }
