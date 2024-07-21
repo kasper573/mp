@@ -30,7 +30,7 @@ export function v2_add(a: Vec2, b: Vec2): Vec2 {
   return v2(a.x + b.x, a.y + b.y);
 }
 
-export function v2_moveInDirection(
+export function v2_moveTowards(
   v: Vec2,
   target: Vec2,
   desiredDistance: number,

@@ -1,5 +1,5 @@
 import type { Vec2 } from "@mp/data";
-import { v2, v2_moveInDirection } from "@mp/data";
+import { v2, v2_moveTowards } from "@mp/data";
 import { t } from "../tsock";
 import type { ConnectionModule } from "./connection";
 import type { Entity } from "./entity";
@@ -67,7 +67,7 @@ export function createPlayerModule(connection: ConnectionModule) {
 }
 
 function moveEntityTowardsTarget(entity: Entity, deltaTime: number) {
-  entity.position = v2_moveInDirection(
+  entity.position = v2_moveTowards(
     entity.position,
     entity.targetPosition,
     entity.speed * deltaTime,
