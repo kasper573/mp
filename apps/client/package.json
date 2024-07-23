@@ -10,10 +10,9 @@
     "start": "http-server dist -p 80"
   },
   "dependencies": {
-    "@mp/tsock": "workspace:*",
     "@mp/validate": "workspace:*",
-    "@mp/data": "workspace:*",
-    "uniqolor": "1.1.1"
+    "colyseus.js": "0.15.25",
+    "phaser": "3.80.1"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",

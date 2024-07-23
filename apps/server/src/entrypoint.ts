@@ -1,7 +1,15 @@
-import { createServer } from "./server";
-import { env } from "./env";
+/**
+ * IMPORTANT:
+ * ---------
+ * Do not manually edit this file if you'd like to use Colyseus Cloud
+ *
+ * If you're self-hosting (without Colyseus Cloud), you can manually instantiate a
+ * Colyseus Server as documented here: 👉 https://docs.colyseus.io/server/api/#constructor-options
+ */
+import { listen } from "@colyseus/tools";
 
-const server = createServer();
-server.listen(env.port);
+// Import arena config
+import appConfig from "./app.config";
 
-setInterval(() => server.tick({ time: new Date() }), env.tickInterval);
+// Create and listen on 2567 (or PORT environment variable.)
+listen(appConfig);

@@ -1,62 +1,91 @@
-import type { Entity, World } from "@mp/data";
-import uniqolor from "uniqolor";
-import { updateWorld, v2 } from "@mp/data";
-import { subscribeToState, events } from "./api";
+import Phaser from "phaser";
+import { Scene } from "./Scene";
+import { env } from "./env";
 
-let world: World | undefined;
-const canvas = document.querySelector("canvas")!;
+const config: Phaser.Types.Core.GameConfig = {
+  type: Phaser.AUTO,
+  fps: {
+    target: 60,
+    forceSetTimeOut: true,
+    smoothStep: false,
+  },
+  width: 800,
+  height: 600,
+  // height: 200,
+  backgroundColor: "#b6d53c",
+  parent: "phaser-example",
+  physics: { default: "arcade" },
+  pixelArt: true,
+  scene: [Scene],
+};
 
-subscribeToState((state) => (world = state));
+const game = new Phaser.Game(config);
 
-window.addEventListener("resize", resizeCanvas);
+/**
+ * Create FPS selector
+ */
 
-renderNextFrame();
-resizeCanvas();
+// current fps label
+const fpsInput = document.querySelector<HTMLInputElement>("input#fps")!;
+const fpsValueLabel =
+  document.querySelector<HTMLSpanElement>("span#fps-value")!;
+fpsValueLabel.innerText = fpsInput.value;
 
-function resizeCanvas() {
-  canvas.width = window.innerWidth;
-  canvas.height = window.innerHeight;
-}
+fpsInput.oninput = (event) => {
+  const value = (event.target as HTMLInputElement).value;
+  fpsValueLabel.innerText = value;
 
-canvas.addEventListener("click", (e) => {
-  const { clientX, clientY } = e;
-  const x = clientX / canvas.width;
-  const y = clientY / canvas.height;
-  events.player.move(v2(x, y));
-});
+  // destroy previous loop
+  game.loop.destroy();
 
-function renderNextFrame() {
-  requestAnimationFrame(() => {
-    if (world) {
-      updateWorld(world, new Date());
-    }
-    renderWorld(world);
-    renderNextFrame();
+  // create new loop
+  game.loop = new Phaser.Core.TimeStep(game, {
+    target: parseInt(value),
+    forceSetTimeOut: true,
+    smoothStep: false,
   });
+
+  // start new loop
+  game.loop.start(game.step.bind(game));
+};
+
+/**
+ * Create latency simulation selector
+ */
+let fetchLatencySimulationInterval: NodeJS.Timeout;
+
+// latency simulation label
+const latencyInput = document.querySelector<HTMLInputElement>("input#latency")!;
+
+// current latency label
+const selectedLatencyLabel =
+  document.querySelector<HTMLInputElement>("#latency-value")!;
+selectedLatencyLabel.innerText = `${latencyInput.value} ms`;
+
+latencyInput.onpointerdown = (event: PointerEvent) =>
+  clearInterval(fetchLatencySimulationInterval);
+
+latencyInput.oninput = () =>
+  (selectedLatencyLabel.innerText = `${latencyInput.value} ms`);
+
+latencyInput.onchange = () => {
+  // request server to update its latency simulation
+  fetch(`${env.httpServerUrl}/simulate-latency/${latencyInput.value}`);
+
+  setIntervalFetchLatencySimulation();
+};
+
+function setIntervalFetchLatencySimulation() {
+  //
+  // Keep fetching latency simulation number from server to keep all browser tabs in sync
+  //
+  fetchLatencySimulationInterval = setInterval(() => {
+    fetch(`${env.httpServerUrl}/latency`)
+      .then((response) => response.json())
+      .then((value) => {
+        latencyInput.value = value;
+        latencyInput.oninput?.(new Event("input"));
+      });
+  }, 1000);
 }
-
-function renderWorld(world?: World) {
-  const ctx = canvas.getContext("2d")!;
-  ctx.reset();
-  if (world) {
-    for (const entity of world.entities.values()) {
-      drawEntity(ctx, entity);
-    }
-  }
-}
-
-function drawEntity(ctx: CanvasRenderingContext2D, entity: Entity) {
-  const { position } = entity;
-  const x = position.value.x * canvas.width;
-  const y = position.value.y * canvas.height;
-
-  ctx.fillStyle = uniqolor(entity.id).color;
-  ctx.fillRect(x - 5, y - 5, 10, 10);
-
-  if (position.interpolation) {
-    const { targetValue } = position.interpolation;
-    const x2 = targetValue.x * canvas.width;
-    const y2 = targetValue.y * canvas.height;
-    ctx.fillRect(x2 - 1, y2 - 1, 2, 2);
-  }
-}
+setIntervalFetchLatencySimulation();
