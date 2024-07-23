@@ -1,14 +1,3 @@
-/**
- * ---------------------------
- * Phaser + Colyseus - Part 4.
- * ---------------------------
- * - Connecting with the room
- * - Sending inputs at the user's framerate
- * - Update other player's positions WITH interpolation (for other players)
- * - Client-predicted input for local (current) player
- * - Fixed tickrate on both client and server
- */
-
 import Phaser from "phaser";
 import type { Room } from "colyseus.js";
 import { Client } from "colyseus.js";
@@ -50,18 +39,12 @@ export class Scene extends Phaser.Scene {
     this.cursorKeys = this.input.keyboard!.createCursorKeys();
     this.debugFPS = this.add.text(4, 4, "", { color: "#ff0000" });
 
-    // connect with the room
     await this.connect();
 
-    console.log("connected, players", this.room?.state.players.size);
-
     this.room?.state.players.onAdd((player, sessionId) => {
-      console.log("players", this.room?.state.players.size);
-
       const entity = this.physics.add.image(player.x, player.y, "ship_0001");
       this.playerEntities[sessionId] = entity;
 
-      // is current player
       if (sessionId === this.room?.sessionId) {
         this.currentPlayer = entity;
 
@@ -78,20 +61,14 @@ export class Scene extends Phaser.Scene {
           }
         });
       } else {
-        // listening for server updates
         player.onChange(() => {
-          //
-          // we're going to LERP the positions during the render loop.
-          //
           entity.setData("serverX", player.x);
           entity.setData("serverY", player.y);
         });
       }
     });
 
-    // remove local reference when entity is removed from the server
     this.room?.state.players.onRemove((player, sessionId) => {
-      console.log("removed");
       const entity = this.playerEntities[sessionId];
       if (entity) {
         entity.destroy();
@@ -99,36 +76,26 @@ export class Scene extends Phaser.Scene {
       }
     });
 
-    // this.cameras.main.startFollow(this.ship, true, 0.2, 0.2);
-    // this.cameras.main.setZoom(1);
     this.cameras.main.setBounds(0, 0, 800, 600);
   }
 
   async connect() {
-    // add connection status text
     const connectionStatusText = this.add
       .text(0, 0, "Trying to connect with the server...")
       .setStyle({ color: "#ff0000" })
       .setPadding(4);
 
-    const client = new Client(env.wsServerUrl);
+    const client = new Client(env.serverUrl);
 
     try {
       this.room = await client.joinOrCreate("test_room", {});
-
-      console.log("connected", this.room.sessionId);
-
-      // connection successful!
       connectionStatusText.destroy();
     } catch (e) {
-      console.log("error", e);
-      // couldn't connect
       connectionStatusText.text = "Could not connect with the server.";
     }
   }
 
   update(time: number, delta: number): void {
-    // skip loop if not connected yet.
     if (!this.currentPlayer) {
       return;
     }
@@ -157,8 +124,6 @@ export class Scene extends Phaser.Scene {
     }
 
     for (const sessionId in this.playerEntities) {
-      // interpolate all player entities
-      // (except the current player)
       if (sessionId === this.room?.sessionId) {
         continue;
       }
