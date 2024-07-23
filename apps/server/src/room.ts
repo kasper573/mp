@@ -33,26 +33,13 @@ export class TestRoom extends Room<TestRoomState> {
   }
 
   fixedTick(timeStep: number) {
-    const velocity = 2;
-
     this.state.players.forEach((player) => {
       let input: InputData | undefined;
 
       // dequeue player inputs
       while ((input = player.inputQueue.shift())) {
-        if (input.left) {
-          player.x -= velocity;
-        } else if (input.right) {
-          player.x += velocity;
-        }
-
-        if (input.up) {
-          player.y -= velocity;
-        } else if (input.down) {
-          player.y += velocity;
-        }
-
-        player.tick = input.tick;
+        player.x = input.x;
+        player.y = input.y;
       }
     });
   }
@@ -63,8 +50,6 @@ export class TestRoom extends Room<TestRoomState> {
     const player = new Player();
     player.x = Math.random() * this.state.mapWidth;
     player.y = Math.random() * this.state.mapHeight;
-
-    console.log("player", player.x, player.y);
 
     this.state.players.set(client.sessionId, player);
   }

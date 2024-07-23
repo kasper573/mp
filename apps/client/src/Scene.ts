@@ -30,18 +30,10 @@ export class Scene extends Phaser.Scene {
 
   cursorKeys?: Phaser.Types.Input.Keyboard.CursorKeys;
 
-  inputPayload: Partial<InputData> = {
-    left: false,
-    right: false,
-    up: false,
-    down: false,
-    tick: undefined,
-  };
+  inputPayload: Partial<InputData> = {};
 
   elapsedTime = 0;
   fixedTimeStep = 1000 / 60;
-
-  currentTick: number = 0;
 
   constructor() {
     super({ key: "test" });
@@ -157,31 +149,7 @@ export class Scene extends Phaser.Scene {
       return;
     }
 
-    this.currentTick++;
-
-    // const currentPlayerRemote = this.room.state.players.get(this.room.sessionId);
-    // const ticksBehind = this.currentTick - currentPlayerRemote.tick;
-    // console.log({ ticksBehind });
-
-    const velocity = 2;
-    this.inputPayload.left = this.cursorKeys?.left.isDown;
-    this.inputPayload.right = this.cursorKeys?.right.isDown;
-    this.inputPayload.up = this.cursorKeys?.up.isDown;
-    this.inputPayload.down = this.cursorKeys?.down.isDown;
-    this.inputPayload.tick = this.currentTick;
-    this.room?.send(0, this.inputPayload);
-
-    if (this.inputPayload.left) {
-      this.currentPlayer.x -= velocity;
-    } else if (this.inputPayload.right) {
-      this.currentPlayer.x += velocity;
-    }
-
-    if (this.inputPayload.up) {
-      this.currentPlayer.y -= velocity;
-    } else if (this.inputPayload.down) {
-      this.currentPlayer.y += velocity;
-    }
+    this.moveByMouse();
 
     if (this.localRef) {
       this.localRef.x = this.currentPlayer.x;
@@ -201,5 +169,17 @@ export class Scene extends Phaser.Scene {
       entity.x = Phaser.Math.Linear(entity.x, serverX, 0.2);
       entity.y = Phaser.Math.Linear(entity.y, serverY, 0.2);
     }
+  }
+
+  moveByMouse() {
+    if (!this.currentPlayer) {
+      return;
+    }
+
+    const { x, y } = this.input.mousePointer;
+    this.inputPayload = { x, y };
+    this.room?.send(0, this.inputPayload);
+    this.currentPlayer.x = x;
+    this.currentPlayer.y = y;
   }
 }
