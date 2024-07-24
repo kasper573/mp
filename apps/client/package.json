@@ -12,9 +12,10 @@
   "dependencies": {
     "@mp/validate": "workspace:*",
     "colyseus.js": "0.15.25",
-    "phaser": "3.80.1"
+    "three": "0.166.1"
   },
   "devDependencies": {
+    "@types/three": "0.166.0",
     "@mp/build": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/tsconfig": "workspace:*",
