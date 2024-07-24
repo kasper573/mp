@@ -9,15 +9,11 @@ export class TestRoom extends Room<TestRoomState> {
   onCreate() {
     this.setState(new TestRoomState());
 
-    // set map dimensions
     this.state.mapWidth = 800;
     this.state.mapHeight = 600;
 
     this.onMessage(0, (client, input) => {
-      // handle player input
       const player = this.state.players.get(client.sessionId);
-
-      // enqueue input to user input buffer.
       player?.inputQueue.push(input);
     });
 
@@ -36,7 +32,6 @@ export class TestRoom extends Room<TestRoomState> {
     this.state.players.forEach((player) => {
       let input: InputData | undefined;
 
-      // dequeue player inputs
       while ((input = player.inputQueue.shift())) {
         player.x = input.x;
         player.y = input.y;
