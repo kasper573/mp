@@ -4,9 +4,10 @@ export type { MapSchema };
 
 export type SessionId = string;
 
-export type CoordinateLike = Pick<Coordinate, "x" | "y">;
+export type CoordinateLike = Pick<Coordinate, "x" | "y" | "__brand__">;
 
 export class Coordinate extends Schema {
+  __brand__: "Coordinate" = undefined as never;
   @type("number") x: number;
   @type("number") y: number;
   constructor(x = 0, y = 0) {
@@ -17,8 +18,8 @@ export class Coordinate extends Schema {
 }
 
 export class Character extends Schema {
-  @type("string") public id: string;
-  @type(Coordinate) public coords = new Coordinate();
+  @type("string") id: string;
+  @type(Coordinate) coords = new Coordinate();
 
   constructor(id: string) {
     super();
