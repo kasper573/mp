@@ -1,1 +1,1 @@
-{ "extends": "@mp/tsconfig/vite.json" }
+{ "extends": "@mp/tsconfig/vite.json", "exclude": ["public"] }

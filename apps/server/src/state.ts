@@ -1,20 +1,31 @@
 import { Schema, type, MapSchema } from "@colyseus/schema";
 
-export interface InputData {
-  x: number;
-  y: number;
+export type { MapSchema };
+
+export type SessionId = string;
+
+export type CoordinateLike = Pick<Coordinate, "x" | "y">;
+
+export class Coordinate extends Schema {
+  @type("number") x: number;
+  @type("number") y: number;
+  constructor(x = 0, y = 0) {
+    super();
+    this.x = x;
+    this.y = y;
+  }
 }
 
-export class Player extends Schema {
-  @type("number") x = 0;
-  @type("number") y = 0;
+export class Character extends Schema {
+  @type("string") public id: string;
+  @type(Coordinate) public coords = new Coordinate();
 
-  inputQueue: InputData[] = [];
+  constructor(id: string) {
+    super();
+    this.id = id;
+  }
 }
 
-export class TestRoomState extends Schema {
-  @type("number") mapWidth = 0;
-  @type("number") mapHeight = 0;
-
-  @type({ map: Player }) players = new MapSchema<Player>();
+export class Area extends Schema {
+  @type({ map: Character }) characters = new MapSchema<Character>();
 }

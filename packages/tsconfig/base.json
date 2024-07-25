@@ -4,6 +4,7 @@
     "allowJs": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
+    "noImplicitOverride": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
     "experimentalDecorators": true,

@@ -1,24 +1,23 @@
-import type { Room } from "colyseus.js";
 import { Client } from "colyseus.js";
-import type { TestRoomState } from "@mp/server";
-
+import type { Area } from "@mp/server";
+import { DisplayMode, Engine } from "excalibur";
 import { env } from "./env";
-import { createApp } from "./map";
+import { AreaScene } from "./AreaScene";
+
+const canvas = document.querySelector("canvas")!;
 
 async function init() {
-  const debugText = document.querySelector<HTMLSpanElement>("span#debug")!;
-
   const client = new Client(env.serverUrl);
-  let room: Room<TestRoomState>;
-  try {
-    room = await client.joinOrCreate<TestRoomState>("test_room", {});
-  } catch (e) {
-    debugText.innerText = `Error: ${e}`;
-    return;
-  }
+  const room = await client.joinOrCreate<Area>("test_room", {});
 
-  const { renderer, stats } = createApp(room);
-  document.body.append(renderer.domElement, stats.dom);
+  const game = new Engine({
+    canvasElement: canvas,
+    displayMode: DisplayMode.FillContainer,
+    scenes: { area: new AreaScene(room) },
+  });
+
+  game.goToScene("area");
+  game.start();
 }
 
 document.addEventListener("DOMContentLoaded", init);

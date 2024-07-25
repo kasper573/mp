@@ -1,60 +1,34 @@
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
-import type { InputData } from "./state";
-import { TestRoomState, Player } from "./state";
+import { Area, Character, Coordinate } from "./state";
 
-export class TestRoom extends Room<TestRoomState> {
+export class TestRoom extends Room<Area> {
   fixedTimeStep = 1000 / 60;
 
-  onCreate() {
-    this.setState(new TestRoomState());
+  override onCreate() {
+    this.setState(new Area());
 
-    this.state.mapWidth = 800;
-    this.state.mapHeight = 600;
-
-    this.onMessage(0, (client, input) => {
-      const player = this.state.players.get(client.sessionId);
-      player?.inputQueue.push(input);
-    });
-
-    let elapsedTime = 0;
-    this.setSimulationInterval((deltaTime) => {
-      elapsedTime += deltaTime;
-
-      while (elapsedTime >= this.fixedTimeStep) {
-        elapsedTime -= this.fixedTimeStep;
-        this.fixedTick(this.fixedTimeStep);
+    this.onMessage(0, (client, { x, y }) => {
+      const char = this.state.characters.get(client.sessionId);
+      if (char) {
+        char.coords = new Coordinate(x, y);
       }
     });
   }
 
-  fixedTick(timeStep: number) {
-    this.state.players.forEach((player) => {
-      let input: InputData | undefined;
-
-      while ((input = player.inputQueue.shift())) {
-        player.x = input.x;
-        player.y = input.y;
-      }
-    });
-  }
-
-  onJoin(client: Client) {
+  override onJoin(client: Client) {
     console.log(client.sessionId, "joined!");
 
-    const player = new Player();
-    player.x = Math.random() * this.state.mapWidth;
-    player.y = Math.random() * this.state.mapHeight;
-
-    this.state.players.set(client.sessionId, player);
+    const player = new Character(client.sessionId);
+    this.state.characters.set(player.id, player);
   }
 
-  onLeave(client: Client, consented: boolean) {
+  override onLeave(client: Client) {
     console.log(client.sessionId, "left!");
-    this.state.players.delete(client.sessionId);
+    this.state.characters.delete(client.sessionId);
   }
 
-  onDispose() {
+  override onDispose() {
     console.log("room", this.roomId, "disposing...");
   }
 }
