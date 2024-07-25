@@ -7,16 +7,23 @@ import { subscribe } from "./subscribe";
 
 export class AreaScene extends Scene {
   private cleanups?: Array<() => void>;
-  private characters: Map<SessionId, CharacterActor> = new Map();
+  private characterActors: Map<SessionId, CharacterActor> = new Map();
+  private tiledMap!: TiledResource;
+
+  get myCharacterId() {
+    return this.room.sessionId;
+  }
 
   constructor(private room: Room<Area>) {
     super();
   }
 
   override onPreLoad(loader: DefaultLoader): void {
-    const map = new TiledResource("areas/island.tmx");
-    loader.addResource(map);
-    loader.areResourcesLoaded().then(() => map.addToScene(this));
+    this.tiledMap = new TiledResource("areas/island.tmx", {
+      useTilemapCameraStrategy: true,
+    });
+    loader.addResource(this.tiledMap);
+    loader.areResourcesLoaded().then(() => this.tiledMap.addToScene(this));
   }
 
   override onActivate(): void {
@@ -33,7 +40,7 @@ export class AreaScene extends Scene {
   }
 
   private onPointerMove = () => {
-    const myActor = this.characters.get(this.room.sessionId);
+    const myActor = this.characterActors.get(this.myCharacterId);
     if (myActor) {
       const { x, y } = this.input.pointers.primary.lastWorldPos;
       myActor.pos = new Vector(x, y);
@@ -42,21 +49,26 @@ export class AreaScene extends Scene {
   };
 
   private addCharacter = (char: Character) => {
-    const entity = new CharacterActor(char);
-    this.characters.set(char.id, entity);
-    this.add(entity);
+    const actor = new CharacterActor(char);
+    this.characterActors.set(char.id, actor);
+    this.add(actor);
+
+    if (char.id === this.myCharacterId) {
+      this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
+    }
+
     this.cleanups?.push(
       char.onChange(() => {
         console.log("Updating character", char.id);
-        entity.lerpTo = new Vector(char.coords.x, char.coords.y);
+        actor.lerpTo = new Vector(char.coords.x, char.coords.y);
       }),
     );
   };
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {
-    const entity = this.characters.get(id);
+    const entity = this.characterActors.get(id);
     console.log("Removing character", id);
     entity?.kill();
-    this.characters.delete(id);
+    this.characterActors.delete(id);
   };
 }
