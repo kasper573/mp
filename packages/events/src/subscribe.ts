@@ -1,12 +1,12 @@
 export function subscribe<
   EventName extends string,
-  EventHandlers extends AnyEvents<EventName>,
+  EventHandlers extends AnyEvents,
   EventTrigger extends {
-    on: <E extends EventName>(
+    on: <E extends keyof EventHandlers>(
       eventName: E,
       eventHandler: EventHandlers[E],
     ) => void;
-    off: <E extends EventName>(
+    off: <E extends keyof EventHandlers>(
       eventName: E,
       eventHandler: EventHandlers[E],
     ) => void;
@@ -20,7 +20,4 @@ export function subscribe<
   return () => trigger.off(eventName, eventHandler);
 }
 
-type AnyEvents<EventName extends string = string> = Record<
-  EventName,
-  (...args: never[]) => void
->;
+type AnyEvents = Record<string, (...args: unknown[]) => void>;
