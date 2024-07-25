@@ -2,9 +2,9 @@ import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
 import { type AreaMessages } from "./messages";
-import { Area, Character } from "./state";
+import { Area, Character } from "./schema";
 
-export class AreaModule extends Room<Area> {
+export class AreaRoom extends Room<Area> {
   fixedTimeStep = 1000 / 60;
 
   bus = messageReceiver<AreaMessages>()(this);
