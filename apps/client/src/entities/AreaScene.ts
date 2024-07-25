@@ -8,8 +8,8 @@ import {
 import type { Room } from "colyseus.js";
 import { Scene, type DefaultLoader } from "excalibur";
 import { messageSender, subscribe, type MessageSender } from "@mp/events";
+import { vecToCoords } from "../data";
 import { CharacterActor } from "./CharacterActor";
-import { vecToCoords } from "./data";
 
 export class AreaScene extends Scene {
   private cleanups?: Array<() => void>;

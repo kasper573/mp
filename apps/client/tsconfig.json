@@ -1,1 +1,7 @@
-{ "extends": "@mp/tsconfig/vite.json", "exclude": ["public"] }
+{
+  "extends": "@mp/tsconfig/vite.json",
+  "exclude": ["public"],
+  "compilerOptions": {
+    "jsx": "react-jsx"
+  }
+}

@@ -5,6 +5,7 @@
     "esModuleInterop": false,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
-    "types": ["vite/client", "node"]
+    "types": ["vite/client", "node"],
+    "jsx": "react-jsx"
   }
 }

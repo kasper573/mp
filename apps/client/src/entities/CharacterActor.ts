@@ -1,7 +1,7 @@
 import type { Character } from "@mp/server";
 import type { Engine, Vector } from "excalibur";
 import { Actor, Circle, Color } from "excalibur";
-import { coordsToVec } from "./data";
+import { coordsToVec } from "../data";
 
 export class CharacterActor extends Actor {
   lerpTo?: Vector;

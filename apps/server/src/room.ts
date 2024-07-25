@@ -12,8 +12,6 @@ export class TestRoom extends Room<Area> {
   override onCreate() {
     this.setState(new Area());
 
-    console.log("restarted server again");
-
     this.bus.onMessage("move", (client, { x, y }) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
