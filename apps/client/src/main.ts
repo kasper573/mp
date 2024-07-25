@@ -1,6 +1,6 @@
 import { Client } from "colyseus.js";
 import type { Area } from "@mp/server";
-import { DisplayMode, Engine } from "excalibur";
+import { DisplayMode, Engine, Scene } from "excalibur";
 import { env } from "./env";
 import { AreaScene } from "./AreaScene";
 
@@ -13,8 +13,10 @@ async function init() {
   const game = new Engine({
     canvasElement: canvas,
     displayMode: DisplayMode.FillContainer,
-    scenes: { area: new AreaScene(room) },
+    scenes: { area: new AreaScene(room), lobby: new Scene() },
   });
+
+  room.onLeave(() => game.goToScene("lobby"));
 
   game.goToScene("area");
   game.start();

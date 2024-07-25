@@ -40,6 +40,7 @@ export class CharacterActor extends Actor {
         this.lerpTo = undefined;
       }
     }
+    this.circle.color = this.character.connected ? Color.Green : Color.Red;
   }
 }
 

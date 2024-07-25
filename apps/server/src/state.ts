@@ -18,6 +18,7 @@ export class Coordinate extends Schema {
 }
 
 export class Character extends Schema {
+  @type("boolean") connected = false;
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
 
