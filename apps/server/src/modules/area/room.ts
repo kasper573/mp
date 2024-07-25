@@ -1,13 +1,13 @@
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
+import { type AreaMessages } from "./messages";
 import { Area, Character } from "./state";
-import { type ServerMessages } from "./messages";
 
-export class TestRoom extends Room<Area> {
+export class AreaModule extends Room<Area> {
   fixedTimeStep = 1000 / 60;
 
-  bus = messageReceiver<ServerMessages>()(this);
+  bus = messageReceiver<AreaMessages>()(this);
 
   override onCreate() {
     this.setState(new Area());

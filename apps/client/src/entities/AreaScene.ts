@@ -3,7 +3,7 @@ import {
   type SessionId,
   type Area,
   type Character,
-  type ServerMessages,
+  type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
 import { Scene, type DefaultLoader } from "excalibur";
@@ -15,7 +15,7 @@ export class AreaScene extends Scene {
   private cleanups?: Array<() => void>;
   private characterActors: Map<SessionId, CharacterActor> = new Map();
   private tiledMap!: TiledResource;
-  private bus: MessageSender<ServerMessages>;
+  private bus: MessageSender<AreaMessages>;
 
   get myCharacterId() {
     return this.room.sessionId;

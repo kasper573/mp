@@ -1,8 +1,9 @@
 import config from "@colyseus/tools";
-import { TestRoom } from "./room";
+import { AreaModule } from "./modules/area/room";
+import { ModuleName } from "./modules";
 
 export default config({
   initializeGameServer(server) {
-    server.define("test_room", TestRoom);
+    server.define(ModuleName.area, AreaModule);
   },
 });

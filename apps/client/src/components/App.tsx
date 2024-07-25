@@ -1,4 +1,4 @@
-import type { Area } from "@mp/server";
+import { ModuleName, type Area } from "@mp/server";
 import { Client } from "colyseus.js";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -7,10 +7,8 @@ import { createGame } from "../entities/Game";
 
 export function App() {
   const client = useMemo(() => new Client(env.serverUrl), []);
-  const [canvasContainer, setCanvasContainer] = useState<HTMLDivElement | null>(
-    null,
-  );
-  const join = useJoinServer(client, canvasContainer);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const join = useJoinGame(client, container);
 
   if (join.isLoading) {
     return <>Loading...</>;
@@ -25,27 +23,27 @@ export function App() {
     );
   }
 
-  return <div ref={setCanvasContainer} />;
+  return <div ref={setContainer} />;
 }
 
-function useJoinServer(client: Client, canvasContainer: HTMLDivElement | null) {
+function useJoinGame(client: Client, container: HTMLDivElement | null) {
   const [joinAttemptNumber, rejoin] = useReducer((n) => n + 1, 0);
 
   const { data: room, ...join } = useQuery({
     queryKey: ["room", joinAttemptNumber],
-    queryFn: () => client.joinOrCreate<Area>("test_room", {}),
+    queryFn: () => client.joinOrCreate<Area>(ModuleName.area, {}),
   });
 
   useEffect(() => {
-    if (!canvasContainer || !room) {
+    if (!container || !room) {
       return;
     }
 
     const game = createGame(room);
-    canvasContainer.appendChild(game.canvas);
+    container.appendChild(game.canvas);
     game.start();
     return () => game.dispose();
-  }, [canvasContainer, room]);
+  }, [container, room]);
 
   useEffect(() => {
     room?.onLeave(rejoin);

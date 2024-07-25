@@ -1,5 +1,5 @@
 import type { CoordinateLike } from "./state";
 
-export type ServerMessages = {
+export type AreaMessages = {
   move(payload: CoordinateLike): void;
 };

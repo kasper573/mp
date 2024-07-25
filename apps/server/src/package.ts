@@ -1,2 +1,3 @@
-export type * from "./state";
-export type * from "./messages";
+export type * from "./modules/area/state";
+export type * from "./modules/area/messages";
+export { ModuleName } from "./modules";
