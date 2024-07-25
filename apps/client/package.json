@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mp/validate": "workspace:*",
+    "@mp/events": "workspace:*",
     "colyseus.js": "0.15.25",
     "excalibur": "0.29.3",
     "@excaliburjs/plugin-tiled": "0.29.2"

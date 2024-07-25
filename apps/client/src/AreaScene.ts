@@ -1,14 +1,15 @@
 import { TiledResource } from "@excaliburjs/plugin-tiled";
-import type { SessionId, Area, Character } from "@mp/server";
+import type { SessionId, Area, Character, ServerMessages } from "@mp/server";
 import type { Room } from "colyseus.js";
 import { Scene, type DefaultLoader, Vector } from "excalibur";
+import { messageSender, subscribe, type MessageSender } from "@mp/events";
 import { CharacterActor } from "./CharacterActor";
-import { subscribe } from "./subscribe";
 
 export class AreaScene extends Scene {
   private cleanups?: Array<() => void>;
   private characterActors: Map<SessionId, CharacterActor> = new Map();
   private tiledMap!: TiledResource;
+  private bus: MessageSender<ServerMessages>;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -16,6 +17,7 @@ export class AreaScene extends Scene {
 
   constructor(private room: Room<Area>) {
     super();
+    this.bus = messageSender(this.room);
   }
 
   override onPreLoad(loader: DefaultLoader): void {
@@ -44,7 +46,7 @@ export class AreaScene extends Scene {
     if (myActor) {
       const { x, y } = this.input.pointers.primary.lastWorldPos;
       myActor.pos = new Vector(x, y);
-      this.room.send(0, { x, y });
+      this.bus.send("move", { x, y });
     }
   };
 

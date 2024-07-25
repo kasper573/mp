@@ -1,14 +1,18 @@
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
+import { messageReceiver } from "@mp/events";
 import { Area, Character, Coordinate } from "./state";
+import type { ServerMessages } from "./messages";
 
 export class TestRoom extends Room<Area> {
   fixedTimeStep = 1000 / 60;
 
+  bus = messageReceiver<ServerMessages>()(this);
+
   override onCreate() {
     this.setState(new Area());
 
-    this.onMessage(0, (client, { x, y }) => {
+    this.bus.onMessage("move", (client, { x, y }) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
         char.coords = new Coordinate(x, y);

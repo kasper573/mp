@@ -15,6 +15,7 @@
   },
   "dependencies": {
     "@mp/validate": "workspace:*",
+    "@mp/events": "workspace:*",
     "@colyseus/monitor": "0.15.7",
     "@colyseus/tools": "0.15.39",
     "@colyseus/schema": "2.0.34",

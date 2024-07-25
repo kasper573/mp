@@ -53,6 +53,9 @@ importers:
       '@excaliburjs/plugin-tiled':
         specifier: 0.29.2
         version: 0.29.2(excalibur@0.29.3)
+      '@mp/events':
+        specifier: workspace:*
+        version: link:../../packages/events
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -90,6 +93,9 @@ importers:
       '@colyseus/tools':
         specifier: 0.15.39
         version: 0.15.39(@colyseus/schema@2.0.34)
+      '@mp/events':
+        specifier: workspace:*
+        version: link:../../packages/events
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -154,6 +160,12 @@ importers:
       execa:
         specifier: ^8.0.1
         version: 8.0.1
+
+  packages/events:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
 
   packages/tsconfig:
     dependencies:
