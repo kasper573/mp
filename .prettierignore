@@ -1,3 +1,4 @@
 dist
 .turbo
 pnpm-lock.yaml
+**/apps/client/public/tilesets/**

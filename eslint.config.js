@@ -13,8 +13,7 @@ export default tseslint.config(
       "**/dist/",
       "**/.turbo/",
       "pnpm-lock.yaml",
-      // Don't lint Tiled maps since eslint confuses them for typescript files
-      "**/apps/client/public/**",
+      "**/apps/client/public/tilesets/**",
     ],
   },
   eslint.configs.recommended,
