@@ -4,11 +4,23 @@ export function messageSender<EventHandlers extends AnyEvents>(
   return target as unknown as MessageSender<EventHandlers>;
 }
 
-export function messageReceiver<EventHandlers extends AnyEvents>() {
+export function messageReceiver<EventHandlers extends AnyEvents>(
+  errorHandler: (e: unknown) => void = console.error,
+) {
   return function create<Client>(
     target: ReceiverLike<Client>,
   ): MessageReceiver<Client, EventHandlers> {
-    return target as unknown as MessageReceiver<Client, EventHandlers>;
+    return {
+      onMessage(eventName, eventHandler) {
+        return target.onMessage(String(eventName), (client, ...args) => {
+          try {
+            eventHandler(client, ...(args as never));
+          } catch (e) {
+            errorHandler(e);
+          }
+        });
+      },
+    };
   };
 }
 
