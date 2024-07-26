@@ -4,8 +4,6 @@ import { createNodeId, type PathGraph } from "./findPath";
 export async function loadPathGraph(
   tiledMap: TiledResource,
 ): Promise<PathGraph> {
-  await tiledMap.load();
-
   const graph: PathGraph = {};
 
   const walkableTiles = tiledMap.getTilesByProperty("walkable", true);
