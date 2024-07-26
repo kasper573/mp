@@ -19,7 +19,7 @@
    eJzt1bcNwlAURuFnU5KWAPYhzwGMQlqE3JJWINktaQVAHInGIDdIIOvB/0mnsEVxr56NjRERERERERERERvsHGM88p2oJ/ky1xiHXOpRnwZu1EN9XoadspSjFa1pY9GeNWatU+ONmS/89ko3C/ZsMmOL2tSh7svMU97DGc1pQUtL38she41oTJOQc9mz14GOdKKzpXtu2W1HHvkvexa5jlOCkpSitAXPaNDT9yHGf2gs6om+JPB9CMpzXXAfZ1my7OzCBL8PYcrcr1D1B3b9d7/wvIqIiIiIiIiEuQPCYiRe
   </data>
  </layer>
- <objectgroup id="4" name="Objects">
+ <objectgroup id="4" name="Objects" visible="0">
   <object id="1" name="Start" type="start" x="360" y="309.667">
    <point/>
   </object>

@@ -2,28 +2,35 @@ import path from "path";
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
+import type { TiledResource } from "@mp/excalibur";
 import { env } from "../../env";
 import { type AreaMessages } from "./messages";
 import { Area, Character } from "./schema";
 import { findPath } from "./findPath";
 import { moveAlongPath } from "./moveAlongPath";
-import { loadPathGraph } from "./loadPathGraph";
+import { createPathGraph } from "./createPathGraph";
 import { loadTiledMap } from "./loadTiledMap";
 import { getStartingPoint } from "./getStartingPoint";
 
+const islandTMX = path.resolve(
+  __dirname,
+  "../../../../client/public/areas/island.tmx",
+);
+
 export class AreaRoom extends Room<Area> {
   bus = messageReceiver<AreaMessages>()(this);
-  tiledMapPromise = loadTiledMap(
-    path.resolve(__dirname, "../../../../client/public/areas/island.tmx"),
-  );
+  tiledMap!: TiledResource;
 
-  override onCreate() {
+  override async onCreate() {
+    this.tiledMap = await loadTiledMap(islandTMX);
+
+    const pathGraph = createPathGraph(this.tiledMap);
+
     this.setState(new Area());
 
     this.bus.onMessage("move", async (client, [x, y]) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
-        const pathGraph = await loadPathGraph(await this.tiledMapPromise);
         const path = findPath(char.coords, { x, y }, pathGraph);
         if (path) {
           char.path = path;
@@ -41,12 +48,11 @@ export class AreaRoom extends Room<Area> {
     }
   };
 
-  override async onJoin(client: Client) {
+  override onJoin(client: Client) {
     console.log(client.sessionId, "joined!");
 
     const player = new Character(client.sessionId);
-    player.coords =
-      getStartingPoint(await this.tiledMapPromise) ?? player.coords;
+    player.coords = getStartingPoint(this.tiledMap) ?? player.coords;
     player.connected = true;
     this.state.characters.set(player.id, player);
   }

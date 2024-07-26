@@ -1,5 +1,7 @@
 import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
+import type { IsometricTileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/iso-tile-layer";
+import type { TileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/tile-layer";
 import { Vector } from "excalibur";
 
 export class TiledResource extends TiledResourceImpl {
@@ -27,6 +29,37 @@ export class TiledResource extends TiledResourceImpl {
         return new Vector(x, y);
       }
     }
+  }
+
+  getMatchingTileCoordinates<T>(
+    propertyFilter: string,
+    valueFilter: (valuesForOneCoordinate: T[]) => boolean,
+  ) {
+    type Tile = TileInfo | IsometricTileInfo;
+
+    const tilesPerCoordinate = new Map<string, Tile[]>();
+    for (const tile of this.getTilesByProperty(propertyFilter)) {
+      const id = `${tile.exTile.x}|${tile.exTile.y}`;
+      let tiles = tilesPerCoordinate.get(id);
+      if (!tiles) {
+        tiles = [];
+        tilesPerCoordinate.set(id, tiles);
+      }
+      tiles.push(tile);
+    }
+
+    const coordinates: VectorLike[] = [];
+    for (const tiles of tilesPerCoordinate.values()) {
+      const values = tiles.map(
+        (t) => t.tiledTile?.properties?.get(propertyFilter) as T,
+      );
+      if (valueFilter(values)) {
+        const { x, y } = tiles[0].exTile;
+        coordinates.push({ x, y });
+      }
+    }
+
+    return coordinates;
   }
 }
 
