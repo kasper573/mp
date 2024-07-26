@@ -48,11 +48,10 @@ export class AreaScene extends Scene {
   }
 
   private moveToPointer = () => {
-    const myActor = this.characterActors.get(this.myCharacterId);
-    if (myActor) {
-      myActor.pos = this.input.pointers.primary.lastWorldPos;
-      this.bus.send("move", vecToCoords(myActor.pos));
-    }
+    this.bus.send(
+      "move",
+      vecToCoords(this.input.pointers.primary.lastWorldPos),
+    );
   };
 
   private addCharacter = (char: Character) => {
