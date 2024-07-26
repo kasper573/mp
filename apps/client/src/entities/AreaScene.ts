@@ -82,7 +82,6 @@ export class AreaScene extends Scene {
   };
 
   private synchronizeCharacterPosition(char: Character) {
-    console.log("synchronizing", char.id, char.coords.toString());
     const newPos = this.tileMap.tileCoordToWorld(char.coords);
     if (!newPos) {
       console.warn(
