@@ -23,7 +23,6 @@
     "colyseus": "0.15.17",
     "cors": "2.8.5",
     "express": "4.19.2",
-    "esm": "3.2.25",
     "dijkstrajs": "1.0.3"
   },
   "devDependencies": {
