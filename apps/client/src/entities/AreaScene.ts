@@ -75,22 +75,25 @@ export class AreaScene extends Scene {
       this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
     }
 
+    this.synchronizeCharacterPosition(char);
     this.characterCleanups.add(
       char.id,
-      char.coords.onChange(() => {
-        const newPos = this.tileMap.tileCoordToWorld(coordsToVec(char.coords));
-        if (!newPos) {
-          console.warn(
-            "Character coordinates received from server does not match tilemap",
-            char.coords,
-          );
-          return;
-        }
-
-        actor.lerpToPosition(newPos);
-      }),
+      char.coords.onChange(() => this.synchronizeCharacterPosition(char)),
     );
   };
+
+  private synchronizeCharacterPosition(char: Character) {
+    const newPos = this.tileMap.tileCoordToWorld(coordsToVec(char.coords));
+    if (!newPos) {
+      console.warn(
+        "Character coordinates received from server does not match tilemap",
+        char.coords,
+      );
+      return;
+    }
+
+    this.characterActors.get(char.id)?.lerpToPosition(newPos);
+  }
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {
     const entity = this.characterActors.get(id);
