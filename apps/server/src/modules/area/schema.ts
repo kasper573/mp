@@ -6,8 +6,8 @@ export type CoordinateLike = Pick<Coordinate, "x" | "y" | "__brand__">;
 
 export class Coordinate extends Schema {
   __brand__: "Coordinate" = undefined as never;
-  @type("number") x: number;
-  @type("number") y: number;
+  @type("uint16") x: number;
+  @type("uint16") y: number;
   constructor(x = 0, y = 0) {
     super();
     this.x = x;
@@ -20,7 +20,7 @@ export class Character extends Schema {
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
   @type({ array: Coordinate }) path = new ArraySchema<Coordinate>();
-  speed = 45;
+  speed = 5;
 
   constructor(id: string) {
     super();

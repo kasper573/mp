@@ -1,27 +1,19 @@
 import type { Character } from "@mp/server";
 import type { Engine, Vector } from "excalibur";
 import { Actor, Circle, Color } from "excalibur";
-import { coordsToVec } from "../data";
 
 export class CharacterActor extends Actor {
-  lerpTo?: Vector;
+  private lerpTo?: Vector;
   private circle = new Circle({ radius: 10, color: Color.Red });
-  private cleanup: () => void;
 
   constructor(private character: Character) {
-    super(character.coords);
-    this.cleanup = character.coords.onChange(this.lerpToCurrentCoords);
+    super();
   }
 
-  private lerpToCurrentCoords = () => {
-    const v = coordsToVec(this.character.coords);
+  lerpToPosition(v: Vector) {
     if (this.pos.distance(v) > lerpMinDistance) {
       this.lerpTo = v;
     }
-  };
-
-  override onPostKill(): void {
-    this.cleanup();
   }
 
   override onInitialize(): void {
@@ -30,6 +22,7 @@ export class CharacterActor extends Actor {
 
   override update(engine: Engine, delta: number) {
     super.update(engine, delta);
+
     if (this.lerpTo) {
       const { pos } = this;
       pos.x = lerp(pos.x, this.lerpTo.x, 0.2);

@@ -1,4 +1,3 @@
-import { TiledResource } from "@excaliburjs/plugin-tiled";
 import {
   type SessionId,
   type Area,
@@ -7,14 +6,22 @@ import {
 } from "@mp/server";
 import type { Room } from "colyseus.js";
 import { Scene, type DefaultLoader } from "excalibur";
-import { messageSender, subscribe, type MessageSender } from "@mp/events";
-import { vecToCoords } from "../data";
+import {
+  Cleanup,
+  CleanupMap,
+  messageSender,
+  subscribe,
+  type MessageSender,
+} from "@mp/events";
+import { TiledResource } from "../TiledResource";
+import { coordsToVec, vecToCoords } from "../data";
 import { CharacterActor } from "./CharacterActor";
 
 export class AreaScene extends Scene {
-  private cleanups?: Array<() => void>;
+  private cleanups = new Cleanup();
+  private characterCleanups = new CleanupMap();
   private characterActors: Map<SessionId, CharacterActor> = new Map();
-  private tiledMap!: TiledResource;
+  private tileMap!: TiledResource;
   private bus: MessageSender<AreaMessages>;
 
   get myCharacterId() {
@@ -27,31 +34,36 @@ export class AreaScene extends Scene {
   }
 
   override onPreLoad(loader: DefaultLoader): void {
-    this.tiledMap = new TiledResource("areas/island.tmx", {
-      useTilemapCameraStrategy: true,
-    });
-    loader.addResource(this.tiledMap);
-    loader.areResourcesLoaded().then(() => this.tiledMap.addToScene(this));
+    this.tileMap = new TiledResource("areas/island.tmx");
+
+    loader.addResource(this.tileMap);
+    loader.areResourcesLoaded().then(() => this.tileMap.addToScene(this));
   }
 
   override onActivate(): void {
     const { characters } = this.room.state;
-    this.cleanups = [
+    this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
       subscribe(this.input.pointers.primary, "down", this.moveToPointer),
-    ];
+    );
   }
 
   override onDeactivate(): void {
-    this.cleanups?.forEach((fn) => fn());
+    this.cleanups.flush();
   }
 
   private moveToPointer = () => {
-    this.bus.send(
-      "move",
-      vecToCoords(this.input.pointers.primary.lastWorldPos),
+    const tiledPos = this.tileMap.worldCoordToTile(
+      this.input.pointers.primary.lastWorldPos,
     );
+
+    if (!tiledPos) {
+      console.warn("Could not translate pointer position to tile coordinate");
+      return;
+    }
+
+    this.bus.send("move", vecToCoords(tiledPos));
   };
 
   private addCharacter = (char: Character) => {
@@ -62,11 +74,28 @@ export class AreaScene extends Scene {
     if (char.id === this.myCharacterId) {
       this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
     }
+
+    this.characterCleanups.add(
+      char.id,
+      char.coords.onChange(() => {
+        const newPos = this.tileMap.tileCoordToWorld(coordsToVec(char.coords));
+        if (!newPos) {
+          console.warn(
+            "Character coordinates received from server does not match tilemap",
+            char.coords,
+          );
+          return;
+        }
+
+        actor.lerpToPosition(newPos);
+      }),
+    );
   };
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {
     const entity = this.characterActors.get(id);
     entity?.kill();
     this.characterActors.delete(id);
+    this.characterCleanups.flush(id);
   };
 }
