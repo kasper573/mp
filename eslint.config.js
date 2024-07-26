@@ -8,7 +8,14 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 export default tseslint.config(
   {
     // Ignores must be defined as the only key in the config object to be interpreted as global ignores
-    ignores: ["**/node_modules/", "**/dist/", "**/.turbo/", "pnpm-lock.yaml"],
+    ignores: [
+      "**/node_modules/",
+      "**/dist/",
+      "**/.turbo/",
+      "pnpm-lock.yaml",
+      // Don't lint Tiled maps since eslint confuses them for typescript files
+      "**/apps/client/public/**",
+    ],
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
