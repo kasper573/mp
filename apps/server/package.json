@@ -16,12 +16,15 @@
   "dependencies": {
     "@mp/validate": "workspace:*",
     "@mp/events": "workspace:*",
+    "@mp/excalibur": "workspace:*",
     "@colyseus/monitor": "0.15.7",
     "@colyseus/tools": "0.15.39",
     "@colyseus/schema": "2.0.34",
     "colyseus": "0.15.17",
     "cors": "2.8.5",
-    "express": "4.19.2"
+    "express": "4.19.2",
+    "esm": "3.2.25",
+    "dijkstrajs": "1.0.3"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",

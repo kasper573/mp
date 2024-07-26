@@ -25,6 +25,11 @@
    <frame tileid="66" duration="250"/>
   </animation>
  </tile>
+ <tile id="40">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
  <tile id="41">
   <animation>
    <frame tileid="41" duration="250"/>
@@ -48,6 +53,21 @@
    <frame tileid="61" duration="250"/>
    <frame tileid="70" duration="250"/>
   </animation>
+ </tile>
+ <tile id="49">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="58">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="67">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
  </tile>
  <tile id="73">
   <animation>
@@ -121,6 +141,11 @@
    <frame tileid="142" duration="250"/>
   </animation>
  </tile>
+ <tile id="145">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
  <tile id="146">
   <animation>
    <frame tileid="146" duration="250"/>
@@ -143,6 +168,41 @@
    <frame tileid="168" duration="250"/>
    <frame tileid="177" duration="250"/>
   </animation>
+ </tile>
+ <tile id="151">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="154">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="160">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="163">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="169">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="172">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="178">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
  </tile>
  <tile id="181">
   <animation>
@@ -240,6 +300,11 @@
    <frame tileid="282" duration="250"/>
   </animation>
  </tile>
+ <tile id="256">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
  <tile id="257">
   <animation>
    <frame tileid="257" duration="250"/>
@@ -264,7 +329,132 @@
    <frame tileid="286" duration="250"/>
   </animation>
  </tile>
+ <tile id="274">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="283">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="325">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="326">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="327">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="328">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="332">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="333">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="334">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="335">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="336">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="337">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="338">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
  <tile id="340">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="361">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="362">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="363">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="364">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="367">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="368">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="369">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="370">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="371">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="372">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="373">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="374">
   <properties>
    <property name="Walkable" type="bool" value="true"/>
   </properties>
@@ -274,9 +464,79 @@
    <property name="Walkable" type="bool" value="true"/>
   </properties>
  </tile>
+ <tile id="397">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="398">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="399">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="400">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="403">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="404">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="405">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="406">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="407">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
  <tile id="412">
   <properties>
    <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="439">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="440">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="441">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="442">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
+  </properties>
+ </tile>
+ <tile id="443">
+  <properties>
+   <property name="Walkable" type="bool" value="false"/>
   </properties>
  </tile>
  <tile id="448">
@@ -284,7 +544,122 @@
    <property name="Walkable" type="bool" value="true"/>
   </properties>
  </tile>
+ <tile id="469">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="470">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="471">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="482">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
  <tile id="484">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="505">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="507">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="518">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="520">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="541">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="543">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="555">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="556">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="557">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="577">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="578">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="579">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="628">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="629">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="630">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="631">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="632">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="633">
+  <properties>
+   <property name="Walkable" type="bool" value="true"/>
+  </properties>
+ </tile>
+ <tile id="634">
   <properties>
    <property name="Walkable" type="bool" value="true"/>
   </properties>

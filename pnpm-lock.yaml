@@ -50,12 +50,12 @@ importers:
 
   apps/client:
     dependencies:
-      '@excaliburjs/plugin-tiled':
-        specifier: 0.29.2
-        version: 0.29.2(excalibur@0.29.3)
       '@mp/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@mp/excalibur':
+        specifier: workspace:*
+        version: link:../../packages/excalibur
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -65,9 +65,6 @@ importers:
       colyseus.js:
         specifier: 0.15.25
         version: 0.15.25
-      excalibur:
-        specifier: 0.29.3
-        version: 0.29.3
       react:
         specifier: 18.3.1
         version: 18.3.1
@@ -111,6 +108,9 @@ importers:
       '@mp/events':
         specifier: workspace:*
         version: link:../../packages/events
+      '@mp/excalibur':
+        specifier: workspace:*
+        version: link:../../packages/excalibur
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -120,6 +120,12 @@ importers:
       cors:
         specifier: 2.8.5
         version: 2.8.5
+      dijkstrajs:
+        specifier: 1.0.3
+        version: 1.0.3
+      esm:
+        specifier: 3.2.25
+        version: 3.2.25
       express:
         specifier: 4.19.2
         version: 4.19.2
@@ -177,6 +183,19 @@ importers:
         version: 8.0.1
 
   packages/events:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/excalibur:
+    dependencies:
+      '@excaliburjs/plugin-tiled':
+        specifier: 0.29.2
+        version: 0.29.2(excalibur@0.29.3)
+      excalibur:
+        specifier: 0.29.3
+        version: 0.29.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -1426,6 +1445,9 @@ packages:
     resolution: {integrity: sha512-bwy0MGW55bG41VqxxypOsdSdGqLwXPI/focwgTYCFMbdUiBAxLg9CFzG08sz2aqzknwiX7Hkl0bQENjg8iLByw==}
     engines: {node: '>=8'}
 
+  dijkstrajs@1.0.3:
+    resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
+
   dir-glob@3.0.1:
     resolution: {integrity: sha512-WkrWp9GR4KXfKGYzOLmTuGVi1UWFfws377n9cc55/tb6DuqyF6pcQ5AbiHEshaDpY9v6oaSr2XCDidGmMwdzIA==}
     engines: {node: '>=8'}
@@ -1603,6 +1625,10 @@ packages:
     resolution: {integrity: sha512-FzJ9D/0nGiCGBf8UXO/IGLTgLVzIxze1zpfA8Ton2mjLovXdAPlYDv+MQDcqj3TmrhAGYfOpz9RfR+ent0AgAw==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
     hasBin: true
+
+  esm@3.2.25:
+    resolution: {integrity: sha512-U1suiZ2oDVWv4zPO56S0NcR5QriEahGtdN2OR6FiOG4WJvcjBVFB0qI4+eKoWFH483PKGuLuu6V8Z4T5g63UVA==}
+    engines: {node: '>=6'}
 
   espree@10.1.0:
     resolution: {integrity: sha512-M1M6CpiE6ffoigIOWYO9UDP8TMUw9kqb21tf+08IgDYjCsOvCuDt4jQcZmoYxx+w7zlKw9/N0KXfto+I8/FrXA==}
@@ -4437,6 +4463,8 @@ snapshots:
   detect-libc@2.0.3:
     optional: true
 
+  dijkstrajs@1.0.3: {}
+
   dir-glob@3.0.1:
     dependencies:
       path-type: 4.0.0
@@ -4729,6 +4757,8 @@ snapshots:
       text-table: 0.2.0
     transitivePeerDependencies:
       - supports-color
+
+  esm@3.2.25: {}
 
   espree@10.1.0:
     dependencies:
