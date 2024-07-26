@@ -12,9 +12,9 @@ export function messageReceiver<EventHandlers extends AnyEvents>(
   ): MessageReceiver<Client, EventHandlers> {
     return {
       onMessage(eventName, eventHandler) {
-        return target.onMessage(String(eventName), (client, ...args) => {
+        return target.onMessage(String(eventName), async (client, ...args) => {
           try {
-            eventHandler(client, ...(args as never));
+            await eventHandler(client, ...(args as never));
           } catch (e) {
             errorHandler(e);
           }
