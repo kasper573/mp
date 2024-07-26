@@ -20,7 +20,7 @@ export class Character extends Schema {
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
   @type({ array: Coordinate }) path = new ArraySchema<Coordinate>();
-  speed = 5;
+  speed = 1;
 
   constructor(id: string) {
     super();
