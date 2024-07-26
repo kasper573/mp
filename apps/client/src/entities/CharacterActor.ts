@@ -1,6 +1,6 @@
 import type { Character } from "@mp/server";
-import type { Engine, Vector } from "excalibur";
-import { Actor, Circle, Color } from "excalibur";
+import type { Engine, Vector } from "@mp/excalibur";
+import { Actor, Circle, Color } from "@mp/excalibur";
 
 export class CharacterActor extends Actor {
   private lerpTo?: Vector;

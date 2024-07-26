@@ -5,7 +5,7 @@ import {
   type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
-import { Scene, type DefaultLoader } from "excalibur";
+import { Scene, type DefaultLoader } from "@mp/excalibur";
 import {
   Cleanup,
   CleanupMap,
@@ -13,8 +13,7 @@ import {
   subscribe,
   type MessageSender,
 } from "@mp/events";
-import { TiledResource } from "../TiledResource";
-import { coordsToVec, vecToCoords } from "../data";
+import { TiledResource } from "@mp/excalibur";
 import { CharacterActor } from "./CharacterActor";
 
 export class AreaScene extends Scene {
@@ -63,7 +62,7 @@ export class AreaScene extends Scene {
       return;
     }
 
-    this.bus.send("move", vecToCoords(tiledPos));
+    this.bus.send("move", [tiledPos.x, tiledPos.y]);
   };
 
   private addCharacter = (char: Character) => {
@@ -83,7 +82,8 @@ export class AreaScene extends Scene {
   };
 
   private synchronizeCharacterPosition(char: Character) {
-    const newPos = this.tileMap.tileCoordToWorld(coordsToVec(char.coords));
+    console.log("synchronizing", char.id, char.coords.toString());
+    const newPos = this.tileMap.tileCoordToWorld(char.coords);
     if (!newPos) {
       console.warn(
         "Character coordinates received from server does not match tilemap",
