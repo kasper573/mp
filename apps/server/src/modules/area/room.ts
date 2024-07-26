@@ -1,6 +1,7 @@
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
+import { env } from "../../env";
 import { type AreaMessages } from "./messages";
 import { Area, Character } from "./schema";
 import { findPath } from "./findPath";
@@ -21,7 +22,7 @@ export class AreaRoom extends Room<Area> {
       }
     });
 
-    this.setSimulationInterval(this.onTick);
+    this.setSimulationInterval(this.onTick, env.tickInterval);
   }
 
   onTick = (deltaTimeMs: number) => {
