@@ -1,8 +1,10 @@
-import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
+import type { TiledMap, TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
 import type { IsometricTileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/iso-tile-layer";
 import type { TileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/tile-layer";
 import { Vector } from "excalibur";
+
+export { TiledMap };
 
 export class TiledResource extends TiledResourceImpl {
   constructor(path: string, options?: TiledResourceOptions) {
