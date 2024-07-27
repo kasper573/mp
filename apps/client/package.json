@@ -13,6 +13,7 @@
     "@mp/validate": "workspace:*",
     "@mp/events": "workspace:*",
     "@mp/excalibur": "workspace:*",
+    "@mp/state": "workspace:*",
     "@tanstack/react-query": "5.51.11",
     "colyseus.js": "0.15.25",
     "react": "18.3.1",

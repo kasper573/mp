@@ -1,3 +1,4 @@
+import { createPathGraph } from "@mp/state";
 import {
   type SessionId,
   type Area,
@@ -10,11 +11,14 @@ import {
   Cleanup,
   CleanupMap,
   messageSender,
-  subscribe,
   type MessageSender,
 } from "@mp/events";
-import { TiledResource } from "@mp/excalibur";
+import {
+  TiledResource,
+  type PointerEvent as ExcaliburPointerEvent,
+} from "@mp/excalibur";
 import { CharacterActor } from "./CharacterActor";
+import { AreaDebugUI } from "./AreaDebugUI";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
@@ -22,6 +26,7 @@ export class AreaScene extends Scene {
   private characterActors: Map<SessionId, CharacterActor> = new Map();
   private tileMap!: TiledResource;
   private bus: MessageSender<AreaMessages>;
+  private debugUI!: AreaDebugUI;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -36,15 +41,26 @@ export class AreaScene extends Scene {
     this.tileMap = new TiledResource("areas/island.tmx");
 
     loader.addResource(this.tileMap);
-    loader.areResourcesLoaded().then(() => this.tileMap.addToScene(this));
+    loader.areResourcesLoaded().then(() => {
+      this.tileMap.addToScene(this);
+
+      this.debugUI = new AreaDebugUI(
+        createPathGraph(this.tileMap),
+        this.tileMap.map,
+      );
+      this.debugUI.z = 1000;
+      this.add(this.debugUI);
+    });
   }
 
   override onActivate(): void {
     const { characters } = this.room.state;
+
+    this.input.pointers.primary.on("down", this.onClick);
     this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
-      subscribe(this.input.pointers.primary, "down", this.moveToPointer),
+      () => this.input.pointers.primary.off("down", this.onClick),
     );
   }
 
@@ -52,17 +68,20 @@ export class AreaScene extends Scene {
     this.cleanups.flush();
   }
 
-  private moveToPointer = () => {
-    const tiledPos = this.tileMap.worldCoordToTile(
-      this.input.pointers.primary.lastWorldPos,
-    );
+  private onClick = (e: ExcaliburPointerEvent) => {
+    const tiledPos = this.tileMap.worldCoordToTile(e.worldPos);
 
     if (!tiledPos) {
       console.warn("Could not translate pointer position to tile coordinate");
       return;
     }
 
-    this.bus.send("move", [tiledPos.x, tiledPos.y]);
+    const { ctrlKey } = e.nativeEvent as PointerEvent;
+    if (ctrlKey) {
+      this.debugUI.toggleNode(tiledPos);
+    } else {
+      this.bus.send("move", [tiledPos.x, tiledPos.y]);
+    }
   };
 
   private addCharacter = (char: Character) => {
