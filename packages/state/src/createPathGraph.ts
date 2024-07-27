@@ -21,7 +21,10 @@ export function createPathGraph(tiledMap: TiledResource): PathGraph {
 }
 
 function isOneTileAway(a: VectorLike, b: VectorLike) {
-  return Math.abs(a.x - b.x) + Math.abs(a.y - b.y) === 1;
+  const dx = Math.abs(a.x - b.x);
+  const dy = Math.abs(a.y - b.y);
+  const isDiagonal = dx === 1 && dy === 1;
+  return dx + dy === 1 || isDiagonal;
 }
 
 const and = (a: boolean, b: boolean) => a && b;

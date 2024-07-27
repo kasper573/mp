@@ -3,14 +3,17 @@ import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
 import type { TiledResource } from "@mp/excalibur";
+import {
+  createPathGraph,
+  findPath,
+  getStartingPoint,
+  moveAlongPath,
+} from "@mp/state";
+import { ArraySchema } from "@colyseus/schema";
 import { env } from "../../env";
-import { type AreaMessages } from "./messages";
-import { Area, Character } from "./schema";
-import { findPath } from "./findPath";
-import { moveAlongPath } from "./moveAlongPath";
-import { createPathGraph } from "./createPathGraph";
 import { loadTiledMap } from "./loadTiledMap";
-import { getStartingPoint } from "./getStartingPoint";
+import { Area, Character, Coordinate } from "./schema";
+import { type AreaMessages } from "./messages";
 
 const islandTMX = path.resolve(
   __dirname,
@@ -33,7 +36,9 @@ export class AreaRoom extends Room<Area> {
       if (char) {
         const path = findPath(char.coords, { x, y }, pathGraph);
         if (path) {
-          char.path = path;
+          char.path = new ArraySchema(
+            ...path.map((v) => new Coordinate(v.x, v.y)),
+          );
         }
       }
     });
@@ -52,7 +57,10 @@ export class AreaRoom extends Room<Area> {
     console.log(client.sessionId, "joined!");
 
     const player = new Character(client.sessionId);
-    player.coords = getStartingPoint(this.tiledMap) ?? player.coords;
+    const start = getStartingPoint(this.tiledMap);
+    if (start) {
+      player.coords = new Coordinate(start.x, start.y);
+    }
     player.connected = true;
     this.state.characters.set(player.id, player);
   }

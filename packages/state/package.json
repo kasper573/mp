@@ -1,0 +1,15 @@
+{
+  "name": "@mp/state",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "license": "MIT",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@mp/excalibur": "workspace:*",
+    "dijkstrajs": "1.0.3"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

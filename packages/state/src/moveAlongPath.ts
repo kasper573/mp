@@ -1,8 +1,8 @@
-import type { Coordinate, Path } from "./schema";
+import type { VectorLike } from "@mp/excalibur";
 
 export function moveAlongPath(
-  coords: Coordinate,
-  path: Path,
+  coords: VectorLike,
+  path: ArrayLike<VectorLike>,
   distance: number,
 ): void {
   while (path.length > 0 && distance > 0) {
@@ -26,4 +26,10 @@ export function moveAlongPath(
 
     // TODO add new coordinate to travelled path when implementing collision detection
   }
+}
+
+interface ArrayLike<T> {
+  shift(): T | undefined;
+  length: number;
+  [index: number]: T;
 }
