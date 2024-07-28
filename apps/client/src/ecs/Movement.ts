@@ -1,44 +1,50 @@
 import { Cleanup, subscribe } from "@mp/events";
-import type { Entity, PostUpdateEvent, Vector } from "@mp/excalibur";
+import type { Entity, PostUpdateEvent } from "@mp/excalibur";
+import { Vector } from "@mp/excalibur";
 import { Component } from "@mp/excalibur";
+import { moveAlongPath } from "@mp/state";
 
 export class Movement extends Component {
   private cleanup = new Cleanup();
 
-  public lerpTo?: Vector;
+  private moveAlong?: MoveAlongParams;
 
   constructor(private getPos: (owner: Entity) => Vector) {
     super();
   }
 
-  updatePosition(pos: Vector) {
-    this.lerpTo = pos;
+  update(target: MovementTarget) {
+    if (target instanceof Vector) {
+      const pos = this.getPos(this.owner!);
+      pos.x = target.x;
+      pos.y = target.y;
+    } else {
+      this.moveAlong = target;
+    }
   }
 
   override onAdd(): void {
-    this.cleanup.add(subscribe(this.owner!, "postupdate", this.update));
+    this.cleanup.add(subscribe(this.owner!, "postupdate", this.onEntityUpdate));
   }
 
   override onRemove(): void {
     this.cleanup.flush();
   }
 
-  private update = (e: PostUpdateEvent) => {
-    if (this.lerpTo && this.owner) {
-      const pos = this.getPos(this.owner);
-      pos.x = lerp(pos.x, this.lerpTo.x, 0.2);
-      pos.y = lerp(pos.y, this.lerpTo.y, 0.2);
-      if (pos.distance(this.lerpTo) < lerpMinDistance) {
-        pos.x = this.lerpTo.x;
-        pos.y = this.lerpTo.y;
-        this.lerpTo = undefined;
-      }
+  private onEntityUpdate = (e: PostUpdateEvent) => {
+    if (!this.owner || !this.moveAlong) {
+      return;
     }
+
+    const pos = this.getPos(this.owner);
+    moveAlongPath(
+      pos,
+      this.moveAlong.path,
+      this.moveAlong.speed * (e.delta / 1000),
+    );
   };
 }
 
-const lerpMinDistance = 1;
+type MoveAlongParams = { path: Vector[]; speed: number };
 
-function lerp(a: number, b: number, t: number) {
-  return a + (b - a) * t;
-}
+type MovementTarget = MoveAlongParams | Vector;

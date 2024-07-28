@@ -117,27 +117,26 @@ export class AreaScene extends Scene {
     this.synchronizeCharacterPosition(char);
     this.characterCleanups.add(
       char.id,
+      char.listen("speed", () => this.synchronizeCharacterPosition(char)),
       char.coords.onChange(() => this.synchronizeCharacterPosition(char)),
       char.path.onChange(() => this.synchronizeCharacterPosition(char)),
     );
   };
 
   private synchronizeCharacterPosition(char: Character) {
-    const newPos = this.tileMap.tileCoordToWorld(char.coords);
-    if (!newPos) {
-      console.warn(
-        "Character coordinates received from server does not match tilemap",
-        char.coords,
-      );
-      return;
-    }
+    const pos = this.tileMap.tileCoordToWorld(char.coords);
+    const path = char.path.map(this.tileMap.tileCoordToWorld);
 
     if (char.id === this.myCharacterId) {
       this.debugUI.setPath(char.path.toArray());
     }
 
     const actor = this.characterActors.get(char.id)!;
-    invoker(Movement, actor).updatePosition(newPos);
+    invoker(Movement, actor).update(
+      path.length
+        ? { path, speed: this.tileMap.tileUnitToWorld(char.speed) }
+        : pos,
+    );
   }
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {

@@ -10,15 +10,15 @@ export class TiledResource extends TiledResourceImpl {
     });
   }
 
-  worldCoordToTile({ x, y }: VectorLike): Vector | undefined {
+  worldCoordToTile = ({ x, y }: VectorLike): Vector | undefined => {
     const [tile] = this.getTilesByPoint(new Vector(x, y));
     if (tile) {
       const { x, y } = tile.exTile;
       return new Vector(x, y);
     }
-  }
+  };
 
-  tileCoordToWorld({ x, y }: VectorLike): Vector | undefined {
+  tileCoordToWorld = ({ x, y }: VectorLike): Vector => {
     for (const layer of this.getTileLayers()) {
       const tile = layer.getTileByCoordinate(x, y);
       if (tile) {
@@ -27,12 +27,15 @@ export class TiledResource extends TiledResourceImpl {
         return new Vector(x, y);
       }
     }
-  }
+    throw new Error(`Tile does not exist: ${x},${y}`);
+  };
 
-  getMatchingTileCoordinates<T>(
+  tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
+
+  getMatchingTileCoordinates = <T>(
     propertyFilter: string,
     valueFilter: (valuesForOneCoordinate: T[]) => boolean,
-  ): Vector[] {
+  ): Vector[] => {
     const tilesPerCoordinate = groupBy(
       this.getTilesByProperty(propertyFilter).map(({ exTile, tiledTile }) => ({
         pos: new Vector(exTile.x, exTile.y),
@@ -50,7 +53,7 @@ export class TiledResource extends TiledResourceImpl {
     }
 
     return coordinates;
-  }
+  };
 }
 
 export interface VectorLike {

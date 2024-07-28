@@ -37,7 +37,6 @@ export class AreaRoom extends Room<Area> {
         const path = findPath(char.coords, { x, y }, dGraph);
         if (path) {
           char.path = new ArraySchema(...path.map(Coordinate.fromVector));
-          char.lastPath = new ArraySchema(...path.map(Coordinate.fromVector));
         }
       }
     });
