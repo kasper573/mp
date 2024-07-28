@@ -82,12 +82,3 @@ export class AreaRoom extends Room<Area> {
     console.log("room", this.roomId, "disposing...");
   }
 }
-
-function generateRandomData() {
-  const obj: Record<string, unknown> = {};
-  for (let i = 0; i < 100; i++) {
-    obj[`key${i}`] =
-      "cool".repeat(Math.round(Math.random() * 20)) + Math.random();
-  }
-  return obj;
-}
