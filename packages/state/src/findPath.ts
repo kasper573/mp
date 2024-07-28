@@ -8,11 +8,15 @@ export function findPath(
   graph: DGraph,
 ): Vector[] | undefined {
   try {
-    return find_path(
+    // Skip the first node in the result because it is the start node.
+    // We are only interested in future nodes.
+    const [_, ...remaining] = find_path(
       graph,
       dNodeFromVector(start),
       dNodeFromVector(target),
     ).map(vectorFromDNode);
+
+    return remaining;
   } catch {
     // Do nothing
   }

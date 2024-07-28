@@ -16,6 +16,10 @@ export class Coordinate extends Schema {
     return `${this.x},${this.y}`;
   }
 
+  toNearestTile() {
+    return new Coordinate(Math.floor(this.x), Math.floor(this.y));
+  }
+
   static fromVector = ({ x, y }: Vector) => new Coordinate(x, y);
 }
 

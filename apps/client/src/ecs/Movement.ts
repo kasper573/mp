@@ -1,25 +1,25 @@
 import { Cleanup, subscribe } from "@mp/events";
 import type { Entity, PostUpdateEvent } from "@mp/excalibur";
-import { Vector } from "@mp/excalibur";
+import type { Vector } from "@mp/excalibur";
 import { Component } from "@mp/excalibur";
 import { moveAlongPath } from "@mp/state";
 
 export class Movement extends Component {
   private cleanup = new Cleanup();
-
   private moveAlong?: MoveAlongParams;
+  private hasAssignedPositionAtLeastOnce = false;
 
   constructor(private getPos: (owner: Entity) => Vector) {
     super();
   }
 
-  update(target: MovementTarget) {
-    if (target instanceof Vector) {
+  sync(currentPosition: Vector, moveAlong?: MoveAlongParams): void {
+    this.moveAlong = moveAlong;
+    if (!moveAlong || !this.hasAssignedPositionAtLeastOnce) {
       const pos = this.getPos(this.owner!);
-      pos.x = target.x;
-      pos.y = target.y;
-    } else {
-      this.moveAlong = target;
+      pos.x = currentPosition.x;
+      pos.y = currentPosition.y;
+      this.hasAssignedPositionAtLeastOnce = true;
     }
   }
 
@@ -36,9 +36,8 @@ export class Movement extends Component {
       return;
     }
 
-    const pos = this.getPos(this.owner);
     moveAlongPath(
-      pos,
+      this.getPos(this.owner),
       this.moveAlong.path,
       this.moveAlong.speed * (e.delta / 1000),
     );
@@ -46,5 +45,3 @@ export class Movement extends Component {
 }
 
 type MoveAlongParams = { path: Vector[]; speed: number };
-
-type MovementTarget = MoveAlongParams | Vector;

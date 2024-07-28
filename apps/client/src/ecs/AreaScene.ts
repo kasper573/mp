@@ -132,11 +132,10 @@ export class AreaScene extends Scene {
     }
 
     const actor = this.characterActors.get(char.id)!;
-    invoker(Movement, actor).update(
-      path.length
-        ? { path, speed: this.tileMap.tileUnitToWorld(char.speed) }
-        : pos,
-    );
+    invoker(Movement, actor).sync(pos, {
+      path,
+      speed: this.tileMap.tileUnitToWorld(char.speed),
+    });
   }
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {

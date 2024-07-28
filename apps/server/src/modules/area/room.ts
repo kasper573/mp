@@ -34,7 +34,7 @@ export class AreaRoom extends Room<Area> {
     this.bus.onMessage("move", async (client, [x, y]) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
-        const path = findPath(char.coords, { x, y }, dGraph);
+        const path = findPath(char.coords.toNearestTile(), { x, y }, dGraph);
         if (path) {
           char.path = new ArraySchema(...path.map(Coordinate.fromVector));
         }
