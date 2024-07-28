@@ -1,4 +1,4 @@
-import { createPathGraph } from "@mp/state";
+import { tiledDGraph } from "@mp/state";
 import {
   type SessionId,
   type Area,
@@ -46,7 +46,7 @@ export class AreaScene extends Scene {
     loader.areResourcesLoaded().then(() => {
       this.tileMap.addToScene(this);
 
-      const dGraph = createPathGraph(this.tileMap);
+      const dGraph = tiledDGraph(this.tileMap);
 
       this.debugUI = new AreaDebugUI(dGraph, this.tileMap.map);
       this.debugUI.z = 1000;

@@ -2,14 +2,14 @@ import type { TiledMap, VectorLike } from "@mp/excalibur";
 import { Vector } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
 import type { Coordinate } from "@mp/server";
-import { type PathGraphNodeId, type PathGraph, parseNodeId } from "@mp/state";
+import { type DNode, type DGraph, vectorFromDNode } from "@mp/state";
 
 export class AreaDebugUI extends Actor {
-  private enabledNodes = new Set<PathGraphNodeId>();
+  private enabledNodes = new Set<DNode>();
   private currentPath: Coordinate[] = [];
   private canvas: Canvas;
 
-  constructor(graph: PathGraph, map: TiledMap) {
+  constructor(graph: DGraph, map: TiledMap) {
     super();
 
     this.canvas = new Canvas({
@@ -33,7 +33,7 @@ export class AreaDebugUI extends Actor {
   }
 
   toggleNode({ x, y }: Vector) {
-    const nodeId: PathGraphNodeId = `${x}|${y}`;
+    const nodeId: DNode = `${x}|${y}`;
     if (this.enabledNodes.has(nodeId)) {
       this.enabledNodes.delete(nodeId);
     } else {
@@ -50,10 +50,10 @@ function costToString(cost: number): string {
 
 function drawDebugGraphics(
   ctx: CanvasRenderingContext2D,
-  graph: PathGraph,
+  graph: DGraph,
   map: TiledMap,
   currentPath: Coordinate[],
-  nodes: Iterable<PathGraphNodeId>,
+  nodes: Iterable<DNode>,
 ): void {
   const scale = new Vector(map.tilewidth, map.tileheight);
   const offset = scale.scale(0.5);
@@ -61,7 +61,7 @@ function drawDebugGraphics(
     new Vector(v.x, v.y).scale(scale).add(offset);
 
   for (const node of nodes) {
-    const start = transform(parseNodeId(node));
+    const start = transform(vectorFromDNode(node));
     ctx.beginPath();
     ctx.lineWidth = 5;
     ctx.arc(start.x, start.y, 4, 0, 2 * Math.PI);
@@ -69,7 +69,7 @@ function drawDebugGraphics(
     ctx.stroke();
 
     for (const [neighbor, cost] of Object.entries(graph[node] ?? {})) {
-      const end = transform(parseNodeId(neighbor as PathGraphNodeId));
+      const end = transform(vectorFromDNode(neighbor as DNode));
       ctx.beginPath();
       ctx.moveTo(start.x, start.y);
       ctx.lineTo(end.x, end.y);

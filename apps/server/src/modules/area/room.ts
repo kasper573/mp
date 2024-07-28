@@ -4,7 +4,7 @@ import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
 import type { TiledResource } from "@mp/excalibur";
 import {
-  createPathGraph,
+  tiledDGraph,
   findPath,
   getStartingPoint,
   moveAlongPath,
@@ -27,14 +27,14 @@ export class AreaRoom extends Room<Area> {
   override async onCreate() {
     this.tiledMap = await loadTiledMap(islandTMX);
 
-    const pathGraph = createPathGraph(this.tiledMap);
+    const dGraph = tiledDGraph(this.tiledMap);
 
     this.setState(new Area());
 
     this.bus.onMessage("move", async (client, [x, y]) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
-        const path = findPath(char.coords, { x, y }, pathGraph);
+        const path = findPath(char.coords, { x, y }, dGraph);
         if (path) {
           char.path = new ArraySchema(...path.map(Coordinate.fromVector));
           char.lastPath = new ArraySchema(...path.map(Coordinate.fromVector));

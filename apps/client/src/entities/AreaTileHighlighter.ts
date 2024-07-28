@@ -1,13 +1,13 @@
 import type { TiledMap } from "@mp/excalibur";
 import { Vector } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
-import { createNodeId, type PathGraph } from "@mp/state";
+import { isInGraph, type DGraph } from "@mp/state";
 
 export class AreaTileHighlighter extends Actor {
   private canvas: Canvas;
   private highlighted?: Vector;
 
-  constructor(graph: PathGraph, map: TiledMap) {
+  constructor(graph: DGraph, map: TiledMap) {
     super();
 
     this.canvas = new Canvas({
@@ -15,8 +15,7 @@ export class AreaTileHighlighter extends Actor {
       height: map.height * map.tileheight,
       cache: true,
       draw: (ctx) => {
-        // Only draw highlight for locations that are available in the DGraph
-        if (this.highlighted && graph[createNodeId(this.highlighted)]) {
+        if (isInGraph(graph, this.highlighted)) {
           drawHighlight(ctx, map, this.highlighted);
         }
       },

@@ -5,32 +5,44 @@ import { find_path } from "./dijkstra";
 export function findPath(
   start: VectorLike,
   target: VectorLike,
-  graph: PathGraph,
+  graph: DGraph,
 ): Vector[] | undefined {
   try {
-    return find_path(graph, createNodeId(start), createNodeId(target)).map(
-      parseNodeId,
-    );
+    return find_path(
+      graph,
+      dNodeFromVector(start),
+      dNodeFromVector(target),
+    ).map(vectorFromDNode);
   } catch {
     // Do nothing
   }
 }
 
-export function createNodeId({ x, y }: VectorLike): PathGraphNodeId {
+export function isInGraph(graph: DGraph, v?: VectorLike): v is VectorLike {
+  return v && graph[dNodeFromVector(v)] ? true : false;
+}
+
+export function dNodeFromVector({ x, y }: VectorLike): DNode {
   return `${x}${separator}${y}`;
 }
 
-export function parseNodeId(nodeId: PathGraphNodeId): Vector {
-  const [x, y] = nodeId.split("|").map(Number);
+export function vectorFromDNode(node: DNode): Vector {
+  const [x, y] = node.split("|").map(Number);
   return new Vector(x, y);
 }
 
-export type PathGraph = DijkstraGraph<PathGraphNodeId>;
-export type PathGraphNodeId = `${number}${typeof separator}${number}`;
-const separator = "|" as const;
-
-type DijkstraGraph<NodeId extends string = string> = {
-  [nodeId in NodeId]?: {
-    [neighborId in NodeId]?: number;
+/**
+ * A directed graph
+ */
+export type DGraph<Node extends DNode = DNode> = {
+  [nodeId in Node]?: {
+    [neighborId in Node]?: number;
   };
 };
+
+/**
+ * A node in a directed graph
+ */
+export type DNode = `${number}${typeof separator}${number}`;
+
+const separator = "|" as const;

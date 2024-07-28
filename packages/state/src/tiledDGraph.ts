@@ -1,9 +1,9 @@
 import { type TiledResource } from "@mp/excalibur";
-import type { PathGraphNodeId } from "./findPath";
-import { createNodeId, type PathGraph } from "./findPath";
+import type { DNode } from "./findPath";
+import { dNodeFromVector, type DGraph } from "./findPath";
 
-export function createPathGraph(tiledMap: TiledResource): PathGraph {
-  const graph: PathGraph = {};
+export function tiledDGraph(tiledMap: TiledResource): DGraph {
+  const graph: DGraph = {};
 
   const walkableTiles = tiledMap.getMatchingTileCoordinates<boolean>(
     "walkable",
@@ -11,16 +11,16 @@ export function createPathGraph(tiledMap: TiledResource): PathGraph {
   );
 
   for (const tile of walkableTiles) {
-    const neighbors: PathGraph[PathGraphNodeId] = {};
+    const neighbors: DGraph[DNode] = {};
     for (const neighbor of walkableTiles) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
       const distance = tile.distance(neighbor);
       if (distance === 1 || distance === Math.SQRT2) {
-        neighbors[createNodeId(neighbor)] = tile.distance(neighbor);
+        neighbors[dNodeFromVector(neighbor)] = tile.distance(neighbor);
       }
     }
-    graph[createNodeId(tile)] = neighbors;
+    graph[dNodeFromVector(tile)] = neighbors;
   }
 
   return graph;
