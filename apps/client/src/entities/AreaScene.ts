@@ -11,6 +11,7 @@ import {
   Cleanup,
   CleanupMap,
   messageSender,
+  subscribe,
   type MessageSender,
 } from "@mp/events";
 import {
@@ -68,13 +69,11 @@ export class AreaScene extends Scene {
   override onActivate(): void {
     const { characters } = this.room.state;
 
-    this.input.pointers.primary.on("down", this.onPointerClick);
-    this.input.pointers.primary.on("move", this.onPointerMove);
     this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
-      () => this.input.pointers.primary.off("down", this.onPointerClick),
-      () => this.input.pointers.primary.off("move", this.onPointerMove),
+      subscribe(this.input.pointers.primary, "down", this.onPointerClick),
+      subscribe(this.input.pointers.primary, "move", this.onPointerMove),
     );
   }
 
