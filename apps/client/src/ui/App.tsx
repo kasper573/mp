@@ -3,7 +3,7 @@ import { Client } from "colyseus.js";
 import { useEffect, useMemo, useReducer, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { env } from "../env";
-import { createGame } from "../entities/Game";
+import { createGame } from "../ecs/Game";
 
 export function App() {
   const client = useMemo(() => new Client(env.serverUrl), []);

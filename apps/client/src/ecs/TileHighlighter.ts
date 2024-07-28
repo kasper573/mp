@@ -3,7 +3,7 @@ import { Vector } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
 import { isInGraph, type DGraph } from "@mp/state";
 
-export class AreaTileHighlighter extends Actor {
+export class TileHighlighter extends Actor {
   private canvas: Canvas;
   private highlighted?: Vector;
 

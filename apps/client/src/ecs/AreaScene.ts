@@ -6,7 +6,7 @@ import {
   type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
-import { Scene, type DefaultLoader, type Layer } from "@mp/excalibur";
+import { invoker, Scene, type DefaultLoader, type Layer } from "@mp/excalibur";
 import {
   Cleanup,
   CleanupMap,
@@ -18,9 +18,10 @@ import {
   TiledResource,
   type PointerEvent as ExcaliburPointerEvent,
 } from "@mp/excalibur";
+import { Movement } from "./Movement";
 import { CharacterActor } from "./CharacterActor";
 import { AreaDebugUI } from "./AreaDebugUI";
-import { AreaTileHighlighter } from "./AreaTileHighlighter";
+import { TileHighlighter } from "./TileHighlighter";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
@@ -29,7 +30,7 @@ export class AreaScene extends Scene {
   private tileMap!: TiledResource;
   private bus: MessageSender<AreaMessages>;
   private debugUI!: AreaDebugUI;
-  private tileHighlighter!: AreaTileHighlighter;
+  private tileHighlighter!: TileHighlighter;
   private characterLayer!: Layer;
 
   get myCharacterId() {
@@ -61,7 +62,7 @@ export class AreaScene extends Scene {
     this.debugUI.z = 1000;
     this.add(this.debugUI);
 
-    this.tileHighlighter = new AreaTileHighlighter(dGraph, this.tileMap.map);
+    this.tileHighlighter = new TileHighlighter(dGraph, this.tileMap.map);
     this.tileHighlighter.z = 999;
     this.add(this.tileHighlighter);
   };
@@ -117,9 +118,7 @@ export class AreaScene extends Scene {
     this.characterCleanups.add(
       char.id,
       char.coords.onChange(() => this.synchronizeCharacterPosition(char)),
-      char.lastPath.onChange(() =>
-        this.debugUI.setPath(char.lastPath.toArray()),
-      ),
+      char.path.onChange(() => this.synchronizeCharacterPosition(char)),
     );
   };
 
@@ -133,7 +132,12 @@ export class AreaScene extends Scene {
       return;
     }
 
-    this.characterActors.get(char.id)?.lerpToPosition(newPos);
+    if (char.id === this.myCharacterId) {
+      this.debugUI.setPath(char.path.toArray());
+    }
+
+    const actor = this.characterActors.get(char.id)!;
+    invoker(Movement, actor).updatePosition(newPos);
   }
 
   private deleteCharacter = (_: unknown, id: Character["id"]) => {

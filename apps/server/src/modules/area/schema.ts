@@ -24,7 +24,6 @@ export class Character extends Schema {
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
   @type({ array: Coordinate }) path = new ArraySchema<Coordinate>();
-  @type({ array: Coordinate }) lastPath = new ArraySchema<Coordinate>();
   speed = 3;
 
   constructor(id: string) {
