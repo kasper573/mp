@@ -6,7 +6,7 @@ import {
   type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
-import { Scene, type DefaultLoader } from "@mp/excalibur";
+import { Scene, type DefaultLoader, type Layer } from "@mp/excalibur";
 import {
   Cleanup,
   CleanupMap,
@@ -29,6 +29,7 @@ export class AreaScene extends Scene {
   private bus: MessageSender<AreaMessages>;
   private debugUI!: AreaDebugUI;
   private tileHighlighter!: AreaTileHighlighter;
+  private characterLayer!: Layer;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -41,22 +42,28 @@ export class AreaScene extends Scene {
 
   override onPreLoad(loader: DefaultLoader): void {
     this.tileMap = new TiledResource("areas/island.tmx");
-
     loader.addResource(this.tileMap);
-    loader.areResourcesLoaded().then(() => {
-      this.tileMap.addToScene(this);
-
-      const dGraph = tiledDGraph(this.tileMap);
-
-      this.debugUI = new AreaDebugUI(dGraph, this.tileMap.map);
-      this.debugUI.z = 1000;
-      this.add(this.debugUI);
-
-      this.tileHighlighter = new AreaTileHighlighter(dGraph, this.tileMap.map);
-      this.tileHighlighter.z = 999;
-      this.add(this.tileHighlighter);
-    });
+    loader.areResourcesLoaded().then(this.onTileMapLoaded);
   }
+
+  private onTileMapLoaded = () => {
+    this.tileMap.addToScene(this);
+
+    this.characterLayer = this.tileMap.getTileLayers("Characters")[0];
+    if (!this.characterLayer) {
+      throw new Error("Map must contain a characters layer");
+    }
+
+    const dGraph = tiledDGraph(this.tileMap);
+
+    this.debugUI = new AreaDebugUI(dGraph, this.tileMap.map);
+    this.debugUI.z = 1000;
+    this.add(this.debugUI);
+
+    this.tileHighlighter = new AreaTileHighlighter(dGraph, this.tileMap.map);
+    this.tileHighlighter.z = 999;
+    this.add(this.tileHighlighter);
+  };
 
   override onActivate(): void {
     const { characters } = this.room.state;
@@ -99,6 +106,7 @@ export class AreaScene extends Scene {
 
   private addCharacter = (char: Character) => {
     const actor = new CharacterActor(char);
+    actor.z = this.characterLayer.order;
     this.characterActors.set(char.id, actor);
     this.add(actor);
 
