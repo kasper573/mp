@@ -20,9 +20,6 @@ importers:
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
-      cross-env:
-        specifier: 7.0.3
-        version: 7.0.3
       eslint:
         specifier: 9.7.0
         version: 9.7.0
@@ -59,9 +56,6 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../packages/validate
       '@tanstack/react-query':
         specifier: 5.51.11
         version: 5.51.11(react@18.3.1)
@@ -78,9 +72,6 @@ importers:
       '@mp/build':
         specifier: workspace:*
         version: link:../../packages/build
-      '@mp/env':
-        specifier: workspace:*
-        version: link:../../packages/env
       '@mp/server':
         specifier: workspace:*
         version: link:../server
@@ -117,9 +108,6 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../packages/validate
       colyseus:
         specifier: 0.15.17
         version: 0.15.17(@colyseus/schema@2.0.34)(express@4.19.2)
@@ -133,9 +121,6 @@ importers:
       '@mp/build':
         specifier: workspace:*
         version: link:../../packages/build
-      '@mp/env':
-        specifier: workspace:*
-        version: link:../../packages/env
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -145,9 +130,6 @@ importers:
 
   packages/build:
     devDependencies:
-      '@mp/env':
-        specifier: workspace:*
-        version: link:../env
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
@@ -160,27 +142,6 @@ importers:
       vite-plugin-checker:
         specifier: 0.6.4
         version: 0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.5.3)(vite@5.2.13(@types/node@20.14.10))
-
-  packages/env:
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../validate
-      '@types/dotenv-flow':
-        specifier: ^3.3.3
-        version: 3.3.3
-      dotenv-expand:
-        specifier: ^11.0.6
-        version: 11.0.6
-      dotenv-flow:
-        specifier: ^4.1.0
-        version: 4.1.0
-      execa:
-        specifier: ^8.0.1
-        version: 8.0.1
 
   packages/events:
     devDependencies:
@@ -225,16 +186,6 @@ importers:
       typescript:
         specifier: 5.5.3
         version: 5.5.3
-
-  packages/validate:
-    dependencies:
-      zod:
-        specifier: ^3
-        version: 3.23.8
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
 
 packages:
 
@@ -922,9 +873,6 @@ packages:
   '@types/conventional-commits-parser@5.0.0':
     resolution: {integrity: sha512-loB369iXNmAZglwWATL+WRe+CRMmmBPtpolYzIebFaX4YA3x+BEfLqhUAV9WanycKI3TG1IMr5bMJDajDKLlUQ==}
 
-  '@types/dotenv-flow@3.3.3':
-    resolution: {integrity: sha512-aJjBsKw4bfGjvaRwrxBtEOfYZxCAq+LiFTpZ4DGTEK2b9eLVt/IAClapSxMfgV4Mi/2bIBKKjoTCO0lOh4ACLg==}
-
   '@types/eslint@8.56.10':
     resolution: {integrity: sha512-Shavhk87gCtY2fhXDctcfS3e6FdxWkCx1iUZ9eEUbh7rTqlZT0/IzOkCOVt0fCjcFuZ9FPYfuezTBImfHCDBGQ==}
 
@@ -1359,11 +1307,6 @@ packages:
       typescript:
         optional: true
 
-  cross-env@7.0.3:
-    resolution: {integrity: sha512-+/HKd6EgcQCJGh2PSjZuUitQBQynKor4wrFbRg4DtAgS1aWO+gU52xpH7M9ScGgXSYmAVS9bIJ8EzuaGw0oNAw==}
-    engines: {node: '>=10.14', npm: '>=6', yarn: '>=1'}
-    hasBin: true
-
   cross-spawn@7.0.3:
     resolution: {integrity: sha512-iRDPJKUPVEND7dHPO8rkbOnPpyDygcDFtWjpeWNCgy8WP2rXcxXL8TskReQl6OrB2G7+UJrags1q15Fudc7G6w==}
     engines: {node: '>= 8'}
@@ -1472,18 +1415,6 @@ packages:
   dot-prop@5.3.0:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
     engines: {node: '>=8'}
-
-  dotenv-expand@11.0.6:
-    resolution: {integrity: sha512-8NHi73otpWsZGBSZwwknTXS5pqMOrk9+Ssrna8xCaxkzEpU9OTf9R5ArQGVw03//Zmk9MOwLPng9WwndvpAJ5g==}
-    engines: {node: '>=12'}
-
-  dotenv-flow@4.1.0:
-    resolution: {integrity: sha512-0cwP9jpQBQfyHwvE0cRhraZMkdV45TQedA8AAUZMsFzvmLcQyc1HPv+oX0OOYwLFjIlvgVepQ+WuQHbqDaHJZg==}
-    engines: {node: '>= 12.0.0'}
-
-  dotenv@16.4.5:
-    resolution: {integrity: sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==}
-    engines: {node: '>=12'}
 
   dotenv@8.6.0:
     resolution: {integrity: sha512-IrPdXQsk2BbzvCBGBOTmmSH5SodmqZNt4ERAZDmW4CT+tL8VtvinqywuANaFu4bOMWki16nqf0e4oC0QIaDr/g==}
@@ -3262,9 +3193,6 @@ packages:
   zod@3.22.4:
     resolution: {integrity: sha512-iC+8Io04lddc+mVqQ9AZ7OQ2MrUKGN+oIQyq1vemgt46jwCwLfhq7/pwnBnNXXXZb8VTVLKwp9EDkx+ryxIWmg==}
 
-  zod@3.23.8:
-    resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
-
   zstddec@0.1.0:
     resolution: {integrity: sha512-w2NTI8+3l3eeltKAdK8QpiLo/flRAr2p8AGeakfMZOXBxOg9HIu4LVDxBi81sYgVhFhdJjv1OrB5ssI8uFPoLg==}
 
@@ -3865,8 +3793,6 @@ snapshots:
     dependencies:
       '@types/node': 20.14.10
 
-  '@types/dotenv-flow@3.3.3': {}
-
   '@types/eslint@8.56.10':
     dependencies:
       '@types/estree': 1.0.5
@@ -4383,10 +4309,6 @@ snapshots:
     optionalDependencies:
       typescript: 5.5.3
 
-  cross-env@7.0.3:
-    dependencies:
-      cross-spawn: 7.0.3
-
   cross-spawn@7.0.3:
     dependencies:
       path-key: 3.1.1
@@ -4485,16 +4407,6 @@ snapshots:
   dot-prop@5.3.0:
     dependencies:
       is-obj: 2.0.0
-
-  dotenv-expand@11.0.6:
-    dependencies:
-      dotenv: 16.4.5
-
-  dotenv-flow@4.1.0:
-    dependencies:
-      dotenv: 16.4.5
-
-  dotenv@16.4.5: {}
 
   dotenv@8.6.0: {}
 
@@ -6455,7 +6367,5 @@ snapshots:
   yocto-queue@1.1.1: {}
 
   zod@3.22.4: {}
-
-  zod@3.23.8: {}
 
   zstddec@0.1.0: {}
