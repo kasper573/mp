@@ -1,10 +1,6 @@
-import type { TiledMap, TiledResourceOptions } from "@excaliburjs/plugin-tiled";
+import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
-import type { IsometricTileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/iso-tile-layer";
-import type { TileInfo } from "@excaliburjs/plugin-tiled/dist/src/resource/tile-layer";
 import { Vector } from "excalibur";
-
-export { TiledMap };
 
 export class TiledResource extends TiledResourceImpl {
   constructor(path: string, options?: TiledResourceOptions) {
@@ -36,28 +32,20 @@ export class TiledResource extends TiledResourceImpl {
   getMatchingTileCoordinates<T>(
     propertyFilter: string,
     valueFilter: (valuesForOneCoordinate: T[]) => boolean,
-  ) {
-    type Tile = TileInfo | IsometricTileInfo;
+  ): Vector[] {
+    const tilesPerCoordinate = groupBy(
+      this.getTilesByProperty(propertyFilter).map(({ exTile, tiledTile }) => ({
+        pos: new Vector(exTile.x, exTile.y),
+        value: tiledTile?.properties?.get(propertyFilter) as T,
+      })),
+      ({ pos: { x, y } }) => `${x}|${y}`,
+    );
 
-    const tilesPerCoordinate = new Map<string, Tile[]>();
-    for (const tile of this.getTilesByProperty(propertyFilter)) {
-      const id = `${tile.exTile.x}|${tile.exTile.y}`;
-      let tiles = tilesPerCoordinate.get(id);
-      if (!tiles) {
-        tiles = [];
-        tilesPerCoordinate.set(id, tiles);
-      }
-      tiles.push(tile);
-    }
-
-    const coordinates: VectorLike[] = [];
+    const coordinates: Vector[] = [];
     for (const tiles of tilesPerCoordinate.values()) {
-      const values = tiles.map(
-        (t) => t.tiledTile?.properties?.get(propertyFilter) as T,
-      );
+      const values = tiles.map((t) => t.value);
       if (valueFilter(values)) {
-        const { x, y } = tiles[0].exTile;
-        coordinates.push({ x, y });
+        coordinates.push(tiles[0].pos);
       }
     }
 
@@ -68,4 +56,18 @@ export class TiledResource extends TiledResourceImpl {
 export interface VectorLike {
   x: number;
   y: number;
+}
+
+function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
+  const map = new Map<K, T[]>();
+  for (const item of array) {
+    const k = key(item);
+    let items = map.get(k);
+    if (!items) {
+      items = [];
+      map.set(k, items);
+    }
+    items.push(item);
+  }
+  return map;
 }
