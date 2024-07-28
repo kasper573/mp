@@ -36,9 +36,8 @@ export class AreaRoom extends Room<Area> {
       if (char) {
         const path = findPath(char.coords, { x, y }, pathGraph);
         if (path) {
-          char.path = new ArraySchema(
-            ...path.map((v) => new Coordinate(v.x, v.y)),
-          );
+          char.path = new ArraySchema(...path.map(Coordinate.fromVector));
+          char.lastPath = new ArraySchema(...path.map(Coordinate.fromVector));
         }
       }
     });
@@ -83,4 +82,13 @@ export class AreaRoom extends Room<Area> {
   override onDispose() {
     console.log("room", this.roomId, "disposing...");
   }
+}
+
+function generateRandomData() {
+  const obj: Record<string, unknown> = {};
+  for (let i = 0; i < 100; i++) {
+    obj[`key${i}`] =
+      "cool".repeat(Math.round(Math.random() * 20)) + Math.random();
+  }
+  return obj;
 }

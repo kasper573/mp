@@ -1,4 +1,5 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import type { Vector } from "@mp/excalibur";
 
 export type SessionId = string;
 
@@ -14,6 +15,8 @@ export class Coordinate extends Schema {
   override toString() {
     return `${this.x},${this.y}`;
   }
+
+  static fromVector = ({ x, y }: Vector) => new Coordinate(x, y);
 }
 
 export class Character extends Schema {
@@ -21,6 +24,7 @@ export class Character extends Schema {
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
   @type({ array: Coordinate }) path = new ArraySchema<Coordinate>();
+  @type({ array: Coordinate }) lastPath = new ArraySchema<Coordinate>();
   speed = 3;
 
   constructor(id: string) {

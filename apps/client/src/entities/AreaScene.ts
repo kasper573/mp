@@ -97,6 +97,9 @@ export class AreaScene extends Scene {
     this.characterCleanups.add(
       char.id,
       char.coords.onChange(() => this.synchronizeCharacterPosition(char)),
+      char.lastPath.onChange(() =>
+        this.debugUI.setPath(char.lastPath.toArray()),
+      ),
     );
   };
 
