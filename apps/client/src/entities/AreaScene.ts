@@ -19,6 +19,7 @@ import {
 } from "@mp/excalibur";
 import { CharacterActor } from "./CharacterActor";
 import { AreaDebugUI } from "./AreaDebugUI";
+import { AreaTileHighlighter } from "./AreaTileHighlighter";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
@@ -27,6 +28,7 @@ export class AreaScene extends Scene {
   private tileMap!: TiledResource;
   private bus: MessageSender<AreaMessages>;
   private debugUI!: AreaDebugUI;
+  private tileHighlighter!: AreaTileHighlighter;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -44,23 +46,28 @@ export class AreaScene extends Scene {
     loader.areResourcesLoaded().then(() => {
       this.tileMap.addToScene(this);
 
-      this.debugUI = new AreaDebugUI(
-        createPathGraph(this.tileMap),
-        this.tileMap.map,
-      );
+      const dGraph = createPathGraph(this.tileMap);
+
+      this.debugUI = new AreaDebugUI(dGraph, this.tileMap.map);
       this.debugUI.z = 1000;
       this.add(this.debugUI);
+
+      this.tileHighlighter = new AreaTileHighlighter(dGraph, this.tileMap.map);
+      this.tileHighlighter.z = 999;
+      this.add(this.tileHighlighter);
     });
   }
 
   override onActivate(): void {
     const { characters } = this.room.state;
 
-    this.input.pointers.primary.on("down", this.onClick);
+    this.input.pointers.primary.on("down", this.onPointerClick);
+    this.input.pointers.primary.on("move", this.onPointerMove);
     this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
-      () => this.input.pointers.primary.off("down", this.onClick),
+      () => this.input.pointers.primary.off("down", this.onPointerClick),
+      () => this.input.pointers.primary.off("move", this.onPointerMove),
     );
   }
 
@@ -68,7 +75,13 @@ export class AreaScene extends Scene {
     this.cleanups.flush();
   }
 
-  private onClick = (e: ExcaliburPointerEvent) => {
+  private onPointerMove = (e: ExcaliburPointerEvent) => {
+    this.tileHighlighter.setHighlighted(
+      this.tileMap.worldCoordToTile(e.worldPos),
+    );
+  };
+
+  private onPointerClick = (e: ExcaliburPointerEvent) => {
     const tiledPos = this.tileMap.worldCoordToTile(e.worldPos);
 
     if (!tiledPos) {
