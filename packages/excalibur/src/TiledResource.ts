@@ -49,3 +49,7 @@ export class TiledResource extends TiledResourceImpl {
     return coordinates;
   };
 }
+
+export function snapTileVector({ x, y }: VectorLike): Vector {
+  return new Vector(Math.floor(x), Math.floor(y));
+}

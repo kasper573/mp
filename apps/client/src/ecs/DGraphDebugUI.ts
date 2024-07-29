@@ -1,5 +1,5 @@
 import type { Engine, TiledResource, Vector, VectorLike } from "@mp/excalibur";
-import { floorVector, Keys } from "@mp/excalibur";
+import { Keys, snapTileVector } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
 import {
   type DNode,
@@ -34,7 +34,7 @@ export class DGraphDebugUI extends Actor {
               ctx,
               tiled,
               graph,
-              floorVector(tiled.worldCoordToTile(this.pointerPos)),
+              snapTileVector(tiled.worldCoordToTile(this.pointerPos)),
             );
           }
 

@@ -1,5 +1,5 @@
 import type { Engine, TiledResource } from "@mp/excalibur";
-import { Actor, Color, floorVector, Rectangle } from "@mp/excalibur";
+import { Actor, Color, Rectangle, snapTileVector } from "@mp/excalibur";
 import { isVectorInGraph, type DGraph } from "@mp/state";
 
 export class TileHighlight extends Actor {
@@ -26,7 +26,7 @@ export class TileHighlight extends Actor {
 
   override update(engine: Engine): void {
     const { lastWorldPos } = engine.input.pointers.primary;
-    const tilePos = floorVector(this.tiled.worldCoordToTile(lastWorldPos));
+    const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
     this.pos = tilePos.scale(this.tiled.tileSize);
 
     const visible = isVectorInGraph(this.graph, tilePos);

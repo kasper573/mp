@@ -1,5 +1,5 @@
 import type { VectorLike } from "@mp/excalibur";
-import { floorVector, Vector } from "@mp/excalibur";
+import { snapTileVector, Vector } from "@mp/excalibur";
 import { find_path } from "./dijkstra";
 
 export function findPath(
@@ -12,7 +12,7 @@ export function findPath(
   }
 
   if (isFractionalVector(target)) {
-    target = floorVector(target);
+    target = snapTileVector(target);
   }
 
   try {
@@ -67,10 +67,10 @@ export function addVectorToAdjacentInGraph(
   return updatedGraph;
 }
 
-function adjacentVectors({ x, y }: VectorLike): Vector[] {
-  const from = floorVector(new Vector(x, y));
-  const xOffset = x % 1 < 0.5 ? -1 : 1;
-  const yOffsetf = y % 1 < 0.5 ? -1 : 1;
+function adjacentVectors(fractional: VectorLike): Vector[] {
+  const from = snapTileVector(fractional);
+  const xOffset = fractional.x % 1 < 0.5 ? -1 : 1;
+  const yOffsetf = fractional.y % 1 < 0.5 ? -1 : 1;
 
   return [
     from,

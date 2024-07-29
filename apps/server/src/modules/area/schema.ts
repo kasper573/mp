@@ -20,10 +20,10 @@ export class Coordinate extends Schema {
     return new Coordinate(Math.round(this.x), Math.round(this.y));
   }
 
-  static create = ({ x, y }: VectorLike) => new Coordinate(x, y);
+  static one = ({ x, y }: VectorLike) => new Coordinate(x, y);
 
-  static path = (v: Iterable<VectorLike> = []): Path =>
-    new ArraySchema(...Array.from(v, Coordinate.create));
+  static many = (v: Iterable<VectorLike> = []): Path =>
+    new ArraySchema(...Array.from(v, Coordinate.one));
 }
 
 export class Character extends Schema {

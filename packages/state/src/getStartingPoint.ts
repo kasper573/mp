@@ -1,9 +1,9 @@
-import { floorVector, type TiledResource, type Vector } from "@mp/excalibur";
+import { snapTileVector, type TiledResource, type Vector } from "@mp/excalibur";
 
 export function getStartingPoint(tiled: TiledResource): Vector | undefined {
   const [startObj] = tiled.getObjectsByClassName("start");
   if (!startObj) {
     return;
   }
-  return floorVector(tiled.worldCoordToTile(startObj));
+  return snapTileVector(tiled.worldCoordToTile(startObj));
 }
