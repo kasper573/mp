@@ -2,6 +2,7 @@ import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
 import { Vector } from "excalibur";
 import type { VectorLike } from "./vector";
+import { groupBy } from "./groupBy";
 
 export class TiledResource extends TiledResourceImpl {
   constructor(path: string, options?: TiledResourceOptions) {
@@ -11,15 +12,16 @@ export class TiledResource extends TiledResourceImpl {
     });
   }
 
+  get tileSize() {
+    return new Vector(this.map.tilewidth, this.map.tileheight);
+  }
+
   worldCoordToTile = ({ x, y }: VectorLike): Vector => {
     return new Vector(x / this.map.tilewidth, y / this.map.tileheight);
   };
 
   tileCoordToWorld = ({ x, y }: VectorLike): Vector => {
-    return new Vector(
-      x * this.map.tilewidth + this.map.tilewidth / 2,
-      y * this.map.tileheight + this.map.tileheight / 2,
-    );
+    return new Vector(x * this.map.tilewidth, y * this.map.tileheight);
   };
 
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
@@ -46,18 +48,4 @@ export class TiledResource extends TiledResourceImpl {
 
     return coordinates;
   };
-}
-
-function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
-  const map = new Map<K, T[]>();
-  for (const item of array) {
-    const k = key(item);
-    let items = map.get(k);
-    if (!items) {
-      items = [];
-      map.set(k, items);
-    }
-    items.push(item);
-  }
-  return map;
 }

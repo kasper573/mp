@@ -1,10 +1,10 @@
 import type { Character } from "@mp/server";
 import type { Engine } from "@mp/excalibur";
-import { Actor, Circle, Color } from "@mp/excalibur";
+import { Actor, Color, Rectangle } from "@mp/excalibur";
 import { Movement } from "./Movement";
 
 export class CharacterActor extends Actor {
-  private circle = new Circle({ radius: 8 });
+  private rect = new Rectangle({ width: 16, height: 16 });
 
   constructor(private character: Character) {
     super();
@@ -12,11 +12,12 @@ export class CharacterActor extends Actor {
   }
 
   override onInitialize(): void {
-    this.graphics.use(this.circle);
+    this.anchor.setTo(0, 0);
+    this.graphics.use(this.rect);
   }
 
   override update(engine: Engine, delta: number) {
     super.update(engine, delta);
-    this.circle.color = this.character.connected ? Color.Green : Color.Red;
+    this.rect.color = this.character.connected ? Color.Green : Color.Red;
   }
 }

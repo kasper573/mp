@@ -58,13 +58,13 @@ export class AreaScene extends Scene {
 
     const dGraph = dGraphFromTiled(this.tiled);
 
-    this.debugUI = new AreaDebugUI(dGraph, this.tiled);
-    this.debugUI.z = 1000;
-    this.add(this.debugUI);
-
     this.tileHighlighter = new TileHighlighter(dGraph, this.tiled);
     this.tileHighlighter.z = 999;
     this.add(this.tileHighlighter);
+
+    this.debugUI = new AreaDebugUI(dGraph, this.tiled);
+    this.debugUI.z = 1000;
+    this.add(this.debugUI);
   };
 
   override onActivate(): void {

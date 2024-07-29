@@ -41,6 +41,10 @@ export class Movement extends Component {
       this.moveAlong.path,
       this.moveAlong.speed * (e.delta / 1000),
     );
+
+    if (this.moveAlong.path.length === 0) {
+      this.moveAlong = undefined;
+    }
   };
 }
 

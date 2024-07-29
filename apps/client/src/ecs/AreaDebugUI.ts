@@ -1,4 +1,4 @@
-import type { Engine, TiledResource, VectorLike } from "@mp/excalibur";
+import type { Engine, TiledResource, Vector, VectorLike } from "@mp/excalibur";
 import { floorVector, Keys } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
 import {
@@ -32,18 +32,22 @@ export class AreaDebugUI extends Actor {
         }
 
         if (this.pointerPos) {
-          const tilePos = tiled.worldCoordToTile(this.pointerPos);
-
           if (this.showTiledDNode) {
-            drawDNode(ctx, tiled, graph, dNodeFromVector(floorVector(tilePos)));
+            drawDNode(
+              ctx,
+              tiled,
+              graph,
+              floorVector(tiled.worldCoordToTile(this.pointerPos)),
+            );
           }
 
           if (this.pointerPos && this.showFractionalDNode) {
+            const tilePos = tiled.worldCoordToTile(this.pointerPos);
             drawDNode(
               ctx,
               tiled,
               addVectorToAdjacentInGraph(graph, tilePos),
-              dNodeFromVector(tilePos),
+              tilePos,
             );
           }
         }
@@ -72,7 +76,11 @@ function drawPath(
   tiled: TiledResource,
   path: VectorLike[],
 ) {
-  const [start, ...rest] = path.map(tiled.tileCoordToWorld);
+  const offset = tiled.tileSize.scale(0.5);
+  const [start, ...rest] = path
+    .map(tiled.tileCoordToWorld)
+    .map((v) => v.add(offset));
+
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
   ctx.lineWidth = 1;
@@ -87,11 +95,16 @@ function drawDNode(
   ctx: CanvasRenderingContext2D,
   tiled: TiledResource,
   graph: DGraph,
-  node: DNode,
+  tilePos: Vector,
 ) {
-  const start = tiled.tileCoordToWorld(vectorFromDNode(node));
-  for (const [neighbor, cost] of Object.entries(graph[node] ?? {})) {
-    const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
+  const offset = tiled.tileSize.scale(0.5);
+  const start = tiled.tileCoordToWorld(tilePos).add(offset);
+  for (const [neighbor, cost] of Object.entries(
+    graph[dNodeFromVector(tilePos)] ?? {},
+  )) {
+    const end = tiled
+      .tileCoordToWorld(vectorFromDNode(neighbor as DNode))
+      .add(offset);
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
