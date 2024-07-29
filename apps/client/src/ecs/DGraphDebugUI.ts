@@ -9,17 +9,14 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/state";
 
-export class AreaDebugUI extends Actor {
+export class DGraphDebugUI extends Actor {
   private path: VectorLike[] = [];
   private canvas: Canvas;
   private pointerPos?: VectorLike;
   private showFractionalDNode = false;
   private showTiledDNode = false;
 
-  constructor(
-    graph: DGraph,
-    private tiled: TiledResource,
-  ) {
+  constructor(graph: DGraph, tiled: TiledResource) {
     super();
 
     const { map } = tiled;

@@ -2,7 +2,7 @@ import type { Engine, TiledResource } from "@mp/excalibur";
 import { Actor, Color, floorVector, Rectangle } from "@mp/excalibur";
 import { isVectorInGraph, type DGraph } from "@mp/state";
 
-export class TileHighlighter extends Actor {
+export class TileHighlight extends Actor {
   private rect!: Rectangle;
 
   constructor(

@@ -20,8 +20,8 @@ import {
 } from "@mp/excalibur";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
-import { AreaDebugUI } from "./AreaDebugUI";
-import { TileHighlighter } from "./TileHighlighter";
+import { DGraphDebugUI } from "./DGraphDebugUI";
+import { TileHighlight } from "./TileHighlight";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
@@ -29,8 +29,7 @@ export class AreaScene extends Scene {
   private characterActors: Map<SessionId, CharacterActor> = new Map();
   private tiled!: TiledResource;
   private bus: MessageSender<AreaMessages>;
-  private debugUI!: AreaDebugUI;
-  private tileHighlighter!: TileHighlighter;
+  private debugUI!: DGraphDebugUI;
   private characterLayer!: Layer;
 
   get myCharacterId() {
@@ -58,11 +57,11 @@ export class AreaScene extends Scene {
 
     const dGraph = dGraphFromTiled(this.tiled);
 
-    this.tileHighlighter = new TileHighlighter(dGraph, this.tiled);
-    this.tileHighlighter.z = 999;
-    this.add(this.tileHighlighter);
+    const tileHighlighter = new TileHighlight(dGraph, this.tiled);
+    tileHighlighter.z = 999;
+    this.add(tileHighlighter);
 
-    this.debugUI = new AreaDebugUI(dGraph, this.tiled);
+    this.debugUI = new DGraphDebugUI(dGraph, this.tiled);
     this.debugUI.z = 1000;
     this.add(this.debugUI);
   };
