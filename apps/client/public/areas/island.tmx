@@ -25,7 +25,7 @@
   </data>
  </layer>
  <objectgroup id="4" name="Objects">
-  <object id="1" name="Start" type="start" x="568" y="473">
+  <object id="1" name="Start" type="start" x="346.992" y="348.331">
    <point/>
   </object>
   <object id="5" name="Exit" type="exit" x="784" y="460" width="22" height="20.6667"/>

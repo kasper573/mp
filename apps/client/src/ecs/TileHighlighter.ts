@@ -1,23 +1,32 @@
-import type { TiledMap } from "@mp/excalibur";
-import { Vector } from "@mp/excalibur";
-import { Actor, Canvas } from "@mp/excalibur";
-import { isInGraph, type DGraph } from "@mp/state";
+import type { Engine, TiledResource, Vector } from "@mp/excalibur";
+import { Actor, Canvas, floorVector } from "@mp/excalibur";
+import { isVectorInGraph, type DGraph } from "@mp/state";
 
 export class TileHighlighter extends Actor {
   private canvas: Canvas;
   private highlighted?: Vector;
 
-  constructor(graph: DGraph, map: TiledMap) {
+  constructor(
+    graph: DGraph,
+    private tiledMap: TiledResource,
+  ) {
     super();
 
+    const { map } = this.tiledMap;
     this.canvas = new Canvas({
       width: map.width * map.tilewidth,
       height: map.height * map.tileheight,
-      cache: true,
       draw: (ctx) => {
-        if (isInGraph(graph, this.highlighted)) {
-          drawHighlight(ctx, map, this.highlighted);
+        if (!isVectorInGraph(graph, this.highlighted)) {
+          return;
         }
+
+        const { x, y } = this.tiledMap.tileCoordToWorld(this.highlighted);
+        ctx.beginPath();
+        ctx.lineWidth = 5;
+        ctx.arc(x, y, 4, 0, 2 * Math.PI);
+        ctx.strokeStyle = "blue";
+        ctx.stroke();
       },
     });
   }
@@ -28,24 +37,11 @@ export class TileHighlighter extends Actor {
     this.canvas.flagDirty();
   }
 
-  setHighlighted(highlighted?: Vector) {
-    this.highlighted = highlighted;
-    this.canvas.flagDirty();
+  override update(engine: Engine): void {
+    this.highlighted = floorVector(
+      this.tiledMap.worldCoordToTile(
+        engine.input.pointers.primary.lastWorldPos,
+      ),
+    );
   }
-}
-
-function drawHighlight(
-  ctx: CanvasRenderingContext2D,
-  map: TiledMap,
-  tile: Vector,
-): void {
-  const scale = new Vector(map.tilewidth, map.tileheight);
-  const offset = scale.scale(0.5);
-  tile = tile.scale(scale).add(offset);
-
-  ctx.beginPath();
-  ctx.lineWidth = 5;
-  ctx.arc(tile.x, tile.y, 4, 0, 2 * Math.PI);
-  ctx.strokeStyle = "blue";
-  ctx.stroke();
 }

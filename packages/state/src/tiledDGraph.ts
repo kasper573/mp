@@ -5,7 +5,7 @@ import { dNodeFromVector, type DGraph } from "./findPath";
 export function tiledDGraph(tiledMap: TiledResource): DGraph {
   const graph: DGraph = {};
 
-  const walkableTiles = tiledMap.getMatchingTileCoordinates<boolean>(
+  const walkableTiles = tiledMap.getMatchingTileCoords<boolean>(
     "walkable",
     allTrue,
   );

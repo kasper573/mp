@@ -58,11 +58,11 @@ export class AreaScene extends Scene {
 
     const dGraph = tiledDGraph(this.tileMap);
 
-    this.debugUI = new AreaDebugUI(dGraph, this.tileMap.map);
+    this.debugUI = new AreaDebugUI(dGraph, this.tileMap);
     this.debugUI.z = 1000;
     this.add(this.debugUI);
 
-    this.tileHighlighter = new TileHighlighter(dGraph, this.tileMap.map);
+    this.tileHighlighter = new TileHighlighter(dGraph, this.tileMap);
     this.tileHighlighter.z = 999;
     this.add(this.tileHighlighter);
   };
@@ -73,8 +73,7 @@ export class AreaScene extends Scene {
     this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
-      subscribe(this.input.pointers.primary, "down", this.onPointerClick),
-      subscribe(this.input.pointers.primary, "move", this.onPointerMove),
+      subscribe(this.input.pointers.primary, "down", this.onClick),
     );
   }
 
@@ -82,26 +81,9 @@ export class AreaScene extends Scene {
     this.cleanups.flush();
   }
 
-  private onPointerMove = (e: ExcaliburPointerEvent) => {
-    this.tileHighlighter.setHighlighted(
-      this.tileMap.worldCoordToTile(e.worldPos),
-    );
-  };
-
-  private onPointerClick = (e: ExcaliburPointerEvent) => {
+  private onClick = (e: ExcaliburPointerEvent) => {
     const tiledPos = this.tileMap.worldCoordToTile(e.worldPos);
-
-    if (!tiledPos) {
-      console.warn("Could not translate pointer position to tile coordinate");
-      return;
-    }
-
-    const { ctrlKey } = e.nativeEvent as PointerEvent;
-    if (ctrlKey) {
-      this.debugUI.toggleNode(tiledPos);
-    } else {
-      this.bus.send("move", [tiledPos.x, tiledPos.y]);
-    }
+    this.bus.send("move", [tiledPos.x, tiledPos.y]);
   };
 
   private addCharacter = (char: Character) => {
@@ -128,7 +110,7 @@ export class AreaScene extends Scene {
     const path = char.path.map(this.tileMap.tileCoordToWorld);
 
     if (char.id === this.myCharacterId) {
-      this.debugUI.setPath(char.path.toArray());
+      this.debugUI.showPath(char.path.toArray());
     }
 
     const actor = this.characterActors.get(char.id)!;

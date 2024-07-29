@@ -1,11 +1,11 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
-import type { Vector } from "@mp/excalibur";
+import type { VectorLike } from "@mp/excalibur";
 
 export type SessionId = string;
 
 export class Coordinate extends Schema {
-  @type("uint16") x: number;
-  @type("uint16") y: number;
+  @type("number") x: number;
+  @type("number") y: number;
   constructor(x = 0, y = 0) {
     super();
     this.x = x;
@@ -17,18 +17,21 @@ export class Coordinate extends Schema {
   }
 
   toNearestTile() {
-    return new Coordinate(Math.floor(this.x), Math.floor(this.y));
+    return new Coordinate(Math.round(this.x), Math.round(this.y));
   }
 
-  static fromVector = ({ x, y }: Vector) => new Coordinate(x, y);
+  static create = ({ x, y }: VectorLike) => new Coordinate(x, y);
+
+  static path = (v: Iterable<VectorLike> = []): Path =>
+    new ArraySchema(...Array.from(v, Coordinate.create));
 }
 
 export class Character extends Schema {
   @type("boolean") connected = false;
   @type("string") id: string;
   @type(Coordinate) coords = new Coordinate();
-  @type({ array: Coordinate }) path = new ArraySchema<Coordinate>();
-  @type("number") speed = 3;
+  @type({ array: Coordinate }) path: Path = new ArraySchema();
+  @type("number") speed = 3.1;
 
   constructor(id: string) {
     super();

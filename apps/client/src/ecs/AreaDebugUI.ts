@@ -1,97 +1,111 @@
-import type { TiledMap, VectorLike } from "@mp/excalibur";
-import { Vector } from "@mp/excalibur";
+import type { Engine, TiledResource, VectorLike } from "@mp/excalibur";
+import { floorVector, Keys } from "@mp/excalibur";
 import { Actor, Canvas } from "@mp/excalibur";
-import type { Coordinate } from "@mp/server";
-import { type DNode, type DGraph, vectorFromDNode } from "@mp/state";
+import {
+  type DNode,
+  type DGraph,
+  vectorFromDNode,
+  dNodeFromVector,
+  addVectorToAdjacentInGraph,
+} from "@mp/state";
 
 export class AreaDebugUI extends Actor {
-  private enabledNodes = new Set<DNode>();
-  private currentPath: Coordinate[] = [];
+  private path: VectorLike[] = [];
   private canvas: Canvas;
+  private pointerPos?: VectorLike;
+  private showFractionalDNode = false;
+  private showTiledDNode = false;
 
-  constructor(graph: DGraph, map: TiledMap) {
+  constructor(
+    graph: DGraph,
+    private tiled: TiledResource,
+  ) {
     super();
 
+    const { map } = tiled;
     this.canvas = new Canvas({
       width: map.width * map.tilewidth,
       height: map.height * map.tileheight,
-      cache: true,
-      draw: (ctx) =>
-        drawDebugGraphics(ctx, graph, map, this.currentPath, this.enabledNodes),
+      draw: (ctx) => {
+        if (this.path.length) {
+          drawPath(ctx, tiled, this.path);
+        }
+
+        if (this.pointerPos) {
+          const tilePos = tiled.worldCoordToTile(this.pointerPos);
+
+          if (this.showTiledDNode) {
+            drawDNode(ctx, tiled, graph, dNodeFromVector(floorVector(tilePos)));
+          }
+
+          if (this.pointerPos && this.showFractionalDNode) {
+            drawDNode(
+              ctx,
+              tiled,
+              addVectorToAdjacentInGraph(graph, tilePos),
+              dNodeFromVector(tilePos),
+            );
+          }
+        }
+      },
     });
   }
 
   override onInitialize(): void {
     this.anchor.setTo(0, 0);
     this.graphics.use(this.canvas);
-    this.canvas.flagDirty();
   }
 
-  setPath(path: Coordinate[]) {
-    this.currentPath = path;
-    this.canvas.flagDirty();
+  showPath(path: VectorLike[]) {
+    this.path = path;
   }
 
-  toggleNode({ x, y }: Vector) {
-    const nodeId: DNode = `${x}|${y}`;
-    if (this.enabledNodes.has(nodeId)) {
-      this.enabledNodes.delete(nodeId);
-    } else {
-      this.enabledNodes.add(nodeId);
-    }
-    this.canvas.flagDirty();
+  override update(engine: Engine): void {
+    this.pointerPos = engine.input.pointers.primary.lastWorldPos;
+    this.showFractionalDNode = engine.input.keyboard.isHeld(Keys.ShiftLeft);
+    this.showTiledDNode = engine.input.keyboard.isHeld(Keys.ControlLeft);
+  }
+}
+
+function drawPath(
+  ctx: CanvasRenderingContext2D,
+  tiled: TiledResource,
+  path: VectorLike[],
+) {
+  const [start, ...rest] = path.map(tiled.tileCoordToWorld);
+  ctx.beginPath();
+  ctx.moveTo(start.x, start.y);
+  ctx.lineWidth = 1;
+  ctx.strokeStyle = "purple";
+  for (const { x, y } of rest) {
+    ctx.lineTo(x, y);
+  }
+  ctx.stroke();
+}
+
+function drawDNode(
+  ctx: CanvasRenderingContext2D,
+  tiled: TiledResource,
+  graph: DGraph,
+  node: DNode,
+) {
+  const start = tiled.tileCoordToWorld(vectorFromDNode(node));
+  for (const [neighbor, cost] of Object.entries(graph[node] ?? {})) {
+    const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
+    ctx.beginPath();
+    ctx.moveTo(start.x, start.y);
+    ctx.lineTo(end.x, end.y);
+    ctx.lineWidth = 2;
+    ctx.strokeStyle = "red";
+    ctx.stroke();
+
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = "black";
+    ctx.strokeText(costToString(cost!), end.x, end.y);
   }
 }
 
 function costToString(cost: number): string {
   const hasFractions = cost % 1 !== 0;
   return hasFractions ? cost.toFixed(1) : cost.toString();
-}
-
-function drawDebugGraphics(
-  ctx: CanvasRenderingContext2D,
-  graph: DGraph,
-  map: TiledMap,
-  currentPath: Coordinate[],
-  nodes: Iterable<DNode>,
-): void {
-  const scale = new Vector(map.tilewidth, map.tileheight);
-  const offset = scale.scale(0.5);
-  const transform = (v: VectorLike) =>
-    new Vector(v.x, v.y).scale(scale).add(offset);
-
-  for (const node of nodes) {
-    const start = transform(vectorFromDNode(node));
-    ctx.beginPath();
-    ctx.lineWidth = 5;
-    ctx.arc(start.x, start.y, 4, 0, 2 * Math.PI);
-    ctx.strokeStyle = "red";
-    ctx.stroke();
-
-    for (const [neighbor, cost] of Object.entries(graph[node] ?? {})) {
-      const end = transform(vectorFromDNode(neighbor as DNode));
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.lineWidth = 2;
-      ctx.strokeStyle = "red";
-      ctx.stroke();
-
-      ctx.lineWidth = 1;
-      ctx.strokeStyle = "black";
-      ctx.strokeText(costToString(cost!), end.x, end.y);
-    }
-  }
-
-  if (currentPath.length > 1) {
-    const [start, ...rest] = currentPath.map(transform);
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineWidth = 1;
-    ctx.strokeStyle = "purple";
-    for (const { x, y } of rest) {
-      ctx.lineTo(x, y);
-    }
-    ctx.stroke();
-  }
 }

@@ -4,7 +4,7 @@ import { Actor, Circle, Color } from "@mp/excalibur";
 import { Movement } from "./Movement";
 
 export class CharacterActor extends Actor {
-  private circle = new Circle({ radius: 10, color: Color.Red });
+  private circle = new Circle({ radius: 8 });
 
   constructor(private character: Character) {
     super();

@@ -1,6 +1,7 @@
 import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
 import { Vector } from "excalibur";
+import type { VectorLike } from "./vector";
 
 export class TiledResource extends TiledResourceImpl {
   constructor(path: string, options?: TiledResourceOptions) {
@@ -10,29 +11,20 @@ export class TiledResource extends TiledResourceImpl {
     });
   }
 
-  worldCoordToTile = ({ x, y }: VectorLike): Vector | undefined => {
-    const [tile] = this.getTilesByPoint(new Vector(x, y));
-    if (tile) {
-      const { x, y } = tile.exTile;
-      return new Vector(x, y);
-    }
+  worldCoordToTile = ({ x, y }: VectorLike): Vector => {
+    return new Vector(x / this.map.tilewidth, y / this.map.tileheight);
   };
 
   tileCoordToWorld = ({ x, y }: VectorLike): Vector => {
-    for (const layer of this.getTileLayers()) {
-      const tile = layer.getTileByCoordinate(x, y);
-      if (tile) {
-        const x = tile.exTile.pos.x + tile.exTile.width / 2;
-        const y = tile.exTile.pos.y + tile.exTile.height / 2;
-        return new Vector(x, y);
-      }
-    }
-    throw new Error(`Tile does not exist: ${x},${y}`);
+    return new Vector(
+      x * this.map.tilewidth + this.map.tilewidth / 2,
+      y * this.map.tileheight + this.map.tileheight / 2,
+    );
   };
 
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
 
-  getMatchingTileCoordinates = <T>(
+  getMatchingTileCoords = <T>(
     propertyFilter: string,
     valueFilter: (valuesForOneCoordinate: T[]) => boolean,
   ): Vector[] => {
@@ -54,11 +46,6 @@ export class TiledResource extends TiledResourceImpl {
 
     return coordinates;
   };
-}
-
-export interface VectorLike {
-  x: number;
-  y: number;
 }
 
 function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
