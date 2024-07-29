@@ -18,7 +18,7 @@ import {
   TiledResource,
   type PointerEvent as ExcaliburPointerEvent,
 } from "@mp/excalibur";
-import { Movement } from "./Movement";
+import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { AreaDebugUI } from "./AreaDebugUI";
 import { TileHighlighter } from "./TileHighlighter";
@@ -114,7 +114,7 @@ export class AreaScene extends Scene {
     }
 
     const actor = this.characterActors.get(char.id)!;
-    invoker(Movement, actor).sync(pos, {
+    invoker(Interpolator, actor).configure(pos, {
       path,
       speed: this.tiled.tileUnitToWorld(char.speed),
     });

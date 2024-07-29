@@ -1,14 +1,14 @@
 import type { Character } from "@mp/server";
 import type { Engine } from "@mp/excalibur";
 import { Actor, Color, Rectangle } from "@mp/excalibur";
-import { Movement } from "./Movement";
+import { Interpolator } from "./Interpolator";
 
 export class CharacterActor extends Actor {
   private rect = new Rectangle({ width: 16, height: 16 });
 
   constructor(private character: Character) {
     super();
-    this.addComponent(new Movement(() => this.pos));
+    this.addComponent(new Interpolator(() => this.pos));
   }
 
   override onInitialize(): void {
