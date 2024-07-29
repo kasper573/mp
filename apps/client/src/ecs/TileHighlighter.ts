@@ -8,11 +8,11 @@ export class TileHighlighter extends Actor {
 
   constructor(
     graph: DGraph,
-    private tiledMap: TiledResource,
+    private tiled: TiledResource,
   ) {
     super();
 
-    const { map } = this.tiledMap;
+    const { map } = this.tiled;
     this.canvas = new Canvas({
       width: map.width * map.tilewidth,
       height: map.height * map.tileheight,
@@ -21,7 +21,7 @@ export class TileHighlighter extends Actor {
           return;
         }
 
-        const { x, y } = this.tiledMap.tileCoordToWorld(this.highlighted);
+        const { x, y } = this.tiled.tileCoordToWorld(this.highlighted);
         ctx.beginPath();
         ctx.lineWidth = 5;
         ctx.arc(x, y, 4, 0, 2 * Math.PI);
@@ -39,9 +39,7 @@ export class TileHighlighter extends Actor {
 
   override update(engine: Engine): void {
     this.highlighted = floorVector(
-      this.tiledMap.worldCoordToTile(
-        engine.input.pointers.primary.lastWorldPos,
-      ),
+      this.tiled.worldCoordToTile(engine.input.pointers.primary.lastWorldPos),
     );
   }
 }

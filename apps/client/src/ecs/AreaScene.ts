@@ -1,4 +1,4 @@
-import { tiledDGraph } from "@mp/state";
+import { dGraphFromTiled } from "@mp/state";
 import {
   type SessionId,
   type Area,
@@ -27,7 +27,7 @@ export class AreaScene extends Scene {
   private cleanups = new Cleanup();
   private characterCleanups = new CleanupMap();
   private characterActors: Map<SessionId, CharacterActor> = new Map();
-  private tileMap!: TiledResource;
+  private tiled!: TiledResource;
   private bus: MessageSender<AreaMessages>;
   private debugUI!: AreaDebugUI;
   private tileHighlighter!: TileHighlighter;
@@ -43,26 +43,26 @@ export class AreaScene extends Scene {
   }
 
   override onPreLoad(loader: DefaultLoader): void {
-    this.tileMap = new TiledResource("areas/island.tmx");
-    loader.addResource(this.tileMap);
-    loader.areResourcesLoaded().then(this.onTileMapLoaded);
+    this.tiled = new TiledResource("areas/island.tmx");
+    loader.addResource(this.tiled);
+    loader.areResourcesLoaded().then(this.onTiledLoaded);
   }
 
-  private onTileMapLoaded = () => {
-    this.tileMap.addToScene(this);
+  private onTiledLoaded = () => {
+    this.tiled.addToScene(this);
 
-    this.characterLayer = this.tileMap.getTileLayers("Characters")[0];
+    this.characterLayer = this.tiled.getTileLayers("Characters")[0];
     if (!this.characterLayer) {
       throw new Error("Map must contain a characters layer");
     }
 
-    const dGraph = tiledDGraph(this.tileMap);
+    const dGraph = dGraphFromTiled(this.tiled);
 
-    this.debugUI = new AreaDebugUI(dGraph, this.tileMap);
+    this.debugUI = new AreaDebugUI(dGraph, this.tiled);
     this.debugUI.z = 1000;
     this.add(this.debugUI);
 
-    this.tileHighlighter = new TileHighlighter(dGraph, this.tileMap);
+    this.tileHighlighter = new TileHighlighter(dGraph, this.tiled);
     this.tileHighlighter.z = 999;
     this.add(this.tileHighlighter);
   };
@@ -82,7 +82,7 @@ export class AreaScene extends Scene {
   }
 
   private onClick = (e: ExcaliburPointerEvent) => {
-    const tiledPos = this.tileMap.worldCoordToTile(e.worldPos);
+    const tiledPos = this.tiled.worldCoordToTile(e.worldPos);
     this.bus.send("move", [tiledPos.x, tiledPos.y]);
   };
 
@@ -106,8 +106,8 @@ export class AreaScene extends Scene {
   };
 
   private synchronizeCharacterPosition(char: Character) {
-    const pos = this.tileMap.tileCoordToWorld(char.coords);
-    const path = char.path.map(this.tileMap.tileCoordToWorld);
+    const pos = this.tiled.tileCoordToWorld(char.coords);
+    const path = char.path.map(this.tiled.tileCoordToWorld);
 
     if (char.id === this.myCharacterId) {
       this.debugUI.showPath(char.path.toArray());
@@ -116,7 +116,7 @@ export class AreaScene extends Scene {
     const actor = this.characterActors.get(char.id)!;
     invoker(Movement, actor).sync(pos, {
       path,
-      speed: this.tileMap.tileUnitToWorld(char.speed),
+      speed: this.tiled.tileUnitToWorld(char.speed),
     });
   }
 

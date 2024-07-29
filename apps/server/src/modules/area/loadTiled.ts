@@ -1,7 +1,7 @@
 import fs from "fs/promises";
 import { TiledResource } from "@mp/excalibur";
 
-export async function loadTiledMap(tmxFile: string) {
+export async function loadTiled(tmxFile: string) {
   const resource = new TiledResource(tmxFile, tiledHeadlessInterface);
   await resource.load();
   return resource;

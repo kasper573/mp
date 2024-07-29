@@ -4,13 +4,13 @@ import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
 import type { TiledResource } from "@mp/excalibur";
 import {
-  tiledDGraph,
+  dGraphFromTiled,
   findPath,
   getStartingPoint,
   moveAlongPath,
 } from "@mp/state";
 import { env } from "../../env";
-import { loadTiledMap } from "./loadTiledMap";
+import { loadTiled } from "./loadTiled";
 import { Area, Character, Coordinate } from "./schema";
 import { type AreaMessages } from "./messages";
 
@@ -21,12 +21,12 @@ const islandTMX = path.resolve(
 
 export class AreaRoom extends Room<Area> {
   bus = messageReceiver<AreaMessages>()(this);
-  tiledMap!: TiledResource;
+  tiled!: TiledResource;
 
   override async onCreate() {
-    this.tiledMap = await loadTiledMap(islandTMX);
+    this.tiled = await loadTiled(islandTMX);
 
-    const dGraph = tiledDGraph(this.tiledMap);
+    const dGraph = dGraphFromTiled(this.tiled);
 
     this.setState(new Area());
 
@@ -51,7 +51,7 @@ export class AreaRoom extends Room<Area> {
     console.log(client.sessionId, "joined!");
 
     const player = new Character(client.sessionId);
-    const start = getStartingPoint(this.tiledMap);
+    const start = getStartingPoint(this.tiled);
     if (start) {
       player.coords = new Coordinate(start.x, start.y);
     }

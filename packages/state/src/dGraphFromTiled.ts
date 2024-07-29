@@ -2,10 +2,10 @@ import { type TiledResource } from "@mp/excalibur";
 import type { DNode } from "./findPath";
 import { dNodeFromVector, type DGraph } from "./findPath";
 
-export function tiledDGraph(tiledMap: TiledResource): DGraph {
+export function dGraphFromTiled(tiled: TiledResource): DGraph {
   const graph: DGraph = {};
 
-  const walkableTiles = tiledMap.getMatchingTileCoords<boolean>(
+  const walkableTiles = tiled.getMatchingTileCoords<boolean>(
     "walkable",
     allTrue,
   );
