@@ -37,7 +37,10 @@ export class AreaRoom extends Room<Area> {
         if (idx !== -1) {
           char.path = Coordinate.many(char.path.slice(0, idx + 1));
         } else {
-          char.path = Coordinate.many(findPath(char.coords, { x, y }, dGraph));
+          const newPath = findPath(char.coords, { x, y }, dGraph);
+          if (newPath) {
+            char.path = Coordinate.many(newPath);
+          }
         }
       }
     });
