@@ -6,8 +6,9 @@ import {
   type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
-import type { Engine, Vector } from "@mp/excalibur";
+import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
 import {
+  clamp,
   invoker,
   Scene,
   snapTileVector,
@@ -36,6 +37,7 @@ export class AreaScene extends Scene {
   private debugUI!: DGraphDebugUI;
   private characterLayer!: Layer;
   private lastSentPos?: Vector;
+  private cameraZoom: number = 2;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -83,6 +85,7 @@ export class AreaScene extends Scene {
       characters.onRemove(this.deleteCharacter),
       subscribe(primary, "down", () => (this.shouldSendMove = true)),
       subscribe(primary, "up", () => (this.shouldSendMove = false)),
+      subscribe(primary, "wheel", this.onMouseWheel),
     );
   }
 
@@ -92,8 +95,15 @@ export class AreaScene extends Scene {
     this.cleanups.flush();
   }
 
+  private onMouseWheel = (e: WheelEvent) => {
+    this.cameraZoom = clamp(this.cameraZoom + Math.sign(e.deltaY) * 0.3, 1, 2);
+  };
+
   override update(engine: Engine, delta: number): void {
     super.update(engine, delta);
+
+    this.camera.zoom = lerp(this.camera.zoom, this.cameraZoom, 0.1);
+
     if (this.shouldSendMove) {
       const { lastWorldPos } = engine.input.pointers.primary;
       const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
@@ -144,4 +154,8 @@ export class AreaScene extends Scene {
     this.characterActors.delete(id);
     this.characterCleanups.flush(id);
   };
+}
+
+function lerp(a: number, b: number, t: number): number {
+  return a + (b - a) * t;
 }
