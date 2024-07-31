@@ -12,7 +12,6 @@ export class CharacterActor extends Actor {
   }
 
   override onInitialize(): void {
-    this.anchor.setTo(0, 0);
     this.graphics.use(this.rect);
   }
 

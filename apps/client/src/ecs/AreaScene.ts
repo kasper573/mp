@@ -41,7 +41,10 @@ export class AreaScene extends Scene {
     return this.room.sessionId;
   }
 
-  constructor(private room: Room<Area>) {
+  constructor(
+    private room: Room<Area>,
+    private renderDebugText: (text: string) => void,
+  ) {
     super();
     this.bus = messageSender(this.room);
   }
@@ -66,7 +69,7 @@ export class AreaScene extends Scene {
     tileHighlighter.z = 999;
     this.add(tileHighlighter);
 
-    this.debugUI = new DGraphDebugUI(dGraph, this.tiled);
+    this.debugUI = new DGraphDebugUI(dGraph, this.tiled, this.renderDebugText);
     this.debugUI.z = 1000;
     this.add(this.debugUI);
   };

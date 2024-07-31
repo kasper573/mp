@@ -17,11 +17,17 @@ export class TiledResource extends TiledResourceImpl {
   }
 
   worldCoordToTile = ({ x, y }: VectorLike): Vector => {
-    return new Vector(x / this.map.tilewidth, y / this.map.tileheight);
+    return new Vector(
+      x / this.map.tilewidth - 0.5,
+      y / this.map.tileheight - 0.5,
+    );
   };
 
   tileCoordToWorld = ({ x, y }: VectorLike): Vector => {
-    return new Vector(x * this.map.tilewidth, y * this.map.tileheight);
+    return new Vector(
+      (x + 0.5) * this.map.tilewidth,
+      (y + 0.5) * this.map.tileheight,
+    );
   };
 
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
@@ -51,5 +57,5 @@ export class TiledResource extends TiledResourceImpl {
 }
 
 export function snapTileVector({ x, y }: VectorLike): Vector {
-  return new Vector(Math.floor(x), Math.floor(y));
+  return new Vector(Math.floor(x + 0.5), Math.floor(y + 0.5));
 }

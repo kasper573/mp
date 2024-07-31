@@ -46,33 +46,30 @@ export function addVectorToAdjacentInGraph(
   graph: DGraph,
   v: VectorLike,
 ): DGraph {
-  const nodeAsVector = new Vector(v.x, v.y);
   const updatedGraph = { ...graph };
+  const nodeAsVector = new Vector(v.x, v.y);
   const adjacent = adjacentVectors(v);
-  const neighbors = Object.fromEntries(
+  updatedGraph[dNodeFromVector(v)] = Object.fromEntries(
     adjacent
       .filter((adjacent) => isVectorInGraph(graph, adjacent))
       .map((adjacent) => [
         dNodeFromVector(adjacent),
-        adjacent.distance(nodeAsVector),
+        nodeAsVector.distance(adjacent),
       ]),
   );
-
-  updatedGraph[dNodeFromVector(v)] = neighbors;
-
   return updatedGraph;
 }
 
 function adjacentVectors(fractional: VectorLike): Vector[] {
   const from = snapTileVector(fractional);
-  const xOffset = fractional.x % 1 < 0.5 ? -1 : 1;
-  const yOffsetf = fractional.y % 1 < 0.5 ? -1 : 1;
+  const xOffset = (fractional.x - 0.5) % 1 < 0.5 ? -1 : 1;
+  const yOffset = (fractional.y - 0.5) % 1 < 0.5 ? -1 : 1;
 
   return [
     from,
     from.add(new Vector(xOffset, 0)),
-    from.add(new Vector(0, yOffsetf)),
-    from.add(new Vector(xOffset, yOffsetf)),
+    from.add(new Vector(0, yOffset)),
+    from.add(new Vector(xOffset, yOffset)),
   ];
 }
 

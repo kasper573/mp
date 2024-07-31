@@ -12,11 +12,15 @@ import {
 export class DGraphDebugUI extends Actor {
   private path: VectorLike[] = [];
   private canvas: Canvas;
-  private pointerPos?: VectorLike;
+  private worldPos?: VectorLike;
   private showFractionalDNode = false;
   private showTiledDNode = false;
 
-  constructor(graph: DGraph, tiled: TiledResource) {
+  constructor(
+    graph: DGraph,
+    private tiled: TiledResource,
+    private renderDebugText: (text: string) => void,
+  ) {
     super();
 
     const { map } = tiled;
@@ -28,18 +32,18 @@ export class DGraphDebugUI extends Actor {
           drawPath(ctx, tiled, this.path);
         }
 
-        if (this.pointerPos) {
+        if (this.worldPos) {
           if (this.showTiledDNode) {
             drawDNode(
               ctx,
               tiled,
               graph,
-              snapTileVector(tiled.worldCoordToTile(this.pointerPos)),
+              snapTileVector(tiled.worldCoordToTile(this.worldPos)),
             );
           }
 
-          if (this.pointerPos && this.showFractionalDNode) {
-            const tilePos = tiled.worldCoordToTile(this.pointerPos);
+          if (this.worldPos && this.showFractionalDNode) {
+            const tilePos = tiled.worldCoordToTile(this.worldPos);
             drawDNode(
               ctx,
               tiled,
@@ -63,9 +67,22 @@ export class DGraphDebugUI extends Actor {
   }
 
   override update(engine: Engine): void {
-    this.pointerPos = engine.input.pointers.primary.lastWorldPos;
-    this.showFractionalDNode = engine.input.keyboard.isHeld(Keys.ShiftLeft);
-    this.showTiledDNode = engine.input.keyboard.isHeld(Keys.ControlLeft);
+    const { pointers, keyboard } = engine.input;
+    this.worldPos = pointers.primary.lastWorldPos;
+    this.showFractionalDNode = keyboard.isHeld(Keys.ShiftLeft);
+    this.showTiledDNode = keyboard.isHeld(Keys.ControlLeft);
+
+    if (keyboard.isHeld(Keys.ShiftLeft) || keyboard.isHeld(Keys.ControlLeft)) {
+      const tilePos = this.tiled.worldCoordToTile(this.worldPos);
+      const text = [
+        `world: ${vecToString(this.worldPos)}`,
+        `tile: ${vecToString(tilePos)}`,
+        `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
+      ].join("\n");
+      this.renderDebugText(text);
+    } else {
+      this.renderDebugText("");
+    }
   }
 }
 
@@ -74,10 +91,7 @@ function drawPath(
   tiled: TiledResource,
   path: VectorLike[],
 ) {
-  const offset = tiled.tileSize.scale(0.5);
-  const [start, ...rest] = path
-    .map(tiled.tileCoordToWorld)
-    .map((v) => v.add(offset));
+  const [start, ...rest] = path.map(tiled.tileCoordToWorld);
 
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
@@ -94,14 +108,12 @@ function drawDNode(
   tiled: TiledResource,
   graph: DGraph,
   tilePos: Vector,
-  start = tiled.tileCoordToWorld(tilePos).add(tiled.tileSize.scale(0.5)),
+  start = tiled.tileCoordToWorld(tilePos),
 ) {
   for (const [neighbor, cost] of Object.entries(
     graph[dNodeFromVector(tilePos)] ?? {},
   )) {
-    const end = tiled
-      .tileCoordToWorld(vectorFromDNode(neighbor as DNode))
-      .add(tiled.tileSize.scale(0.5));
+    const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
@@ -111,11 +123,15 @@ function drawDNode(
 
     ctx.lineWidth = 1;
     ctx.strokeStyle = "black";
-    ctx.strokeText(costToString(cost!), end.x, end.y);
+    ctx.strokeText(costToString(cost!), end.x, end.y, 10);
   }
 }
 
 function costToString(cost: number): string {
   const hasFractions = cost % 1 !== 0;
   return hasFractions ? cost.toFixed(1) : cost.toString();
+}
+
+function vecToString(v: VectorLike): string {
+  return `(${v.x.toFixed(1)},${v.y.toFixed(1)})`;
 }
