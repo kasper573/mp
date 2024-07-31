@@ -2,7 +2,7 @@ import path from "path";
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
-import { snapTileVector, type TiledResource } from "@mp/excalibur";
+import { type TiledResource } from "@mp/excalibur";
 import {
   dGraphFromTiled,
   findPath,
@@ -33,12 +33,11 @@ export class AreaRoom extends Room<Area> {
     this.bus.onMessage("move", async (client, [x, y]) => {
       const char = this.state.characters.get(client.sessionId);
       if (char) {
-        const to = snapTileVector({ x, y });
-        const idx = char.path.findIndex((c) => c.x === to.x && c.y === to.y);
+        const idx = char.path.findIndex((c) => c.x === x && c.y === y);
         if (idx !== -1) {
           char.path = Coordinate.many(char.path.slice(0, idx + 1));
         } else {
-          char.path = Coordinate.many(findPath(char.coords, to, dGraph));
+          char.path = Coordinate.many(findPath(char.coords, { x, y }, dGraph));
         }
       }
     });
