@@ -6,7 +6,14 @@ import {
   type AreaMessages,
 } from "@mp/server";
 import type { Room } from "colyseus.js";
-import { invoker, Scene, type DefaultLoader, type Layer } from "@mp/excalibur";
+import type { Engine, Vector } from "@mp/excalibur";
+import {
+  invoker,
+  Scene,
+  snapTileVector,
+  type DefaultLoader,
+  type Layer,
+} from "@mp/excalibur";
 import {
   Cleanup,
   CleanupMap,
@@ -14,10 +21,7 @@ import {
   subscribe,
   type MessageSender,
 } from "@mp/events";
-import {
-  TiledResource,
-  type PointerEvent as ExcaliburPointerEvent,
-} from "@mp/excalibur";
+import { TiledResource } from "@mp/excalibur";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
@@ -31,6 +35,7 @@ export class AreaScene extends Scene {
   private bus: MessageSender<AreaMessages>;
   private debugUI!: DGraphDebugUI;
   private characterLayer!: Layer;
+  private lastSentPos?: Vector;
 
   get myCharacterId() {
     return this.room.sessionId;
@@ -69,21 +74,32 @@ export class AreaScene extends Scene {
   override onActivate(): void {
     const { characters } = this.room.state;
 
+    const { primary } = this.engine.input.pointers;
     this.cleanups.add(
       characters.onAdd(this.addCharacter),
       characters.onRemove(this.deleteCharacter),
-      subscribe(this.input.pointers.primary, "down", this.onClick),
+      subscribe(primary, "down", () => (this.shouldSendMove = true)),
+      subscribe(primary, "up", () => (this.shouldSendMove = false)),
     );
   }
+
+  private shouldSendMove = false;
 
   override onDeactivate(): void {
     this.cleanups.flush();
   }
 
-  private onClick = (e: ExcaliburPointerEvent) => {
-    const tiledPos = this.tiled.worldCoordToTile(e.worldPos);
-    this.bus.send("move", [tiledPos.x, tiledPos.y]);
-  };
+  override update(engine: Engine, delta: number): void {
+    super.update(engine, delta);
+    if (this.shouldSendMove) {
+      const { lastWorldPos } = engine.input.pointers.primary;
+      const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
+      if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
+        this.bus.send("move", [tilePos.x, tilePos.y]);
+        this.lastSentPos = tilePos;
+      }
+    }
+  }
 
   private addCharacter = (char: Character) => {
     const actor = new CharacterActor(char);
