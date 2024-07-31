@@ -45,6 +45,7 @@ export class DGraphDebugUI extends Actor {
               tiled,
               addVectorToAdjacentInGraph(graph, tilePos),
               tilePos,
+              tiled.tileCoordToWorld(tilePos),
             );
           }
         }
@@ -93,15 +94,14 @@ function drawDNode(
   tiled: TiledResource,
   graph: DGraph,
   tilePos: Vector,
+  start = tiled.tileCoordToWorld(tilePos).add(tiled.tileSize.scale(0.5)),
 ) {
-  const offset = tiled.tileSize.scale(0.5);
-  const start = tiled.tileCoordToWorld(tilePos).add(offset);
   for (const [neighbor, cost] of Object.entries(
     graph[dNodeFromVector(tilePos)] ?? {},
   )) {
     const end = tiled
       .tileCoordToWorld(vectorFromDNode(neighbor as DNode))
-      .add(offset);
+      .add(tiled.tileSize.scale(0.5));
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);
