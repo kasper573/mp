@@ -11,10 +11,6 @@ export function findPath(
     graph = addVectorToAdjacentInGraph(graph, start);
   }
 
-  if (isFractionalVector(target)) {
-    target = snapTileVector(target);
-  }
-
   try {
     // Skip the first node in the result because it is the start node.
     // We are only interested in future nodes.
