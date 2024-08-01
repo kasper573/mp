@@ -1,4 +1,4 @@
-import type { TiledResourceOptions } from "@excaliburjs/plugin-tiled";
+import { type TiledResourceOptions } from "@excaliburjs/plugin-tiled";
 import { TiledResource as TiledResourceImpl } from "@excaliburjs/plugin-tiled";
 import { Vector } from "excalibur";
 import type { VectorLike } from "./vector";

@@ -1,10 +1,10 @@
-import type { Area } from "@mp/server";
+import type { AreaState } from "@mp/server";
 import type { Room } from "colyseus.js";
 import { Engine } from "@mp/excalibur";
 import { AreaScene } from "./AreaScene";
 
 export function createGame(
-  room: Room<Area>,
+  room: Room<AreaState>,
   renderDebugText: (text: string) => void,
 ) {
   const game = new Engine({

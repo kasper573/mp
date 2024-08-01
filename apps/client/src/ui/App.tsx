@@ -1,4 +1,4 @@
-import { ModuleName, type Area } from "@mp/server";
+import { ModuleName, type AreaState } from "@mp/server";
 import { Client } from "colyseus.js";
 import type { CSSProperties, RefObject } from "react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
@@ -44,7 +44,7 @@ function useJoinGame(
 
   const { data: room, ...join } = useQuery({
     queryKey: ["room", joinAttemptNumber],
-    queryFn: () => client.joinOrCreate<Area>(ModuleName.area, {}),
+    queryFn: () => client.joinOrCreate<AreaState>(ModuleName.area, {}),
   });
 
   useEffect(() => {

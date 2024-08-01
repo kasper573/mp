@@ -15,7 +15,14 @@ export default config({
       throw new Error("No areas found!");
     }
     const [someArea] = Array.from(areas.values());
-    server.define(ModuleName.area, AreaRoom, someArea);
+    server.define(
+      ModuleName.area,
+      class extends AreaRoom {
+        constructor() {
+          super(someArea);
+        }
+      },
+    );
   },
   initializeExpress(app) {
     app.use(morgan("tiny"));

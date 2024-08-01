@@ -42,7 +42,7 @@ export class Character extends Schema {
 
 export type Path = ArraySchema<Coordinate>;
 
-export class Area extends Schema {
+export class AreaState extends Schema {
   @type({ map: Character }) characters = new MapSchema<Character>();
   @type("string") tiledResourceUrl!: UrlToPublicFile;
 

@@ -1,12 +1,8 @@
 import path from "path";
 import fs from "fs/promises";
-import type { TiledResource } from "@mp/excalibur";
-import type {
-  FileReference,
-  PathToLocalFile,
-  UrlToPublicFile,
-} from "../../FileReference";
+import type { PathToLocalFile, UrlToPublicFile } from "../../FileReference";
 import { loadTiled } from "./loadTiled";
+import { AreaResource } from "./AreaResource";
 
 export async function loadAreas(
   dir: string,
@@ -18,18 +14,13 @@ export async function loadAreas(
       const tmxFile = path.join(dir, file) as PathToLocalFile;
       return [
         file,
-        {
-          tmxFile: { filepath: tmxFile, url: createUrl(tmxFile) },
-          tiled: await loadTiled(tmxFile),
-        },
+        new AreaResource(
+          { filepath: tmxFile, url: createUrl(tmxFile) },
+          await loadTiled(tmxFile),
+        ),
       ] as const;
     }),
   );
 
   return new Map(entries);
-}
-
-export interface AreaResource {
-  tmxFile: FileReference;
-  tiled: TiledResource;
 }

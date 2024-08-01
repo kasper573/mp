@@ -1,7 +1,7 @@
 import { dGraphFromTiled } from "@mp/state";
 import {
   type SessionId,
-  type Area,
+  type AreaState,
   type Character,
   type AreaMessages,
 } from "@mp/server";
@@ -45,7 +45,7 @@ export class AreaScene extends Scene {
   }
 
   constructor(
-    private room: Room<Area>,
+    private room: Room<AreaState>,
     private renderDebugText: (text: string) => void,
   ) {
     super();
