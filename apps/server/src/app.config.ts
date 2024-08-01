@@ -24,7 +24,8 @@ export default config({
 });
 
 function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
-  return `//${env.host}:${env.httpPort}${publicPath}${path.relative(publicDir, fileInPublicDir)}` as UrlToPublicFile;
+  const port = env.httpPort === 80 ? "" : `:${env.httpPort}`;
+  return `//${env.host}${port}${publicPath}${path.relative(publicDir, fileInPublicDir)}` as UrlToPublicFile;
 }
 
 const publicPath = "/public/";
