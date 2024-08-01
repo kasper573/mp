@@ -1,4 +1,4 @@
 {
   "extends": "@mp/tsconfig/vite.json",
-  "exclude": ["public"]
+  "exclude": ["../server/public"]
 }

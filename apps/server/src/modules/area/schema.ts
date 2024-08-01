@@ -43,4 +43,10 @@ export type Path = ArraySchema<Coordinate>;
 
 export class Area extends Schema {
   @type({ map: Character }) characters = new MapSchema<Character>();
+  @type("string") tiledResourceUrl!: string;
+
+  constructor(tiledResourceUrl: string) {
+    super();
+    this.tiledResourceUrl = tiledResourceUrl;
+  }
 }

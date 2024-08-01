@@ -5,9 +5,10 @@ import type { VectorLike } from "./vector";
 import { groupBy } from "./groupBy";
 
 export class TiledResource extends TiledResourceImpl {
-  constructor(path: string, options?: TiledResourceOptions) {
-    super(path, {
+  constructor(tmxFile: string, options?: TiledResourceOptions) {
+    super(tmxFile, {
       useTilemapCameraStrategy: true,
+      fileLoader: (path) => fetch(path).then((r) => r.text()),
       ...options,
     });
   }

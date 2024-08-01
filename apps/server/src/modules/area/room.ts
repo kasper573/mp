@@ -1,8 +1,6 @@
-import path from "path";
 import type { Client } from "colyseus";
 import { Room } from "colyseus";
 import { messageReceiver } from "@mp/events";
-import { type TiledResource } from "@mp/excalibur";
 import {
   dGraphFromTiled,
   findPath,
@@ -10,25 +8,18 @@ import {
   moveAlongPath,
 } from "@mp/state";
 import { env } from "../../env";
-import { loadTiled } from "./loadTiled";
 import { Area, Character, Coordinate } from "./schema";
 import { type AreaMessages } from "./messages";
-
-const islandTMX = path.resolve(
-  __dirname,
-  "../../../../client/public/areas/island.tmx",
-);
+import type { AreaResource } from "./loadAreas";
 
 export class AreaRoom extends Room<Area> {
   bus = messageReceiver<AreaMessages>()(this);
-  tiled!: TiledResource;
+  area!: AreaResource;
 
-  override async onCreate() {
-    this.tiled = await loadTiled(islandTMX);
-
-    const dGraph = dGraphFromTiled(this.tiled);
-
-    this.setState(new Area());
+  override async onCreate(area: AreaResource) {
+    this.area = area;
+    const dGraph = dGraphFromTiled(this.area.tiled);
+    this.setState(new Area(this.area.tmxFile.url));
 
     this.bus.onMessage("move", async (client, [x, y]) => {
       const char = this.state.characters.get(client.sessionId);
@@ -59,7 +50,7 @@ export class AreaRoom extends Room<Area> {
     console.log(client.sessionId, "joined!");
 
     const player = new Character(client.sessionId);
-    const start = getStartingPoint(this.tiled);
+    const start = getStartingPoint(this.area.tiled);
     if (start) {
       player.coords = new Coordinate(start.x, start.y);
     }

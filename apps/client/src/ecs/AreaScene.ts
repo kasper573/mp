@@ -27,6 +27,7 @@ import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
+import { WaitUntil } from "./WaitUntil";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
@@ -52,9 +53,17 @@ export class AreaScene extends Scene {
   }
 
   override onPreLoad(loader: DefaultLoader): void {
-    this.tiled = new TiledResource("areas/island.tmx");
-    loader.addResource(this.tiled);
-    loader.areResourcesLoaded().then(this.onTiledLoaded);
+    loader.addResource(
+      new WaitUntil(async () => {
+        if (this.room.state.tiledResourceUrl) {
+          this.tiled = new TiledResource(this.room.state.tiledResourceUrl);
+          await this.tiled.load();
+          this.onTiledLoaded();
+          return true;
+        }
+        return false;
+      }),
+    );
   }
 
   private onTiledLoaded = () => {
