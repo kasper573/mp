@@ -1,5 +1,6 @@
 import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
 import type { VectorLike } from "@mp/excalibur";
+import type { UrlToPublicFile } from "../../FileReference";
 
 export type SessionId = string;
 
@@ -43,9 +44,9 @@ export type Path = ArraySchema<Coordinate>;
 
 export class Area extends Schema {
   @type({ map: Character }) characters = new MapSchema<Character>();
-  @type("string") tiledResourceUrl!: string;
+  @type("string") tiledResourceUrl!: UrlToPublicFile;
 
-  constructor(tiledResourceUrl: string) {
+  constructor(tiledResourceUrl: UrlToPublicFile) {
     super();
     this.tiledResourceUrl = tiledResourceUrl;
   }

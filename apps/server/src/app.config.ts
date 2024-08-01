@@ -6,6 +6,7 @@ import { AreaRoom } from "./modules/area/room";
 import { ModuleName } from "./modules/names";
 import { loadAreas } from "./modules/area/loadAreas";
 import { env } from "./env";
+import type { PathToLocalFile, UrlToPublicFile } from "./FileReference";
 
 export default config({
   async initializeGameServer(server) {
@@ -22,8 +23,8 @@ export default config({
   },
 });
 
-function createUrl(fileInPublicDir: string) {
-  return `//${env.host}:${env.port}${publicPath}${path.relative(publicDir, fileInPublicDir)}`;
+function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
+  return `//${env.host}:${env.httpPort}${publicPath}${path.relative(publicDir, fileInPublicDir)}` as UrlToPublicFile;
 }
 
 const publicPath = "/public/";
