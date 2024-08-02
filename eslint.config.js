@@ -13,7 +13,7 @@ export default tseslint.config(
       "**/dist/",
       "**/.turbo/",
       "pnpm-lock.yaml",
-      "**/apps/client/public/tilesets/**",
+      "**/apps/server/public/tilesets/**",
     ],
   },
   eslint.configs.recommended,
