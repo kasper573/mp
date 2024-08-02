@@ -18,7 +18,6 @@ import { TileHighlight } from "./TileHighlight";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
-  private characterCleanups = new CleanupMap();
   private characterActors: Map<SessionId, CharacterActor> = new Map();
   private bus: MessageSender<AreaMessages>;
   private debugUI!: DGraphDebugUI;
@@ -54,11 +53,25 @@ export class AreaScene extends Scene {
 
   override onActivate(): void {
     const { characters } = this.room.state;
-
     const { primary } = this.engine.input.pointers;
+
+    const characterCleanups = new CleanupMap();
     this.cleanups.add(
-      characters.onAdd(this.addCharacter),
-      characters.onRemove(this.deleteCharacter),
+      characters.onAdd((char: Character) => {
+        const sync = () => this.upsertCharacterActor(char);
+        sync();
+        characterCleanups.add(
+          char.id,
+          char.listen("areaId", sync),
+          char.listen("speed", sync),
+          char.coords.onChange(sync),
+          char.path.onChange(sync),
+        );
+      }),
+      characters.onRemove((char) => {
+        this.deleteCharacterActor(char.id);
+        characterCleanups.flush(char.id);
+      }),
       subscribe(primary, "down", () => (this.shouldSendMove = true)),
       subscribe(primary, "up", () => (this.shouldSendMove = false)),
       subscribe(primary, "wheel", this.onMouseWheel),
@@ -92,50 +105,41 @@ export class AreaScene extends Scene {
     }
   }
 
-  private addCharacter = (char: Character) => {
-    if (this.characterActors.has(char.id)) {
+  private deleteCharacterActor = (id: Character["id"]) => {
+    const entity = this.characterActors.get(id);
+    entity?.kill();
+    this.characterActors.delete(id);
+  };
+
+  private upsertCharacterActor(char: Character) {
+    if (char.areaId !== this.area.id) {
+      this.deleteCharacterActor(char.id);
       return;
     }
 
-    const actor = new CharacterActor(char);
-    actor.z = this.area.characterLayer;
-    this.characterActors.set(char.id, actor);
-    this.add(actor);
-
-    if (char.id === this.myCharacterId) {
-      this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
+    let actor = this.characterActors.get(char.id);
+    if (!actor) {
+      actor = new CharacterActor(char);
+      actor.z = this.area.characterLayer;
+      this.add(actor);
+      this.characterActors.set(char.id, actor);
+      if (char.id === this.myCharacterId) {
+        this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
+      }
     }
 
-    this.synchronizeCharacterPosition(char);
-    this.characterCleanups.add(
-      char.id,
-      char.listen("speed", () => this.synchronizeCharacterPosition(char)),
-      char.coords.onChange(() => this.synchronizeCharacterPosition(char)),
-      char.path.onChange(() => this.synchronizeCharacterPosition(char)),
-    );
-  };
-
-  private synchronizeCharacterPosition(char: Character) {
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
     const path = char.path.map(this.area.tiled.tileCoordToWorld);
 
-    if (char.id === this.myCharacterId) {
-      this.debugUI.showPath(char.path.toArray());
-    }
-
-    const actor = this.characterActors.get(char.id)!;
     invoker(Interpolator, actor).configure(pos, {
       path,
       speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
-  }
 
-  private deleteCharacter = (_: unknown, id: Character["id"]) => {
-    const entity = this.characterActors.get(id);
-    entity?.kill();
-    this.characterActors.delete(id);
-    this.characterCleanups.flush(id);
-  };
+    if (char.id === this.myCharacterId) {
+      this.debugUI.showPath(char.path.toArray());
+    }
+  }
 
   inheritProperties(other: AreaScene) {
     this.cameraZoom = other.cameraZoom;
