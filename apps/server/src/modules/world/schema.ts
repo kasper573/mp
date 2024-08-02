@@ -1,6 +1,5 @@
-import { Schema, type, MapSchema } from "@colyseus/schema";
-import { Character } from "../area/schema";
+import type { Character, CharacterId } from "../character/schema";
 
-export class WorldState extends Schema {
-  @type({ map: Character }) characters = new MapSchema<Character>();
+export interface WorldState {
+  characters: Map<CharacterId, Character>;
 }

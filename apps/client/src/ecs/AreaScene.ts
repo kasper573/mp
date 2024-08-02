@@ -1,16 +1,9 @@
 import type { AreaResource } from "@mp/state";
-import type { WorldState } from "@mp/server";
-import { type SessionId, type Character, type AreaMessages } from "@mp/server";
-import type { Room } from "colyseus.js";
+import type { Character, CharacterId } from "@mp/server";
 import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
 import { clamp, invoker, Scene, snapTileVector } from "@mp/excalibur";
-import {
-  Cleanup,
-  CleanupMap,
-  messageSender,
-  subscribe,
-  type MessageSender,
-} from "@mp/events";
+import { Cleanup, subscribe } from "@mp/events";
+import { api } from "../api";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
@@ -18,23 +11,20 @@ import { TileHighlight } from "./TileHighlight";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
-  private characterActors: Map<SessionId, CharacterActor> = new Map();
-  private bus: MessageSender<AreaMessages>;
+  private characterActors: Map<CharacterId, CharacterActor> = new Map();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
   private cameraZoom = 2;
 
   get myCharacterId() {
-    return this.room.sessionId;
+    return api.clientId;
   }
 
   constructor(
-    private room: Room<WorldState>,
     readonly area: AreaResource,
     private renderDebugText: (text: string) => void,
   ) {
     super();
-    this.bus = messageSender(this.room);
 
     area.tiled.addToScene(this);
 
@@ -52,26 +42,10 @@ export class AreaScene extends Scene {
   }
 
   override onActivate(): void {
-    const { characters } = this.room.state;
     const { primary } = this.engine.input.pointers;
 
-    const characterCleanups = new CleanupMap();
     this.cleanups.add(
-      characters.onAdd((char: Character) => {
-        const sync = () => this.upsertCharacterActor(char);
-        sync();
-        characterCleanups.add(
-          char.id,
-          char.listen("areaId", sync),
-          char.listen("speed", sync),
-          char.coords.onChange(sync),
-          char.path.onChange(sync),
-        );
-      }),
-      characters.onRemove((char) => {
-        this.deleteCharacterActor(char.id);
-        characterCleanups.flush(char.id);
-      }),
+      api.state.subscribe(this.synchronizeCharacters),
       subscribe(primary, "down", () => (this.shouldSendMove = true)),
       subscribe(primary, "up", () => (this.shouldSendMove = false)),
       subscribe(primary, "wheel", this.onMouseWheel),
@@ -99,11 +73,23 @@ export class AreaScene extends Scene {
         this.area.tiled.worldCoordToTile(lastWorldPos),
       );
       if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
-        this.bus.send("move", [tilePos.x, tilePos.y]);
+        api.modules.world.move(tilePos);
         this.lastSentPos = tilePos;
       }
     }
   }
+
+  private synchronizeCharacters = () => {
+    const { characters } = api.state.value;
+    const removed = new Set(this.characterActors.keys()).difference(
+      new Set(characters.keys()),
+    );
+    removed.forEach(this.deleteCharacterActor);
+    const addedOrUpdated = new Set(characters.keys()).difference(removed);
+    for (const id of addedOrUpdated) {
+      this.upsertCharacterActor(characters.get(id)!);
+    }
+  };
 
   private deleteCharacterActor = (id: Character["id"]) => {
     const entity = this.characterActors.get(id);
@@ -137,7 +123,7 @@ export class AreaScene extends Scene {
     });
 
     if (char.id === this.myCharacterId) {
-      this.debugUI.showPath(char.path.toArray());
+      this.debugUI.showPath(char.path);
     }
   }
 

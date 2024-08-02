@@ -1,4 +1,5 @@
-export type * from "./modules/area/schema";
-export type * from "./modules/area/messages";
+// This module should never export runtime code. Only use type exports
+export type * from "./modules/definition";
 export type * from "./modules/world/schema";
-export { ModuleName } from "./modules/names";
+export type * from "./modules/character/schema";
+export type * from "./context";
