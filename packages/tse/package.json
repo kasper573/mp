@@ -24,11 +24,11 @@
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
+    "@mp/logger": "workspace:*",
+    "@preact/signals-core": "1.7.0",
     "socket.io": "4.7.5",
     "socket.io-client": "4.7.5",
-    "chalk": "5.3.0",
-    "superjson": "2.2.1",
-    "@preact/signals-core": "1.7.0"
+    "superjson": "2.2.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

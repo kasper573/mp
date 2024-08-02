@@ -1,4 +1,5 @@
-import { Client, Logger } from "@mp/tse/client";
+import { Client } from "@mp/tse/client";
+import { Logger } from "@mp/logger";
 import { transformers, type ClientState, type ServerModules } from "@mp/server";
 import { env } from "./env";
 

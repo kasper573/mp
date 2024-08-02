@@ -1,6 +1,6 @@
 import "./polyfill";
 import path from "path";
-import { Logger } from "@mp/tse/server";
+import { Logger } from "@mp/logger";
 import express from "express";
 import {
   TimeSpan,

@@ -6,7 +6,8 @@ import {
   type AreaResource,
 } from "@mp/state";
 import type { VectorLike } from "@mp/excalibur";
-import type { DisconnectReason, Logger } from "@mp/tse/server";
+import type { DisconnectReason } from "@mp/tse/server";
+import type { Logger } from "@mp/logger";
 import { t } from "../tse";
 import type { ConnectionModule } from "../connection";
 import type { ServerContext } from "../../context";

@@ -1,4 +1,5 @@
 import { Server as SocketServer } from "socket.io";
+import type { Logger } from "@mp/logger";
 import type {
   EventDefinition,
   EventHandlerArg,
@@ -6,7 +7,6 @@ import type {
   Module,
 } from "./module";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
-import { Logger } from "./logger";
 import type {
   SocketIO_ClientToServerEvents,
   SocketIO_Data,
@@ -16,7 +16,6 @@ import type {
 import type { Transformer } from "./transformer";
 
 export { Factory } from "./factory";
-export { Logger };
 export type * from "./transformer";
 export type { inferModuleDefinitions } from "./module";
 export type { EventResult } from "./event";

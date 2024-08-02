@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import { signal, type Signal } from "@preact/signals-core";
-import { Logger } from "./logger";
+import type { Logger } from "@mp/logger";
 import type {
   AnyEventDefinition,
   AnyEventRecord,
@@ -19,7 +19,6 @@ import type {
 } from "./socket";
 import type { Transformer } from "./transformer";
 
-export { Logger };
 export type * from "./transformer";
 
 export interface ClientOptions<State> {
