@@ -1,5 +1,5 @@
 import type { DisconnectReason } from "@mp/tse/server";
-import { t } from "../tse";
+import { t } from "./tse";
 
 export type ConnectionModule = ReturnType<typeof createConnectionModule>;
 export function createConnectionModule() {

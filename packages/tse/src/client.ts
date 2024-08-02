@@ -14,16 +14,22 @@ import type { EventBus } from "./event";
 import { createEventBus } from "./event";
 import type {
   SocketIO_ClientToServerEvents,
+  SocketIO_Message,
   SocketIO_ServerToClientEvents,
 } from "./socket";
-import { transformer } from "./transformer";
+import type { Transformer } from "./transformer";
 
 export { Logger };
+export type * from "./transformer";
 
 export interface ClientOptions<State> {
   url: string;
   logger?: Logger;
   disconnectedState: State;
+  transformers: {
+    message: Transformer<SocketIO_Message>;
+    clientState: Transformer<State>;
+  };
 }
 
 export class Client<
@@ -48,11 +54,17 @@ export class Client<
 
     this.state = signal(options.disconnectedState);
 
-    this.socket.on(
-      "clientState",
-      (serializedState) =>
-        (this.state.value = transformer.parse(serializedState)),
-    );
+    this.socket.on("clientState", (serializedState) => {
+      const result =
+        this.options.transformers.clientState.deserialize(serializedState);
+
+      if (!result.ok) {
+        this.options.logger?.error("Could not deserialize state", result.error);
+        return;
+      }
+
+      this.state.value = result.value;
+    });
 
     this.socket.on(
       "disconnect",
@@ -88,7 +100,7 @@ function createModuleEventBus<State>(
     logger?.chain(eventName).info(payload);
     socket.emit(
       "message",
-      transformer.serialize({
+      options.transformers.message.serialize({
         moduleName: String(moduleName),
         eventName: String(eventName),
         payload,

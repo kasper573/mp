@@ -1,15 +1,14 @@
-import SuperJSON from "superjson";
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface Transformer<T = any> {
+  serialize(value: T): Serialized<T>;
+  deserialize(data: Serialized<T>): DeserializationResult<T>;
+}
 
-export const transformer = {
-  serialize<T>(data: T): Serialized<T> {
-    return SuperJSON.stringify(data) as Serialized<T>;
-  },
-  parse<T>(data: Serialized<T>): T {
-    return SuperJSON.parse(data);
-  },
-};
+export type DeserializationResult<T> =
+  | { ok: true; value: T }
+  | { ok: false; error: unknown };
 
-export type Serialized<T> = string & {
+export type Serialized<T> = (Uint8Array | string) & {
   T?: T;
   __brand__: "SocketIO_TransformedData";
 };

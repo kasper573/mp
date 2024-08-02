@@ -6,8 +6,8 @@ import {
   type AreaResource,
 } from "@mp/state";
 import type { VectorLike } from "@mp/excalibur";
-import type { DisconnectReason } from "@mp/tse/server";
-import { t } from "../../tse";
+import type { DisconnectReason, Logger } from "@mp/tse/server";
+import { t } from "../tse";
 import type { ConnectionModule } from "../connection";
 import type { ServerContext } from "../../context";
 import type { Character } from "../character/schema";
@@ -18,10 +18,11 @@ export interface WorldModuleDependencies {
   connection: ConnectionModule;
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
+  logger: Logger;
   allowReconnection: (
     id: ServerContext["clientId"],
     timeoutSeconds: number,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
 }
 
 export function createWorldModule({
@@ -30,6 +31,7 @@ export function createWorldModule({
   areas,
   defaultAreaId,
   allowReconnection,
+  logger,
 }: WorldModuleDependencies) {
   const tick = t.event
     .type("server-only")
@@ -108,18 +110,22 @@ export function createWorldModule({
     .type("server-only")
     .payload<DisconnectReason>()
     .create(async ({ payload: reason, context: { clientId } }) => {
+      logger.info("Client disconnected", { clientId, reason });
       state.characters.get(clientId)!.connected = false;
-      try {
-        if (reason === "consented") {
-          throw new Error("consented leave");
-        }
+
+      if (reason !== "consented") {
         console.log("Allowing reconnection...", clientId);
-        await allowReconnection(clientId, 2);
-        state.characters.get(clientId)!.connected = false;
-      } catch {
-        console.log(clientId, "left!");
-        state.characters.delete(clientId);
+        const didReconnect = await allowReconnection(clientId, 2);
+        if (didReconnect) {
+          console.log("Reconnected!", clientId);
+          state.characters.get(clientId)!.connected = true;
+          return;
+        }
+        console.log("Client never reconnected", clientId);
       }
+
+      state.characters.delete(clientId);
+      logger.info("Character removed", clientId);
     });
 
   // TODO when should these unsubscribe?

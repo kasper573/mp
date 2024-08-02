@@ -108,6 +108,9 @@ importers:
       express:
         specifier: 4.19.2
         version: 4.19.2
+      superjson:
+        specifier: 2.2.1
+        version: 2.2.1
     devDependencies:
       '@mp/build':
         specifier: workspace:*

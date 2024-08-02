@@ -16,6 +16,7 @@ import type { ServerModules } from "./modules/definition";
 import { createModules } from "./modules/definition";
 import type { CharacterId, WorldState } from "./package";
 import { loadAreas } from "./modules/area/loadAreas";
+import { transformers } from "./transformers";
 
 async function main() {
   const cors = createCors();
@@ -31,7 +32,8 @@ async function main() {
   };
 
   async function allowReconnection(id: CharacterId, timeoutSeconds: number) {
-    throw new Error("Not implemented");
+    logger.warn(`allowReconnection() is not implemented`);
+    return false;
   }
 
   const connection = createConnectionModule();
@@ -41,6 +43,7 @@ async function main() {
     defaultAreaId,
     state: world,
     allowReconnection,
+    logger,
   });
 
   let lastTick = new Date();
@@ -58,6 +61,7 @@ async function main() {
       time: lastTick,
     }),
     modules,
+    transformers,
   });
 
   function tick() {
