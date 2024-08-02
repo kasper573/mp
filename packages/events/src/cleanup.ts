@@ -3,9 +3,15 @@ export type CleanupFn = () => void;
 export class Cleanup {
   private fns = new Set<CleanupFn>();
 
-  add(...fns: CleanupFn[]) {
+  constructor(...fns: Array<CleanupFn | undefined>) {
+    this.add(...fns);
+  }
+
+  add(...fns: Array<CleanupFn | undefined>) {
     for (const fn of fns) {
-      this.fns.add(fn);
+      if (fn) {
+        this.fns.add(fn);
+      }
     }
   }
 

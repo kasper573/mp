@@ -2,24 +2,20 @@ import path from "path";
 import express from "express";
 import config from "@colyseus/tools";
 import morgan from "morgan";
-import { AreaRoom } from "./modules/area/room";
+import type { PathToLocalFile, UrlToPublicFile } from "@mp/state";
+import { WorldRoom } from "./modules/world/room";
 import { ModuleName } from "./modules/names";
 import { loadAreas } from "./modules/area/loadAreas";
 import { env } from "./env";
-import type { PathToLocalFile, UrlToPublicFile } from "./FileReference";
 
 export default config({
   async initializeGameServer(server) {
     const areas = await loadAreas(path.resolve(publicDir, "areas"), createUrl);
-    if (!areas.size) {
-      throw new Error("No areas found!");
-    }
-    const [someArea] = Array.from(areas.values());
     server.define(
-      ModuleName.area,
-      class extends AreaRoom {
+      ModuleName.world,
+      class extends WorldRoom {
         constructor() {
-          super(someArea);
+          super(areas, areas.keys().next().value);
         }
       },
     );

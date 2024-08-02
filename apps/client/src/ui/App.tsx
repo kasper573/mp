@@ -1,10 +1,11 @@
-import { ModuleName, type AreaState } from "@mp/server";
+import { ModuleName, type WorldState } from "@mp/server";
 import { Client } from "colyseus.js";
 import type { CSSProperties, RefObject } from "react";
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { env } from "../env";
 import { createGame } from "../ecs/Game";
+import { AreaLoader } from "../ecs/AreaLoader";
 
 export function App() {
   const client = useMemo(() => new Client(env.serverUrl), []);
@@ -41,10 +42,11 @@ function useJoinGame(
   debugText: RefObject<HTMLSpanElement>,
 ) {
   const [joinAttemptNumber, rejoin] = useReducer((n) => n + 1, 0);
+  const areaLoader = new AreaLoader();
 
   const { data: room, ...join } = useQuery({
     queryKey: ["room", joinAttemptNumber],
-    queryFn: () => client.joinOrCreate<AreaState>(ModuleName.area, {}),
+    queryFn: () => client.joinOrCreate<WorldState>(ModuleName.world, {}),
   });
 
   useEffect(() => {
@@ -59,7 +61,7 @@ function useJoinGame(
       }
     }
 
-    const game = createGame(room, renderDebugText);
+    const game = createGame(room, areaLoader, renderDebugText);
     container.appendChild(game.canvas);
     game.start();
     return () => game.dispose();

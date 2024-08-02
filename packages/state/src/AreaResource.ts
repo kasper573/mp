@@ -1,18 +1,36 @@
 import type { Vector, VectorLike } from "@mp/excalibur";
 import { tiled, snapTileVector, type TiledResource } from "@mp/excalibur";
-import type { FileReference } from "../../FileReference";
+import type { DGraph } from "./findPath";
+import type { FileReference } from "./FileReference";
+import { dGraphFromTiled } from "./dGraphFromTiled";
+
+export type AreaId = string & { __brand__: "AreaId" };
 
 export class AreaResource {
   readonly start: Vector;
   private objects: tiled.PluginObject[];
+  readonly dGraph: DGraph;
+  readonly characterLayer: number;
 
   constructor(
-    readonly tmxFile: FileReference,
+    readonly id: AreaId,
+    readonly tmxFile: FileReference, // TODO remove this
     readonly tiled: TiledResource,
   ) {
     const [startObj] = tiled.getObjectsByClassName("start");
+    if (!startObj) {
+      throw new Error("Areas must contain a start object");
+    }
+
+    const [layer] = this.tiled.getTileLayers("Characters");
+    if (!layer) {
+      throw new Error("Areas must contain a characters layer");
+    }
+
+    this.characterLayer = layer.order;
     this.start = snapTileVector(tiled.worldCoordToTile(startObj));
     this.objects = this.tiled.getObjectLayers().flatMap((l) => l.objects);
+    this.dGraph = dGraphFromTiled(tiled);
   }
 
   hitTestObjects<Subject>(

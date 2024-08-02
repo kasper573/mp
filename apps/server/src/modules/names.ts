@@ -1,3 +1,3 @@
 export enum ModuleName {
-  area = "area",
+  world = "world",
 }

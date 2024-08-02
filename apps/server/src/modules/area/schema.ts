@@ -1,6 +1,6 @@
-import { Schema, type, MapSchema, ArraySchema } from "@colyseus/schema";
+import { Schema, type, ArraySchema } from "@colyseus/schema";
 import type { VectorLike } from "@mp/excalibur";
-import type { UrlToPublicFile } from "../../FileReference";
+import type { AreaId } from "@mp/state";
 
 export type SessionId = string;
 
@@ -33,21 +33,13 @@ export class Character extends Schema {
   @type(Coordinate) coords = new Coordinate();
   @type({ array: Coordinate }) path: Path = new ArraySchema();
   @type("number") speed = 3.1;
+  @type("string") areaId: AreaId;
 
-  constructor(id: string) {
+  constructor(id: string, area: AreaId) {
     super();
     this.id = id;
+    this.areaId = area;
   }
 }
 
 export type Path = ArraySchema<Coordinate>;
-
-export class AreaState extends Schema {
-  @type({ map: Character }) characters = new MapSchema<Character>();
-  @type("string") tiledResourceUrl!: UrlToPublicFile;
-
-  constructor(tiledResourceUrl: UrlToPublicFile) {
-    super();
-    this.tiledResourceUrl = tiledResourceUrl;
-  }
-}

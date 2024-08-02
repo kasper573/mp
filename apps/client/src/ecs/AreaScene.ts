@@ -1,20 +1,9 @@
-import { dGraphFromTiled } from "@mp/state";
-import {
-  type SessionId,
-  type AreaState,
-  type Character,
-  type AreaMessages,
-} from "@mp/server";
+import type { AreaResource } from "@mp/state";
+import type { WorldState } from "@mp/server";
+import { type SessionId, type Character, type AreaMessages } from "@mp/server";
 import type { Room } from "colyseus.js";
 import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
-import {
-  clamp,
-  invoker,
-  Scene,
-  snapTileVector,
-  type DefaultLoader,
-  type Layer,
-} from "@mp/excalibur";
+import { clamp, invoker, Scene, snapTileVector } from "@mp/excalibur";
 import {
   Cleanup,
   CleanupMap,
@@ -22,68 +11,46 @@ import {
   subscribe,
   type MessageSender,
 } from "@mp/events";
-import { TiledResource } from "@mp/excalibur";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
-import { WaitUntil } from "./WaitUntil";
 
 export class AreaScene extends Scene {
   private cleanups = new Cleanup();
   private characterCleanups = new CleanupMap();
   private characterActors: Map<SessionId, CharacterActor> = new Map();
-  private tiled!: TiledResource;
   private bus: MessageSender<AreaMessages>;
   private debugUI!: DGraphDebugUI;
-  private characterLayer!: Layer;
   private lastSentPos?: Vector;
-  private cameraZoom: number = 2;
+  private cameraZoom = 2;
 
   get myCharacterId() {
     return this.room.sessionId;
   }
 
   constructor(
-    private room: Room<AreaState>,
+    private room: Room<WorldState>,
+    readonly area: AreaResource,
     private renderDebugText: (text: string) => void,
   ) {
     super();
     this.bus = messageSender(this.room);
-  }
 
-  override onPreLoad(loader: DefaultLoader): void {
-    loader.addResource(
-      new WaitUntil(async () => {
-        if (this.room.state.tiledResourceUrl) {
-          this.tiled = new TiledResource(this.room.state.tiledResourceUrl);
-          await this.tiled.load();
-          this.onTiledLoaded();
-          return true;
-        }
-        return false;
-      }),
-    );
-  }
+    area.tiled.addToScene(this);
 
-  private onTiledLoaded = () => {
-    this.tiled.addToScene(this);
-
-    this.characterLayer = this.tiled.getTileLayers("Characters")[0];
-    if (!this.characterLayer) {
-      throw new Error("Map must contain a characters layer");
-    }
-
-    const dGraph = dGraphFromTiled(this.tiled);
-
-    const tileHighlighter = new TileHighlight(dGraph, this.tiled);
+    const tileHighlighter = new TileHighlight(area.dGraph, area.tiled);
     tileHighlighter.z = 999;
     this.add(tileHighlighter);
 
-    this.debugUI = new DGraphDebugUI(dGraph, this.tiled, this.renderDebugText);
+    this.debugUI = new DGraphDebugUI(
+      area.dGraph,
+      area.tiled,
+      this.renderDebugText,
+    );
     this.debugUI.z = 1000;
     this.add(this.debugUI);
-  };
+  }
 
   override onActivate(): void {
     const { characters } = this.room.state;
@@ -115,7 +82,9 @@ export class AreaScene extends Scene {
 
     if (this.shouldSendMove) {
       const { lastWorldPos } = engine.input.pointers.primary;
-      const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
+      const tilePos = snapTileVector(
+        this.area.tiled.worldCoordToTile(lastWorldPos),
+      );
       if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
         this.bus.send("move", [tilePos.x, tilePos.y]);
         this.lastSentPos = tilePos;
@@ -124,8 +93,12 @@ export class AreaScene extends Scene {
   }
 
   private addCharacter = (char: Character) => {
+    if (this.characterActors.has(char.id)) {
+      return;
+    }
+
     const actor = new CharacterActor(char);
-    actor.z = this.characterLayer.order;
+    actor.z = this.area.characterLayer;
     this.characterActors.set(char.id, actor);
     this.add(actor);
 
@@ -143,8 +116,8 @@ export class AreaScene extends Scene {
   };
 
   private synchronizeCharacterPosition(char: Character) {
-    const pos = this.tiled.tileCoordToWorld(char.coords);
-    const path = char.path.map(this.tiled.tileCoordToWorld);
+    const pos = this.area.tiled.tileCoordToWorld(char.coords);
+    const path = char.path.map(this.area.tiled.tileCoordToWorld);
 
     if (char.id === this.myCharacterId) {
       this.debugUI.showPath(char.path.toArray());
@@ -153,7 +126,7 @@ export class AreaScene extends Scene {
     const actor = this.characterActors.get(char.id)!;
     invoker(Interpolator, actor).configure(pos, {
       path,
-      speed: this.tiled.tileUnitToWorld(char.speed),
+      speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
   }
 
@@ -163,6 +136,11 @@ export class AreaScene extends Scene {
     this.characterActors.delete(id);
     this.characterCleanups.flush(id);
   };
+
+  inheritProperties(other: AreaScene) {
+    this.cameraZoom = other.cameraZoom;
+    this.camera.zoom = other.camera.zoom;
+  }
 }
 
 function lerp(a: number, b: number, t: number): number {
