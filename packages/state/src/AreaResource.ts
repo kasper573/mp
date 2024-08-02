@@ -3,7 +3,7 @@ import { tiled, snapTileVector, type TiledResource } from "@mp/excalibur";
 import type { DGraph } from "./findPath";
 import type { FileReference } from "./FileReference";
 import { dGraphFromTiled } from "./dGraphFromTiled";
-import type { Branded } from "./branded";
+import type { Branded } from "./Branded";
 
 export type AreaId = Branded<string, "AreaId">;
 

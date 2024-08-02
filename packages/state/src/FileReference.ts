@@ -1,7 +1,9 @@
+import type { Branded } from "./Branded";
+
 export interface FileReference {
   filepath: PathToLocalFile;
   url: UrlToPublicFile;
 }
 
-export type PathToLocalFile = string & { __brand__: "PathToLocalFile" };
-export type UrlToPublicFile = string & { __brand__: "UrlToPublicFile" };
+export type PathToLocalFile = Branded<string, "PathToLocalFile">;
+export type UrlToPublicFile = Branded<string, "UrlToPublicFile">;
