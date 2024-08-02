@@ -1,4 +1,4 @@
-import type { Serialized } from "./transformer";
+import type { Serialized } from "./serialization";
 
 export type SocketIO_Data<ClientContext> = ClientContext;
 

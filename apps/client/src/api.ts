@@ -6,7 +6,8 @@ import { env } from "./env";
 export const api = new Client<ServerModules, ClientState>({
   url: env.serverUrl,
   logger: new Logger(console),
-  transformers,
+  parseClientState: transformers.clientState.parse,
+  serializeMessage: transformers.message.serialize,
   disconnectedState: {
     characters: new Map(),
   },

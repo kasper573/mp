@@ -13,10 +13,10 @@ import type {
   SocketIO_Message,
   SocketIO_ServerToClientEvents,
 } from "./socket";
-import type { Transformer } from "./transformer";
+import type { Parser, Serializer } from "./serialization";
 
 export { Factory } from "./factory";
-export type * from "./transformer";
+export type * from "./serialization";
 export type { inferModuleDefinitions } from "./module";
 export type { EventResult } from "./event";
 
@@ -28,10 +28,8 @@ export interface CreateServerOptions<
   modules: ModuleRecord<ModuleDefinitions>;
   createContext: (options: CreateContextOptions) => ServerContext;
   connection?: ServerConnectionModule<ServerContext>;
-  transformers: {
-    message: Transformer<SocketIO_Message>;
-    clientState: Transformer<ClientState>;
-  };
+  parseMessage: Parser<SocketIO_Message>;
+  serializeClientState: Serializer<ClientState>;
   logger?: Logger;
 }
 
@@ -59,7 +57,7 @@ export class Server<
       ClientState
     >,
   ) {
-    const { modules, connection, createContext, transformers } = options;
+    const { modules, connection, createContext, parseMessage } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
       this.logger?.info(`connected`, { clientId: socket.id });
@@ -77,13 +75,8 @@ export class Server<
       });
 
       socket.on("message", (serializedMessage) => {
-        const result = transformers.message.deserialize(serializedMessage);
-        if (!result.ok) {
-          console.error("Failed to deserialize message", result.error);
-          return;
-        }
-
-        const { moduleName, eventName, payload } = result.value;
+        const { moduleName, eventName, payload } =
+          parseMessage(serializedMessage);
 
         const module = modules[moduleName];
         const log = this.logger?.chain(moduleName, eventName);
@@ -112,10 +105,7 @@ export class Server<
 
   sendClientState(clientId: string, clientState: ClientState) {
     const socket = this.wss.sockets.sockets.get(clientId);
-    socket?.emit(
-      "clientState",
-      this.options.transformers.clientState.serialize(clientState),
-    );
+    socket?.emit("clientState", this.options.serializeClientState(clientState));
   }
 
   listen(port: number) {

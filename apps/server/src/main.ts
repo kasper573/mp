@@ -61,7 +61,8 @@ async function main() {
       time: lastTick,
     }),
     modules,
-    transformers,
+    serializeClientState: transformers.clientState.serialize,
+    parseMessage: transformers.message.parse,
   });
 
   function tick() {

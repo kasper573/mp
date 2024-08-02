@@ -1,38 +1,23 @@
-import type {
-  DeserializationResult,
-  Serialized,
-  Transformer,
-} from "@mp/tse/server";
+import type { Parser, Serializer } from "@mp/tse/server";
 import SuperJSON from "superjson";
 import { Vector } from "@mp/excalibur";
 import type { ClientState } from "./context";
 
 SuperJSON.registerClass(Vector, { identifier: "vector" });
 
-const jsonTransformer: Transformer = {
-  deserialize: (str) => {
-    try {
-      return { ok: true, value: SuperJSON.parse(str as string) };
-    } catch (error) {
-      return { ok: false, error };
-    }
-  },
-  serialize: (state) => {
-    return SuperJSON.stringify(state) as Serialized<ClientState>;
-  },
+const jsonTransformer = {
+  parse: SuperJSON.parse as Parser,
+  serialize: SuperJSON.stringify as Serializer,
 };
 
-const clientState: Transformer<ClientState> = {
-  deserialize: (serialized) => {
-    return jsonTransformer.deserialize(
-      serialized,
-    ) as DeserializationResult<ClientState>;
-  },
-  serialize: (state) =>
-    jsonTransformer.serialize(state) as Serialized<ClientState>,
-};
+const clientState = jsonTransformer as Transformer<ClientState>;
 
 export const transformers = {
   clientState,
   message: jsonTransformer,
 };
+
+interface Transformer<T> {
+  parse: Parser<T>;
+  serialize: Serializer<T>;
+}
