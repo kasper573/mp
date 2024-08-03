@@ -4,7 +4,9 @@ on: [push]
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  REGISTRY: ${{ vars.DIGITALOCEAN_REGISTRY }}
+  REGISTRY_HOST: registry.digitalocean.com
+  REGISTRY_NAME: ${{ vars.DIGITALOCEAN_REGISTRY_NAME }}
+  REGISTRY_URL: registry.digitalocean.com/${{ vars.DIGITALOCEAN_REGISTRY_NAME }}
   IMAGE_NAME: "mp"
 
 jobs:
@@ -29,7 +31,7 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build container image
-        run: docker build -t $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
+        run: docker build -t $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
 
       - name: Install doctl
         uses: digitalocean/action-doctl@v2
@@ -42,8 +44,11 @@ jobs:
       - name: Remove all old images
         run: if [ ! -z "$(doctl registry repository list | grep "$(echo $IMAGE_NAME)")" ]; then doctl registry repository delete-manifest $(echo $IMAGE_NAME) $(doctl registry repository list-tags $(echo $IMAGE_NAME) | grep -o "sha.*") --force; else echo "No repository"; fi
 
+      - name: Run DigitalOcean Container Registry garbage collection
+        run: doctl registry garbage-collection start [--include-untagged-manifests] $(echo $REGISTRY_NAME)
+
       - name: Push image to DigitalOcean Container Registry
-        run: docker push $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+        run: docker push $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
 
       - name: Read contents of the file .env.production and add to github actions env
         id: readfile
@@ -55,9 +60,9 @@ jobs:
           host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: IMAGE_NAME,REGISTRY,GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
+          envs: IMAGE_NAME,REGISTRY_URL,REGISTRY_HOST,GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
           script: |
-            docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} registry.digitalocean.com
+            docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} $(echo $REGISTRY_HOST)
             docker stop $(echo $IMAGE_NAME)
             docker rm $(echo $IMAGE_NAME)
             docker run -d \
@@ -65,4 +70,4 @@ jobs:
             --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name $(echo $IMAGE_NAME) \
-            $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+            $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
