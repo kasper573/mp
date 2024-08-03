@@ -14,7 +14,6 @@
     "dev": "NODE_ENV=development dotenv-flow tsx watch src/main.ts --clear-screen=false"
   },
   "dependencies": {
-    "@mp/events": "workspace:*",
     "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/tse": "workspace:*",

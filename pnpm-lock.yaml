@@ -93,9 +93,6 @@ importers:
 
   apps/server:
     dependencies:
-      '@mp/events':
-        specifier: workspace:*
-        version: link:../../packages/events
       '@mp/excalibur':
         specifier: workspace:*
         version: link:../../packages/excalibur
