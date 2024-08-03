@@ -59,9 +59,9 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
-      '@mp/tse':
+      '@mp/network':
         specifier: workspace:*
-        version: link:../../packages/tse
+        version: link:../../packages/network
       '@tanstack/react-query':
         specifier: 5.51.11
         version: 5.51.11(react@18.3.1)
@@ -99,9 +99,9 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
-      '@mp/tse':
+      '@mp/network':
         specifier: workspace:*
-        version: link:../../packages/tse
+        version: link:../../packages/network
       cors:
         specifier: 2.8.5
         version: 2.8.5
@@ -194,7 +194,7 @@ importers:
         specifier: 5.5.3
         version: 5.5.3
 
-  packages/tse:
+  packages/network:
     dependencies:
       '@mp/logger':
         specifier: workspace:*

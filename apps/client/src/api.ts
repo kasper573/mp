@@ -1,6 +1,6 @@
-import { Client } from "@mp/tse/client";
 import { Logger } from "@mp/logger";
 import { transformers, type ClientState, type ServerModules } from "@mp/server";
+import { Client } from "@mp/network/client";
 import { env } from "./env";
 
 export const api = new Client<ServerModules, ClientState>({

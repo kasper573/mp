@@ -1,4 +1,4 @@
-import type { inferModuleDefinitions } from "@mp/tse/server";
+import type { inferModuleDefinitions } from "@mp/network/server";
 import type { WorldModuleDependencies } from "./world/module";
 import { createWorldModule } from "./world/module";
 

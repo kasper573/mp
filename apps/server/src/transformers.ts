@@ -1,6 +1,6 @@
-import type { Parser, Serializer } from "@mp/tse/server";
 import SuperJSON from "superjson";
 import { Vector } from "@mp/excalibur";
+import type { Parser, Serializer } from "@mp/network/server";
 import type { ClientState } from "./context";
 
 SuperJSON.registerClass(Vector, { identifier: "vector" });

@@ -7,8 +7,8 @@ import {
   type PathToLocalFile,
   type UrlToPublicFile,
 } from "@mp/state";
-import { Server } from "@mp/tse/server";
 import createCors from "cors";
+import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createConnectionModule } from "./modules/connection";
 import type { ClientContext, ClientState, ServerContext } from "./context";

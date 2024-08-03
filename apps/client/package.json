@@ -12,7 +12,7 @@
   "dependencies": {
     "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
-    "@mp/tse": "workspace:*",
+    "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@tanstack/react-query": "5.51.11",

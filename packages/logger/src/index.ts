@@ -3,7 +3,7 @@ import chalk from "chalk";
 export class Logger {
   constructor(
     private impl: Pick<typeof console, LogLevel>,
-    private prefixes: unknown[] = ["tse"],
+    private prefixes: unknown[] = ["network"],
   ) {}
 
   info = this.log.bind(this, "info");
