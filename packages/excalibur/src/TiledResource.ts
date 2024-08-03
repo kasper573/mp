@@ -8,7 +8,8 @@ export class TiledResource extends TiledResourceImpl {
   constructor(tmxFile: string, options?: TiledResourceOptions) {
     super(tmxFile, {
       useTilemapCameraStrategy: true,
-      fileLoader: (path) => fetch(path).then((r) => r.text()),
+      fileLoader: (path) =>
+        fetch(path, { mode: "no-cors" }).then((r) => r.text()),
       ...options,
     });
   }
