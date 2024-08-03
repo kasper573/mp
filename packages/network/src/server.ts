@@ -30,11 +30,7 @@ export interface CreateServerOptions<
   createContext: (options: CreateContextOptions) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeClientState: Serializer<ClientState>;
-  onError?: (
-    error: unknown,
-    event: "connection" | "disconnect" | "message",
-    message?: SocketIO_Message,
-  ) => void;
+  onError?: ServerErrorHandler;
   onMessageIgnored?: (message: SocketIO_Message) => void;
 }
 
@@ -140,3 +136,9 @@ export type ServerConnectionModule<ServerContext> = Module<{
 }>;
 
 export type { DisconnectReason };
+
+export type ServerErrorHandler = (
+  error: unknown,
+  event: "connection" | "disconnect" | "message",
+  message?: SocketIO_Message,
+) => void;
