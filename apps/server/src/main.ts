@@ -121,7 +121,7 @@ async function main() {
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `http://${env.host}${port}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${env.host}${port}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
