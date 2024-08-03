@@ -5,3 +5,5 @@ export * from "./TiledResource";
 export * from "./invoker";
 export * from "./vector";
 export * from "./groupBy";
+export * from "./cleanup";
+export * from "./sub";

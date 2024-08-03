@@ -10,7 +10,6 @@
     "start": "http-server dist -p 80"
   },
   "dependencies": {
-    "@mp/events": "workspace:*",
     "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/tse": "workspace:*",

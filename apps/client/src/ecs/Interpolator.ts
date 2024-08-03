@@ -1,6 +1,5 @@
-import { Cleanup, subscribe } from "@mp/events";
-import type { Entity, PostUpdateEvent } from "@mp/excalibur";
-import type { Vector } from "@mp/excalibur";
+import { Cleanup, sub } from "@mp/excalibur";
+import type { Vector, Entity, PostUpdateEvent } from "@mp/excalibur";
 import { Component } from "@mp/excalibur";
 import { moveAlongPath } from "@mp/state";
 
@@ -27,7 +26,7 @@ export class Interpolator extends Component {
   }
 
   override onAdd(): void {
-    this.cleanup.add(subscribe(this.owner!, "postupdate", this.onEntityUpdate));
+    this.cleanup.add(sub(this.owner!, "postupdate", this.onEntityUpdate));
   }
 
   override onRemove(): void {

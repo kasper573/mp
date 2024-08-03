@@ -47,9 +47,6 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp/events':
-        specifier: workspace:*
-        version: link:../../packages/events
       '@mp/excalibur':
         specifier: workspace:*
         version: link:../../packages/excalibur
@@ -145,12 +142,6 @@ importers:
       vite-plugin-checker:
         specifier: 0.6.4
         version: 0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.5.3)(vite@5.2.13(@types/node@20.14.10))
-
-  packages/events:
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
 
   packages/excalibur:
     dependencies:

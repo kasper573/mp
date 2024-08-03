@@ -1,8 +1,8 @@
 import type { AreaResource } from "@mp/state";
 import type { Character, CharacterId } from "@mp/server";
 import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
+import { Cleanup, sub } from "@mp/excalibur";
 import { clamp, invoker, Scene, snapTileVector } from "@mp/excalibur";
-import { Cleanup, subscribe } from "@mp/events";
 import { api } from "../api";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
@@ -46,9 +46,9 @@ export class AreaScene extends Scene {
 
     this.cleanups.add(
       api.state.subscribe(this.synchronizeCharacters),
-      subscribe(primary, "down", () => (this.shouldSendMove = true)),
-      subscribe(primary, "up", () => (this.shouldSendMove = false)),
-      subscribe(primary, "wheel", this.onMouseWheel),
+      sub(primary, "down", () => (this.shouldSendMove = true)),
+      sub(primary, "up", () => (this.shouldSendMove = false)),
+      sub(primary, "wheel", this.onMouseWheel),
     );
   }
 
