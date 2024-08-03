@@ -2,16 +2,14 @@ export function createProcedureBus<
   OutgoingProcedures extends AnyProcedures,
   IncomingProcedures extends AnyProcedures,
 >(
-  call: EmitFn<OutgoingProcedures>,
+  call: CallFn<OutgoingProcedures>,
   subscribe = noop as SubscribeFn<IncomingProcedures>,
 ): ProcedureBus<OutgoingProcedures, IncomingProcedures> {
   return new Proxy({} as ProcedureBus<OutgoingProcedures, IncomingProcedures>, {
     get(_, propertyName: string) {
       function procedure(
         ...args: Parameters<OutgoingProcedures[keyof OutgoingProcedures]>
-      ): ProcedureOutput<
-        ReturnType<OutgoingProcedures[keyof OutgoingProcedures]>
-      > {
+      ) {
         return call(propertyName, ...args);
       }
 
@@ -29,25 +27,36 @@ export type ProcedureError = string;
 export type ProcedureOutput<T> = Promise<T> | T;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyProcedures = { [K: string]: (...args: any[]) => ProcedureOutput<any> };
+type AnyProcedures = { [K: string]: ProcedureDefinition<any[], any> };
+
+type ProcedureDefinition<Args extends unknown[], Output> = (
+  ...args: Args
+) => ProcedureOutput<Output>;
 
 export type ProcedureBus<
   OutgoingProcedures extends AnyProcedures,
   IncomingProcedures extends AnyProcedures,
 > = {
-  [ProcedureName in keyof OutgoingProcedures]: OutgoingProcedures[ProcedureName];
+  [ProcedureName in keyof OutgoingProcedures]: RPC<
+    OutgoingProcedures[ProcedureName]
+  >;
 } & {
   [ProcedureName in keyof IncomingProcedures]: {
     subscribe(handler: IncomingProcedures[ProcedureName]): Unsubscribe;
   };
 };
 
-export type EmitFn<Procedures extends AnyProcedures = AnyProcedures> = <
+type RPC<Definition> =
+  Definition extends ProcedureDefinition<infer Args, infer Output>
+    ? (...args: Args) => Promise<Awaited<Output>>
+    : never;
+
+export type CallFn<Procedures extends AnyProcedures = AnyProcedures> = <
   ProcedureName extends keyof Procedures,
 >(
   procedureName: ProcedureName,
   ...args: Parameters<Procedures[ProcedureName]>
-) => ProcedureOutput<ReturnType<Procedures[ProcedureName]>>;
+) => Promise<ReturnType<Procedures[ProcedureName]>>;
 
 export type SubscribeFn<Procedures extends AnyProcedures = AnyProcedures> = <
   ProcedureName extends keyof Procedures,

@@ -1,5 +1,5 @@
 import { it, expect, vi } from "vitest";
-import type { EmitFn } from "../src/procedure";
+import type { CallFn } from "../src/procedure";
 import { createProcedureBus } from "../src/procedure";
 
 it("it can call procedures", () => {
@@ -96,4 +96,4 @@ it("using the same incoming procedure call handler multiple times still becomes 
   expect(receiver).toBeCalledTimes(3);
 });
 
-const noop = (() => {}) as EmitFn;
+const noop = (async () => {}) as CallFn;

@@ -60,7 +60,7 @@ export class Server<
         }
       });
 
-      socket.on("rpc", (serializedRPC, respondWithOutput) => {
+      socket.on("rpc", async (serializedRPC, respondWithOutput) => {
         let message;
         try {
           message = parseRPC(serializedRPC);
@@ -72,7 +72,7 @@ export class Server<
             return;
           }
 
-          const output = module[procedureName]({
+          const output = await module[procedureName]({
             input,
             context: socketContext(),
           });
@@ -130,7 +130,6 @@ export type ServerErrorHandler = (
 
 export type { DisconnectReason };
 export type { inferModuleDefinitions } from "./module";
-export type { ProcedureOutput } from "./procedure";
 export type * from "./serialization";
 
 export type ConnectReason = "new" | "recovered";

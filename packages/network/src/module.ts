@@ -12,14 +12,18 @@ export function createModule<Procedures extends AnyProcedureRecord>(
 
   // A module is essentially just an procedure bus
   const bus = createProcedureBus(
-    (...[procedureName, procedurePayload]) => {
+    async (...[procedureName, procedurePayload]) => {
       let outputForBuiltInHandler;
-      procedureHandlers.get(procedureName)?.forEach((handler) => {
-        const output = handler(procedurePayload);
-        if (handler === procedures[procedureName].handler) {
-          outputForBuiltInHandler = output;
-        }
-      });
+
+      const handlersForProcedure = procedureHandlers.get(procedureName);
+      if (handlersForProcedure) {
+        Array.from(handlersForProcedure).map((handler) => {
+          const output = handler(procedurePayload);
+          if (handler === procedures[procedureName].handler) {
+            outputForBuiltInHandler = output;
+          }
+        });
+      }
 
       return outputForBuiltInHandler as never;
     },

@@ -12,10 +12,8 @@ export class AreaLoader {
       return promise;
     }
 
-    const url = await api.modules.area.areaFileUrl(id);
-
     const areaFile = {
-      url,
+      url: await api.modules.area.areaFileUrl(id),
       filepath: "irrelevant-on-client" as PathToLocalFile,
     };
     const tiled = new TiledResource(areaFile.url);
