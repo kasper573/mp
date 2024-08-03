@@ -30,7 +30,7 @@ export interface CreateServerOptions<
   parseMessage: Parser<SocketIO_Message>;
   serializeClientState: Serializer<ClientState>;
   onEventError?: (error: unknown, message: SocketIO_Message) => void;
-  onEventIgnored?: (message: SocketIO_Message) => void;
+  onMessageIgnored?: (message: SocketIO_Message) => void;
 }
 
 export class Server<
@@ -59,7 +59,7 @@ export class Server<
       createContext,
       parseMessage,
       onEventError,
-      onEventIgnored,
+      onMessageIgnored: onEventIgnored,
     } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
