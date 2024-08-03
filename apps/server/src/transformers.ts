@@ -1,7 +1,7 @@
 import SuperJSON from "superjson";
 import { Vector } from "@mp/excalibur";
 import type { Parser, Serializer } from "@mp/network/server";
-import type { ClientState } from "./context";
+import type { ClientStateUpdate } from "./context";
 
 SuperJSON.registerClass(Vector, { identifier: "vector" });
 
@@ -10,10 +10,8 @@ const jsonTransformer = {
   serialize: SuperJSON.stringify as Serializer,
 };
 
-const clientState = jsonTransformer as Transformer<ClientState>;
-
 export const transformers = {
-  clientState,
+  stateUpdate: jsonTransformer as Transformer<ClientStateUpdate>,
   message: jsonTransformer,
 };
 

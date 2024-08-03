@@ -18,16 +18,6 @@ import type {
 } from "./socket";
 import type { Parser, Serializer } from "./serialization";
 
-export type * from "./serialization";
-
-export interface ClientOptions<State, StateUpdate> {
-  url: string;
-  serializeMessage: Serializer<SocketIO_Message>;
-  parseStateUpdate: Parser<StateUpdate>;
-  createNextState: (state: State, update: StateUpdate) => State;
-  createDisconnectedState: () => State;
-}
-
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   State,
@@ -49,18 +39,18 @@ export class Client<
       this.options,
     );
 
-    this.state = signal(options.createDisconnectedState());
+    this.state = signal(options.createInitialState());
 
-    this.socket.on("clientState", (serializedState) => {
+    this.socket.on("stateUpdate", (serialized) => {
       this.state.value = options.createNextState(
         this.state.value,
-        options.parseStateUpdate(serializedState),
+        options.parseStateUpdate(serialized),
       );
     });
 
     this.socket.on(
       "disconnect",
-      () => (this.state.value = options.createDisconnectedState()),
+      () => (this.state.value = options.createInitialState()),
     );
   }
 
@@ -99,6 +89,16 @@ function createModuleEventBus<State, StateUpdate>(
     );
   });
 }
+
+export interface ClientOptions<State, StateUpdate> {
+  url: string;
+  serializeMessage: Serializer<SocketIO_Message>;
+  parseStateUpdate: Parser<StateUpdate>;
+  createNextState: (state: State, update: StateUpdate) => State;
+  createInitialState: () => State;
+}
+
+export type * from "./serialization";
 
 type ClientSocket<State> = Socket<
   SocketIO_ServerToClientEvents<State>,

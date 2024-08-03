@@ -48,7 +48,7 @@ async function main() {
       allowReconnection,
       logger,
     }),
-    serializeClientState: transformers.clientState.serialize,
+    serializeStateUpdate: transformers.stateUpdate.serialize,
     parseMessage: transformers.message.parse,
     onConnection: (context) => global.connect({ context }),
     onDisconnect: (payload, context) => global.disconnect({ payload, context }),
@@ -77,7 +77,7 @@ async function main() {
       });
 
       for (const id of world.characters.keys()) {
-        socketServer.sendClientState(id, world);
+        socketServer.sendStateUpdate(id, world);
       }
     } catch (error) {
       onError(error, "tick");

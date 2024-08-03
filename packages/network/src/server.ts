@@ -10,35 +10,15 @@ import type {
 } from "./socket";
 import type { Parser, Serializer } from "./serialization";
 
-export { Factory } from "./factory";
-export type * from "./serialization";
-export type { inferModuleDefinitions } from "./module";
-export type { EventResult } from "./event";
-
-export interface CreateServerOptions<
-  ModuleDefinitions extends AnyModuleDefinitionRecord,
-  ServerContext,
-  ClientState,
-> {
-  modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (options: CreateContextOptions) => ServerContext;
-  parseMessage: Parser<SocketIO_Message>;
-  serializeClientState: Serializer<ClientState>;
-  onConnection?: (context: ServerContext) => void;
-  onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
-  onError?: ServerErrorHandler;
-  onMessageIgnored?: (message: SocketIO_Message) => void;
-}
-
 export class Server<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
   ClientContext,
-  ClientState,
+  StateUpdate,
 > {
   private wss: SocketServer<
     SocketIO_ClientToServerEvents,
-    SocketIO_ServerToClientEvents<ClientState>,
+    SocketIO_ServerToClientEvents<StateUpdate>,
     object,
     SocketIO_Data<ClientContext>
   >;
@@ -47,7 +27,7 @@ export class Server<
     protected readonly options: CreateServerOptions<
       ModuleDefinitions,
       ServerContext,
-      ClientState
+      StateUpdate
     >,
   ) {
     const {
@@ -98,9 +78,9 @@ export class Server<
     });
   }
 
-  sendClientState(clientId: string, clientState: ClientState) {
+  sendStateUpdate(clientId: string, stateUpdate: StateUpdate) {
     const socket = this.wss.sockets.sockets.get(clientId);
-    socket?.emit("clientState", this.options.serializeClientState(clientState));
+    socket?.emit("stateUpdate", this.options.serializeStateUpdate(stateUpdate));
   }
 
   listen(port: number) {
@@ -110,6 +90,21 @@ export class Server<
   close() {
     this.wss.close();
   }
+}
+
+export interface CreateServerOptions<
+  ModuleDefinitions extends AnyModuleDefinitionRecord,
+  ServerContext,
+  StateUpdate,
+> {
+  modules: ModuleRecord<ModuleDefinitions>;
+  createContext: (options: CreateContextOptions) => ServerContext;
+  parseMessage: Parser<SocketIO_Message>;
+  serializeStateUpdate: Serializer<StateUpdate>;
+  onConnection?: (context: ServerContext) => void;
+  onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
+  onError?: ServerErrorHandler;
+  onMessageIgnored?: (message: SocketIO_Message) => void;
 }
 
 export interface CreateContextOptions {
@@ -123,3 +118,8 @@ export type ServerErrorHandler = (
   event: "connection" | "disconnect" | "message",
   message?: SocketIO_Message,
 ) => void;
+
+export { Factory } from "./factory";
+export type { inferModuleDefinitions } from "./module";
+export type { EventResult } from "./event";
+export type * from "./serialization";

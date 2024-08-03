@@ -12,6 +12,6 @@ export interface SocketIO_Message {
   payload: unknown;
 }
 
-export interface SocketIO_ServerToClientEvents<ClientState> {
-  clientState: (data: Serialized<ClientState>) => void;
+export interface SocketIO_ServerToClientEvents<StateUpdate> {
+  stateUpdate: (data: Serialized<StateUpdate>) => void;
 }
