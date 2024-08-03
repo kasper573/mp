@@ -10,7 +10,6 @@ export async function tryUntilSuccess(
     try {
       await operation();
     } catch (e) {
-      console.log("Attempt failed", n);
       if (n === lastAttempt) {
         throw e;
       }

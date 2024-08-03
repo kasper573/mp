@@ -1,35 +1,35 @@
-import type { WorldState } from "@mp/server";
-import type { Room } from "colyseus.js";
+import type { CharacterId } from "@mp/server";
 import { Engine } from "@mp/excalibur";
 import { type AreaId } from "@mp/state";
+import { api } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
 
 export function createGame(
-  world: Room<WorldState>,
   areaLoader: AreaLoader,
   debug: (text: string) => void,
 ): Game {
   const game = new Engine({});
-  const emitter = world.onStateChange(() => changeArea(me(world)?.areaId));
+
   const changeArea = createAreaChanger(game, (id) =>
-    areaLoader.require(id).then((area) => new AreaScene(world, area, debug)),
+    areaLoader.require(id).then((area) => new AreaScene(area, debug)),
   );
+  const unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
 
   return {
     get canvas() {
       return game.canvas;
     },
     dispose() {
-      emitter.clear();
+      unsubFromState();
       game.dispose();
     },
     start: () => game.start(),
   };
 }
 
-function me(world: Room<WorldState>) {
-  return world.state.characters.get(world.sessionId);
+function me() {
+  return api.state.value.characters.get(api.clientId as CharacterId);
 }
 
 function createAreaChanger(

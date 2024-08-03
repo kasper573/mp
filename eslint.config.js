@@ -21,6 +21,7 @@ export default tseslint.config(
   {
     rules: {
       "no-undef": "off", // Gives false negatives. We already have typescript to catch these.
+      "no-console": "error",
     },
   },
   {

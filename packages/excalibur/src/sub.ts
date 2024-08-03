@@ -1,6 +1,6 @@
 import type { CleanupFn } from "./cleanup";
 
-export function subscribe<
+export function sub<
   EventHandlers extends AnyEventHandlers,
   EventName extends keyof EventHandlers,
 >(

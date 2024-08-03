@@ -12,7 +12,7 @@ export class AreaLoader {
     }
 
     const areaFile = {
-      url: `http://localhost:2567/public/areas/${id}.tmx` as UrlToPublicFile,
+      url: `http://localhost:2000/public/areas/${id}.tmx` as UrlToPublicFile,
       filepath: "irrelevant-on-client" as PathToLocalFile,
     };
     const tiled = new TiledResource(areaFile.url);

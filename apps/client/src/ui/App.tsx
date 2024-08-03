@@ -1,80 +1,37 @@
-import { ModuleName, type WorldState } from "@mp/server";
-import { Client } from "colyseus.js";
-import type { CSSProperties, RefObject } from "react";
-import { useEffect, useMemo, useReducer, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { env } from "../env";
+import type { CSSProperties } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createGame } from "../ecs/Game";
 import { AreaLoader } from "../ecs/AreaLoader";
 
 export function App() {
-  const client = useMemo(() => new Client(env.serverUrl), []);
-  const [canvasContainer, setCanvasContainer] = useState<HTMLDivElement | null>(
-    null,
-  );
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const debugTextRef = useRef<HTMLSpanElement>(null);
-  const join = useJoinGame(client, canvasContainer, debugTextRef);
+  const areaLoader = useMemo(() => new AreaLoader(), []);
 
-  if (join.isLoading) {
-    return <>Loading...</>;
-  }
+  useEffect(() => {
+    if (!container) {
+      return;
+    }
 
-  if (join.error) {
-    return (
-      <>
-        Could not connect to server: {join.error?.message}
-        <button onClick={() => join.refetch()}>Try again</button>
-      </>
-    );
+    const game = createGame(areaLoader, renderDebugText);
+    container.appendChild(game.canvas);
+    game.start();
+    return () => game.dispose();
+  }, [container]);
+
+  function renderDebugText(text: string) {
+    if (debugTextRef.current) {
+      debugTextRef.current.innerText = text;
+      debugTextRef.current.style.display = text ? "block" : "none";
+    }
   }
 
   return (
     <>
-      <div ref={setCanvasContainer} />
+      <div ref={setContainer} />
       <span style={styles.debugText} ref={debugTextRef} />
     </>
   );
-}
-
-function useJoinGame(
-  client: Client,
-  container: HTMLDivElement | null,
-  debugText: RefObject<HTMLSpanElement>,
-) {
-  const [joinAttemptNumber, rejoin] = useReducer((n) => n + 1, 0);
-  const areaLoader = new AreaLoader();
-
-  const { data: room, ...join } = useQuery({
-    queryKey: ["room", joinAttemptNumber],
-    queryFn: () => client.joinOrCreate<WorldState>(ModuleName.world, {}),
-  });
-
-  useEffect(() => {
-    if (!container || !room || !debugText) {
-      return;
-    }
-
-    function renderDebugText(text: string) {
-      if (debugText.current) {
-        debugText.current.innerText = text;
-        debugText.current.style.display = text ? "block" : "none";
-      }
-    }
-
-    const game = createGame(room, areaLoader, renderDebugText);
-    container.appendChild(game.canvas);
-    game.start();
-    return () => game.dispose();
-  }, [container, room]);
-
-  useEffect(() => {
-    room?.onLeave(rejoin);
-    return () => {
-      room?.leave();
-    };
-  }, [room]);
-
-  return join;
 }
 
 const styles = {

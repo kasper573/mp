@@ -10,25 +10,23 @@
     }
   },
   "scripts": {
-    "start": "NODE_ENV=production tsx src/entrypoint.ts",
-    "dev": "NODE_ENV=development tsx watch src/entrypoint.ts --clear-screen=false"
+    "start": "NODE_ENV=production dotenv-flow tsx src/main.ts",
+    "dev": "NODE_ENV=development dotenv-flow tsx watch src/main.ts --clear-screen=false"
   },
   "dependencies": {
-    "@mp/events": "workspace:*",
     "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
-    "@colyseus/monitor": "0.15.7",
-    "@colyseus/tools": "0.15.39",
-    "@colyseus/schema": "2.0.34",
-    "colyseus": "0.15.17",
-    "cors": "2.8.5",
+    "@mp/network": "workspace:*",
+    "@mp/logger": "workspace:*",
     "express": "4.19.2",
-    "morgan": "1.10.0"
+    "cors": "2.8.5",
+    "superjson": "2.2.1"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/express": "4.17.21",
-    "@types/morgan": "1.9.9"
+    "@types/cors": "2.8.17",
+    "dotenv-flow-cli": "1.1.1"
   }
 }
