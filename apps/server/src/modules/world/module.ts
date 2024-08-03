@@ -80,7 +80,8 @@ export function createWorldModule({
 
     move: t.procedure
       .input<VectorLike>()
-      .create(({ input: { x, y }, context: { characterId } }) => {
+      .create(({ input: { x, y }, context: { source } }) => {
+        const { characterId } = source.unwrap("client");
         const char = state.characters.get(characterId);
         if (!char) {
           logger.error("Character not found", characterId);
@@ -107,45 +108,45 @@ export function createWorldModule({
     join: t.procedure
       .type("server-only")
       .input<ConnectReason>()
-      .create(
-        ({ input: connectReason, context: { clientId, characterId } }) => {
-          if (connectReason === "recovered") {
-            cancelCharacterRemoval(characterId);
-            logger.info("Client reconnected", clientId);
-          } else {
-            logger.info("Client joined", clientId);
+      .create(({ input: connectReason, context: { source } }) => {
+        const { clientId, characterId } = source.unwrap("client");
+        if (connectReason === "recovered") {
+          cancelCharacterRemoval(characterId);
+          logger.info("Client reconnected", clientId);
+        } else {
+          logger.info("Client joined", clientId);
+        }
+
+        let player = state.characters.get(characterId);
+        if (!player) {
+          logger.info("Character claimed", characterId);
+
+          const area = areas.get(defaultAreaId);
+          if (!area) {
+            logger.error("Default area not found", defaultAreaId);
+            return;
           }
 
-          let player = state.characters.get(characterId);
-          if (!player) {
-            logger.info("Character claimed", characterId);
+          player = {
+            connected: false,
+            areaId: area.id,
+            coords: { x: 0, y: 0 },
+            id: characterId,
+            path: [],
+            speed: 3,
+          };
+          player.coords = area.start.clone();
+          state.characters.set(player.id, player);
+        }
 
-            const area = areas.get(defaultAreaId);
-            if (!area) {
-              logger.error("Default area not found", defaultAreaId);
-              return;
-            }
-
-            player = {
-              connected: false,
-              areaId: area.id,
-              coords: { x: 0, y: 0 },
-              id: characterId,
-              path: [],
-              speed: 3,
-            };
-            player.coords = area.start.clone();
-            state.characters.set(player.id, player);
-          }
-
-          player.connected = true;
-        },
-      ),
+        player.connected = true;
+      }),
 
     leave: t.procedure
       .type("server-only")
       .input<DisconnectReason>()
-      .create(async ({ input: reason, context: { clientId, characterId } }) => {
+      .create(async ({ input: reason, context: { source } }) => {
+        const { clientId, characterId } = source.unwrap("client");
         logger.info("Client disconnected", { clientId, reason });
         state.characters.get(characterId)!.connected = false;
 

@@ -13,16 +13,17 @@ import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
-import type {
-  CharacterId,
-  ClientContext,
-  ClientId,
-  ClientStateUpdate,
-  ServerContext,
-  ServerModules,
-  WorldState,
-} from "./package";
+import {
+  ServerContextSource,
+  type ClientContext,
+  type ClientId,
+  type ClientStateUpdate,
+  type ServerContext,
+} from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
+import type { CharacterId } from "./modules/world/schema";
+import type { ServerModules } from "./modules/definition";
+import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 
 async function main() {
@@ -54,7 +55,7 @@ async function main() {
     ClientStateUpdate,
     ClientId
   >({
-    createContext,
+    createContext: createClientContext,
     modules,
     serializeRPCOutput: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
@@ -71,8 +72,7 @@ async function main() {
   let lastTick = performance.now();
 
   const tickContext: ServerContext = {
-    clientId: "server-tick" as ClientId,
-    characterId: "server-tick-has-no-character" as CharacterId,
+    source: new ServerContextSource({ type: "server" }),
     world,
   };
 
@@ -99,13 +99,16 @@ async function main() {
     }
   }
 
-  function createContext({
+  function createClientContext({
     clientId,
   }: CreateContextOptions<ClientId>): ServerContext {
     return {
       world,
-      clientId,
-      characterId: getCharacterIdByClientId(clientId),
+      source: new ServerContextSource({
+        type: "client",
+        clientId,
+        characterId: getCharacterIdByClientId(clientId),
+      }),
     };
   }
 
