@@ -62,13 +62,13 @@ export function createWorldModule({
     .create(({ payload: { x, y }, context: { clientId } }) => {
       const char = state.characters.get(clientId);
       if (!char) {
-        console.error("No character available for session id", clientId);
+        logger.error("No character available for session id", clientId);
         return;
       }
 
       const area = areas.get(char.areaId);
       if (!area) {
-        console.error("Area not found", char.areaId);
+        logger.error("Area not found", char.areaId);
         return;
       }
 
@@ -86,11 +86,11 @@ export function createWorldModule({
   const join = t.event
     .type("server-only")
     .create(({ context: { clientId } }) => {
-      console.log(clientId, "joined!");
+      logger.info(clientId, "joined!");
 
       const area = areas.get(defaultAreaId);
       if (!area) {
-        console.error("Default area not found", defaultAreaId);
+        logger.error("Default area not found", defaultAreaId);
         return;
       }
 
@@ -115,14 +115,14 @@ export function createWorldModule({
       state.characters.get(clientId)!.connected = false;
 
       if (reason !== "consented") {
-        console.log("Allowing reconnection...", clientId);
+        logger.info("Allowing reconnection...", clientId);
         const didReconnect = await allowReconnection(clientId, 2);
         if (didReconnect) {
-          console.log("Reconnected!", clientId);
+          logger.info("Reconnected!", clientId);
           state.characters.get(clientId)!.connected = true;
           return;
         }
-        console.log("Client never reconnected", clientId);
+        logger.info("Client never reconnected", clientId);
       }
 
       state.characters.delete(clientId);

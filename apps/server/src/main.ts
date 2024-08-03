@@ -53,7 +53,6 @@ async function main() {
     ClientContext,
     ClientState
   >({
-    logger,
     connection,
     createContext: ({ clientId }) => ({
       clientId: clientId as CharacterId,

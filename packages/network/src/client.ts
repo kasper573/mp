@@ -1,7 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import { signal, type Signal } from "@preact/signals-core";
-import type { Logger } from "@mp/logger";
 import type {
   AnyEventDefinition,
   AnyEventRecord,
@@ -23,7 +22,6 @@ export type * from "./serialization";
 
 export interface ClientOptions<State> {
   url: string;
-  logger?: Logger;
   disconnectedState: State;
   serializeMessage: Serializer<SocketIO_Message>;
   parseClientState: Parser<State>;
@@ -83,10 +81,8 @@ function createModuleEventBus<State>(
   socket: ClientSocket<State>,
   options: ClientOptions<State>,
 ) {
-  const logger = options.logger?.chain(moduleName);
   return createEventBus((eventName, ...args) => {
     const [payload] = args;
-    logger?.chain(eventName).info(payload);
     socket.emit(
       "message",
       options.serializeMessage({

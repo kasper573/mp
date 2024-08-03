@@ -1,5 +1,4 @@
 import { Server as SocketServer } from "socket.io";
-import type { Logger } from "@mp/logger";
 import type {
   EventDefinition,
   EventHandlerArg,
@@ -26,11 +25,12 @@ export interface CreateServerOptions<
   ClientState,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (options: CreateContextOptions) => ServerContext;
   connection?: ServerConnectionModule<ServerContext>;
+  createContext: (options: CreateContextOptions) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeClientState: Serializer<ClientState>;
-  logger?: Logger;
+  onEventError?: (error: unknown, message: SocketIO_Message) => void;
+  onEventIgnored?: (message: SocketIO_Message) => void;
 }
 
 export class Server<
@@ -46,10 +46,6 @@ export class Server<
     SocketIO_Data<ClientContext>
   >;
 
-  private get logger() {
-    return this.options.logger?.chain("Server");
-  }
-
   constructor(
     protected readonly options: CreateServerOptions<
       ModuleDefinitions,
@@ -57,17 +53,21 @@ export class Server<
       ClientState
     >,
   ) {
-    const { modules, connection, createContext, parseMessage } = options;
+    const {
+      modules,
+      connection,
+      createContext,
+      parseMessage,
+      onEventError,
+      onEventIgnored,
+    } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
-      this.logger?.info(`connected`, { clientId: socket.id });
-
       connection?.connect({
         context: createContext({ clientId: socket.id }),
       });
 
       socket.once("disconnect", () => {
-        this.logger?.info(`disconnected`, { clientContext: socket.data });
         connection?.disconnect({
           payload: "unknown", // TODO: add reason
           context: createContext({ clientId: socket.id }),
@@ -75,21 +75,15 @@ export class Server<
       });
 
       socket.on("message", (serializedMessage) => {
-        const { moduleName, eventName, payload } =
-          parseMessage(serializedMessage);
+        const message = parseMessage(serializedMessage);
+        const { moduleName, eventName, payload } = message;
 
         const module = modules[moduleName];
-        const log = this.logger?.chain(moduleName, eventName);
 
         if (module.$getEventType(eventName) !== "client-to-server") {
-          log?.warn(`event may not be triggered by clients`, {
-            payload,
-            socketId: socket.id,
-          });
+          onEventIgnored?.(message);
           return;
         }
-
-        log?.info({ clientId: socket.id, payload });
 
         try {
           module[eventName]({
@@ -97,7 +91,7 @@ export class Server<
             context: createContext({ clientId: socket.id }),
           });
         } catch (e) {
-          log?.error(`error while triggering event`, e);
+          onEventError?.(e, message);
         }
       });
     });
@@ -110,12 +104,10 @@ export class Server<
 
   listen(port: number) {
     this.wss.listen(port);
-    this.logger?.info(`listening on port ${port}`);
   }
 
   close() {
     this.wss.close();
-    this.logger?.info(`closed`);
   }
 }
 
