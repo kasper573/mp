@@ -55,7 +55,6 @@ jobs:
           host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           envs: IMAGE_NAME,REGISTRY,{{ secrets.DIGITALOCEAN_TOKEN }},GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
-          allenvs: true
           script: |
             docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} registry.digitalocean.com
             docker stop $(echo $IMAGE_NAME)
