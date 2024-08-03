@@ -55,10 +55,10 @@ export function createWorldModule({
   }
 
   return t.module({
-    tick: t.event
+    tick: t.procedure
       .type("server-only")
-      .payload<TimeSpan>()
-      .create(({ payload: delta }) => {
+      .input<TimeSpan>()
+      .create(({ input: delta }) => {
         for (const char of state.characters.values()) {
           moveAlongPath(char.coords, char.path, char.speed, delta);
 
@@ -78,9 +78,9 @@ export function createWorldModule({
         }
       }),
 
-    move: t.event
-      .payload<VectorLike>()
-      .create(({ payload: { x, y }, context: { characterId } }) => {
+    move: t.procedure
+      .input<VectorLike>()
+      .create(({ input: { x, y }, context: { characterId } }) => {
         const char = state.characters.get(characterId);
         if (!char) {
           logger.error("Character not found", characterId);
@@ -104,11 +104,11 @@ export function createWorldModule({
         }
       }),
 
-    join: t.event
+    join: t.procedure
       .type("server-only")
-      .payload<ConnectReason>()
+      .input<ConnectReason>()
       .create(
-        ({ payload: connectReason, context: { clientId, characterId } }) => {
+        ({ input: connectReason, context: { clientId, characterId } }) => {
           if (connectReason === "recovered") {
             cancelCharacterRemoval(characterId);
             logger.info("Client reconnected", clientId);
@@ -142,21 +142,19 @@ export function createWorldModule({
         },
       ),
 
-    leave: t.event
+    leave: t.procedure
       .type("server-only")
-      .payload<DisconnectReason>()
-      .create(
-        async ({ payload: reason, context: { clientId, characterId } }) => {
-          logger.info("Client disconnected", { clientId, reason });
-          state.characters.get(characterId)!.connected = false;
+      .input<DisconnectReason>()
+      .create(async ({ input: reason, context: { clientId, characterId } }) => {
+        logger.info("Client disconnected", { clientId, reason });
+        state.characters.get(characterId)!.connected = false;
 
-          if (reason !== "transport close") {
-            logger.info("Allowing reconnection...", clientId);
-            enqueueCharacterRemoval(characterId);
-          } else {
-            removeCharacter(characterId);
-          }
-        },
-      ),
+        if (reason !== "transport close") {
+          logger.info("Allowing reconnection...", clientId);
+          enqueueCharacterRemoval(characterId);
+        } else {
+          removeCharacter(characterId);
+        }
+      }),
   });
 }

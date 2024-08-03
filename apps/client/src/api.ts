@@ -11,6 +11,7 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   url: env.serverUrl,
   createInitialState: () => ({ characters: new Map() }),
   parseStateUpdate: serialization.stateUpdate.parse,
+  parseRPCOutput: serialization.rpc.parse,
   createNextState: (_, nextState) => nextState,
-  serializeMessage: serialization.message.serialize,
+  serializeRPC: serialization.rpc.serialize,
 });

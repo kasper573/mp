@@ -1,39 +1,66 @@
 import type {
-  EventDefinition,
-  EventHandler,
-  EventType,
-  AnyEventRecord,
+  ProcedureDefinition,
+  ProcedureHandler,
+  ProcedureType,
+  AnyProcedureRecord,
   Module,
-  EventHandlerArg,
+  ProcedurePayload,
+  isVoidOrUndefined,
 } from "./module";
 import { createModule } from "./module";
 
 export class Factory<Context> {
-  module<Events extends AnyEventRecord>(events: Events): Module<Events> {
-    return createModule(events);
+  module<Procedures extends AnyProcedureRecord>(
+    procedures: Procedures,
+  ): Module<Procedures> {
+    return createModule(procedures);
   }
 
-  event = new ModuleEventFactory<"client-to-server", void, Context>(
+  procedure = new ModuleProcedureFactory<
+    Context,
     "client-to-server",
-  );
+    void,
+    void
+  >("client-to-server");
 }
 
-class ModuleEventFactory<Type extends EventType, Payload, Context> {
+class ModuleProcedureFactory<
+  Context,
+  Type extends ProcedureType,
+  Input,
+  Output,
+> {
   constructor(private _type: Type) {}
 
-  payload<Payload>() {
-    return new ModuleEventFactory<Type, Payload, Context>(this._type);
+  input<NewInput>() {
+    return new ModuleProcedureFactory<Context, Type, NewInput, Output>(
+      this._type,
+    );
   }
 
-  type<NewType extends EventType>(newType: NewType) {
-    return new ModuleEventFactory<NewType, Payload, Context>(newType);
+  type<NewType extends ProcedureType>(newType: NewType) {
+    return new ModuleProcedureFactory<Context, NewType, Input, Output>(newType);
+  }
+
+  output<NewOutput>() {
+    return new ModuleProcedureFactory<Context, Type, Input, NewOutput>(
+      this._type,
+    );
   }
 
   create(
-    handler: EventHandler<EventHandlerArg<Payload, Context>> = noop,
-  ): EventDefinition<Type, EventHandlerArg<Payload, Context>> {
-    return { type: this._type, handler: handler };
+    ...[handler]: OptionalHandlerWhen<
+      ProcedureHandler<ProcedurePayload<Input, Context>, Output>,
+      isVoidOrUndefined<Output>
+    >
+  ): ProcedureDefinition<Type, ProcedurePayload<Input, Context>, Output> {
+    return { type: this._type, handler: handler ?? (noop as never) };
   }
 }
+
+type OptionalHandlerWhen<
+  Param,
+  Condition extends boolean,
+> = Condition extends true ? [handler?: Param] : [handler: Param];
 
 const noop = () => {};
