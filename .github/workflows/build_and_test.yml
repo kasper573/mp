@@ -74,18 +74,17 @@ jobs:
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
+          host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           envs: DOCKER_IMAGE,DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,MP_WS_PORT,MP_HTTP_PORT
           script: |
-            echo "Hello World"
-            # docker login -u $(echo $DOCKER_USERNAME) -p $(echo $DOCKER_PASSWORD) $(echo $DOCKER_REGISTRY)
-            # docker stop $(echo $DOCKER_IMAGE)
-            # docker rm $(echo $DOCKER_IMAGE)
-            # docker run -d \
-            # --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
-            # --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
-            # --restart always \
-            # --name $(echo $DOCKER_IMAGE) \
-            # $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE)
+            docker login -u $(echo $DOCKER_USERNAME) -p $(echo $DOCKER_PASSWORD) $(echo $DOCKER_REGISTRY)
+            docker stop $(echo $DOCKER_IMAGE)
+            docker rm $(echo $DOCKER_IMAGE)
+            docker run -d \
+            --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
+            --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
+            --restart always \
+            --name $(echo $DOCKER_IMAGE) \
+            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE)
