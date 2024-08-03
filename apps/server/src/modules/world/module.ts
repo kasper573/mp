@@ -70,7 +70,7 @@ export function createWorldModule({
               );
               if (targetArea) {
                 char.areaId = targetArea.id;
-                char.coords = targetArea.start;
+                char.coords = targetArea.start.clone();
                 char.path = [];
               }
             }
@@ -134,7 +134,7 @@ export function createWorldModule({
               path: [],
               speed: 3,
             };
-            player.coords = area.start;
+            player.coords = area.start.clone();
             state.characters.set(player.id, player);
           }
 
