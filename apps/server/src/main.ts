@@ -11,11 +11,9 @@ import createCors from "cors";
 import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createConnectionModule } from "./modules/connection";
-import type { ClientContext, ClientState, ServerContext } from "./context";
-import type { ServerModules } from "./modules/definition";
 import { createModules } from "./modules/definition";
 import type { CharacterId, WorldState } from "./package";
-import { loadAreas } from "./modules/area/loadAreas";
+import { loadAreas } from "./modules/world/loadAreas";
 import { transformers } from "./transformers";
 
 async function main() {
@@ -47,12 +45,7 @@ async function main() {
   });
 
   let lastTick = new Date();
-  const socketServer = new Server<
-    ServerModules,
-    ServerContext,
-    ClientContext,
-    ClientState
-  >({
+  const socketServer = new Server({
     connection,
     createContext: ({ clientId }) => ({
       clientId: clientId as CharacterId,
