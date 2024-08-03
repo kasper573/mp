@@ -2,11 +2,10 @@ import { transformers, type ClientState, type ServerModules } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { env } from "./env";
 
-export const api = new Client<ServerModules, ClientState>({
+export const api = new Client<ServerModules, ClientState, ClientState>({
   url: env.serverUrl,
-  parseClientState: transformers.clientState.parse,
+  parseStateUpdate: transformers.clientState.parse,
+  createNextState: (_, nextState) => nextState,
   serializeMessage: transformers.message.serialize,
-  disconnectedState: {
-    characters: new Map(),
-  },
+  createDisconnectedState: () => ({ characters: new Map() }),
 });

@@ -76,7 +76,7 @@ async function main() {
         },
       });
 
-      for (const { id } of world.characters.values()) {
+      for (const id of world.characters.keys()) {
         socketServer.sendClientState(id, world);
       }
     } catch (error) {

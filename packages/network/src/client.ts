@@ -20,18 +20,20 @@ import type { Parser, Serializer } from "./serialization";
 
 export type * from "./serialization";
 
-export interface ClientOptions<State> {
+export interface ClientOptions<State, StateUpdate> {
   url: string;
-  disconnectedState: State;
   serializeMessage: Serializer<SocketIO_Message>;
-  parseClientState: Parser<State>;
+  parseStateUpdate: Parser<StateUpdate>;
+  createNextState: (state: State, update: StateUpdate) => State;
+  createDisconnectedState: () => State;
 }
 
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   State,
+  StateUpdate,
 > {
-  private socket: ClientSocket<State>;
+  private socket: ClientSocket<StateUpdate>;
   readonly modules: ClientModuleRecord<ModuleDefinitions>;
   readonly state: Signal<State>;
 
@@ -39,23 +41,26 @@ export class Client<
     return this.socket.id;
   }
 
-  constructor(private options: ClientOptions<State>) {
+  constructor(private options: ClientOptions<State, StateUpdate>) {
     this.socket = io(options.url, { transports: ["websocket"] });
 
-    this.modules = createModuleInterface<ModuleDefinitions, State>(
+    this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(
       this.socket,
       this.options,
     );
 
-    this.state = signal(options.disconnectedState);
+    this.state = signal(options.createDisconnectedState());
 
     this.socket.on("clientState", (serializedState) => {
-      this.state.value = this.options.parseClientState(serializedState);
+      this.state.value = options.createNextState(
+        this.state.value,
+        options.parseStateUpdate(serializedState),
+      );
     });
 
     this.socket.on(
       "disconnect",
-      () => (this.state.value = options.disconnectedState),
+      () => (this.state.value = options.createDisconnectedState()),
     );
   }
 
@@ -67,19 +72,20 @@ export class Client<
 function createModuleInterface<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   State,
+  StateUpdate,
 >(
   socket: ClientSocket<State>,
-  options: ClientOptions<State>,
+  options: ClientOptions<State, StateUpdate>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
     get: (_, moduleName) => createModuleEventBus(moduleName, socket, options),
   });
 }
 
-function createModuleEventBus<State>(
+function createModuleEventBus<State, StateUpdate>(
   moduleName: PropertyKey,
   socket: ClientSocket<State>,
-  options: ClientOptions<State>,
+  options: ClientOptions<State, StateUpdate>,
 ) {
   return createEventBus((eventName, ...args) => {
     const [payload] = args;
