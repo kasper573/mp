@@ -2,18 +2,18 @@ import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
 import { signal, type Signal } from "@preact/signals-core";
 import type {
-  AnyEventDefinition,
-  AnyEventRecord,
+  AnyProcedureDefinition,
+  AnyProcedureRecord,
   AnyModuleDefinitionRecord,
-  EventDefinition,
-  EventHandler,
-  EventType,
+  ProcedureDefinition,
+  ProcedureHandler,
+  ProcedureType,
 } from "./module";
-import type { EventBus } from "./event";
-import { createEventBus } from "./event";
+import type { ProcedureBus } from "./procedure";
+import { createProcedureBus } from "./procedure";
 import type {
   SocketIO_ClientToServerEvents,
-  SocketIO_Message,
+  SocketIO_RPC,
   SocketIO_ServerToClientEvents,
 } from "./socket";
 import type { Parser, Serializer } from "./serialization";
@@ -68,31 +68,39 @@ function createModuleInterface<
   options: ClientOptions<State, StateUpdate>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
-    get: (_, moduleName) => createModuleEventBus(moduleName, socket, options),
+    get: (_, moduleName) =>
+      createModuleProcedureBus(moduleName, socket, options),
   });
 }
 
-function createModuleEventBus<State, StateUpdate>(
+function createModuleProcedureBus<State, StateUpdate>(
   moduleName: PropertyKey,
   socket: ClientSocket<State>,
   options: ClientOptions<State, StateUpdate>,
 ) {
-  return createEventBus((eventName, ...args) => {
-    const [payload] = args;
-    socket.emit(
-      "message",
-      options.serializeMessage({
-        moduleName: String(moduleName),
-        eventName: String(eventName),
-        payload,
-      }),
-    );
-  });
+  return createProcedureBus(
+    async (procedureName, ...[input]) => {
+      const serializedResponse = await socket.emitWithAck(
+        "rpc",
+        options.serializeRPC({
+          moduleName: String(moduleName),
+          procedureName: String(procedureName),
+          input,
+        }),
+      );
+
+      return options.parseRPCOutput(serializedResponse) as never;
+    },
+    () => {
+      throw new Error("Subscriptions are not supported on the client");
+    },
+  );
 }
 
 export interface ClientOptions<State, StateUpdate> {
   url: string;
-  serializeMessage: Serializer<SocketIO_Message>;
+  serializeRPC: Serializer<SocketIO_RPC>;
+  parseRPCOutput: Parser<unknown>;
   parseStateUpdate: Parser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
@@ -105,37 +113,39 @@ type ClientSocket<State> = Socket<
   SocketIO_ClientToServerEvents
 >;
 
-type ClientModuleRecord<Events extends AnyModuleDefinitionRecord> = {
-  [K in keyof Events]: ClientModule<Events[K]>;
+type ClientModuleRecord<Procedures extends AnyModuleDefinitionRecord> = {
+  [K in keyof Procedures]: ClientModule<Procedures[K]>;
 };
 
-type ClientModule<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
-  ClientToServerEvents<Events>,
-  {}
->;
+type ClientModule<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
+  ProcedureBus<ClientToServerProcedures<Procedures>, {}>;
 
-type ClientToServerEvents<Events extends AnyEventRecord> = {
-  [EventName in EventNamesForType<
-    Events,
+type ClientToServerProcedures<Procedures extends AnyProcedureRecord> = {
+  [ProcedureName in ProcedureNamesForType<
+    Procedures,
     "client-to-server"
-  >]: ClientEventHandler<Events[EventName]>;
+  >]: ClientProcedureHandler<Procedures[ProcedureName]>;
 };
 
-type ClientEventHandler<
-  Event extends AnyEventDefinition,
-  Type extends EventType = EventType,
+type ClientProcedureHandler<
+  Procedure extends AnyProcedureDefinition,
+  Type extends ProcedureType = ProcedureType,
 > =
-  Event extends EventDefinition<Type, infer Arg>
-    ? EventHandler<Arg["payload"]>
+  Procedure extends ProcedureDefinition<Type, infer Payload, infer Output>
+    ? ProcedureHandler<Payload["input"], Output>
     : never;
 
 // This seems to cause the language service to fail to go to definition
-// on module events even though it resolves to the correct types
-type EventNamesForType<
-  Events extends AnyEventRecord,
-  Type extends EventType,
+// on module procedures even though it resolves to the correct types
+type ProcedureNamesForType<
+  Procedures extends AnyProcedureRecord,
+  Type extends ProcedureType,
 > = {
-  [Key in keyof Events]: Events[Key] extends EventDefinition<Type>
+  [Key in keyof Procedures]: Procedures[Key] extends ProcedureDefinition<
+    Type,
+    infer _1,
+    infer _2
+  >
     ? Key
     : never;
-}[keyof Events];
+}[keyof Procedures];

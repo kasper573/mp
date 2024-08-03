@@ -12,7 +12,7 @@ const json = {
 
 export const serialization = {
   stateUpdate: json as Transformer<ClientStateUpdate>,
-  message: json,
+  rpc: json,
 };
 
 interface Transformer<T> {

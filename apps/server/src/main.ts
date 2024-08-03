@@ -13,13 +13,17 @@ import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
-import type {
-  CharacterId,
-  ClientId,
-  ServerContext,
-  WorldState,
-} from "./package";
-import { loadAreas } from "./modules/world/loadAreas";
+import {
+  ServerContextSource,
+  type ClientContext,
+  type ClientId,
+  type ClientStateUpdate,
+  type ServerContext,
+} from "./context";
+import { loadAreas } from "./modules/area/loadAreas";
+import type { CharacterId } from "./modules/world/schema";
+import type { ServerModules } from "./modules/definition";
+import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 
 async function main() {
@@ -41,15 +45,23 @@ async function main() {
     defaultAreaId,
     state: world,
     logger,
+    createUrl,
   });
 
-  const socketServer = new Server({
-    createContext,
+  const socketServer = new Server<
+    ServerModules,
+    ServerContext,
+    ClientContext,
+    ClientStateUpdate,
+    ClientId
+  >({
+    createContext: createClientContext,
     modules,
+    serializeRPCOutput: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
-    parseMessage: serialization.message.parse,
-    onConnection: (payload, context) => global.connect({ payload, context }),
-    onDisconnect: (payload, context) => global.disconnect({ payload, context }),
+    parseRPC: serialization.rpc.parse,
+    onConnection: (input, context) => global.connect({ input, context }),
+    onDisconnect: (input, context) => global.disconnect({ input, context }),
     onError,
   });
 
@@ -60,8 +72,7 @@ async function main() {
   let lastTick = performance.now();
 
   const tickContext: ServerContext = {
-    clientId: "server-tick" as ClientId,
-    characterId: "server-tick-has-no-character" as CharacterId,
+    source: new ServerContextSource({ type: "server" }),
     world,
   };
 
@@ -71,7 +82,7 @@ async function main() {
       const tickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
       lastTick = thisTick;
 
-      global.tick({ payload: tickDelta, context: tickContext });
+      global.tick({ input: tickDelta, context: tickContext });
 
       for (const [clientId, stateUpdate] of getStateUpdates()) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
@@ -88,13 +99,16 @@ async function main() {
     }
   }
 
-  function createContext({
+  function createClientContext({
     clientId,
   }: CreateContextOptions<ClientId>): ServerContext {
     return {
       world,
-      clientId,
-      characterId: getCharacterIdByClientId(clientId),
+      source: new ServerContextSource({
+        type: "client",
+        clientId,
+        characterId: getCharacterIdByClientId(clientId),
+      }),
     };
   }
 
@@ -104,7 +118,10 @@ async function main() {
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const port = env.httpPort === 80 ? "" : `:${env.httpPort}`;
-    return `//${env.host}${port}${publicPath}${path.relative(publicDir, fileInPublicDir)}` as UrlToPublicFile;
+    const relativePath = path.isAbsolute(fileInPublicDir)
+      ? path.relative(publicDir, fileInPublicDir)
+      : fileInPublicDir;
+    return `http://${env.host}${port}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {

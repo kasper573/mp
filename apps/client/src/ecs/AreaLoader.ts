@@ -1,6 +1,7 @@
 import { TiledResource } from "@mp/excalibur";
-import type { AreaId, PathToLocalFile, UrlToPublicFile } from "@mp/state";
+import type { AreaId, PathToLocalFile } from "@mp/state";
 import { AreaResource } from "@mp/state";
+import { api } from "../api";
 
 export class AreaLoader {
   private cache = new Map<AreaId, Promise<AreaResource>>();
@@ -12,7 +13,7 @@ export class AreaLoader {
     }
 
     const areaFile = {
-      url: `http://localhost:2000/public/areas/${id}.tmx` as UrlToPublicFile,
+      url: await api.modules.area.areaFileUrl(id),
       filepath: "irrelevant-on-client" as PathToLocalFile,
     };
     const tiled = new TiledResource(areaFile.url);

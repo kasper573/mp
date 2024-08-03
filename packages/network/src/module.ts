@@ -1,93 +1,120 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { EmitFn, EventBus, EventResult } from "./event";
-import { createEventBus } from "./event";
+import type { ProcedureBus, ProcedureOutput } from "./procedure";
+import { createProcedureBus } from "./procedure";
 
-export function createModule<Events extends AnyEventRecord>(
-  events: Events,
-): Module<Events> {
-  const fns = new Set<EmitFn>();
+export function createModule<Procedures extends AnyProcedureRecord>(
+  procedures: Procedures,
+): Module<Procedures> {
+  const procedureHandlers = new Map<
+    keyof Procedures,
+    Set<AnyProcedureHandler>
+  >();
 
-  // A module is essentially just an event bus
-  const bus = createEventBus(
-    (...args) => fns.forEach((fn) => fn(...args)),
-    (fn) => {
-      fns.add(fn);
-      return () => fns.delete(fn);
+  // A module is essentially just an procedure bus
+  const bus = createProcedureBus(
+    async (...[procedureName, procedurePayload]) => {
+      let outputForBuiltInHandler;
+
+      const handlersForProcedure = procedureHandlers.get(procedureName);
+      if (handlersForProcedure) {
+        Array.from(handlersForProcedure).map((handler) => {
+          const output = handler(procedurePayload);
+          if (handler === procedures[procedureName].handler) {
+            outputForBuiltInHandler = output;
+          }
+        });
+      }
+
+      return outputForBuiltInHandler as never;
+    },
+    (procedureName, handler) => {
+      let handlers = procedureHandlers.get(procedureName);
+      if (!handlers) {
+        handlers = new Set();
+        procedureHandlers.set(procedureName, handlers);
+      }
+      handlers.add(handler);
+      return () => handlers.delete(handler);
     },
   );
 
-  // But with predefined event handlers
-  Object.entries(events).forEach(([name, { handler }]) =>
+  // But with predefined procedure handlers
+  Object.entries(procedures).forEach(([name, { handler }]) =>
     bus[name].subscribe(handler),
   );
 
-  return new Proxy(bus as Module<Events>, {
+  return new Proxy(bus as Module<Procedures>, {
     get(target, prop) {
-      // It has the ability to inspect the type of an event
-      if (prop === eventTypeGetter) {
-        return (eventName: keyof Events) => events[eventName].type;
+      // It has the ability to inspect the type of an procedure
+      if (prop === procedureTypeGetter) {
+        return (procedureName: keyof Procedures) =>
+          procedures[procedureName].type;
       } else {
-        // And everything else an event bus can do
+        // And everything else an procedure bus can do
         return target[prop];
       }
     },
   });
 }
 
-const eventTypeGetter = "$getEventType" as const;
+const procedureTypeGetter = "$getProcedureType" as const;
 
-export type Module<Events extends AnyEventRecord = AnyEventRecord> = EventBus<
-  ModuleEvents<Events>,
-  ModuleEvents<Events>
-> & {
-  [eventTypeGetter](eventName: keyof Events): EventType;
-};
+export type Module<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
+  ProcedureBus<ModuleProcedures<Procedures>, ModuleProcedures<Procedures>> & {
+    [procedureTypeGetter](procedureName: keyof Procedures): ProcedureType;
+  };
 
-export type ModuleRecord<Events extends AnyModuleDefinitionRecord> = {
-  [K in keyof Events]: Module<Events[K]>;
+export type ModuleRecord<Procedures extends AnyModuleDefinitionRecord> = {
+  [K in keyof Procedures]: Module<Procedures[K]>;
 };
 
 export type inferModuleDefinitions<T> =
   T extends ModuleRecord<infer Definitions> ? Definitions : never;
 
-export type AnyModuleDefinitionRecord = Record<PropertyKey, AnyEventRecord>;
+export type AnyModuleDefinitionRecord = Record<PropertyKey, AnyProcedureRecord>;
 
-export type AnyEventRecord<Arg extends EventHandlerArg = EventHandlerArg> = {
-  [K: PropertyKey]: AnyEventDefinition<Arg>;
+export type AnyProcedureRecord<
+  Payload extends ProcedurePayload = ProcedurePayload,
+> = {
+  [K: PropertyKey]: AnyProcedureDefinition<Payload>;
 };
 
-export type AnyEventDefinition<Arg extends EventHandlerArg = EventHandlerArg> =
-  EventDefinition<EventType, Arg>;
+export type AnyProcedureDefinition<
+  Payload extends ProcedurePayload = ProcedurePayload,
+> = ProcedureDefinition<ProcedureType, Payload, any>;
 
-export interface EventHandlerArg<Payload = any, Context = any> {
-  payload: Payload;
+export interface ProcedurePayload<Input = any, Context = any> {
+  input: Input;
   context: Context;
 }
 
-export type EventType = "client-to-server" | "server-only";
+export type ProcedureType = "client-to-server" | "server-only";
 
-export type EventDefinition<
-  Type extends EventType,
-  Arg extends EventHandlerArg = EventHandlerArg,
+export type ProcedureDefinition<
+  Type extends ProcedureType,
+  Payload extends ProcedurePayload,
+  Output,
 > = {
   type: Type;
-  handler: EventHandler<Arg>;
+  handler: ProcedureHandler<Payload, Output>;
 };
 
-export type EventHandler<Arg extends EventHandlerArg = EventHandlerArg> = (
-  arg: MakePayloadOptional<Arg>,
-) => EventResult;
+export type AnyProcedureHandler = ProcedureHandler<any, any>;
 
-export type ModuleEvents<Events extends AnyEventRecord> = {
-  [EventName in keyof Events]: Events[EventName]["handler"];
+export type ProcedureHandler<Payload extends ProcedurePayload, Output> = (
+  payload: MakeInputOptional<Payload>,
+) => ProcedureOutput<Output>;
+
+export type ModuleProcedures<Procedures extends AnyProcedureRecord> = {
+  [ProcedureName in keyof Procedures]: Procedures[ProcedureName]["handler"];
 };
 
-type MakePayloadOptional<Arg extends EventHandlerArg> =
-  isVoidOrUndefined<Arg["payload"]> extends true
+type MakeInputOptional<Payload extends ProcedurePayload> =
+  isVoidOrUndefined<Payload["input"]> extends true
     ? {
-        payload?: Arg["payload"];
-        context: Arg["context"];
+        input?: Payload["input"];
+        context: Payload["context"];
       }
-    : Arg;
+    : Payload;
 
-type isVoidOrUndefined<T> = T extends void | undefined ? true : false;
+export type isVoidOrUndefined<T> = T extends void | undefined ? true : false;

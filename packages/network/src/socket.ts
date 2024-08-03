@@ -1,13 +1,16 @@
 import type { Serialized } from "./serialization";
 
 export interface SocketIO_ClientToServerEvents {
-  message: (message: Serialized<SocketIO_Message>) => void;
+  rpc: (
+    serializedRPC: Serialized<SocketIO_RPC>,
+    respondWithOutput: (serializedOutput: Serialized<unknown>) => void,
+  ) => void;
 }
 
-export interface SocketIO_Message {
+export interface SocketIO_RPC {
   moduleName: string;
-  eventName: string;
-  payload: unknown;
+  procedureName: string;
+  input: unknown;
 }
 
 export interface SocketIO_ServerToClientEvents<StateUpdate> {

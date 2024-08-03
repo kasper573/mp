@@ -4,7 +4,7 @@ import type { DisconnectReason } from "socket.io";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
   SocketIO_ClientToServerEvents,
-  SocketIO_Message,
+  SocketIO_RPC as SocketIO_RPC,
   SocketIO_ServerToClientEvents,
 } from "./socket";
 import type { Parser, Serializer } from "./serialization";
@@ -34,7 +34,8 @@ export class Server<
     const {
       modules,
       createContext,
-      parseMessage,
+      parseRPC,
+      serializeRPCOutput,
       onError,
       onMessageIgnored,
       onConnection,
@@ -59,19 +60,24 @@ export class Server<
         }
       });
 
-      socket.on("message", (serializedMessage) => {
+      socket.on("rpc", async (serializedRPC, respondWithOutput) => {
         let message;
         try {
-          message = parseMessage(serializedMessage);
-          const { moduleName, eventName, payload } = message;
+          message = parseRPC(serializedRPC);
+          const { moduleName, procedureName, input } = message;
           const module = modules[moduleName];
 
-          if (module.$getEventType(eventName) !== "client-to-server") {
+          if (module.$getProcedureType(procedureName) !== "client-to-server") {
             onMessageIgnored?.(message);
             return;
           }
 
-          module[eventName]({ payload, context: socketContext() });
+          const output = await module[procedureName]({
+            input,
+            context: socketContext(),
+          });
+
+          respondWithOutput(serializeRPCOutput(output));
         } catch (e) {
           onError?.(e, "message", message);
         }
@@ -103,12 +109,13 @@ export interface CreateServerOptions<
 > {
   modules: ModuleRecord<ModuleDefinitions>;
   createContext: (options: CreateContextOptions<ClientId>) => ServerContext;
-  parseMessage: Parser<SocketIO_Message>;
+  parseRPC: Parser<SocketIO_RPC>;
+  serializeRPCOutput: Serializer<unknown>;
   serializeStateUpdate: Serializer<StateUpdate>;
   onConnection?: (reason: ConnectReason, context: ServerContext) => void;
   onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
   onError?: ServerErrorHandler;
-  onMessageIgnored?: (message: SocketIO_Message) => void;
+  onMessageIgnored?: (message: SocketIO_RPC) => void;
 }
 
 export interface CreateContextOptions<ClientId extends string> {
@@ -117,13 +124,12 @@ export interface CreateContextOptions<ClientId extends string> {
 
 export type ServerErrorHandler = (
   error: unknown,
-  event: "connection" | "disconnect" | "message",
-  message?: SocketIO_Message,
+  procedure: "connection" | "disconnect" | "message",
+  message?: SocketIO_RPC,
 ) => void;
 
 export type { DisconnectReason };
 export type { inferModuleDefinitions } from "./module";
-export type { EventResult } from "./event";
 export type * from "./serialization";
 
 export type ConnectReason = "new" | "recovered";
