@@ -72,7 +72,7 @@ jobs:
         run: echo "$(cat .env.production)" >> $GITHUB_ENV
 
       - name: Deploy to Digital Ocean droplet via SSH action
-        uses: appleboy/ssh-action@v0.1.3
+        uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
