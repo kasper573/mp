@@ -12,7 +12,12 @@ import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
-import type { CharacterId, ClientId, WorldState } from "./package";
+import type {
+  CharacterId,
+  ClientId,
+  ServerContext,
+  WorldState,
+} from "./package";
 import { loadAreas } from "./modules/world/loadAreas";
 import { transformers } from "./transformers";
 
@@ -30,9 +35,10 @@ async function main() {
   httpServer.use(publicPath, express.static(publicDir, {}));
 
   const socketServer = new Server({
-    createContext: ({ clientId }) => ({
+    createContext: ({ clientId }): ServerContext => ({
       world,
-      clientId: clientId as CharacterId,
+      clientId: clientId as ClientId,
+      characterId: getCharacterIdByClientId(clientId as ClientId),
     }),
     modules: createModules({
       global,
@@ -62,8 +68,12 @@ async function main() {
       lastTick = thisTick;
 
       global.tick({
-        context: { clientId: "server-tick" as ClientId, world },
         payload: lastTickDelta,
+        context: {
+          clientId: "server-tick" as ClientId,
+          characterId: "no-character" as CharacterId,
+          world,
+        },
       });
 
       for (const { id } of world.characters.values()) {
@@ -74,7 +84,7 @@ async function main() {
     }
   }
 
-  async function allowReconnection(id: CharacterId, timeout: TimeSpan) {
+  async function allowReconnection(id: ClientId, timeout: TimeSpan) {
     logger.warn(`allowReconnection() is not implemented`);
     return false;
   }
@@ -86,6 +96,11 @@ async function main() {
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const port = env.httpPort === 80 ? "" : `:${env.httpPort}`;
     return `//${env.host}${port}${publicPath}${path.relative(publicDir, fileInPublicDir)}` as UrlToPublicFile;
+  }
+
+  function getCharacterIdByClientId(clientId: ClientId): CharacterId {
+    // TODO implement
+    return clientId as unknown as CharacterId;
   }
 }
 

@@ -54,10 +54,10 @@ export function createWorldModule({
 
     move: t.event
       .payload<VectorLike>()
-      .create(({ payload: { x, y }, context: { clientId } }) => {
-        const char = state.characters.get(clientId);
+      .create(({ payload: { x, y }, context: { characterId } }) => {
+        const char = state.characters.get(characterId);
         if (!char) {
-          logger.error("No character available for session id", clientId);
+          logger.error("Character not found", characterId);
           return;
         }
 
@@ -78,51 +78,56 @@ export function createWorldModule({
         }
       }),
 
-    join: t.event.type("server-only").create(({ context: { clientId } }) => {
-      logger.info(clientId, "joined!");
+    join: t.event
+      .type("server-only")
+      .create(({ context: { clientId, characterId } }) => {
+        logger.info("Client joined", clientId);
+        logger.info("Character claimed", characterId);
 
-      const area = areas.get(defaultAreaId);
-      if (!area) {
-        logger.error("Default area not found", defaultAreaId);
-        return;
-      }
+        const area = areas.get(defaultAreaId);
+        if (!area) {
+          logger.error("Default area not found", defaultAreaId);
+          return;
+        }
 
-      const player: Character = {
-        connected: false,
-        areaId: area.id,
-        coords: { x: 0, y: 0 },
-        id: clientId,
-        path: [],
-        speed: 3,
-      };
-      player.coords = area.start;
-      player.connected = true;
-      state.characters.set(player.id, player);
-    }),
+        const player: Character = {
+          connected: false,
+          areaId: area.id,
+          coords: { x: 0, y: 0 },
+          id: characterId,
+          path: [],
+          speed: 3,
+        };
+        player.coords = area.start;
+        player.connected = true;
+        state.characters.set(player.id, player);
+      }),
 
     leave: t.event
       .type("server-only")
       .payload<DisconnectReason>()
-      .create(async ({ payload: reason, context: { clientId } }) => {
-        logger.info("Client disconnected", { clientId, reason });
-        state.characters.get(clientId)!.connected = false;
+      .create(
+        async ({ payload: reason, context: { clientId, characterId } }) => {
+          logger.info("Client disconnected", { clientId, reason });
+          state.characters.get(characterId)!.connected = false;
 
-        if (reason !== "transport close") {
-          logger.info("Allowing reconnection...", clientId);
-          const didReconnect = await allowReconnection(
-            clientId,
-            TimeSpan.fromSeconds(2),
-          );
-          if (didReconnect) {
-            logger.info("Reconnected!", clientId);
-            state.characters.get(clientId)!.connected = true;
-            return;
+          if (reason !== "transport close") {
+            logger.info("Allowing reconnection...", clientId);
+            const didReconnect = await allowReconnection(
+              clientId,
+              TimeSpan.fromSeconds(2),
+            );
+            if (didReconnect) {
+              logger.info("Reconnected!", clientId);
+              state.characters.get(characterId)!.connected = true;
+              return;
+            }
+            logger.info("Client never reconnected", clientId);
           }
-          logger.info("Client never reconnected", clientId);
-        }
 
-        state.characters.delete(clientId);
-        logger.info("Character removed", clientId);
-      }),
+          state.characters.delete(characterId);
+          logger.info("Character removed", characterId);
+        },
+      ),
   });
 }
