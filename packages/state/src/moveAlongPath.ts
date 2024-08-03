@@ -7,7 +7,7 @@ export function moveAlongPath(
   speed: number,
   delta: TimeSpan,
 ): void {
-  let distance = speed * delta.seconds;
+  let distance = speed * delta.totalSeconds;
   while (path.length > 0 && distance > 0) {
     const destination = path[0];
     const distanceToDestination = Math.hypot(
