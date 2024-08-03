@@ -60,11 +60,11 @@ async function main() {
   setInterval(tick, env.tickInterval);
 
   let lastTickDelta = TimeSpan.Zero;
-  let lastTick = new Date();
+  let lastTick = performance.now();
   function tick() {
     try {
-      const thisTick = new Date();
-      lastTickDelta = TimeSpan.fromDateDiff(lastTick, thisTick);
+      const thisTick = performance.now();
+      lastTickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
       lastTick = thisTick;
 
       global.tick({
