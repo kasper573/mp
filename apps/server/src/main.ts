@@ -75,7 +75,10 @@ async function main() {
   wsLogger.info("listening on port", env.wsPort);
 
   httpServer.listen(env.httpPort, env.httpListenHostname, () => {
-    httpLogger.info("listening on port", env.httpPort);
+    httpLogger.info(
+      "listening on",
+      `${env.httpListenHostname}:${env.httpPort}`,
+    );
   });
 
   setInterval(tick, env.tickInterval);
