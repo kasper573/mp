@@ -41,10 +41,10 @@ export class Client<
 
     this.state = signal(options.createInitialState());
 
-    this.socket.on("stateUpdate", (serialized) => {
+    this.socket.on("stateUpdate", (update) => {
       this.state.value = options.createNextState(
         this.state.value,
-        options.parseStateUpdate(serialized),
+        options.parseStateUpdate(update),
       );
     });
 

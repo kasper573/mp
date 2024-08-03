@@ -14,6 +14,7 @@ export class Server<
   ServerContext,
   ClientContext,
   StateUpdate,
+  ClientId extends string = string,
 > {
   private wss: SocketServer<
     SocketIO_ClientToServerEvents,
@@ -26,7 +27,8 @@ export class Server<
     protected readonly options: CreateServerOptions<
       ModuleDefinitions,
       ServerContext,
-      StateUpdate
+      StateUpdate,
+      ClientId
     >,
   ) {
     const {
@@ -40,15 +42,18 @@ export class Server<
     } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
+      const socketContext = () =>
+        createContext({ clientId: socket.id as ClientId });
+
       try {
-        onConnection?.(createContext({ clientId: socket.id }));
+        onConnection?.(socketContext());
       } catch (e) {
         onError?.(e, "connection");
       }
 
       socket.once("disconnect", (reason) => {
         try {
-          onDisconnect?.(reason, createContext({ clientId: socket.id }));
+          onDisconnect?.(reason, socketContext());
         } catch (e) {
           onError?.(e, "disconnect");
         }
@@ -66,10 +71,7 @@ export class Server<
             return;
           }
 
-          module[eventName]({
-            payload,
-            context: createContext({ clientId: socket.id }),
-          });
+          module[eventName]({ payload, context: socketContext() });
         } catch (e) {
           onError?.(e, "message", message);
         }
@@ -77,9 +79,9 @@ export class Server<
     });
   }
 
-  sendStateUpdate(clientId: string, stateUpdate: StateUpdate) {
+  sendStateUpdate(clientId: ClientId, update: StateUpdate) {
     const socket = this.wss.sockets.sockets.get(clientId);
-    socket?.emit("stateUpdate", this.options.serializeStateUpdate(stateUpdate));
+    socket?.emit("stateUpdate", this.options.serializeStateUpdate(update));
   }
 
   listen(port: number) {
@@ -97,9 +99,10 @@ export interface CreateServerOptions<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
   StateUpdate,
+  ClientId extends string,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (options: CreateContextOptions) => ServerContext;
+  createContext: (options: CreateContextOptions<ClientId>) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeStateUpdate: Serializer<StateUpdate>;
   onConnection?: (context: ServerContext) => void;
@@ -108,8 +111,8 @@ export interface CreateServerOptions<
   onMessageIgnored?: (message: SocketIO_Message) => void;
 }
 
-export interface CreateContextOptions {
-  clientId: string;
+export interface CreateContextOptions<ClientId extends string> {
+  clientId: ClientId;
 }
 
 export type ServerErrorHandler = (

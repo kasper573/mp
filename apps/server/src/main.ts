@@ -8,6 +8,7 @@ import {
   type UrlToPublicFile,
 } from "@mp/state";
 import createCors from "cors";
+import type { CreateContextOptions } from "@mp/network/server";
 import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createGlobalModule } from "./modules/global";
@@ -34,20 +35,18 @@ async function main() {
   httpServer.use(createCors());
   httpServer.use(publicPath, express.static(publicDir, {}));
 
+  const modules = createModules({
+    global,
+    areas,
+    defaultAreaId,
+    state: world,
+    allowReconnection,
+    logger,
+  });
+
   const socketServer = new Server({
-    createContext: ({ clientId }): ServerContext => ({
-      world,
-      clientId: clientId as ClientId,
-      characterId: getCharacterIdByClientId(clientId as ClientId),
-    }),
-    modules: createModules({
-      global,
-      areas,
-      defaultAreaId,
-      state: world,
-      allowReconnection,
-      logger,
-    }),
+    createContext,
+    modules,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseMessage: serialization.message.parse,
     onConnection: (context) => global.connect({ context }),
@@ -61,27 +60,36 @@ async function main() {
 
   let lastTickDelta = TimeSpan.Zero;
   let lastTick = performance.now();
+  const tickContext: ServerContext = {
+    clientId: "server-tick" as ClientId,
+    characterId: "server-tick-has-no-character" as CharacterId,
+    world,
+  };
+
   function tick() {
     try {
       const thisTick = performance.now();
       lastTickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
       lastTick = thisTick;
 
-      global.tick({
-        payload: lastTickDelta,
-        context: {
-          clientId: "server-tick" as ClientId,
-          characterId: "no-character" as CharacterId,
-          world,
-        },
-      });
+      global.tick({ payload: lastTickDelta, context: tickContext });
 
       for (const id of world.characters.keys()) {
-        socketServer.sendStateUpdate(id, world);
+        socketServer.sendStateUpdate(getClientIdByCharacterId(id), world);
       }
     } catch (error) {
       onError(error, "tick");
     }
+  }
+
+  function createContext({
+    clientId,
+  }: CreateContextOptions<ClientId>): ServerContext {
+    return {
+      world,
+      clientId,
+      characterId: getCharacterIdByClientId(clientId),
+    };
   }
 
   async function allowReconnection(id: ClientId, timeout: TimeSpan) {
@@ -101,6 +109,11 @@ async function main() {
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
     // TODO implement
     return clientId as unknown as CharacterId;
+  }
+
+  function getClientIdByCharacterId(characterId: CharacterId): ClientId {
+    // TODO implement
+    return characterId as unknown as ClientId;
   }
 }
 

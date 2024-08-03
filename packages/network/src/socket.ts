@@ -1,7 +1,7 @@
 import type { Serialized } from "./serialization";
 
 export interface SocketIO_ClientToServerEvents {
-  message: (serializedMessage: Serialized<SocketIO_Message>) => void;
+  message: (message: Serialized<SocketIO_Message>) => void;
 }
 
 export interface SocketIO_Message {
@@ -11,5 +11,5 @@ export interface SocketIO_Message {
 }
 
 export interface SocketIO_ServerToClientEvents<StateUpdate> {
-  stateUpdate: (data: Serialized<StateUpdate>) => void;
+  stateUpdate: (update: Serialized<StateUpdate>) => void;
 }
