@@ -83,10 +83,11 @@ export type ModuleEvents<Events extends AnyEventRecord> = {
 };
 
 type MakePayloadOptional<Arg extends EventHandlerArg> =
-  isExactlyVoid<Arg["payload"]> extends true ? Pick<Arg, "context"> : Arg;
+  isVoidOrUndefined<Arg["payload"]> extends true
+    ? {
+        payload?: Arg["payload"];
+        context: Arg["context"];
+      }
+    : Arg;
 
-type isExactlyVoid<T> = void extends T
-  ? T extends void
-    ? true
-    : false
-  : false;
+type isVoidOrUndefined<T> = T extends void | undefined ? true : false;
