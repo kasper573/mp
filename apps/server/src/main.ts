@@ -37,6 +37,8 @@ async function main() {
   const httpLogger = logger.chain("http");
   const wsLogger = logger.chain("ws");
 
+  logger.info("starting server with env", env);
+
   const global = createGlobalModule();
   const httpServer = express();
   httpServer.use(createExpressLogger(httpLogger));
