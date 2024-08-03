@@ -1,4 +1,4 @@
-import type { TimeSpan } from "@mp/state";
+import { TimeSpan } from "@mp/state";
 import {
   findPath,
   moveAlongPath,
@@ -10,7 +10,7 @@ import type { Logger } from "@mp/logger";
 import type { DisconnectReason } from "@mp/network/server";
 import { t } from "../factory";
 import type { ConnectionModule } from "../connection";
-import type { ServerContext } from "../../context";
+import type { ClientId } from "../../context";
 import type { Character } from "./schema";
 import type { WorldState } from "./schema";
 
@@ -20,10 +20,7 @@ export interface WorldModuleDependencies {
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
   logger: Logger;
-  allowReconnection: (
-    id: ServerContext["clientId"],
-    timeoutSeconds: number,
-  ) => Promise<boolean>;
+  allowReconnection: (id: ClientId, timeout: TimeSpan) => Promise<boolean>;
 }
 
 export function createWorldModule({
@@ -116,7 +113,10 @@ export function createWorldModule({
 
       if (reason !== "transport close") {
         logger.info("Allowing reconnection...", clientId);
-        const didReconnect = await allowReconnection(clientId, 2);
+        const didReconnect = await allowReconnection(
+          clientId,
+          TimeSpan.fromSeconds(2),
+        );
         if (didReconnect) {
           logger.info("Reconnected!", clientId);
           state.characters.get(clientId)!.connected = true;

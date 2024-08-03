@@ -12,7 +12,7 @@ import { Server } from "@mp/network/server";
 import { env } from "./env";
 import { createConnectionModule } from "./modules/connection";
 import { createModules } from "./modules/definition";
-import type { CharacterId, WorldState } from "./package";
+import type { CharacterId, ClientId, WorldState } from "./package";
 import { loadAreas } from "./modules/world/loadAreas";
 import { transformers } from "./transformers";
 
@@ -44,13 +44,13 @@ async function main() {
     logger,
   });
 
+  let lastTickDelta = TimeSpan.Zero;
   let lastTick = new Date();
   const socketServer = new Server({
     connection,
     createContext: ({ clientId }) => ({
-      clientId: clientId as CharacterId,
       world,
-      time: lastTick,
+      clientId: clientId as CharacterId,
     }),
     modules,
     serializeClientState: transformers.clientState.serialize,
@@ -65,28 +65,23 @@ async function main() {
   function tick() {
     try {
       const thisTick = new Date();
-      const delta = TimeSpan.fromDateDiff(lastTick, thisTick);
+      lastTickDelta = TimeSpan.fromDateDiff(lastTick, thisTick);
+      lastTick = thisTick;
 
       modules.world.tick({
-        context: {
-          clientId: "server-tick" as CharacterId, // TODO this seems weird
-          time: thisTick,
-          world,
-        },
-        payload: delta,
+        context: { clientId: "server-tick" as ClientId, world },
+        payload: lastTickDelta,
       });
 
       for (const { id } of world.characters.values()) {
         socketServer.sendClientState(id, world);
       }
-
-      lastTick = thisTick;
     } catch (error) {
       onError(error, "tick");
     }
   }
 
-  async function allowReconnection(id: CharacterId, timeoutSeconds: number) {
+  async function allowReconnection(id: CharacterId, timeout: TimeSpan) {
     logger.warn(`allowReconnection() is not implemented`);
     return false;
   }
