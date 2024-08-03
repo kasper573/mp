@@ -74,8 +74,9 @@ async function main() {
   socketServer.listen(env.wsPort);
   wsLogger.info("listening on port", env.wsPort);
 
-  httpServer.listen(env.httpPort);
-  httpLogger.info("listening on port", env.httpPort);
+  httpServer.listen(env.httpPort, env.httpListenHostname, () => {
+    httpLogger.info("listening on port", env.httpPort);
+  });
 
   setInterval(tick, env.tickInterval);
 
@@ -131,7 +132,7 @@ async function main() {
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${env.host}${port}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${env.httpPublicHostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
