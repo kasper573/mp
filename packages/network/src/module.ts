@@ -1,30 +1,33 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { EventEmitter } from "events";
-import type { EventBus, EventResult } from "./event";
+import type { EmitFn, EventBus, EventResult } from "./event";
 import { createEventBus } from "./event";
 
 export function createModule<Events extends AnyEventRecord>(
   events: Events,
 ): Module<Events> {
-  const emitter = new EventEmitter();
+  const fns = new Set<EmitFn>();
 
+  // A module is essentially just an event bus
   const bus = createEventBus(
-    (...args) => emitter.emit("event", ...args),
-    (handler) => {
-      emitter.on("event", handler);
-      return () => emitter.off("event", handler);
+    (...args) => fns.forEach((fn) => fn(...args)),
+    (fn) => {
+      fns.add(fn);
+      return () => fns.delete(fn);
     },
   );
 
+  // But with predefined event handlers
   Object.entries(events).forEach(([name, { handler }]) =>
     bus[name].subscribe(handler),
   );
 
   return new Proxy(bus as Module<Events>, {
     get(target, prop) {
+      // It has the ability to inspect the type of an event
       if (prop === eventTypeGetter) {
         return (eventName: keyof Events) => events[eventName].type;
       } else {
+        // And everything else an event bus can do
         return target[prop];
       }
     },
@@ -71,7 +74,7 @@ export type EventDefinition<
   handler: EventHandler<Arg>;
 };
 
-export type EventHandler<Arg extends EventHandlerArg> = (
+export type EventHandler<Arg extends EventHandlerArg = EventHandlerArg> = (
   arg: MakePayloadOptional<Arg>,
 ) => EventResult;
 

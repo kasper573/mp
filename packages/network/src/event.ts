@@ -2,7 +2,7 @@ export function createEventBus<
   OutgoingEvents extends AnyEvents,
   IncomingEvents extends AnyEvents,
 >(
-  emitOutgoingEvent: EmitFnFor<OutgoingEvents>,
+  emitOutgoingEvent: EmitFn<OutgoingEvents>,
   subscribeToAllIncomingEvents = noop as SubscribeFnFor<IncomingEvents>,
 ): EventBus<OutgoingEvents, IncomingEvents> {
   return new Proxy({} as EventBus<OutgoingEvents, IncomingEvents>, {
@@ -67,7 +67,7 @@ export type DiscriminatedEvent<Events extends AnyEvents> = {
   };
 }[keyof Events];
 
-export type EmitFnFor<Events extends AnyEvents> = <
+export type EmitFn<Events extends AnyEvents = AnyEvents> = <
   EventName extends keyof Events,
 >(
   eventName: EventName,
@@ -75,7 +75,7 @@ export type EmitFnFor<Events extends AnyEvents> = <
 ) => EventResult;
 
 export type SubscribeFnFor<Events extends AnyEvents> = (
-  handler: EmitFnFor<Events>,
+  handler: EmitFn<Events>,
 ) => Unsubscribe;
 
 const noop = () => () => {};
