@@ -57,7 +57,7 @@ jobs:
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           envs: IMAGE_NAME,REGISTRY,GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
           script: |
-            doctl registry login
+            docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} registry.digitalocean.com
             docker stop $(echo $IMAGE_NAME)
             docker rm $(echo $IMAGE_NAME)
             docker run -d \
