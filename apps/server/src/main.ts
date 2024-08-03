@@ -58,8 +58,8 @@ async function main() {
   httpServer.listen(env.httpPort);
   setInterval(tick, env.tickInterval);
 
-  let lastTickDelta = TimeSpan.Zero;
   let lastTick = performance.now();
+
   const tickContext: ServerContext = {
     clientId: "server-tick" as ClientId,
     characterId: "server-tick-has-no-character" as CharacterId,
@@ -69,16 +69,23 @@ async function main() {
   function tick() {
     try {
       const thisTick = performance.now();
-      lastTickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
+      const tickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
       lastTick = thisTick;
 
-      global.tick({ payload: lastTickDelta, context: tickContext });
+      global.tick({ payload: tickDelta, context: tickContext });
 
-      for (const id of world.characters.keys()) {
-        socketServer.sendStateUpdate(getClientIdByCharacterId(id), world);
+      for (const [clientId, stateUpdate] of getStateUpdates()) {
+        socketServer.sendStateUpdate(clientId, stateUpdate);
       }
     } catch (error) {
       onError(error, "tick");
+    }
+  }
+
+  function* getStateUpdates() {
+    // TODO optimize by sending changes only
+    for (const id of world.characters.keys()) {
+      yield [getClientIdByCharacterId(id), world] as const;
     }
   }
 
