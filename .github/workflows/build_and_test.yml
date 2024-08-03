@@ -87,4 +87,4 @@ jobs:
             --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name $(echo $DOCKER_IMAGE) \
-            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_USERNAME):$(echo $DOCKER_IMAGE)
+            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name}}
