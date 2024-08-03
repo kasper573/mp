@@ -92,6 +92,8 @@ export class Server<
   }
 }
 
+export { Factory } from "./factory";
+
 export interface CreateServerOptions<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
@@ -111,15 +113,13 @@ export interface CreateContextOptions {
   clientId: string;
 }
 
-export type { DisconnectReason };
-
 export type ServerErrorHandler = (
   error: unknown,
   event: "connection" | "disconnect" | "message",
   message?: SocketIO_Message,
 ) => void;
 
-export { Factory } from "./factory";
+export type { DisconnectReason };
 export type { inferModuleDefinitions } from "./module";
 export type { EventResult } from "./event";
 export type * from "./serialization";
