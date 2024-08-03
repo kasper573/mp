@@ -105,7 +105,7 @@ async function main() {
   }
 
   function onError(e: unknown, type: string, message?: unknown) {
-    return logger.chain(type).error(...(message ? [message, e] : [e]));
+    logger.chain(type).error(...(message ? [message, e] : [e]));
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
