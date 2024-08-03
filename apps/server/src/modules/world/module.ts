@@ -11,7 +11,7 @@ import type { DisconnectReason } from "@mp/network/server";
 import { t } from "../factory";
 import type { ConnectionModule } from "../connection";
 import type { ServerContext } from "../../context";
-import type { Character } from "../character/schema";
+import type { Character } from "./schema";
 import type { WorldState } from "./schema";
 
 export interface WorldModuleDependencies {
