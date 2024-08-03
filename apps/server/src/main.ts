@@ -66,7 +66,11 @@ async function main() {
   });
 
   socketServer.listen(env.wsPort);
+  logger.info("WS server listening on port", env.wsPort);
+
   httpServer.listen(env.httpPort);
+  logger.info("HTTP server listening on port", env.httpPort);
+
   setInterval(tick, env.tickInterval);
 
   let lastTick = performance.now();
