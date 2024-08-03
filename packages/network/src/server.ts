@@ -30,7 +30,11 @@ export interface CreateServerOptions<
   createContext: (options: CreateContextOptions) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeClientState: Serializer<ClientState>;
-  onEventError?: (error: unknown, message: SocketIO_Message) => void;
+  onError?: (
+    error: unknown,
+    event: "connection" | "disconnect" | "message",
+    message?: SocketIO_Message,
+  ) => void;
   onMessageIgnored?: (message: SocketIO_Message) => void;
 }
 
@@ -59,40 +63,48 @@ export class Server<
       connection,
       createContext,
       parseMessage,
-      onEventError,
+      onError,
       onMessageIgnored: onEventIgnored,
     } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
-      connection?.connect({
-        context: createContext({ clientId: socket.id }),
-      });
-
-      socket.once("disconnect", (reason) => {
-        connection?.disconnect({
-          payload: reason,
+      try {
+        connection?.connect({
           context: createContext({ clientId: socket.id }),
         });
+      } catch (e) {
+        onError?.(e, "connection");
+      }
+
+      socket.once("disconnect", (reason) => {
+        try {
+          connection?.disconnect({
+            payload: reason,
+            context: createContext({ clientId: socket.id }),
+          });
+        } catch (e) {
+          onError?.(e, "disconnect");
+        }
       });
 
       socket.on("message", (serializedMessage) => {
-        const message = parseMessage(serializedMessage);
-        const { moduleName, eventName, payload } = message;
-
-        const module = modules[moduleName];
-
-        if (module.$getEventType(eventName) !== "client-to-server") {
-          onEventIgnored?.(message);
-          return;
-        }
-
+        let message;
         try {
+          message = parseMessage(serializedMessage);
+          const { moduleName, eventName, payload } = message;
+          const module = modules[moduleName];
+
+          if (module.$getEventType(eventName) !== "client-to-server") {
+            onEventIgnored?.(message);
+            return;
+          }
+
           module[eventName]({
             payload,
             context: createContext({ clientId: socket.id }),
           });
         } catch (e) {
-          onEventError?.(e, message);
+          onError?.(e, "message", message);
         }
       });
     });
