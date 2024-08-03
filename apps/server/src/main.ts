@@ -40,7 +40,6 @@ async function main() {
     areas,
     defaultAreaId,
     state: world,
-    allowReconnection,
     logger,
   });
 
@@ -49,7 +48,7 @@ async function main() {
     modules,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseMessage: serialization.message.parse,
-    onConnection: (context) => global.connect({ context }),
+    onConnection: (payload, context) => global.connect({ payload, context }),
     onDisconnect: (payload, context) => global.disconnect({ payload, context }),
     onError,
   });
@@ -97,11 +96,6 @@ async function main() {
       clientId,
       characterId: getCharacterIdByClientId(clientId),
     };
-  }
-
-  async function allowReconnection(id: ClientId, timeout: TimeSpan) {
-    logger.warn(`allowReconnection() is not implemented`);
-    return false;
   }
 
   function onError(e: unknown, type: string, message?: unknown) {

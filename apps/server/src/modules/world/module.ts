@@ -7,10 +7,10 @@ import {
 } from "@mp/state";
 import type { VectorLike } from "@mp/excalibur";
 import type { Logger } from "@mp/logger";
-import type { DisconnectReason } from "@mp/network/server";
+import type { ConnectReason } from "@mp/network/server";
+import { type DisconnectReason } from "@mp/network/server";
 import { t } from "../factory";
-import type { ClientId } from "../../context";
-import type { Character } from "./schema";
+import type { CharacterId } from "./schema";
 import type { WorldState } from "./schema";
 
 export interface WorldModuleDependencies {
@@ -18,16 +18,42 @@ export interface WorldModuleDependencies {
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
   logger: Logger;
-  allowReconnection: (id: ClientId, timeout: TimeSpan) => Promise<boolean>;
+  characterKeepAliveTimeout?: TimeSpan;
 }
 
 export function createWorldModule({
   state,
   areas,
   defaultAreaId,
-  allowReconnection,
   logger,
+  characterKeepAliveTimeout = TimeSpan.fromMilliseconds(5000),
 }: WorldModuleDependencies) {
+  const characterRemovalTimeouts = new Map<CharacterId, NodeJS.Timeout>();
+
+  function enqueueCharacterRemoval(id: CharacterId) {
+    characterRemovalTimeouts.set(
+      id,
+      setTimeout(
+        () => removeCharacter(id),
+        characterKeepAliveTimeout.totalMilliseconds,
+      ),
+    );
+  }
+
+  function cancelCharacterRemoval(id: CharacterId) {
+    const timeout = characterRemovalTimeouts.get(id);
+    if (timeout) {
+      clearTimeout(timeout);
+      characterRemovalTimeouts.delete(id);
+    }
+  }
+
+  function removeCharacter(id: CharacterId) {
+    state.characters.delete(id);
+    characterRemovalTimeouts.delete(id);
+    logger.info("Character removed", id);
+  }
+
   return t.module({
     tick: t.event
       .type("server-only")
@@ -80,28 +106,41 @@ export function createWorldModule({
 
     join: t.event
       .type("server-only")
-      .create(({ context: { clientId, characterId } }) => {
-        logger.info("Client joined", clientId);
-        logger.info("Character claimed", characterId);
+      .payload<ConnectReason>()
+      .create(
+        ({ payload: connectReason, context: { clientId, characterId } }) => {
+          if (connectReason === "recovered") {
+            cancelCharacterRemoval(characterId);
+            logger.info("Client reconnected", clientId);
+          } else {
+            logger.info("Client joined", clientId);
+          }
 
-        const area = areas.get(defaultAreaId);
-        if (!area) {
-          logger.error("Default area not found", defaultAreaId);
-          return;
-        }
+          let player = state.characters.get(characterId);
+          if (!player) {
+            logger.info("Character claimed", characterId);
 
-        const player: Character = {
-          connected: false,
-          areaId: area.id,
-          coords: { x: 0, y: 0 },
-          id: characterId,
-          path: [],
-          speed: 3,
-        };
-        player.coords = area.start;
-        player.connected = true;
-        state.characters.set(player.id, player);
-      }),
+            const area = areas.get(defaultAreaId);
+            if (!area) {
+              logger.error("Default area not found", defaultAreaId);
+              return;
+            }
+
+            player = {
+              connected: false,
+              areaId: area.id,
+              coords: { x: 0, y: 0 },
+              id: characterId,
+              path: [],
+              speed: 3,
+            };
+            player.coords = area.start;
+            state.characters.set(player.id, player);
+          }
+
+          player.connected = true;
+        },
+      ),
 
     leave: t.event
       .type("server-only")
@@ -113,20 +152,10 @@ export function createWorldModule({
 
           if (reason !== "transport close") {
             logger.info("Allowing reconnection...", clientId);
-            const didReconnect = await allowReconnection(
-              clientId,
-              TimeSpan.fromSeconds(2),
-            );
-            if (didReconnect) {
-              logger.info("Reconnected!", clientId);
-              state.characters.get(characterId)!.connected = true;
-              return;
-            }
-            logger.info("Client never reconnected", clientId);
+            enqueueCharacterRemoval(characterId);
+          } else {
+            removeCharacter(characterId);
           }
-
-          state.characters.delete(characterId);
-          logger.info("Character removed", characterId);
         },
       ),
   });
