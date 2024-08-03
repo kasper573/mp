@@ -46,7 +46,7 @@ export class Server<
         createContext({ clientId: socket.id as ClientId });
 
       try {
-        onConnection?.(socketContext());
+        onConnection?.(socket.recovered ? "recovered" : "new", socketContext());
       } catch (e) {
         onError?.(e, "connection");
       }
@@ -105,7 +105,7 @@ export interface CreateServerOptions<
   createContext: (options: CreateContextOptions<ClientId>) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeStateUpdate: Serializer<StateUpdate>;
-  onConnection?: (context: ServerContext) => void;
+  onConnection?: (reason: ConnectReason, context: ServerContext) => void;
   onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
   onError?: ServerErrorHandler;
   onMessageIgnored?: (message: SocketIO_Message) => void;
@@ -125,3 +125,5 @@ export type { DisconnectReason };
 export type { inferModuleDefinitions } from "./module";
 export type { EventResult } from "./event";
 export type * from "./serialization";
+
+export type ConnectReason = "new" | "recovered";
