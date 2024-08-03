@@ -34,8 +34,12 @@ async function main() {
   const world: WorldState = { characters: new Map() };
 
   const logger = new Logger(console);
+  const httpLogger = logger.chain("http");
+  const wsLogger = logger.chain("ws");
+
   const global = createGlobalModule();
   const httpServer = express();
+  httpServer.use(createExpressLogger(httpLogger));
   httpServer.use(createCors());
   httpServer.use(publicPath, express.static(publicDir, {}));
 
@@ -44,7 +48,7 @@ async function main() {
     areas,
     defaultAreaId,
     state: world,
-    logger,
+    logger: wsLogger,
     createUrl,
   });
 
@@ -66,10 +70,10 @@ async function main() {
   });
 
   socketServer.listen(env.wsPort);
-  logger.info("WS server listening on port", env.wsPort);
+  wsLogger.info("listening on port", env.wsPort);
 
   httpServer.listen(env.httpPort);
-  logger.info("HTTP server listening on port", env.httpPort);
+  httpLogger.info("listening on port", env.httpPort);
 
   setInterval(tick, env.tickInterval);
 
@@ -137,6 +141,13 @@ async function main() {
     // TODO implement
     return characterId as unknown as ClientId;
   }
+}
+
+function createExpressLogger(logger: Logger): express.RequestHandler {
+  return (req, _, next) => {
+    logger.info(req.method, req.url);
+    next();
+  };
 }
 
 main();
