@@ -19,7 +19,7 @@ import type {
   WorldState,
 } from "./package";
 import { loadAreas } from "./modules/world/loadAreas";
-import { transformers } from "./transformers";
+import { serialization } from "./serialization";
 
 async function main() {
   const publicPath = "/public/";
@@ -48,8 +48,8 @@ async function main() {
       allowReconnection,
       logger,
     }),
-    serializeStateUpdate: transformers.stateUpdate.serialize,
-    parseMessage: transformers.message.parse,
+    serializeStateUpdate: serialization.stateUpdate.serialize,
+    parseMessage: serialization.message.parse,
     onConnection: (context) => global.connect({ context }),
     onDisconnect: (payload, context) => global.disconnect({ payload, context }),
     onError,

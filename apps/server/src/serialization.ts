@@ -5,14 +5,14 @@ import type { ClientStateUpdate } from "./context";
 
 SuperJSON.registerClass(Vector, { identifier: "vector" });
 
-const jsonTransformer = {
+const json = {
   parse: SuperJSON.parse as Parser,
   serialize: SuperJSON.stringify as Serializer,
 };
 
-export const transformers = {
-  stateUpdate: jsonTransformer as Transformer<ClientStateUpdate>,
-  message: jsonTransformer,
+export const serialization = {
+  stateUpdate: json as Transformer<ClientStateUpdate>,
+  message: json,
 };
 
 interface Transformer<T> {
