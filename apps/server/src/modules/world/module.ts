@@ -34,7 +34,7 @@ export function createWorldModule({
       .payload<TimeSpan>()
       .create(({ payload: delta }) => {
         for (const char of state.characters.values()) {
-          moveAlongPath(char.coords, char.path, char.speed * delta.seconds);
+          moveAlongPath(char.coords, char.path, char.speed, delta);
 
           const area = areas.get(char.areaId);
           if (area) {
