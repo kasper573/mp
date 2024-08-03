@@ -4,6 +4,8 @@ on: [push]
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
+  REGISTRY: ${{ vars.DIGITALOCEAN_REGISTRY }}
+  IMAGE_NAME: "mp"
 
 jobs:
   conventions:
@@ -21,14 +23,46 @@ jobs:
       - uses: ./.github/workflows/composites/install/
       - run: pnpm test
 
-  build:
+  build_and_deploy:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/workflows/composites/install/
-      - run: pnpm build
-        env:
-          NODE_ENV: production
-          # No additional application specific environment variables should be provided here or in the CI.
-          # Application environment variables should be provided by the external deployment build system.
-          # (Providing no environment variables here also ensures that all apps support being built with zero config)
+
+      - name: Build container image
+        run: docker build -t $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
+
+      - name: Install doctl
+        uses: digitalocean/action-doctl@v2
+        with:
+          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+
+      - name: Log in to DigitalOcean Container Registry with short-lived credentials
+        run: doctl registry login --expiry-seconds 600
+
+      - name: Remove all old images
+        run: if [ ! -z "$(doctl registry repository list | grep "$(echo $IMAGE_NAME)")" ]; then doctl registry repository delete-manifest $(echo $IMAGE_NAME) $(doctl registry repository list-tags $(echo $IMAGE_NAME) | grep -o "sha.*") --force; else echo "No repository"; fi
+
+      - name: Push image to DigitalOcean Container Registry
+        run: docker push $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+
+      - name: Read contents of the file .env.production and add to github actions env
+        id: readfile
+        run: echo "$(cat .env.production)" >> $GITHUB_ENV
+
+      - name: Deploy to Digital Ocean droplet via SSH action
+        uses: appleboy/ssh-action@v0.1.3
+        with:
+          host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
+          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+          envs: IMAGE_NAME,REGISTRY,{{ secrets.DIGITALOCEAN_TOKEN }},GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
+          allenvs: true
+          script: |
+            docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} registry.digitalocean.com
+            docker stop $(echo $IMAGE_NAME)
+            docker rm $(echo $IMAGE_NAME)
+            docker run -d \
+            --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
+            --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
+            --restart always \
+            --name $(echo $IMAGE_NAME) \
+            $(echo $REGISTRY)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)

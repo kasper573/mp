@@ -43,7 +43,10 @@ async function main() {
   const httpServer = express();
   httpServer.use(createExpressLogger(httpLogger));
   httpServer.use(createCors({ origin: env.httpCorsOrigin }));
-  httpServer.use(publicPath, express.static(publicDir, {}));
+  httpServer.use(publicPath, express.static(publicDir));
+  if (env.clientDistPath !== undefined) {
+    httpServer.use("/", express.static(env.clientDistPath));
+  }
 
   const modules = createModules({
     global,
