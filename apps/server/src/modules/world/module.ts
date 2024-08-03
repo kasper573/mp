@@ -114,7 +114,7 @@ export function createWorldModule({
       logger.info("Client disconnected", { clientId, reason });
       state.characters.get(clientId)!.connected = false;
 
-      if (reason !== "consented") {
+      if (reason !== "transport close") {
         logger.info("Allowing reconnection...", clientId);
         const didReconnect = await allowReconnection(clientId, 2);
         if (didReconnect) {

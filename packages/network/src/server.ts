@@ -1,4 +1,5 @@
 import { Server as SocketServer } from "socket.io";
+import type { DisconnectReason } from "socket.io";
 import type {
   EventDefinition,
   EventHandlerArg,
@@ -67,9 +68,9 @@ export class Server<
         context: createContext({ clientId: socket.id }),
       });
 
-      socket.once("disconnect", () => {
+      socket.once("disconnect", (reason) => {
         connection?.disconnect({
-          payload: "unknown", // TODO: add reason
+          payload: reason,
           context: createContext({ clientId: socket.id }),
         });
       });
@@ -126,4 +127,4 @@ export type ServerConnectionModule<ServerContext> = Module<{
   >;
 }>;
 
-export type DisconnectReason = "consented" | "unknown";
+export type { DisconnectReason };
