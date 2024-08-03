@@ -1,7 +1,5 @@
 import type { Serialized } from "./serialization";
 
-export type SocketIO_Data<ClientContext> = ClientContext;
-
 export interface SocketIO_ClientToServerEvents {
   message: (serializedMessage: Serialized<SocketIO_Message>) => void;
 }

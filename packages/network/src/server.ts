@@ -4,7 +4,6 @@ import type { DisconnectReason } from "socket.io";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
   SocketIO_ClientToServerEvents,
-  SocketIO_Data,
   SocketIO_Message,
   SocketIO_ServerToClientEvents,
 } from "./socket";
@@ -20,7 +19,7 @@ export class Server<
     SocketIO_ClientToServerEvents,
     SocketIO_ServerToClientEvents<StateUpdate>,
     object,
-    SocketIO_Data<ClientContext>
+    ClientContext
   >;
 
   constructor(
