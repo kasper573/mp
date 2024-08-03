@@ -87,4 +87,4 @@ jobs:
             --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name $(echo $DOCKER_IMAGE) \
-            ${{ steps.meta.outputs.tags }}
+            $(echo $DOCKER_IMAGE)
