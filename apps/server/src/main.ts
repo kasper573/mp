@@ -19,7 +19,7 @@ import type {
   ServerContext,
   WorldState,
 } from "./package";
-import { loadAreas } from "./modules/world/loadAreas";
+import { loadAreas } from "./modules/area/loadAreas";
 import { serialization } from "./serialization";
 
 async function main() {
@@ -41,6 +41,7 @@ async function main() {
     defaultAreaId,
     state: world,
     logger,
+    createUrl,
   });
 
   const socketServer = new Server({
