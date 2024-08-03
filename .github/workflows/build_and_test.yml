@@ -4,10 +4,10 @@ on: [push]
 env:
   TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
   TURBO_TEAM: ${{ vars.TURBO_TEAM }}
-  REGISTRY_HOST: registry.digitalocean.com
-  REGISTRY_NAME: ${{ vars.DIGITALOCEAN_REGISTRY_NAME }}
-  REGISTRY_URL: registry.digitalocean.com/${{ vars.DIGITALOCEAN_REGISTRY_NAME }}
-  IMAGE_NAME: "mp"
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_USERNAME: ${{ github.actor }}
+  DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  DOCKER_IMAGE: ${{ github.repository }}
 
 jobs:
   conventions:
@@ -27,30 +27,47 @@ jobs:
 
   build_and_deploy:
     runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      packages: write
+      attestations: write
+      id-token: write
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Build container image
-        run: docker build -t $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7) .
-
-      - name: Install doctl
-        uses: digitalocean/action-doctl@v2
+      - name: Log in to the Container registry
+        uses: docker/login-action@65b78e6e13532edd9afa3aa52ac7964289d1a9c1
         with:
-          token: ${{ secrets.DIGITALOCEAN_TOKEN }}
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ env.DOCKER_USERNAME }}
+          password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Log in to DigitalOcean Container Registry with short-lived credentials
-        run: doctl registry login --expiry-seconds 600
+      - name: Extract metadata (tags, labels) for Docker
+        id: meta
+        uses: docker/metadata-action@9ec57ed1fcdbf14dcef7dfbe97b2010124a938b7
+        with:
+          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}
 
-      - name: Remove all old images
-        run: if [ ! -z "$(doctl registry repository list | grep "$(echo $IMAGE_NAME)")" ]; then doctl registry repository delete-manifest $(echo $IMAGE_NAME) $(doctl registry repository list-tags $(echo $IMAGE_NAME) | grep -o "sha.*") --force; else echo "No repository"; fi
+      - name: Build and push Docker image
+        id: push
+        uses: docker/build-push-action@f2a1d5e99d037542a71f64918e516c093c6f3fc4
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
 
-      - name: Run DigitalOcean Container Registry garbage collection
-        run: doctl registry garbage-collection start --force --include-untagged-manifests $(echo $REGISTRY_NAME)
+      - name: Generate artifact attestation
+        uses: actions/attest-build-provenance@v1
+        with:
+          subject-name: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE}}
+          subject-digest: ${{ steps.push.outputs.digest }}
+          push-to-registry: true
 
-      - name: Push image to DigitalOcean Container Registry
-        run: docker push $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
-
-      - name: Read contents of the file .env.production and add to github actions env
+      - name: Load production environment file into Github environment
         id: readfile
         run: echo "$(cat .env.production)" >> $GITHUB_ENV
 
@@ -60,14 +77,14 @@ jobs:
           host: ${{ secrets.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: IMAGE_NAME,REGISTRY_URL,REGISTRY_HOST,GITHUB_SHA,MP_WS_PORT,MP_HTTP_PORT
+          envs: DOCKER_IMAGE,DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,MP_WS_PORT,MP_HTTP_PORT
           script: |
-            docker login -u ${{ secrets.DIGITALOCEAN_TOKEN }} -p ${{ secrets.DIGITALOCEAN_TOKEN }} $(echo $REGISTRY_HOST)
-            docker stop $(echo $IMAGE_NAME)
-            docker rm $(echo $IMAGE_NAME)
+            docker login -u $(echo $DOCKER_USERNAME) -p $(echo $DOCKER_PASSWORD) $(echo $DOCKER_REGISTRY)
+            docker stop $(echo $DOCKER_IMAGE)
+            docker rm $(echo $DOCKER_IMAGE)
             docker run -d \
             --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
             --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
-            --name $(echo $IMAGE_NAME) \
-            $(echo $REGISTRY_URL)/$(echo $IMAGE_NAME):$(echo $GITHUB_SHA | head -c7)
+            --name $(echo $DOCKER_IMAGE) \
+            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE)
