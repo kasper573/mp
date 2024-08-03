@@ -10,51 +10,42 @@ import {
 import createCors from "cors";
 import { Server } from "@mp/network/server";
 import { env } from "./env";
-import { createConnectionModule } from "./modules/connection";
+import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import type { CharacterId, ClientId, WorldState } from "./package";
 import { loadAreas } from "./modules/world/loadAreas";
 import { transformers } from "./transformers";
 
 async function main() {
-  // Data, state and configuration
   const publicPath = "/public/";
   const publicDir = path.resolve(__dirname, "../public");
   const areas = await loadAreas(path.resolve(publicDir, "areas"), createUrl);
   const defaultAreaId = areas.keys().next().value;
-  const world: WorldState = {
-    characters: new Map(),
-  };
+  const world: WorldState = { characters: new Map() };
 
-  // Modules
-  const cors = createCors();
   const logger = new Logger(console);
+  const global = createGlobalModule();
   const httpServer = express();
-
-  httpServer.use(cors);
+  httpServer.use(createCors());
   httpServer.use(publicPath, express.static(publicDir, {}));
 
-  const connection = createConnectionModule();
-  const modules = createModules({
-    connection,
-    areas,
-    defaultAreaId,
-    state: world,
-    allowReconnection,
-    logger,
-  });
-
-  let lastTickDelta = TimeSpan.Zero;
-  let lastTick = new Date();
   const socketServer = new Server({
-    connection,
     createContext: ({ clientId }) => ({
       world,
       clientId: clientId as CharacterId,
     }),
-    modules,
+    modules: createModules({
+      global,
+      areas,
+      defaultAreaId,
+      state: world,
+      allowReconnection,
+      logger,
+    }),
     serializeClientState: transformers.clientState.serialize,
     parseMessage: transformers.message.parse,
+    onConnection: (context) => global.connect({ context }),
+    onDisconnect: (payload, context) => global.disconnect({ payload, context }),
     onError,
   });
 
@@ -62,13 +53,15 @@ async function main() {
   httpServer.listen(env.httpPort);
   setInterval(tick, env.tickInterval);
 
+  let lastTickDelta = TimeSpan.Zero;
+  let lastTick = new Date();
   function tick() {
     try {
       const thisTick = new Date();
       lastTickDelta = TimeSpan.fromDateDiff(lastTick, thisTick);
       lastTick = thisTick;
 
-      modules.world.tick({
+      global.tick({
         context: { clientId: "server-tick" as ClientId, world },
         payload: lastTickDelta,
       });

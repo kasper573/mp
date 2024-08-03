@@ -1,11 +1,6 @@
 import { Server as SocketServer } from "socket.io";
 import type { DisconnectReason } from "socket.io";
-import type {
-  EventDefinition,
-  EventHandlerArg,
-  EventType,
-  Module,
-} from "./module";
+
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
   SocketIO_ClientToServerEvents,
@@ -26,10 +21,11 @@ export interface CreateServerOptions<
   ClientState,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  connection?: ServerConnectionModule<ServerContext>;
   createContext: (options: CreateContextOptions) => ServerContext;
   parseMessage: Parser<SocketIO_Message>;
   serializeClientState: Serializer<ClientState>;
+  onConnection?: (context: ServerContext) => void;
+  onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
   onError?: ServerErrorHandler;
   onMessageIgnored?: (message: SocketIO_Message) => void;
 }
@@ -56,28 +52,24 @@ export class Server<
   ) {
     const {
       modules,
-      connection,
       createContext,
       parseMessage,
       onError,
-      onMessageIgnored: onEventIgnored,
+      onMessageIgnored,
+      onConnection,
+      onDisconnect,
     } = options;
     this.wss = new SocketServer({ transports: ["websocket"] });
     this.wss.on("connection", (socket) => {
       try {
-        connection?.connect({
-          context: createContext({ clientId: socket.id }),
-        });
+        onConnection?.(createContext({ clientId: socket.id }));
       } catch (e) {
         onError?.(e, "connection");
       }
 
       socket.once("disconnect", (reason) => {
         try {
-          connection?.disconnect({
-            payload: reason,
-            context: createContext({ clientId: socket.id }),
-          });
+          onDisconnect?.(reason, createContext({ clientId: socket.id }));
         } catch (e) {
           onError?.(e, "disconnect");
         }
@@ -91,7 +83,7 @@ export class Server<
           const module = modules[moduleName];
 
           if (module.$getEventType(eventName) !== "client-to-server") {
-            onEventIgnored?.(message);
+            onMessageIgnored?.(message);
             return;
           }
 
@@ -123,17 +115,6 @@ export class Server<
 export interface CreateContextOptions {
   clientId: string;
 }
-
-/**
- * An optional module that can be used to handle server connection events.
- */
-export type ServerConnectionModule<ServerContext> = Module<{
-  connect: EventDefinition<EventType, EventHandlerArg<void, ServerContext>>;
-  disconnect: EventDefinition<
-    EventType,
-    EventHandlerArg<DisconnectReason, ServerContext>
-  >;
-}>;
 
 export type { DisconnectReason };
 
