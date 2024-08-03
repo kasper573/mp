@@ -40,7 +40,7 @@ async function main() {
   const global = createGlobalModule();
   const httpServer = express();
   httpServer.use(createExpressLogger(httpLogger));
-  httpServer.use(createCors());
+  httpServer.use(createCors({ origin: env.httpCorsOrigin }));
   httpServer.use(publicPath, express.static(publicDir, {}));
 
   const modules = createModules({
