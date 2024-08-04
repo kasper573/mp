@@ -1,4 +1,4 @@
-name: Build and Test
+name: Test, Build, Deploy
 on: [push]
 
 env:
@@ -25,7 +25,7 @@ jobs:
       - uses: ./.github/workflows/composites/install/
       - run: pnpm test
 
-  build_and_deploy:
+  build:
     runs-on: ubuntu-latest
 
     permissions:
@@ -67,6 +67,11 @@ jobs:
           subject-digest: ${{ steps.push.outputs.digest }}
           push-to-registry: true
 
+  deploy:
+    needs: build
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+
       - name: Load production environment file into Github environment
         id: readfile
         run: echo "$(cat .env.production)" >> $GITHUB_ENV
@@ -87,4 +92,4 @@ jobs:
             --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name $(echo $DOCKER_IMAGE) \
-            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name}}
+            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name }}
