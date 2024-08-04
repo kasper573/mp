@@ -88,8 +88,8 @@ jobs:
             docker stop mp
             docker rm mp
             docker run -d \
-            --publish $MP_WS_PORT:$MP_WS_PORT \
-            --publish $MP_HTTP_PORT:$MP_HTTP_PORT \
+            --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
+            --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name mp \
             $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name }}
