@@ -85,11 +85,12 @@ jobs:
           envs: DOCKER_IMAGE,DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,MP_WS_PORT,MP_HTTP_PORT
           script: |
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
-            docker stop $(echo $DOCKER_IMAGE)
-            docker rm $(echo $DOCKER_IMAGE)
+            export TAG=$DOCKER_REGISTRY/$DOCKER_IMAGE:${{ github.ref_name }}
+            docker stop $TAG
+            docker rm $TAG
             docker run -d \
-            --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
-            --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
+            --publish $MP_WS_PORT:$MP_WS_PORT \
+            --publish $MP_HTTP_PORT:$MP_HTTP_PORT \
             --restart always \
-            --name $(echo $DOCKER_IMAGE) \
-            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name }}
+            --name $TAG \
+            $TAG
