@@ -1,6 +1,7 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { signal, type Signal } from "@preact/signals-core";
+import type { ReadonlySignal } from "@preact/signals-core";
+import { computed, signal, type Signal } from "@preact/signals-core";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,
@@ -25,11 +26,14 @@ export class Client<
 > {
   private socket: ClientSocket<StateUpdate>;
   readonly modules: ClientModuleRecord<ModuleDefinitions>;
-  readonly state: Signal<State>;
 
-  get clientId() {
-    return this.socket.id;
-  }
+  private readonly clientState: Signal<State>;
+  private readonly builtInState: Signal<BuiltInClientState>;
+
+  readonly state: ReadonlySignal<State & BuiltInClientState> = computed(() => ({
+    ...this.clientState.value,
+    ...this.builtInState.value,
+  }));
 
   constructor(private options: ClientOptions<State, StateUpdate>) {
     this.socket = io(options.url, { transports: ["websocket"] });
@@ -39,19 +43,31 @@ export class Client<
       this.options,
     );
 
-    this.state = signal(options.createInitialState());
+    this.clientState = signal(options.createInitialState());
+    this.builtInState = signal(this.createBuiltInState());
 
     this.socket.on("stateUpdate", (update) => {
-      this.state.value = options.createNextState(
-        this.state.value,
+      this.clientState.value = options.createNextState(
+        this.clientState.value,
         options.parseStateUpdate(update),
       );
     });
 
-    this.socket.on(
-      "disconnect",
-      () => (this.state.value = options.createInitialState()),
-    );
+    this.socket.on("connect", () => {
+      this.builtInState.value = this.createBuiltInState();
+    });
+
+    this.socket.on("disconnect", () => {
+      this.clientState.value = options.createInitialState();
+      this.builtInState.value = this.createBuiltInState();
+    });
+  }
+
+  private createBuiltInState(): BuiltInClientState {
+    return {
+      clientId: this.socket.id,
+      connected: this.socket.connected,
+    };
   }
 
   dispose() {
@@ -95,6 +111,11 @@ function createModuleProcedureBus<State, StateUpdate>(
       throw new Error("Subscriptions are not supported on the client");
     },
   );
+}
+
+export interface BuiltInClientState {
+  connected: boolean;
+  clientId?: Socket["id"];
 }
 
 export interface ClientOptions<State, StateUpdate> {
