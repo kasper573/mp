@@ -26,7 +26,7 @@ export function createWorldModule({
   areas,
   defaultAreaId,
   logger,
-  characterKeepAliveTimeout = TimeSpan.fromMilliseconds(5000),
+  characterKeepAliveTimeout = TimeSpan.fromMilliseconds(10_000),
 }: WorldModuleDependencies) {
   const characterRemovalTimeouts = new Map<CharacterId, NodeJS.Timeout>();
 
