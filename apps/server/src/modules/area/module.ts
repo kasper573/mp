@@ -13,7 +13,7 @@ export function createAreaModule(createUrl: UrlFactory) {
       .output<UrlToPublicFile>()
       .type("client-to-server")
       .create(({ input: areaId }) =>
-        createUrl(`areas/${areaId}.tmx` as PathToLocalFile),
+        createUrl(`areas/${areaId}.tmj` as PathToLocalFile),
       ),
   });
 }

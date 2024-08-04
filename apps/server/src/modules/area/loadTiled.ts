@@ -9,5 +9,5 @@ export async function loadTiled(tmxFile: string) {
 
 const tiledHeadlessInterface = {
   headless: true,
-  fileLoader: (path: string) => fs.readFile(path, "utf-8"),
+  fileLoader: (path: string) => fs.readFile(path, "utf-8").then(JSON.parse),
 };
