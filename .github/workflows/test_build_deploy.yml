@@ -85,11 +85,13 @@ jobs:
           envs: DOCKER_IMAGE,DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,MP_WS_PORT,MP_HTTP_PORT
           script: |
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
-            docker stop mp
-            docker rm mp
+            if [ "$(docker ps -q -f name=mp)" ]; then
+              docker stop mp
+              docker rm mp
+            fi
             docker run -d \
-            --publish $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
-            --publish $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
+            -p $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
+            -p $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
             --restart always \
             --name mp \
             $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name }}
