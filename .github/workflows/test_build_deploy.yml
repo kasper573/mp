@@ -59,9 +59,6 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          secret-envs:
-            TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
-            TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
 
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v1
