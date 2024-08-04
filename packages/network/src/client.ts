@@ -27,13 +27,13 @@ export class Client<
   private socket: ClientSocket<StateUpdate>;
   readonly modules: ClientModuleRecord<ModuleDefinitions>;
 
-  private readonly clientState: Signal<State>;
-  private readonly builtInState: Signal<BuiltInClientState>;
+  private _state: Signal<State>;
 
-  readonly state: ReadonlySignal<State & BuiltInClientState> = computed(() => ({
-    ...this.clientState.value,
-    ...this.builtInState.value,
-  }));
+  readonly connected = signal(false);
+  readonly state: ReadonlySignal<State> = computed(() => this._state.value);
+  get clientId() {
+    return this.socket.id;
+  }
 
   constructor(private options: ClientOptions<State, StateUpdate>) {
     this.socket = io(options.url, { transports: ["websocket"] });
@@ -43,31 +43,17 @@ export class Client<
       this.options,
     );
 
-    this.clientState = signal(options.createInitialState());
-    this.builtInState = signal(this.createBuiltInState());
+    this._state = signal(options.createInitialState());
 
     this.socket.on("stateUpdate", (update) => {
-      this.clientState.value = options.createNextState(
-        this.clientState.value,
+      this._state.value = options.createNextState(
+        this._state.value,
         options.parseStateUpdate(update),
       );
     });
 
-    this.socket.on("connect", () => {
-      this.builtInState.value = this.createBuiltInState();
-    });
-
-    this.socket.on("disconnect", () => {
-      this.clientState.value = options.createInitialState();
-      this.builtInState.value = this.createBuiltInState();
-    });
-  }
-
-  private createBuiltInState(): BuiltInClientState {
-    return {
-      clientId: this.socket.id,
-      connected: this.socket.connected,
-    };
+    this.socket.on("connect", () => (this.connected.value = true));
+    this.socket.on("disconnect", () => (this.connected.value = false));
   }
 
   dispose() {

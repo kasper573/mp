@@ -1,15 +1,26 @@
 import type { CSSProperties } from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { createGame } from "../ecs/Game";
 import { AreaLoader } from "../ecs/AreaLoader";
+import { api } from "../api";
 
 export function App() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const debugTextRef = useRef<HTMLSpanElement>(null);
   const areaLoader = useMemo(() => new AreaLoader(), []);
+  const connected = useSyncExternalStore(
+    (fn) => api.connected.subscribe(fn),
+    () => api.connected.value,
+  );
 
   useEffect(() => {
-    if (!container) {
+    if (!container || !connected) {
       return;
     }
 
@@ -17,7 +28,7 @@ export function App() {
     container.appendChild(game.canvas);
     game.start();
     return () => game.dispose();
-  }, [container]);
+  }, [container, connected]);
 
   function renderDebugText(text: string) {
     if (debugTextRef.current) {
@@ -29,6 +40,7 @@ export function App() {
   return (
     <>
       <div ref={setContainer} />
+      {!connected && <div>Connecting...</div>}
       <span style={styles.debugText} ref={debugTextRef} />
     </>
   );

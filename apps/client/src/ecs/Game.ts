@@ -29,9 +29,7 @@ export function createGame(
 }
 
 function me() {
-  return api.state.value.characters.get(
-    api.state.value.clientId as CharacterId,
-  );
+  return api.state.value.characters.get(api.clientId as CharacterId);
 }
 
 function createAreaChanger(

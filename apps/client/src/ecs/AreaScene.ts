@@ -17,7 +17,7 @@ export class AreaScene extends Scene {
   private cameraZoom = 2;
 
   get myCharacterId() {
-    return api.state.value.clientId;
+    return api.clientId;
   }
 
   constructor(
