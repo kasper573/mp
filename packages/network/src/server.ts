@@ -41,7 +41,12 @@ export class Server<
       onConnection,
       onDisconnect,
     } = options;
-    this.wss = new SocketServer({ transports: ["websocket"] });
+
+    this.wss = new SocketServer({
+      transports: ["websocket"],
+      connectionStateRecovery: {},
+    });
+
     this.wss.on("connection", (socket) => {
       const socketContext = () =>
         createContext({ clientId: socket.id as ClientId });
