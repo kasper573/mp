@@ -5,6 +5,8 @@ on:
   workflow_dispatch:
 jobs:
   ghcr-cleanup-image:
+    permissions:
+      packages: write
     name: ghcr cleanup action
     runs-on: ubuntu-latest
     steps:
