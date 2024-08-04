@@ -71,7 +71,7 @@ jobs:
     needs: build
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
-
+    steps:
       - name: Load production environment file into Github environment
         id: readfile
         run: echo "$(cat .env.production)" >> $GITHUB_ENV
