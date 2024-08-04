@@ -1,0 +1,22 @@
+{
+  "name": "@mp/transformer",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "superjson": "2.2.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "vitest": "2.0.3"
+  }
+}

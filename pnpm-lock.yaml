@@ -102,15 +102,15 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@mp/transformer':
+        specifier: workspace:*
+        version: link:../../packages/transformer
       cors:
         specifier: 2.8.5
         version: 2.8.5
       express:
         specifier: 4.19.2
         version: 4.19.2
-      superjson:
-        specifier: 2.2.1
-        version: 2.2.1
     devDependencies:
       '@mp/build':
         specifier: workspace:*
@@ -174,9 +174,15 @@ importers:
       socket.io-client:
         specifier: 4.7.5
         version: 4.7.5
-      superjson:
-        specifier: 2.2.1
-        version: 2.2.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
+
+  packages/schema:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -200,6 +206,28 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+
+  packages/tiled:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
+
+  packages/transformer:
+    dependencies:
+      superjson:
+        specifier: 2.2.1
+        version: 2.2.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
 
   packages/tsconfig:
     dependencies:

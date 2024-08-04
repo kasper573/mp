@@ -14,10 +14,11 @@ import type { ProcedureBus } from "./procedure";
 import { createProcedureBus } from "./procedure";
 import type {
   SocketIO_ClientToServerEvents,
+  SocketIO_DTOParser,
+  SocketIO_DTOSerializer,
   SocketIO_RPC,
   SocketIO_ServerToClientEvents,
 } from "./socket";
-import type { Parser, Serializer } from "./serialization";
 
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
@@ -106,14 +107,14 @@ export interface BuiltInClientState {
 
 export interface ClientOptions<State, StateUpdate> {
   url: string;
-  serializeRPC: Serializer<SocketIO_RPC>;
-  parseRPCOutput: Parser<unknown>;
-  parseStateUpdate: Parser<StateUpdate>;
+  serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
+  parseRPCOutput: SocketIO_DTOParser<unknown>;
+  parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
 }
 
-export type * from "./serialization";
+export type { SocketIO_DTO } from "./socket";
 
 type ClientSocket<State> = Socket<
   SocketIO_ServerToClientEvents<State>,

@@ -1,21 +1,15 @@
-import SuperJSON from "superjson";
+import type { AbstractTransformer } from "@mp/transformer";
+import { jsonTransformer, type ConcreteTransformer } from "@mp/transformer";
 import { Vector } from "@mp/excalibur";
-import type { Parser, Serializer } from "@mp/network/server";
+import type { SocketIO_DTO } from "@mp/network/server";
 import type { ClientStateUpdate } from "./context";
 
-SuperJSON.registerClass(Vector, { identifier: "vector" });
-
-const json = {
-  parse: SuperJSON.parse as Parser,
-  serialize: SuperJSON.stringify as Serializer,
-};
+jsonTransformer.registerClass(Vector, { identifier: "vector" });
 
 export const serialization = {
-  stateUpdate: json as Transformer<ClientStateUpdate>,
-  rpc: json,
+  stateUpdate: jsonTransformer as unknown as ConcreteTransformer<
+    ClientStateUpdate,
+    SocketIO_DTO
+  >,
+  rpc: jsonTransformer as unknown as AbstractTransformer<SocketIO_DTO>,
 };
-
-interface Transformer<T> {
-  parse: Parser<T>;
-  serialize: Serializer<T>;
-}

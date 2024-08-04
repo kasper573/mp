@@ -1,9 +1,7 @@
-import type { Serialized } from "./serialization";
-
 export interface SocketIO_ClientToServerEvents {
   rpc: (
-    serializedRPC: Serialized<SocketIO_RPC>,
-    respondWithOutput: (serializedOutput: Serialized<unknown>) => void,
+    rpc: SocketIO_DTO<SocketIO_RPC>,
+    respondWithOutput: (output: SocketIO_DTO<unknown>) => void,
   ) => void;
 }
 
@@ -14,5 +12,17 @@ export interface SocketIO_RPC {
 }
 
 export interface SocketIO_ServerToClientEvents<StateUpdate> {
-  stateUpdate: (update: Serialized<StateUpdate>) => void;
+  stateUpdate: (update: SocketIO_DTO<StateUpdate>) => void;
 }
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SocketIO_DTOSerializer<T = any> = (value: T) => SocketIO_DTO<T>;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SocketIO_DTOParser<T = any> = (data: SocketIO_DTO<T>) => T;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type SocketIO_DTO<T = any> = (Uint8Array | string) & {
+  T?: T;
+  __brand__: "SocketIO_DTO";
+};

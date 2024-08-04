@@ -4,10 +4,11 @@ import type { DisconnectReason } from "socket.io";
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
   SocketIO_ClientToServerEvents,
+  SocketIO_DTOParser,
+  SocketIO_DTOSerializer,
   SocketIO_RPC as SocketIO_RPC,
   SocketIO_ServerToClientEvents,
 } from "./socket";
-import type { Parser, Serializer } from "./serialization";
 
 export class Server<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
@@ -114,9 +115,9 @@ export interface CreateServerOptions<
 > {
   modules: ModuleRecord<ModuleDefinitions>;
   createContext: (options: CreateContextOptions<ClientId>) => ServerContext;
-  parseRPC: Parser<SocketIO_RPC>;
-  serializeRPCOutput: Serializer<unknown>;
-  serializeStateUpdate: Serializer<StateUpdate>;
+  parseRPC: SocketIO_DTOParser<SocketIO_RPC>;
+  serializeRPCOutput: SocketIO_DTOSerializer<unknown>;
+  serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
   onConnection?: (reason: ConnectReason, context: ServerContext) => void;
   onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
   onError?: ServerErrorHandler;
@@ -135,6 +136,6 @@ export type ServerErrorHandler = (
 
 export type { DisconnectReason };
 export type { inferModuleDefinitions } from "./module";
-export type * from "./serialization";
+export type { SocketIO_DTO } from "./socket";
 
 export type ConnectReason = "new" | "recovered";

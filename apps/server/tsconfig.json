@@ -1,6 +1,1 @@
-{
-  "extends": "@mp/tsconfig/node.json",
-  "compilerOptions": {
-    "useDefineForClassFields": false
-  }
-}
+{ "extends": "@mp/tsconfig/node.json" }

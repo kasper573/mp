@@ -18,9 +18,9 @@
     "@mp/state": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/transformer": "workspace:*",
     "express": "4.19.2",
-    "cors": "2.8.5",
-    "superjson": "2.2.1"
+    "cors": "2.8.5"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
