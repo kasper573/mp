@@ -68,7 +68,7 @@ jobs:
           push-to-registry: true
 
   deploy:
-    needs: build
+    needs: [build, test, conventions]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
