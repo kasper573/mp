@@ -211,7 +211,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/tiled:
+  packages/tiled-parser:
     dependencies:
       '@mp/schema':
         specifier: workspace:*
