@@ -1,10 +1,10 @@
-import type { Type } from "@mp/schema";
+import type { Schema } from "@mp/schema";
 import { customAsync, object, parse, string } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import { tileset as tilesetSchema, type Tileset } from "./tileset";
 import { globalTileID } from "./common";
 
-export function tilesetReference(context: LoaderContext): Type<Tileset> {
+export function tilesetReference(context: LoaderContext): Schema<Tileset> {
   return customAsync(async (data): Promise<Tileset> => {
     let tileset = parse(tilesetSchema, data);
 

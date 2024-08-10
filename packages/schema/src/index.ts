@@ -10,7 +10,7 @@ import {
   transform as transformImpl,
 } from "valibot";
 
-export type { InferOutput as TypeOf, GenericSchema as Type };
+export type { InferOutput as TypeOf, GenericSchema as Schema };
 export {
   array,
   variant,

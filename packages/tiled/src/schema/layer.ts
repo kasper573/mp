@@ -1,4 +1,4 @@
-import type { Type, TypeOf } from "@mp/schema";
+import type { Schema, TypeOf } from "@mp/schema";
 import {
   array,
   boolean,
@@ -109,9 +109,9 @@ export type GroupLayer = TypeOf<typeof sharedObj> & {
   layers: Layer[];
 };
 
-const layerArray: Type<Layer[]> = lazy(() => array(layer));
+const layerArray: Schema<Layer[]> = lazy(() => array(layer));
 
-export const groupLayer: Type<GroupLayer> = object({
+export const groupLayer: Schema<GroupLayer> = object({
   type: literal("group"),
   layers: layerArray,
   ...sharedProperties,
@@ -119,7 +119,7 @@ export const groupLayer: Type<GroupLayer> = object({
 
 export type Layer = GroupLayer | TileLayer | ImageLayer | ObjectGroupLayer;
 
-export const layer: Type<Layer> = lazy((input): Type<Layer> => {
+export const layer: Schema<Layer> = lazy((input): Schema<Layer> => {
   if (input && typeof input === "object" && "type" in input) {
     switch (input.type as Layer["type"]) {
       case "group":
