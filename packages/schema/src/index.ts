@@ -1,13 +1,9 @@
 import {
   number,
-  unknown as unknownSchema,
   string as stringSchema,
   boolean as booleanSchema,
-  never as neverSchema,
   type GenericSchema,
   type InferOutput,
-  pipe,
-  transform as transformImpl,
 } from "valibot";
 
 export type { InferOutput as TypeOf, GenericSchema as Schema };
@@ -22,27 +18,17 @@ export {
   lazy,
   intersect as intersection,
   tuple,
-  parse,
-  parseAsync,
-  safeParse,
-  safeParseAsync,
+  safeParse as parse,
+  safeParseAsync as parseAsync,
   fallback,
 } from "valibot";
 
 export * from "./literalEnum";
 export * from "./customAsync";
+export * from "./transform";
 
-export const unknown = unknownSchema();
 export const integer = number();
 export const float = number();
 export const uchar = number();
 export const string = stringSchema();
 export const boolean = booleanSchema();
-export const never = neverSchema();
-
-export function transform<From, To>(
-  base: GenericSchema<From>,
-  fn: (from: From) => To,
-): GenericSchema<To> {
-  return pipe(base, transformImpl(fn)) as GenericSchema<To>;
-}

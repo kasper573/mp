@@ -1,21 +1,35 @@
-import type { Schema } from "@mp/schema";
+import type { CustomParserResult, Schema } from "@mp/schema";
 import { customAsync, object, parse, string } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import { tileset as tilesetSchema, type Tileset } from "./tileset";
 import { globalTileID } from "./common";
 
 export function tilesetReference(context: LoaderContext): Schema<Tileset> {
-  return customAsync(async (data): Promise<Tileset> => {
-    let tileset = parse(tilesetSchema, data);
+  return customAsync<Tileset>(
+    async (data): Promise<CustomParserResult<Tileset>> => {
+      const tilesetResult = parse(tilesetSchema, data);
+      if (tilesetResult.success) {
+        return tilesetResult;
+      }
 
-    if (!tileset) {
-      const file = parse(tilesetFile, data);
-      const json = await context.loadTileset(file.source);
-      tileset = parse(tilesetSchema, json);
-    }
+      const fileResult = parse(tilesetFile, data);
+      if (!fileResult.success) {
+        return { success: false, issues: fileResult.issues };
+      }
 
-    return tileset;
-  });
+      let json: unknown;
+      try {
+        json = await context.loadTileset(fileResult.output.source);
+      } catch (error) {
+        return {
+          success: false,
+          issues: [`Failed to load tileset: ${error}`],
+        };
+      }
+
+      return parse(tilesetSchema, json);
+    },
+  );
 }
 
 const tilesetFile = object({
