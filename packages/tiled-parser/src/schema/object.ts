@@ -10,6 +10,7 @@ import {
   transform,
   union,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 import {
   file,
   globalTileID,
@@ -86,9 +87,11 @@ export const tiledObject = union([
   rectangleObject,
 ]);
 
-export type ObjectTemplate = TypeOf<typeof objectTemplate>;
-export const objectTemplate = object({
-  template: file,
-  tileset: optional(tilesetReference),
-  object: tiledObject,
-});
+export type ObjectTemplate = TypeOf<ReturnType<typeof objectTemplate>>;
+export function objectTemplate(context: LoaderContext) {
+  return object({
+    template: file,
+    tileset: optional(tilesetReference(context)),
+    object: tiledObject,
+  });
+}
