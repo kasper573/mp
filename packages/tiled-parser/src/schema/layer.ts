@@ -11,6 +11,7 @@ import {
   literalEnum,
   fallback,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 import {
   color,
   Compression,
@@ -94,13 +95,15 @@ export const imageLayer = object({
   ...sharedProperties,
 });
 
-export type ObjectGroupLayer = TypeOf<typeof objectGroupLayer>;
-export const objectGroupLayer = object({
-  type: literal("objectgroup"),
-  draworder: fallback(layerDrawOrder, "topdown"),
-  objects: array(tiledObject),
-  ...sharedProperties,
-});
+export type ObjectGroupLayer = TypeOf<ReturnType<typeof objectGroupLayer>>;
+export function objectGroupLayer(context: LoaderContext) {
+  return object({
+    type: literal("objectgroup"),
+    draworder: fallback(layerDrawOrder, "topdown"),
+    objects: array(tiledObject(context)),
+    ...sharedProperties,
+  });
+}
 
 const sharedObj = object(sharedProperties);
 
@@ -109,28 +112,30 @@ export type GroupLayer = TypeOf<typeof sharedObj> & {
   layers: Layer[];
 };
 
-const layerArray: Schema<Layer[]> = lazy(() => array(layer));
-
-export const groupLayer: Schema<GroupLayer> = object({
-  type: literal("group"),
-  layers: layerArray,
-  ...sharedProperties,
-});
+export function groupLayer(context: LoaderContext): Schema<GroupLayer> {
+  return object({
+    type: literal("group"),
+    layers: lazy(() => array(layer(context))),
+    ...sharedProperties,
+  });
+}
 
 export type Layer = GroupLayer | TileLayer | ImageLayer | ObjectGroupLayer;
 
-export const layer: Schema<Layer> = lazy((input): Schema<Layer> => {
-  if (input && typeof input === "object" && "type" in input) {
-    switch (input.type as Layer["type"]) {
-      case "group":
-        return groupLayer;
-      case "tilelayer":
-        return tileLayer;
-      case "imagelayer":
-        return imageLayer;
-      case "objectgroup":
-        return objectGroupLayer;
+export function layer(context: LoaderContext): Schema<Layer> {
+  return lazy((input): Schema<Layer> => {
+    if (input && typeof input === "object" && "type" in input) {
+      switch (input.type as Layer["type"]) {
+        case "group":
+          return groupLayer(context);
+        case "tilelayer":
+          return tileLayer;
+        case "imagelayer":
+          return imageLayer;
+        case "objectgroup":
+          return objectGroupLayer(context);
+      }
     }
-  }
-  throw new Error(`Not a layer type: ${input}`);
-});
+    throw new Error(`Not a layer type: ${input}`);
+  });
+}

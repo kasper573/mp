@@ -1,8 +1,9 @@
-import type { TypeOf } from "@mp/schema";
+import type { Schema, TypeOf } from "@mp/schema";
 import {
   array,
   boolean,
   intersection,
+  lazy,
   literal,
   object,
   optional,
@@ -23,6 +24,7 @@ import {
 import { property } from "./property";
 import { text } from "./text";
 import { tilesetReference } from "./tilesetReference";
+import type { Tileset } from "./tileset";
 
 const commonProperties = object({
   /**
@@ -77,21 +79,39 @@ export const rectangleObject = transform(commonProperties, (data) => ({
   rectangle: true,
 }));
 
-export type TiledObject = TypeOf<typeof tiledObject>;
-export const tiledObject = union([
-  ellipseObject,
-  pointObject,
-  polygonObject,
-  polylineObject,
-  textObject,
-  rectangleObject,
-]);
+export type TiledObject =
+  | EllipseObject
+  | PointObject
+  | PolygonObject
+  | PolylineObject
+  | TextObject
+  | RectangleObject
+  | ObjectTemplate;
 
-export type ObjectTemplate = TypeOf<ReturnType<typeof objectTemplate>>;
-export function objectTemplate(context: LoaderContext) {
+export function tiledObject(context: LoaderContext): Schema<TiledObject> {
+  return lazy(() =>
+    union([
+      ellipseObject,
+      pointObject,
+      polygonObject,
+      polylineObject,
+      textObject,
+      rectangleObject,
+      objectTemplate(context),
+    ]),
+  );
+}
+
+export interface ObjectTemplate {
+  template: string;
+  tileset?: Tileset;
+  object: TiledObject;
+}
+
+export function objectTemplate(context: LoaderContext): Schema<ObjectTemplate> {
   return object({
     template: file,
     tileset: optional(tilesetReference(context)),
-    object: tiledObject,
+    object: tiledObject(context),
   });
 }
