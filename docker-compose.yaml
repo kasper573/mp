@@ -15,10 +15,7 @@ services:
       MP_WS_PORT: 9090
       MP_HTTP_PORT: 8080
       MP_HTTP_PUBLIC_HOSTNAME: "k573.dev"
-      MP_HTTP_LISTEN_HOSTNAME: "0.0.0.0"
       MP_HTTP_CORS_ORIGIN: "k573.dev"
-      MP_TICK_INTERVAL: 16
-      MP_CLIENT_DIST_PATH: ../client/dist
   proxy:
     image: "jc21/nginx-proxy-manager:2.11.3"
     restart: unless-stopped

@@ -20,9 +20,6 @@ importers:
       '@types/eslint__js':
         specifier: ^8.42.3
         version: 8.42.3
-      dotenv-flow-cli:
-        specifier: 1.1.1
-        version: 1.1.1
       eslint:
         specifier: 9.7.0
         version: 9.7.0
@@ -111,6 +108,9 @@ importers:
       express:
         specifier: 4.19.2
         version: 4.19.2
+      yargs:
+        specifier: 17.7.2
+        version: 17.7.2
     devDependencies:
       '@mp/build':
         specifier: workspace:*
@@ -124,6 +124,9 @@ importers:
       '@types/express':
         specifier: 4.17.21
         version: 4.17.21
+      '@types/yargs':
+        specifier: 17.0.33
+        version: 17.0.33
 
   packages/build:
     devDependencies:
@@ -930,6 +933,12 @@ packages:
   '@types/serve-static@1.15.7':
     resolution: {integrity: sha512-W8Ym+h8nhuRwaKPaDw34QUkwsGi6Rc4yYqvKFo5rm2FUEhCFbzVWrxXUxuKK8TASjWsysJY0nsmNCGhCOIsrOw==}
 
+  '@types/yargs-parser@21.0.3':
+    resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
+
+  '@types/yargs@17.0.33':
+    resolution: {integrity: sha512-WpxBCKWPLr4xSsHgz511rFJAM+wS28w2zEO1QDNY5zM/S8ok70NNfztH0xwhqKyaK0OHCbN98LDAZuy1ctxDkA==}
+
   '@typescript-eslint/eslint-plugin@7.16.1':
     resolution: {integrity: sha512-SxdPak/5bO0EnGktV05+Hq8oatjAYVY3Zh2bye9pGZy6+jwyR3LG3YKkV4YatlsgqXP28BTeVm9pqwJM96vf2A==}
     engines: {node: ^18.18.0 || >=20.0.0}
@@ -1403,22 +1412,6 @@ packages:
   dot-prop@5.3.0:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
     engines: {node: '>=8'}
-
-  dotenv-expand@11.0.6:
-    resolution: {integrity: sha512-8NHi73otpWsZGBSZwwknTXS5pqMOrk9+Ssrna8xCaxkzEpU9OTf9R5ArQGVw03//Zmk9MOwLPng9WwndvpAJ5g==}
-    engines: {node: '>=12'}
-
-  dotenv-flow-cli@1.1.1:
-    resolution: {integrity: sha512-r2Ij1fAqHSownUugXAmdqtgJ6pyXTuPIJFY+y4sWnwSoelBkdCEgttaremc5gdjwXjdUQqNOzonIYl/Wx69OOg==}
-    hasBin: true
-
-  dotenv-flow@4.1.0:
-    resolution: {integrity: sha512-0cwP9jpQBQfyHwvE0cRhraZMkdV45TQedA8AAUZMsFzvmLcQyc1HPv+oX0OOYwLFjIlvgVepQ+WuQHbqDaHJZg==}
-    engines: {node: '>= 12.0.0'}
-
-  dotenv@16.4.5:
-    resolution: {integrity: sha512-ZmdL2rui+eB2YwhsWzjInR8LldtZHGDoQ1ugH85ppHKwpUHL7j7rN0Ti9NCnGiQbhaZ11FpR+7ao1dNsmduNUg==}
-    engines: {node: '>=12'}
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
@@ -3709,6 +3702,12 @@ snapshots:
       '@types/node': 20.14.10
       '@types/send': 0.17.4
 
+  '@types/yargs-parser@21.0.3': {}
+
+  '@types/yargs@17.0.33':
+    dependencies:
+      '@types/yargs-parser': 21.0.3
+
   '@typescript-eslint/eslint-plugin@7.16.1(@typescript-eslint/parser@7.16.1(eslint@9.7.0)(typescript@5.5.3))(eslint@9.7.0)(typescript@5.5.3)':
     dependencies:
       '@eslint-community/regexpp': 4.11.0
@@ -4245,23 +4244,6 @@ snapshots:
   dot-prop@5.3.0:
     dependencies:
       is-obj: 2.0.0
-
-  dotenv-expand@11.0.6:
-    dependencies:
-      dotenv: 16.4.5
-
-  dotenv-flow-cli@1.1.1:
-    dependencies:
-      cross-spawn: 7.0.3
-      dotenv-expand: 11.0.6
-      dotenv-flow: 4.1.0
-      minimist: 1.2.8
-
-  dotenv-flow@4.1.0:
-    dependencies:
-      dotenv: 16.4.5
-
-  dotenv@16.4.5: {}
 
   eastasianwidth@0.2.0: {}
 

@@ -10,7 +10,6 @@ import {
 import createCors from "cors";
 import type { CreateContextOptions } from "@mp/network/server";
 import { Server } from "@mp/network/server";
-import { env } from "./env";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import {
@@ -25,8 +24,9 @@ import type { CharacterId } from "./modules/world/schema";
 import type { ServerModules } from "./modules/definition";
 import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
+import { readCliArgs, type CliArgs } from "./cli";
 
-async function main() {
+async function main(args: CliArgs) {
   const publicPath = "/public/";
   const publicDir = path.resolve(__dirname, "../public");
   const areas = await loadAreas(path.resolve(publicDir, "areas"), createUrl);
@@ -37,15 +37,15 @@ async function main() {
   const httpLogger = logger.chain("http");
   const wsLogger = logger.chain("ws");
 
-  logger.info("starting server with env", env);
+  logger.info("starting server with env", args);
 
   const global = createGlobalModule();
   const httpServer = express();
   httpServer.use(createExpressLogger(httpLogger));
-  httpServer.use(createCors({ origin: env.httpCorsOrigin }));
+  httpServer.use(createCors({ origin: args.httpCorsOrigin }));
   httpServer.use(publicPath, express.static(publicDir));
-  if (env.clientDistPath !== undefined) {
-    httpServer.use("/", express.static(env.clientDistPath));
+  if (args.clientDistPath !== undefined) {
+    httpServer.use("/", express.static(args.clientDistPath));
   }
 
   const modules = createModules({
@@ -74,17 +74,17 @@ async function main() {
     onError,
   });
 
-  socketServer.listen(env.wsPort);
-  wsLogger.info("listening on port", env.wsPort);
+  socketServer.listen(args.wsPort);
+  wsLogger.info("listening on port", args.wsPort);
 
-  httpServer.listen(env.httpPort, env.httpListenHostname, () => {
+  httpServer.listen(args.httpPort, args.httpListenHostname, () => {
     httpLogger.info(
       "listening on",
-      `${env.httpListenHostname}:${env.httpPort}`,
+      `${args.httpListenHostname}:${args.httpPort}`,
     );
   });
 
-  setInterval(tick, env.tickInterval);
+  setInterval(tick, args.tickInterval);
 
   let lastTick = performance.now();
 
@@ -134,11 +134,11 @@ async function main() {
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
-    const port = env.httpPort === 80 ? "" : `:${env.httpPort}`;
+    const port = args.httpPort === 80 ? "" : `:${args.httpPort}`;
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${env.httpPublicHostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${args.httpPublicHostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
@@ -159,4 +159,4 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
   };
 }
 
-main();
+main(readCliArgs());
