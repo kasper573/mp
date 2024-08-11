@@ -6,18 +6,18 @@ export type CliArgs = RemoveIndexSignature<ReturnType<typeof readCliArgs>>;
 
 export function readCliArgs() {
   return yargs(hideBin(process.argv))
-    .option("clientDistPath", {
+    .option("clientPath", {
       type: "string",
       coerce: (p) => (p ? fallbackToRelative(p) : undefined),
     })
-    .option("assetsDir", {
+    .option("publicDir", {
       type: "string",
       default: "public",
       coerce: fallbackToRelative,
     })
+    .option("publicPath", { type: "string", default: "/assets/" })
     .option("port", { type: "number", default: 4000 })
-    .option("publicAssetsPath", { type: "string", default: "/assets/" })
-    .option("publicHostname", { type: "string", default: "localhost:4000" })
+    .option("hostname", { type: "string", default: "localhost:4000" })
     .option("corsOrigin", { type: "string", default: "*" })
     .option("tickInterval", { type: "number", default: 1000 / 60 })
     .parseSync();

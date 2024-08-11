@@ -32,7 +32,7 @@ async function main(args: CliArgs) {
   logger.info("starting server with env", args);
 
   const areas = await loadAreas(
-    path.resolve(args.assetsDir, "areas"),
+    path.resolve(args.publicDir, "areas"),
     createUrl,
   );
   const defaultAreaId = areas.keys().next().value;
@@ -45,9 +45,9 @@ async function main(args: CliArgs) {
   const expressApp = express();
   expressApp.use(createExpressLogger(httpLogger));
   expressApp.use(createCors({ origin: args.corsOrigin }));
-  expressApp.use(args.publicAssetsPath, express.static(args.assetsDir));
-  if (args.clientDistPath !== undefined) {
-    expressApp.use("/", express.static(args.clientDistPath));
+  expressApp.use(args.publicPath, express.static(args.publicDir));
+  if (args.clientPath !== undefined) {
+    expressApp.use("/", express.static(args.clientPath));
   }
 
   const httpServer = http.createServer(expressApp);
@@ -135,9 +135,9 @@ async function main(args: CliArgs) {
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
-      ? path.relative(args.assetsDir, fileInPublicDir)
+      ? path.relative(args.publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${args.publicHostname}${args.publicAssetsPath}${relativePath}` as UrlToPublicFile;
+    return `//${args.hostname}${args.publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
