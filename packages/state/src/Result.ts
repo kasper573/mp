@@ -17,9 +17,16 @@ export class Result<V, E = unknown> {
     return !this.state.ok ? this.state.error : fallback(this.state.value);
   }
 
-  assert(): V {
+  assert(
+    panic = (error: E): unknown => {
+      throw error;
+    },
+  ): V {
     if (!this.state.ok) {
-      throw this.state.error;
+      panic(this.state.error);
+      throw new Error(
+        `Result assertion panic function failed to exit process. Error was: ${this.state.error}`,
+      );
     }
     return this.state.value;
   }

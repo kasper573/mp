@@ -34,7 +34,7 @@ async function main(args: CliArgs) {
   const areas = await loadAreas(
     path.resolve(args.publicDir, "areas"),
     createUrl,
-  ).then((res) => res.assert());
+  ).then((res) => res.assert(panic));
 
   const defaultAreaId = areas.keys().next().value;
   const world: WorldState = { characters: new Map() };
@@ -149,6 +149,11 @@ async function main(args: CliArgs) {
   function getClientIdByCharacterId(characterId: CharacterId): ClientId {
     // TODO implement
     return characterId as unknown as ClientId;
+  }
+
+  function panic(error: unknown) {
+    logger.error("panic", error);
+    process.exit(1);
   }
 }
 
