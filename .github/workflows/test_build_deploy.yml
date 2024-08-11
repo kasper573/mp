@@ -58,7 +58,7 @@ jobs:
 
       - name: Load docker-compose file into environment
         id: read-file
-        run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64)" >> $GITHUB_ENV
+        run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
