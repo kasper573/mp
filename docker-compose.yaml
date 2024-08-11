@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: ghcr.io/kasper573/mp:latest
+    image: ghcr.io/kasper573/mp-app:latest
     restart: always
     environment:
       MP_SERVER_URL: ws://k573.dev:4000
