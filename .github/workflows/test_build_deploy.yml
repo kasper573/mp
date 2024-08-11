@@ -70,7 +70,8 @@ jobs:
           script: |
             cd ~
             echo $DOCKER_COMPOSE_BASE64 > base64.txt
-            printf '%s' \"$DOCKER_COMPOSE_BASE64\" | base64 --decode > docker-compose.yaml
+            cat base64.txt | base64 --decode > docker-compose.yaml
+            rm base64.txt
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
