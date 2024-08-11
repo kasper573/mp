@@ -7,7 +7,6 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_USERNAME: ${{ github.actor }}
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-  DOCKER_IMAGE: ${{ github.repository }}
 
 jobs:
   conventions:
