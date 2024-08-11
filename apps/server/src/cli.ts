@@ -10,12 +10,13 @@ export function readCliArgs() {
       type: "string",
       coerce: (p) => (p ? fallbackToRelative(p) : undefined),
     })
-    .option("publicDir", {
+    .option("assetsDir", {
       type: "string",
       default: "public",
       coerce: fallbackToRelative,
     })
     .option("port", { type: "number", default: 4000 })
+    .option("publicAssetsPath", { type: "string", default: "/assets/" })
     .option("publicHostname", { type: "string", default: "localhost:4000" })
     .option("corsOrigin", { type: "string", default: "*" })
     .option("tickInterval", { type: "number", default: 1000 / 60 })

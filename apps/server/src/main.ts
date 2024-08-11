@@ -28,25 +28,24 @@ import { serialization } from "./serialization";
 import { readCliArgs, type CliArgs } from "./cli";
 
 async function main(args: CliArgs) {
-  const publicPath = "/public/";
+  const logger = new Logger(console);
+  logger.info("starting server with env", args);
+
   const areas = await loadAreas(
-    path.resolve(args.publicDir, "areas"),
+    path.resolve(args.assetsDir, "areas"),
     createUrl,
   );
   const defaultAreaId = areas.keys().next().value;
   const world: WorldState = { characters: new Map() };
 
-  const logger = new Logger(console);
   const httpLogger = logger.chain("http");
   const wsLogger = logger.chain("ws");
-
-  logger.info("starting server with env", args);
 
   const global = createGlobalModule();
   const expressApp = express();
   expressApp.use(createExpressLogger(httpLogger));
   expressApp.use(createCors({ origin: args.corsOrigin }));
-  expressApp.use(publicPath, express.static(args.publicDir));
+  expressApp.use(args.publicAssetsPath, express.static(args.assetsDir));
   if (args.clientDistPath !== undefined) {
     expressApp.use("/", express.static(args.clientDistPath));
   }
@@ -136,9 +135,9 @@ async function main(args: CliArgs) {
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
-      ? path.relative(args.publicDir, fileInPublicDir)
+      ? path.relative(args.assetsDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${args.publicHostname}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${args.publicHostname}${args.publicAssetsPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
