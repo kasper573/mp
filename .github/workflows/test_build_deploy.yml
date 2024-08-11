@@ -63,7 +63,7 @@ jobs:
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           source: docker-compose.yaml
-          target: ~/docker-compose.yaml
+          target: ~/
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
