@@ -8,7 +8,7 @@ export function readCliArgs() {
   return yargs(hideBin(process.argv))
     .option("clientDistPath", { type: "string", coerce: fallbackToRelative })
     .option("port", { type: "number", default: 4000 })
-    .option("hostname", { type: "string", default: "localhost" })
+    .option("publicHostname", { type: "string", default: "localhost:4000" })
     .option("corsOrigin", { type: "string", default: "*" })
     .option("tickInterval", { type: "number", default: 1000 / 60 })
     .parseSync();

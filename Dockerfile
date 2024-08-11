@@ -18,11 +18,11 @@ RUN pnpm build
 
 # Server args
 ENV PORT=
-ENV HOSTNAME=
+ENV PUBLIC_HOSTNAME=
 ENV CORS_ORIGIN=
 
 CMD pnpm --filter server start \
   --clientDistPath=../client/dist \
   --port=$PORT \
-  --hostname=$HOSTNAME \
+  --publicHostname=$PUBLIC_HOSTNAME \
   --corsOrigin=$CORS_ORIGIN \

@@ -133,11 +133,10 @@ async function main(args: CliArgs) {
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
-    const port = args.port === 80 ? "" : `:${args.port}`;
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${args.hostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${args.publicHostname}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
