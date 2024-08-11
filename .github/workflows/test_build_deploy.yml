@@ -56,15 +56,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up SSH
-        run: |
-          mkdir -p ~/.ssh
-          echo "${{ secrets.DIGITALOCEAN_SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H ${{ vars.DIGITALOCEAN_SSH_HOST }} >> ~/.ssh/known_hosts
-
-      - name: Copy Docker Compose file to server
-        run: rsync -avz -e "ssh -i ~/.ssh/id_rsa" docker-compose.yaml ${{ vars.DIGITALOCEAN_SSH_USERNAME }}@${{ vars.DIGITALOCEAN_SSH_HOST }}:~/
+      - name: Load docker-compose file into environment
+        id: read-file
+        run: echo "DOCKER_COMPOSE=$(cat docker-compose.yaml)" >> $GITHUB_ENV
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
@@ -72,9 +66,10 @@ jobs:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD
+          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,DOCKER_COMPOSE
           script: |
             cd ~
+            printf '%s' \"$DOCKER_COMPOSE\" > docker-compose.yaml
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
