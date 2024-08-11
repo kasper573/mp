@@ -66,7 +66,7 @@ jobs:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,DOCKER_COMPOSE
+          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,DOCKER_COMPOSE_BASE64
           script: |
             cd ~
             echo \"$DOCKER_COMPOSE_BASE64\" | base64 --decode > docker-compose.yaml
