@@ -58,7 +58,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Copy Docker Compose file to server
-        uses: appleboy/scp-action@v1.0.3
+        uses: appleboy/scp-action@v0.1.7
         with:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
