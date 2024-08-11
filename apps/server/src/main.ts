@@ -34,7 +34,8 @@ async function main(args: CliArgs) {
   const areas = await loadAreas(
     path.resolve(args.publicDir, "areas"),
     createUrl,
-  );
+  ).then((res) => res.assert());
+
   const defaultAreaId = areas.keys().next().value;
   const world: WorldState = { characters: new Map() };
 
