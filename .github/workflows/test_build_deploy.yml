@@ -46,8 +46,8 @@ jobs:
 
       - name: Build and push Docker images
         run: |
-          docker compose -f docker-compose.build.yaml build
-          docker compose -f docker-compose.build.yaml push
+          docker compose build
+          docker compose push
 
   deploy:
     needs: [build, test, conventions]
