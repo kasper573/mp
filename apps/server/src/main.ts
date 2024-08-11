@@ -29,8 +29,10 @@ import { readCliArgs, type CliArgs } from "./cli";
 
 async function main(args: CliArgs) {
   const publicPath = "/public/";
-  const publicDir = path.resolve(__dirname, "../public");
-  const areas = await loadAreas(path.resolve(publicDir, "areas"), createUrl);
+  const areas = await loadAreas(
+    path.resolve(args.publicDir, "areas"),
+    createUrl,
+  );
   const defaultAreaId = areas.keys().next().value;
   const world: WorldState = { characters: new Map() };
 
@@ -44,7 +46,7 @@ async function main(args: CliArgs) {
   const expressApp = express();
   expressApp.use(createExpressLogger(httpLogger));
   expressApp.use(createCors({ origin: args.corsOrigin }));
-  expressApp.use(publicPath, express.static(publicDir));
+  expressApp.use(publicPath, express.static(args.publicDir));
   if (args.clientDistPath !== undefined) {
     expressApp.use("/", express.static(args.clientDistPath));
   }
@@ -134,7 +136,7 @@ async function main(args: CliArgs) {
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
-      ? path.relative(publicDir, fileInPublicDir)
+      ? path.relative(args.publicDir, fileInPublicDir)
       : fileInPublicDir;
     return `//${args.publicHostname}${publicPath}${relativePath}` as UrlToPublicFile;
   }

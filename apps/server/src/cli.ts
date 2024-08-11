@@ -6,7 +6,15 @@ export type CliArgs = RemoveIndexSignature<ReturnType<typeof readCliArgs>>;
 
 export function readCliArgs() {
   return yargs(hideBin(process.argv))
-    .option("clientDistPath", { type: "string", coerce: fallbackToRelative })
+    .option("clientDistPath", {
+      type: "string",
+      coerce: (p) => (p ? fallbackToRelative(p) : undefined),
+    })
+    .option("publicDir", {
+      type: "string",
+      default: "public",
+      coerce: fallbackToRelative,
+    })
     .option("port", { type: "number", default: 4000 })
     .option("publicHostname", { type: "string", default: "localhost:4000" })
     .option("corsOrigin", { type: "string", default: "*" })
@@ -14,10 +22,8 @@ export function readCliArgs() {
     .parseSync();
 }
 
-function fallbackToRelative(p?: string) {
-  if (p !== undefined) {
-    return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
-  }
+function fallbackToRelative(p: string): string {
+  return path.isAbsolute(p) ? p : path.resolve(process.cwd(), p);
 }
 
 type RemoveIndexSignature<T> = {
