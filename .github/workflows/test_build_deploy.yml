@@ -57,7 +57,6 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Load docker-compose file into environment
-        id: read-file
         run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
 
       - name: Deploy to Digital Ocean droplet via SSH action
@@ -67,8 +66,10 @@ jobs:
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,DOCKER_COMPOSE_BASE64
+          script_stop: true
           script: |
             cd ~
+            echo $DOCKER_COMPOSE_BASE64 > base64.txt
             printf '%s' \"$DOCKER_COMPOSE_BASE64\" | base64 --decode > docker-compose.yaml
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             docker compose pull
