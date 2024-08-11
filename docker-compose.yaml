@@ -3,13 +3,15 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        NODE_ENV: production
+        MP_SERVER_URL: ws://k573.dev:9090
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
       - "8080"
       - "9090:9090"
     environment:
-      MP_SERVER_URL: ws://k573.dev:9090
       MP_WS_PORT: 9090
       MP_HTTP_PORT: 8080
       MP_HTTP_PUBLIC_HOSTNAME: "k573.dev"
