@@ -31,7 +31,6 @@ jobs:
     permissions:
       contents: read
       packages: write
-      attestations: write
       id-token: write
 
     steps:
@@ -45,27 +44,10 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Extract metadata (tags, labels) for Docker
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE }}
-
-      - name: Build and push Docker image
-        id: push
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-
-      - name: Generate artifact attestation
-        uses: actions/attest-build-provenance@v1
-        with:
-          subject-name: ${{ env.DOCKER_REGISTRY }}/${{ env.DOCKER_IMAGE}}
-          subject-digest: ${{ steps.push.outputs.digest }}
-          push-to-registry: true
+      - name: Build and push Docker images
+        run: |
+          docker compose -f docker-compose.build.yaml build
+          docker compose -f docker-compose.build.yaml push
 
   deploy:
     needs: [build, test, conventions]
@@ -75,9 +57,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Load production environment file into Github environment
-        id: readfile
-        run: echo "$(cat .env.production)" >> $GITHUB_ENV
+      - name: Copy Docker Compose file to server
+        uses: appleboy/scp-action@v1.0.3
+        with:
+          host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
+          username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
+          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+          source: "docker-compose.yaml"
+          target: "~"
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
@@ -85,16 +72,10 @@ jobs:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          envs: DOCKER_IMAGE,DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,MP_WS_PORT,MP_HTTP_PORT
+          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD
           script: |
+            cd ~
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
-            if [ "$(docker ps -q -f name=mp)" ]; then
-              docker stop mp
-              docker rm mp
-            fi
-            docker run -d \
-            -p $(echo $MP_WS_PORT):$(echo $MP_WS_PORT) \
-            -p $(echo $MP_HTTP_PORT):$(echo $MP_HTTP_PORT) \
-            --restart always \
-            --name mp \
-            $(echo $DOCKER_REGISTRY)/$(echo $DOCKER_IMAGE):${{ github.ref_name }}
+            docker compose pull
+            docker compose up -d --remove-orphans
+            docker system prune -f
