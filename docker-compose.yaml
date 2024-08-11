@@ -5,17 +5,16 @@ services:
       dockerfile: Dockerfile
       args:
         NODE_ENV: production
-        MP_SERVER_URL: ws://k573.dev:9090
+        MP_SERVER_URL: wss://k573.dev:9090
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
       - "8080"
       - "9090:9090"
     environment:
-      MP_WS_PORT: 9090
-      MP_HTTP_PORT: 8080
-      MP_HTTP_PUBLIC_HOSTNAME: "k573.dev"
-      MP_HTTP_CORS_ORIGIN: "k573.dev"
+      PORT: 8080
+      HOSTNAME: "k573.dev"
+      CORS_ORIGIN: "k573.dev"
   proxy:
     image: "jc21/nginx-proxy-manager:2.11.3"
     restart: unless-stopped

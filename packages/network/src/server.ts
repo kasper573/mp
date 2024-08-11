@@ -24,6 +24,8 @@ export class Server<
     ClientContext
   >;
 
+  listen: SocketServer["listen"];
+
   constructor(
     protected readonly options: CreateServerOptions<
       ModuleDefinitions,
@@ -47,6 +49,8 @@ export class Server<
       transports: ["websocket"],
       connectionStateRecovery: {},
     });
+
+    this.listen = (...args) => this.wss.listen(...args);
 
     this.wss.on("connection", (socket) => {
       const socketContext = () =>
@@ -94,10 +98,6 @@ export class Server<
   sendStateUpdate(clientId: ClientId, update: StateUpdate) {
     const socket = this.wss.sockets.sockets.get(clientId);
     socket?.emit("stateUpdate", this.options.serializeStateUpdate(update));
-  }
-
-  listen(port: number) {
-    this.wss.listen(port);
   }
 
   close() {

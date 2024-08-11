@@ -1,5 +1,6 @@
 import "./polyfill";
 import path from "path";
+import http from "http";
 import { Logger } from "@mp/logger";
 import express from "express";
 import {
@@ -40,13 +41,15 @@ async function main(args: CliArgs) {
   logger.info("starting server with env", args);
 
   const global = createGlobalModule();
-  const httpServer = express();
-  httpServer.use(createExpressLogger(httpLogger));
-  httpServer.use(createCors({ origin: args.httpCorsOrigin }));
-  httpServer.use(publicPath, express.static(publicDir));
+  const expressApp = express();
+  expressApp.use(createExpressLogger(httpLogger));
+  expressApp.use(createCors({ origin: args.corsOrigin }));
+  expressApp.use(publicPath, express.static(publicDir));
   if (args.clientDistPath !== undefined) {
-    httpServer.use("/", express.static(args.clientDistPath));
+    expressApp.use("/", express.static(args.clientDistPath));
   }
+
+  const httpServer = http.createServer(expressApp);
 
   const modules = createModules({
     global,
@@ -74,14 +77,10 @@ async function main(args: CliArgs) {
     onError,
   });
 
-  socketServer.listen(args.wsPort);
-  wsLogger.info("listening on port", args.wsPort);
+  socketServer.listen(httpServer);
 
-  httpServer.listen(args.httpPort, args.httpListenHostname, () => {
-    httpLogger.info(
-      "listening on",
-      `${args.httpListenHostname}:${args.httpPort}`,
-    );
+  httpServer.listen(args.port, "0.0.0.0", () => {
+    logger.info("server listening on", `0.0.0.0:${args.port}`);
   });
 
   setInterval(tick, args.tickInterval);
@@ -134,11 +133,11 @@ async function main(args: CliArgs) {
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
-    const port = args.httpPort === 80 ? "" : `:${args.httpPort}`;
+    const port = args.port === 80 ? "" : `:${args.port}`;
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${args.httpPublicHostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${args.hostname}${port}${publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
