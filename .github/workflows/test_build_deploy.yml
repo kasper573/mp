@@ -57,14 +57,15 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DIGITALOCEAN_SSH_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ vars.DIGITALOCEAN_SSH_HOST }} >> ~/.ssh/known_hosts
+
       - name: Copy Docker Compose file to server
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
-          username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
-          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "docker-compose.yaml"
-          target: "~"
+        run: scp -i ~/.ssh/id_rsa docker-compose.yml ${{ vars.DIGITALOCEAN_SSH_USERNAME }}@${{ vars.DIGITALOCEAN_SSH_HOST }}:~/
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
