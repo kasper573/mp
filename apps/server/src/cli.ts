@@ -2,10 +2,12 @@ import path from "path";
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
 
-export type CliArgs = RemoveIndexSignature<ReturnType<typeof readCliArgs>>;
+export type CliOptions = RemoveIndexSignature<
+  ReturnType<typeof readCliOptions>
+>;
 
-export function readCliArgs() {
-  const res = yargs(hideBin(process.argv))
+export function readCliOptions(argv = process.argv) {
+  const options = yargs(hideBin(argv))
     .parserConfiguration({
       "camel-case-expansion": false, // Ensures only the explicit option names are used
       "unknown-options-as-args": true, // Omits unknown args from the options object
@@ -36,7 +38,12 @@ export function readCliArgs() {
     .option("hostname", {
       type: "string",
       default: "localhost:4000",
-      description: "The public hostname. Used for generating URLs",
+      description: "The public accessable hostname. Used for generating URLs",
+    })
+    .option("listenHostname", {
+      type: "string",
+      default: "0.0.0.0",
+      description: "The hostname for the server to listen on",
     })
     .option("corsOrigin", {
       type: "string",
@@ -51,10 +58,10 @@ export function readCliArgs() {
     .parseSync();
 
   // Remove some yargs internals
-  delete (res as Record<string, unknown>)["$0"];
-  delete (res as Record<string, unknown>)["_"];
+  delete (options as Record<string, unknown>)["$0"];
+  delete (options as Record<string, unknown>)["_"];
 
-  return res;
+  return options;
 }
 
 type RemoveIndexSignature<T> = {
