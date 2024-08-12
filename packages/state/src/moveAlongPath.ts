@@ -3,7 +3,7 @@ import type { TimeSpan } from "timespan-ts";
 
 export function moveAlongPath(
   coords: VectorLike,
-  path: ArrayLike<VectorLike>,
+  path: ShiftableArray<VectorLike>,
   speed: number,
   delta: TimeSpan,
 ): void {
@@ -31,8 +31,6 @@ export function moveAlongPath(
   }
 }
 
-interface ArrayLike<T> {
+interface ShiftableArray<T> extends ArrayLike<T> {
   shift(): T | undefined;
-  length: number;
-  [index: number]: T;
 }
