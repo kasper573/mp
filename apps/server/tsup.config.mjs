@@ -1,11 +1,13 @@
 import { defineConfig } from "@mp/build/tsup.mjs";
-import { inferInternalPackages } from "@mp/build/utils.mjs";
 
 export default defineConfig(__dirname, {
   outExtension: () => ({ js: `.js` }),
-  format: "esm",
+  format: "cjs",
   target: "node20",
-  entry: { index: "src/entrypoint.ts" },
+  bundle: true,
+  splitting: false,
+  minify: true,
+  entry: { index: "src/main.ts" },
   dts: false,
-  noExternal: inferInternalPackages(__dirname),
+  noExternal: [/.*/],
 });

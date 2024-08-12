@@ -1,6 +1,5 @@
-FROM node:20.10.0-alpine3.19
-
-WORKDIR /app
+FROM node:20.10.0-alpine3.19 AS builder
+WORKDIR /builder
 
 COPY package.json .
 RUN npm install -g $(node -p "require('./package.json').packageManager")
@@ -8,7 +7,6 @@ RUN npm install -g $(node -p "require('./package.json').packageManager")
 COPY . .
 RUN pnpm install
 
-# Client build args
 ARG NODE_ENV
 ENV NODE_ENV=$NODE_ENV
 ARG MP_SERVER_URL
@@ -16,13 +14,21 @@ ENV MP_SERVER_URL=$MP_SERVER_URL
 
 RUN pnpm build
 
-# Server args
+
+FROM node:20.10.0-alpine3.19 AS app
+WORKDIR /app
+
+COPY --from=builder /builder/apps/server/public /app/public
+COPY --from=builder /builder/apps/server/dist /app/server
+COPY --from=builder /builder/apps/client/dist /app/client
+
 ENV PORT=
-ENV PUBLIC_HOSTNAME=
+ENV HOSTNAME=
 ENV CORS_ORIGIN=
 
-CMD pnpm --filter server start \
-  --clientDistPath=../client/dist \
+CMD node server \
+  --clientDir=/app/client \
+  --publicDir=/app/public \
   --port=$PORT \
-  --publicHostname=$PUBLIC_HOSTNAME \
+  --hostname=$HOSTNAME \
   --corsOrigin=$CORS_ORIGIN \
