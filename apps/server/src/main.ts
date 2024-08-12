@@ -47,8 +47,8 @@ async function main(args: CliArgs) {
   expressApp.use(createExpressLogger(httpLogger));
   expressApp.use(createCors({ origin: args.corsOrigin }));
   expressApp.use(args.publicPath, express.static(args.publicDir));
-  if (args.clientPath !== undefined) {
-    expressApp.use("/", express.static(args.clientPath));
+  if (args.clientDir !== undefined) {
+    expressApp.use("/", express.static(args.clientDir));
   }
 
   const httpServer = http.createServer(expressApp);
