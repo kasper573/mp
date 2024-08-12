@@ -15,60 +15,54 @@ import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import {
   ServerContextSource,
-  type ClientContext,
   type ClientId,
-  type ClientStateUpdate,
   type ServerContext,
 } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import type { CharacterId } from "./modules/world/schema";
-import type { ServerModules } from "./modules/definition";
 import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
-import { readCliArgs, type CliArgs } from "./cli";
+import { readCliOptions, type CliOptions } from "./cli";
 
-async function main(args: CliArgs) {
+async function main(opt: CliOptions) {
   const logger = new Logger(console);
-  logger.info("starting server with env", args);
+  logger.info(serverTextHeader(opt));
 
   const areas = await loadAreas(
-    path.resolve(args.publicDir, "areas"),
+    path.resolve(opt.publicDir, "areas"),
     createUrl,
-  ).then((res) => res.assert(panic));
+  );
 
-  const defaultAreaId = areas.keys().next().value;
+  if (areas.isErr() || areas.value.size === 0) {
+    logger.error(
+      "Cannot start server without areas",
+      areas.isErr() ? areas.error : "No areas found",
+    );
+    process.exit(1);
+  }
+
+  const defaultAreaId = areas.value.keys().next().value;
   const world: WorldState = { characters: new Map() };
-
-  const httpLogger = logger.chain("http");
-  const wsLogger = logger.chain("ws");
 
   const global = createGlobalModule();
   const expressApp = express();
-  expressApp.use(createExpressLogger(httpLogger));
-  expressApp.use(createCors({ origin: args.corsOrigin }));
-  expressApp.use(args.publicPath, express.static(args.publicDir));
-  if (args.clientDir !== undefined) {
-    expressApp.use("/", express.static(args.clientDir));
+  expressApp.use(createExpressLogger(logger.chain("http")));
+  expressApp.use(createCors({ origin: opt.corsOrigin }));
+  expressApp.use(opt.publicPath, express.static(opt.publicDir));
+  if (opt.clientDir !== undefined) {
+    expressApp.use("/", express.static(opt.clientDir));
   }
-
-  const httpServer = http.createServer(expressApp);
 
   const modules = createModules({
     global,
-    areas,
+    areas: areas.value,
     defaultAreaId,
     state: world,
-    logger: wsLogger,
+    logger: logger.chain("module"),
     createUrl,
   });
 
-  const socketServer = new Server<
-    ServerModules,
-    ServerContext,
-    ClientContext,
-    ClientStateUpdate,
-    ClientId
-  >({
+  const socketServer = new Server({
     createContext: createClientContext,
     modules,
     serializeRPCOutput: serialization.rpc.serialize,
@@ -79,13 +73,13 @@ async function main(args: CliArgs) {
     onError,
   });
 
+  const httpServer = http.createServer(expressApp);
   socketServer.listen(httpServer);
-
-  httpServer.listen(args.port, "0.0.0.0", () => {
-    logger.info("server listening on", `0.0.0.0:${args.port}`);
+  httpServer.listen(opt.port, opt.listenHostname, () => {
+    logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  setInterval(tick, args.tickInterval);
+  setInterval(tick, opt.tickInterval);
 
   let lastTick = performance.now();
 
@@ -136,9 +130,9 @@ async function main(args: CliArgs) {
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
-      ? path.relative(args.publicDir, fileInPublicDir)
+      ? path.relative(opt.publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${args.hostname}${args.publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 
   function getCharacterIdByClientId(clientId: ClientId): CharacterId {
@@ -150,11 +144,6 @@ async function main(args: CliArgs) {
     // TODO implement
     return characterId as unknown as ClientId;
   }
-
-  function panic(error: unknown) {
-    logger.error("panic", error);
-    process.exit(1);
-  }
 }
 
 function createExpressLogger(logger: Logger): express.RequestHandler {
@@ -164,4 +153,21 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
   };
 }
 
-main(readCliArgs());
+function serverTextHeader(options: CliOptions) {
+  return `
+=====================================================
+#                                                   #
+#                ███╗   ███╗ ██████╗                #
+#                ████╗ ████║ ██╔══██╗               #
+#                ██╔████╔██║ ██████╔╝               #
+#                ██║╚██╔╝██║ ██╔═══╝                #
+#                ██║ ╚═╝ ██║ ██║                    #
+#                ╚═╝     ╚═╝ ╚═╝                    #
+=====================================================
+${Object.entries(options)
+  .map(([k, v]) => `- ${k}: ${v}`)
+  .join("\n")}
+=====================================================`;
+}
+
+main(readCliOptions());
