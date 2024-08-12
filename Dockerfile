@@ -1,26 +1,13 @@
-FROM node:20.10.0-alpine3.19 AS builder
-WORKDIR /builder
 
-COPY package.json .
-RUN npm install -g $(node -p "require('./package.json').packageManager")
-
-COPY . .
-RUN pnpm install
-
-ARG NODE_ENV
-ENV NODE_ENV=$NODE_ENV
-ARG MP_SERVER_URL
-ENV MP_SERVER_URL=$MP_SERVER_URL
-
-RUN pnpm build
-
-
-FROM node:20.10.0-alpine3.19 AS app
+FROM node:20.10.0-alpine3.19 AS production
 WORKDIR /app
 
-COPY --from=builder /builder/apps/server/public /app/public
-COPY --from=builder /builder/apps/server/dist /app/server
-COPY --from=builder /builder/apps/client/dist /app/client
+# The app is assumed to have been built on the host machine with `pnpm build` prior to docker build.
+# This dockerfile will only copy the build artifacts into the image, bind env vars, and finally initialize the server.
+
+COPY ./apps/server/public /app/public
+COPY ./apps/server/dist /app/server
+COPY ./apps/client/dist /app/client
 
 ENV PORT=
 ENV HOSTNAME=

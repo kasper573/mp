@@ -1,11 +1,8 @@
+# This is the production services and environments definition
 services:
   app:
     build:
       context: .
-      dockerfile: Dockerfile
-      args:
-        NODE_ENV: production
-        MP_SERVER_URL: wss://k573.dev
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
