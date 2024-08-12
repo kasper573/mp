@@ -6,7 +6,9 @@ export function moveAlongPath(
   path: ShiftableArray<VectorLike>,
   speed: number,
   delta: TimeSpan,
-): void {
+): { destinationReached: boolean } {
+  const pathLengthBefore = path.length;
+
   let distance = speed * delta.totalSeconds;
   while (path.length > 0 && distance > 0) {
     const destination = path[0];
@@ -29,6 +31,10 @@ export function moveAlongPath(
 
     // TODO add new coordinate to travelled path when implementing collision detection
   }
+
+  return {
+    destinationReached: path.length === 0 && pathLengthBefore > 0,
+  };
 }
 
 interface ShiftableArray<T> extends ArrayLike<T> {

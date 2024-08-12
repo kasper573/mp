@@ -38,14 +38,14 @@ export class Interpolator extends Component {
       return;
     }
 
-    moveAlongPath(
+    const { destinationReached } = moveAlongPath(
       this.getPos(this.owner),
       this.pathInterpolation.path,
       this.pathInterpolation.speed,
       TimeSpan.fromMilliseconds(e.delta),
     );
 
-    if (this.pathInterpolation.path.length === 0) {
+    if (destinationReached) {
       this.pathInterpolation = undefined;
     }
   };
