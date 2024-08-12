@@ -1,4 +1,4 @@
-import type { AreaResource } from "@mp/state";
+import { dNodeFromVector, type AreaResource } from "@mp/state";
 import type { Character, CharacterId } from "@mp/server";
 import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
 import { Cleanup, sub } from "@mp/excalibur";
@@ -46,13 +46,13 @@ export class AreaScene extends Scene {
 
     this.cleanups.add(
       api.state.subscribe(this.synchronizeCharacters),
-      sub(primary, "down", () => (this.shouldSendMove = true)),
-      sub(primary, "up", () => (this.shouldSendMove = false)),
+      sub(primary, "down", () => (this.isMouseDown = true)),
+      sub(primary, "up", () => (this.isMouseDown = false)),
       sub(primary, "wheel", this.onMouseWheel),
     );
   }
 
-  private shouldSendMove = false;
+  private isMouseDown = false;
 
   override onDeactivate(): void {
     this.cleanups.flush();
@@ -67,15 +67,23 @@ export class AreaScene extends Scene {
 
     this.camera.zoom = lerp(this.camera.zoom, this.cameraZoom, 0.1);
 
-    if (this.shouldSendMove) {
-      const { lastWorldPos } = engine.input.pointers.primary;
-      const tilePos = snapTileVector(
-        this.area.tiled.worldCoordToTile(lastWorldPos),
-      );
-      if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
-        api.modules.world.move(tilePos);
-        this.lastSentPos = tilePos;
-      }
+    if (!this.isMouseDown) {
+      return;
+    }
+
+    const { lastWorldPos } = engine.input.pointers.primary;
+    const tilePos = snapTileVector(
+      this.area.tiled.worldCoordToTile(lastWorldPos),
+    );
+
+    const isValidTarget = !!this.area.dGraph[dNodeFromVector(tilePos)];
+    if (!isValidTarget) {
+      return;
+    }
+
+    if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
+      api.modules.world.move(tilePos);
+      this.lastSentPos = tilePos;
     }
   }
 
