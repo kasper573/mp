@@ -43,7 +43,6 @@ jobs:
           set +o allexport
 
       - name: Build application
-        env-file:
         run: pnpm build
 
       - name: Log in to the Container registry
