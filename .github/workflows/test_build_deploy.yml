@@ -1,4 +1,4 @@
-name: Build and Deploy
+name: Test, Build, Deploy
 on: [push]
 
 env:
@@ -9,6 +9,21 @@ env:
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
+  conventions:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/composites/install/
+      - run: pnpm lint
+      - run: pnpm format
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/workflows/composites/install/
+      - run: pnpm test
+
   build:
     runs-on: ubuntu-latest
 
@@ -20,12 +35,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install/
-
-      - name: Code quality checks
-        run: |
-          pnpm lint
-          pnpm format
-          pnpm test
 
       - name: Load production build args into environment
         run: echo "$(cat production-build-args.env)" >> $GITHUB_ENV
@@ -46,7 +55,7 @@ jobs:
           docker compose push
 
   deploy:
-    needs: [build]
+    needs: [conventions, test, build]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
