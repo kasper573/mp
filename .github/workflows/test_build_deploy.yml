@@ -39,7 +39,7 @@ jobs:
       - name: Load production build args into environment
         run: |
           set -o allexport
-          source .production-build-args.env
+          source production-build-args.env
           set +o allexport
 
       - name: Build application
