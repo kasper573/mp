@@ -12,7 +12,7 @@ import { loadTiled } from "./loadTiled";
 export async function loadAreas(
   dir: string,
   createUrl: (file: PathToLocalFile) => UrlToPublicFile,
-): Promise<Result<Map<AreaId, AreaResource>>> {
+): Promise<Result<Map<AreaId, AreaResource>, unknown>> {
   try {
     const files = await fs.readdir(dir);
     const entries = await Promise.all(
