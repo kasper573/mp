@@ -8,7 +8,8 @@
   "dependencies": {
     "@mp/excalibur": "workspace:*",
     "dijkstrajs": "1.0.3",
-    "timespan-ts": "1.0.3"
+    "timespan-ts": "1.0.3",
+    "neverthrow": "7.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

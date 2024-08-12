@@ -206,6 +206,9 @@ importers:
       dijkstrajs:
         specifier: 1.0.3
         version: 1.0.3
+      neverthrow:
+        specifier: 7.0.0
+        version: 7.0.0
       timespan-ts:
         specifier: 1.0.3
         version: 1.0.3
@@ -2222,6 +2225,10 @@ packages:
   negotiator@0.6.3:
     resolution: {integrity: sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==}
     engines: {node: '>= 0.6'}
+
+  neverthrow@7.0.0:
+    resolution: {integrity: sha512-GDDz+SQGGZWIGYk3cL2Jf+RX7QYRJOsQltrbpBiSQiNVN4QJi3/YJhaZY4pRlDou+W3YSHk8DYBKMt4CDPBglg==}
+    engines: {node: '>=18'}
 
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
@@ -5209,6 +5216,8 @@ snapshots:
   natural-compare@1.4.0: {}
 
   negotiator@0.6.3: {}
+
+  neverthrow@7.0.0: {}
 
   normalize-path@3.0.0: {}
 

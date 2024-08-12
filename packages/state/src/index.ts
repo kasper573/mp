@@ -4,5 +4,5 @@ export * from "./moveAlongPath";
 export * from "./AreaResource";
 export * from "./FileReference";
 export * from "./Branded";
-export * from "./Result";
+export * from "neverthrow";
 export { TimeSpan } from "timespan-ts";
