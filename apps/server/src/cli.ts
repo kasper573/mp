@@ -24,7 +24,7 @@ export function readCliArgs() {
     })
     .option("publicPath", {
       type: "string",
-      default: "public",
+      default: "/public/",
       description:
         "The relative path after the hostname where the public dir will be exposed",
     })
