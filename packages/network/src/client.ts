@@ -10,8 +10,8 @@ import type {
   ProcedureHandler,
   ProcedureType,
 } from "./module";
-import type { ProcedureBus } from "./procedure";
-import { createProcedureBus } from "./procedure";
+import type { Dispatcher } from "./dispatcher";
+import { createDispatcher } from "./dispatcher";
 import type {
   SocketIO_ClientToServerEvents,
   SocketIO_DTOParser,
@@ -71,17 +71,16 @@ function createModuleInterface<
   options: ClientOptions<State, StateUpdate>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
-    get: (_, moduleName) =>
-      createModuleProcedureBus(moduleName, socket, options),
+    get: (_, moduleName) => createModuleDispatcher(moduleName, socket, options),
   });
 }
 
-function createModuleProcedureBus<State, StateUpdate>(
+function createModuleDispatcher<State, StateUpdate>(
   moduleName: PropertyKey,
   socket: ClientSocket<State>,
   options: ClientOptions<State, StateUpdate>,
 ) {
-  return createProcedureBus(
+  return createDispatcher(
     async (procedureName, ...[input]) => {
       const serializedResponse = await socket.emitWithAck(
         "rpc",
@@ -126,7 +125,7 @@ type ClientModuleRecord<Procedures extends AnyModuleDefinitionRecord> = {
 };
 
 type ClientModule<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
-  ProcedureBus<ClientToServerProcedures<Procedures>, {}>;
+  Dispatcher<ClientToServerProcedures<Procedures>, {}>;
 
 type ClientToServerProcedures<Procedures extends AnyProcedureRecord> = {
   [ProcedureName in ProcedureNamesForType<

@@ -1,11 +1,11 @@
-export function createProcedureBus<
+export function createDispatcher<
   OutgoingProcedures extends AnyProcedures,
   IncomingProcedures extends AnyProcedures,
 >(
   call: CallFn<OutgoingProcedures>,
   subscribe = noop as SubscribeFn<IncomingProcedures>,
-): ProcedureBus<OutgoingProcedures, IncomingProcedures> {
-  return new Proxy({} as ProcedureBus<OutgoingProcedures, IncomingProcedures>, {
+): Dispatcher<OutgoingProcedures, IncomingProcedures> {
+  return new Proxy({} as Dispatcher<OutgoingProcedures, IncomingProcedures>, {
     get(_, propertyName: string) {
       function procedure(
         ...args: Parameters<OutgoingProcedures[keyof OutgoingProcedures]>
@@ -33,7 +33,7 @@ type ProcedureDefinition<Args extends unknown[], Output> = (
   ...args: Args
 ) => ProcedureOutput<Output>;
 
-export type ProcedureBus<
+export type Dispatcher<
   OutgoingProcedures extends AnyProcedures,
   IncomingProcedures extends AnyProcedures,
 > = {

@@ -1,35 +1,35 @@
 import { it, expect, vi } from "vitest";
-import type { CallFn } from "../src/procedure";
-import { createProcedureBus } from "../src/procedure";
+import type { CallFn } from "../src/dispatcher";
+import { createDispatcher } from "../src/dispatcher";
 
 it("it can call procedures", () => {
   const handler = vi.fn();
 
-  const bus = createProcedureBus(handler);
+  const d = createDispatcher(handler);
 
-  bus.message();
+  d.message();
   expect(handler).toBeCalled();
 });
 
 it("can call procedure with arbitrary number of arguments", () => {
   const handler = vi.fn();
 
-  const bus = createProcedureBus(handler);
+  const d = createDispatcher(handler);
 
-  bus.message("foo", 123, false);
+  d.message("foo", 123, false);
   expect(handler).toHaveBeenCalledWith("message", "foo", 123, false);
 });
 
 it("can subscribe to incoming procedure calls", () => {
   let send: (...args: unknown[]) => void = () => {};
 
-  const bus = createProcedureBus(noop, (_, fn) => {
+  const d = createDispatcher(noop, (_, fn) => {
     send = fn;
     return () => {};
   });
 
   const receiver = vi.fn();
-  bus.foo.subscribe(receiver);
+  d.foo.subscribe(receiver);
   send("foo");
   expect(receiver).toHaveBeenCalled();
 });
@@ -37,26 +37,26 @@ it("can subscribe to incoming procedure calls", () => {
 it("subscribe function receives procedure name", () => {
   const send: (...args: unknown[]) => void = () => {};
 
-  const bus = createProcedureBus(noop, (name) => {
+  const d = createDispatcher(noop, (name) => {
     expect(name as string).toEqual("foo");
     return () => {};
   });
 
   const receiver = vi.fn();
-  bus.foo.subscribe(receiver);
+  d.foo.subscribe(receiver);
   send("other");
 });
 
 it("can receive arbitrary number of procedure arguments from incoming procedure calls", () => {
   let send: (str: string, n: number, b: boolean) => void = () => {};
 
-  const bus = createProcedureBus(noop, (_, fn) => {
+  const d = createDispatcher(noop, (_, fn) => {
     send = fn;
     return () => {};
   });
 
   const receiver = vi.fn();
-  bus.message.subscribe(receiver);
+  d.message.subscribe(receiver);
   send("foo", 123, false);
   expect(receiver).toHaveBeenCalledWith("foo", 123, false);
 });
@@ -64,7 +64,7 @@ it("can receive arbitrary number of procedure arguments from incoming procedure 
 it("can unsubscribe from incoming procedure call", () => {
   let send: () => void = () => {};
 
-  const bus = createProcedureBus(noop, (_, fn) => {
+  const d = createDispatcher(noop, (_, fn) => {
     send = fn;
     return () => {
       send = () => {};
@@ -72,7 +72,7 @@ it("can unsubscribe from incoming procedure call", () => {
   });
 
   const receiver = vi.fn();
-  const unsub = bus.foo.subscribe(receiver);
+  const unsub = d.foo.subscribe(receiver);
   unsub();
   send();
   expect(receiver).not.toHaveBeenCalled();
@@ -81,15 +81,15 @@ it("can unsubscribe from incoming procedure call", () => {
 it("using the same incoming procedure call handler multiple times still becomes multiple subscriptions", () => {
   const callbacks = new Array<(procedureName: string) => void>();
 
-  const bus = createProcedureBus(noop, (_, fn) => {
+  const d = createDispatcher(noop, (_, fn) => {
     callbacks.push(fn);
     return () => {};
   });
 
   const receiver = vi.fn();
-  bus.foo.subscribe(receiver);
-  bus.foo.subscribe(receiver);
-  bus.foo.subscribe(receiver);
+  d.foo.subscribe(receiver);
+  d.foo.subscribe(receiver);
+  d.foo.subscribe(receiver);
   for (const send of callbacks) {
     send("foo");
   }

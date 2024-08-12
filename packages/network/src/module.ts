@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import type { ProcedureBus, ProcedureOutput } from "./procedure";
-import { createProcedureBus } from "./procedure";
+import type { Dispatcher, ProcedureOutput } from "./dispatcher";
+import { createDispatcher } from "./dispatcher";
 
 export function createModule<Procedures extends AnyProcedureRecord>(
   procedures: Procedures,
@@ -10,8 +10,8 @@ export function createModule<Procedures extends AnyProcedureRecord>(
     Set<AnyProcedureHandler>
   >();
 
-  // A module is essentially just an procedure bus
-  const bus = createProcedureBus(
+  // A module is essentially just a dispatcher
+  const dispatcher = createDispatcher(
     async (...[procedureName, procedurePayload]) => {
       let outputForBuiltInHandler;
 
@@ -40,17 +40,17 @@ export function createModule<Procedures extends AnyProcedureRecord>(
 
   // But with predefined procedure handlers
   Object.entries(procedures).forEach(([name, { handler }]) =>
-    bus[name].subscribe(handler),
+    dispatcher[name].subscribe(handler),
   );
 
-  return new Proxy(bus as Module<Procedures>, {
+  return new Proxy(dispatcher as Module<Procedures>, {
     get(target, prop) {
       // It has the ability to inspect the type of an procedure
       if (prop === procedureTypeGetter) {
         return (procedureName: keyof Procedures) =>
           procedures[procedureName].type;
       } else {
-        // And everything else an procedure bus can do
+        // And everything else a dispatcher can do
         return target[prop];
       }
     },
@@ -60,7 +60,7 @@ export function createModule<Procedures extends AnyProcedureRecord>(
 const procedureTypeGetter = "$getProcedureType" as const;
 
 export type Module<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
-  ProcedureBus<ModuleProcedures<Procedures>, ModuleProcedures<Procedures>> & {
+  Dispatcher<ModuleProcedures<Procedures>, ModuleProcedures<Procedures>> & {
     [procedureTypeGetter](procedureName: keyof Procedures): ProcedureType;
   };
 
