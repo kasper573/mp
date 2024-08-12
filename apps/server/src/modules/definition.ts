@@ -1,5 +1,6 @@
 import type { inferModuleDefinitions } from "@mp/network/server";
 import type { UrlFactory } from "@mp/state";
+import type { Logger } from "@mp/logger";
 import type { WorldModuleDependencies } from "./world/module";
 import { createWorldModule } from "./world/module";
 import type { GlobalModule } from "./global";
@@ -13,7 +14,7 @@ export function createModules({
   createUrl,
   ...dependencies
 }: WorldModuleDependencies & { global: GlobalModule; createUrl: UrlFactory }) {
-  const world = createWorldModule(dependencies);
+  const world = createWorldModule(withLogger(dependencies, "world"));
   const area = createAreaModule(createUrl);
 
   // TODO when do these unsubscribe?
@@ -30,3 +31,10 @@ export function createModules({
 export type ServerModules = inferModuleDefinitions<
   ReturnType<typeof createModules>
 >;
+
+function withLogger<T extends { logger: Logger }>(deps: T, name: string): T {
+  return {
+    ...deps,
+    logger: deps.logger.chain(name),
+  };
+}
