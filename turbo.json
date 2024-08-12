@@ -5,15 +5,7 @@
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "build/**"],
-      "env": ["NODE_ENV", "MP_*"],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env",
-        ".env.local",
-        ".env.test",
-        ".env.development",
-        ".env.production"
-      ]
+      "env": ["NODE_ENV", "MP_*"]
     },
     "test": {
       "dependsOn": ["^build", "^test"]
