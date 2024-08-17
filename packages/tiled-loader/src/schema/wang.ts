@@ -8,7 +8,7 @@ import {
   uchar,
   tuple,
   transform,
-  literalEnum,
+  picklist,
 } from "@mp/schema";
 import { color, localTileID, tiledClass } from "./common";
 import { property } from "./property";
@@ -51,6 +51,6 @@ export const wangSet = object({
   name: string,
   properties: array(property),
   tile: localTileID,
-  type: literalEnum(["corner", "edge", "mixed"]),
+  type: picklist(["corner", "edge", "mixed"]),
   wangtiles: array(wangTile),
 });

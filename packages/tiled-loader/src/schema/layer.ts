@@ -8,8 +8,8 @@ import {
   object,
   optional,
   string,
-  literalEnum,
   fallback,
+  picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import {
@@ -30,7 +30,7 @@ import { tiledObject } from "./object";
 import { chunk } from "./chunk";
 
 export type LayerDrawOrder = TypeOf<typeof layerDrawOrder>;
-export const layerDrawOrder = literalEnum(["topdown", "index"]);
+export const layerDrawOrder = picklist(["topdown", "index"]);
 
 const sharedProperties = {
   class: optional(tiledClass),

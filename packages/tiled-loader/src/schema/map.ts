@@ -6,9 +6,9 @@ import {
   object,
   optional,
   string,
-  literalEnum,
   fallback,
   type TypeOf,
+  picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import {
@@ -25,7 +25,7 @@ import { property } from "./property";
 import { tilesetReference } from "./tilesetReference";
 
 export type MapRenderOrder = TypeOf<typeof mapRenderOrder>;
-export const mapRenderOrder = literalEnum([
+export const mapRenderOrder = picklist([
   "right-down",
   "right-up",
   "left-down",
@@ -33,10 +33,10 @@ export const mapRenderOrder = literalEnum([
 ]);
 
 export type StaggerAxis = TypeOf<typeof staggerAxis>;
-export const staggerAxis = literalEnum(["x", "y"]);
+export const staggerAxis = picklist(["x", "y"]);
 
 export type StaggerIndex = TypeOf<typeof staggerIndex>;
-export const staggerIndex = literalEnum(["odd", "even"]);
+export const staggerIndex = picklist(["odd", "even"]);
 
 function sharedProperties(context: LoaderContext) {
   return {

@@ -44,40 +44,37 @@ const commonProperties = object({
 });
 
 export type EllipseObject = TypeOf<typeof ellipseObject>;
-export const ellipseObject = intersection([
-  object({ ellipse: literal(true) }),
-  commonProperties,
-]);
+export const ellipseObject = giveDiscriminator(
+  "ellipse",
+  intersection([object({ ellipse: literal(true) }), commonProperties]),
+);
 
 export type PointObject = TypeOf<typeof pointObject>;
-export const pointObject = intersection([
-  object({ point: boolean }),
-  commonProperties,
-]);
+export const pointObject = giveDiscriminator(
+  "point",
+  intersection([object({ point: boolean }), commonProperties]),
+);
 
 export type PolygonObject = TypeOf<typeof polygonObject>;
-export const polygonObject = intersection([
-  object({ polygon: array(pixelVector) }),
-  commonProperties,
-]);
+export const polygonObject = giveDiscriminator(
+  "polygon",
+  intersection([object({ polygon: array(pixelVector) }), commonProperties]),
+);
 
 export type PolylineObject = TypeOf<typeof polylineObject>;
-export const polylineObject = intersection([
-  object({ polyline: array(pixelVector) }),
-  commonProperties,
-]);
+export const polylineObject = giveDiscriminator(
+  "polyline",
+  intersection([object({ polyline: array(pixelVector) }), commonProperties]),
+);
 
 export type TextObject = TypeOf<typeof textObject>;
-export const textObject = intersection([
-  object({ text: text }),
-  commonProperties,
-]);
+export const textObject = giveDiscriminator(
+  "text",
+  intersection([object({ text: text }), commonProperties]),
+);
 
 export type RectangleObject = TypeOf<typeof rectangleObject>;
-export const rectangleObject = transform(commonProperties, (data) => ({
-  data,
-  rectangle: true,
-}));
+export const rectangleObject = giveDiscriminator("rectangle", commonProperties);
 
 export type TiledObject =
   | EllipseObject
@@ -106,12 +103,29 @@ export interface ObjectTemplate {
   template: string;
   tileset?: Tileset;
   object: TiledObject;
+  objectType: "objectTemplate";
 }
 
 export function objectTemplate(context: LoaderContext): Schema<ObjectTemplate> {
-  return object({
-    template: file,
-    tileset: optional(tilesetReference(context)),
-    object: tiledObject(context),
-  });
+  return giveDiscriminator(
+    "objectTemplate",
+    object({
+      template: file,
+      tileset: optional(tilesetReference(context)),
+      object: tiledObject(context),
+    }),
+  );
+}
+
+function giveDiscriminator<
+  TypeName extends string,
+  BaseSchema extends Schema<object>,
+>(
+  name: TypeName,
+  base: BaseSchema,
+): Schema<{ objectType: TypeName } & TypeOf<BaseSchema>> {
+  return transform(base, (value) => ({
+    ...value,
+    objectType: name,
+  }));
 }

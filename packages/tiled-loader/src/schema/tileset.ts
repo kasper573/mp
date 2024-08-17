@@ -4,8 +4,8 @@ import {
   object,
   optional,
   string,
-  literalEnum,
   fallback,
+  picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import {
@@ -26,10 +26,10 @@ import { transformations } from "./transformations";
 import { grid } from "./grid";
 
 export type FillMode = TypeOf<typeof fillMode>;
-export const fillMode = literalEnum(["stretch", "preserve-aspect-fit"]);
+export const fillMode = picklist(["stretch", "preserve-aspect-fit"]);
 
 export type ObjectAlignment = TypeOf<typeof objectAlignment>;
-export const objectAlignment = literalEnum([
+export const objectAlignment = picklist([
   "unspecified",
   "topleft",
   "top",
@@ -43,7 +43,7 @@ export const objectAlignment = literalEnum([
 ]);
 
 export type TileRenderSize = TypeOf<typeof tileRenderSize>;
-export const tileRenderSize = literalEnum(["tile", "grid"]);
+export const tileRenderSize = picklist(["tile", "grid"]);
 
 export type Tileset = TypeOf<ReturnType<typeof tileset>>;
 export function tileset(context: LoaderContext) {

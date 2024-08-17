@@ -21,10 +21,10 @@ export {
   safeParse as parse,
   safeParseAsync as parseAsync,
   fallback,
+  picklist,
   type SafeParseResult,
 } from "valibot";
 
-export * from "./literalEnum";
 export * from "./customAsync";
 export * from "./transform";
 

@@ -3,11 +3,11 @@ import {
   integer,
   object,
   string,
-  literalEnum,
   nativeEnum,
   union,
   transform,
   array,
+  picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
 
@@ -59,7 +59,7 @@ export const compressionLevel = transform(
 );
 
 // Enums
-export const orientation = literalEnum([
+export const orientation = picklist([
   "orthogonal",
   "isometric",
   "staggered",
@@ -75,7 +75,7 @@ export enum Compression {
 
 export const compression = nativeEnum(Compression);
 
-export const encoding = literalEnum(["csv", "base64"]);
+export const encoding = picklist(["csv", "base64"]);
 
 /**
  * Incremental ID, unique across all objects
