@@ -1,5 +1,5 @@
 {
-  "name": "@mp/tiled-parser",
+  "name": "@mp/tiled-loader",
   "version": "0.0.0",
   "private": true,
   "exports": {
