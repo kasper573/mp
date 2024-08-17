@@ -8,7 +8,7 @@ import type {
 } from "@mp/tiled-loader";
 import { createObjectGraphics } from "./object";
 
-export abstract class LayerContainer<L extends Layer> extends Container {
+export abstract class LayerView<L extends Layer> extends Container {
   constructor(protected readonly layer: L) {
     super();
 
@@ -18,23 +18,21 @@ export abstract class LayerContainer<L extends Layer> extends Container {
   protected abstract initialize(): void;
 }
 
-export class GroupLayerContainer extends LayerContainer<GroupLayer> {
+export class GroupLayerView extends LayerView<GroupLayer> {
   protected initialize(): void {
-    this.layer.layers.forEach((layer) =>
-      this.addChild(createLayerContainer(layer)),
-    );
+    this.layer.layers.forEach((layer) => this.addChild(createLayerView(layer)));
   }
 }
 
-export class TileLayerContainer extends LayerContainer<TileLayer> {
+export class TileLayerView extends LayerView<TileLayer> {
   protected initialize(): void {}
 }
 
-export class ImageLayerContainer extends LayerContainer<ImageLayer> {
+export class ImageLayerView extends LayerView<ImageLayer> {
   protected initialize(): void {}
 }
 
-export class ObjectGroupLayerContainer extends LayerContainer<ObjectGroupLayer> {
+export class ObjectGroupLayerView extends LayerView<ObjectGroupLayer> {
   protected initialize(): void {
     this.layer.objects.forEach((obj) =>
       this.addChild(createObjectGraphics(obj)),
@@ -42,15 +40,15 @@ export class ObjectGroupLayerContainer extends LayerContainer<ObjectGroupLayer> 
   }
 }
 
-export function createLayerContainer(layer: Layer): Container {
+export function createLayerView(layer: Layer): Container {
   switch (layer.type) {
     case "group":
-      return new GroupLayerContainer(layer);
+      return new GroupLayerView(layer);
     case "tilelayer":
-      return new TileLayerContainer(layer);
+      return new TileLayerView(layer);
     case "imagelayer":
-      return new ImageLayerContainer(layer);
+      return new ImageLayerView(layer);
     case "objectgroup":
-      return new ObjectGroupLayerContainer(layer);
+      return new ObjectGroupLayerView(layer);
   }
 }
