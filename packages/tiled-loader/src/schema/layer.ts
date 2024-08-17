@@ -65,27 +65,25 @@ const sharedProperties = {
   y: tileUnit,
 };
 
-export type TileLayer = TypeOf<ReturnType<typeof tileLayer>>;
-export function tileLayer(context: LoaderContext) {
-  return object({
-    type: literal("tilelayer"),
-    chunks: optional(array(chunk(context))),
-    compression: fallback(compression, Compression.None),
-    data: data(context),
-    encoding: fallback(encoding, "csv"),
+export type TileLayer = TypeOf<typeof tileLayer>;
+export const tileLayer = object({
+  type: literal("tilelayer"),
+  chunks: optional(array(chunk)),
+  compression: fallback(compression, Compression.None),
+  data,
+  encoding: fallback(encoding, "csv"),
 
-    /**
-     * Row count. Same as map height for fixed-size maps.
-     */
-    height: tileUnit,
+  /**
+   * Row count. Same as map height for fixed-size maps.
+   */
+  height: tileUnit,
 
-    /**
-     * Column count. Same as map width for fixed-size maps.
-     */
-    width: tileUnit,
-    ...sharedProperties,
-  });
-}
+  /**
+   * Column count. Same as map width for fixed-size maps.
+   */
+  width: tileUnit,
+  ...sharedProperties,
+});
 
 export type ImageLayer = TypeOf<typeof imageLayer>;
 export const imageLayer = object({
@@ -131,7 +129,7 @@ export function layer(context: LoaderContext): Schema<Layer> {
         case "group":
           return groupLayer(context);
         case "tilelayer":
-          return tileLayer(context);
+          return tileLayer;
         case "imagelayer":
           return imageLayer;
         case "objectgroup":

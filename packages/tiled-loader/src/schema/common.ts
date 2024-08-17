@@ -9,7 +9,6 @@ import {
   array,
   picklist,
 } from "@mp/schema";
-import type { LoaderContext } from "../context";
 
 // Primitives
 export const rgb = string;
@@ -38,13 +37,11 @@ export const file = string;
 export const image = file;
 
 // Complex
-export function base64Buffer(context: LoaderContext) {
-  return transform(string, context.readBase64);
-}
-
-export function data(context: LoaderContext) {
-  return union([array(globalTileID), base64Buffer(context)]);
-}
+/**
+ * When it's a string then it's array of GID encoded and compressed by something.
+ * The encoding and compression should be defined alongside the data field.
+ */
+export const data = union([array(globalTileID), string]);
 
 export type CompressionLevel =
   | { type: "specific"; value: number }

@@ -8,7 +8,6 @@ const loadJson = (p: string) => fs.readFile(p, "utf-8").then(JSON.parse);
 
 function createLoaderContext(mapPath: string): LoaderContext {
   return {
-    readBase64: (str) => Buffer.from(str, "base64"),
     loadMap: loadJson,
     loadTileset: (tileset) =>
       loadJson(path.resolve(path.dirname(mapPath), tileset)),
