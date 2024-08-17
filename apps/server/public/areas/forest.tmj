@@ -560,28 +560,6 @@
                  "width":17.0197,
                  "x":46.5054,
                  "y":335.575
-                }, 
-                {
-                 "height":46,
-                 "id":41,
-                 "name":"",
-                 "rotation":20,
-                 "text":
-                    {
-                     "bold":true,
-                     "color":"#ffffff",
-                     "halign":"right",
-                     "italic":true,
-                     "strikeout":true,
-                     "text":"Hello World",
-                     "underline":true,
-                     "wrap":true
-                    },
-                 "type":"",
-                 "visible":true,
-                 "width":55,
-                 "x":378.5,
-                 "y":25.5
                 }],
          "opacity":1,
          "type":"objectgroup",
