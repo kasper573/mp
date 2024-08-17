@@ -17,7 +17,7 @@ export class AreaLoader {
       filepath: "irrelevant-on-client" as PathToLocalFile,
     };
     const tiled = new TiledResource(areaFile.url);
-    promise = tiled.load().then(() => new AreaResource(id, areaFile, tiled));
+    promise = tiled.load().then(() => new AreaResource(id, tiled));
     this.cache.set(id, promise);
     return promise;
   }

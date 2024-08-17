@@ -1,7 +1,6 @@
 import type { Vector, VectorLike } from "@mp/excalibur";
 import { tiled, snapTileVector, type TiledResource } from "@mp/excalibur";
 import type { DGraph } from "./findPath";
-import type { FileReference } from "./FileReference";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import type { Branded } from "./Branded";
 
@@ -15,7 +14,6 @@ export class AreaResource {
 
   constructor(
     readonly id: AreaId,
-    readonly tmxFile: FileReference, // TODO remove this
     readonly tiled: TiledResource,
   ) {
     const [startObj] = tiled.getObjectsByClassName("start");

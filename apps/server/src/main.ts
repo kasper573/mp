@@ -28,10 +28,7 @@ async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
-  const areas = await loadAreas(
-    path.resolve(opt.publicDir, "areas"),
-    createUrl,
-  );
+  const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
   if (areas.isErr() || areas.value.size === 0) {
     logger.error(
