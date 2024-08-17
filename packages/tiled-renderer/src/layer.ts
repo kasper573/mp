@@ -29,7 +29,9 @@ export class TileLayerView extends LayerView<TileLayer> {
 }
 
 export class ImageLayerView extends LayerView<ImageLayer> {
-  protected initialize(): void {}
+  protected initialize(): void {
+    throw new Error("Not implemented");
+  }
 }
 
 export class ObjectGroupLayerView extends LayerView<ObjectGroupLayer> {
