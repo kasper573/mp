@@ -7,7 +7,7 @@ import { globalTileID } from "./common";
 export function tilesetReference(context: LoaderContext): Schema<Tileset> {
   return customAsync<Tileset>(
     async (data): Promise<CustomParserResult<Tileset>> => {
-      const tilesetResult = parse(tilesetSchema, data);
+      const tilesetResult = parse(tilesetSchema(context), data);
       if (tilesetResult.success) {
         return tilesetResult;
       }
@@ -27,7 +27,7 @@ export function tilesetReference(context: LoaderContext): Schema<Tileset> {
         };
       }
 
-      return parse(tilesetSchema, json);
+      return parse(tilesetSchema(context), json);
     },
   );
 }

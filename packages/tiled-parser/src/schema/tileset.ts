@@ -7,6 +7,7 @@ import {
   literalEnum,
   fallback,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 import {
   color,
   globalTileID,
@@ -44,72 +45,74 @@ export const objectAlignment = literalEnum([
 export type TileRenderSize = TypeOf<typeof tileRenderSize>;
 export const tileRenderSize = literalEnum(["tile", "grid"]);
 
-export type Tileset = TypeOf<typeof tileset>;
-export const tileset = object({
-  backgroundcolor: optional(color),
-  class: optional(tiledClass),
-  columns: tileUnit,
-  fillmode: fallback(fillMode, "stretch"),
-  firstgid: fallback(globalTileID, 1),
-  grid: optional(grid),
+export type Tileset = TypeOf<ReturnType<typeof tileset>>;
+export function tileset(context: LoaderContext) {
+  return object({
+    backgroundcolor: optional(color),
+    class: optional(tiledClass),
+    columns: tileUnit,
+    fillmode: fallback(fillMode, "stretch"),
+    firstgid: fallback(globalTileID, 1),
+    grid: optional(grid),
 
-  image,
-  imageheight: pixelUnit,
-  imagewidth: pixelUnit,
+    image,
+    imageheight: pixelUnit,
+    imagewidth: pixelUnit,
 
-  /**
-   * Buffer between image edge and first tile (pixels)
-   */
-  margin: pixelUnit,
+    /**
+     * Buffer between image edge and first tile (pixels)
+     */
+    margin: pixelUnit,
 
-  name: string,
-  objectalignment: fallback(objectAlignment, "unspecified"),
+    name: string,
+    objectalignment: fallback(objectAlignment, "unspecified"),
 
-  properties: optional(array(property)),
+    properties: optional(array(property)),
 
-  /**
-   * Spacing between adjacent tiles in image (pixels)
-   */
-  spacing: pixelUnit,
+    /**
+     * Spacing between adjacent tiles in image (pixels)
+     */
+    spacing: pixelUnit,
 
-  terrains: optional(array(terrain)),
+    terrains: optional(array(terrain)),
 
-  /**
-   * The number of tiles in this tileset
-   */
-  tilecount: tileUnit,
+    /**
+     * The number of tiles in this tileset
+     */
+    tilecount: tileUnit,
 
-  /**
-   * The Tiled version used to save the file
-   */
-  tiledversion: string,
+    /**
+     * The Tiled version used to save the file
+     */
+    tiledversion: string,
 
-  /**
-   * Maximum height of tiles in this set
-   */
-  tileheight: optional(tileUnit),
-  /**
-   * Maximum width of tiles in this set
-   */
-  tilewidth: optional(tileUnit),
+    /**
+     * Maximum height of tiles in this set
+     */
+    tileheight: optional(tileUnit),
+    /**
+     * Maximum width of tiles in this set
+     */
+    tilewidth: optional(tileUnit),
 
-  tileoffset: optional(pixelVector),
+    tileoffset: optional(pixelVector),
 
-  tilerendersize: fallback(tileRenderSize, "tile"),
+    tilerendersize: fallback(tileRenderSize, "tile"),
 
-  tiles: optional(array(tile)),
+    tiles: optional(array(tile(context))),
 
-  /**
-   * Allowed transformations
-   */
-  transformations: optional(transformations),
+    /**
+     * Allowed transformations
+     */
+    transformations: optional(transformations),
 
-  transparentcolor: optional(rgb),
+    transparentcolor: optional(rgb),
 
-  /**
-   * The JSON format version
-   */
-  version: optional(string),
+    /**
+     * The JSON format version
+     */
+    version: optional(string),
 
-  wangsets: optional(array(wangSet)),
-});
+    wangsets: optional(array(wangSet)),
+  });
+}
