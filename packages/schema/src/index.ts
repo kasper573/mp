@@ -21,6 +21,7 @@ export {
   safeParse as parse,
   safeParseAsync as parseAsync,
   fallback,
+  type SafeParseResult,
 } from "valibot";
 
 export * from "./literalEnum";
