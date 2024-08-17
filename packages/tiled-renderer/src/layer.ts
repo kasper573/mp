@@ -20,7 +20,9 @@ export abstract class LayerView<L extends Layer> extends Container {
 
 export class GroupLayerView extends LayerView<GroupLayer> {
   protected initialize(): void {
-    this.layer.layers.forEach((layer) => this.addChild(createLayerView(layer)));
+    for (const childLayerView of createOrderedLayerViews(this.layer.layers)) {
+      this.addChild(childLayerView);
+    }
   }
 }
 
@@ -53,4 +55,9 @@ export function createLayerView(layer: Layer): Container {
     case "objectgroup":
       return new ObjectGroupLayerView(layer);
   }
+}
+
+export function createOrderedLayerViews(layers: Layer[]) {
+  // layers are already in the draw order in the tiled data
+  return layers.map(createLayerView);
 }

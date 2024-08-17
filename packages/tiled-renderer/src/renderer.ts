@@ -1,6 +1,6 @@
 import { Container, Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
-import { createLayerView } from "./layer";
+import { createOrderedLayerViews } from "./layer";
 
 export class TiledRenderer extends Container {
   constructor(private tiledMap: TiledMap) {
@@ -16,9 +16,8 @@ export class TiledRenderer extends Container {
     bg.fill(0x0000ff);
     this.addChild(bg);
 
-    // layers are already in the draw order in the tiled data
-    for (const layer of this.tiledMap.layers) {
-      this.addChild(createLayerView(layer));
+    for (const layerView of createOrderedLayerViews(tiledMap.layers)) {
+      this.addChild(layerView);
     }
   }
 }
