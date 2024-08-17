@@ -15,7 +15,7 @@ import type {
 
 export * from "./renderer";
 
-export function createObjectGraphics(obj: TiledObject): ViewContainer {
+export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {
     case "ellipse":
       return createEllipseGraphics(obj);
