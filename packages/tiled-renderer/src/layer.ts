@@ -8,52 +8,41 @@ import type {
 } from "@mp/tiled-loader";
 import { createObjectGraphics } from "./object";
 
-export abstract class LayerView<L extends Layer> extends Container {
-  constructor(protected readonly layer: L) {
-    super();
+export type LayerView = Container;
 
-    this.initialize();
+export function createGroupLayerView(layer: GroupLayer): LayerView {
+  const container = new Container();
+  for (const childLayer of layer.layers) {
+    container.addChild(createLayerView(childLayer));
   }
-
-  protected abstract initialize(): void;
+  return container;
 }
 
-export class GroupLayerView extends LayerView<GroupLayer> {
-  protected initialize(): void {
-    for (const childLayerView of createOrderedLayerViews(this.layer.layers)) {
-      this.addChild(childLayerView);
-    }
-  }
+export function createTileLayerView(layer: TileLayer): LayerView {
+  console.log(layer.name, layer);
+  return new Container();
 }
 
-export class TileLayerView extends LayerView<TileLayer> {
-  protected initialize(): void {}
+export function createImageLayerView(layer: ImageLayer): LayerView {
+  throw new Error("Not implemented");
 }
 
-export class ImageLayerView extends LayerView<ImageLayer> {
-  protected initialize(): void {
-    throw new Error("Not implemented");
-  }
+export function createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {
+  const view = new Container();
+  layer.objects.forEach((obj) => view.addChild(createObjectGraphics(obj)));
+  return view;
 }
 
-export class ObjectGroupLayerView extends LayerView<ObjectGroupLayer> {
-  protected initialize(): void {
-    this.layer.objects.forEach((obj) =>
-      this.addChild(createObjectGraphics(obj)),
-    );
-  }
-}
-
-export function createLayerView(layer: Layer): Container {
+export function createLayerView(layer: Layer): LayerView {
   switch (layer.type) {
     case "group":
-      return new GroupLayerView(layer);
+      return createGroupLayerView(layer);
     case "tilelayer":
-      return new TileLayerView(layer);
+      return createTileLayerView(layer);
     case "imagelayer":
-      return new ImageLayerView(layer);
+      return createImageLayerView(layer);
     case "objectgroup":
-      return new ObjectGroupLayerView(layer);
+      return createObjectGroupLayerView(layer);
   }
 }
 
