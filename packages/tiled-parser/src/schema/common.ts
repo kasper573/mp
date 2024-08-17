@@ -9,6 +9,7 @@ import {
   transform,
   array,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 
 // Primitives
 export const rgb = string;
@@ -37,13 +38,13 @@ export const file = string;
 export const image = file;
 
 // Complex
-// export const base64Buffer = transform(string, (str) =>
-//   Buffer.from(str, "base64"),
-// );
-export const base64Buffer = transform(string, (str) =>
-  Buffer.from(str, "base64"),
-);
-export const data = union([array(globalTileID), base64Buffer]);
+export function base64Buffer(context: LoaderContext) {
+  return transform(string, context.bufferFromBase64);
+}
+
+export function data(context: LoaderContext) {
+  return union([array(globalTileID), base64Buffer(context)]);
+}
 
 export type CompressionLevel =
   | { type: "specific"; value: number }
