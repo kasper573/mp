@@ -39,7 +39,7 @@ export const image = file;
 
 // Complex
 export function base64Buffer(context: LoaderContext) {
-  return transform(string, context.bufferFromBase64);
+  return transform(string, context.readBase64);
 }
 
 export function data(context: LoaderContext) {
