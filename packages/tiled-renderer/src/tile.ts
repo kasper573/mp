@@ -1,6 +1,6 @@
 import { Sprite } from "@mp/pixi";
-import type { Tile } from "@mp/tiled-loader";
+import type { AssignedTile } from "@mp/tiled-decoder";
 
-function createTileSprite(tile: Tile): Sprite {
+export function createTileSprite(tile: AssignedTile): Sprite {
   return new Sprite();
 }

@@ -236,6 +236,22 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/tiled-decoder:
+    dependencies:
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../tiled-loader
+      pako:
+        specifier: 2.1.0
+        version: 2.1.0
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/pako':
+        specifier: 2.0.3
+        version: 2.0.3
+
   packages/tiled-loader:
     dependencies:
       '@mp/schema':
@@ -254,6 +270,9 @@ importers:
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi
+      '@mp/tiled-decoder':
+        specifier: workspace:*
+        version: link:../tiled-decoder
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
@@ -955,6 +974,9 @@ packages:
 
   '@types/node@20.8.10':
     resolution: {integrity: sha512-TlgT8JntpcbmKUFzjhsyhGfP2fsiz1Mv56im6enJ905xG1DAYesxJaeSbGqQmAw8OWPdhyJGhGSQGKRNJ45u9w==}
+
+  '@types/pako@2.0.3':
+    resolution: {integrity: sha512-bq0hMV9opAcrmE0Byyo0fY3Ew4tgOevJmQ9grUhpXQhYfyLJ1Kqg3P33JT5fdbT2AjeAjR51zqqVjAL/HMkx7Q==}
 
   '@types/prop-types@15.7.12':
     resolution: {integrity: sha512-5zvhXYtRNRluoE/jAp4GVsSduVUzNWKkOZrCDBWYtE7biZywwdC2AcEzg+cSMLFRfVgeAFqpfNabiPjxFddV1Q==}
@@ -2369,6 +2391,9 @@ packages:
   pako@1.0.11:
     resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
 
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
+
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
     engines: {node: '>=6'}
@@ -3751,6 +3776,8 @@ snapshots:
   '@types/node@20.8.10':
     dependencies:
       undici-types: 5.26.5
+
+  '@types/pako@2.0.3': {}
 
   '@types/prop-types@15.7.12': {}
 
@@ -5382,6 +5409,8 @@ snapshots:
   package-json-from-dist@1.0.0: {}
 
   pako@1.0.11: {}
+
+  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:
