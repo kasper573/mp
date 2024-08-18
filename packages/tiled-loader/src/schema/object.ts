@@ -7,6 +7,7 @@ import {
   literal,
   object,
   optional,
+  pipe,
   string,
   transform,
   union,
@@ -124,8 +125,11 @@ function giveDiscriminator<
   name: TypeName,
   base: BaseSchema,
 ): Schema<{ objectType: TypeName } & TypeOf<BaseSchema>> {
-  return transform(base, (value) => ({
-    ...value,
-    objectType: name,
-  }));
+  return pipe(
+    base,
+    transform(async (value) => ({
+      ...value,
+      objectType: name,
+    })),
+  ) as Schema<{ objectType: TypeName } & TypeOf<BaseSchema>>;
 }

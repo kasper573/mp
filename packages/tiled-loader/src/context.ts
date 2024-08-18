@@ -1,6 +1,7 @@
-export type JsonLoader = (path: string) => Promise<unknown>;
+export type JsonLoader<Args extends unknown[]> = (
+  ...args: Args
+) => Promise<unknown>;
 
 export interface LoaderContext {
-  loadMap: JsonLoader;
-  loadTileset: JsonLoader;
+  loadTileset: JsonLoader<[tilesetPath: string]>;
 }

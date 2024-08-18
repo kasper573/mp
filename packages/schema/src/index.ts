@@ -2,31 +2,31 @@ import {
   number,
   string as stringSchema,
   boolean as booleanSchema,
-  type GenericSchema,
+  type GenericSchemaAsync,
   type InferOutput,
 } from "valibot";
 
-export type { InferOutput as TypeOf, GenericSchema as Schema };
+export type { InferOutput as TypeOf, GenericSchemaAsync as Schema };
 export {
-  array,
-  variant,
-  union,
-  optional,
-  object,
+  arrayAsync as array,
+  variantAsync as variant,
+  unionAsync as union,
+  optionalAsync as optional,
+  objectAsync as object,
   enum as nativeEnum,
   literal,
-  lazy,
-  intersect as intersection,
-  tuple,
-  safeParse as parse,
-  safeParseAsync as parseAsync,
-  fallback,
+  lazyAsync as lazy,
+  pipeAsync as pipe,
+  transformAsync as transform,
+  intersectAsync as intersection,
+  tupleAsync as tuple,
+  parseAsync as parse,
+  fallbackAsync as fallback,
   picklist,
+  flatten,
+  ValiError as ParseError,
   type SafeParseResult,
 } from "valibot";
-
-export * from "./customAsync";
-export * from "./transform";
 
 export const integer = number();
 export const float = number();

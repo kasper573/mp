@@ -1,4 +1,4 @@
-import type { TypeOf } from "@mp/schema";
+import type { Schema, TypeOf } from "@mp/schema";
 import {
   array,
   object,
@@ -7,7 +7,6 @@ import {
   optional,
   uchar,
   tuple,
-  transform,
   picklist,
 } from "@mp/schema";
 import { color, localTileID, tiledClass } from "./common";
@@ -44,10 +43,7 @@ export const wangTile = object({
 export type WangSet = TypeOf<typeof wangSet>;
 export const wangSet = object({
   class: optional(tiledClass),
-  colors: transform(
-    array(wangColor),
-    (arr) => arr as Record<WangColorIndex, WangColor>,
-  ),
+  colors: array(wangColor) as Schema<Record<WangColorIndex, WangColor>>,
   name: string,
   properties: array(property),
   tile: localTileID,
