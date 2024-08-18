@@ -18,7 +18,7 @@ export const wangColor = object({
   color,
   name: string,
   probability: float,
-  properties: array(property),
+  properties: optional(array(property)),
   tile: localTileID,
 });
 
@@ -43,9 +43,11 @@ export const wangTile = object({
 export type WangSet = TypeOf<typeof wangSet>;
 export const wangSet = object({
   class: optional(tiledClass),
-  colors: array(wangColor) as Schema<Record<WangColorIndex, WangColor>>,
+  colors: optional(array(wangColor)) as Schema<
+    Record<WangColorIndex, WangColor> | undefined
+  >,
   name: string,
-  properties: array(property),
+  properties: optional(array(property)),
   tile: localTileID,
   type: picklist(["corner", "edge", "mixed"]),
   wangtiles: array(wangTile),

@@ -33,9 +33,9 @@ export const pixelVector = object({
 });
 
 // Semantics
-export type GlobalTileId = typeof globalTileID;
+export type GlobalTileId = TypeOf<typeof globalTileID>;
 export const globalTileID = integer;
-export type LocalTileId = typeof localTileID;
+export type LocalTileId = TypeOf<typeof localTileID>;
 export const localTileID = integer;
 export const tiledClass = string;
 export const file = string;

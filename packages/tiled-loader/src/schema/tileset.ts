@@ -6,8 +6,11 @@ import {
   string,
   fallback,
   picklist,
+  pipe,
+  transform,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
+import type { LocalTileId } from "./common";
 import {
   color,
   globalTileID,
@@ -21,6 +24,7 @@ import {
 import { property } from "./property";
 import { wangSet } from "./wang";
 import { terrain } from "./terrain";
+import type { Tile } from "./tile";
 import { tile } from "./tile";
 import { transformations } from "./transformations";
 import { grid } from "./grid";
@@ -99,7 +103,16 @@ export function tileset(context: LoaderContext) {
 
     tilerendersize: fallback(tileRenderSize, "tile"),
 
-    tiles: optional(array(tile(context))),
+    tiles: pipe(
+      optional(array(tile(context))),
+      transform(async (tiles = []): Promise<Map<LocalTileId, Tile>> => {
+        const tileById = new Map<LocalTileId, Tile>();
+        for (const tile of tiles) {
+          tileById.set(tile.id, tile);
+        }
+        return tileById;
+      }),
+    ),
 
     /**
      * Allowed transformations
