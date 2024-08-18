@@ -12,11 +12,15 @@ import type {
 import { decodeTileLayerData } from "@mp/tiled-decoder";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
+import type { TiledSpritesheet } from "./spritesheet";
 
 export type LayerView = Container;
 
 export class LayerViewFactory {
-  constructor(private readonly tiledMap: TiledMap) {}
+  constructor(
+    private readonly tiledMap: TiledMap,
+    private readonly spritesheet: TiledSpritesheet,
+  ) {}
 
   createLayerViews(layers = this.tiledMap.layers) {
     // layers are already in the draw order in the tiled data
@@ -35,7 +39,9 @@ export class LayerViewFactory {
     const tiles = decodeTileLayerData(layer, this.tiledMap);
     const container = new Container();
     for (const tile of tiles) {
-      container.addChild(createTileSprite(tile, this.tiledMap));
+      container.addChild(
+        createTileSprite(tile, this.tiledMap, this.spritesheet),
+      );
     }
     return container;
   }

@@ -1,4 +1,4 @@
-import type { Tile } from "@mp/tiled-loader";
+import type { GlobalTileId, Tile } from "@mp/tiled-loader";
 import type { TileLayer, TiledMap } from "@mp/tiled-loader";
 import { decoders } from "./decoders";
 import { decompressors } from "./decompressors";
@@ -59,12 +59,13 @@ export function decodeTileLayerData(
           const tile = tileset.tiles?.get(LID);
           if (tile) {
             tiles.push({
+              id: GID,
               x,
               y,
               image: {
-                image: tile.image ?? tileset.image,
-                imageheight: tile.imageheight ?? tileset.imageheight,
-                imagewidth: tile.imagewidth ?? tileset.imagewidth,
+                url: tile.image ?? tileset.image,
+                height: tile.imageheight ?? tileset.imageheight,
+                width: tile.imagewidth ?? tileset.imagewidth,
               },
               tile,
               flippedHorizontally,
@@ -82,15 +83,18 @@ export function decodeTileLayerData(
   return tiles;
 }
 
-export type ResolvedTileImage = Required<
-  Pick<Tile, "image" | "imageheight" | "imagewidth">
->;
+export interface ResolvedTileImage {
+  url: string;
+  width: number;
+  height: number;
+}
 
 export interface ResolvedTile {
+  id: GlobalTileId;
   x: number;
   y: number;
   image: ResolvedTileImage;
-  tile: Omit<Tile, keyof ResolvedTileImage>;
+  tile: Omit<Tile, "image" | "imageheight" | "imagewidth">;
   flippedHorizontally: boolean;
   flippedVertically: boolean;
   flippedDiagonally: boolean;
