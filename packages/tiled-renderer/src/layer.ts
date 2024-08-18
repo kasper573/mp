@@ -28,7 +28,7 @@ export class LayerViewFactory {
   }
 
   private createGroupLayerView(layer: GroupLayer): LayerView {
-    const container = new Container();
+    const container = new Container({ isRenderGroup: true });
     for (const childLayerView of this.createLayerViews(layer.layers)) {
       container.addChild(childLayerView);
     }
@@ -37,7 +37,9 @@ export class LayerViewFactory {
 
   private createTileLayerView(layer: TileLayer): LayerView {
     const tiles = decodeTileLayerData(layer, this.tiledMap);
-    const container = new Container();
+    const container = new Container({
+      isRenderGroup: true,
+    });
     for (const tile of tiles) {
       container.addChild(createTileSprite(tile, this.textureByGID));
     }
@@ -49,7 +51,7 @@ export class LayerViewFactory {
   }
 
   private createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {
-    const view = new Container();
+    const view = new Container({ isRenderGroup: true });
     const toSorted = createObjectSorter(layer.draworder);
 
     for (const obj of toSorted(layer.objects)) {
