@@ -1,4 +1,4 @@
-import type { GlobalTileId, Tile } from "@mp/tiled-loader";
+import { localToGlobalId, type GlobalTileId } from "@mp/tiled-loader";
 import type { TileLayer, TiledMap } from "@mp/tiled-loader";
 import { decoders } from "./decoders";
 import { decompressors } from "./decompressors";
@@ -26,6 +26,15 @@ export function decodeTileLayerData(
     );
   }
 
+  const tileLookup = new Map(
+    map.tilesets.flatMap((tileset) =>
+      Array.from(tileset.tiles.values()).map((tile) => {
+        const gid = localToGlobalId(tileset.firstgid, tile.id);
+        return [gid, { tile, tileset }] as const;
+      }),
+    ),
+  );
+
   const tiles: ResolvedTile[] = [];
   for (let y = 0; y < map.height; ++y) {
     for (let x = 0; x < map.width; ++x) {
@@ -51,32 +60,33 @@ export function decodeTileLayerData(
         ROTATED_HEXAGONAL_120_FLAG
       );
 
-      // Find the tileset that contains this tile
-      for (let i = map.tilesets.length - 1; i >= 0; --i) {
-        const tileset = map.tilesets[i];
-        if (tileset.firstgid <= GID) {
-          const LID = GID - tileset.firstgid;
-          const tile = tileset.tiles?.get(LID);
-          if (tile) {
-            tiles.push({
-              id: GID,
-              x,
-              y,
-              image: {
-                url: tile.image ?? tileset.image,
-                height: tile.imageheight ?? tileset.imageheight,
-                width: tile.imagewidth ?? tileset.imagewidth,
-              },
-              tile,
-              flippedHorizontally,
-              flippedVertically,
-              flippedDiagonally,
-              rotatedHexagonal120,
-            });
-            break;
-          }
-        }
+      if (GID === 0) {
+        // Skip empty tiles
+        continue;
       }
+
+      const match = tileLookup.get(GID);
+      if (!match) {
+        throw new Error(`Could not find tileset for GID ${GID}`);
+      }
+
+      const { tile, tileset } = match;
+      tiles.push({
+        gid: GID,
+        x: x * map.tilewidth,
+        y: y * map.tileheight,
+        width: tile?.width ?? tileset.tilewidth ?? map.tilewidth,
+        height: tile?.height ?? tileset.tileheight ?? map.tileheight,
+        image: {
+          url: tile?.image ?? tileset.image,
+          height: tile?.imageheight ?? tileset.imageheight,
+          width: tile?.imagewidth ?? tileset.imagewidth,
+        },
+        flippedHorizontally,
+        flippedVertically,
+        flippedDiagonally,
+        rotatedHexagonal120,
+      });
     }
   }
 
@@ -90,11 +100,12 @@ export interface ResolvedTileImage {
 }
 
 export interface ResolvedTile {
-  id: GlobalTileId;
+  gid: GlobalTileId;
   x: number;
   y: number;
+  width: number;
+  height: number;
   image: ResolvedTileImage;
-  tile: Omit<Tile, "image" | "imageheight" | "imagewidth">;
   flippedHorizontally: boolean;
   flippedVertically: boolean;
   flippedDiagonally: boolean;

@@ -10,6 +10,7 @@ import {
   fallback,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
+import type { LocalTileId } from "./common";
 import { image, index, localTileID, pixelUnit } from "./common";
 import { objectGroupLayer } from "./layer";
 import { property } from "./property";
@@ -51,4 +52,12 @@ export function tile(context: LoaderContext) {
     terrain: optional(tuple([index, index, index, index])),
     type: optional(string),
   });
+}
+
+export function createEmptyTile(id: LocalTileId): Tile {
+  return {
+    id,
+    x: 0,
+    y: 0,
+  };
 }

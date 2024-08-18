@@ -25,7 +25,7 @@ import { property } from "./property";
 import { wangSet } from "./wang";
 import { terrain } from "./terrain";
 import type { Tile } from "./tile";
-import { tile } from "./tile";
+import { createEmptyTile, tile } from "./tile";
 import { transformations } from "./transformations";
 import { grid } from "./grid";
 
@@ -51,12 +51,13 @@ export const tileRenderSize = picklist(["tile", "grid"]);
 
 export type Tileset = TypeOf<ReturnType<typeof tileset>>;
 export function tileset(context: LoaderContext) {
-  return object({
+  const tileSchema = tile(context);
+  const base = object({
     backgroundcolor: optional(color),
     class: optional(tiledClass),
     columns: tileUnit,
     fillmode: fallback(fillMode, "stretch"),
-    firstgid: fallback(globalTileID, 1),
+    firstgid: globalTileID,
     grid: optional(grid),
 
     image: image(context),
@@ -104,7 +105,7 @@ export function tileset(context: LoaderContext) {
     tilerendersize: fallback(tileRenderSize, "tile"),
 
     tiles: pipe(
-      optional(array(tile(context))),
+      optional(array(tileSchema)),
       transform(async (tiles = []): Promise<Map<LocalTileId, Tile>> => {
         const tileById = new Map<LocalTileId, Tile>();
         for (const tile of tiles) {
@@ -128,4 +129,20 @@ export function tileset(context: LoaderContext) {
 
     wangsets: optional(array(wangSet(context))),
   });
+
+  return pipe(
+    base,
+    transform(async (tileset) => {
+      for (
+        let localId: LocalTileId = 0;
+        localId < tileset.tilecount;
+        localId++
+      ) {
+        if (!tileset.tiles.has(localId)) {
+          tileset.tiles.set(localId, createEmptyTile(localId));
+        }
+      }
+      return tileset;
+    }),
+  );
 }

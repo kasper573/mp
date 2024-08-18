@@ -1,5 +1,9 @@
 import type { AreaId } from "@mp/state";
-import { createTiledSpritesheet, TiledRenderer } from "@mp/tiled-renderer";
+import {
+  createTextureByGIDQuery,
+  loadTiledMapSpritesheets,
+  TiledRenderer,
+} from "@mp/tiled-renderer";
 import { createTiledLoader } from "@mp/tiled-loader";
 import { Application } from "@mp/pixi";
 import { api } from "./api";
@@ -18,12 +22,13 @@ async function main() {
     return;
   }
 
-  const areaSpritesheet = createTiledSpritesheet(tiledMap);
-  await areaSpritesheet.parse();
+  const spritesheets = await loadTiledMapSpritesheets(tiledMap);
+  const textureByGID = createTextureByGIDQuery(spritesheets);
+  await Promise.all(Object.values(spritesheets).map((ss) => ss.parse()));
 
   const app = new Application();
   await app.init({ antialias: true, background: 0x005500, resizeTo: window });
-  app.stage.addChild(new TiledRenderer(tiledMap, areaSpritesheet));
+  app.stage.addChild(new TiledRenderer(tiledMap, textureByGID));
   rootElement.appendChild(app.canvas);
 }
 

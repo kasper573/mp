@@ -12,14 +12,14 @@ import type {
 import { decodeTileLayerData } from "@mp/tiled-decoder";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
-import type { TiledSpritesheet } from "./spritesheet";
+import type { TextureByGID } from "./spritesheet";
 
 export type LayerView = Container;
 
 export class LayerViewFactory {
   constructor(
     private readonly tiledMap: TiledMap,
-    private readonly spritesheet: TiledSpritesheet,
+    private readonly textureByGID: TextureByGID,
   ) {}
 
   createLayerViews(layers = this.tiledMap.layers) {
@@ -39,9 +39,7 @@ export class LayerViewFactory {
     const tiles = decodeTileLayerData(layer, this.tiledMap);
     const container = new Container();
     for (const tile of tiles) {
-      container.addChild(
-        createTileSprite(tile, this.tiledMap, this.spritesheet),
-      );
+      container.addChild(createTileSprite(tile, this.textureByGID));
     }
     return container;
   }

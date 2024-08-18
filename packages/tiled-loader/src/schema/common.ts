@@ -47,6 +47,20 @@ export function file(context: LoaderContext) {
 }
 export const image = file;
 
+export function localToGlobalId(
+  tilesetFirstGID: GlobalTileId,
+  localId: LocalTileId,
+): GlobalTileId {
+  return tilesetFirstGID + localId;
+}
+
+export function globalToLocalId(
+  tilesetFirstGID: GlobalTileId,
+  globalId: GlobalTileId,
+): LocalTileId {
+  return globalId - tilesetFirstGID;
+}
+
 // Complex
 
 /**
