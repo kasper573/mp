@@ -7,9 +7,7 @@ import {
   literal,
   object,
   optional,
-  pipe,
   string,
-  transform,
   union,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
@@ -27,55 +25,47 @@ import { text } from "./text";
 import { tilesetReference } from "./tilesetReference";
 import type { Tileset } from "./tileset";
 
-const commonProperties = object({
-  /**
-   * Set if object represents a tile
-   */
-  gid: optional(globalTileID),
-  id: objectId,
-  name: string,
-  x: pixelUnit,
-  y: pixelUnit,
-  height: pixelUnit,
-  width: pixelUnit,
-  rotation,
-  type: optional(tiledClass),
-  visible: boolean,
-  properties: optional(array(property)),
-});
+type CommonProperties = TypeOf<ReturnType<typeof commonProperties>>;
+function commonProperties(context: LoaderContext) {
+  return object({
+    /**
+     * Set if object represents a tile
+     */
+    gid: optional(globalTileID),
+    id: objectId,
+    name: string,
+    x: pixelUnit,
+    y: pixelUnit,
+    height: pixelUnit,
+    width: pixelUnit,
+    rotation,
+    type: optional(tiledClass),
+    visible: boolean,
+    properties: optional(array(property(context))),
+  });
+}
 
-export type EllipseObject = TypeOf<typeof ellipseObject>;
-export const ellipseObject = giveDiscriminator(
-  "ellipse",
-  intersection([object({ ellipse: literal(true) }), commonProperties]),
+export type EllipseObject = TypeOf<ReturnType<typeof ellipseObject>>;
+export const ellipseObject = objectType(object({ ellipse: literal(true) }));
+
+export type PointObject = TypeOf<ReturnType<typeof pointObject>>;
+export const pointObject = objectType(object({ point: boolean }));
+
+export type PolygonObject = TypeOf<ReturnType<typeof polygonObject>>;
+export const polygonObject = objectType(
+  object({ polygon: array(pixelVector) }),
 );
 
-export type PointObject = TypeOf<typeof pointObject>;
-export const pointObject = giveDiscriminator(
-  "point",
-  intersection([object({ point: boolean }), commonProperties]),
+export type PolylineObject = TypeOf<ReturnType<typeof polylineObject>>;
+export const polylineObject = objectType(
+  object({ polyline: array(pixelVector) }),
 );
 
-export type PolygonObject = TypeOf<typeof polygonObject>;
-export const polygonObject = giveDiscriminator(
-  "polygon",
-  intersection([object({ polygon: array(pixelVector) }), commonProperties]),
-);
+export type TextObject = TypeOf<ReturnType<typeof textObject>>;
+export const textObject = objectType(object({ text }));
 
-export type PolylineObject = TypeOf<typeof polylineObject>;
-export const polylineObject = giveDiscriminator(
-  "polyline",
-  intersection([object({ polyline: array(pixelVector) }), commonProperties]),
-);
-
-export type TextObject = TypeOf<typeof textObject>;
-export const textObject = giveDiscriminator(
-  "text",
-  intersection([object({ text: text }), commonProperties]),
-);
-
-export type RectangleObject = TypeOf<typeof rectangleObject>;
-export const rectangleObject = giveDiscriminator("rectangle", commonProperties);
+export type RectangleObject = TypeOf<ReturnType<typeof rectangleObject>>;
+export const rectangleObject = objectType(object({}));
 
 export type TiledObject =
   | EllipseObject
@@ -89,12 +79,12 @@ export type TiledObject =
 export function tiledObject(context: LoaderContext): Schema<TiledObject> {
   return lazy(() =>
     union([
-      ellipseObject,
-      pointObject,
-      polygonObject,
-      polylineObject,
-      textObject,
-      rectangleObject,
+      ellipseObject(context),
+      pointObject(context),
+      polygonObject(context),
+      polylineObject(context),
+      textObject(context),
+      rectangleObject(context),
       objectTemplate(context),
     ]),
   );
@@ -104,32 +94,20 @@ export interface ObjectTemplate {
   template: string;
   tileset?: Tileset;
   object: TiledObject;
-  objectType: "objectTemplate";
 }
 
 export function objectTemplate(context: LoaderContext): Schema<ObjectTemplate> {
-  return giveDiscriminator(
-    "objectTemplate",
-    object({
-      template: file,
-      tileset: optional(tilesetReference(context)),
-      object: tiledObject(context),
-    }),
-  );
+  return object({
+    template: file(context),
+    tileset: optional(tilesetReference(context)),
+    object: tiledObject(context),
+  });
 }
 
-function giveDiscriminator<
-  TypeName extends string,
-  BaseSchema extends Schema<object>,
->(
-  name: TypeName,
-  base: BaseSchema,
-): Schema<{ objectType: TypeName } & TypeOf<BaseSchema>> {
-  return pipe(
-    base,
-    transform(async (value) => ({
-      ...value,
-      objectType: name,
-    })),
-  ) as Schema<{ objectType: TypeName } & TypeOf<BaseSchema>>;
+function objectType<Base>(base: Schema<Base>) {
+  return function define(
+    context: LoaderContext,
+  ): Schema<Base & CommonProperties> {
+    return intersection([base, commonProperties(context)]);
+  };
 }

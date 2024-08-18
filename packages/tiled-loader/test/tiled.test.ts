@@ -7,9 +7,8 @@ import { createTiledLoader } from "../src/loader";
 const loadJson = (p: string) => fs.readFile(p, "utf-8").then(JSON.parse);
 
 const loaderOptions: CreateTiledLoaderOptions = {
-  loadMap: loadJson,
-  loadTileset: (tilesetPath, mapPath) =>
-    loadJson(path.resolve(path.dirname(mapPath), tilesetPath)),
+  loadJson,
+  relativePath: (p, b) => path.resolve(path.dirname(b), p),
 };
 
 const tmjPath = path.resolve(__dirname, "./fixtures/map.tmj");

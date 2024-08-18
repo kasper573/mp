@@ -6,7 +6,7 @@ import { decompressors } from "./decompressors";
 export function decodeTileLayerData(
   layer: TileLayer,
   map: TiledMap,
-): AssignedTile[] {
+): ResolvedTile[] {
   const { compression, encoding, data: rawData } = layer;
 
   const decode = decoders[encoding];
@@ -26,7 +26,7 @@ export function decodeTileLayerData(
     );
   }
 
-  const tiles: AssignedTile[] = [];
+  const tiles: ResolvedTile[] = [];
   for (let y = 0; y < map.height; ++y) {
     for (let x = 0; x < map.width; ++x) {
       // Read the GID in little-endian byte order:
@@ -61,6 +61,11 @@ export function decodeTileLayerData(
             tiles.push({
               x,
               y,
+              image: {
+                image: tile.image ?? tileset.image,
+                imageheight: tile.imageheight ?? tileset.imageheight,
+                imagewidth: tile.imagewidth ?? tileset.imagewidth,
+              },
               tile,
               flippedHorizontally,
               flippedVertically,
@@ -77,10 +82,15 @@ export function decodeTileLayerData(
   return tiles;
 }
 
-export interface AssignedTile {
+export type ResolvedTileImage = Required<
+  Pick<Tile, "image" | "imageheight" | "imagewidth">
+>;
+
+export interface ResolvedTile {
   x: number;
   y: number;
-  tile: Tile;
+  image: ResolvedTileImage;
+  tile: Omit<Tile, keyof ResolvedTileImage>;
   flippedHorizontally: boolean;
   flippedVertically: boolean;
   flippedDiagonally: boolean;

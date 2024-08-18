@@ -9,6 +9,7 @@ import {
   optional,
   string,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 import { color, file, objectId, tiledClass } from "./common";
 
 const sharedProps = {
@@ -22,14 +23,16 @@ const sharedProps = {
   propertytype: optional(string),
 };
 
-export type Property = TypeOf<typeof property>;
-export const property = variant("type", [
-  object({ ...sharedProps, type: literal("string"), value: string }),
-  object({ ...sharedProps, type: literal("int"), value: integer }),
-  object({ ...sharedProps, type: literal("float"), value: float }),
-  object({ ...sharedProps, type: literal("bool"), value: boolean }),
-  object({ ...sharedProps, type: literal("color"), value: color }),
-  object({ ...sharedProps, type: literal("file"), value: file }),
-  object({ ...sharedProps, type: literal("object"), value: objectId }),
-  object({ ...sharedProps, type: literal("class"), value: tiledClass }),
-]);
+export type Property = TypeOf<ReturnType<typeof property>>;
+export function property(context: LoaderContext) {
+  return variant("type", [
+    object({ ...sharedProps, type: literal("string"), value: string }),
+    object({ ...sharedProps, type: literal("int"), value: integer }),
+    object({ ...sharedProps, type: literal("float"), value: float }),
+    object({ ...sharedProps, type: literal("bool"), value: boolean }),
+    object({ ...sharedProps, type: literal("color"), value: color }),
+    object({ ...sharedProps, type: literal("file"), value: file(context) }),
+    object({ ...sharedProps, type: literal("object"), value: objectId }),
+    object({ ...sharedProps, type: literal("class"), value: tiledClass }),
+  ]);
+}

@@ -1,26 +1,21 @@
 import { parse } from "@mp/schema";
-import type { JsonLoader, LoaderContext } from "./context";
+import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
 import { tiledMap } from "./schema/map";
 import { createError } from "./error";
 
-export interface CreateTiledLoaderOptions {
-  loadMap: JsonLoader<[mapPath: string]>;
-  loadTileset: JsonLoader<[tilesetPath: string, mapPath: string]>;
-}
+export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 
-export function createTiledLoader({
-  loadMap,
-  loadTileset,
-}: CreateTiledLoaderOptions) {
+export function createTiledLoader(options: CreateTiledLoaderOptions) {
   return async function loadTiled(mapPath: string): Promise<TiledLoaderResult> {
     const context: LoaderContext = {
-      loadTileset: (tilesetPath) => loadTileset(tilesetPath, mapPath),
+      basePath: mapPath,
+      ...options,
     };
 
     let json;
     try {
-      json = await loadMap(mapPath);
+      json = await context.loadJson(mapPath);
       return { tiledMap: await parse(tiledMap(context), json) };
     } catch (error) {
       return {

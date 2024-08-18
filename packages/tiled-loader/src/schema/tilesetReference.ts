@@ -18,12 +18,17 @@ const file = object({
 });
 
 function tilesetFile(context: LoaderContext): Schema<Tileset> {
+  const { basePath, loadJson, relativePath } = context;
   return pipe(
     file,
     transform(async ({ source, firstgid }) => {
       try {
-        const tileset = (await context.loadTileset(source)) as Tileset;
-        return await parse(tilesetSchema(context), { ...tileset, firstgid });
+        const absPath = relativePath(source, basePath);
+        const json = (await loadJson(absPath)) as object;
+        return await parse(tilesetSchema({ ...context, basePath: absPath }), {
+          ...json,
+          firstgid,
+        });
       } catch (error) {
         throw `Error in ${source}: ${createError(error)}`;
       }

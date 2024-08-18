@@ -59,7 +59,7 @@ export function tileset(context: LoaderContext) {
     firstgid: fallback(globalTileID, 1),
     grid: optional(grid),
 
-    image,
+    image: image(context),
     imageheight: pixelUnit,
     imagewidth: pixelUnit,
 
@@ -71,14 +71,14 @@ export function tileset(context: LoaderContext) {
     name: string,
     objectalignment: fallback(objectAlignment, "unspecified"),
 
-    properties: optional(array(property)),
+    properties: optional(array(property(context))),
 
     /**
      * Spacing between adjacent tiles in image (pixels)
      */
     spacing: pixelUnit,
 
-    terrains: optional(array(terrain)),
+    terrains: optional(array(terrain(context))),
 
     /**
      * The number of tiles in this tileset
@@ -126,6 +126,6 @@ export function tileset(context: LoaderContext) {
      */
     version: optional(string),
 
-    wangsets: optional(array(wangSet)),
+    wangsets: optional(array(wangSet(context))),
   });
 }

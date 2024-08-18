@@ -45,7 +45,7 @@ function sharedProperties(context: LoaderContext) {
     tiledversion: string,
 
     tilesets: array(tilesetReference(context)),
-    properties: optional(array(property)),
+    properties: optional(array(property(context))),
     layers: array(layer(context)),
 
     backgroundcolor: optional(color),

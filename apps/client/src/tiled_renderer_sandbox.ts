@@ -6,8 +6,8 @@ import { api } from "./api";
 
 async function main() {
   const loadTiled = createTiledLoader({
-    loadMap: fetchJson,
-    loadTileset: (...args) => fetchJson(relativeURL(...args)),
+    loadJson,
+    relativePath: relativeURL,
   });
 
   const rootElement = document.querySelector("div#root")!;
@@ -26,7 +26,7 @@ async function main() {
 
 main();
 
-async function fetchJson(url: string) {
+async function loadJson(url: string) {
   const response = await fetch(url);
   return response.json();
 }

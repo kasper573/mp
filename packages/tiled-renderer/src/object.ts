@@ -16,40 +16,17 @@ import type {
 export * from "./renderer";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
-  switch (obj.objectType) {
-    case "ellipse":
-      return createEllipseGraphics(obj);
-    case "point":
-      return createPointGraphics(obj);
-    case "polygon":
-      return createPolygonGraphics(obj);
-    case "polyline":
-      return createPolylineGraphics(obj);
-    case "text":
-      return createTextRenderer(obj);
-    case "rectangle":
-      return createRectangleGraphics(obj);
-    case "objectTemplate":
-      return createObjectTemplateGraphics(obj);
-  }
+  if ("ellipse" in obj) return createEllipseGraphics(obj);
+  if ("point" in obj) return createPointGraphics(obj);
+  if ("polygon" in obj) return createPolygonGraphics(obj);
+  if ("polyline" in obj) return createPolylineGraphics(obj);
+  if ("text" in obj) return createTextRenderer(obj);
+  if ("object" in obj) return createObjectTemplateGraphics(obj);
+  return createRectangleGraphics(obj);
 }
 
 const strokeStyle: StrokeStyle = { width: 2, color: 0xff0000 };
 const fillStyle: FillStyle = { color: 0x00ff00 };
-const textStyle = new TextStyle({
-  fontFamily: "Arial",
-  dropShadow: {
-    alpha: 0.8,
-    angle: 2.1,
-    blur: 4,
-    color: "0x111111",
-    distance: 10,
-  },
-  fill: "#ffffff",
-  stroke: { color: "#004620", width: 12, join: "round" },
-  fontSize: 60,
-  fontWeight: "lighter",
-});
 
 function createEllipseGraphics(obj: EllipseObject): Graphics {
   const g = new Graphics();

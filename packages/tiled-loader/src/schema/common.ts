@@ -11,6 +11,7 @@ import {
   picklist,
   pipe,
 } from "@mp/schema";
+import type { LoaderContext } from "../context";
 
 // Primitives
 export const rgb = string;
@@ -38,7 +39,12 @@ export const globalTileID = integer;
 export type LocalTileId = TypeOf<typeof localTileID>;
 export const localTileID = integer;
 export const tiledClass = string;
-export const file = string;
+export function file(context: LoaderContext) {
+  return pipe(
+    string,
+    transform(async (p) => context.relativePath(p, context.basePath)),
+  );
+}
 export const image = file;
 
 // Complex

@@ -35,7 +35,7 @@ export class LayerViewFactory {
     const tiles = decodeTileLayerData(layer, this.tiledMap);
     const container = new Container();
     for (const tile of tiles) {
-      container.addChild(createTileSprite(tile));
+      container.addChild(createTileSprite(tile, this.tiledMap));
     }
     return container;
   }
@@ -80,11 +80,10 @@ function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
 }
 
 function getObjectY(obj: TiledObject): number {
-  if (obj.objectType === "objectTemplate") {
+  if ("object" in obj) {
     return getObjectY(obj.object);
-  } else {
-    return obj.y;
   }
+  return obj.y;
 }
 
 type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];

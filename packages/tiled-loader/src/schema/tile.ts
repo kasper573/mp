@@ -23,7 +23,7 @@ export function tile(context: LoaderContext) {
     /**
      * Used for image collection tilesets
      */
-    image: optional(image),
+    image: optional(image(context)),
     imageheight: optional(pixelUnit),
     imagewidth: optional(pixelUnit),
 
@@ -43,7 +43,7 @@ export function tile(context: LoaderContext) {
      */
     probability: optional(float),
 
-    properties: optional(array(property)),
+    properties: optional(array(property(context))),
 
     /**
      * Index of terrain for each corner of tile
