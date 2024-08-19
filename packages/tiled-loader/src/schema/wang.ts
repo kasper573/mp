@@ -1,4 +1,3 @@
-import type { Schema, TypeOf } from "@mp/schema";
 import {
   array,
   object,
@@ -10,10 +9,20 @@ import {
   picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
+import type { LocalTileId, TiledClass } from "./common";
 import { color, localTileID, tiledClass } from "./common";
+import type { Property } from "./property";
 import { property } from "./property";
 
-export type WangColor = TypeOf<ReturnType<typeof wangColor>>;
+export interface WangColor {
+  class?: TiledClass;
+  color: string;
+  name: string;
+  probability: number;
+  properties?: Property[];
+  tile: LocalTileId;
+}
+
 export function wangColor(context: LoaderContext) {
   return object({
     class: optional(tiledClass),
@@ -25,10 +34,24 @@ export function wangColor(context: LoaderContext) {
   });
 }
 
-export type WangColorIndex = TypeOf<typeof wangColorIndex>;
+export type WangColorIndex = number;
+
 export const wangColorIndex = uchar;
 
-export type WangTile = TypeOf<typeof wangTile>;
+export interface WangTile {
+  tileid: LocalTileId;
+  wangid: [
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+    WangColorIndex,
+  ];
+}
+
 export const wangTile = object({
   tileid: localTileID,
   wangid: tuple([
@@ -43,13 +66,20 @@ export const wangTile = object({
   ]),
 });
 
-export type WangSet = TypeOf<ReturnType<typeof wangSet>>;
+export interface WangSet {
+  class?: TiledClass;
+  colors?: Record<WangColorIndex, WangColor>;
+  name: string;
+  properties?: Property[];
+  tile: LocalTileId;
+  type: "corner" | "edge" | "mixed";
+  wangtiles: WangTile[];
+}
+
 export function wangSet(context: LoaderContext) {
   return object({
     class: optional(tiledClass),
-    colors: optional(array(wangColor(context))) as Schema<
-      Record<WangColorIndex, WangColor> | undefined
-    >,
+    colors: optional(array(wangColor(context))),
     name: string,
     properties: optional(array(property(context))),
     tile: localTileID,

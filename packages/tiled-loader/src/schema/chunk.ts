@@ -1,8 +1,6 @@
 import { object } from "@mp/schema";
-import type { TypeOf } from "@mp/schema";
+import type { TiledData, TileUnit } from "./common";
 import { data, tileUnit } from "./common";
-
-export type Chunk = TypeOf<typeof chunk>;
 
 export const chunk = object({
   data,
@@ -11,3 +9,11 @@ export const chunk = object({
   x: tileUnit,
   y: tileUnit,
 });
+
+export interface Chunk {
+  data: TiledData;
+  height: TileUnit;
+  width: TileUnit;
+  x: TileUnit;
+  y: TileUnit;
+}

@@ -1,4 +1,3 @@
-import type { TypeOf } from "@mp/schema";
 import {
   array,
   float,
@@ -10,25 +9,47 @@ import {
   fallback,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
-import type { LocalTileId } from "./common";
+import type { ImageFile, LocalTileId, PixelUnit } from "./common";
 import { image, index, localTileID, pixelUnit } from "./common";
+import type { ObjectGroupLayer } from "./layer";
 import { objectGroupLayer } from "./layer";
+import type { Property } from "./property";
 import { property } from "./property";
+import type { Frame } from "./frame";
 import { frame } from "./frame";
 
-export type Tile = TypeOf<ReturnType<typeof tile>>;
+export interface Tile {
+  animation?: Frame[];
+  id: LocalTileId;
+
+  // Used for image collection tilesets
+  image?: ImageFile;
+  imageheight?: PixelUnit;
+  imagewidth?: PixelUnit;
+
+  // The bounds of the sub-rectangle representing this tile
+  // (width/height defaults to image width/height)
+  x: PixelUnit;
+  y: PixelUnit;
+  width?: PixelUnit;
+  height?: PixelUnit;
+
+  objectgroup?: ObjectGroupLayer;
+  probability?: number;
+  properties?: Property[];
+  terrain?: [number, number, number, number];
+  type?: string;
+}
+
 export function tile(context: LoaderContext) {
   return object({
     animation: optional(array(frame)),
     id: localTileID,
-    /**
-     * Used for image collection tilesets
-     */
+
     image: optional(image(context)),
     imageheight: optional(pixelUnit),
     imagewidth: optional(pixelUnit),
 
-    // The bounds of the sub-rectangle representing this tile (width/height defaults to image width/height)
     x: fallback(pixelUnit, 0),
     y: fallback(pixelUnit, 0),
     width: optional(pixelUnit),

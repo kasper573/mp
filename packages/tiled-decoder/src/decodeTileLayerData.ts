@@ -1,5 +1,14 @@
-import { localToGlobalId, type GlobalTileId } from "@mp/tiled-loader";
-import type { TileLayer, TiledMap } from "@mp/tiled-loader";
+import {
+  localToGlobalId,
+  readGlobalIdBuffer,
+  type GlobalTileId,
+} from "@mp/tiled-loader";
+import type {
+  ImageFile,
+  PixelUnit,
+  TileLayer,
+  TiledMap,
+} from "@mp/tiled-loader";
 import { decoders } from "./decoders";
 import { decompressors } from "./decompressors";
 
@@ -39,53 +48,34 @@ export function decodeTileLayerData(
   for (let y = 0; y < map.height; ++y) {
     for (let x = 0; x < map.width; ++x) {
       // Read the GID in little-endian byte order:
-      let GID =
-        data[dataOffset] |
-        (data[dataOffset + 1] << 8) |
-        (data[dataOffset + 2] << 16) |
-        (data[dataOffset + 3] << 24);
-      dataOffset += 4;
+      const { gid, newOffset, flags } = readGlobalIdBuffer(data, dataOffset);
+      dataOffset = newOffset;
 
-      // Read out the flags
-      const flippedHorizontally = (GID & FLIPPED_HORIZONTALLY_FLAG) !== 0;
-      const flippedVertically = (GID & FLIPPED_VERTICALLY_FLAG) !== 0;
-      const flippedDiagonally = (GID & FLIPPED_DIAGONALLY_FLAG) !== 0;
-      const rotatedHexagonal120 = (GID & ROTATED_HEXAGONAL_120_FLAG) !== 0;
-
-      // Clear all four flags
-      GID &= ~(
-        FLIPPED_HORIZONTALLY_FLAG |
-        FLIPPED_VERTICALLY_FLAG |
-        FLIPPED_DIAGONALLY_FLAG |
-        ROTATED_HEXAGONAL_120_FLAG
-      );
-
-      if (GID === 0) {
+      if (gid === 0) {
         // Skip empty tiles
         continue;
       }
 
-      const match = tileLookup.get(GID);
+      const match = tileLookup.get(gid);
       if (!match) {
-        throw new Error(`Could not find tileset for GID ${GID}`);
+        throw new Error(`Could not find tileset for GID ${gid}`);
       }
 
       const { tile, tileset } = match;
       tiles.push({
-        gid: GID,
-        x: x * map.tilewidth,
-        y: y * map.tileheight,
-        width: tile?.width ?? tileset.tilewidth ?? map.tilewidth,
-        height: tile?.height ?? tileset.tileheight ?? map.tileheight,
+        gid,
+        x: (x * map.tilewidth) as PixelUnit,
+        y: (y * map.tileheight) as PixelUnit,
+        width: (tile?.width ?? tileset.tilewidth ?? map.tilewidth) as PixelUnit,
+        height: (tile?.height ??
+          tileset.tileheight ??
+          map.tileheight) as PixelUnit,
         image: {
           url: tile?.image ?? tileset.image,
           height: tile?.imageheight ?? tileset.imageheight,
           width: tile?.imagewidth ?? tileset.imagewidth,
         },
-        flippedHorizontally,
-        flippedVertically,
-        flippedDiagonally,
-        rotatedHexagonal120,
+        ...flags,
       });
     }
   }
@@ -94,25 +84,20 @@ export function decodeTileLayerData(
 }
 
 export interface ResolvedTileImage {
-  url: string;
-  width: number;
-  height: number;
+  url: ImageFile;
+  width: PixelUnit;
+  height: PixelUnit;
 }
 
 export interface ResolvedTile {
   gid: GlobalTileId;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+  x: PixelUnit;
+  y: PixelUnit;
+  width: PixelUnit;
+  height: PixelUnit;
   image: ResolvedTileImage;
   flippedHorizontally: boolean;
   flippedVertically: boolean;
   flippedDiagonally: boolean;
   rotatedHexagonal120: boolean;
 }
-
-const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
-const FLIPPED_VERTICALLY_FLAG = 0x40000000;
-const FLIPPED_DIAGONALLY_FLAG = 0x20000000;
-const ROTATED_HEXAGONAL_120_FLAG = 0x10000000;

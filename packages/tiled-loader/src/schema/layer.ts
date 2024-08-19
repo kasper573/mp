@@ -1,4 +1,4 @@
-import type { Schema, TypeOf } from "@mp/schema";
+import type { Schema } from "@mp/schema";
 import {
   array,
   boolean,
@@ -13,6 +13,18 @@ import {
   intersection,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
+import type {
+  Color,
+  Encoding,
+  ImageFile,
+  LayerId,
+  PixelUnit,
+  Ratio,
+  RGB,
+  TiledClass,
+  TiledData,
+  TileUnit,
+} from "./common";
 import {
   color,
   Compression,
@@ -26,12 +38,48 @@ import {
   tiledClass,
   tileUnit,
 } from "./common";
+import type { Property } from "./property";
 import { property } from "./property";
+import type { TiledObject } from "./object";
 import { tiledObject } from "./object";
+import type { Chunk } from "./chunk";
 import { chunk } from "./chunk";
 
-export type LayerDrawOrder = TypeOf<typeof layerDrawOrder>;
+export type LayerDrawOrder = "topdown" | "index";
 export const layerDrawOrder = picklist(["topdown", "index"]);
+
+export interface SharedLayerProperties {
+  class?: TiledClass;
+  id: LayerId;
+  locked: boolean;
+  name: string;
+  offsetx: PixelUnit;
+  offsety: PixelUnit;
+  opacity: Ratio;
+  parallaxx: Ratio;
+  parallaxy: Ratio;
+  properties?: Property[];
+  visible: boolean;
+
+  // coordinate where layer content starts (for infinite maps)
+  startx?: PixelUnit;
+  starty?: PixelUnit;
+
+  /**
+   * multiplied with any graphics drawn by this layer or any child layers
+   */
+  tintcolor?: Color;
+
+  /**
+   * Horizontal layer offset in tiles. Always 0.
+   */
+  x: TileUnit;
+
+  /**
+   * Vertical layer offset in tiles. Always 0.
+   */
+  y: TileUnit;
+}
 
 function sharedProperties(context: LoaderContext) {
   return object({
@@ -47,28 +95,35 @@ function sharedProperties(context: LoaderContext) {
     properties: optional(array(property(context))),
     visible: boolean,
 
-    // coordinate where layer content starts (for infinite maps)
     startx: optional(pixelUnit),
     starty: optional(pixelUnit),
 
-    /**
-     * multiplied with any graphics drawn by this layer or any child layers
-     */
     tintcolor: optional(color),
 
-    /**
-     * Horizontal layer offset in tiles. Always 0.
-     */
     x: tileUnit,
 
-    /**
-     * Vertical layer offset in tiles. Always 0.
-     */
     y: tileUnit,
   });
 }
 
-export type TileLayer = TypeOf<ReturnType<typeof tileLayer>>;
+export interface TileLayer extends SharedLayerProperties {
+  type: "tilelayer";
+  chunks?: Chunk[];
+  compression: Compression;
+  data: TiledData;
+  encoding: Encoding;
+
+  /**
+   * Row count. Same as map height for fixed-size maps.
+   */
+  height: TileUnit;
+
+  /**
+   * Column count. Same as map width for fixed-size maps.
+   */
+  width: TileUnit;
+}
+
 export function tileLayer(context: LoaderContext) {
   return intersection([
     object({
@@ -77,22 +132,21 @@ export function tileLayer(context: LoaderContext) {
       compression: fallback(compression, Compression.None),
       data,
       encoding: fallback(encoding, "csv"),
-
-      /**
-       * Row count. Same as map height for fixed-size maps.
-       */
       height: tileUnit,
-
-      /**
-       * Column count. Same as map width for fixed-size maps.
-       */
       width: tileUnit,
     }),
     sharedProperties(context),
   ]);
 }
 
-export type ImageLayer = TypeOf<ReturnType<typeof imageLayer>>;
+export interface ImageLayer extends SharedLayerProperties {
+  type: "imagelayer";
+  image: ImageFile;
+  repeatx: boolean;
+  repeaty: boolean;
+  transparentcolor?: RGB;
+}
+
 export function imageLayer(context: LoaderContext) {
   return intersection([
     object({
@@ -106,7 +160,12 @@ export function imageLayer(context: LoaderContext) {
   ]);
 }
 
-export type ObjectGroupLayer = TypeOf<ReturnType<typeof objectGroupLayer>>;
+export interface ObjectGroupLayer extends SharedLayerProperties {
+  type: "objectgroup";
+  draworder: LayerDrawOrder;
+  objects: TiledObject[];
+}
+
 export function objectGroupLayer(context: LoaderContext) {
   return intersection([
     object({
@@ -118,10 +177,10 @@ export function objectGroupLayer(context: LoaderContext) {
   ]);
 }
 
-export type GroupLayer = TypeOf<ReturnType<typeof sharedProperties>> & {
+export interface GroupLayer extends SharedLayerProperties {
   type: "group";
   layers: Layer[];
-};
+}
 
 export function groupLayer(context: LoaderContext): Schema<GroupLayer> {
   return intersection([

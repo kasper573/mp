@@ -7,10 +7,18 @@ import {
   optional,
   string,
   fallback,
-  type TypeOf,
   picklist,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
+import type {
+  Color,
+  CompressionLevel,
+  LayerId,
+  ObjectId,
+  PixelUnit,
+  TiledClass,
+  TileUnit,
+} from "./common";
 import {
   color,
   compressionLevel,
@@ -20,11 +28,18 @@ import {
   tiledClass,
   tileUnit,
 } from "./common";
+import type { Layer } from "./layer";
 import { layer } from "./layer";
+import type { Property } from "./property";
 import { property } from "./property";
 import { tilesetReference } from "./tilesetReference";
+import type { Tileset } from "./tileset";
 
-export type MapRenderOrder = TypeOf<typeof mapRenderOrder>;
+export type MapRenderOrder =
+  | "right-down"
+  | "right-up"
+  | "left-down"
+  | "left-up";
 export const mapRenderOrder = picklist([
   "right-down",
   "right-up",
@@ -32,11 +47,52 @@ export const mapRenderOrder = picklist([
   "left-up",
 ]);
 
-export type StaggerAxis = TypeOf<typeof staggerAxis>;
+export type StaggerAxis = "x" | "y";
 export const staggerAxis = picklist(["x", "y"]);
 
-export type StaggerIndex = TypeOf<typeof staggerIndex>;
+export type StaggerIndex = "odd" | "even";
 export const staggerIndex = picklist(["odd", "even"]);
+
+interface SharedMapProperties {
+  type: "map";
+  version: string;
+  tiledversion: string;
+
+  tilesets: Tileset[];
+  properties?: Property[];
+  layers: Layer[];
+
+  backgroundcolor?: Color;
+  class?: TiledClass;
+
+  height: TileUnit;
+  width: TileUnit;
+  tileheight: TileUnit;
+  tilewidth: TileUnit;
+
+  parallaxoriginx: PixelUnit;
+  parallaxoriginy: PixelUnit;
+
+  /**
+   * Whether the map has infinite dimensions
+   */
+  infinite: boolean;
+
+  /**
+   * The compression level to use for tile layer data
+   */
+  compressionlevel: CompressionLevel;
+
+  /**
+   * Auto-increments for each layer
+   */
+  nextlayerid: LayerId;
+
+  /**
+   * Auto-increments for each placed object
+   */
+  nextobjectid: ObjectId;
+}
 
 function sharedProperties(context: LoaderContext) {
   return {
@@ -59,31 +115,23 @@ function sharedProperties(context: LoaderContext) {
     parallaxoriginx: fallback(pixelUnit, 0),
     parallaxoriginy: fallback(pixelUnit, 0),
 
-    /**
-     * Whether the map has infinite dimensions
-     */
     infinite: boolean,
 
-    /**
-     * The compression level to use for tile layer data
-     */
     compressionlevel: fallback(compressionLevel, {
       type: "use-algorithm-default",
     }),
 
-    /**
-     * Auto-increments for each layer
-     */
     nextlayerid: layerId,
 
-    /**
-     * Auto-increments for each placed object
-     */
     nextobjectid: objectId,
   };
 }
 
-export type OrthogonalMap = TypeOf<ReturnType<typeof orthogonalMap>>;
+export interface OrthogonalMap extends SharedMapProperties {
+  renderorder: MapRenderOrder;
+  orientation: "orthogonal";
+}
+
 export function orthogonalMap(context: LoaderContext) {
   return object({
     renderorder: fallback(mapRenderOrder, "right-down"),
@@ -92,7 +140,10 @@ export function orthogonalMap(context: LoaderContext) {
   });
 }
 
-export type IsometricMap = TypeOf<ReturnType<typeof isometricMap>>;
+export interface IsometricMap extends SharedMapProperties {
+  orientation: "isometric";
+}
+
 export function isometricMap(context: LoaderContext) {
   return object({
     orientation: literal("isometric"),
@@ -100,7 +151,12 @@ export function isometricMap(context: LoaderContext) {
   });
 }
 
-export type StaggeredMap = TypeOf<ReturnType<typeof staggeredMap>>;
+export interface StaggeredMap extends SharedMapProperties {
+  staggeraxis: StaggerAxis;
+  staggerindex: StaggerIndex;
+  orientation: "staggered";
+}
+
 export function staggeredMap(context: LoaderContext) {
   return object({
     staggeraxis: staggerAxis,
@@ -110,7 +166,13 @@ export function staggeredMap(context: LoaderContext) {
   });
 }
 
-export type HexagonalMap = TypeOf<ReturnType<typeof hexagonalMap>>;
+export interface HexagonalMap extends SharedMapProperties {
+  hexsidelength: PixelUnit;
+  staggeraxis: StaggerAxis;
+  staggerindex: StaggerIndex;
+  orientation: "hexagonal";
+}
+
 export function hexagonalMap(context: LoaderContext) {
   return object({
     hexsidelength: pixelUnit,
@@ -121,7 +183,12 @@ export function hexagonalMap(context: LoaderContext) {
   });
 }
 
-export type TiledMap = TypeOf<ReturnType<typeof tiledMap>>;
+export type TiledMap =
+  | OrthogonalMap
+  | IsometricMap
+  | StaggeredMap
+  | HexagonalMap;
+
 export function tiledMap(context: LoaderContext) {
   return variant("orientation", [
     orthogonalMap(context),

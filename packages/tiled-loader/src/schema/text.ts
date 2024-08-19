@@ -1,4 +1,3 @@
-import type { TypeOf } from "@mp/schema";
 import {
   boolean,
   integer,
@@ -8,9 +7,9 @@ import {
   fallback,
   picklist,
 } from "@mp/schema";
+import type { Color } from "./common";
 import { rgb, argb } from "./common";
 
-export type TiledText = TypeOf<typeof text>;
 export const text = object({
   bold: fallback(boolean, false),
   color: fallback(union([rgb, argb]), "#000000"),
@@ -25,3 +24,18 @@ export const text = object({
   valign: fallback(picklist(["top", "center", "bottom"]), "top"),
   wrap: fallback(boolean, false),
 });
+
+export interface TiledText {
+  bold: boolean;
+  color: Color;
+  fontfamily: string;
+  halign: "center" | "right" | "justify" | "left";
+  italic: boolean;
+  kerning: boolean;
+  pixelsize: number;
+  strikeout: boolean;
+  text: string;
+  underline: boolean;
+  valign: "top" | "center" | "bottom";
+  wrap: boolean;
+}

@@ -1,9 +1,13 @@
-import type { TypeOf } from "@mp/schema";
 import { object } from "@mp/schema";
+import type { LocalTileId, Milliseconds } from "./common";
 import { localTileID, milliseconds } from "./common";
 
-export type Frame = TypeOf<typeof frame>;
 export const frame = object({
   duration: milliseconds,
   tileid: localTileID,
 });
+
+export interface Frame {
+  duration: Milliseconds;
+  tileid: LocalTileId;
+}

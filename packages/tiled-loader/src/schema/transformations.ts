@@ -1,25 +1,30 @@
-import type { TypeOf } from "@mp/schema";
 import { boolean, object } from "@mp/schema";
 
-export type Transformations = TypeOf<typeof transformations>;
-export const transformations = object({
+export interface Transformations {
   /**
    * Tiles can be flipped horizontally
    */
-  hflip: boolean,
+  hflip: boolean;
 
   /**
    * Tiles can be flipped vertically
    */
-  vflip: boolean,
+  vflip: boolean;
 
   /**
    * Tiles can be rotated in 90-degree increments
    */
-  rotate: boolean,
+  rotate: boolean;
 
   /**
    * Whether untransformed tiles remain preferred, otherwise transformed tiles are used to produce more variations
    */
+  preferuntransformed: boolean;
+}
+
+export const transformations = object({
+  hflip: boolean,
+  vflip: boolean,
+  rotate: boolean,
   preferuntransformed: boolean,
 });
