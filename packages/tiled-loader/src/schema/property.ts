@@ -1,16 +1,4 @@
-import {
-  boolean,
-  variant,
-  float,
-  integer,
-  literal,
-  object,
-  string,
-  optional,
-} from "@mp/schema";
-import type { LoaderContext } from "../context";
-import type { Color, File, ObjectId, TiledClass } from "./common";
-import { color, file, objectId, tiledClass } from "./common";
+import type { Color, ObjectId, TiledClass } from "./common";
 
 interface SpecificProperty<Type extends string, Value> {
   /**
@@ -31,30 +19,9 @@ export type Property =
   | SpecificProperty<"float", number>
   | SpecificProperty<"bool", boolean>
   | SpecificProperty<"color", Color>
-  | SpecificProperty<"file", File>
+  // Disabling this until we need property files since filepaths need reconciling
+  // and properties are used so often, and it's a bit of a pain to reconcile them all
+  // and then not even use property files
+  //| SpecificProperty<"file", FilePath>
   | SpecificProperty<"object", ObjectId>
   | SpecificProperty<"class", TiledClass>;
-
-const sharedProps = {
-  /**
-   * Name of the property
-   */
-  name: string,
-  /**
-   * Name of the custom property type, when applicable
-   */
-  propertytype: optional(string),
-};
-
-export function property(context: LoaderContext) {
-  return variant("type", [
-    object({ ...sharedProps, type: literal("string"), value: string }),
-    object({ ...sharedProps, type: literal("int"), value: integer }),
-    object({ ...sharedProps, type: literal("float"), value: float }),
-    object({ ...sharedProps, type: literal("bool"), value: boolean }),
-    object({ ...sharedProps, type: literal("color"), value: color }),
-    object({ ...sharedProps, type: literal("file"), value: file(context) }),
-    object({ ...sharedProps, type: literal("object"), value: objectId }),
-    object({ ...sharedProps, type: literal("class"), value: tiledClass }),
-  ]);
-}

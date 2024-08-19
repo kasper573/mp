@@ -1,3 +1,3 @@
 # schema
 
-Define types at runtime
+Runtime type parsing

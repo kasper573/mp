@@ -1,5 +1,3 @@
-import { boolean, object } from "@mp/schema";
-
 export interface Transformations {
   /**
    * Tiles can be flipped horizontally
@@ -21,10 +19,3 @@ export interface Transformations {
    */
   preferuntransformed: boolean;
 }
-
-export const transformations = object({
-  hflip: boolean,
-  vflip: boolean,
-  rotate: boolean,
-  preferuntransformed: boolean,
-});

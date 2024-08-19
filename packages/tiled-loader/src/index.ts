@@ -14,3 +14,4 @@ export type * from "./schema/wang";
 
 export * from "./schema/common";
 export * from "./loader";
+export * from "./gid";

@@ -8,15 +8,7 @@
       "require": "./src/index.ts"
     }
   },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
-  "dependencies": {
-    "valibot": "0.37.0"
-  },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "vitest": "2.0.3"
+    "@mp/tsconfig": "workspace:*"
   }
 }

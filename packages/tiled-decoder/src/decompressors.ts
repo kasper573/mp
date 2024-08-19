@@ -1,15 +1,15 @@
 import pako from "pako";
-import { Compression } from "@mp/tiled-loader";
+import type { Compression } from "@mp/tiled-loader";
 
 export const decompressors: Record<Compression, Decompressor> = {
-  [Compression.None](data) {
+  none(data) {
     return data;
   },
-  [Compression.Zlib]: pako.inflate,
-  [Compression.Zstd]() {
+  zlib: pako.inflate,
+  zstd() {
     throw new Error("Not implemented");
   },
-  [Compression.Gzip]() {
+  gzip() {
     throw new Error("Not implemented");
   },
 };

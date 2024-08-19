@@ -3,12 +3,7 @@ import {
   readGlobalIdBuffer,
   type GlobalTileId,
 } from "@mp/tiled-loader";
-import type {
-  ImageFile,
-  PixelUnit,
-  TileLayer,
-  TiledMap,
-} from "@mp/tiled-loader";
+import type { Pixel, TileLayer, TiledMap } from "@mp/tiled-loader";
 import { decoders } from "./decoders";
 import { decompressors } from "./decompressors";
 
@@ -64,12 +59,10 @@ export function decodeTileLayerData(
       const { tile, tileset } = match;
       tiles.push({
         gid,
-        x: (x * map.tilewidth) as PixelUnit,
-        y: (y * map.tileheight) as PixelUnit,
-        width: (tile?.width ?? tileset.tilewidth ?? map.tilewidth) as PixelUnit,
-        height: (tile?.height ??
-          tileset.tileheight ??
-          map.tileheight) as PixelUnit,
+        x: (x * map.tilewidth) as Pixel,
+        y: (y * map.tileheight) as Pixel,
+        width: (tile?.width ?? tileset.tilewidth ?? map.tilewidth) as Pixel,
+        height: (tile?.height ?? tileset.tileheight ?? map.tileheight) as Pixel,
         image: {
           url: tile?.image ?? tileset.image,
           height: tile?.imageheight ?? tileset.imageheight,
@@ -84,17 +77,17 @@ export function decodeTileLayerData(
 }
 
 export interface ResolvedTileImage {
-  url: ImageFile;
-  width: PixelUnit;
-  height: PixelUnit;
+  url: string;
+  width: Pixel;
+  height: Pixel;
 }
 
 export interface ResolvedTile {
   gid: GlobalTileId;
-  x: PixelUnit;
-  y: PixelUnit;
-  width: PixelUnit;
-  height: PixelUnit;
+  x: Pixel;
+  y: Pixel;
+  width: Pixel;
+  height: Pixel;
   image: ResolvedTileImage;
   flippedHorizontally: boolean;
   flippedVertically: boolean;
