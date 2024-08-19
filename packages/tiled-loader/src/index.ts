@@ -7,7 +7,6 @@ export type * from "./schema/object";
 export type * from "./schema/property";
 export type * from "./schema/terrain";
 export type * from "./schema/text";
-export type * from "./schema/tile";
 export type * from "./schema/tileset";
 export type * from "./schema/transformations";
 export type * from "./schema/wang";

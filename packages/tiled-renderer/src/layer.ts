@@ -9,7 +9,7 @@ import type {
   TiledObject,
   TileLayer,
 } from "@mp/tiled-loader";
-import { decodeTileLayerData } from "@mp/tiled-loader";
+import { reconcileTileLayer } from "@mp/tiled-loader";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureByGID } from "./spritesheet";
@@ -36,7 +36,7 @@ export class LayerViewFactory {
   }
 
   private createTileLayerView(layer: TileLayer): LayerView {
-    const tiles = decodeTileLayerData(layer, this.tiledMap);
+    const tiles = reconcileTileLayer(layer, this.tiledMap);
     const container = new Container({
       isRenderGroup: true,
     });

@@ -1,7 +1,5 @@
 import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
-import type { LocalTileId, Pixel } from "./schema/common";
-import type { Tile } from "./schema/tile";
 import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
@@ -28,12 +26,4 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
 export interface TiledLoaderResult {
   tiledMap?: TiledMap;
   error?: string;
-}
-
-export function createEmptyTile(id: LocalTileId): Tile {
-  return {
-    id,
-    x: 0 as Pixel,
-    y: 0 as Pixel,
-  };
 }

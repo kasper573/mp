@@ -1,35 +1,35 @@
 import { Sprite } from "@mp/pixi";
-import type { ResolvedTile } from "@mp/tiled-loader";
+import type { TileLayerTile } from "@mp/tiled-loader";
 import type { TextureByGID } from "./spritesheet";
 
 export function createTileSprite(
-  tile: ResolvedTile,
+  { id, flags, x, y, width, height }: TileLayerTile,
   textureByGID: TextureByGID,
 ): Sprite {
   const sprite = new Sprite({
-    x: tile.x,
-    y: tile.y,
-    width: tile.width,
-    height: tile.height,
-    texture: textureByGID(tile.gid),
+    x: x * width,
+    y: y * height,
+    width,
+    height,
+    texture: textureByGID(id),
   });
 
-  if (tile.flippedHorizontally) {
+  if (flags.flippedHorizontally) {
     sprite.scale.x *= -1;
-    sprite.x += tile.width;
+    sprite.x += width;
   }
 
-  if (tile.flippedVertically) {
+  if (flags.flippedVertically) {
     sprite.scale.y *= -1;
-    sprite.y += tile.height;
+    sprite.y += height;
   }
 
-  if (tile.flippedDiagonally) {
+  if (flags.flippedDiagonally) {
     sprite.rotation = Math.PI / 2;
-    sprite.x += tile.width;
+    sprite.x += width;
   }
 
-  if (tile.rotatedHexagonal120) {
+  if (flags.rotatedHexagonal120) {
     sprite.rotation = (Math.PI / 180) * 120;
   }
 

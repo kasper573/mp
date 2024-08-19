@@ -1,6 +1,13 @@
 import type { GlobalTileId, LocalTileId } from "./schema/common";
 
-export function readGlobalIdBuffer(buffer: Uint8Array, offset: number) {
+export function readGlobalIdBuffer(
+  buffer: Uint8Array,
+  offset: number,
+): {
+  gid: GlobalTileId;
+  newOffset: number;
+  flags: GlobalIdFlags;
+} {
   let i =
     buffer[offset] |
     (buffer[offset + 1] << 8) |
@@ -31,6 +38,13 @@ export function readGlobalIdBuffer(buffer: Uint8Array, offset: number) {
       rotatedHexagonal120,
     },
   };
+}
+
+export interface GlobalIdFlags {
+  flippedHorizontally: boolean;
+  flippedVertically: boolean;
+  flippedDiagonally: boolean;
+  rotatedHexagonal120: boolean;
 }
 
 export function localToGlobalId(

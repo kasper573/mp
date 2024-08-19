@@ -11,11 +11,12 @@ import type {
   FilePath,
 } from "./common";
 import type { WangSet } from "./wang";
-import type { Tile } from "./tile";
 import type { Transformations } from "./transformations";
 import type { Grid } from "./grid";
 import type { Property } from "./property";
 import type { Terrain } from "./terrain";
+import type { Frame } from "./frame";
+import type { ObjectGroupLayer } from "./layer";
 
 export interface Tileset {
   backgroundcolor?: string;
@@ -67,7 +68,7 @@ export interface Tileset {
   tileoffset?: Coord;
   tilerendersize: TileRenderSize;
 
-  tiles: Map<LocalTileId, Tile>;
+  tiles: Map<LocalTileId, TilesetTile>;
 
   /**
    * Allowed transformations
@@ -82,4 +83,27 @@ export interface Tileset {
   version?: string;
 
   wangsets?: WangSet[];
+}
+
+export interface TilesetTile {
+  animation?: Frame[];
+  id: LocalTileId;
+
+  // Used for image collection tilesets
+  image?: FilePath;
+  imageheight?: Pixel;
+  imagewidth?: Pixel;
+
+  // The bounds of the sub-rectangle representing this tile
+  // (width/height defaults to image width/height)
+  x?: Pixel;
+  y?: Pixel;
+  width?: Pixel;
+  height?: Pixel;
+
+  objectgroup?: ObjectGroupLayer;
+  probability?: number;
+  properties?: Property[];
+  terrain?: [number, number, number, number];
+  type?: string;
 }

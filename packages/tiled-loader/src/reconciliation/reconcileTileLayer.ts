@@ -1,15 +1,22 @@
-import {
-  localToGlobalId,
-  readGlobalIdBuffer,
-  type GlobalTileId,
+import { localToGlobalId, readGlobalIdBuffer } from "@mp/tiled-loader";
+import type {
+  Pixel,
+  TileLayerTile,
+  TileLayer,
+  TiledMap,
+  CompressedTileLayer,
+  TileNumber,
 } from "@mp/tiled-loader";
-import type { Pixel, TileLayer, TiledMap } from "@mp/tiled-loader";
 import { decoders, decompressors } from "@mp/transformer";
 
-export function decodeTileLayerData(
-  layer: TileLayer,
+export function reconcileTileLayer(
+  layer: TileLayer | CompressedTileLayer,
   map: TiledMap,
-): ResolvedTile[] {
+): TileLayerTile[] {
+  if ("tiles" in layer) {
+    return Object.values(layer.tiles);
+  }
+
   const { compression, encoding, data: rawData } = layer;
 
   const decode = decoders[encoding];
@@ -41,7 +48,7 @@ export function decodeTileLayerData(
     ),
   );
 
-  const tiles: ResolvedTile[] = [];
+  const tiles: TileLayerTile[] = [];
   for (let y = 0; y < map.height; ++y) {
     for (let x = 0; x < map.width; ++x) {
       // Read the GID in little-endian byte order:
@@ -60,39 +67,17 @@ export function decodeTileLayerData(
 
       const { tile, tileset } = match;
       tiles.push({
-        gid,
-        x: (x * map.tilewidth) as Pixel,
-        y: (y * map.tileheight) as Pixel,
+        id: gid,
+        x: x as TileNumber,
+        y: y as TileNumber,
         width: (tile?.width ?? tileset.tilewidth ?? map.tilewidth) as Pixel,
         height: (tile?.height ?? tileset.tileheight ?? map.tileheight) as Pixel,
-        image: {
-          url: tile?.image ?? tileset.image,
-          height: tile?.imageheight ?? tileset.imageheight,
-          width: tile?.imagewidth ?? tileset.imagewidth,
-        },
-        ...flags,
+        flags,
+        tile,
+        tileset,
       });
     }
   }
 
   return tiles;
-}
-
-export interface ResolvedTileImage {
-  url: string;
-  width: Pixel;
-  height: Pixel;
-}
-
-export interface ResolvedTile {
-  gid: GlobalTileId;
-  x: Pixel;
-  y: Pixel;
-  width: Pixel;
-  height: Pixel;
-  image: ResolvedTileImage;
-  flippedHorizontally: boolean;
-  flippedVertically: boolean;
-  flippedDiagonally: boolean;
-  rotatedHexagonal120: boolean;
 }
