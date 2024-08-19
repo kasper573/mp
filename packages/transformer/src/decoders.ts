@@ -8,7 +8,7 @@ export const decoders = {
     return bytes;
   },
   csv(data) {
-    throw new Error("Not implemented");
+    return Uint8Array.from(data.split(",").map(Number));
   },
 } satisfies Record<string, Decoder>;
 
