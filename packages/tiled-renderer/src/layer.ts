@@ -9,7 +9,6 @@ import type {
   TiledObject,
   TileLayer,
 } from "@mp/tiled-loader";
-import { reconcileTileLayer } from "@mp/tiled-loader";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureByGID } from "./spritesheet";
@@ -36,11 +35,8 @@ export class LayerViewFactory {
   }
 
   private createTileLayerView(layer: TileLayer): LayerView {
-    const tiles = reconcileTileLayer(layer, this.tiledMap);
-    const container = new Container({
-      isRenderGroup: true,
-    });
-    for (const tile of tiles) {
+    const container = new Container({ isRenderGroup: true });
+    for (const tile of layer.tiles) {
       container.addChild(createTileSprite(tile, this.textureByGID));
     }
     return container;

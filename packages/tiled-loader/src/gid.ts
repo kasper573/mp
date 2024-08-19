@@ -8,6 +8,7 @@ export function readGlobalIdBuffer(
   newOffset: number;
   flags: GlobalIdFlags;
 } {
+  // Read the GID in little-endian byte order:
   let i =
     buffer[offset] |
     (buffer[offset + 1] << 8) |
@@ -61,7 +62,7 @@ export function globalToLocalId(
   return (globalId - tilesetFirstGID) as LocalTileId;
 }
 
-export const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
-export const FLIPPED_VERTICALLY_FLAG = 0x40000000;
-export const FLIPPED_DIAGONALLY_FLAG = 0x20000000;
-export const ROTATED_HEXAGONAL_120_FLAG = 0x10000000;
+const FLIPPED_HORIZONTALLY_FLAG = 0x80000000;
+const FLIPPED_VERTICALLY_FLAG = 0x40000000;
+const FLIPPED_DIAGONALLY_FLAG = 0x20000000;
+const ROTATED_HEXAGONAL_120_FLAG = 0x10000000;

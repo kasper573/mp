@@ -18,6 +18,7 @@ async function main() {
   const areaUrl = await api.modules.area.areaFileUrl("forest" as AreaId);
   const { tiledMap, error } = await loadTiled(areaUrl);
   if (!tiledMap) {
+    console.error(error);
     rootElement.innerHTML = `<pre>${error}</pre>`;
     return;
   }

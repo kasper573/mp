@@ -23,7 +23,7 @@ export async function reconcileTileset(
 
   // The original tileset data is a list of tiles, but we want them mapped by GID
   tileset.tiles = new Map();
-  for (const tile of tileset.tiles as unknown as TilesetTile[]) {
+  for (const tile of (tileset as unknown as UnresolvedTileset).tiles) {
     tileset.tiles.set(tile.id, tile);
   }
 
@@ -36,6 +36,10 @@ export async function reconcileTileset(
 
   return tileset;
 }
+
+type UnresolvedTileset = Omit<Tileset, "tiles"> & {
+  tiles: TilesetTile[];
+};
 
 interface TilesetFile {
   source: string;

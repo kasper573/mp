@@ -28,8 +28,8 @@ export interface SharedMapProperties {
 
   height: TileNumber;
   width: TileNumber;
-  tileheight: TileNumber;
-  tilewidth: TileNumber;
+  tileheight: Pixel;
+  tilewidth: Pixel;
 
   parallaxoriginx: Pixel;
   parallaxoriginy: Pixel;

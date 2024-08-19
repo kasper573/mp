@@ -4,20 +4,21 @@ import { reconcileLayer } from "./reconcileLayer";
 import { reconcileTileset } from "./reconcileTileset";
 
 /**
- * The original map data in the tiled files is mostly directly matching our
+ * The original map data in the tiled files is almost matching our
  * data structure but needs some adjustments to be fully compatible.
  */
-export async function* reconcileTiledMap(
+export async function reconcileTiledMap(
   context: LoaderContext,
   map: TiledMap,
-) {
-  for (let i = 0; i < map.tilesets.length; i++) {
-    yield await reconcileTileset(context, map.tilesets[i]).then((updated) => {
-      map.tilesets[i] = updated;
-    });
-  }
+): Promise<void> {
+  // Tilesets must be reconciled first because they are referenced by layers
+  await Promise.all(
+    map.tilesets.map(async (tileset, i) => {
+      map.tilesets[i] = await reconcileTileset(context, tileset);
+    }),
+  );
 
-  for (const layer of map.layers) {
-    yield reconcileLayer(context, layer);
-  }
+  await Promise.all(
+    map.layers.map((layer) => reconcileLayer(context, layer, map)),
+  );
 }

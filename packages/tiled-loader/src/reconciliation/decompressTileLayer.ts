@@ -1,22 +1,21 @@
 import { localToGlobalId, readGlobalIdBuffer } from "@mp/tiled-loader";
 import type {
-  Pixel,
   TileLayerTile,
-  TileLayer,
   TiledMap,
-  CompressedTileLayer,
   TileNumber,
+  SharedLayerProperties,
+  CommonTileLayerProperties,
+  Chunk,
+  Compression,
+  TiledData,
+  Encoding,
 } from "@mp/tiled-loader";
 import { decoders, decompressors } from "@mp/transformer";
 
-export function reconcileTileLayer(
-  layer: TileLayer | CompressedTileLayer,
+export function decompressTileLayer(
+  layer: CompressedTileLayer,
   map: TiledMap,
 ): TileLayerTile[] {
-  if ("tiles" in layer) {
-    return Object.values(layer.tiles);
-  }
-
   const { compression, encoding, data: rawData } = layer;
 
   const decode = decoders[encoding];
@@ -49,9 +48,8 @@ export function reconcileTileLayer(
   );
 
   const tiles: TileLayerTile[] = [];
-  for (let y = 0; y < map.height; ++y) {
-    for (let x = 0; x < map.width; ++x) {
-      // Read the GID in little-endian byte order:
+  for (let y = 0 as TileNumber; y < map.height; y++) {
+    for (let x = 0 as TileNumber; x < map.width; x++) {
       const { gid, newOffset, flags } = readGlobalIdBuffer(data, dataOffset);
       dataOffset = newOffset;
 
@@ -68,10 +66,10 @@ export function reconcileTileLayer(
       const { tile, tileset } = match;
       tiles.push({
         id: gid,
-        x: x as TileNumber,
-        y: y as TileNumber,
-        width: (tile?.width ?? tileset.tilewidth ?? map.tilewidth) as Pixel,
-        height: (tile?.height ?? tileset.tileheight ?? map.tileheight) as Pixel,
+        x,
+        y,
+        width: map.tilewidth,
+        height: map.tileheight,
         flags,
         tile,
         tileset,
@@ -80,4 +78,25 @@ export function reconcileTileLayer(
   }
 
   return tiles;
+}
+
+export interface CompressedTileLayer
+  extends SharedLayerProperties,
+    CommonTileLayerProperties {
+  chunks?: Chunk[];
+  compression: Compression;
+  data: TiledData;
+  encoding: Encoding;
+}
+
+export function isCompressedTileLayer(
+  layer: unknown,
+): layer is CompressedTileLayer {
+  return (
+    layer !== null &&
+    typeof layer === "object" &&
+    "type" in layer &&
+    layer.type === "tilelayer" &&
+    "compression" in layer
+  );
 }

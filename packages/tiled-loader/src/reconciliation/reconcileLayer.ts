@@ -1,31 +1,44 @@
 import type { LoaderContext } from "../context";
-import type { Layer } from "../schema/layer";
+import type { Layer, TileLayer } from "../schema/layer";
+import type { TiledMap } from "../schema/map";
 import { reconcileFilePath } from "./reconcileFilePath";
+import {
+  decompressTileLayer,
+  isCompressedTileLayer,
+} from "./decompressTileLayer";
 import { reconcileTileset } from "./reconcileTileset";
 
-export async function* reconcileLayer(
+export async function reconcileLayer(
   context: LoaderContext,
   layer: Layer,
-): AsyncGenerator {
+  map: TiledMap,
+): Promise<void> {
+  const promises: Promise<unknown>[] = [];
+
   switch (layer.type) {
     case "imagelayer":
       layer.image = reconcileFilePath(context, layer.image);
       break;
     case "objectgroup":
-      for (const object of layer.objects) {
-        if ("template" in object && object.tileset) {
-          yield await reconcileTileset(context, object.tileset).then(
-            (updated) => {
-              object.tileset = updated;
-            },
-          );
-        }
-      }
+      promises.push(
+        ...layer.objects.map(async (object) => {
+          if ("template" in object && object.tileset) {
+            object.tileset = await reconcileTileset(context, object.tileset);
+          }
+        }),
+      );
       break;
     case "group":
-      for (const child of layer.layers) {
-        yield reconcileLayer(context, child);
-      }
+      promises.push(
+        ...layer.layers.map((child) => reconcileLayer(context, child, map)),
+      );
       break;
+    case "tilelayer": {
+      if (isCompressedTileLayer(layer)) {
+        (layer as TileLayer).tiles = decompressTileLayer(layer, map);
+      }
+    }
   }
+
+  await Promise.all(promises);
 }

@@ -13,17 +13,15 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
 
     try {
       const tiledMap = (await context.loadJson(mapPath)) as TiledMap;
-      for await (const _ of reconcileTiledMap(context, tiledMap));
+      await reconcileTiledMap(context, tiledMap);
       return { tiledMap };
     } catch (error) {
-      return {
-        error: `Error in ${mapPath}: ${error}`,
-      };
+      return { error };
     }
   };
 }
 
 export interface TiledLoaderResult {
   tiledMap?: TiledMap;
-  error?: string;
+  error?: unknown;
 }

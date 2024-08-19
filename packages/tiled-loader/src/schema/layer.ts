@@ -1,15 +1,12 @@
 import type { GlobalIdFlags } from "../gid";
 import type {
   Color,
-  Encoding,
   LayerId,
   Pixel,
   Ratio,
   RGB,
   TiledClass,
-  TiledData,
   TileNumber,
-  Compression,
   LayerDrawOrder,
   FilePath,
   GlobalTileId,
@@ -17,7 +14,6 @@ import type {
 
 import type { Property } from "./property";
 import type { TiledObject } from "./object";
-import { type Chunk } from "./chunk";
 import type { Tileset, TilesetTile } from "./tileset";
 
 export interface SharedLayerProperties {
@@ -69,7 +65,7 @@ export interface CommonTileLayerProperties {
 export interface TileLayer
   extends SharedLayerProperties,
     CommonTileLayerProperties {
-  tiles: Map<GlobalTileId, TileLayerTile>;
+  tiles: TileLayerTile[];
 }
 
 export interface TileLayerTile {
@@ -81,15 +77,6 @@ export interface TileLayerTile {
   tileset: Tileset;
   tile: TilesetTile;
   flags: GlobalIdFlags;
-}
-
-export interface CompressedTileLayer
-  extends SharedLayerProperties,
-    CommonTileLayerProperties {
-  chunks?: Chunk[];
-  compression: Compression;
-  data: TiledData;
-  encoding: Encoding;
 }
 
 export interface ImageLayer extends SharedLayerProperties {
