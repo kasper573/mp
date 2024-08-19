@@ -13,6 +13,7 @@
     "@mp/state": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
+    "@mp/logger": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/pixi": "workspace:*",

@@ -6,6 +6,7 @@ import {
 } from "@mp/tiled-renderer";
 import { createTiledLoader } from "@mp/tiled-loader";
 import { Application } from "@mp/pixi";
+import { Logger } from "@mp/logger";
 import { api } from "./api";
 
 async function main() {
@@ -14,11 +15,12 @@ async function main() {
     relativePath: relativeURL,
   });
 
+  const logger = new Logger(console);
   const rootElement = document.querySelector("div#root")!;
   const areaUrl = await api.modules.area.areaFileUrl("forest" as AreaId);
   const { tiledMap, error } = await loadTiled(areaUrl);
   if (!tiledMap) {
-    console.error(error);
+    logger.error(error);
     rootElement.innerHTML = `<pre>${error}</pre>`;
     return;
   }

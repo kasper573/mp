@@ -50,6 +50,9 @@ importers:
       '@mp/excalibur':
         specifier: workspace:*
         version: link:../../packages/excalibur
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../packages/logger
       '@mp/network':
         specifier: workspace:*
         version: link:../../packages/network
