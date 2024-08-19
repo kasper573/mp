@@ -9,7 +9,8 @@ export async function reconcileTileset(
 ): Promise<Tileset> {
   const { basePath, loadJson, relativePath } = context;
 
-  // The tileset data may actually be a file reference
+  // In the tiled file data a tileset may be defined as a file reference,
+  // In which case we replace the data with that of the referenced file.
   if ("source" in tileset) {
     const { source, firstgid } = tileset;
     const absPath = relativePath(source, basePath);
@@ -18,7 +19,9 @@ export async function reconcileTileset(
     tileset = { ...json, firstgid } as Tileset;
   }
 
-  // File paths are relative in the original data and need to be resolved
+  // Now that we know we're working with a tileset object,
+  // we can proceed with reconciling its properties.
+
   tileset.image = reconcileFilePath(context, tileset.image);
 
   // The original tileset data is a list of tiles, but we want them mapped by GID

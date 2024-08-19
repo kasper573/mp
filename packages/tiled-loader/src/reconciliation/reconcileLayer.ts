@@ -8,6 +8,10 @@ import {
 } from "./decompressTileLayer";
 import { reconcileTileset } from "./reconcileTileset";
 
+/**
+ * Since layers contain data that needs to be reconciled,
+ * we need to do this for each layer in the map.
+ */
 export async function reconcileLayer(
   context: LoaderContext,
   layer: Layer,
