@@ -1,26 +1,19 @@
-import { object, fallback } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import { createEmptyTile } from "../loader";
 import type { LocalTileId } from "../schema/common";
-import { globalTileID } from "../schema/common";
 import type { Tile } from "../schema/tile";
 import type { Tileset } from "../schema/tileset";
 import { reconcileFilePath } from "./reconcileFilePath";
 
 export async function reconcileTileset(
   context: LoaderContext,
-  tileset: Tileset,
+  tileset: Tileset | TilesetFile,
 ): Promise<Tileset> {
   const { basePath, loadJson, relativePath } = context;
-  const parseTilesetFile = object({
-    firstgid: globalTileID,
-    source: (value) => reconcileFilePath(context, value as string),
-  });
 
   // The tileset data may actually be a file reference
-  const tilesetFile = fallback(parseTilesetFile, undefined)(tileset);
-  if (tilesetFile) {
-    const { source, firstgid } = tilesetFile;
+  if ("source" in tileset) {
+    const { source, firstgid } = tileset;
     const absPath = relativePath(source, basePath);
     const json = (await loadJson(absPath)) as object;
     context = { ...context, basePath: absPath };
@@ -44,4 +37,9 @@ export async function reconcileTileset(
   }
 
   return tileset;
+}
+
+interface TilesetFile {
+  source: string;
+  firstgid: number;
 }

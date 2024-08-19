@@ -1,56 +1,37 @@
-import type { Branded, Parser, TypeOf } from "@mp/schema";
-import {
-  array,
-  branded,
-  oneOf,
-  float,
-  integer,
-  object,
-  string,
-  union,
-} from "@mp/schema";
+export type Branded<T, Brand> = T & { __brand: Brand };
 
 // Primitives
-export type RGB = TypeOf<typeof rgb>;
-export const rgb = branded<string, "RGB">(string);
+export type RGB = Branded<string, "RGB">;
 
-export type ARGB = TypeOf<typeof argb>;
-export const argb = branded<string, "ARGB">(string);
+export type ARGB = Branded<string, "ARGB">;
 
-export type Color = TypeOf<typeof color>;
-export const color = union([argb, rgb]);
+export type Color = RGB | ARGB;
 
 // Units
-export type TileNumber = TypeOf<typeof tileNumber>;
-export const tileNumber = branded<number, "TileUnit">(integer);
+export type TileNumber = Branded<number, "TileNumber">;
 
-export type Pixel = TypeOf<typeof pixel>;
-export const pixel = branded<number, "PixelUnit">(float);
+export type Pixel = Branded<number, "Pixel">;
 
 /**
  * 0-1
  */
-export type Ratio = TypeOf<typeof ratio>;
-export const ratio = branded<number, "Ratio">(float);
+export type Ratio = Branded<number, "Ratio">;
 
-export type Milliseconds = TypeOf<typeof milliseconds>;
-export const milliseconds = branded<number, "Milliseconds">(float);
+export type Milliseconds = Branded<number, "Milliseconds">;
 
-export type Degrees = TypeOf<typeof degrees>;
-export const degrees = branded<number, "Degrees">(float);
+export type Degrees = Branded<number, "Degrees">;
 
-export type Coord = TypeOf<typeof coord>;
-export const coord = object({ x: pixel, y: pixel });
+export interface Coord {
+  x: Pixel;
+  y: Pixel;
+}
 
 // Semantics
-export type GlobalTileId = TypeOf<typeof globalTileID>;
-export const globalTileID = branded<number, "GlobalTileId">(integer);
+export type GlobalTileId = Branded<number, "GlobalTileId">;
 
-export type LocalTileId = TypeOf<typeof localTileID>;
-export const localTileID = branded<number, "LocalTileId">(integer);
+export type LocalTileId = Branded<number, "LocalTileId">;
 
-export type TiledClass = TypeOf<typeof tiledClass>;
-export const tiledClass = branded<string, "TiledClass">(string);
+export type TiledClass = Branded<string, "TiledClass">;
 
 export type FilePath = Branded<string, "FilePath">;
 
@@ -61,88 +42,61 @@ export type FilePath = Branded<string, "FilePath">;
  * string: encoded and compressed Uint8Array
  * (The encoding and compression should be defined alongside the data field)
  */
-export type TiledData = TypeOf<typeof data>;
-export const data = union([array(integer), string]);
+export type TiledData = number[] | string;
 
-export type CompressionLevel =
-  | { type: "specific"; value: number }
-  | { type: "use-algorithm-default" };
-
-export const compressionLevel: Parser<CompressionLevel> = (input) => {
-  const value = float(input);
-  return value === -1
-    ? { type: "use-algorithm-default" }
-    : { type: "specific", value };
-};
+/**
+ * -1 = use algorithm default
+ * Otherwise it's a specific value to be given to the algorithm
+ */
+export type CompressionLevel = number;
 
 // Enums
-export type Orientation = TypeOf<typeof orientation>;
+export type Orientation =
+  | "orthogonal"
+  | "isometric"
+  | "staggered"
+  | "hexagonal";
 
-export const orientation = oneOf([
-  "orthogonal",
-  "isometric",
-  "staggered",
-  "hexagonal",
-]);
+export type Compression = "zlib" | "gzip" | "zstd" | "";
 
-export type Compression = "zlib" | "gzip" | "zstd" | "none";
-
-export const compression: Parser<Compression> = (input) => {
-  const value = string(input);
-  return value ? (value as Compression) : "none";
-};
-
-export type Encoding = TypeOf<typeof encoding>;
-export const encoding = oneOf(["csv", "base64"]);
+export type Encoding = "csv" | "base64";
 
 /**
  * Incremental ID, unique across all objects
  */
-export type ObjectId = TypeOf<typeof objectId>;
-export const objectId = branded<number, "ObjectId">(integer);
+export type ObjectId = Branded<number, "ObjectId">;
 
 /**
  * Incremental ID, unique across all layers
  */
-export type LayerId = TypeOf<typeof layerId>;
-export const layerId = branded<number, "LayerId">(integer);
+export type LayerId = Branded<number, "LayerId">;
 
-export type MapRenderOrder = TypeOf<typeof mapRenderOrder>;
+export type MapRenderOrder =
+  | "right-down"
+  | "right-up"
+  | "left-down"
+  | "left-up";
 
-export const mapRenderOrder = oneOf([
-  "right-down",
-  "right-up",
-  "left-down",
-  "left-up",
-]);
+export type StaggerAxis = "x" | "y";
 
-export type StaggerAxis = TypeOf<typeof staggerAxis>;
-export const staggerAxis = oneOf(["x", "y"]);
+export type StaggerIndex = "odd" | "even";
 
-export type StaggerIndex = TypeOf<typeof staggerIndex>;
-export const staggerIndex = oneOf(["odd", "even"]);
+export type FillMode = "stretch" | "preserve-aspect-fit";
 
-export type FillMode = TypeOf<typeof fillMode>;
-export const fillMode = oneOf(["stretch", "preserve-aspect-fit"]);
+export type ObjectAlignment =
+  | "unspecified"
+  | "topleft"
+  | "top"
+  | "topright"
+  | "left"
+  | "center"
+  | "right"
+  | "bottomleft"
+  | "bottom"
+  | "bottomright";
 
-export type ObjectAlignment = TypeOf<typeof objectAlignment>;
-export const objectAlignment = oneOf([
-  "unspecified",
-  "topleft",
-  "top",
-  "topright",
-  "left",
-  "center",
-  "right",
-  "bottomleft",
-  "bottom",
-  "bottomright",
-]);
+export type TileRenderSize = "tile" | "grid";
 
-export type TileRenderSize = TypeOf<typeof tileRenderSize>;
-export const tileRenderSize = oneOf(["tile", "grid"]);
-
-export type LayerDrawOrder = TypeOf<typeof layerDrawOrder>;
-export const layerDrawOrder = oneOf(["topdown", "index"]);
+export type LayerDrawOrder = "topdown" | "index";
 
 export type WangColorIndex = Branded<number, "WangColorIndex">;

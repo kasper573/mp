@@ -1,9 +1,6 @@
 import pako from "pako";
 
 export const decompressors = {
-  none(data) {
-    return data;
-  },
   zlib: pako.inflate,
   zstd() {
     throw new Error("Not implemented");

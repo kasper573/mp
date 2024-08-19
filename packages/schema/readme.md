@@ -1,3 +1,0 @@
-# schema
-
-Runtime type parsing

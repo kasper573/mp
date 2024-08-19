@@ -204,12 +204,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/schema:
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/state:
     dependencies:
       '@mp/excalibur':
@@ -231,9 +225,6 @@ importers:
 
   packages/tiled-loader:
     dependencies:
-      '@mp/schema':
-        specifier: workspace:*
-        version: link:../schema
       '@mp/transformer':
         specifier: workspace:*
         version: link:../transformer

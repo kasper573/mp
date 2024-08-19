@@ -13,7 +13,10 @@ export function decodeTileLayerData(
   const { compression, encoding, data: rawData } = layer;
 
   const decode = decoders[encoding];
-  const decompress = decompressors[compression];
+  const decompress =
+    compression in decompressors
+      ? decompressors[compression as keyof typeof decompressors]
+      : <T>(data: T) => data;
 
   const data: Uint8Array =
     typeof rawData === "string"
