@@ -8,6 +8,7 @@ import {
 
 export type { InferOutput as TypeOf, GenericSchemaAsync as Schema };
 export {
+  unknown,
   arrayAsync as array,
   variantAsync as variant,
   unionAsync as union,

@@ -11,6 +11,9 @@ import {
   fallback,
   picklist,
   intersection,
+  pipe,
+  unknown,
+  transform,
 } from "@mp/schema";
 import type { LoaderContext } from "../context";
 import type {
@@ -42,8 +45,7 @@ import type { Property } from "./property";
 import { property } from "./property";
 import type { TiledObject } from "./object";
 import { tiledObject } from "./object";
-import type { Chunk } from "./chunk";
-import { chunk } from "./chunk";
+import { parseChunk, type Chunk } from "./chunk";
 
 export type LayerDrawOrder = "topdown" | "index";
 export const layerDrawOrder = picklist(["topdown", "index"]);
@@ -128,7 +130,14 @@ export function tileLayer(context: LoaderContext) {
   return intersection([
     object({
       type: literal("tilelayer"),
-      chunks: optional(array(chunk)),
+      chunks: optional(
+        array(
+          pipe(
+            unknown(),
+            transform(async (o) => parseChunk(o)),
+          ),
+        ),
+      ),
       compression: fallback(compression, Compression.None),
       data,
       encoding: fallback(encoding, "csv"),

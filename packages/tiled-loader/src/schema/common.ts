@@ -1,3 +1,4 @@
+import type { Schema } from "@mp/schema";
 import {
   float,
   integer,
@@ -16,20 +17,20 @@ export type Branded<T, Brand> = T & { __brand: Brand };
 
 // Primitives
 export type RGB = Branded<string, "RGB">;
-export const rgb = string;
+export const rgb = string as unknown as Schema<RGB>;
 
 export type ARGB = Branded<string, "ARGB">;
-export const argb = string;
+export const argb = string as unknown as Schema<ARGB>;
 
 export type Color = RGB | ARGB;
 export const color = union([argb, rgb]);
 
 // Units
 export type Index = Branded<number, "Index">;
-export const index = integer;
+export const index = integer as unknown as Schema<Index>;
 
 export type TileUnit = Branded<number, "TileUnit">;
-export const tileUnit = integer;
+export const tileUnit = integer as unknown as Schema<TileUnit>;
 
 export type PixelUnit = Branded<number, "PixelUnit">;
 export const pixelUnit = float;
