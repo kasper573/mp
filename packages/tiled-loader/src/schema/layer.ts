@@ -45,7 +45,7 @@ import type { Property } from "./property";
 import { property } from "./property";
 import type { TiledObject } from "./object";
 import { tiledObject } from "./object";
-import { parseChunk, type Chunk } from "./chunk";
+import { chunk, type Chunk } from "./chunk";
 
 export type LayerDrawOrder = "topdown" | "index";
 export const layerDrawOrder = picklist(["topdown", "index"]);
@@ -134,7 +134,7 @@ export function tileLayer(context: LoaderContext) {
         array(
           pipe(
             unknown(),
-            transform(async (o) => parseChunk(o)),
+            transform(async (o) => chunk(o)),
           ),
         ),
       ),

@@ -8,6 +8,6 @@ export interface Chunk {
   y: TileUnit;
 }
 
-export function parseChunk(obj: unknown): Chunk {
+export function chunk(obj: unknown): Chunk {
   return obj as Chunk;
 }
