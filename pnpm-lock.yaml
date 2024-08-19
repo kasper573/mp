@@ -229,24 +229,14 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/tiled-decoder:
-    dependencies:
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../tiled-loader
-      '@mp/transformer':
-        specifier: workspace:*
-        version: link:../transformer
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/tiled-loader:
     dependencies:
       '@mp/schema':
         specifier: workspace:*
         version: link:../schema
+      '@mp/transformer':
+        specifier: workspace:*
+        version: link:../transformer
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -260,9 +250,6 @@ importers:
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi
-      '@mp/tiled-decoder':
-        specifier: workspace:*
-        version: link:../tiled-decoder
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader

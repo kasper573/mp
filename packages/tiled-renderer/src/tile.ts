@@ -1,5 +1,5 @@
 import { Sprite } from "@mp/pixi";
-import type { ResolvedTile } from "@mp/tiled-decoder";
+import type { ResolvedTile } from "@mp/tiled-loader";
 import type { TextureByGID } from "./spritesheet";
 
 export function createTileSprite(

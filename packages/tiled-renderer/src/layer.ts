@@ -9,7 +9,7 @@ import type {
   TiledObject,
   TileLayer,
 } from "@mp/tiled-loader";
-import { decodeTileLayerData } from "@mp/tiled-decoder";
+import { decodeTileLayerData } from "@mp/tiled-loader";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureByGID } from "./spritesheet";
