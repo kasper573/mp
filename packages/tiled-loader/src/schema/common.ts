@@ -1,4 +1,4 @@
-export type Branded<T, Brand> = T & { __brand: Brand };
+type Branded<T, Brand> = T & { __brand: Brand };
 
 // Primitives
 export type RGB = Branded<string, "RGB">;

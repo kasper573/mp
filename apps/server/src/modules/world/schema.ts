@@ -4,6 +4,7 @@ import type { AreaId, Branded } from "@mp/state";
 export interface WorldState {
   characters: Map<CharacterId, Character>;
 }
+
 export interface Character {
   connected: boolean;
   id: CharacterId;
@@ -12,4 +13,5 @@ export interface Character {
   speed: number;
   areaId: AreaId;
 }
+
 export type CharacterId = Branded<string, "CharacterId">;
