@@ -4,8 +4,7 @@ import {
   type GlobalTileId,
 } from "@mp/tiled-loader";
 import type { Pixel, TileLayer, TiledMap } from "@mp/tiled-loader";
-import { decoders } from "./decoders";
-import { decompressors } from "./decompressors";
+import { decoders, decompressors } from "@mp/transformer";
 
 export function decodeTileLayerData(
   layer: TileLayer,

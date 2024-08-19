@@ -1,7 +1,6 @@
 import pako from "pako";
-import type { Compression } from "@mp/tiled-loader";
 
-export const decompressors: Record<Compression, Decompressor> = {
+export const decompressors = {
   none(data) {
     return data;
   },
@@ -12,6 +11,6 @@ export const decompressors: Record<Compression, Decompressor> = {
   gzip() {
     throw new Error("Not implemented");
   },
-};
+} satisfies Record<string, Decompressor>;
 
-type Decompressor = (str: Uint8Array) => Uint8Array;
+export type Decompressor = (str: Uint8Array) => Uint8Array;

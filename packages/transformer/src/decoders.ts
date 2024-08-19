@@ -1,6 +1,4 @@
-import type { Encoding } from "@mp/tiled-loader";
-
-export const decoders: Record<Encoding, Decoder> = {
+export const decoders = {
   base64(data) {
     const binaryString = atob(data);
     const bytes = new Uint8Array(binaryString.length);
@@ -12,6 +10,6 @@ export const decoders: Record<Encoding, Decoder> = {
   csv(data) {
     throw new Error("Not implemented");
   },
-};
+} satisfies Record<string, Decoder>;
 
-type Decoder = (str: string) => Uint8Array;
+export type Decoder = (str: string) => Uint8Array;

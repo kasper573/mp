@@ -234,16 +234,13 @@ importers:
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
-      pako:
-        specifier: 2.1.0
-        version: 2.1.0
+      '@mp/transformer':
+        specifier: workspace:*
+        version: link:../transformer
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      '@types/pako':
-        specifier: 2.0.3
-        version: 2.0.3
 
   packages/tiled-loader:
     dependencies:
@@ -276,6 +273,9 @@ importers:
 
   packages/transformer:
     dependencies:
+      pako:
+        specifier: 2.1.0
+        version: 2.1.0
       superjson:
         specifier: 2.2.1
         version: 2.2.1
@@ -283,6 +283,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/pako':
+        specifier: 2.0.3
+        version: 2.0.3
       vitest:
         specifier: 2.0.3
         version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)

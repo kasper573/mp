@@ -11,10 +11,9 @@
   },
   "dependencies": {
     "@mp/tiled-loader": "workspace:*",
-    "pako": "2.1.0"
+    "@mp/transformer": "workspace:*"
   },
   "devDependencies": {
-    "@types/pako": "2.0.3",
     "@mp/tsconfig": "workspace:*"
   }
 }
