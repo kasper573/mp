@@ -49,7 +49,7 @@ function createTileFrameData(
   tileset: Tileset,
   tileSize: { width: number; height: number },
   tileId: LocalTileId,
-): [TiledSpritesheetFrameId, SpritesheetFrameData] {
+): [GlobalTileId, SpritesheetFrameData] {
   const tileX = tileId % tileset.columns;
   const tileY = Math.floor(tileId / tileset.columns);
 
@@ -58,9 +58,8 @@ function createTileFrameData(
   const w = tileSize.width;
   const h = tileSize.height;
 
-  const gid = localToGlobalId(tileset.firstgid, tileId);
   return [
-    frameIdForGID(gid),
+    localToGlobalId(tileset.firstgid, tileId),
     {
       frame: { x, y, w, h },
       spriteSourceSize: { x: 0, y: 0, w, h },
@@ -72,18 +71,15 @@ function createTileFrameData(
 export function createTextureByGIDQuery(
   spritesheets: TiledSpritesheetRecord,
 ): TextureByGID {
-  return (gid) => {
-    const frameId = frameIdForGID(gid);
-    for (const spritesheet of Object.values(spritesheets)) {
-      if (gid in spritesheet.data.frames) {
-        const texture = spritesheet.textures[frameId];
-        if (texture) {
-          return texture;
-        }
+  return (id) => {
+    for (const ss of Object.values(spritesheets)) {
+      const texture = ss.textures[id];
+      if (texture) {
+        return texture;
       }
     }
     throw new Error(
-      `TiledSpritesheetRecord does not contain a texture for GID ${gid}`,
+      `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
     );
   };
 }
@@ -95,13 +91,5 @@ export type TiledSpritesheetRecord = { [image: string]: TiledSpritesheet };
 export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
 
 export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
-  frames: Record<TiledSpritesheetFrameId, SpritesheetFrameData>;
+  frames: Record<GlobalTileId, SpritesheetFrameData>;
 };
-
-export type TiledSpritesheetFrameId = string & {
-  __brand: "TiledSpritesheetFrameId";
-};
-
-export function frameIdForGID(gid: GlobalTileId): TiledSpritesheetFrameId {
-  return `${gid}` as TiledSpritesheetFrameId;
-}
