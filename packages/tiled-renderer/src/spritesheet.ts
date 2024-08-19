@@ -42,7 +42,11 @@ export async function loadTilesetSpritesheet(
     },
   };
 
-  return new Spritesheet(await Assets.load(tileset.image), data);
+  const ss = new Spritesheet(await Assets.load(tileset.image), data);
+
+  await ss.parse();
+
+  return ss;
 }
 
 function createTileFrameData(

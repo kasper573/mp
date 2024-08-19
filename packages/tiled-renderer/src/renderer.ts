@@ -1,25 +1,42 @@
 import { Container, Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
 import { LayerViewFactory } from "./layer";
-import type { TextureByGID } from "./spritesheet";
+import {
+  createTextureByGIDQuery,
+  loadTiledMapSpritesheets,
+} from "./spritesheet";
 
 export class TiledRenderer extends Container {
-  constructor(tiledMap: TiledMap, textureByGID: TextureByGID) {
+  private loader: Graphics;
+  constructor(private map: TiledMap) {
     super();
 
-    const bg = new Graphics();
-    bg.rect(
+    this.loader = new Graphics();
+    this.loader.rect(
       0,
       0,
-      tiledMap.width * tiledMap.tilewidth,
-      tiledMap.height * tiledMap.tileheight,
+      map.width * map.tilewidth,
+      map.height * map.tileheight,
     );
-    bg.fill(0x0000ff);
-    this.addChild(bg);
+    this.loader.fill(0x0000ff);
+    this.addChild(this.loader);
 
-    const factory = new LayerViewFactory(tiledMap, textureByGID);
+    this.load();
+  }
+
+  async load() {
+    // TODO container lifecyle
+    const spritesheets = await loadTiledMapSpritesheets(this.map);
+
+    const factory = new LayerViewFactory(
+      this.map,
+      createTextureByGIDQuery(spritesheets),
+    );
+
     for (const layerView of factory.createLayerViews()) {
       this.addChild(layerView);
     }
+
+    this.removeChild(this.loader);
   }
 }
