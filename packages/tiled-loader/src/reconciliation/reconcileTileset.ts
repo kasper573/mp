@@ -29,18 +29,20 @@ export async function reconcileTileset(
   tileset.wangsets?.forEach(reconcileProperties);
 
   // The original tileset data is a list of tiles, but we want them mapped by GID
-  tileset.tiles = new Map();
+  const tiles = new Map();
   for (const tile of (tileset as unknown as UnresolvedTileset).tiles) {
     reconcileProperties(tile);
-    tileset.tiles.set(tile.id, tile);
+    tiles.set(tile.id, tile);
   }
 
   // The original data also omits empty tiles, so we need to fill in the gaps.
   for (let id = 0 as LocalTileId; id < tileset.tilecount; id++) {
-    if (!tileset.tiles.has(id)) {
-      tileset.tiles.set(id, { id, properties: new Map() });
+    if (!tiles.has(id)) {
+      tiles.set(id, { id, properties: new Map() });
     }
   }
+
+  tileset.tiles = tiles;
 
   return tileset;
 }

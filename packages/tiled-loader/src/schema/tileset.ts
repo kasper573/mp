@@ -105,5 +105,5 @@ export interface TilesetTile {
   probability?: number;
   properties: Map<string, Property>;
   terrain?: [number, number, number, number];
-  type?: string;
+  type?: TiledClass;
 }
