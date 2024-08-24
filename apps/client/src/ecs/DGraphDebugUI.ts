@@ -36,7 +36,7 @@ export class DGraphDebugUI extends Graphics {
     this.showFractionalDNode = keyboard.isHeld("Shift");
     this.showTiledDNode = keyboard.isHeld("Control");
 
-    if (this.path.length) {
+    if (this.pathToDraw.length) {
       drawPath(this, this.tiled, this.pathToDraw);
     }
 
