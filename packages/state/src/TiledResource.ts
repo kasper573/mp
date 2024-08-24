@@ -31,24 +31,24 @@ export class TiledResource {
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
 
   getMatchingTileCoords = <T>(
-    propertyFilter: string,
-    valueFilter: (valuesForOneCoordinate: T[]) => boolean,
+    tilesetTilePropertyName: string,
+    coordinateTest: (propertyValuesForCoordinate: T[]) => boolean,
   ): Vector[] => {
     const tilesPerCoordinate = groupBy(
-      this.getTilesByProperty(propertyFilter).map((layerTile) => ({
-        pos: new Vector(
-          layerTile.x * this.map.tilewidth,
-          layerTile.y * this.map.tileheight,
-        ),
-        value: layerTile.tile.properties.get(propertyFilter) as T,
-      })),
+      this.map.layers
+        .flatMap((layer) => filterTileLayerTiles(layer, all))
+        .map((layerTile) => ({
+          pos: new Vector(layerTile.x, layerTile.y),
+          propertyValue: layerTile.tile.properties.get(tilesetTilePropertyName)
+            ?.value as T,
+        })),
       ({ pos: { x, y } }) => `${x}|${y}`,
     );
 
     const coordinates: Vector[] = [];
     for (const tiles of tilesPerCoordinate.values()) {
-      const values = tiles.map((t) => t.value);
-      if (valueFilter(values)) {
+      const values = tiles.map((t) => t.propertyValue);
+      if (coordinateTest(values)) {
         coordinates.push(tiles[0].pos);
       }
     }
@@ -80,7 +80,7 @@ export class TiledResource {
   };
 
   getObjects = (): Iterable<TiledObject> =>
-    this.map.layers.flatMap((layer) => filterTiledObjects(layer, yes));
+    this.map.layers.flatMap((layer) => filterTiledObjects(layer, all));
 }
 
 export function snapTileVector({ x, y }: Vector): Vector {
@@ -151,4 +151,4 @@ function filterTiledObjects(
   }
 }
 
-const yes = () => true;
+const all = () => true;
