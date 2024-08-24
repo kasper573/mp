@@ -178,6 +178,12 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/math:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/network:
     dependencies:
       '@preact/signals-core':
@@ -212,6 +218,12 @@ importers:
       '@mp/excalibur':
         specifier: workspace:*
         version: link:../excalibur
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../tiled-loader
       dijkstrajs:
         specifier: 1.0.3
         version: 1.0.3
