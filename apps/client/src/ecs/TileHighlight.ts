@@ -13,7 +13,7 @@ export class TileHighlight extends Graphics {
     super();
 
     this.fillStyle = visibleStyle;
-    this.rect(0, 0, tiled.map.width, tiled.map.height);
+    this.rect(0, 0, tiled.map.tilewidth, tiled.map.tileheight);
     this.fill();
   }
 
