@@ -1,42 +1,58 @@
 import { Container, Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
 import { LayerViewFactory } from "./layer";
+import type { TiledSpritesheetRecord } from "./spritesheet";
 import {
   createTextureByGIDQuery,
   loadTiledMapSpritesheets,
 } from "./spritesheet";
 
 export class TiledRenderer extends Container {
-  private loader: Graphics;
+  private spritesheets: TiledSpritesheetRecord = {};
+
   constructor(private map: TiledMap) {
     super();
 
-    this.loader = new Graphics();
-    this.loader.rect(
-      0,
-      0,
-      map.width * map.tilewidth,
-      map.height * map.tileheight,
-    );
-    this.loader.fill(0x0000ff);
-    this.addChild(this.loader);
-
-    this.load();
+    this.on("added", this.activate);
+    this.on("removed", this.deactivate);
   }
 
-  async load() {
-    // TODO container lifecyle
-    const spritesheets = await loadTiledMapSpritesheets(this.map);
+  private activate = async () => {
+    await this.load();
+    this.updateLayers();
+  };
 
+  private deactivate = () => {
+    for (const spritesheet of Object.values(this.spritesheets)) {
+      spritesheet.destroy();
+    }
+    this.spritesheets = {};
+  };
+
+  async load() {
+    const loader = new Graphics();
+    loader.rect(
+      0,
+      0,
+      this.map.width * this.map.tilewidth,
+      this.map.height * this.map.tileheight,
+    );
+    loader.fill(0x0000ff);
+    this.addChild(loader);
+
+    this.spritesheets = await loadTiledMapSpritesheets(this.map);
+  }
+
+  private updateLayers() {
     const factory = new LayerViewFactory(
       this.map,
-      createTextureByGIDQuery(spritesheets),
+      createTextureByGIDQuery(this.spritesheets),
     );
+
+    this.removeChildren();
 
     for (const layerView of factory.createLayerViews()) {
       this.addChild(layerView);
     }
-
-    this.removeChild(this.loader);
   }
 }
