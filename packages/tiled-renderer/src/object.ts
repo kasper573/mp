@@ -25,14 +25,16 @@ export function createObjectView(obj: TiledObject): ViewContainer {
   return createRectangleGraphics(obj);
 }
 
-const strokeStyle: StrokeStyle = { width: 2, color: 0xff0000 };
-const fillStyle: FillStyle = { color: 0x00ff00 };
+const strokeStyle: StrokeStyle = { width: 2, color: "rgba(150,150,150,0.9)" };
+const fillStyle: FillStyle = { color: "rgba(100,100,100,0.5)" };
 
 function createEllipseGraphics(obj: EllipseObject): Graphics {
   const g = new Graphics();
   g.strokeStyle = strokeStyle;
+  g.fillStyle = fillStyle;
   g.angle = obj.rotation;
   g.ellipse(obj.x, obj.y, obj.width / 2, obj.height / 2);
+  g.fill();
   g.stroke();
   return g;
 }
