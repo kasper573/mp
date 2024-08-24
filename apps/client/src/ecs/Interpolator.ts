@@ -1,7 +1,7 @@
 import type { Container } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { moveAlongPath } from "@mp/state";
-import { engine } from "./engine";
+import { Engine } from "./Engine";
 
 export class Interpolator {
   private pathInterpolation?: PathIntepolation;
@@ -31,7 +31,7 @@ export class Interpolator {
       this.target.position,
       this.pathInterpolation.path,
       this.pathInterpolation.speed,
-      engine.ticker.deltaTime,
+      Engine.instance.ticker.deltaTime,
     );
 
     if (destinationReached) {

@@ -9,7 +9,7 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/state";
 import { Graphics } from "@mp/pixi";
-import { engine } from "./engine";
+import { Engine } from "./Engine";
 
 export class DGraphDebugUI extends Graphics {
   private pathToDraw: Path = [];
@@ -32,7 +32,7 @@ export class DGraphDebugUI extends Graphics {
     const {
       pointer: { lastWorldPos },
       keyboard,
-    } = engine.input;
+    } = Engine.instance.input;
     this.showFractionalDNode = keyboard.isHeld("Shift");
     this.showTiledDNode = keyboard.isHeld("Control");
 

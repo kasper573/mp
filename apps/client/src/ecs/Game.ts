@@ -4,6 +4,7 @@ import { Application } from "@mp/pixi";
 import { api } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
+import { Engine } from "./Engine";
 
 export function createGame(
   areaLoader: AreaLoader,
@@ -18,6 +19,7 @@ export function createGame(
 
   return {
     async init({ canvas }: GameInitOptions) {
+      Engine.replace(canvas);
       await game.init({
         antialias: true,
         background: 0x005500,

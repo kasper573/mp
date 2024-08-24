@@ -3,7 +3,7 @@ import type { TiledResource } from "@mp/state";
 import { snapTileVector } from "@mp/state";
 import { Graphics } from "@mp/pixi";
 import { isVectorInGraph, type DGraph } from "@mp/state";
-import { engine } from "./engine";
+import { Engine } from "./Engine";
 
 export class TileHighlight extends Graphics {
   constructor(
@@ -18,7 +18,7 @@ export class TileHighlight extends Graphics {
   }
 
   override _onRender = () => {
-    const { lastWorldPos } = engine.input.pointer;
+    const { lastWorldPos } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
     const worldPos = tilePos.scale(this.tiled.tileSize);
     this.position.set(worldPos.x, worldPos.y);

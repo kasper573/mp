@@ -9,7 +9,7 @@ import { api } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
-import { engine } from "./engine";
+import { Engine } from "./Engine";
 
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
@@ -72,7 +72,7 @@ export class AreaScene extends Container {
       return;
     }
 
-    const { lastWorldPos } = engine.input.pointer;
+    const { lastWorldPos } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(
       this.area.tiled.worldCoordToTile(lastWorldPos),
     );
