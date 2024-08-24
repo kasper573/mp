@@ -12,6 +12,7 @@ export class CharacterActor extends Graphics {
   ) {
     super();
     this.rect(0, 0, this.tileSize.x, this.tileSize.y);
+    this.fill();
   }
 
   override _onRender = () => {
