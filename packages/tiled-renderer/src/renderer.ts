@@ -9,6 +9,7 @@ import {
 
 export class TiledRenderer extends Container {
   private spritesheets: TiledSpritesheetRecord = {};
+  private debugUIEnabled = false;
 
   constructor(private map: TiledMap) {
     super();
@@ -19,7 +20,7 @@ export class TiledRenderer extends Container {
 
   private activate = async () => {
     await this.load();
-    this.updateLayers();
+    this.upsertLayerViews();
   };
 
   private deactivate = () => {
@@ -29,7 +30,7 @@ export class TiledRenderer extends Container {
     this.spritesheets = {};
   };
 
-  async load() {
+  load = async () => {
     const loader = new Graphics();
     loader.rect(
       0,
@@ -41,9 +42,14 @@ export class TiledRenderer extends Container {
     this.addChild(loader);
 
     this.spritesheets = await loadTiledMapSpritesheets(this.map);
-  }
+  };
 
-  private updateLayers() {
+  toggleDebugUI = (enabled: boolean) => {
+    this.debugUIEnabled = enabled;
+    this.upsertLayerViews();
+  };
+
+  private upsertLayerViews() {
     const factory = new LayerViewFactory(
       this.map,
       createTextureByGIDQuery(this.spritesheets),
@@ -51,7 +57,11 @@ export class TiledRenderer extends Container {
 
     this.removeChildren();
 
-    for (const layerView of factory.createLayerViews()) {
+    const layers = this.debugUIEnabled
+      ? this.map.layers
+      : this.map.layers.filter((l) => l.type !== "objectgroup");
+
+    for (const layerView of factory.createLayerViews(layers)) {
       this.addChild(layerView);
     }
   }

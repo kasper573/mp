@@ -27,6 +27,7 @@ export class Engine {
     },
     keyboard: {
       isHeld: (key: KeyName) => this.heldKeys.has(key),
+      subscribe: subscribeToKey,
     },
   };
 
@@ -68,6 +69,25 @@ export class Engine {
 
   private onKeyUp = (e: KeyboardEvent) => {
     this.heldKeys.delete(e.key as KeyName);
+  };
+}
+
+function subscribeToKey(key: KeyName, callback: (isHeld: boolean) => void) {
+  const onDown = (e: KeyboardEvent) => {
+    if (e.key === key) {
+      callback(true);
+    }
+  };
+  const onUp = (e: KeyboardEvent) => {
+    if (e.key === key) {
+      callback(false);
+    }
+  };
+  window.addEventListener("keydown", onDown);
+  window.addEventListener("keyup", onUp);
+  return () => {
+    window.removeEventListener("keydown", onDown);
+    window.removeEventListener("keyup", onUp);
   };
 }
 

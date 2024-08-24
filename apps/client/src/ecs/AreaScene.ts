@@ -13,6 +13,7 @@ import { Engine } from "./Engine";
 
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
+  private tiledRenderer: TiledRenderer;
   private characterActors: Map<CharacterId, CharacterActor> = new Map();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
@@ -28,7 +29,8 @@ export class AreaScene extends Container {
   ) {
     super({ interactive: true });
 
-    this.addChild(new TiledRenderer(area.tiled.map));
+    this.tiledRenderer = new TiledRenderer(area.tiled.map);
+    this.addChild(this.tiledRenderer);
 
     const tileHighlighter = new TileHighlight(area.dGraph, area.tiled);
     tileHighlighter.zIndex = 999;
@@ -52,6 +54,10 @@ export class AreaScene extends Container {
       sub(this, "mousedown", () => (this.isMouseDown = true)),
       sub(this, "mouseup", () => (this.isMouseDown = false)),
       sub(this, "wheel", this.onMouseWheel),
+      Engine.instance.input.keyboard.subscribe(
+        "Shift",
+        this.tiledRenderer.toggleDebugUI,
+      ),
     );
   };
 
