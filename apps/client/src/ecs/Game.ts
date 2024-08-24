@@ -10,6 +10,7 @@ export function createGame(
   areaLoader: AreaLoader,
   debug: (text: string) => void,
 ): Game {
+  const canvas = document.createElement("canvas");
   const game = new Application();
 
   const changeArea = createAreaChanger(game, (id) =>
@@ -19,7 +20,9 @@ export function createGame(
   let unsubFromState: () => void;
 
   return {
-    async init({ canvas, resizeTo }: GameInitOptions) {
+    canvas,
+    async init({ container, resizeTo }: GameInitOptions) {
+      container.appendChild(canvas);
       Engine.replace(canvas);
       unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
       await game.init({ antialias: true, resizeTo, canvas });
@@ -27,6 +30,7 @@ export function createGame(
     dispose() {
       unsubFromState();
       game.destroy(undefined, { children: true });
+      canvas.remove();
     },
   };
 }
@@ -67,11 +71,12 @@ function createAreaChanger(
 }
 
 export interface GameInitOptions {
-  canvas: HTMLCanvasElement;
+  container: HTMLElement;
   resizeTo: HTMLElement | Window;
 }
 
 export interface Game {
+  canvas: HTMLCanvasElement;
   init(options: GameInitOptions): Promise<void>;
   dispose(): void;
 }
