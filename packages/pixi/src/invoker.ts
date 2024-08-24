@@ -1,5 +1,3 @@
-import type { Component, Entity } from "excalibur";
-
 export function invoker<T extends Component>(
   componentClass: InstanceOf<T>,
   entity: Entity,

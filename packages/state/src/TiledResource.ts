@@ -1,5 +1,11 @@
 import { Vector } from "@mp/math";
-import type { TiledMap, TileLayerTile, Layer } from "@mp/tiled-loader";
+import type {
+  TiledMap,
+  TileLayerTile,
+  Layer,
+  TileLayer,
+  TiledObject,
+} from "@mp/tiled-loader";
 
 export class TiledResource {
   constructor(private map: TiledMap) {}
@@ -50,11 +56,30 @@ export class TiledResource {
   };
 
   getTilesByProperty = (propertyFilter: string): TileLayerTile[] => {
-    const predicate = propertyFilterPredicate(propertyFilter);
+    const predicate = (lt: TileLayerTile) =>
+      lt.tile.properties.has(propertyFilter);
     return this.map.layers.flatMap((layer) =>
       filterTileLayerTiles(layer, predicate),
     );
   };
+
+  getObjectsByClassName = (className: string): TiledObject[] => {
+    const predicate = (obj: TiledObject) =>
+      obj.objectType !== "template" && obj.properties.has(className);
+    return this.map.layers.flatMap((layer) =>
+      filterTiledObjects(layer, predicate),
+    );
+  };
+
+  getTileLayers = (name: string): TileLayer[] => {
+    const predicate = (layer: TileLayer) => layer.name === name;
+    return this.map.layers.flatMap((layer) =>
+      filterTileLayers(layer, predicate),
+    );
+  };
+
+  getObjects = (): Iterable<TiledObject> =>
+    this.map.layers.flatMap((layer) => filterTiledObjects(layer, yes));
 }
 
 export function snapTileVector({ x, y }: Vector): Vector {
@@ -75,8 +100,20 @@ function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
   return map;
 }
 
-function propertyFilterPredicate(propertyFilter: string) {
-  return (tile: TileLayerTile) => tile.tile.properties.has(propertyFilter);
+function filterTileLayers(
+  layer: Layer,
+  filter: (layer: TileLayer) => boolean,
+): TileLayer[] {
+  switch (layer.type) {
+    case "group":
+      return layer.layers.flatMap((child) => filterTileLayers(child, filter));
+    case "tilelayer":
+      return filter(layer) ? [layer] : [];
+    case "imagelayer":
+      return [];
+    case "objectgroup":
+      return [];
+  }
 }
 
 function filterTileLayerTiles(
@@ -96,3 +133,21 @@ function filterTileLayerTiles(
       return [];
   }
 }
+
+function filterTiledObjects(
+  layer: Layer,
+  filter: (obj: TiledObject) => boolean,
+): TiledObject[] {
+  switch (layer.type) {
+    case "group":
+      return layer.layers.flatMap((child) => filterTiledObjects(child, filter));
+    case "tilelayer":
+      return [];
+    case "imagelayer":
+      return [];
+    case "objectgroup":
+      return layer.objects.filter(filter);
+  }
+}
+
+const yes = () => true;

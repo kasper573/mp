@@ -1,6 +1,6 @@
 import type { Character } from "@mp/server";
-import type { Engine } from "@mp/excalibur";
-import { Actor, Color, Rectangle } from "@mp/excalibur";
+import type { Engine } from "@mp/pixi";
+import { Actor, Color, Rectangle } from "@mp/pixi";
 import { Interpolator } from "./Interpolator";
 
 export class CharacterActor extends Actor {

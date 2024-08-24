@@ -1,4 +1,4 @@
-import { type TiledResource } from "@mp/excalibur";
+import { type TiledResource } from "./TiledResource";
 import type { DNode } from "./findPath";
 import { dNodeFromVector, type DGraph } from "./findPath";
 

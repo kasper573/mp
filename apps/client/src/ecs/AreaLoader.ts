@@ -1,11 +1,17 @@
-import { TiledResource } from "@mp/excalibur";
 import type { AreaId, PathToLocalFile } from "@mp/state";
-import { AreaResource } from "@mp/state";
+import { AreaResource, TiledResource } from "@mp/state";
+import { createTiledLoader } from "@mp/tiled-loader";
 import { api } from "../api";
 
 export class AreaLoader {
   private cache = new Map<AreaId, Promise<AreaResource>>();
 
+  private loadTiled = createTiledLoader({
+    loadJson,
+    relativePath: relativeURL,
+  });
+
+  // TODO result type
   async require(id: AreaId): Promise<AreaResource> {
     let promise = this.cache.get(id);
     if (promise) {
@@ -16,9 +22,25 @@ export class AreaLoader {
       url: await api.modules.area.areaFileUrl(id),
       filepath: "irrelevant-on-client" as PathToLocalFile,
     };
-    const tiled = new TiledResource(areaFile.url);
-    promise = tiled.load().then(() => new AreaResource(id, tiled));
+
+    const tiledPromise = this.loadTiled(areaFile.url);
+    promise = tiledPromise.then(({ tiledMap, error }) => {
+      if (error || !tiledMap) {
+        throw new Error(String(error || "Failed to load area"));
+      }
+      return new AreaResource(id, new TiledResource(tiledMap));
+    });
     this.cache.set(id, promise);
     return promise;
   }
+}
+
+async function loadJson(url: string) {
+  const response = await fetch(url);
+  return response.json();
+}
+
+function relativeURL(url: string, base: string) {
+  base = base.startsWith("//") ? window.location.protocol + base : base;
+  return new URL(url, base).toString();
 }

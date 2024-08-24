@@ -1,5 +1,7 @@
-import type { Engine, TiledResource } from "@mp/excalibur";
-import { Actor, Color, Rectangle, snapTileVector } from "@mp/excalibur";
+import type { Engine } from "@mp/pixi";
+import type { TiledResource } from "@mp/state";
+import { snapTileVector } from "@mp/state";
+import { Actor, Color, Rectangle } from "@mp/pixi";
 import { isVectorInGraph, type DGraph } from "@mp/state";
 
 export class TileHighlight extends Actor {

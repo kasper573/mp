@@ -1,4 +1,4 @@
-import type { VectorLike, Path } from "@mp/excalibur";
+import type { Vector, Path } from "@mp/math";
 import type { AreaId, Branded } from "@mp/state";
 
 export interface WorldState {
@@ -8,7 +8,7 @@ export interface WorldState {
 export interface Character {
   connected: boolean;
   id: CharacterId;
-  coords: VectorLike;
+  coords: Vector;
   path: Path;
   speed: number;
   areaId: AreaId;

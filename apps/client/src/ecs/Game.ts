@@ -1,5 +1,5 @@
 import type { CharacterId } from "@mp/server";
-import { Engine } from "@mp/excalibur";
+import { Engine } from "@mp/pixi";
 import { type AreaId } from "@mp/state";
 import { api } from "../api";
 import type { AreaLoader } from "./AreaLoader";

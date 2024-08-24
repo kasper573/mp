@@ -1,8 +1,7 @@
 import { dNodeFromVector, type AreaResource } from "@mp/state";
 import type { Character, CharacterId } from "@mp/server";
-import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
-import { Cleanup, sub } from "@mp/excalibur";
-import { clamp, invoker, Scene, snapTileVector } from "@mp/excalibur";
+import type { Engine, Vector, WheelEvent, Cleanup, sub, Scene } from "@mp/pixi";
+import { clamp, invoker, snapTileVector } from "@mp/state";
 import { api } from "../api";
 import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";

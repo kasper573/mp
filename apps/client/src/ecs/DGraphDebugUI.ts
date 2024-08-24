@@ -1,6 +1,5 @@
-import type { Engine, TiledResource, Vector, VectorLike } from "@mp/excalibur";
-import { Keys, snapTileVector } from "@mp/excalibur";
-import { Actor, Canvas } from "@mp/excalibur";
+import type { Engine, TiledResource, snapTileVector } from "@mp/state";
+import type { Vector, Path } from "@mp/math";
 import {
   type DNode,
   type DGraph,
@@ -8,11 +7,12 @@ import {
   dNodeFromVector,
   addVectorToAdjacentInGraph,
 } from "@mp/state";
+import { Actor, Canvas } from "@mp/pixi";
 
 export class DGraphDebugUI extends Actor {
-  private path: VectorLike[] = [];
+  private path: Path = [];
   private canvas: Canvas;
-  private worldPos?: VectorLike;
+  private worldPos?: Vector;
   private showFractionalDNode = false;
   private showTiledDNode = false;
 
@@ -62,7 +62,7 @@ export class DGraphDebugUI extends Actor {
     this.graphics.use(this.canvas);
   }
 
-  showPath(path: VectorLike[]) {
+  showPath(path: Vector[]) {
     this.path = path;
   }
 
@@ -89,7 +89,7 @@ export class DGraphDebugUI extends Actor {
 function drawPath(
   ctx: CanvasRenderingContext2D,
   tiled: TiledResource,
-  path: VectorLike[],
+  path: Vector[],
 ) {
   const [start, ...rest] = path.map(tiled.tileCoordToWorld);
 
@@ -132,6 +132,6 @@ function costToString(cost: number): string {
   return hasFractions ? cost.toFixed(1) : cost.toString();
 }
 
-function vecToString(v: VectorLike): string {
+function vecToString(v: Vector): string {
   return `(${v.x.toFixed(1)},${v.y.toFixed(1)})`;
 }

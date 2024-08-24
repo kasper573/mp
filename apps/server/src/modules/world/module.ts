@@ -5,7 +5,7 @@ import {
   type AreaId,
   type AreaResource,
 } from "@mp/state";
-import type { VectorLike } from "@mp/excalibur";
+import { Vector } from "@mp/math";
 import type { Logger } from "@mp/logger";
 import type { ConnectReason } from "@mp/network/server";
 import { type DisconnectReason } from "@mp/network/server";
@@ -65,12 +65,15 @@ export function createWorldModule({
           const area = areas.get(char.areaId);
           if (area) {
             for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
+              if (hit.object.objectType === "template") {
+                continue;
+              }
               const targetArea = areas.get(
-                hit.object.properties.get("goto") as AreaId,
+                hit.object.properties.get("goto")?.value as AreaId,
               );
               if (targetArea) {
                 char.areaId = targetArea.id;
-                char.coords = targetArea.start.clone();
+                char.coords = targetArea.start.copy();
                 char.path = [];
               }
             }
@@ -79,7 +82,7 @@ export function createWorldModule({
       }),
 
     move: t.procedure
-      .input<VectorLike>()
+      .input<Vector>()
       .create(({ input: { x, y }, context: { source } }) => {
         const { characterId } = source.unwrap("client");
         const char = state.characters.get(characterId);
@@ -98,7 +101,7 @@ export function createWorldModule({
         if (idx !== -1) {
           char.path = char.path.slice(0, idx + 1);
         } else {
-          const newPath = findPath(char.coords, { x, y }, area.dGraph);
+          const newPath = findPath(char.coords, new Vector(x, y), area.dGraph);
           if (newPath) {
             char.path = newPath;
           }
@@ -130,12 +133,12 @@ export function createWorldModule({
           player = {
             connected: false,
             areaId: area.id,
-            coords: { x: 0, y: 0 },
+            coords: new Vector(0, 0),
             id: characterId,
             path: [],
             speed: 3,
           };
-          player.coords = area.start.clone();
+          player.coords = area.start.copy();
           state.characters.set(player.id, player);
         }
 

@@ -1,10 +1,10 @@
-import type { VectorLike } from "@mp/excalibur";
-import { snapTileVector, Vector } from "@mp/excalibur";
+import { Vector } from "@mp/math";
+import { snapTileVector } from "./TiledResource";
 import { find_path } from "./dijkstra";
 
 export function findPath(
-  start: VectorLike,
-  target: VectorLike,
+  start: Vector,
+  target: Vector,
   graph: DGraph,
 ): Vector[] | undefined {
   if (isFractionalVector(start)) {
@@ -26,14 +26,11 @@ export function findPath(
   }
 }
 
-export function isVectorInGraph(
-  graph: DGraph,
-  v?: VectorLike,
-): v is VectorLike {
+export function isVectorInGraph(graph: DGraph, v?: Vector): v is Vector {
   return v && graph[dNodeFromVector(v)] ? true : false;
 }
 
-export function dNodeFromVector({ x, y }: VectorLike): DNode {
+export function dNodeFromVector({ x, y }: Vector): DNode {
   return `${x}${separator}${y}`;
 }
 
@@ -42,10 +39,7 @@ export function vectorFromDNode(node: DNode): Vector {
   return new Vector(x, y);
 }
 
-export function addVectorToAdjacentInGraph(
-  graph: DGraph,
-  v: VectorLike,
-): DGraph {
+export function addVectorToAdjacentInGraph(graph: DGraph, v: Vector): DGraph {
   const updatedGraph = { ...graph };
   const nodeAsVector = new Vector(v.x, v.y);
   const adjacent = adjacentVectors(v);
@@ -60,7 +54,7 @@ export function addVectorToAdjacentInGraph(
   return updatedGraph;
 }
 
-function adjacentVectors(fractional: VectorLike): Vector[] {
+function adjacentVectors(fractional: Vector): Vector[] {
   const from = snapTileVector(fractional);
   const xOffset = (fractional.x - 0.5) % 1 < 0.5 ? -1 : 1;
   const yOffset = (fractional.y - 0.5) % 1 < 0.5 ? -1 : 1;
@@ -73,7 +67,7 @@ function adjacentVectors(fractional: VectorLike): Vector[] {
   ];
 }
 
-function isFractionalVector(v: VectorLike): boolean {
+function isFractionalVector(v: Vector): boolean {
   return v.x % 1 !== 0 || v.y % 1 !== 0;
 }
 

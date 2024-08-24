@@ -15,8 +15,9 @@
     "dev": "tsx watch src/main.ts --clear-screen=false"
   },
   "dependencies": {
-    "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/transformer": "workspace:*",

@@ -21,6 +21,7 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
   };
 }
 
+// TODO result type
 export interface TiledLoaderResult {
   tiledMap?: TiledMap;
   error?: unknown;

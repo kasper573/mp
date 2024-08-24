@@ -1,7 +1,8 @@
-import { Cleanup, sub } from "@mp/excalibur";
-import type { Vector, Entity, PostUpdateEvent } from "@mp/excalibur";
-import { Component } from "@mp/excalibur";
+import { Cleanup, sub } from "@mp/pixi";
+import type { Entity, PostUpdateEvent } from "@mp/pixi";
+import type { Vector } from "@mp/math";
 import { moveAlongPath, TimeSpan } from "@mp/state";
+import { Component } from "@mp/pixi";
 
 export class Interpolator extends Component {
   private cleanup = new Cleanup();
