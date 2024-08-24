@@ -1,30 +1,37 @@
 import type { CharacterId } from "@mp/server";
-import { Engine } from "@mp/excalibur";
 import { type AreaId } from "@mp/state";
+import { Application } from "@mp/pixi";
 import { api } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
+import { Engine } from "./Engine";
 
 export function createGame(
   areaLoader: AreaLoader,
   debug: (text: string) => void,
 ): Game {
-  const game = new Engine({});
+  const canvas = document.createElement("canvas");
+  const game = new Application();
 
   const changeArea = createAreaChanger(game, (id) =>
     areaLoader.require(id).then((area) => new AreaScene(area, debug)),
   );
-  const unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
+
+  let unsubFromState: () => void;
 
   return {
-    get canvas() {
-      return game.canvas;
+    canvas,
+    async init({ container, resizeTo }: GameInitOptions) {
+      container.appendChild(canvas);
+      Engine.replace(canvas);
+      unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
+      await game.init({ antialias: true, resizeTo, canvas });
     },
     dispose() {
       unsubFromState();
-      game.dispose();
+      game.destroy(undefined, { children: true });
+      canvas.remove();
     },
-    start: () => game.start(),
   };
 }
 
@@ -32,8 +39,9 @@ function me() {
   return api.state.value.characters.get(api.clientId as CharacterId);
 }
 
+// TODO refactor
 function createAreaChanger(
-  game: Engine,
+  game: Application,
   loadScene: (id: AreaId) => Promise<AreaScene>,
 ) {
   let currentAreaId: AreaId | undefined;
@@ -43,25 +51,32 @@ function createAreaChanger(
     }
 
     currentAreaId = areaId;
+    const [currentScene] = game.stage.children;
+    if (currentScene instanceof AreaScene) {
+      game.stage.removeChild(currentScene);
+    }
+
     if (areaId === undefined) {
       return;
     }
 
     const nextScene = await loadScene(areaId);
 
-    let sceneToRemove: AreaScene | undefined;
-    if (game.currentScene instanceof AreaScene) {
-      nextScene.inheritProperties(game.currentScene as AreaScene);
-      sceneToRemove = game.currentScene;
+    if (currentScene instanceof AreaScene) {
+      nextScene.inheritProperties(currentScene as AreaScene);
     }
 
-    game.addScene(nextScene.area.id, nextScene);
-    await game.goToScene(nextScene.area.id);
-
-    if (sceneToRemove) {
-      game.removeScene(sceneToRemove);
-    }
+    game.stage.addChild(nextScene);
   };
 }
 
-export type Game = Pick<Engine, "dispose" | "start" | "canvas">;
+export interface GameInitOptions {
+  container: HTMLElement;
+  resizeTo: HTMLElement | Window;
+}
+
+export interface Game {
+  canvas: HTMLCanvasElement;
+  init(options: GameInitOptions): Promise<void>;
+  dispose(): void;
+}

@@ -47,18 +47,30 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp/excalibur':
+      '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/excalibur
+        version: link:../../packages/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
       '@mp/network':
         specifier: workspace:*
         version: link:../../packages/network
+      '@mp/pixi':
+        specifier: workspace:*
+        version: link:../../packages/pixi
       '@mp/server':
         specifier: workspace:*
         version: link:../server
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../packages/tiled-loader
+      '@mp/tiled-renderer':
+        specifier: workspace:*
+        version: link:../../packages/tiled-renderer
       '@tanstack/react-query':
         specifier: 5.51.11
         version: 5.51.11(react@18.3.1)
@@ -87,18 +99,21 @@ importers:
 
   apps/server:
     dependencies:
-      '@mp/excalibur':
-        specifier: workspace:*
-        version: link:../../packages/excalibur
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
       '@mp/network':
         specifier: workspace:*
         version: link:../../packages/network
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../packages/tiled-loader
       '@mp/transformer':
         specifier: workspace:*
         version: link:../../packages/transformer
@@ -143,24 +158,17 @@ importers:
         specifier: 0.6.4
         version: 0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.5.3)(vite@5.2.13(@types/node@20.14.10))
 
-  packages/excalibur:
-    dependencies:
-      '@excaliburjs/plugin-tiled':
-        specifier: 0.29.2
-        version: 0.29.2(excalibur@0.29.3)
-      excalibur:
-        specifier: 0.29.3
-        version: 0.29.3
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/logger:
     dependencies:
       chalk:
         specifier: 5.3.0
         version: 5.3.0
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/math:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -185,24 +193,24 @@ importers:
         specifier: 2.0.3
         version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
 
-  packages/schema:
+  packages/pixi:
     dependencies:
-      valibot:
-        specifier: 0.37.0
-        version: 0.37.0(typescript@5.5.3)
+      pixi.js:
+        specifier: 8.3.3
+        version: 8.3.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      vitest:
-        specifier: 2.0.3
-        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
 
   packages/state:
     dependencies:
-      '@mp/excalibur':
+      '@mp/math':
         specifier: workspace:*
-        version: link:../excalibur
+        version: link:../math
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../tiled-loader
       dijkstrajs:
         specifier: 1.0.3
         version: 1.0.3
@@ -217,11 +225,11 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/tiled-parser:
+  packages/tiled-loader:
     dependencies:
-      '@mp/schema':
+      '@mp/transformer':
         specifier: workspace:*
-        version: link:../schema
+        version: link:../transformer
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -230,8 +238,24 @@ importers:
         specifier: 2.0.3
         version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
 
+  packages/tiled-renderer:
+    dependencies:
+      '@mp/pixi':
+        specifier: workspace:*
+        version: link:../pixi
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../tiled-loader
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/transformer:
     dependencies:
+      pako:
+        specifier: 2.1.0
+        version: 2.1.0
       superjson:
         specifier: 2.2.1
         version: 2.2.1
@@ -239,6 +263,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/pako':
+        specifier: 2.0.3
+        version: 2.0.3
       vitest:
         specifier: 2.0.3
         version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
@@ -647,11 +674,6 @@ packages:
     resolution: {integrity: sha512-BsWiH1yFGjXXS2yvrf5LyuoSIIbPrGUWob917o+BTKuZ7qJdxX8aJLRxs1fS9n6r7vESrq1OUqb68dANcFXuQQ==}
     engines: {node: ^18.18.0 || ^20.9.0 || >=21.1.0}
 
-  '@excaliburjs/plugin-tiled@0.29.2':
-    resolution: {integrity: sha512-BZv0uQ+AVaqqX/ZwC/t21tLff4DnN1vZO3nahnVbc5PfUYaGo+HmfdVneMKQ5o4qxuKuUJFKxQqr5cFHYcpsXQ==}
-    peerDependencies:
-      excalibur: ~0.29.0
-
   '@humanwhocodes/module-importer@1.0.1':
     resolution: {integrity: sha512-bxveV4V8v5Yb4ncFTT3rPSgZBOpCkjfK0y4oVVVJwIuDVBRMDXrPyXRL988i5ap9m9bnyEEjWfm5WkBmtffLfA==}
     engines: {node: '>=12.22'}
@@ -693,6 +715,9 @@ packages:
   '@nodelib/fs.walk@1.2.8':
     resolution: {integrity: sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg==}
     engines: {node: '>= 8'}
+
+  '@pixi/colord@2.9.6':
+    resolution: {integrity: sha512-nezytU2pw587fQstUu1AsJZDVEynjskwOL+kibwcdxsMBFqPsFFNA7xl0ii/gXuDi6M0xj3mfRJj8pBSc2jCfA==}
 
   '@pkgjs/parseargs@0.11.0':
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
@@ -882,6 +907,12 @@ packages:
   '@types/cors@2.8.17':
     resolution: {integrity: sha512-8CGDvrBj1zgo2qE+oS3pOCyYNqCPryMWY2bGfwA0dcfopWGgxs+78df0Rs3rc9THP4JkOhLsAa+15VdpAqkcUA==}
 
+  '@types/css-font-loading-module@0.0.12':
+    resolution: {integrity: sha512-x2tZZYkSxXqWvTDgveSynfjq/T2HyiZHXb00j/+gy19yp70PHCizM48XFdjBCWH7eHBD0R5i/pw9yMBP/BH5uA==}
+
+  '@types/earcut@2.1.4':
+    resolution: {integrity: sha512-qp3m9PPz4gULB9MhjGID7wpo3gJ4bTGXm7ltNDsmOvsPduTeHp8wSW9YckBj3mljeOh4F0m2z/0JKAALRKbmLQ==}
+
   '@types/eslint@8.56.10':
     resolution: {integrity: sha512-Shavhk87gCtY2fhXDctcfS3e6FdxWkCx1iUZ9eEUbh7rTqlZT0/IzOkCOVt0fCjcFuZ9FPYfuezTBImfHCDBGQ==}
 
@@ -914,6 +945,9 @@ packages:
 
   '@types/node@20.8.10':
     resolution: {integrity: sha512-TlgT8JntpcbmKUFzjhsyhGfP2fsiz1Mv56im6enJ905xG1DAYesxJaeSbGqQmAw8OWPdhyJGhGSQGKRNJ45u9w==}
+
+  '@types/pako@2.0.3':
+    resolution: {integrity: sha512-bq0hMV9opAcrmE0Byyo0fY3Ew4tgOevJmQ9grUhpXQhYfyLJ1Kqg3P33JT5fdbT2AjeAjR51zqqVjAL/HMkx7Q==}
 
   '@types/prop-types@15.7.12':
     resolution: {integrity: sha512-5zvhXYtRNRluoE/jAp4GVsSduVUzNWKkOZrCDBWYtE7biZywwdC2AcEzg+cSMLFRfVgeAFqpfNabiPjxFddV1Q==}
@@ -1020,6 +1054,13 @@ packages:
 
   '@vitest/utils@2.0.3':
     resolution: {integrity: sha512-c/UdELMuHitQbbc/EVctlBaxoYAwQPQdSNwv7z/vHyBKy2edYZaFgptE27BRueZB7eW8po+cllotMNTDpL3HWg==}
+
+  '@webgpu/types@0.1.44':
+    resolution: {integrity: sha512-JDpYJN5E/asw84LTYhKyvPpxGnD+bAKPtpW9Ilurf7cZpxaTbxkQcGwOd7jgB9BPBrTYQ+32ufo4HiuomTjHNQ==}
+
+  '@xmldom/xmldom@0.8.10':
+    resolution: {integrity: sha512-2WALfTl4xo2SkGCYRt6rDTFfk9R1czmBvUQy12gK2KuRKIpWEhcbbzy8EZXtz/jkRqHX8bFEc6FC1HjX4TUWYw==}
+    engines: {node: '>=10.0.0'}
 
   JSONStream@1.3.5:
     resolution: {integrity: sha512-E+iruNOY8VV9s4JEbe1aNEm6MiszPRr/UfcHMz0TQh1BXSxHK+ASV1R6W4HpjBhSeS+54PIsAMCBmwD06LLsqQ==}
@@ -1241,9 +1282,6 @@ packages:
   compare-func@2.0.0:
     resolution: {integrity: sha512-zHig5N+tPWARooBnb0Zx1MFcdfpyJrfTJ3Y5L+IFvUm8rM74hHz66z0gw0x4tijh5CorKkKUCnW82R2vmpeCRA==}
 
-  compare-versions@6.1.0:
-    resolution: {integrity: sha512-LNZQXhqUvqUTotpZ00qLSaify3b4VFD588aRr8MKFw4CMUr98ytzCW5wDH5qx/DEY5kCDXcbcRuCqL0szEf2tg==}
-
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
@@ -1282,9 +1320,6 @@ packages:
   copy-anything@3.0.5:
     resolution: {integrity: sha512-yCEafptTtb4bk7GLEQoM8KVJpxAfdBJYaXyzQEgQQQgYrZiDp8SJmGKlYza6CYjEDNstAdNdKA3UuoULlEbS6w==}
     engines: {node: '>=12.13'}
-
-  core-js@3.36.1:
-    resolution: {integrity: sha512-BTvUrwxVBezj5SZ3f10ImnX2oRByMxql3EimVqMysepbC9EeMUOpLwdy6Eoili2x6E4kf+ZUB5k/+Jv55alPfA==}
 
   cors@2.8.5:
     resolution: {integrity: sha512-KIHbLJqu73RGr/hnbrO9uBeixNGuvSQjul/jdFvS/KFSIH1hWVd1ng7zOHx+YrEfInLG7q4n6GHQ9cDtxv/P6g==}
@@ -1415,6 +1450,9 @@ packages:
   dot-prop@5.3.0:
     resolution: {integrity: sha512-QM8q3zDe58hqUqjraQOmzZ1LIH9SWQJTlEKCH4kJ2oQvLZk7RbQXvtDM2XEq3fwkV9CCvvH4LA0AV+ogFsBM2Q==}
     engines: {node: '>=8'}
+
+  earcut@2.2.4:
+    resolution: {integrity: sha512-/pjZsA1b4RPHbeWZQn66SWS8nZZWLQQ23oE3Eam7aroEFGEvwKAsJfZ9ytiEMycfzXWpca4FA9QIOehf7PocBQ==}
 
   eastasianwidth@0.2.0:
     resolution: {integrity: sha512-I88TYZWc9XiYHRQ4/3c5rjjfgkjhLyW2luGIheGERbNQ6OY7yTybanSpDXZa8y7VUP9YmDcYa+eyq4ca7iLqWA==}
@@ -1601,8 +1639,8 @@ packages:
   eventemitter3@4.0.7:
     resolution: {integrity: sha512-8guHBZCwKnFhYdHr2ysuRWErTwhoN2X8XELRlrRwpmfeY2jjuUN4taQMsULKUVo1K4DvZl+0pgfyoysHxvmvEw==}
 
-  excalibur@0.29.3:
-    resolution: {integrity: sha512-R1Nzf5/U2oSuIcWKZinAUR8b3eW71bwC6UvnqSt08d2uTVpaIDwl6cyVvB+1jY5GeA0BWmFS/wQ/PaNKTZDP7A==}
+  eventemitter3@5.0.1:
+    resolution: {integrity: sha512-GWkBvjiSZK87ELrYOSESUYeVIc9mvLLf/nXalMOS5dYrgZq9o5OVkbZAVM06CVxYsCwH9BDZFPlQTlPA1j4ahA==}
 
   execa@5.1.1:
     resolution: {integrity: sha512-8uSpZZocAZRBAPIEINJj3Lo9HyGitllczc27Eh5YYojjMFMn8yHMDMaUHE2Jqfq05D/wucwI4JGURyXt1vchyg==}
@@ -1631,10 +1669,6 @@ packages:
 
   fast-uri@3.0.1:
     resolution: {integrity: sha512-MWipKbbYiYI0UC7cl8m/i/IWTqfC8YXsqjzybjddLsFjStroQzsHXkc73JutMvBiXmOvapk+axIl79ig5t55Bw==}
-
-  fast-xml-parser@3.21.1:
-    resolution: {integrity: sha512-FTFVjYoBOZTJekiUsawGsSYV9QL0A+zDYCRj7y34IO6Jg+2IMYEtQa+bbictpdpV8dHxXywqU7C0gRDEOFtBFg==}
-    hasBin: true
 
   fastq@1.17.1:
     resolution: {integrity: sha512-sRVD3lWVIXWg6By68ZN7vho9a1pQcN/WBFaAAsDDFzlJjvoGx0P8z7V1t72grFJfJhu3YPZBuu25f7Kaw2jN1w==}
@@ -2009,6 +2043,9 @@ packages:
   isexe@2.0.0:
     resolution: {integrity: sha512-RHxMLp9lnKHGHRng9QFhRCMbYAcVpn69smSGcq3f36xjgVVWThj4qqLbTLlq7Ssj8B+fIQ1EuCEGI2lKsyQeIw==}
 
+  ismobilejs@1.1.1:
+    resolution: {integrity: sha512-VaFW53yt8QO61k2WJui0dHf4SlL8lxBofUuUmwBo0ljPk0Drz2TiuDW4jo3wDcv41qy/SxrJ+VAzJ/qYqsmzRw==}
+
   jackspeak@3.4.3:
     resolution: {integrity: sha512-OGlZQpz2yfahA/Rd1Y8Cd9SIEsqvXkLVoSw/cgwhnhFMDbsQFeZYoJJ7bIZBS9BcamUW96asq/npPWugM+RQBw==}
 
@@ -2309,8 +2346,8 @@ packages:
   package-json-from-dist@1.0.0:
     resolution: {integrity: sha512-dATvCeZN/8wQsGywez1mzHtTlP22H8OEfPrVMLNr4/eGa+ijtLn/6M5f0dY8UKNrC2O9UCU6SSoG3qRKnt7STw==}
 
-  pako@1.0.11:
-    resolution: {integrity: sha512-4hLB8Py4zZce5s4yd9XzopqwVv/yGNhV1Bl8NTmCq1763HeK2+EwVTv+leGeL13Dnh2wfbqowVPXCIO0z4taYw==}
+  pako@2.1.0:
+    resolution: {integrity: sha512-w+eufiZ1WuJYgPXbV/PO3NCMEc3xqylkKHzp8bxp1uW4qaSNQUkwmLLEc3kKsfz8lpV1F8Ht3U1Cm+9Srog2ug==}
 
   parent-module@1.0.1:
     resolution: {integrity: sha512-GQ2EWRpQV8/o+Aw8YqtfZZPfNRWZYkbidE9k5rpl/hC3vtHHBfGm2Ifi6qWV+coDGkrUKZAxE3Lot5kcsRlh+g==}
@@ -2319,6 +2356,9 @@ packages:
   parse-json@5.2.0:
     resolution: {integrity: sha512-ayCKvm/phCGxOkYRSCM82iDwct8/EonSEgCSxWxD7ve6jHggsFl4fZVQBPRNgQoKiuV/odhFrGzQXZwbifC8Rg==}
     engines: {node: '>=8'}
+
+  parse-svg-path@0.1.2:
+    resolution: {integrity: sha512-JyPSBnkTJ0AI8GGJLfMXvKq42cj5c006fnLz6fXy6zfoVjJizi8BNTpu8on8ziI1cKy9d9DGNuY17Ce7wuejpQ==}
 
   parse5@7.1.2:
     resolution: {integrity: sha512-Czj1WaSVpaoj0wbhMzLmWD69anp2WH7FXMB9n1Sy8/ZFF9jolSQVMu1Ij5WIyGmcBmhk7EOndpO4mIpihVqAXw==}
@@ -2374,6 +2414,9 @@ packages:
   pirates@4.0.6:
     resolution: {integrity: sha512-saLsH7WeYYPiD25LDuLRRY/i+6HaPYr6G1OUlN39otzkSTxKnubR9RTxS3/Kk50s1g2JTgFwWQDQyplC5/SHZg==}
     engines: {node: '>= 6'}
+
+  pixi.js@8.3.3:
+    resolution: {integrity: sha512-dpucBKAqEm0K51MQKlXvyIJ40bcxniP82uz4ZPEQejGtPp0P+vueuG5DyArHCkC48mkVE2FEDvyYvBa45/JlQg==}
 
   portfinder@1.0.32:
     resolution: {integrity: sha512-on2ZJVVDXRADWE6jnQaX0ioEylzgBpQk8r55NE4wjXW1ZxO+BgDlY6DXwj20i0V8eB4SenDQ00WEaxfiIQPcxg==}
@@ -2660,9 +2703,6 @@ packages:
     resolution: {integrity: sha512-6fPc+R4ihwqP6N/aIv2f1gMH8lOVtWQHoqC4yK6oSDVVocumAsfCqjkXnqiYMhmMwS/mEHLp7Vehlt3ql6lEig==}
     engines: {node: '>=8'}
 
-  strnum@1.0.5:
-    resolution: {integrity: sha512-J8bbNyKKXl5qYcR36TIO8W3mVGVHrmmxsd5PAItGkmyzwJvybiw2IVq5nqd0i4LSNSkB/sx9VHllbfFdr9k1JA==}
-
   sucrase@3.35.0:
     resolution: {integrity: sha512-8EbVDiu9iN/nESwxeSxDKe0dunta1GOlHufmSSXxMD2z2/tMZpDMpvXQGsc+ajGo8y2uYUmixaSRUc/QPoQ0GA==}
     engines: {node: '>=16 || 14 >=14.17'}
@@ -2900,14 +2940,6 @@ packages:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
 
-  valibot@0.37.0:
-    resolution: {integrity: sha512-FQz52I8RXgFgOHym3XHYSREbNtkgSjF9prvMFH1nBsRyfL6SfCzoT1GuSDTlbsuPubM7/6Kbw0ZMQb8A+V+VsQ==}
-    peerDependencies:
-      typescript: '>=5'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
-
   vary@1.1.2:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
@@ -3131,12 +3163,6 @@ packages:
   yocto-queue@1.1.1:
     resolution: {integrity: sha512-b4JR1PFR10y1mKjhHY9LaGo6tmrgjit7hxVIeAmyMw3jegXR4dhYqLaQF5zMXZxY7tLpMyJeLjr1C4rLmkVe8g==}
     engines: {node: '>=12.20'}
-
-  zod@3.22.4:
-    resolution: {integrity: sha512-iC+8Io04lddc+mVqQ9AZ7OQ2MrUKGN+oIQyq1vemgt46jwCwLfhq7/pwnBnNXXXZb8VTVLKwp9EDkx+ryxIWmg==}
-
-  zstddec@0.1.0:
-    resolution: {integrity: sha512-w2NTI8+3l3eeltKAdK8QpiLo/flRAr2p8AGeakfMZOXBxOg9HIu4LVDxBi81sYgVhFhdJjv1OrB5ssI8uFPoLg==}
 
 snapshots:
 
@@ -3448,22 +3474,6 @@ snapshots:
 
   '@eslint/object-schema@2.1.4': {}
 
-  '@excaliburjs/plugin-tiled@0.29.2(excalibur@0.29.3)':
-    dependencies:
-      compare-versions: 6.1.0
-      excalibur: 0.29.3
-      fast-xml-parser: 3.21.1
-      pako: 1.0.11
-      zod: 3.22.4
-      zstddec: 0.1.0
-    optionalDependencies:
-      jsdom: 23.2.0
-    transitivePeerDependencies:
-      - bufferutil
-      - canvas
-      - supports-color
-      - utf-8-validate
-
   '@humanwhocodes/module-importer@1.0.1': {}
 
   '@humanwhocodes/retry@0.3.0': {}
@@ -3505,6 +3515,8 @@ snapshots:
     dependencies:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.17.1
+
+  '@pixi/colord@2.9.6': {}
 
   '@pkgjs/parseargs@0.11.0':
     optional: true
@@ -3642,6 +3654,10 @@ snapshots:
     dependencies:
       '@types/node': 20.14.10
 
+  '@types/css-font-loading-module@0.0.12': {}
+
+  '@types/earcut@2.1.4': {}
+
   '@types/eslint@8.56.10':
     dependencies:
       '@types/estree': 1.0.5
@@ -3682,6 +3698,8 @@ snapshots:
   '@types/node@20.8.10':
     dependencies:
       undici-types: 5.26.5
+
+  '@types/pako@2.0.3': {}
 
   '@types/prop-types@15.7.12': {}
 
@@ -3832,6 +3850,10 @@ snapshots:
       estree-walker: 3.0.3
       loupe: 3.1.1
       tinyrainbow: 1.2.0
+
+  '@webgpu/types@0.1.44': {}
+
+  '@xmldom/xmldom@0.8.10': {}
 
   JSONStream@1.3.5:
     dependencies:
@@ -4095,8 +4117,6 @@ snapshots:
       array-ify: 1.0.0
       dot-prop: 5.3.0
 
-  compare-versions@6.1.0: {}
-
   concat-map@0.0.1: {}
 
   content-disposition@0.5.4:
@@ -4129,8 +4149,6 @@ snapshots:
   copy-anything@3.0.5:
     dependencies:
       is-what: 4.1.16
-
-  core-js@3.36.1: {}
 
   cors@2.8.5:
     dependencies:
@@ -4251,6 +4269,8 @@ snapshots:
   dot-prop@5.3.0:
     dependencies:
       is-obj: 2.0.0
+
+  earcut@2.2.4: {}
 
   eastasianwidth@0.2.0: {}
 
@@ -4563,9 +4583,7 @@ snapshots:
 
   eventemitter3@4.0.7: {}
 
-  excalibur@0.29.3:
-    dependencies:
-      core-js: 3.36.1
+  eventemitter3@5.0.1: {}
 
   execa@5.1.1:
     dependencies:
@@ -4642,10 +4660,6 @@ snapshots:
   fast-levenshtein@2.0.6: {}
 
   fast-uri@3.0.1: {}
-
-  fast-xml-parser@3.21.1:
-    dependencies:
-      strnum: 1.0.5
 
   fastq@1.17.1:
     dependencies:
@@ -5025,6 +5039,8 @@ snapshots:
 
   isexe@2.0.0: {}
 
+  ismobilejs@1.1.1: {}
+
   jackspeak@3.4.3:
     dependencies:
       '@isaacs/cliui': 8.0.2
@@ -5302,7 +5318,7 @@ snapshots:
 
   package-json-from-dist@1.0.0: {}
 
-  pako@1.0.11: {}
+  pako@2.1.0: {}
 
   parent-module@1.0.1:
     dependencies:
@@ -5314,6 +5330,8 @@ snapshots:
       error-ex: 1.3.2
       json-parse-even-better-errors: 2.3.1
       lines-and-columns: 1.2.4
+
+  parse-svg-path@0.1.2: {}
 
   parse5@7.1.2:
     dependencies:
@@ -5350,6 +5368,18 @@ snapshots:
   picomatch@2.3.1: {}
 
   pirates@4.0.6: {}
+
+  pixi.js@8.3.3:
+    dependencies:
+      '@pixi/colord': 2.9.6
+      '@types/css-font-loading-module': 0.0.12
+      '@types/earcut': 2.1.4
+      '@webgpu/types': 0.1.44
+      '@xmldom/xmldom': 0.8.10
+      earcut: 2.2.4
+      eventemitter3: 5.0.1
+      ismobilejs: 1.1.1
+      parse-svg-path: 0.1.2
 
   portfinder@1.0.32:
     dependencies:
@@ -5682,8 +5712,6 @@ snapshots:
 
   strip-json-comments@3.1.1: {}
 
-  strnum@1.0.5: {}
-
   sucrase@3.35.0:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.5
@@ -5925,10 +5953,6 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
-  valibot@0.37.0(typescript@5.5.3):
-    optionalDependencies:
-      typescript: 5.5.3
-
   vary@1.1.2: {}
 
   vite-node@2.0.3(@types/node@20.14.10):
@@ -6138,7 +6162,3 @@ snapshots:
   yocto-queue@0.1.0: {}
 
   yocto-queue@1.1.1: {}
-
-  zod@3.22.4: {}
-
-  zstddec@0.1.0: {}

@@ -9,10 +9,14 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@mp/excalibur": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/tiled-renderer": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/pixi": "workspace:*",
     "@tanstack/react-query": "5.51.11",
     "react": "18.3.1",
     "react-dom": "18.3.1"

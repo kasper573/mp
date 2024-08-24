@@ -1,16 +1,19 @@
 import { dNodeFromVector, type AreaResource } from "@mp/state";
+import { clamp } from "@mp/math";
 import type { Character, CharacterId } from "@mp/server";
-import type { Engine, Vector, WheelEvent } from "@mp/excalibur";
-import { Cleanup, sub } from "@mp/excalibur";
-import { clamp, invoker, Scene, snapTileVector } from "@mp/excalibur";
+import { Cleanup, Container, sub } from "@mp/pixi";
+import { snapTileVector } from "@mp/state";
+import type { Vector } from "@mp/math";
+import { TiledRenderer } from "@mp/tiled-renderer";
 import { api } from "../api";
-import { Interpolator } from "./Interpolator";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
+import { Engine } from "./Engine";
 
-export class AreaScene extends Scene {
+export class AreaScene extends Container {
   private cleanups = new Cleanup();
+  private tiledRenderer: TiledRenderer;
   private characterActors: Map<CharacterId, CharacterActor> = new Map();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
@@ -21,57 +24,61 @@ export class AreaScene extends Scene {
   }
 
   constructor(
-    readonly area: AreaResource,
+    private readonly area: AreaResource,
     private renderDebugText: (text: string) => void,
   ) {
-    super();
+    super({ interactive: true });
 
-    area.tiled.addToScene(this);
+    this.tiledRenderer = new TiledRenderer(area.tiled.map);
+    this.addChild(this.tiledRenderer);
 
     const tileHighlighter = new TileHighlight(area.dGraph, area.tiled);
-    tileHighlighter.z = 999;
-    this.add(tileHighlighter);
+    tileHighlighter.zIndex = 999;
+    this.addChild(tileHighlighter);
 
     this.debugUI = new DGraphDebugUI(
       area.dGraph,
       area.tiled,
       this.renderDebugText,
     );
-    this.debugUI.z = 1000;
-    this.add(this.debugUI);
+    this.debugUI.zIndex = 1000;
+    this.addChild(this.debugUI);
+
+    this.on("added", this.activate);
+    this.on("removed", this.deactivate);
   }
 
-  override onActivate(): void {
-    const { primary } = this.engine.input.pointers;
-
+  activate = () => {
     this.cleanups.add(
       api.state.subscribe(this.synchronizeCharacters),
-      sub(primary, "down", () => (this.isMouseDown = true)),
-      sub(primary, "up", () => (this.isMouseDown = false)),
-      sub(primary, "wheel", this.onMouseWheel),
+      sub(this, "mousedown", () => (this.isMouseDown = true)),
+      sub(this, "mouseup", () => (this.isMouseDown = false)),
+      sub(this, "wheel", this.onMouseWheel),
+      Engine.instance.input.keyboard.subscribe(
+        "Shift",
+        this.tiledRenderer.toggleDebugUI,
+      ),
     );
-  }
+  };
 
   private isMouseDown = false;
 
-  override onDeactivate(): void {
+  deactivate = () => {
     this.cleanups.flush();
-  }
+  };
 
   private onMouseWheel = (e: WheelEvent) => {
     this.cameraZoom = clamp(this.cameraZoom + Math.sign(e.deltaY) * 0.3, 1, 2);
   };
 
-  override update(engine: Engine, delta: number): void {
-    super.update(engine, delta);
-
-    this.camera.zoom = lerp(this.camera.zoom, this.cameraZoom, 0.1);
+  override _onRender = () => {
+    // TODO this.camera.zoom = lerp(this.camera.zoom, this.cameraZoom, 0.1);
 
     if (!this.isMouseDown) {
       return;
     }
 
-    const { lastWorldPos } = engine.input.pointers.primary;
+    const { lastWorldPos } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(
       this.area.tiled.worldCoordToTile(lastWorldPos),
     );
@@ -85,7 +92,7 @@ export class AreaScene extends Scene {
       api.modules.world.move(tilePos);
       this.lastSentPos = tilePos;
     }
-  }
+  };
 
   private synchronizeCharacters = () => {
     const { characters } = api.state.value;
@@ -101,8 +108,10 @@ export class AreaScene extends Scene {
 
   private deleteCharacterActor = (id: Character["id"]) => {
     const entity = this.characterActors.get(id);
-    entity?.kill();
-    this.characterActors.delete(id);
+    if (entity) {
+      this.removeChild(entity);
+      this.characterActors.delete(id);
+    }
   };
 
   private upsertCharacterActor(char: Character) {
@@ -113,19 +122,19 @@ export class AreaScene extends Scene {
 
     let actor = this.characterActors.get(char.id);
     if (!actor) {
-      actor = new CharacterActor(char);
-      actor.z = this.area.characterLayer;
-      this.add(actor);
+      actor = new CharacterActor(char, this.area.tiled.tileSize);
+      actor.zIndex = this.area.characterLayer;
+      this.addChild(actor);
       this.characterActors.set(char.id, actor);
       if (char.id === this.myCharacterId) {
-        this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
+        // TODO this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
       }
     }
 
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
     const path = char.path.map(this.area.tiled.tileCoordToWorld);
 
-    invoker(Interpolator, actor).configure(pos, {
+    actor.interpolator.configure(pos, {
       path,
       speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
@@ -137,7 +146,7 @@ export class AreaScene extends Scene {
 
   inheritProperties(other: AreaScene) {
     this.cameraZoom = other.cameraZoom;
-    this.camera.zoom = other.camera.zoom;
+    // TODO this.camera.zoom = other.camera.zoom;
   }
 }
 

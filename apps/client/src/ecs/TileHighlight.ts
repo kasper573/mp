@@ -1,37 +1,32 @@
-import type { Engine, TiledResource } from "@mp/excalibur";
-import { Actor, Color, Rectangle, snapTileVector } from "@mp/excalibur";
+import type { FillStyle } from "@mp/pixi";
+import type { TiledResource } from "@mp/state";
+import { snapTileVector } from "@mp/state";
+import { Graphics } from "@mp/pixi";
 import { isVectorInGraph, type DGraph } from "@mp/state";
+import { Engine } from "./Engine";
 
-export class TileHighlight extends Actor {
-  private rect!: Rectangle;
-
+export class TileHighlight extends Graphics {
   constructor(
     private graph: DGraph,
     private tiled: TiledResource,
   ) {
     super();
 
-    const { map } = this.tiled;
-    this.rect = new Rectangle({
-      width: map.tilewidth,
-      height: map.tileheight,
-      color,
-    });
+    this.fillStyle = visibleStyle;
+    this.rect(0, 0, tiled.map.tilewidth, tiled.map.tileheight);
+    this.fill();
   }
 
-  override onInitialize(): void {
-    this.anchor.setTo(0, 0);
-    this.graphics.use(this.rect);
-  }
-
-  override update(engine: Engine): void {
-    const { lastWorldPos } = engine.input.pointers.primary;
+  override _onRender = () => {
+    const { lastWorldPos } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(this.tiled.worldCoordToTile(lastWorldPos));
-    this.pos = tilePos.scale(this.tiled.tileSize);
+    const worldPos = tilePos.scale(this.tiled.tileSize);
+    this.position.set(worldPos.x, worldPos.y);
 
     const visible = isVectorInGraph(this.graph, tilePos);
-    this.rect.color = visible ? color : Color.Transparent;
-  }
+    this.fillStyle = visible ? visibleStyle : hiddenStyle;
+  };
 }
 
-const color = new Color(100, 100, 150, 0.25);
+const visibleStyle: FillStyle = { color: "rgba(100,100,100,0.5)" };
+const hiddenStyle: FillStyle = { color: "rgba(0,0,0,0)" };

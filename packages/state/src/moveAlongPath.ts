@@ -1,4 +1,4 @@
-import type { VectorLike } from "@mp/excalibur";
+import type { VectorLike } from "@mp/math";
 import type { TimeSpan } from "timespan-ts";
 
 export function moveAlongPath(
