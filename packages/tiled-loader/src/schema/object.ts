@@ -26,27 +26,30 @@ export interface SharedObjectProperties {
 }
 
 export interface EllipseObject extends SharedObjectProperties {
-  ellipse: boolean;
+  objectType: "ellipse";
 }
 
 export interface PointObject extends SharedObjectProperties {
-  point: boolean;
+  objectType: "point";
 }
 
 export interface PolygonObject extends SharedObjectProperties {
+  objectType: "polygon";
   polygon: Coord[];
 }
 
 export interface PolylineObject extends SharedObjectProperties {
+  objectType: "polyline";
   polyline: Coord[];
 }
 
 export interface TextObject extends SharedObjectProperties {
+  objectType: "text";
   text: TiledText;
 }
 
 export interface RectangleObject extends SharedObjectProperties {
-  rectangle: true;
+  objectType: "rectangle";
 }
 
 export type TiledObject =
@@ -59,6 +62,7 @@ export type TiledObject =
   | ObjectTemplate;
 
 export interface ObjectTemplate {
+  objectType: "template";
   template: string;
   tileset?: Tileset;
   object: TiledObject;

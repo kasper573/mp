@@ -7,6 +7,7 @@ import {
   isCompressedTileLayer,
 } from "./decompressTileLayer";
 import { reconcileTileset } from "./reconcileTileset";
+import { reconcileObject } from "./reconcileObject";
 
 /**
  * Since layers contain data that needs to be reconciled,
@@ -25,10 +26,14 @@ export async function reconcileLayer(
       break;
     case "objectgroup":
       promises.push(
-        ...layer.objects.map(async (object) => {
-          if ("template" in object && object.tileset) {
+        ...layer.objects.map(async (object, i) => {
+          object = reconcileObject(object);
+          layer.objects[i] = object;
+
+          if (object.objectType === "template" && object.tileset) {
             object.tileset = await reconcileTileset(context, object.tileset);
           }
+          return object;
         }),
       );
       break;

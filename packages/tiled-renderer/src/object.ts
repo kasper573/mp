@@ -16,13 +16,22 @@ import type {
 export * from "./renderer";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
-  if ("ellipse" in obj) return createEllipseGraphics(obj);
-  if ("point" in obj) return createPointGraphics(obj);
-  if ("polygon" in obj) return createPolygonGraphics(obj);
-  if ("polyline" in obj) return createPolylineGraphics(obj);
-  if ("text" in obj) return createTextRenderer(obj);
-  if ("object" in obj) return createObjectTemplateGraphics(obj);
-  return createRectangleGraphics(obj);
+  switch (obj.objectType) {
+    case "ellipse":
+      return createEllipseGraphics(obj);
+    case "point":
+      return createPointGraphics(obj);
+    case "polygon":
+      return createPolygonGraphics(obj);
+    case "polyline":
+      return createPolylineGraphics(obj);
+    case "text":
+      return createTextRenderer(obj);
+    case "template":
+      return createObjectTemplateGraphics(obj);
+    case "rectangle":
+      return createRectangleGraphics(obj);
+  }
 }
 
 const strokeStyle: StrokeStyle = { width: 2, color: "rgba(150,150,150,0.9)" };
