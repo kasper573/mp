@@ -6,7 +6,7 @@ export function dGraphFromTiled(tiled: TiledResource): DGraph {
   const graph: DGraph = {};
 
   const walkableTileCoords = tiled.getMatchingTileCoords<boolean>(
-    "Walkable",
+    ({ tile }) => (tile.properties.get("Walkable")?.value ?? true) === true,
     allTrue,
   );
 

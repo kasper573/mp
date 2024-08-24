@@ -31,16 +31,15 @@ export class TiledResource {
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
 
   getMatchingTileCoords = <T>(
-    tilesetTilePropertyName: string,
-    coordinateTest: (propertyValuesForCoordinate: T[]) => boolean,
+    getValue: (tile: TileLayerTile) => T,
+    coordinateTest: (values: T[]) => boolean,
   ): Vector[] => {
     const tilesPerCoordinate = groupBy(
       this.map.layers
         .flatMap((layer) => filterTileLayerTiles(layer, all))
         .map((layerTile) => ({
           pos: new Vector(layerTile.x, layerTile.y),
-          propertyValue: layerTile.tile.properties.get(tilesetTilePropertyName)
-            ?.value as T,
+          propertyValue: getValue(layerTile),
         })),
       ({ pos: { x, y } }) => `${x}|${y}`,
     );
