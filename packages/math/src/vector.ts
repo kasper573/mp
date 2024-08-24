@@ -9,7 +9,14 @@ export class Vector implements VectorLike {
 
   add = (v: Vector) => new Vector(this.x + v.x, this.y + v.y);
 
+  scale = (s: number | Vector) =>
+    typeof s === "number"
+      ? new Vector(this.x * s, this.y * s)
+      : new Vector(this.x * s.x, this.y * s.y);
+
   copy = () => new Vector(this.x, this.y);
+
+  equals = (v: Vector) => this.x === v.x && this.y === v.y;
 
   static from = (v: VectorLike) => new Vector(v.x, v.y);
 }

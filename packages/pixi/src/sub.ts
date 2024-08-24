@@ -12,7 +12,7 @@ export function sub<
   return () => trigger.off(event, callback);
 }
 
-type AnyEventHandlers = Record<PropertyKey, (...args: never[]) => void>;
+type AnyEventHandlers = Record<string, (...args: never[]) => void>;
 
 interface TriggerLike<EventHandlers extends AnyEventHandlers> {
   on<EventName extends keyof EventHandlers>(

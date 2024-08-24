@@ -5,10 +5,11 @@ import type {
   Layer,
   TileLayer,
   TiledObject,
+  TiledClass,
 } from "@mp/tiled-loader";
 
 export class TiledResource {
-  constructor(private map: TiledMap) {}
+  constructor(public readonly map: TiledMap) {}
   get tileSize() {
     return new Vector(this.map.tilewidth, this.map.tileheight);
   }
@@ -63,9 +64,9 @@ export class TiledResource {
     );
   };
 
-  getObjectsByClassName = (className: string): TiledObject[] => {
+  getObjectsByClassName = (className: TiledClass): TiledObject[] => {
     const predicate = (obj: TiledObject) =>
-      obj.objectType !== "template" && obj.properties.has(className);
+      obj.objectType !== "template" && obj.type === className;
     return this.map.layers.flatMap((layer) =>
       filterTiledObjects(layer, predicate),
     );

@@ -1,55 +1,43 @@
-import { Cleanup, sub } from "@mp/pixi";
-import type { Entity, PostUpdateEvent } from "@mp/pixi";
+import type { Container } from "@mp/pixi";
 import type { Vector } from "@mp/math";
-import { moveAlongPath, TimeSpan } from "@mp/state";
-import { Component } from "@mp/pixi";
+import { moveAlongPath } from "@mp/state";
+import { engine } from "./engine";
 
-export class Interpolator extends Component {
-  private cleanup = new Cleanup();
+export class Interpolator {
   private pathInterpolation?: PathIntepolation;
-  private needsInitialPoisition = true;
+  private needsInitialPosition = true;
 
-  constructor(private getPos: (owner: Entity) => Vector) {
-    super();
-  }
+  constructor(private target: Container) {}
 
   configure(
     staticPosition: Vector,
     pathInterpolation?: PathIntepolation,
   ): void {
     this.pathInterpolation = pathInterpolation;
-    if (!pathInterpolation || this.needsInitialPoisition) {
-      const pos = this.getPos(this.owner!);
+    if (!pathInterpolation || this.needsInitialPosition) {
+      const pos = this.target.position;
       pos.x = staticPosition.x;
       pos.y = staticPosition.y;
-      this.needsInitialPoisition = false;
+      this.needsInitialPosition = false;
     }
   }
 
-  override onAdd(): void {
-    this.cleanup.add(sub(this.owner!, "postupdate", this.onEntityUpdate));
-  }
-
-  override onRemove(): void {
-    this.cleanup.flush();
-  }
-
-  private onEntityUpdate = (e: PostUpdateEvent) => {
-    if (!this.owner || !this.pathInterpolation) {
+  update() {
+    if (!this.pathInterpolation) {
       return;
     }
 
     const { destinationReached } = moveAlongPath(
-      this.getPos(this.owner),
+      this.target.position,
       this.pathInterpolation.path,
       this.pathInterpolation.speed,
-      TimeSpan.fromMilliseconds(e.delta),
+      engine.ticker.deltaTime,
     );
 
     if (destinationReached) {
       this.pathInterpolation = undefined;
     }
-  };
+  }
 }
 
 type PathIntepolation = { path: Vector[]; speed: number };

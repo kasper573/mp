@@ -11,7 +11,7 @@ import { AreaLoader } from "../ecs/AreaLoader";
 import { api } from "../api";
 
 export function App() {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
   const debugTextRef = useRef<HTMLSpanElement>(null);
   const areaLoader = useMemo(() => new AreaLoader(), []);
   const connected = useSyncExternalStore(
@@ -20,15 +20,15 @@ export function App() {
   );
 
   useEffect(() => {
-    if (!container || !connected) {
+    if (!canvas || !connected) {
       return;
     }
 
+    renderDebugText("");
     const game = createGame(areaLoader, renderDebugText);
-    container.appendChild(game.canvas);
-    game.start();
+    game.init({ canvas });
     return () => game.dispose();
-  }, [container, connected]);
+  }, [canvas, connected]);
 
   function renderDebugText(text: string) {
     if (debugTextRef.current) {
@@ -39,7 +39,7 @@ export function App() {
 
   return (
     <>
-      <div ref={setContainer} />
+      <canvas ref={setCanvas} />
       {!connected && <div>Connecting...</div>}
       <span style={styles.debugText} ref={debugTextRef} />
     </>

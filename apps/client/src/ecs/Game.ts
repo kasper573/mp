@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/server";
-import { Engine } from "@mp/pixi";
 import { type AreaId } from "@mp/state";
+import { Application } from "@mp/pixi";
 import { api } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
@@ -9,7 +9,7 @@ export function createGame(
   areaLoader: AreaLoader,
   debug: (text: string) => void,
 ): Game {
-  const game = new Engine({});
+  const game = new Application();
 
   const changeArea = createAreaChanger(game, (id) =>
     areaLoader.require(id).then((area) => new AreaScene(area, debug)),
@@ -17,14 +17,18 @@ export function createGame(
   const unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
 
   return {
-    get canvas() {
-      return game.canvas;
+    async init({ canvas }: GameInitOptions) {
+      await game.init({
+        antialias: true,
+        background: 0x005500,
+        resizeTo: window,
+        canvas,
+      });
     },
     dispose() {
       unsubFromState();
-      game.dispose();
+      game.destroy();
     },
-    start: () => game.start(),
   };
 }
 
@@ -33,7 +37,7 @@ function me() {
 }
 
 function createAreaChanger(
-  game: Engine,
+  game: Application,
   loadScene: (id: AreaId) => Promise<AreaScene>,
 ) {
   let currentAreaId: AreaId | undefined;
@@ -48,20 +52,22 @@ function createAreaChanger(
     }
 
     const nextScene = await loadScene(areaId);
+    const [currentScene] = game.stage.children;
 
-    let sceneToRemove: AreaScene | undefined;
-    if (game.currentScene instanceof AreaScene) {
-      nextScene.inheritProperties(game.currentScene as AreaScene);
-      sceneToRemove = game.currentScene;
+    if (currentScene instanceof AreaScene) {
+      nextScene.inheritProperties(currentScene as AreaScene);
+      game.stage.removeChild(currentScene);
     }
 
-    game.addScene(nextScene.area.id, nextScene);
-    await game.goToScene(nextScene.area.id);
-
-    if (sceneToRemove) {
-      game.removeScene(sceneToRemove);
-    }
+    game.stage.addChild(nextScene);
   };
 }
 
-export type Game = Pick<Engine, "dispose" | "start" | "canvas">;
+export interface GameInitOptions {
+  canvas: HTMLCanvasElement;
+}
+
+export interface Game {
+  init(options: GameInitOptions): Promise<void>;
+  dispose(): void;
+}

@@ -1,22 +1,21 @@
 import type { Character } from "@mp/server";
-import type { Engine } from "@mp/pixi";
-import { Actor, Color, Rectangle } from "@mp/pixi";
+import { Graphics } from "@mp/pixi";
+import type { VectorLike } from "@mp/math";
 import { Interpolator } from "./Interpolator";
 
-export class CharacterActor extends Actor {
-  private rect = new Rectangle({ width: 16, height: 16 });
+export class CharacterActor extends Graphics {
+  public readonly interpolator = new Interpolator(this);
 
-  constructor(private character: Character) {
+  constructor(
+    private character: Character,
+    private tileSize: VectorLike,
+  ) {
     super();
-    this.addComponent(new Interpolator(() => this.pos));
+    this.rect(0, 0, this.tileSize.x, this.tileSize.y);
   }
 
-  override onInitialize(): void {
-    this.graphics.use(this.rect);
-  }
-
-  override update(engine: Engine, delta: number) {
-    super.update(engine, delta);
-    this.rect.color = this.character.connected ? Color.Green : Color.Red;
-  }
+  override _onRender = () => {
+    this.fillStyle.color = this.character.connected ? 0x00ff00 : 0xff0000;
+    this.interpolator.update();
+  };
 }

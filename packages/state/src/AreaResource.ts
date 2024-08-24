@@ -4,6 +4,7 @@ import { snapTileVector, type TiledResource } from "./TiledResource";
 import type { DGraph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import type { Branded } from "./Branded";
+import { TiledFixture } from "./TiledFixture";
 
 export type AreaId = Branded<string, "AreaId">;
 
@@ -17,7 +18,7 @@ export class AreaResource {
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
-    const [startObj] = tiled.getObjectsByClassName("start");
+    const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
     if (!startObj) {
       throw new Error("Areas must contain a start object");
     }
