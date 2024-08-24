@@ -103,7 +103,7 @@ export interface TilesetTile {
 
   objectgroup?: ObjectGroupLayer;
   probability?: number;
-  properties?: Property[];
+  properties: Map<string, Property>;
   terrain?: [number, number, number, number];
   type?: string;
 }
