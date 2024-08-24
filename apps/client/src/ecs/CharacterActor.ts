@@ -11,7 +11,13 @@ export class CharacterActor extends Graphics {
     private tileSize: VectorLike,
   ) {
     super();
-    this.rect(0, 0, this.tileSize.x, this.tileSize.y);
+
+    this.rect(
+      -this.tileSize.x / 2,
+      -this.tileSize.y / 2,
+      this.tileSize.x,
+      this.tileSize.y,
+    );
     this.fill();
   }
 
