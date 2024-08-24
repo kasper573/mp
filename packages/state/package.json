@@ -7,6 +7,8 @@
   "types": "src/index.ts",
   "dependencies": {
     "@mp/excalibur": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/math": "workspace:*",
     "dijkstrajs": "1.0.3",
     "timespan-ts": "1.0.3",
     "neverthrow": "7.0.0"
