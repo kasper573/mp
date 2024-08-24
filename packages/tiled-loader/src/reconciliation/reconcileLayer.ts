@@ -8,6 +8,7 @@ import {
 } from "./decompressTileLayer";
 import { reconcileTileset } from "./reconcileTileset";
 import { reconcileObject } from "./reconcileObject";
+import { reconcileProperties } from "./reconcileProperties";
 
 /**
  * Since layers contain data that needs to be reconciled,
@@ -19,6 +20,8 @@ export async function reconcileLayer(
   map: TiledMap,
 ): Promise<void> {
   const promises: Promise<unknown>[] = [];
+
+  reconcileProperties(layer);
 
   switch (layer.type) {
     case "imagelayer":

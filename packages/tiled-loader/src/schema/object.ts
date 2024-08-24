@@ -7,7 +7,7 @@ import type {
   TiledClass,
 } from "./common";
 
-import type { Property } from "./property";
+import type { PropertyMap } from "./property";
 import type { TiledText } from "./text";
 import type { Tileset } from "./tileset";
 
@@ -22,7 +22,7 @@ export interface SharedObjectProperties {
   rotation: Degrees;
   type?: TiledClass;
   visible: boolean;
-  properties?: Property[];
+  properties: PropertyMap;
 }
 
 export interface EllipseObject extends SharedObjectProperties {

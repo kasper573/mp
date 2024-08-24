@@ -1,12 +1,12 @@
 import type { LocalTileId, TiledClass, WangColorIndex } from "./common";
-import type { Property } from "./property";
+import type { PropertyMap } from "./property";
 
 export interface WangColor {
   class?: TiledClass;
   color: string;
   name: string;
   probability: number;
-  properties?: Property[];
+  properties: PropertyMap;
   tile: LocalTileId;
 }
 
@@ -28,7 +28,7 @@ export interface WangSet {
   class?: TiledClass;
   colors?: Record<WangColorIndex, WangColor>;
   name: string;
-  properties?: Property[];
+  properties: PropertyMap;
   tile: LocalTileId;
   type: "corner" | "edge" | "mixed";
   wangtiles: WangTile[];

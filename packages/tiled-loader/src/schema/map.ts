@@ -11,7 +11,7 @@ import type {
   TileNumber,
 } from "./common";
 import type { Layer } from "./layer";
-import type { Property } from "./property";
+import type { PropertyMap } from "./property";
 import type { Tileset } from "./tileset";
 
 export interface SharedMapProperties {
@@ -20,7 +20,7 @@ export interface SharedMapProperties {
   tiledversion: string;
 
   tilesets: Tileset[];
-  properties?: Property[];
+  properties: PropertyMap;
   layers: Layer[];
 
   backgroundcolor?: Color;

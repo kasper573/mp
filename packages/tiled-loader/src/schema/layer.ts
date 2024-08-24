@@ -12,7 +12,7 @@ import type {
   GlobalTileId,
 } from "./common";
 
-import type { Property } from "./property";
+import type { PropertyMap } from "./property";
 import type { TiledObject } from "./object";
 import type { Tileset, TilesetTile } from "./tileset";
 
@@ -26,7 +26,7 @@ export interface SharedLayerProperties {
   opacity: Ratio;
   parallaxx: Ratio;
   parallaxy: Ratio;
-  properties?: Property[];
+  properties: PropertyMap;
   visible: boolean;
 
   // coordinate where layer content starts (for infinite maps)

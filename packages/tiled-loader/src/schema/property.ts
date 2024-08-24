@@ -25,3 +25,5 @@ export type Property =
   //| SpecificProperty<"file", FilePath>
   | SpecificProperty<"object", ObjectId>
   | SpecificProperty<"class", TiledClass>;
+
+export type PropertyMap = Map<string, Property>;

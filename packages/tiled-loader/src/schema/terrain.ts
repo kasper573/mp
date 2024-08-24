@@ -3,6 +3,6 @@ import type { Property } from "./property";
 
 export interface Terrain {
   name: string;
-  properties: Property[];
+  properties: Map<string, Property>;
   tile: LocalTileId;
 }

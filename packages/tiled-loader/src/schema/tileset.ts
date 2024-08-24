@@ -13,7 +13,7 @@ import type {
 import type { WangSet } from "./wang";
 import type { Transformations } from "./transformations";
 import type { Grid } from "./grid";
-import type { Property } from "./property";
+import type { Property, PropertyMap } from "./property";
 import type { Terrain } from "./terrain";
 import type { Frame } from "./frame";
 import type { ObjectGroupLayer } from "./layer";
@@ -37,7 +37,7 @@ export interface Tileset {
 
   name: string;
   objectalignment: ObjectAlignment;
-  properties?: Property[];
+  properties: PropertyMap;
 
   /**
    * Spacing between adjacent tiles in image (pixels)

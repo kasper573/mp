@@ -2,7 +2,7 @@ import type { LoaderContext } from "../context";
 import type { LocalTileId } from "../schema/common";
 import type { Tileset, TilesetTile } from "../schema/tileset";
 import { reconcileFilePath } from "./reconcileFilePath";
-import { reconcileTilesetTile } from "./reconcileTilesetTile";
+import { reconcileProperties } from "./reconcileProperties";
 
 export async function reconcileTileset(
   context: LoaderContext,
@@ -25,10 +25,13 @@ export async function reconcileTileset(
 
   tileset.image = reconcileFilePath(context, tileset.image);
 
+  tileset.terrains?.forEach(reconcileProperties);
+  tileset.wangsets?.forEach(reconcileProperties);
+
   // The original tileset data is a list of tiles, but we want them mapped by GID
   tileset.tiles = new Map();
   for (const tile of (tileset as unknown as UnresolvedTileset).tiles) {
-    reconcileTilesetTile(tile);
+    reconcileProperties(tile);
     tileset.tiles.set(tile.id, tile);
   }
 
