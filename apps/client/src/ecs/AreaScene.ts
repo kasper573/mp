@@ -26,7 +26,7 @@ export class AreaScene extends Container {
     private readonly area: AreaResource,
     private renderDebugText: (text: string) => void,
   ) {
-    super();
+    super({ interactive: true });
 
     this.addChild(new TiledRenderer(area.tiled.map));
 
