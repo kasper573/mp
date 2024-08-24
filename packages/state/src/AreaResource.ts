@@ -5,6 +5,7 @@ import type { DGraph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import type { Branded } from "./Branded";
 import { TiledFixture } from "./TiledFixture";
+import { hitTestTiledObject } from "./hitTestTiledObject";
 
 export type AreaId = Branded<string, "AreaId">;
 
@@ -56,34 +57,9 @@ function* hitTestObjects<Subject>(
   for (const subject of subjects) {
     const worldPos = getWorldCoordOfSubject(subject);
     for (const object of objects) {
-      if (hitTest(object, worldPos)) {
+      if (hitTestTiledObject(object, worldPos)) {
         yield { subject, object };
       }
     }
   }
-}
-
-function hitTest(obj: TiledObject, pos: Vector): boolean {
-  if (obj.objectType === "point") {
-    // TODO test for snapped tile
-    return obj.x === pos.x && obj.y === pos.y;
-  }
-
-  if (obj.objectType === "ellipse") {
-    const { x, y, width, height } = obj;
-    const dx = x - pos.x;
-    const dy = y - pos.y;
-    const rx = width / 2;
-    const ry = height / 2;
-    return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
-  }
-
-  if (obj.objectType === "polygon") {
-    const { x, y, width, height } = obj;
-    return (
-      pos.x >= x && pos.x <= x + width && pos.y >= y && pos.y <= y + height
-    );
-  }
-
-  return false;
 }
