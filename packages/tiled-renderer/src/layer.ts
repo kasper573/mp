@@ -25,6 +25,7 @@ export class LayerViewFactory {
     // layers are already in the draw order in the tiled data
     return layers.map((layer, index) => {
       const view = this.createLayerView(layer);
+      view.label = layer.name;
       view.zIndex = index;
       return view;
     });
