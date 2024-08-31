@@ -1,5 +1,5 @@
-import { Sprite } from "@mp/pixi";
-import type { TileLayerTile } from "@mp/tiled-loader";
+import { Matrix, Sprite } from "@mp/pixi";
+import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
 import type { TextureByGID } from "./spritesheet";
 
 export function createTileSprite(
@@ -7,31 +7,38 @@ export function createTileSprite(
   textureByGID: TextureByGID,
 ): Sprite {
   const sprite = new Sprite({
-    x: x * width,
-    y: y * height,
     width,
     height,
+    anchor: center,
     texture: textureByGID(id),
   });
 
-  if (flags.flippedHorizontally) {
-    sprite.scale.x *= -1;
-    sprite.x += width;
-  }
-
-  if (flags.flippedVertically) {
-    sprite.scale.y *= -1;
-    sprite.y += height;
-  }
-
-  if (flags.flippedDiagonally) {
-    sprite.rotation = Math.PI / 2;
-    sprite.x += width;
-  }
-
-  if (flags.rotatedHexagonal120) {
-    sprite.rotation = (Math.PI / 180) * 120;
-  }
+  const m = createFlipMatrix(flags);
+  m.translate(x * width + width / 2, y * height + height / 2);
+  sprite.setFromMatrix(m);
 
   return sprite;
 }
+
+function createFlipMatrix(flags: GlobalIdFlags): Matrix {
+  const m = new Matrix();
+
+  if (flags.flippedDiagonally) {
+    m.set(0, 1, 1, 0, 0, 0);
+  }
+
+  if (flags.flippedHorizontally) {
+    m.scale(-1, 1);
+  }
+
+  if (flags.flippedVertically) {
+    m.scale(1, -1);
+  }
+
+  if (flags.rotatedHexagonal120) {
+    m.translate(0, -m.ty);
+  }
+  return m;
+}
+
+const center = { x: 0.5, y: 0.5 };
