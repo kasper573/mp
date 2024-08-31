@@ -5,9 +5,20 @@ import { dNodeFromVector, type DGraph } from "./findPath";
 export function dGraphFromTiled(tiled: TiledResource): DGraph {
   const graph: DGraph = {};
 
-  const walkableTileCoords = tiled.getMatchingTileCoords<boolean>(
-    ({ tile }) => (tile.properties.get("Walkable")?.value ?? true) === true,
-    allTrue,
+  const walkableTileCoords = tiled.getMatchingTileCoords(
+    ({ tile }) => tile.properties.get("Walkable")?.value,
+    (valuesPerTile) => {
+      let walkable = false;
+      for (const value of valuesPerTile) {
+        if (value === false) {
+          return false;
+        }
+        if (value === true) {
+          walkable = true;
+        }
+      }
+      return walkable;
+    },
   );
 
   for (const tile of walkableTileCoords) {
@@ -25,6 +36,3 @@ export function dGraphFromTiled(tiled: TiledResource): DGraph {
 
   return graph;
 }
-
-const allTrue = (values: boolean[]) => values.reduce(and);
-const and = (a: boolean, b: boolean) => a && b;
