@@ -73,13 +73,16 @@ export class Engine {
 }
 
 function subscribeToKey(key: KeyName, callback: (isHeld: boolean) => void) {
+  let isHeld = false;
   const onDown = (e: KeyboardEvent) => {
-    if (e.key === key) {
+    if (e.key === key && !isHeld) {
+      isHeld = true;
       callback(true);
     }
   };
   const onUp = (e: KeyboardEvent) => {
-    if (e.key === key) {
+    if (e.key === key && isHeld) {
+      isHeld = false;
       callback(false);
     }
   };
