@@ -15,6 +15,7 @@ export class AreaScene extends Container {
   private cleanups = new Cleanup();
   private tiledRenderer: TiledRenderer;
   private characterActors: Map<CharacterId, CharacterActor> = new Map();
+  private characterContainer = new Container();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
   private cameraZoom = 2;
@@ -31,6 +32,9 @@ export class AreaScene extends Container {
 
     this.tiledRenderer = new TiledRenderer(area.tiled.map);
     this.addChild(this.tiledRenderer);
+
+    this.characterContainer.zIndex = area.characterLayerIndex;
+    this.tiledRenderer.addChild(this.characterContainer);
 
     const tileHighlighter = new TileHighlight(area.dGraph, area.tiled);
     tileHighlighter.zIndex = 999;
@@ -109,7 +113,7 @@ export class AreaScene extends Container {
   private deleteCharacterActor = (id: Character["id"]) => {
     const entity = this.characterActors.get(id);
     if (entity) {
-      this.removeChild(entity);
+      this.characterContainer.removeChild(entity);
       this.characterActors.delete(id);
     }
   };
@@ -123,8 +127,7 @@ export class AreaScene extends Container {
     let actor = this.characterActors.get(char.id);
     if (!actor) {
       actor = new CharacterActor(char, this.area.tiled.tileSize);
-      actor.zIndex = this.area.characterLayer;
-      this.addChild(actor);
+      this.characterContainer.addChild(actor);
       this.characterActors.set(char.id, actor);
       if (char.id === this.myCharacterId) {
         // TODO this.camera.strategy.elasticToActor(actor, 0.8, 0.9);

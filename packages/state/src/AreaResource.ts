@@ -13,7 +13,7 @@ export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
   readonly dGraph: DGraph;
-  readonly characterLayer: number;
+  readonly characterLayerIndex: number;
 
   constructor(
     readonly id: AreaId,
@@ -24,16 +24,20 @@ export class AreaResource {
       throw new Error("Areas must contain a start object");
     }
 
-    const [layer] = this.tiled.getTileLayers("Characters");
-    if (!layer) {
+    const characterLayer = this.tiled.getTileLayers("Characters")[0];
+    if (!characterLayer) {
       throw new Error("Areas must contain a characters layer");
+    }
+
+    this.characterLayerIndex = this.tiled.map.layers.indexOf(characterLayer);
+    if (this.characterLayerIndex === -1) {
+      throw new Error("Characters layer must be at top level");
     }
 
     if (startObj.objectType === "template") {
       throw new Error("Start object cannot be a template");
     }
 
-    this.characterLayer = 10; // TODO infer from map
     this.start = snapTileVector(tiled.worldCoordToTile(Vector.from(startObj)));
     this.objects = this.tiled.getObjects();
     this.dGraph = dGraphFromTiled(tiled);

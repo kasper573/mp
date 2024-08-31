@@ -23,11 +23,15 @@ export class LayerViewFactory {
 
   createLayerViews(layers = this.tiledMap.layers) {
     // layers are already in the draw order in the tiled data
-    return layers.map((layer) => this.createLayerView(layer));
+    return layers.map((layer, index) => {
+      const view = this.createLayerView(layer);
+      view.zIndex = index;
+      return view;
+    });
   }
 
   private createGroupLayerView(layer: GroupLayer): LayerView {
-    const container = new Container({ isRenderGroup: true });
+    const container = new LayerContainer();
     for (const childLayerView of this.createLayerViews(layer.layers)) {
       container.addChild(childLayerView);
     }
@@ -47,7 +51,7 @@ export class LayerViewFactory {
   }
 
   private createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {
-    const view = new Container({ isRenderGroup: true });
+    const view = new LayerContainer();
     const toSorted = createObjectSorter(layer.draworder);
 
     for (const obj of toSorted(layer.objects)) {
@@ -68,6 +72,12 @@ export class LayerViewFactory {
       case "objectgroup":
         return this.createObjectGroupLayerView(layer);
     }
+  }
+}
+
+export class LayerContainer extends Container {
+  constructor() {
+    super({ isRenderGroup: true, sortableChildren: true });
   }
 }
 

@@ -1,13 +1,13 @@
-import { Container, Graphics } from "@mp/pixi";
+import { Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
-import { LayerViewFactory } from "./layer";
+import { LayerContainer, LayerViewFactory } from "./layer";
 import type { TiledSpritesheetRecord } from "./spritesheet";
 import {
   createTextureByGIDQuery,
   loadTiledMapSpritesheets,
 } from "./spritesheet";
 
-export class TiledRenderer extends Container {
+export class TiledRenderer extends LayerContainer {
   private spritesheets: TiledSpritesheetRecord = {};
   private debugUIEnabled = false;
 
@@ -55,7 +55,12 @@ export class TiledRenderer extends Container {
       createTextureByGIDQuery(this.spritesheets),
     );
 
-    this.removeChildren();
+    for (const child of this.children) {
+      if (child instanceof LayerContainer) {
+        this.removeChild(child);
+        child.destroy();
+      }
+    }
 
     const layers = this.debugUIEnabled
       ? this.map.layers
