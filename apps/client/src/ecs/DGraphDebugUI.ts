@@ -1,6 +1,6 @@
 import type { TiledResource } from "@mp/state";
 import { snapTileVector } from "@mp/state";
-import type { Vector, Path } from "@mp/math";
+import { Vector, type Path } from "@mp/math";
 import {
   type DNode,
   type DGraph,
@@ -13,8 +13,7 @@ import { Engine } from "./Engine";
 
 export class DGraphDebugUI extends Graphics {
   private pathToDraw: Path = [];
-  private showFractionalDNode = false;
-  private showTiledDNode = false;
+  private allTileCoords: Vector[];
 
   constructor(
     private graph: DGraph,
@@ -22,6 +21,10 @@ export class DGraphDebugUI extends Graphics {
     private renderDebugText: (text: string) => void,
   ) {
     super();
+    this.allTileCoords = generateAllTileCoords(
+      tiled.map.width,
+      tiled.map.height,
+    );
   }
 
   showPath(path: Vector[]) {
@@ -33,8 +36,6 @@ export class DGraphDebugUI extends Graphics {
       pointer: { lastWorldPos },
       keyboard,
     } = Engine.instance.input;
-    this.showFractionalDNode = keyboard.isHeld("Shift");
-    this.showTiledDNode = keyboard.isHeld("Control");
 
     this.clear();
 
@@ -42,7 +43,11 @@ export class DGraphDebugUI extends Graphics {
       drawPath(this, this.tiled, this.pathToDraw);
     }
 
-    if (this.showTiledDNode) {
+    if (keyboard.isHeld("Control") && keyboard.isHeld("Shift")) {
+      for (const pos of this.allTileCoords) {
+        drawDNode(this, this.tiled, this.graph, pos);
+      }
+    } else if (keyboard.isHeld("Control")) {
       drawDNode(
         this,
         this.tiled,
@@ -51,7 +56,7 @@ export class DGraphDebugUI extends Graphics {
       );
     }
 
-    if (this.showFractionalDNode) {
+    if (keyboard.isHeld("Shift")) {
       const tilePos = this.tiled.worldCoordToTile(lastWorldPos);
       drawDNode(
         this,
@@ -117,4 +122,14 @@ function costToString(cost: number): string {
 
 function vecToString(v: Vector): string {
   return `(${v.x.toFixed(1)},${v.y.toFixed(1)})`;
+}
+
+function generateAllTileCoords(width: number, height: number): Vector[] {
+  const result: Vector[] = [];
+  for (let x = 0; x < width; x++) {
+    for (let y = 0; y < height; y++) {
+      result.push(new Vector(x, y));
+    }
+  }
+  return result;
 }
