@@ -3,7 +3,6 @@ import { TextStyle } from "@mp/pixi";
 import { Graphics, Text } from "@mp/pixi";
 import type {
   EllipseObject,
-  ObjectTemplate,
   PointObject,
   PolygonObject,
   PolylineObject,
@@ -27,8 +26,6 @@ export function createObjectView(obj: TiledObject): ViewContainer {
       return createPolylineGraphics(obj);
     case "text":
       return createTextRenderer(obj);
-    case "template":
-      return createObjectTemplateGraphics(obj);
     case "rectangle":
       return createRectangleGraphics(obj);
   }
@@ -121,8 +118,4 @@ function createRectangleGraphics(obj: RectangleObject): Graphics {
   g.fill();
   g.stroke();
   return g;
-}
-
-function createObjectTemplateGraphics(obj: ObjectTemplate): Graphics {
-  throw new Error("Not implemented");
 }

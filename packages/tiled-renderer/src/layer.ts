@@ -84,18 +84,10 @@ export class LayerContainer extends Container {
 function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
   switch (order) {
     case "topdown":
-      return (objects) =>
-        objects.toSorted((a, b) => getObjectY(a) - getObjectY(b));
+      return (objects) => objects.toSorted((a, b) => a.y - b.y);
     case "index":
       return (objects) => objects;
   }
-}
-
-function getObjectY(obj: TiledObject): number {
-  if ("object" in obj) {
-    return getObjectY(obj.object);
-  }
-  return obj.y;
 }
 
 type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];

@@ -9,7 +9,6 @@ import type {
 
 import type { PropertyMap } from "./property";
 import type { TiledText } from "./text";
-import type { Tileset } from "./tileset";
 
 export interface SharedObjectProperties {
   gid?: GlobalTileId;
@@ -58,12 +57,4 @@ export type TiledObject =
   | PolygonObject
   | PolylineObject
   | TextObject
-  | RectangleObject
-  | ObjectTemplate;
-
-export interface ObjectTemplate {
-  objectType: "template";
-  template: string;
-  tileset?: Tileset;
-  object: TiledObject;
-}
+  | RectangleObject;

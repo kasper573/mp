@@ -65,9 +65,6 @@ export function createWorldModule({
           const area = areas.get(char.areaId);
           if (area) {
             for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
-              if (hit.object.objectType === "template") {
-                continue;
-              }
               const targetArea = areas.get(
                 hit.object.properties.get("goto")?.value as AreaId,
               );

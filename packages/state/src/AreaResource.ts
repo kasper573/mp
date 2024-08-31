@@ -34,10 +34,6 @@ export class AreaResource {
       throw new Error("Characters layer must be at top level");
     }
 
-    if (startObj.objectType === "template") {
-      throw new Error("Start object cannot be a template");
-    }
-
     this.start = snapTileVector(tiled.worldCoordToTile(Vector.from(startObj)));
     this.objects = this.tiled.getObjects();
     this.dGraph = dGraphFromTiled(tiled);

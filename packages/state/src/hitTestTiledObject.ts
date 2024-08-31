@@ -1,6 +1,5 @@
 import type {
   EllipseObject,
-  ObjectTemplate,
   PointObject,
   PolygonObject,
   PolylineObject,
@@ -22,8 +21,6 @@ export function hitTestTiledObject(obj: TiledObject, pos: Vector): boolean {
       return polygon(obj, pos);
     case "polyline":
       return polyline(obj, pos);
-    case "template":
-      return template(obj, pos);
     case "text":
       return text(obj, pos);
   }
@@ -53,11 +50,6 @@ function polygon(obj: PolygonObject, pos: Vector): boolean {
 }
 
 function polyline(obj: PolylineObject, pos: Vector): boolean {
-  // TODO
-  return false;
-}
-
-function template(obj: ObjectTemplate, pos: Vector): boolean {
   // TODO
   return false;
 }

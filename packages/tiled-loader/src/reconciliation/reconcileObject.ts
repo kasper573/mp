@@ -1,13 +1,12 @@
 import type { TiledObject } from "../schema/object";
+import type { Tileset } from "../schema/tileset";
 import { reconcileProperties } from "./reconcileProperties";
 
-export function reconcileObject(obj: TiledObject): TiledObject {
+export function reconcileObject(
+  obj: TiledObject | ObjectTemplate,
+): TiledObject {
   if ("object" in obj) {
-    return {
-      ...obj,
-      objectType: "template",
-      object: reconcileObject(obj.object),
-    };
+    throw new Error("Object template reconciliation not implemented");
   }
 
   reconcileProperties(obj);
@@ -19,4 +18,10 @@ export function reconcileObject(obj: TiledObject): TiledObject {
   if ("text" in obj) return { ...obj, objectType: "text" };
 
   return { ...obj, objectType: "rectangle" };
+}
+
+interface ObjectTemplate {
+  template: string;
+  tileset?: Tileset;
+  object: TiledObject;
 }

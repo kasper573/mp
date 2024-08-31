@@ -64,8 +64,7 @@ export class TiledResource {
   };
 
   getObjectsByClassName = (className: TiledClass): TiledObject[] => {
-    const predicate = (obj: TiledObject) =>
-      obj.objectType !== "template" && obj.type === className;
+    const predicate = (obj: TiledObject) => obj.type === className;
     return this.map.layers.flatMap((layer) =>
       filterTiledObjects(layer, predicate),
     );

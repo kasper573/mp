@@ -6,7 +6,6 @@ import {
   decompressTileLayer,
   isCompressedTileLayer,
 } from "./decompressTileLayer";
-import { reconcileTileset } from "./reconcileTileset";
 import { reconcileObject } from "./reconcileObject";
 import { reconcileProperties } from "./reconcileProperties";
 
@@ -32,10 +31,6 @@ export async function reconcileLayer(
         ...layer.objects.map(async (object, i) => {
           object = reconcileObject(object);
           layer.objects[i] = object;
-
-          if (object.objectType === "template" && object.tileset) {
-            object.tileset = await reconcileTileset(context, object.tileset);
-          }
           return object;
         }),
       );
