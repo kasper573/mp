@@ -32,7 +32,7 @@ export class TiledResource {
 
   getMatchingTileCoords = <T>(
     getValue: (tile: TileLayerTile) => T,
-    coordinateTest: (values: T[]) => boolean,
+    coordinateTest: (values: NoInfer<T>[]) => boolean,
   ): Vector[] => {
     const tilesPerCoordinate = groupBy(
       this.map.layers
