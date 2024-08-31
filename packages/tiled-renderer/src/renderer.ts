@@ -8,6 +8,7 @@ import {
 } from "./spritesheet";
 
 export class TiledRenderer extends LayerContainer {
+  private layerViews: LayerContainer[] = [];
   private spritesheets: TiledSpritesheetRecord = {};
   private debugUIEnabled = false;
 
@@ -28,6 +29,7 @@ export class TiledRenderer extends LayerContainer {
       spritesheet.destroy();
     }
     this.spritesheets = {};
+    this.removeLayerViews();
   };
 
   load = async () => {
@@ -55,19 +57,22 @@ export class TiledRenderer extends LayerContainer {
       createTextureByGIDQuery(this.spritesheets),
     );
 
-    for (const child of this.children) {
-      if (child instanceof LayerContainer) {
-        this.removeChild(child);
-        child.destroy();
-      }
-    }
+    this.removeLayerViews();
 
     const layers = this.debugUIEnabled
       ? this.map.layers
       : this.map.layers.filter((l) => l.type !== "objectgroup");
 
-    for (const layerView of factory.createLayerViews(layers)) {
+    this.layerViews = factory.createLayerViews(layers);
+    for (const layerView of this.layerViews) {
       this.addChild(layerView);
+    }
+  }
+
+  private removeLayerViews() {
+    for (const child of this.layerViews) {
+      this.removeChild(child);
+      child.destroy();
     }
   }
 }
