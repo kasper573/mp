@@ -24,7 +24,7 @@ export async function loadTiledMapSpritesheets(
   );
 }
 
-export async function loadTilesetSpritesheet(
+async function loadTilesetSpritesheet(
   tileset: Tileset,
   tileSize: { width: number; height: number },
 ): Promise<TiledSpritesheet> {
