@@ -1,7 +1,8 @@
 import { Vector } from "@mp/math";
 import type { TiledObject } from "@mp/tiled-loader";
 import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { DGraph } from "./findPath";
+import type { DNode } from "./findPath";
+import { vectorFromDNode, type DGraph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import type { Branded } from "./Branded";
 import { TiledFixture } from "./TiledFixture";
@@ -19,24 +20,23 @@ export class AreaResource {
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
-    const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
-    if (!startObj) {
-      throw new Error("Areas must contain a start object");
-    }
-
     const characterLayer = this.tiled.getTileLayers("Characters")[0];
-    if (!characterLayer) {
-      throw new Error("Areas must contain a characters layer");
-    }
+    this.characterLayerIndex = characterLayer
+      ? this.tiled.map.layers.indexOf(characterLayer)
+      : this.tiled.map.layers.length;
 
-    this.characterLayerIndex = this.tiled.map.layers.indexOf(characterLayer);
     if (this.characterLayerIndex === -1) {
       throw new Error("Characters layer must be at top level");
     }
 
-    this.start = snapTileVector(tiled.worldCoordToTile(Vector.from(startObj)));
     this.objects = this.tiled.getObjects();
     this.dGraph = dGraphFromTiled(tiled);
+
+    const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
+
+    this.start = startObj
+      ? snapTileVector(tiled.worldCoordToTile(Vector.from(startObj)))
+      : vectorFromDNode(Object.keys(this.dGraph)[0] as DNode);
   }
 
   hitTestObjects<Subject>(
