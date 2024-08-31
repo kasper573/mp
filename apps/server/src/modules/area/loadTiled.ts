@@ -6,7 +6,9 @@ import { createTiledLoader } from "@mp/tiled-loader";
 export async function loadTiled(tmxFile: string) {
   const { error, tiledMap } = await load(tmxFile);
   if (error || !tiledMap) {
-    throw new Error(String(error || "Failed to load area"));
+    throw error instanceof Error
+      ? error
+      : new Error(String(error || "Failed to load area"));
   }
   return new TiledResource(tiledMap);
 }
