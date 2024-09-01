@@ -129,7 +129,12 @@ async function main(opt: CliOptions) {
   function* getStateUpdates() {
     // TODO optimize by sending changes only
     for (const id of world.characters.keys()) {
-      yield [getClientIdByCharacterId(id), world] as const;
+      const clientId = connectedClients.get(id);
+      if (clientId) {
+        yield [clientId, world] as const;
+      } else {
+        // TODO collect metrics
+      }
     }
   }
 
@@ -166,14 +171,6 @@ async function main(opt: CliOptions) {
   function getCharacterIdByAuthToken(authToken: string): CharacterId {
     // TODO implement
     return authToken as CharacterId;
-  }
-
-  function getClientIdByCharacterId(characterId: CharacterId): ClientId {
-    const id = connectedClients.get(characterId);
-    if (!id) {
-      throw new Error(`Client not found for character ${characterId}`);
-    }
-    return id as ClientId;
   }
 }
 
