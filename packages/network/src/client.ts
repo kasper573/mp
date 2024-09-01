@@ -33,14 +33,11 @@ export class Client<
   readonly connected = signal(false);
   readonly state: ReadonlySignal<State> = computed(() => this._state.value);
 
-  get clientId() {
-    return this.socket.id;
-  }
-
   constructor(private options: ClientOptions<State, StateUpdate>) {
     this.socket = io(options.url, {
       transports: ["websocket"],
-      auth: options.getAuth,
+      // The socket.js typedefs force an object, but in reality it can be undefined
+      auth: (resolve) => resolve(options.getAuth?.() as object),
     });
 
     this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(

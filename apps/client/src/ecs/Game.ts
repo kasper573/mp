@@ -1,7 +1,6 @@
-import type { CharacterId } from "@mp/server";
 import { type AreaId } from "@mp/state";
 import { Application } from "@mp/pixi";
-import { api } from "../api";
+import { api, getMyFakeCharacterId } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
 import { Engine } from "./Engine";
@@ -36,7 +35,7 @@ export function createGame(
 }
 
 function me() {
-  return api.state.value.characters.get(api.clientId as CharacterId);
+  return api.state.value.characters.get(getMyFakeCharacterId());
 }
 
 // TODO refactor

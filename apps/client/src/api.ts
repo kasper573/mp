@@ -1,4 +1,4 @@
-import type { ClientStateUpdate } from "@mp/server";
+import type { CharacterId, ClientStateUpdate } from "@mp/server";
 import {
   serialization,
   type ClientState,
@@ -15,15 +15,14 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   parseRPCOutput: serialization.rpc.parse,
   createNextState: (_, nextState) => nextState,
   serializeRPC: serialization.rpc.serialize,
-  //getAuth: () => ({ token: getFakeUniqueUserId() }),
+  getAuth: () => ({ token: getMyFakeCharacterId() }),
 });
 
-function getFakeUniqueUserId() {
+export function getMyFakeCharacterId(): CharacterId {
   let existingId = localStorage.getItem("userId");
   if (!existingId) {
     existingId = uuid();
     localStorage.setItem("userId", existingId);
   }
-  console.log("User ID:", existingId);
-  return existingId;
+  return existingId as CharacterId;
 }
