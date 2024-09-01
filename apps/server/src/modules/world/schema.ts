@@ -1,12 +1,11 @@
 import type { AreaId, Branded } from "@mp/state";
-import { integer, pgTable, boolean } from "drizzle-orm/pg-core";
+import { integer, pgTable } from "drizzle-orm/pg-core";
 import type { Vector, Path } from "@mp/math";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
 
 export const characterTable = pgTable("characters", {
   id: branded<CharacterId>("id").primaryKey(),
-  connected: boolean("connected").notNull(),
   coords: vector("coords").notNull(),
   destination: vector("destination"),
   areaId: branded<AreaId>("area_id").notNull(),
@@ -16,7 +15,6 @@ export const characterTable = pgTable("characters", {
 export type DBCharacter = typeof characterTable.$inferInsert;
 
 export interface Character {
-  connected: boolean;
   id: CharacterId;
   coords: Vector;
   path?: Path;

@@ -101,7 +101,6 @@ export function createWorldModule({
           }
 
           player = {
-            connected: false,
             areaId: area.id,
             coords: new Vector(0, 0),
             id: characterId,
@@ -113,8 +112,6 @@ export function createWorldModule({
         } else {
           logger.info("Character reclaimed", characterId);
         }
-
-        player.connected = true;
       }),
 
     leave: t.procedure
@@ -122,8 +119,7 @@ export function createWorldModule({
       .input<DisconnectReason>()
       .create(async ({ input: reason, context: { source } }) => {
         const { clientId, characterId } = source.unwrap("client");
-        logger.info("Client disconnected", { clientId, reason });
-        state.characters.get(characterId)!.connected = false;
+        logger.info("Client disconnected", { clientId, characterId, reason });
       }),
   });
 }

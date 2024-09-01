@@ -43,6 +43,13 @@
       "when": 1725189731642,
       "tag": "0005_good_spacker_dave",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1725199829304,
+      "tag": "0006_clear_squirrel_girl",
+      "breakpoints": true
     }
   ]
 }

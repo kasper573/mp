@@ -37,7 +37,6 @@ export async function loadWorldState(db: DBClient): Promise<WorldState> {
 function serializeCharacter(char: Character): DBCharacter {
   return {
     areaId: char.areaId,
-    connected: char.connected,
     coords: char.coords,
     destination: char.path?.[char.path.length - 1],
     speed: char.speed,
@@ -48,7 +47,6 @@ function serializeCharacter(char: Character): DBCharacter {
 function deserializeCharacter(char: DBCharacter): Character {
   return {
     areaId: char.areaId,
-    connected: char.connected,
     coords: char.coords,
     speed: char.speed,
     id: char.id,

@@ -62,6 +62,8 @@ async function main(opt: CliOptions) {
     createUrl,
   });
 
+  const characterConnections = new Map<CharacterId, Set<ClientId>>();
+
   const socketServer = new Server({
     createContext: createServerContext,
     modules,
@@ -69,8 +71,27 @@ async function main(opt: CliOptions) {
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
     parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),
-    onConnection: (input, context) => global.connect({ input, context }),
-    onDisconnect: (input, context) => global.disconnect({ input, context }),
+    onConnection: (input, context) => {
+      const { characterId, clientId } = context.source.unwrap("client");
+      let clientIdsForCharacter = characterConnections.get(characterId);
+      if (!clientIdsForCharacter) {
+        clientIdsForCharacter = new Set();
+        characterConnections.set(characterId, clientIdsForCharacter);
+      }
+      clientIdsForCharacter.add(clientId);
+      global.connect({ input, context });
+    },
+    onDisconnect: (input, context) => {
+      const { characterId, clientId } = context.source.unwrap("client");
+      global.disconnect({ input, context });
+      const clientIdsForCharacter = characterConnections.get(characterId);
+      if (clientIdsForCharacter) {
+        clientIdsForCharacter.delete(clientId);
+        if (clientIdsForCharacter.size === 0) {
+          characterConnections.delete(characterId);
+        }
+      }
+    },
     onError,
   });
 
@@ -82,18 +103,6 @@ async function main(opt: CliOptions) {
 
   setInterval(tick, opt.tickInterval);
   setTimeout(persist, opt.persistInterval);
-
-  global.connect.subscribe(({ context }) => {
-    const { characterId, clientId } = context.source.unwrap("client");
-    connectedClients.set(characterId, clientId);
-    logger.info("Client connected", { clientId, characterId });
-  });
-
-  global.disconnect.subscribe(({ context }) => {
-    const { characterId } = context.source.unwrap("client");
-    connectedClients.delete(characterId);
-    logger.info("Client disconnected", { characterId });
-  });
 
   let lastTick = performance.now();
 
@@ -127,11 +136,15 @@ async function main(opt: CliOptions) {
   }
 
   function* getStateUpdates() {
+    const state = getClientWorldState(world);
+
     // TODO optimize by sending changes only
     for (const id of world.characters.keys()) {
-      const clientId = connectedClients.get(id);
-      if (clientId) {
-        yield [clientId, getClientWorldState(world)] as const;
+      const clientIds = characterConnections.get(id);
+      if (clientIds) {
+        for (const id of clientIds) {
+          yield [id, state] as const;
+        }
       } else {
         // TODO collect metrics
       }
@@ -141,8 +154,8 @@ async function main(opt: CliOptions) {
   function getClientWorldState(world: WorldState): WorldState {
     return {
       characters: new Map(
-        Array.from(world.characters.entries()).filter(
-          ([id, char]) => char.connected,
+        Array.from(world.characters.entries()).filter(([id]) =>
+          characterConnections.has(id),
         ),
       ),
     };
@@ -164,8 +177,6 @@ async function main(opt: CliOptions) {
       }),
     };
   }
-
-  const connectedClients = new Map<CharacterId, ClientId>();
 
   function onError(e: unknown, type: string, message?: unknown) {
     logger.chain(type).error(...(message ? [message, e] : [e]));
