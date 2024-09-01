@@ -199,8 +199,3 @@ ${Object.entries(options)
 }
 
 main(readCliOptions());
-
-interface CharacterSession {
-  characterId: CharacterId;
-  clientId: ClientId;
-}
