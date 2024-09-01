@@ -36,6 +36,13 @@ services:
     volumes:
       - proxy-data:/data
       - letsencrypt-data:/etc/letsencrypt
+  devtools:
+    build:
+      dockerfile: Dockerfile.devtools
+      context: .
+    image: ghcr.io/kasper573/mp-devtools:latest
+    environment:
+      MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
 volumes:
   proxy-data:
   letsencrypt-data:

@@ -1,0 +1,18 @@
+# This is the source code and dependencies of the app bundled into an image.
+# It can be used to run pnpm commands on the server host machine (ie. db migrations)
+
+FROM node:20.10.0-alpine3.19 AS production
+WORKDIR /app
+
+# Install pnpm
+RUN apk add jq
+COPY package.json ./
+RUN PNPM_VERSION=$(jq -r '.packageManager' package.json) && \
+    npm install -g $PNPM_VERSION
+
+# Install node dependencies
+COPY pnpm-lock.yaml .
+RUN pnpm install --frozen-lockfile
+
+# Copy the source code
+COPY . .

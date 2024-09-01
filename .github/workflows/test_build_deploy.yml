@@ -62,15 +62,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Upload database migration scripts
-        uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
-        with:
-          host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
-          username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
-          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "apps/server/drizzle/**,apps/server/drizzle.config.js"
-          target: /tmp/mp-drizzle/
-
       - name: Load docker-compose file into environment
         run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
 
@@ -90,7 +81,5 @@ jobs:
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans
+            docker compose run devtools pnpm -F server db:migrate
             docker system prune -f
-
-            cd /tmp/mp-drizzle/apps/server && npx drizzle-kit migrate
-            rm -rf /tmp/mp-drizzle

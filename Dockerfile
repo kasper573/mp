@@ -1,3 +1,4 @@
+# This is the production server image
 
 FROM node:20.10.0-alpine3.19 AS production
 WORKDIR /app
