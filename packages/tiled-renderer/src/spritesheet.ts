@@ -1,11 +1,12 @@
 import type {
   AnimatedSpriteFrames,
+  FrameObject,
   SpritesheetData,
   SpritesheetFrameData,
   Texture,
 } from "@mp/pixi";
 import { Assets, Spritesheet } from "@mp/pixi";
-import type { LocalTileId } from "@mp/tiled-loader";
+import type { LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
   localToGlobalId,
   type GlobalTileId,
@@ -34,6 +35,19 @@ async function loadTilesetSpritesheet(
   tileSize: { width: number; height: number },
 ): Promise<TiledSpritesheet> {
   const tiles = Array.from(tileset.tiles.values());
+
+  const animationsWithDuration = new Map(
+    tiles
+      .filter((tile) => tile.animation)
+      .map((tile) => [
+        localToGlobalId(tileset.firstgid, tile.id),
+        tile.animation!.map((frame) => ({
+          duration: frame.duration,
+          id: localToGlobalId(tileset.firstgid, frame.tileid),
+        })),
+      ]),
+  );
+
   const data: TiledSpritesheetData = {
     frames: Object.fromEntries(
       tiles.map((tile) => createTileFrameData(tileset, tileSize, tile.id)),
@@ -45,15 +59,12 @@ async function loadTilesetSpritesheet(
       scale: 1,
     },
     animations: Object.fromEntries(
-      tiles
-        .filter((tile) => tile.animation)
-        .map((tile) => [
-          stringOf(localToGlobalId(tileset.firstgid, tile.id)),
-          tile.animation!.map((frame) =>
-            stringOf(localToGlobalId(tileset.firstgid, frame.tileid)),
-          ),
-        ]),
+      Array.from(animationsWithDuration.entries()).map(([id, frames]) => [
+        String(id),
+        frames.map((frame) => String(frame.id)),
+      ]),
     ),
+    animationsWithDuration,
   };
 
   const ss = new Spritesheet(await Assets.load(tileset.image), data);
@@ -101,12 +112,14 @@ export function createTextureLookup(
         `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
       );
     },
-    animation(id) {
-      const sid = stringOf(id);
+    animation(id): FrameObject[] {
       for (const ss of Object.values(spritesheets)) {
-        const frames = ss.animations[sid];
+        const frames = ss.data.animationsWithDuration?.get(id);
         if (frames) {
-          return frames;
+          return frames.map(({ duration, id }) => ({
+            texture: ss.textures[id],
+            time: duration,
+          }));
         }
       }
       throw new Error(
@@ -125,18 +138,10 @@ export type TiledSpritesheetRecord = { [image: string]: TiledSpritesheet };
 
 export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
 
-export type TiledSpritesheetData = Omit<
-  SpritesheetData,
-  "frames" | "animations"
-> & {
+export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
   frames: Record<GlobalTileId, SpritesheetFrameData>;
-  animations?: Record<GIDAsString, GIDAsString[]>;
+  animationsWithDuration?: Map<
+    GlobalTileId,
+    Array<{ duration: Milliseconds; id: GlobalTileId }>
+  >;
 };
-
-type GIDAsString = `${GlobalTileId}`;
-
-function stringOf<
-  T extends string | number | bigint | boolean | null | undefined,
->(arg: T): `${T}` {
-  return String(arg) as `${T}`;
-}
