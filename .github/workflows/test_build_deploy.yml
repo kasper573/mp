@@ -68,7 +68,7 @@ jobs:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "apps/server/drizzle/**,apps/server/drizzle.config.ts"
+          source: "apps/server/drizzle/**,apps/server/drizzle.config.js"
           target: /tmp/mp-drizzle/
 
       - name: Load docker-compose file into environment
