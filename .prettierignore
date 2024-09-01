@@ -2,3 +2,4 @@ dist
 .turbo
 pnpm-lock.yaml
 **/apps/server/public/tilesets/**
+**/apps/server/drizzle/**
