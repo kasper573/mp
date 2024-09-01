@@ -25,7 +25,6 @@ export function createDBSync({
 
         const state = getSnapshot();
 
-        logger.info("Saving state...");
         try {
           await db.transaction((tx) =>
             Promise.all([
