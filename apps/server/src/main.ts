@@ -19,7 +19,7 @@ import {
   type ServerContext,
 } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { CharacterId } from "./modules/world/schema";
+import type { CharacterId, WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
@@ -131,11 +131,21 @@ async function main(opt: CliOptions) {
     for (const id of world.characters.keys()) {
       const clientId = connectedClients.get(id);
       if (clientId) {
-        yield [clientId, world] as const;
+        yield [clientId, getClientWorldState(world)] as const;
       } else {
         // TODO collect metrics
       }
     }
+  }
+
+  function getClientWorldState(world: WorldState): WorldState {
+    return {
+      characters: new Map(
+        Array.from(world.characters.entries()).filter(
+          ([id, char]) => char.connected,
+        ),
+      ),
+    };
   }
 
   async function createServerContext({

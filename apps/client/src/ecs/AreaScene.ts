@@ -126,7 +126,7 @@ export class AreaScene extends Container {
 
     let actor = this.characterActors.get(char.id);
     if (!actor) {
-      actor = new CharacterActor(char, this.area.tiled.tileSize);
+      actor = new CharacterActor(this.area.tiled.tileSize);
       this.characterContainer.addChild(actor);
       this.characterActors.set(char.id, actor);
       if (char.id === this.myCharacterId) {
