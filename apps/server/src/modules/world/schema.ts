@@ -7,7 +7,6 @@ import { vector } from "../../db/types/vector";
 export const characterTable = pgTable("characters", {
   id: branded<CharacterId>("id").primaryKey(),
   coords: vector("coords").notNull(),
-  destination: vector("destination"),
   areaId: branded<AreaId>("area_id").notNull(),
   speed: integer("speed").notNull(),
 });
