@@ -3,6 +3,7 @@ import type { DisconnectReason } from "socket.io";
 
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
+  SocketIO_Auth,
   SocketIO_ClientToServerEvents,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
@@ -13,15 +14,13 @@ import type {
 export class Server<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
-  ClientContext,
   StateUpdate,
   ClientId extends string = string,
 > {
   private wss: SocketServer<
     SocketIO_ClientToServerEvents,
     SocketIO_ServerToClientEvents<StateUpdate>,
-    object,
-    ClientContext
+    object
   >;
 
   listen: SocketServer["listen"];
@@ -52,19 +51,27 @@ export class Server<
 
     this.listen = (...args) => this.wss.listen(...args);
 
-    this.wss.on("connection", (socket) => {
-      const socketContext = () =>
-        createContext({ clientId: socket.id as ClientId });
+    this.wss.on("connection", async (socket) => {
+      const socketContext = () => {
+        return createContext({
+          clientId: socket.id as ClientId,
+          auth: options.parseAuth?.(socket.handshake.auth),
+        });
+      };
 
       try {
-        onConnection?.(socket.recovered ? "recovered" : "new", socketContext());
+        onConnection?.(
+          socket.recovered ? "recovered" : "new",
+          await socketContext(),
+        );
       } catch (e) {
         onError?.(e, "connection");
       }
 
-      socket.once("disconnect", (reason) => {
+      socket.once("disconnect", async (reason) => {
         try {
-          onDisconnect?.(reason, socketContext());
+          socket.data;
+          onDisconnect?.(reason, await socketContext());
         } catch (e) {
           onError?.(e, "disconnect");
         }
@@ -84,7 +91,7 @@ export class Server<
 
           const output = await module[procedureName]({
             input,
-            context: socketContext(),
+            context: await socketContext(),
           });
 
           respondWithOutput(serializeRPCOutput(output));
@@ -114,8 +121,11 @@ export interface CreateServerOptions<
   ClientId extends string,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
-  createContext: (options: CreateContextOptions<ClientId>) => ServerContext;
+  createContext: (
+    options: CreateContextOptions<ClientId>,
+  ) => ServerContext | Promise<ServerContext>;
   parseRPC: SocketIO_DTOParser<SocketIO_RPC>;
+  parseAuth?: (auth: Record<string, string>) => SocketIO_Auth | undefined;
   serializeRPCOutput: SocketIO_DTOSerializer<unknown>;
   serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
   onConnection?: (reason: ConnectReason, context: ServerContext) => void;
@@ -126,6 +136,7 @@ export interface CreateServerOptions<
 
 export interface CreateContextOptions<ClientId extends string> {
   clientId: ClientId;
+  auth?: SocketIO_Auth;
 }
 
 export type ServerErrorHandler = (

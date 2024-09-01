@@ -19,14 +19,17 @@ import {
   type ServerContext,
 } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { CharacterId } from "./modules/world/schema";
-import type { WorldState } from "./modules/world/schema";
+import type { CharacterId, WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
+import { createDBClient } from "./db/client";
+import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
+
+  const db = createDBClient(opt.databaseUrl);
 
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
@@ -39,7 +42,7 @@ async function main(opt: CliOptions) {
   }
 
   const defaultAreaId = areas.value.keys().next().value;
-  const world: WorldState = { characters: new Map() };
+  const world = await loadWorldState(db);
 
   const global = createGlobalModule();
   const expressApp = express();
@@ -59,14 +62,36 @@ async function main(opt: CliOptions) {
     createUrl,
   });
 
+  const characterConnections = new Map<CharacterId, Set<ClientId>>();
+
   const socketServer = new Server({
-    createContext: createClientContext,
+    createContext: createServerContext,
     modules,
     serializeRPCOutput: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
-    onConnection: (input, context) => global.connect({ input, context }),
-    onDisconnect: (input, context) => global.disconnect({ input, context }),
+    parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),
+    onConnection: (input, context) => {
+      const { characterId, clientId } = context.source.unwrap("client");
+      let clientIdsForCharacter = characterConnections.get(characterId);
+      if (!clientIdsForCharacter) {
+        clientIdsForCharacter = new Set();
+        characterConnections.set(characterId, clientIdsForCharacter);
+      }
+      clientIdsForCharacter.add(clientId);
+      global.connect({ input, context });
+    },
+    onDisconnect: (input, context) => {
+      const { characterId, clientId } = context.source.unwrap("client");
+      global.disconnect({ input, context });
+      const clientIdsForCharacter = characterConnections.get(characterId);
+      if (clientIdsForCharacter) {
+        clientIdsForCharacter.delete(clientId);
+        if (clientIdsForCharacter.size === 0) {
+          characterConnections.delete(characterId);
+        }
+      }
+    },
     onError,
   });
 
@@ -77,6 +102,7 @@ async function main(opt: CliOptions) {
   });
 
   setInterval(tick, opt.tickInterval);
+  setTimeout(persist, opt.persistInterval);
 
   let lastTick = performance.now();
 
@@ -101,22 +127,53 @@ async function main(opt: CliOptions) {
     }
   }
 
+  async function persist() {
+    const result = await persistWorldState(db, world);
+    if (!result.ok) {
+      logger.error("Failed to persist world state", result.error);
+    }
+    setTimeout(persist, opt.persistInterval);
+  }
+
   function* getStateUpdates() {
+    const state = getClientWorldState(world);
+
     // TODO optimize by sending changes only
     for (const id of world.characters.keys()) {
-      yield [getClientIdByCharacterId(id), world] as const;
+      const clientIds = characterConnections.get(id);
+      if (clientIds) {
+        for (const id of clientIds) {
+          yield [id, state] as const;
+        }
+      } else {
+        // TODO collect metrics
+      }
     }
   }
 
-  function createClientContext({
+  function getClientWorldState(world: WorldState): WorldState {
+    return {
+      characters: new Map(
+        Array.from(world.characters.entries()).filter(([id]) =>
+          characterConnections.has(id),
+        ),
+      ),
+    };
+  }
+
+  async function createServerContext({
     clientId,
-  }: CreateContextOptions<ClientId>): ServerContext {
+    auth,
+  }: CreateContextOptions<ClientId>): Promise<ServerContext> {
+    if (!auth) {
+      throw new Error(`Client ${clientId} is not authenticated`);
+    }
     return {
       world,
       source: new ServerContextSource({
         type: "client",
         clientId,
-        characterId: getCharacterIdByClientId(clientId),
+        characterId: getCharacterIdByAuthToken(auth.token),
       }),
     };
   }
@@ -132,14 +189,9 @@ async function main(opt: CliOptions) {
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 
-  function getCharacterIdByClientId(clientId: ClientId): CharacterId {
+  function getCharacterIdByAuthToken(authToken: string): CharacterId {
     // TODO implement
-    return clientId as unknown as CharacterId;
-  }
-
-  function getClientIdByCharacterId(characterId: CharacterId): ClientId {
-    // TODO implement
-    return characterId as unknown as ClientId;
+    return authToken as CharacterId;
   }
 }
 

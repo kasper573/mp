@@ -1,12 +1,11 @@
 import type { Branded } from "@mp/state";
-import type { CharacterId, WorldState } from "./modules/world/schema";
+import type { CharacterId } from "./modules/world/schema";
+import type { WorldState } from "./modules/world/schema";
 
 export interface ServerContext {
   source: ServerContextSource;
   world: WorldState;
 }
-
-export interface ClientContext {}
 
 export type ClientId = Branded<string, "ClientId">;
 

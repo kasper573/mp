@@ -5,7 +5,7 @@ import { Cleanup, Container, sub } from "@mp/pixi";
 import { snapTileVector } from "@mp/state";
 import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { api } from "../api";
+import { api, getMyFakeCharacterId } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
@@ -21,7 +21,7 @@ export class AreaScene extends Container {
   private cameraZoom = 2;
 
   get myCharacterId() {
-    return api.clientId;
+    return getMyFakeCharacterId();
   }
 
   constructor(
@@ -126,7 +126,7 @@ export class AreaScene extends Container {
 
     let actor = this.characterActors.get(char.id);
     if (!actor) {
-      actor = new CharacterActor(char, this.area.tiled.tileSize);
+      actor = new CharacterActor(this.area.tiled.tileSize);
       this.characterContainer.addChild(actor);
       this.characterActors.set(char.id, actor);
       if (char.id === this.myCharacterId) {
@@ -135,14 +135,14 @@ export class AreaScene extends Container {
     }
 
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
-    const path = char.path.map(this.area.tiled.tileCoordToWorld);
+    const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
 
     actor.interpolator.configure(pos, {
       path,
       speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
 
-    if (char.id === this.myCharacterId) {
+    if (char.path && char.id === this.myCharacterId) {
       this.debugUI.showPath(char.path);
     }
   }

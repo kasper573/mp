@@ -1,17 +1,14 @@
-import type { Character } from "@mp/server";
 import { Graphics } from "@mp/pixi";
 import type { VectorLike } from "@mp/math";
 import { Interpolator } from "./Interpolator";
 
 export class CharacterActor extends Graphics {
-  public readonly interpolator = new Interpolator(this);
+  readonly interpolator = new Interpolator(this);
 
-  constructor(
-    private character: Character,
-    private tileSize: VectorLike,
-  ) {
+  constructor(private tileSize: VectorLike) {
     super();
 
+    this.fillStyle.color = 0x00ff00;
     this.rect(
       -this.tileSize.x / 2,
       -this.tileSize.y / 2,
@@ -21,8 +18,5 @@ export class CharacterActor extends Graphics {
     this.fill();
   }
 
-  override _onRender = () => {
-    this.fillStyle.color = this.character.connected ? 0x00ff00 : 0xff0000;
-    this.interpolator.update();
-  };
+  override _onRender = () => this.interpolator.update();
 }
