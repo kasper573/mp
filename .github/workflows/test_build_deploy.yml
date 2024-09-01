@@ -63,7 +63,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Upload database migration scripts
-        uses: appleboy/scp-action@v0.1.7
+        uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
         with:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
@@ -92,5 +92,5 @@ jobs:
             docker compose up -d --remove-orphans
             docker system prune -f
 
-            cd /tmp/mp-drizzle && npx drizzle-kit migrate
+            cd /tmp/mp-drizzle/apps/server && npx drizzle-kit migrate
             rm -rf /tmp/mp-drizzle
