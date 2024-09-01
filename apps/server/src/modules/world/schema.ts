@@ -1,6 +1,6 @@
 import type { AreaId, Branded } from "@mp/state";
 import { integer, pgTable } from "drizzle-orm/pg-core";
-import type { Vector, Path } from "@mp/math";
+import type { Path } from "@mp/math";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
 
@@ -14,12 +14,8 @@ export const characterTable = pgTable("characters", {
 
 export type DBCharacter = typeof characterTable.$inferInsert;
 
-export interface Character {
-  id: CharacterId;
-  coords: Vector;
+export interface Character extends DBCharacter {
   path?: Path;
-  speed: number;
-  areaId: AreaId;
 }
 
 export interface WorldState {
