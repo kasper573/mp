@@ -13,6 +13,7 @@ import type {
 import type { Dispatcher } from "./dispatcher";
 import { createDispatcher } from "./dispatcher";
 import type {
+  SocketIO_Auth,
   SocketIO_ClientToServerEvents,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
@@ -25,19 +26,22 @@ export class Client<
   State,
   StateUpdate,
 > {
-  private socket: ClientSocket<StateUpdate>;
-  readonly modules: ClientModuleRecord<ModuleDefinitions>;
-
   private _state: Signal<State>;
+  private socket: ClientSocket<StateUpdate>;
 
+  readonly modules: ClientModuleRecord<ModuleDefinitions>;
   readonly connected = signal(false);
   readonly state: ReadonlySignal<State> = computed(() => this._state.value);
+
   get clientId() {
     return this.socket.id;
   }
 
   constructor(private options: ClientOptions<State, StateUpdate>) {
-    this.socket = io(options.url, { transports: ["websocket"] });
+    this.socket = io(options.url, {
+      transports: ["websocket"],
+      auth: options.getAuth,
+    });
 
     this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(
       this.socket,
@@ -111,6 +115,7 @@ export interface ClientOptions<State, StateUpdate> {
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
+  getAuth?: () => SocketIO_Auth | undefined;
 }
 
 export type { SocketIO_DTO } from "./socket";

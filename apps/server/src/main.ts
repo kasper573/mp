@@ -63,11 +63,12 @@ async function main(opt: CliOptions) {
   });
 
   const socketServer = new Server({
-    createContext: createClientContext,
+    createContext: createServerContext,
     modules,
     serializeRPCOutput: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
+    parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),
     onConnection: (input, context) => global.connect({ input, context }),
     onDisconnect: (input, context) => global.disconnect({ input, context }),
     onError,
@@ -81,6 +82,18 @@ async function main(opt: CliOptions) {
 
   setInterval(tick, opt.tickInterval);
   setTimeout(persist, opt.persistInterval);
+
+  global.connect.subscribe(({ context }) => {
+    const { characterId, clientId } = context.source.unwrap("client");
+    connectedClients.set(characterId, clientId);
+    logger.info("Client connected", { clientId, characterId });
+  });
+
+  global.disconnect.subscribe(({ context }) => {
+    const { characterId } = context.source.unwrap("client");
+    connectedClients.delete(characterId);
+    logger.info("Client disconnected", { characterId });
+  });
 
   let lastTick = performance.now();
 
@@ -120,18 +133,24 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function createClientContext({
+  async function createServerContext({
     clientId,
-  }: CreateContextOptions<ClientId>): ServerContext {
+    auth,
+  }: CreateContextOptions<ClientId>): Promise<ServerContext> {
+    if (!auth) {
+      throw new Error(`Client ${clientId} is not authenticated`);
+    }
     return {
       world,
       source: new ServerContextSource({
         type: "client",
         clientId,
-        characterId: getCharacterIdByClientId(clientId),
+        characterId: getCharacterIdByAuthToken(auth.token),
       }),
     };
   }
+
+  const connectedClients = new Map<CharacterId, ClientId>();
 
   function onError(e: unknown, type: string, message?: unknown) {
     logger.chain(type).error(...(message ? [message, e] : [e]));
@@ -144,14 +163,17 @@ async function main(opt: CliOptions) {
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 
-  function getCharacterIdByClientId(clientId: ClientId): CharacterId {
+  function getCharacterIdByAuthToken(authToken: string): CharacterId {
     // TODO implement
-    return clientId as unknown as CharacterId;
+    return authToken as CharacterId;
   }
 
   function getClientIdByCharacterId(characterId: CharacterId): ClientId {
-    // TODO implement
-    return characterId as unknown as ClientId;
+    const id = connectedClients.get(characterId);
+    if (!id) {
+      throw new Error(`Client not found for character ${characterId}`);
+    }
+    return id as ClientId;
   }
 }
 
@@ -180,3 +202,8 @@ ${Object.entries(options)
 }
 
 main(readCliOptions());
+
+interface CharacterSession {
+  characterId: CharacterId;
+  clientId: ClientId;
+}

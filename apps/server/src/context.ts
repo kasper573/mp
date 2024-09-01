@@ -7,8 +7,6 @@ export interface ServerContext {
   world: WorldState;
 }
 
-export interface ClientContext {}
-
 export type ClientId = Branded<string, "ClientId">;
 
 export type ClientState = WorldState;

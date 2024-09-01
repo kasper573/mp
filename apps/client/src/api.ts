@@ -5,6 +5,7 @@ import {
   type ServerModules,
 } from "@mp/server";
 import { Client } from "@mp/network/client";
+import { v4 as uuid } from "uuid";
 import { env } from "./env";
 
 export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
@@ -14,4 +15,15 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   parseRPCOutput: serialization.rpc.parse,
   createNextState: (_, nextState) => nextState,
   serializeRPC: serialization.rpc.serialize,
+  //getAuth: () => ({ token: getFakeUniqueUserId() }),
 });
+
+function getFakeUniqueUserId() {
+  let existingId = localStorage.getItem("userId");
+  if (!existingId) {
+    existingId = uuid();
+    localStorage.setItem("userId", existingId);
+  }
+  console.log("User ID:", existingId);
+  return existingId;
+}

@@ -26,3 +26,7 @@ export type SocketIO_DTO<T = any> = (Uint8Array | string) & {
   T?: T;
   __brand__: "SocketIO_DTO";
 };
+
+export interface SocketIO_Auth {
+  token: string;
+}
