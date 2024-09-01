@@ -6,8 +6,11 @@ export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
 >;
 
+export const cliEnvPrefix = "MP";
+
 export function readCliOptions(argv = process.argv) {
   const options = yargs(hideBin(argv))
+    .env(cliEnvPrefix)
     .parserConfiguration({
       "camel-case-expansion": false, // Ensures only the explicit option names are used
       "unknown-options-as-args": true, // Omits unknown args from the options object
@@ -54,6 +57,18 @@ export function readCliOptions(argv = process.argv) {
       type: "number",
       default: 1000 / 60,
       description: "The server tick interval in milliseconds",
+    })
+
+    .option("persistInterval", {
+      type: "number",
+      default: 1000,
+      description:
+        "How often in milliseconds to save the world state to the database",
+    })
+    .option("databaseUrl", {
+      type: "string",
+      description: "The URL to the database",
+      demandOption: true,
     })
     .parseSync();
 

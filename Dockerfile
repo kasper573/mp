@@ -9,13 +9,11 @@ COPY ./apps/server/public /app/public
 COPY ./apps/server/dist /app/server
 COPY ./apps/client/dist /app/client
 
-ENV PORT=
-ENV HOSTNAME=
-ENV CORS_ORIGIN=
+ENV MP_PORT=
+ENV MP_HOSTNAME=
+ENV MP_CORS_ORIGIN=
+ENV MP_DATABASE_URL=
 
 CMD node server \
   --clientDir=/app/client \
-  --publicDir=/app/public \
-  --port=$PORT \
-  --hostname=$HOSTNAME \
-  --corsOrigin=$CORS_ORIGIN \
+  --publicDir=/app/public

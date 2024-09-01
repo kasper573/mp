@@ -1,5 +1,16 @@
 # This is the production services and environments definition
 services:
+  pg:
+    image: postgres:16.4
+    restart: always
+    environment:
+      POSTGRES_USER: mp
+      POSTGRES_PASSWORD: mp
+      POSTGRES_DB: mp
+    ports:
+      - 5432:5432
+    volumes:
+      - postgres:/var/lib/postgresql/data
   app:
     build:
       context: .
@@ -8,9 +19,10 @@ services:
     ports:
       - "8080"
     environment:
-      PORT: 8080
-      HOSTNAME: "k573.dev"
-      CORS_ORIGIN: "k573.dev"
+      MP_PORT: 8080
+      MP_HOSTNAME: "k573.dev"
+      MP_CORS_ORIGIN: "k573.dev"
+      MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
   proxy:
     image: "jc21/nginx-proxy-manager:2.11.3"
     restart: unless-stopped

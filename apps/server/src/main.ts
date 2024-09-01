@@ -23,10 +23,20 @@ import type { CharacterId } from "./modules/world/schema";
 import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
+import { createDBClient } from "./db/client";
+import { createDBSync } from "./db/sync";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
+
+  const db = createDBClient(opt.databaseUrl);
+  const persistence = createDBSync({
+    db,
+    logger,
+    interval: opt.persistInterval,
+    getSnapshot: () => world,
+  });
 
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
@@ -77,6 +87,7 @@ async function main(opt: CliOptions) {
   });
 
   setInterval(tick, opt.tickInterval);
+  persistence.start();
 
   let lastTick = performance.now();
 

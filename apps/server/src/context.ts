@@ -1,5 +1,6 @@
 import type { Branded } from "@mp/state";
-import type { CharacterId, WorldState } from "./modules/world/schema";
+import type { CharacterId } from "./modules/world/schema";
+import type { WorldState } from "./modules/world/schema";
 
 export interface ServerContext {
   source: ServerContextSource;
