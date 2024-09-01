@@ -11,14 +11,14 @@ import type {
 } from "@mp/tiled-loader";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
-import type { TextureByGID } from "./spritesheet";
+import type { TextureLookup } from "./spritesheet";
 
 export type LayerView = Container;
 
 export class LayerViewFactory {
   constructor(
     private readonly tiledMap: TiledMap,
-    private readonly textureByGID: TextureByGID,
+    private readonly textureLookup: TextureLookup,
   ) {}
 
   createLayerViews(layers = this.tiledMap.layers) {
@@ -42,7 +42,7 @@ export class LayerViewFactory {
   private createTileLayerView(layer: TileLayer): LayerView {
     const container = new Container({ isRenderGroup: true });
     for (const tile of layer.tiles) {
-      container.addChild(createTileSprite(tile, this.textureByGID));
+      container.addChild(createTileSprite(tile, this.textureLookup));
     }
     return container;
   }

@@ -1,4 +1,9 @@
-import type { SpritesheetData, SpritesheetFrameData, Texture } from "@mp/pixi";
+import type {
+  AnimatedSpriteFrames,
+  SpritesheetData,
+  SpritesheetFrameData,
+  Texture,
+} from "@mp/pixi";
 import { Assets, Spritesheet } from "@mp/pixi";
 import type { LocalTileId } from "@mp/tiled-loader";
 import {
@@ -28,11 +33,10 @@ async function loadTilesetSpritesheet(
   tileset: Tileset,
   tileSize: { width: number; height: number },
 ): Promise<TiledSpritesheet> {
+  const tiles = Array.from(tileset.tiles.values());
   const data: TiledSpritesheetData = {
     frames: Object.fromEntries(
-      Array.from(tileset.tiles.values()).map((tile) =>
-        createTileFrameData(tileset, tileSize, tile.id),
-      ),
+      tiles.map((tile) => createTileFrameData(tileset, tileSize, tile.id)),
     ),
     meta: {
       image: tileset.image,
@@ -40,6 +44,16 @@ async function loadTilesetSpritesheet(
       size: { w: tileset.imagewidth, h: tileset.imageheight },
       scale: 1,
     },
+    animations: Object.fromEntries(
+      tiles
+        .filter((tile) => tile.animation)
+        .map((tile) => [
+          stringOf(localToGlobalId(tileset.firstgid, tile.id)),
+          tile.animation!.map((frame) =>
+            stringOf(localToGlobalId(tileset.firstgid, frame.tileid)),
+          ),
+        ]),
+    ),
   };
 
   const ss = new Spritesheet(await Assets.load(tileset.image), data);
@@ -72,28 +86,57 @@ function createTileFrameData(
   ];
 }
 
-export function createTextureByGIDQuery(
+export function createTextureLookup(
   spritesheets: TiledSpritesheetRecord,
-): TextureByGID {
-  return (id) => {
-    for (const ss of Object.values(spritesheets)) {
-      const texture = ss.textures[id];
-      if (texture) {
-        return texture;
+): TextureLookup {
+  return {
+    texture(id) {
+      for (const ss of Object.values(spritesheets)) {
+        const texture = ss.textures[id];
+        if (texture) {
+          return texture;
+        }
       }
-    }
-    throw new Error(
-      `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
-    );
+      throw new Error(
+        `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
+      );
+    },
+    animation(id) {
+      const sid = stringOf(id);
+      for (const ss of Object.values(spritesheets)) {
+        const frames = ss.animations[sid];
+        if (frames) {
+          return frames;
+        }
+      }
+      throw new Error(
+        `TiledSpritesheetRecord does not contain an animation for GID ${id}`,
+      );
+    },
   };
 }
 
-export type TextureByGID = (gid: GlobalTileId) => Texture | undefined;
+export interface TextureLookup {
+  texture: (gid: GlobalTileId) => Texture;
+  animation: (gid: GlobalTileId) => AnimatedSpriteFrames;
+}
 
 export type TiledSpritesheetRecord = { [image: string]: TiledSpritesheet };
 
 export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
 
-export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
+export type TiledSpritesheetData = Omit<
+  SpritesheetData,
+  "frames" | "animations"
+> & {
   frames: Record<GlobalTileId, SpritesheetFrameData>;
+  animations?: Record<GIDAsString, GIDAsString[]>;
 };
+
+type GIDAsString = `${GlobalTileId}`;
+
+function stringOf<
+  T extends string | number | bigint | boolean | null | undefined,
+>(arg: T): `${T}` {
+  return String(arg) as `${T}`;
+}

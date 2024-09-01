@@ -1,17 +1,30 @@
-import { Matrix, Sprite } from "@mp/pixi";
-import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
-import type { TextureByGID } from "./spritesheet";
+import { AnimatedSprite, Matrix, Sprite } from "@mp/pixi";
+import type { Frame, GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
+import type { TextureLookup } from "./spritesheet";
 
 export function createTileSprite(
-  { id, flags, x, y, width, height }: TileLayerTile,
-  textureByGID: TextureByGID,
+  { id, flags, x, y, width, height, tile }: TileLayerTile,
+  lookup: TextureLookup,
 ): Sprite {
-  const sprite = new Sprite({
-    width,
-    height,
-    anchor: center,
-    texture: textureByGID(id),
-  });
+  let sprite: Sprite;
+  if (tile.animation) {
+    const anim = new AnimatedSprite({
+      width,
+      height,
+      anchor: center,
+      textures: lookup.animation(id),
+    });
+    anim.animationSpeed = animationSpeed(tile.animation, 60);
+    anim.play();
+    sprite = anim;
+  } else {
+    sprite = new Sprite({
+      width,
+      height,
+      anchor: center,
+      texture: lookup.texture(id),
+    });
+  }
 
   const m = createFlipMatrix(flags);
   m.translate(x * width + width / 2, y * height + height / 2);
@@ -39,6 +52,11 @@ function createFlipMatrix(flags: GlobalIdFlags): Matrix {
     m.translate(0, -m.ty);
   }
   return m;
+}
+
+function animationSpeed(frames: Frame[], fps: number): number {
+  const totalDuration = frames.reduce((acc, frame) => acc + frame.duration, 0);
+  return frames.length / ((totalDuration * fps) / 1000);
 }
 
 const center = { x: 0.5, y: 0.5 };

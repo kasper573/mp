@@ -2,10 +2,7 @@ import { Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
 import { LayerContainer, LayerViewFactory } from "./layer";
 import type { TiledSpritesheetRecord } from "./spritesheet";
-import {
-  createTextureByGIDQuery,
-  loadTiledMapSpritesheets,
-} from "./spritesheet";
+import { createTextureLookup, loadTiledMapSpritesheets } from "./spritesheet";
 
 export class TiledRenderer extends LayerContainer {
   private layerViews: LayerContainer[] = [];
@@ -54,7 +51,7 @@ export class TiledRenderer extends LayerContainer {
   private upsertLayerViews() {
     const factory = new LayerViewFactory(
       this.map,
-      createTextureByGIDQuery(this.spritesheets),
+      createTextureLookup(this.spritesheets),
     );
 
     this.removeLayerViews();
