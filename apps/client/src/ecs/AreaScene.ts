@@ -135,14 +135,14 @@ export class AreaScene extends Container {
     }
 
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
-    const path = char.path.map(this.area.tiled.tileCoordToWorld);
+    const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
 
     actor.interpolator.configure(pos, {
       path,
       speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
 
-    if (char.id === this.myCharacterId) {
+    if (char.path && char.id === this.myCharacterId) {
       this.debugUI.showPath(char.path);
     }
   }

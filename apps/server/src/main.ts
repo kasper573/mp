@@ -20,23 +20,16 @@ import {
 } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import type { CharacterId } from "./modules/world/schema";
-import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
-import { createDBSync } from "./db/sync";
+import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
   const db = createDBClient(opt.databaseUrl);
-  const persistence = createDBSync({
-    db,
-    logger,
-    interval: opt.persistInterval,
-    getSnapshot: () => world,
-  });
 
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
@@ -49,7 +42,7 @@ async function main(opt: CliOptions) {
   }
 
   const defaultAreaId = areas.value.keys().next().value;
-  const world: WorldState = { characters: new Map() };
+  const world = await loadWorldState(db);
 
   const global = createGlobalModule();
   const expressApp = express();
@@ -87,7 +80,7 @@ async function main(opt: CliOptions) {
   });
 
   setInterval(tick, opt.tickInterval);
-  persistence.start();
+  setTimeout(persist, opt.persistInterval);
 
   let lastTick = performance.now();
 
@@ -110,6 +103,14 @@ async function main(opt: CliOptions) {
     } catch (error) {
       onError(error, "tick");
     }
+  }
+
+  async function persist() {
+    const result = await persistWorldState(db, world);
+    if (!result.ok) {
+      logger.error("Failed to persist world state", result.error);
+    }
+    setTimeout(persist, opt.persistInterval);
   }
 
   function* getStateUpdates() {

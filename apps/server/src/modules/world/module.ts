@@ -60,7 +60,9 @@ export function createWorldModule({
       .input<TimeSpan>()
       .create(({ input: delta }) => {
         for (const char of state.characters.values()) {
-          moveAlongPath(char.coords, char.path, char.speed, delta);
+          if (char.path) {
+            moveAlongPath(char.coords, char.path, char.speed, delta);
+          }
 
           const area = areas.get(char.areaId);
           if (area) {
@@ -94,13 +96,19 @@ export function createWorldModule({
           return;
         }
 
-        const idx = char.path.findIndex((c) => c.x === x && c.y === y);
-        if (idx !== -1) {
-          char.path = char.path.slice(0, idx + 1);
-        } else {
-          const newPath = findPath(char.coords, new Vector(x, y), area.dGraph);
-          if (newPath) {
-            char.path = newPath;
+        if (char.path) {
+          const idx = char.path.findIndex((c) => c.x === x && c.y === y);
+          if (idx !== -1) {
+            char.path = char.path.slice(0, idx + 1);
+          } else {
+            const newPath = findPath(
+              char.coords,
+              new Vector(x, y),
+              area.dGraph,
+            );
+            if (newPath) {
+              char.path = newPath;
+            }
           }
         }
       }),

@@ -19,7 +19,7 @@ export interface Character {
   connected: boolean;
   id: CharacterId;
   coords: Vector;
-  path: Path;
+  path?: Path;
   speed: number;
   areaId: AreaId;
 }
@@ -29,14 +29,3 @@ export interface WorldState {
 }
 
 export type CharacterId = Branded<string, "CharacterId">;
-
-export function serializeCharacter(char: Character): DBCharacter {
-  return {
-    areaId: char.areaId,
-    connected: char.connected,
-    coords: char.coords,
-    destination: char.path[char.path.length - 1],
-    speed: char.speed,
-    id: char.id,
-  };
-}
