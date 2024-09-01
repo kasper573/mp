@@ -83,3 +83,4 @@ jobs:
             docker compose up -d --remove-orphans
             docker compose run devtools pnpm -F server db:migrate
             docker system prune -f
+            docker image prune -af
