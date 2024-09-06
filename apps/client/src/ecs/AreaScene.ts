@@ -1,5 +1,4 @@
 import { dNodeFromVector, type AreaResource } from "@mp/state";
-import { clamp } from "@mp/math";
 import type { Character, CharacterId } from "@mp/server";
 import { Cleanup, Container, sub } from "@mp/pixi";
 import { snapTileVector } from "@mp/state";
@@ -10,6 +9,7 @@ import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
 import { Engine } from "./Engine";
+import { Camera } from "./camera";
 
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
@@ -18,7 +18,7 @@ export class AreaScene extends Container {
   private characterContainer = new Container();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
-  private cameraZoom = 2;
+  private camera = new Camera(this);
 
   get myCharacterId() {
     return getMyFakeCharacterId();
@@ -57,7 +57,6 @@ export class AreaScene extends Container {
       api.state.subscribe(this.synchronizeCharacters),
       sub(this, "mousedown", () => (this.isMouseDown = true)),
       sub(this, "mouseup", () => (this.isMouseDown = false)),
-      sub(this, "wheel", this.onMouseWheel),
       Engine.instance.input.keyboard.subscribe(
         "Shift",
         this.tiledRenderer.toggleDebugUI,
@@ -71,20 +70,16 @@ export class AreaScene extends Container {
     this.cleanups.flush();
   };
 
-  private onMouseWheel = (e: WheelEvent) => {
-    this.cameraZoom = clamp(this.cameraZoom + Math.sign(e.deltaY) * 0.3, 1, 2);
-  };
-
   override _onRender = () => {
-    // TODO this.camera.zoom = lerp(this.camera.zoom, this.cameraZoom, 0.1);
+    this.camera.update(Engine.instance.ticker.deltaTime);
 
     if (!this.isMouseDown) {
       return;
     }
 
-    const { lastWorldPos } = Engine.instance.input.pointer;
+    const { lastScreenPosition } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(
-      this.area.tiled.worldCoordToTile(lastWorldPos),
+      this.area.tiled.worldCoordToTile(lastScreenPosition),
     );
 
     const isValidTarget = !!this.area.dGraph[dNodeFromVector(tilePos)];
@@ -129,13 +124,14 @@ export class AreaScene extends Container {
       actor = new CharacterActor(this.area.tiled.tileSize);
       this.characterContainer.addChild(actor);
       this.characterActors.set(char.id, actor);
-      if (char.id === this.myCharacterId) {
-        // TODO this.camera.strategy.elasticToActor(actor, 0.8, 0.9);
-      }
     }
 
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
     const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
+
+    if (char.id === this.myCharacterId) {
+      this.camera.target = pos;
+    }
 
     actor.interpolator.configure(pos, {
       path,
@@ -146,13 +142,4 @@ export class AreaScene extends Container {
       this.debugUI.showPath(char.path);
     }
   }
-
-  inheritProperties(other: AreaScene) {
-    this.cameraZoom = other.cameraZoom;
-    // TODO this.camera.zoom = other.camera.zoom;
-  }
-}
-
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
 }

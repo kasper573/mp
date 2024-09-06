@@ -23,7 +23,7 @@ export class Engine {
 
   input = {
     pointer: {
-      lastWorldPos: new Vector(0, 0),
+      lastScreenPosition: new Vector(0, 0),
     },
     keyboard: {
       isHeld: (key: KeyName) => this.heldKeys.has(key),
@@ -60,7 +60,7 @@ export class Engine {
   }
 
   private onMouseMove = (e: MouseEvent) => {
-    this.input.pointer.lastWorldPos = new Vector(e.clientX, e.clientY);
+    this.input.pointer.lastScreenPosition = new Vector(e.clientX, e.clientY);
   };
 
   private onKeyDown = (e: KeyboardEvent) => {

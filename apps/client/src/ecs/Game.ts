@@ -59,13 +59,7 @@ function createAreaChanger(
       return;
     }
 
-    const nextScene = await loadScene(areaId);
-
-    if (currentScene instanceof AreaScene) {
-      nextScene.inheritProperties(currentScene as AreaScene);
-    }
-
-    game.stage.addChild(nextScene);
+    game.stage.addChild(await loadScene(areaId));
   };
 }
 
