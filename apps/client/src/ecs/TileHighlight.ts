@@ -18,9 +18,9 @@ export class TileHighlight extends Graphics {
   }
 
   override _onRender = () => {
-    const { lastScreenPosition } = Engine.instance.input.pointer;
+    const { lastWorldPosition } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(
-      this.tiled.worldCoordToTile(lastScreenPosition),
+      this.tiled.worldCoordToTile(lastWorldPosition),
     );
     const worldPos = tilePos.scale(this.tiled.tileSize);
     this.position.set(worldPos.x, worldPos.y);

@@ -33,7 +33,7 @@ export class DGraphDebugUI extends Graphics {
 
   override _onRender = () => {
     const {
-      pointer: { lastScreenPosition },
+      pointer: { lastWorldPosition },
       keyboard,
     } = Engine.instance.input;
 
@@ -52,12 +52,12 @@ export class DGraphDebugUI extends Graphics {
         this,
         this.tiled,
         this.graph,
-        snapTileVector(this.tiled.worldCoordToTile(lastScreenPosition)),
+        snapTileVector(this.tiled.worldCoordToTile(lastWorldPosition)),
       );
     }
 
     if (keyboard.isHeld("Shift")) {
-      const tilePos = this.tiled.worldCoordToTile(lastScreenPosition);
+      const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
       drawDNode(
         this,
         this.tiled,
@@ -68,9 +68,9 @@ export class DGraphDebugUI extends Graphics {
     }
 
     if (keyboard.isHeld("Shift") || keyboard.isHeld("Control")) {
-      const tilePos = this.tiled.worldCoordToTile(lastScreenPosition);
+      const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
       const text = [
-        `world: ${vecToString(lastScreenPosition)}`,
+        `world: ${vecToString(lastWorldPosition)}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       ].join("\n");

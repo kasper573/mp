@@ -1,8 +1,11 @@
 import { Vector } from "@mp/math";
 import { TimeSpan } from "@mp/state";
+import { Camera } from "./camera";
 
 export class Engine {
   public static instance: Engine;
+
+  public camera = new Camera();
 
   static replace(canvas: HTMLCanvasElement) {
     if (Engine.instance) {
@@ -24,6 +27,7 @@ export class Engine {
   input = {
     pointer: {
       lastScreenPosition: new Vector(0, 0),
+      lastWorldPosition: new Vector(0, 0),
     },
     keyboard: {
       isHeld: (key: KeyName) => this.heldKeys.has(key),
@@ -61,6 +65,9 @@ export class Engine {
 
   private onMouseMove = (e: MouseEvent) => {
     this.input.pointer.lastScreenPosition = new Vector(e.clientX, e.clientY);
+    this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
+      this.input.pointer.lastScreenPosition,
+    );
   };
 
   private onKeyDown = (e: KeyboardEvent) => {

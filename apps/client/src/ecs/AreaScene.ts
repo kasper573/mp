@@ -9,7 +9,7 @@ import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
 import { Engine } from "./Engine";
-import { Camera } from "./camera";
+import { CameraDebugUI } from "./camera";
 
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
@@ -18,7 +18,6 @@ export class AreaScene extends Container {
   private characterContainer = new Container();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
-  private camera = new Camera(this);
 
   get myCharacterId() {
     return getMyFakeCharacterId();
@@ -29,6 +28,11 @@ export class AreaScene extends Container {
     private renderDebugText: (text: string) => void,
   ) {
     super({ interactive: true });
+
+    const { camera } = Engine.instance;
+    camera.world = this;
+    camera.width = this.area.tiled.map.tilewidth * 10;
+    camera.height = this.area.tiled.map.tileheight * 10;
 
     this.tiledRenderer = new TiledRenderer(area.tiled.map);
     this.addChild(this.tiledRenderer);
@@ -47,6 +51,10 @@ export class AreaScene extends Container {
     );
     this.debugUI.zIndex = 1000;
     this.addChild(this.debugUI);
+
+    const cameraDebugUI = new CameraDebugUI(camera);
+    cameraDebugUI.zIndex = 1001;
+    this.addChild(cameraDebugUI);
 
     this.on("added", this.activate);
     this.on("removed", this.deactivate);
@@ -71,15 +79,13 @@ export class AreaScene extends Container {
   };
 
   override _onRender = () => {
-    this.camera.update(Engine.instance.ticker.deltaTime);
-
     if (!this.isMouseDown) {
       return;
     }
 
-    const { lastScreenPosition } = Engine.instance.input.pointer;
+    const { lastWorldPosition } = Engine.instance.input.pointer;
     const tilePos = snapTileVector(
-      this.area.tiled.worldCoordToTile(lastScreenPosition),
+      this.area.tiled.worldCoordToTile(lastWorldPosition),
     );
 
     const isValidTarget = !!this.area.dGraph[dNodeFromVector(tilePos)];
@@ -130,7 +136,7 @@ export class AreaScene extends Container {
     const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
 
     if (char.id === this.myCharacterId) {
-      this.camera.target = pos;
+      Engine.instance.camera.update(pos);
     }
 
     actor.interpolator.configure(pos, {
