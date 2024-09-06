@@ -1,62 +1,48 @@
-import { clamp, Vector } from "@mp/math";
-import { Rect } from "@mp/math";
-import type { StrokeStyle } from "@mp/pixi";
-import { Container, Graphics } from "@mp/pixi";
+import { Vector } from "@mp/math";
+import type { Size } from "@mp/pixi";
+import { Matrix } from "@mp/pixi";
 
 export class Camera {
-  public target?: Vector;
+  private position = new Vector(0, 0);
+  private zoom = 1;
 
-  get rect(): Rect {
-    const { x, y } = this.target ?? Vector.zero;
-    const maxX = this.world.width - this.width;
-    const maxY = this.world.height - this.height;
+  constructor(private readonly cameraSize: Size) {}
 
-    return new Rect(
-      clamp(x - this.width / 2, 0, maxX),
-      clamp(y - this.height / 2, 0, maxY),
-      this.width,
-      this.height,
+  update(worldSize: Size, position: Vector): Matrix {
+    this.position = position;
+
+    const m = new Matrix();
+
+    const scaleX = this.cameraSize.width / worldSize.width;
+    const scaleY = this.cameraSize.height / worldSize.height;
+    this.zoom = Math.max(scaleX, scaleY);
+
+    const offsetX = position.x - this.cameraSize.width / 2 / this.zoom;
+    const offsetY = position.y - this.cameraSize.height / 2 / this.zoom;
+
+    m.set(
+      this.zoom,
+      0,
+      0,
+      this.zoom,
+      -offsetX * this.zoom,
+      -offsetY * this.zoom,
     );
-  }
 
-  constructor(
-    public readonly world: Container,
-    public width = world.width,
-    public height = world.height,
-  ) {}
-
-  update(target: Vector): void {
-    this.target = target;
-    const { rect } = this;
-    this.world?.position.set(-rect.x, -rect.y);
+    return m;
   }
 
   screenToWorld(screenPos: Vector): Vector {
-    return new Vector(screenPos.x + this.rect.x, screenPos.y + this.rect.y);
+    return new Vector(
+      (screenPos.x - this.cameraSize.width / 2) / this.zoom + this.position.x,
+      (screenPos.y - this.cameraSize.height / 2) / this.zoom + this.position.y,
+    );
   }
 
   worldToScreen(worldPos: Vector): Vector {
-    return new Vector(worldPos.x - this.rect.x, worldPos.y - this.rect.y);
+    return new Vector(
+      (worldPos.x - this.position.x) * this.zoom + this.cameraSize.width / 2,
+      (worldPos.y - this.position.y) * this.zoom + this.cameraSize.height / 2,
+    );
   }
 }
-
-export class CameraDebugUI extends Container {
-  private g: Graphics;
-  constructor(private camera: Camera) {
-    super();
-    this.g = new Graphics();
-    this.addChild(this.g);
-  }
-
-  override _onRender = () => {
-    this.g.clear();
-    const { target, rect } = this.camera;
-    if (target) {
-      this.g.strokeStyle = strokeStyle;
-      this.g.rect(rect.x, rect.y, rect.width, rect.height);
-      this.g.stroke();
-    }
-  };
-}
-
-const strokeStyle: StrokeStyle = { width: 2, color: "rgba(150,150,150,0.9)" };

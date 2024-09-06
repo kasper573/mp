@@ -72,7 +72,6 @@ export class DGraphDebugUI extends Graphics {
       const text = [
         `screen: ${vecToString(lastScreenPosition)}`,
         `world: ${vecToString(lastWorldPosition)}`,
-        `camera rect: ${Engine.instance.camera.rect.toString()}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       ].join("\n");

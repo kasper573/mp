@@ -25,7 +25,7 @@ export function createGame(
       unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
       await game.init({ antialias: true, resizeTo, canvas });
       game.stage.interactive = true;
-      Engine.replace(game.stage);
+      Engine.replace(game);
     },
     dispose() {
       unsubFromState();

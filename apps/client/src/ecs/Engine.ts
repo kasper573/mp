@@ -1,6 +1,6 @@
 import { Vector } from "@mp/math";
 import { TimeSpan } from "@mp/state";
-import type { Container, FederatedPointerEvent } from "@mp/pixi";
+import type { Application, FederatedPointerEvent } from "@mp/pixi";
 import { Camera } from "./camera";
 
 export class Engine {
@@ -8,12 +8,12 @@ export class Engine {
 
   public camera: Camera;
 
-  static replace(stage: Container) {
+  static replace(app: Application) {
     if (Engine.instance) {
       Engine.instance.stop();
     }
 
-    Engine.instance = new Engine(stage);
+    Engine.instance = new Engine(app);
     Engine.instance.start();
   }
 
@@ -37,8 +37,8 @@ export class Engine {
     },
   };
 
-  private constructor(private stage: Container) {
-    this.camera = new Camera(stage);
+  private constructor(private app: Application) {
+    this.camera = new Camera(app.canvas);
   }
 
   private nextFrame: FrameRequestCallback = () => {
@@ -53,9 +53,9 @@ export class Engine {
   };
 
   private start() {
-    this.stage.on("pointermove", this.onPointerMove);
-    this.stage.on("pointerdown", this.onPointerDown);
-    this.stage.on("pointerup", this.onPointerUp);
+    this.app.stage.on("pointermove", this.onPointerMove);
+    this.app.stage.on("pointerdown", this.onPointerDown);
+    this.app.stage.on("pointerup", this.onPointerUp);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
 
@@ -64,9 +64,9 @@ export class Engine {
   }
 
   private stop() {
-    this.stage.off("pointermove", this.onPointerMove);
-    this.stage.off("pointerdown", this.onPointerDown);
-    this.stage.off("pointerup", this.onPointerUp);
+    this.app.stage.off("pointermove", this.onPointerMove);
+    this.app.stage.off("pointerdown", this.onPointerDown);
+    this.app.stage.off("pointerup", this.onPointerUp);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
   }
