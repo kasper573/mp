@@ -19,6 +19,7 @@ export class Vector implements VectorLike {
   equals = (v: Vector) => this.x === v.x && this.y === v.y;
 
   static from = (v: VectorLike) => new Vector(v.x, v.y);
+  static zero = new Vector(0, 0);
 }
 
 export interface VectorLike {
