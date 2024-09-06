@@ -9,16 +9,28 @@ export class Camera {
   constructor(private readonly cameraSize: Size) {}
 
   update(worldSize: Size, position: Vector): Matrix {
-    this.position = position;
-
-    const m = new Matrix();
-
     const scaleX = this.cameraSize.width / worldSize.width;
     const scaleY = this.cameraSize.height / worldSize.height;
     this.zoom = Math.max(scaleX, scaleY);
 
-    const offsetX = position.x - this.cameraSize.width / 2 / this.zoom;
-    const offsetY = position.y - this.cameraSize.height / 2 / this.zoom;
+    const halfCameraWidth = this.cameraSize.width / 2 / this.zoom;
+    const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;
+
+    const clampedX = Math.max(
+      halfCameraWidth,
+      Math.min(worldSize.width - halfCameraWidth, position.x),
+    );
+    const clampedY = Math.max(
+      halfCameraHeight,
+      Math.min(worldSize.height - halfCameraHeight, position.y),
+    );
+
+    this.position = new Vector(clampedX, clampedY);
+
+    const m = new Matrix();
+
+    const offsetX = this.position.x - halfCameraWidth;
+    const offsetY = this.position.y - halfCameraHeight;
 
     m.set(
       this.zoom,
