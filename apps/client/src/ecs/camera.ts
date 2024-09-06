@@ -1,4 +1,4 @@
-import { Vector } from "@mp/math";
+import { clamp, Vector } from "@mp/math";
 import type { Size } from "@mp/pixi";
 import { Matrix } from "@mp/pixi";
 
@@ -16,24 +16,17 @@ export class Camera {
   update(worldSize: Size, position: Vector): void {
     const scaleX = this.cameraSize.width / worldSize.width;
     const scaleY = this.cameraSize.height / worldSize.height;
-
     const minZoom = Math.max(scaleX, scaleY);
 
-    this.zoom = Math.max(minZoom, Math.min(this.maxZoom, this.desiredZoom));
+    this.zoom = clamp(this.desiredZoom, minZoom, this.maxZoom);
 
     const halfCameraWidth = this.cameraSize.width / 2 / this.zoom;
     const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;
 
-    const clampedX = Math.max(
-      halfCameraWidth,
-      Math.min(worldSize.width - halfCameraWidth, position.x),
+    this.position = new Vector(
+      clamp(position.x, halfCameraWidth, worldSize.width - halfCameraWidth),
+      clamp(position.y, halfCameraHeight, worldSize.height - halfCameraHeight),
     );
-    const clampedY = Math.max(
-      halfCameraHeight,
-      Math.min(worldSize.height - halfCameraHeight, position.y),
-    );
-
-    this.position = new Vector(clampedX, clampedY);
 
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
