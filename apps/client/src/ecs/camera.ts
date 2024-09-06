@@ -8,8 +8,8 @@ export class Camera {
 
   get rect(): Rect {
     const { x, y } = this.target ?? Vector.zero;
-    const maxX = this.world?.width ?? 0 - this.width;
-    const maxY = this.world?.height ?? 0 - this.height;
+    const maxX = this.world.width - this.width;
+    const maxY = this.world.height - this.height;
 
     return new Rect(
       clamp(x - this.width / 2, 0, maxX),
@@ -20,9 +20,9 @@ export class Camera {
   }
 
   constructor(
-    public world?: Container,
-    public width = world?.width ?? 1,
-    public height = world?.height ?? 1,
+    public readonly world: Container,
+    public width = world.width,
+    public height = world.height,
   ) {}
 
   update(target: Vector): void {

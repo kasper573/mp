@@ -1,18 +1,19 @@
 import { Vector } from "@mp/math";
 import { TimeSpan } from "@mp/state";
+import type { Container, FederatedPointerEvent } from "@mp/pixi";
 import { Camera } from "./camera";
 
 export class Engine {
   public static instance: Engine;
 
-  public camera = new Camera();
+  public camera: Camera;
 
-  static replace(canvas: HTMLCanvasElement) {
+  static replace(stage: Container) {
     if (Engine.instance) {
       Engine.instance.stop();
     }
 
-    Engine.instance = new Engine(canvas);
+    Engine.instance = new Engine(stage);
     Engine.instance.start();
   }
 
@@ -28,6 +29,7 @@ export class Engine {
     pointer: {
       lastScreenPosition: new Vector(0, 0),
       lastWorldPosition: new Vector(0, 0),
+      isDown: false,
     },
     keyboard: {
       isHeld: (key: KeyName) => this.heldKeys.has(key),
@@ -35,7 +37,9 @@ export class Engine {
     },
   };
 
-  private constructor(private canvas: HTMLCanvasElement) {}
+  private constructor(private stage: Container) {
+    this.camera = new Camera(stage);
+  }
 
   private nextFrame: FrameRequestCallback = () => {
     const thisFrame = performance.now();
@@ -49,7 +53,9 @@ export class Engine {
   };
 
   private start() {
-    this.canvas.addEventListener("mousemove", this.onMouseMove);
+    this.stage.on("pointermove", this.onPointerMove);
+    this.stage.on("pointerdown", this.onPointerDown);
+    this.stage.on("pointerup", this.onPointerUp);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
 
@@ -58,17 +64,22 @@ export class Engine {
   }
 
   private stop() {
-    this.canvas.removeEventListener("mousemove", this.onMouseMove);
+    this.stage.off("pointermove", this.onPointerMove);
+    this.stage.off("pointerdown", this.onPointerDown);
+    this.stage.off("pointerup", this.onPointerUp);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
   }
 
-  private onMouseMove = (e: MouseEvent) => {
+  private onPointerMove = (e: FederatedPointerEvent) => {
     this.input.pointer.lastScreenPosition = new Vector(e.clientX, e.clientY);
     this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
       this.input.pointer.lastScreenPosition,
     );
   };
+
+  private onPointerDown = () => (this.input.pointer.isDown = true);
+  private onPointerUp = () => (this.input.pointer.isDown = false);
 
   private onKeyDown = (e: KeyboardEvent) => {
     this.heldKeys.add(e.key as KeyName);

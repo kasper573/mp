@@ -1,6 +1,6 @@
 import { dNodeFromVector, type AreaResource } from "@mp/state";
 import type { Character, CharacterId } from "@mp/server";
-import { Cleanup, Container, sub } from "@mp/pixi";
+import { Cleanup, Container } from "@mp/pixi";
 import { snapTileVector } from "@mp/state";
 import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
@@ -30,7 +30,6 @@ export class AreaScene extends Container {
     super({ interactive: true });
 
     const { camera } = Engine.instance;
-    camera.world = this;
     camera.width = this.area.tiled.map.tilewidth * 10;
     camera.height = this.area.tiled.map.tileheight * 10;
 
@@ -63,8 +62,6 @@ export class AreaScene extends Container {
   activate = () => {
     this.cleanups.add(
       api.state.subscribe(this.synchronizeCharacters),
-      sub(this, "mousedown", () => (this.isMouseDown = true)),
-      sub(this, "mouseup", () => (this.isMouseDown = false)),
       Engine.instance.input.keyboard.subscribe(
         "Shift",
         this.tiledRenderer.toggleDebugUI,
@@ -72,14 +69,12 @@ export class AreaScene extends Container {
     );
   };
 
-  private isMouseDown = false;
-
   deactivate = () => {
     this.cleanups.flush();
   };
 
   override _onRender = () => {
-    if (!this.isMouseDown) {
+    if (!Engine.instance.input.pointer.isDown) {
       return;
     }
 
