@@ -5,10 +5,11 @@ import { Matrix } from "@mp/pixi";
 export class Camera {
   private position = new Vector(0, 0);
   private zoom = 1;
+  readonly transform: Matrix = new Matrix();
 
   constructor(private readonly cameraSize: Size) {}
 
-  update(worldSize: Size, position: Vector): Matrix {
+  update(worldSize: Size, position: Vector): void {
     const scaleX = this.cameraSize.width / worldSize.width;
     const scaleY = this.cameraSize.height / worldSize.height;
     this.zoom = Math.max(scaleX, scaleY);
@@ -27,12 +28,10 @@ export class Camera {
 
     this.position = new Vector(clampedX, clampedY);
 
-    const m = new Matrix();
-
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
 
-    m.set(
+    this.transform.set(
       this.zoom,
       0,
       0,
@@ -40,8 +39,6 @@ export class Camera {
       -offsetX * this.zoom,
       -offsetY * this.zoom,
     );
-
-    return m;
   }
 
   screenToWorld(screenPos: Vector): Vector {

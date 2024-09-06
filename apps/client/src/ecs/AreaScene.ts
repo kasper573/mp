@@ -122,9 +122,8 @@ export class AreaScene extends Container {
     const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
 
     if (char.id === this.myCharacterId) {
-      this.setFromMatrix(
-        Engine.instance.camera.update(this.tiledRenderer, pos),
-      );
+      Engine.instance.camera.update(this.tiledRenderer, pos);
+      this.setFromMatrix(Engine.instance.camera.transform);
     }
 
     actor.interpolator.configure(pos, {
