@@ -10,9 +10,8 @@ COPY package.json ./
 RUN PNPM_VERSION=$(jq -r '.packageManager' package.json) && \
     npm install -g $PNPM_VERSION
 
-# Install node dependencies
-COPY pnpm-lock.yaml .
-RUN pnpm install --frozen-lockfile
-
 # Copy the source code
 COPY . .
+    
+# Install node dependencies
+RUN pnpm install --frozen-lockfile
