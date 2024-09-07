@@ -39,10 +39,6 @@ export class DGraphDebugUI extends Graphics {
 
     this.clear();
 
-    if (this.pathToDraw.length) {
-      drawPath(this, this.tiled, this.pathToDraw);
-    }
-
     if (keyboard.isHeld("Control") && keyboard.isHeld("Shift")) {
       for (const pos of this.allTileCoords) {
         drawDNode(this, this.tiled, this.graph, pos);
@@ -68,6 +64,10 @@ export class DGraphDebugUI extends Graphics {
     }
 
     if (keyboard.isHeld("Shift") || keyboard.isHeld("Control")) {
+      if (this.pathToDraw.length) {
+        drawPath(this, this.tiled, this.pathToDraw);
+      }
+
       const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
       const text = [
         `screen: ${vecToString(lastScreenPosition)}`,
