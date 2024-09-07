@@ -14,7 +14,7 @@ export type ClientState = WorldState;
 export type ClientStateUpdate = WorldState;
 
 export class ServerContextSource {
-  constructor(private payload: ServerContextSourcePayload) {}
+  constructor(public readonly payload: ServerContextSourcePayload) {}
 
   unwrap<T extends ServerContextSourcePayload["type"]>(
     type: T,
@@ -27,9 +27,9 @@ export class ServerContextSource {
 }
 
 type ServerContextSourcePayload =
-  | { type: "server" }
-  | {
+  | Readonly<{ type: "server" }>
+  | Readonly<{
       type: "client";
       clientId: ClientId;
       characterId: CharacterId;
-    };
+    }>;

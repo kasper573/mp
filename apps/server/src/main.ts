@@ -41,7 +41,6 @@ async function main(opt: CliOptions) {
   const defaultAreaId = areas.value.keys().next().value;
   const world = await loadWorldState(db);
 
-  const global = createGlobalModule();
   const expressApp = express();
   expressApp.use(createExpressLogger(logger.chain("http")));
   expressApp.use(createCors({ origin: opt.corsOrigin }));
@@ -51,13 +50,14 @@ async function main(opt: CliOptions) {
   }
 
   const modules = createModules({
-    global,
     areas: areas.value,
     defaultAreaId,
     state: world,
     logger: logger.chain("module"),
     createUrl,
   });
+
+  const global = createGlobalModule(modules);
 
   const characterConnections = new Map<CharacterId, Set<ClientId>>();
 
@@ -68,7 +68,7 @@ async function main(opt: CliOptions) {
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
     parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),
-    onConnection: (input, context) => {
+    async onConnection(input, context) {
       const { characterId, clientId } = context.source.unwrap("client");
       let clientIdsForCharacter = characterConnections.get(characterId);
       if (!clientIdsForCharacter) {
@@ -76,11 +76,11 @@ async function main(opt: CliOptions) {
         characterConnections.set(characterId, clientIdsForCharacter);
       }
       clientIdsForCharacter.add(clientId);
-      global.connect({ input, context });
+      await global.connect({ input, context });
     },
-    onDisconnect: (input, context) => {
+    async onDisconnect(input, context) {
       const { characterId, clientId } = context.source.unwrap("client");
-      global.disconnect({ input, context });
+      await global.disconnect({ input, context });
       const clientIdsForCharacter = characterConnections.get(characterId);
       if (clientIdsForCharacter) {
         clientIdsForCharacter.delete(clientId);
@@ -98,7 +98,7 @@ async function main(opt: CliOptions) {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  setInterval(tick, opt.tickInterval);
+  setTimeout(tick, opt.tickInterval);
   setTimeout(persist, opt.persistInterval);
 
   let lastTick = performance.now();
@@ -108,17 +108,22 @@ async function main(opt: CliOptions) {
     world,
   };
 
-  function tick() {
+  async function tick() {
     try {
       const thisTick = performance.now();
       const tickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
       lastTick = thisTick;
 
-      global.tick({ input: tickDelta, context: tickContext });
+      // TODO ticks should be synchronous
+      await global.tick({ input: tickDelta, context: tickContext });
 
       for (const [clientId, stateUpdate] of getStateUpdates()) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
+
+      const tickDuration = performance.now() - thisTick;
+      const nextTick = Math.max(0, opt.tickInterval - tickDuration);
+      setTimeout(tick, nextTick);
     } catch (error) {
       onError(error, "tick");
     }
@@ -216,4 +221,4 @@ ${Object.entries(options)
 =====================================================`;
 }
 
-main(readCliOptions());
+void main(readCliOptions());

@@ -20,6 +20,7 @@ export interface WorldModuleDependencies {
   characterKeepAliveTimeout?: TimeSpan;
 }
 
+export type WorldModule = ReturnType<typeof createWorldModule>;
 export function createWorldModule({
   state,
   areas,
@@ -54,9 +55,10 @@ export function createWorldModule({
 
     move: t.procedure
       .input<Vector>()
-      .create(({ input: { x, y }, context: { source } }) => {
+      .create(async ({ input: { x, y }, context: { source } }) => {
         const { characterId } = source.unwrap("client");
         const char = state.characters.get(characterId);
+
         if (!char) {
           logger.error("Character not found", characterId);
           return;

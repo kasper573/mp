@@ -1,1 +1,7 @@
-{ "extends": "@mp/tsconfig/node.json" }
+{
+  "extends": "@mp/tsconfig/node.json",
+  "include": ["src", "./drizzle.config.js", "./tsup.config.mjs"],
+  "compilerOptions": {
+    "allowJs": true
+  }
+}
