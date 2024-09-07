@@ -1,3 +1,0 @@
-FROM jc21/nginx-proxy-manager:2.11.3 AS production
-
-COPY ./nginx/ /data/nginx/custom/

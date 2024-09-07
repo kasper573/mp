@@ -24,10 +24,7 @@ services:
       MP_CORS_ORIGIN: "k573.dev"
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
   proxy:
-    build:
-      dockerfile: Dockerfile.proxy
-      context: .
-    image: ghcr.io/kasper573/mp-proxy:latest
+    image: "jc21/nginx-proxy-manager:2.11.3"
     restart: unless-stopped
     ports:
       - "80:80"
