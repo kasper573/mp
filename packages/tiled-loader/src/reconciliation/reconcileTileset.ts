@@ -29,7 +29,7 @@ export async function reconcileTileset(
   tileset.wangsets?.forEach(reconcileProperties);
 
   // The original tileset data is a list of tiles, but we want them mapped by GID
-  const tiles = new Map();
+  const tiles = new Map<LocalTileId, TilesetTile>();
   for (const tile of (tileset as unknown as UnresolvedTileset).tiles ?? []) {
     reconcileProperties(tile);
     tiles.set(tile.id, tile);

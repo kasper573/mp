@@ -55,7 +55,7 @@ export function createWorldModule({
 
     move: t.procedure
       .input<Vector>()
-      .create(async ({ input: { x, y }, context: { source } }) => {
+      .create(({ input: { x, y }, context: { source } }) => {
         const { characterId } = source.unwrap("client");
         const char = state.characters.get(characterId);
 
@@ -119,7 +119,7 @@ export function createWorldModule({
     leave: t.procedure
       .type("server-only")
       .input<DisconnectReason>()
-      .create(async ({ input: reason, context: { source } }) => {
+      .create(({ input: reason, context: { source } }) => {
         const { clientId, characterId } = source.unwrap("client");
         logger.info("Client disconnected", { clientId, characterId, reason });
       }),

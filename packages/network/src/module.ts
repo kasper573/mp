@@ -6,8 +6,9 @@ export function createModule<Procedures extends AnyProcedureRecord>(
   procedureHandlers: Procedures,
 ): Module<Procedures> {
   // A module is essentially just a dispatcher
-  const dispatcher = createDispatcher((...[procedureName, procedurePayload]) =>
-    procedureHandlers[procedureName].handler(procedurePayload),
+  const dispatcher = createDispatcher(
+    (...[procedureName, procedurePayload]) =>
+      procedureHandlers[procedureName].handler(procedurePayload) as never,
   );
 
   return new Proxy(dispatcher as Module<Procedures>, {
@@ -24,7 +25,7 @@ export function createModule<Procedures extends AnyProcedureRecord>(
   });
 }
 
-const procedureTypeGetter = "$getProcedureType" as const;
+const procedureTypeGetter = "$getProcedureType";
 
 export type Module<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
   Dispatcher<ModuleProcedures<Procedures>> & {

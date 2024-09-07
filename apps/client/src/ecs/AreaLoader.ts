@@ -37,7 +37,8 @@ export class AreaLoader {
 
 async function loadJson(url: string) {
   const response = await fetch(url);
-  return response.json();
+  const json: unknown = await response.json();
+  return json as Record<string, unknown>;
 }
 
 function relativeURL(url: string, base: string) {

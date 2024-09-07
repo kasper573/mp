@@ -45,7 +45,7 @@ function isPrimitive(value: unknown) {
 }
 
 function decoratePrefix(prefix: unknown) {
-  return `[${prefix}]`;
+  return `[${String(prefix)}]`;
 }
 
 const logLevelColors = {

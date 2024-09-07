@@ -14,12 +14,14 @@ export function findPath(
   try {
     // Skip the first node in the result because it is the start node.
     // We are only interested in future nodes.
-    const [_, ...remaining] = find_path(
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const res: DNode[] = find_path(
       graph,
       dNodeFromVector(start),
       dNodeFromVector(target),
-    ).map(vectorFromDNode);
+    );
 
+    const [_, ...remaining] = res.map(vectorFromDNode);
     return remaining;
   } catch {
     // Do nothing
@@ -79,4 +81,4 @@ export type DGraph<Node extends DNode = DNode> = {
 
 export type DNode = `${number}${typeof separator}${number}`;
 
-const separator = "|" as const;
+const separator = "|";

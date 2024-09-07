@@ -27,13 +27,11 @@ export async function reconcileLayer(
       layer.image = reconcileFilePath(context, layer.image);
       break;
     case "objectgroup":
-      promises.push(
-        ...layer.objects.map(async (object, i) => {
-          object = reconcileObject(object);
-          layer.objects[i] = object;
-          return object;
-        }),
-      );
+      layer.objects.forEach((object, i) => {
+        object = reconcileObject(object);
+        layer.objects[i] = object;
+        return object;
+      });
       break;
     case "group":
       promises.push(

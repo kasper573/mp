@@ -22,7 +22,7 @@ export function createGame(
     canvas,
     async init({ container, resizeTo }: GameInitOptions) {
       container.appendChild(canvas);
-      unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
+      unsubFromState = api.state.subscribe(() => void changeArea(me()?.areaId));
       await app.init({ antialias: true, roundPixels: true, resizeTo, canvas });
 
       app.stage.interactive = true;

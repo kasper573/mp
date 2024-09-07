@@ -1,6 +1,7 @@
 import path from "path";
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
+import { TimeSpan } from "@mp/time";
 
 export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
@@ -19,13 +20,13 @@ export function readCliOptions(argv = process.argv) {
       type: "string",
       description:
         "If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.",
-      coerce: (p) => (p ? path.resolve(p) : undefined),
+      coerce: (p: string) => (p ? path.resolve(p) : undefined),
     })
     .option("publicDir", {
       type: "string",
       default: "public",
       description: "The directory to serve static files from",
-      coerce: path.resolve,
+      coerce: (p: string) => path.resolve(p),
     })
     .option("publicPath", {
       type: "string",
@@ -57,6 +58,7 @@ export function readCliOptions(argv = process.argv) {
       type: "number",
       default: 1000 / 60,
       description: "The server tick interval in milliseconds",
+      coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
     })
 
     .option("persistInterval", {
@@ -64,6 +66,7 @@ export function readCliOptions(argv = process.argv) {
       default: 1000,
       description:
         "How often in milliseconds to save the world state to the database",
+      coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
     })
     .option("databaseUrl", {
       type: "string",

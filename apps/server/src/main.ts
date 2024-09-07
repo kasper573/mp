@@ -1,4 +1,3 @@
-import "./polyfill";
 import path from "path";
 import http from "http";
 import { Logger } from "@mp/logger";
@@ -7,7 +6,7 @@ import { type PathToLocalFile, type UrlToPublicFile } from "@mp/state";
 import createCors from "cors";
 import type { CreateContextOptions } from "@mp/network/server";
 import { Server } from "@mp/network/server";
-import { TimeSpan } from "@mp/time";
+import type { TimeSpan } from "@mp/time";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import {
@@ -21,6 +20,7 @@ import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
+import { setAsyncInterval } from "./asyncInterval";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
@@ -38,7 +38,7 @@ async function main(opt: CliOptions) {
     process.exit(1);
   }
 
-  const defaultAreaId = areas.value.keys().next().value;
+  const defaultAreaId = Array.from(areas.value.keys())[0];
   const world = await loadWorldState(db);
 
   const expressApp = express();
@@ -98,32 +98,22 @@ async function main(opt: CliOptions) {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  setTimeout(tick, opt.tickInterval);
-  setTimeout(persist, opt.persistInterval);
-
-  let lastTick = performance.now();
+  setAsyncInterval(tick, opt.tickInterval);
+  setAsyncInterval(persist, opt.persistInterval);
 
   const tickContext: ServerContext = {
     source: new ServerContextSource({ type: "server" }),
     world,
   };
 
-  async function tick() {
+  async function tick(tickDelta: TimeSpan) {
     try {
-      const thisTick = performance.now();
-      const tickDelta = TimeSpan.fromMilliseconds(thisTick - lastTick);
-      lastTick = thisTick;
-
       // TODO ticks should be synchronous
       await global.tick({ input: tickDelta, context: tickContext });
 
       for (const [clientId, stateUpdate] of getStateUpdates()) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
-
-      const tickDuration = performance.now() - thisTick;
-      const nextTick = Math.max(0, opt.tickInterval - tickDuration);
-      setTimeout(tick, nextTick);
     } catch (error) {
       onError(error, "tick");
     }
@@ -134,7 +124,6 @@ async function main(opt: CliOptions) {
     if (!result.ok) {
       logger.error("Failed to persist world state", result.error);
     }
-    setTimeout(persist, opt.persistInterval);
   }
 
   function* getStateUpdates() {
@@ -163,10 +152,10 @@ async function main(opt: CliOptions) {
     };
   }
 
-  async function createServerContext({
+  function createServerContext({
     clientId,
     auth,
-  }: CreateContextOptions<ClientId>): Promise<ServerContext> {
+  }: CreateContextOptions<ClientId>): ServerContext {
     if (!auth) {
       throw new Error(`Client ${clientId} is not authenticated`);
     }
@@ -216,7 +205,7 @@ function serverTextHeader(options: CliOptions) {
 #                ╚═╝     ╚═╝ ╚═╝                    #
 =====================================================
 ${Object.entries(options)
-  .map(([k, v]) => `- ${k}: ${v}`)
+  .map(([k, v]) => `- ${k}: ${String(v)}`)
   .join("\n")}
 =====================================================`;
 }

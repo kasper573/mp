@@ -88,7 +88,7 @@ export class Server<
             return;
           }
 
-          const output = await module[procedureName]({
+          const output: unknown = await module[procedureName]({
             input,
             context: await socketContext(),
           });
@@ -130,11 +130,11 @@ export interface CreateServerOptions<
   onConnection?: (
     reason: ConnectReason,
     context: ServerContext,
-  ) => unknown | Promise<unknown>;
+  ) => void | undefined | Promise<unknown>;
   onDisconnect?: (
     reason: DisconnectReason,
     context: ServerContext,
-  ) => unknown | Promise<unknown>;
+  ) => void | undefined | Promise<unknown>;
   onError?: ServerErrorHandler;
   onMessageIgnored?: (message: SocketIO_RPC) => void;
 }

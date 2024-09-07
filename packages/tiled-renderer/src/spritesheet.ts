@@ -6,7 +6,7 @@ import type {
   Texture,
 } from "@mp/pixi";
 import { Assets, Spritesheet } from "@mp/pixi";
-import type { LocalTileId, Milliseconds } from "@mp/tiled-loader";
+import type { FilePath, LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
   localToGlobalId,
   type GlobalTileId,
@@ -17,17 +17,19 @@ import {
 export async function loadTiledMapSpritesheets(
   tiledMap: TiledMap,
 ): Promise<TiledSpritesheetRecord> {
-  return Object.fromEntries(
-    await Promise.all(
-      tiledMap.tilesets.map(async (tileset) => [
+  const tilesetsByPath = await Promise.all(
+    tiledMap.tilesets.map(
+      async (tileset): Promise<[FilePath, TiledSpritesheet]> => [
         tileset.image,
         await loadTilesetSpritesheet(tileset, {
           width: tiledMap.tilewidth,
           height: tiledMap.tileheight,
         }),
-      ]),
+      ],
     ),
   );
+
+  return Object.fromEntries<TiledSpritesheet>(tilesetsByPath);
 }
 
 async function loadTilesetSpritesheet(

@@ -12,7 +12,7 @@ export class TiledRenderer extends LayerContainer {
   constructor(private map: TiledMap) {
     super();
 
-    this.on("added", this.activate);
+    this.on("added", this.activate as () => void);
     this.on("removed", this.deactivate);
   }
 
