@@ -54,7 +54,6 @@ async function loadTilesetSpritesheet(
     ),
     meta: {
       image: tileset.image,
-      format: "RGBA8888", // TODO figure out what this should be
       size: { w: tileset.imagewidth, h: tileset.imageheight },
       scale: 1,
     },
@@ -67,7 +66,9 @@ async function loadTilesetSpritesheet(
     animationsWithDuration,
   };
 
-  const ss = new Spritesheet(await Assets.load(tileset.image), data);
+  const texture = await Assets.load<Texture>(tileset.image);
+  texture.source.scaleMode = "nearest";
+  const ss = new Spritesheet(texture, data);
 
   await ss.parse();
 
@@ -104,6 +105,7 @@ export function createTextureLookup(
     texture(id) {
       for (const ss of Object.values(spritesheets)) {
         const texture = ss.textures[id];
+
         if (texture) {
           return texture;
         }

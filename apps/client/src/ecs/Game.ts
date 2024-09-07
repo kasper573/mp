@@ -10,9 +10,9 @@ export function createGame(
   debug: (text: string) => void,
 ): Game {
   const canvas = document.createElement("canvas");
-  const game = new Application();
+  const app = new Application();
 
-  const changeArea = createAreaChanger(game, (id) =>
+  const changeArea = createAreaChanger(app, (id) =>
     areaLoader.require(id).then((area) => new AreaScene(area, debug)),
   );
 
@@ -23,13 +23,14 @@ export function createGame(
     async init({ container, resizeTo }: GameInitOptions) {
       container.appendChild(canvas);
       unsubFromState = api.state.subscribe(() => changeArea(me()?.areaId));
-      await game.init({ antialias: true, resizeTo, canvas });
-      game.stage.interactive = true;
-      Engine.replace(game);
+      await app.init({ antialias: true, roundPixels: true, resizeTo, canvas });
+
+      app.stage.interactive = true;
+      Engine.replace(app);
     },
     dispose() {
       unsubFromState();
-      game.destroy(undefined, { children: true });
+      app.destroy(undefined, { children: true });
       canvas.remove();
     },
   };
@@ -41,7 +42,7 @@ function me() {
 
 // TODO refactor
 function createAreaChanger(
-  game: Application,
+  app: Application,
   loadScene: (id: AreaId) => Promise<AreaScene>,
 ) {
   let currentAreaId: AreaId | undefined;
@@ -51,16 +52,16 @@ function createAreaChanger(
     }
 
     currentAreaId = areaId;
-    const [currentScene] = game.stage.children;
+    const [currentScene] = app.stage.children;
     if (currentScene instanceof AreaScene) {
-      game.stage.removeChild(currentScene);
+      app.stage.removeChild(currentScene);
     }
 
     if (areaId === undefined) {
       return;
     }
 
-    game.stage.addChild(await loadScene(areaId));
+    app.stage.addChild(await loadScene(areaId));
   };
 }
 
