@@ -70,7 +70,6 @@ export class Server<
 
       socket.once("disconnect", async (reason) => {
         try {
-          socket.data;
           onDisconnect?.(reason, await socketContext());
         } catch (e) {
           onError?.(e, "disconnect");
