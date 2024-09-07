@@ -71,8 +71,9 @@ jobs:
           host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
           username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          source: "nginx/**"
+          source: "nginx/*"
           target: /data/nginx/custom/
+          rm: true
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
