@@ -60,7 +60,7 @@ export class Server<
       };
 
       try {
-        onConnection?.(
+        await onConnection?.(
           socket.recovered ? "recovered" : "new",
           await socketContext(),
         );
@@ -70,7 +70,7 @@ export class Server<
 
       socket.once("disconnect", async (reason) => {
         try {
-          onDisconnect?.(reason, await socketContext());
+          await onDisconnect?.(reason, await socketContext());
         } catch (e) {
           onError?.(e, "disconnect");
         }
@@ -127,8 +127,14 @@ export interface CreateServerOptions<
   parseAuth?: (auth: Record<string, string>) => SocketIO_Auth | undefined;
   serializeRPCOutput: SocketIO_DTOSerializer<unknown>;
   serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
-  onConnection?: (reason: ConnectReason, context: ServerContext) => void;
-  onDisconnect?: (reason: DisconnectReason, context: ServerContext) => void;
+  onConnection?: (
+    reason: ConnectReason,
+    context: ServerContext,
+  ) => unknown | Promise<unknown>;
+  onDisconnect?: (
+    reason: DisconnectReason,
+    context: ServerContext,
+  ) => unknown | Promise<unknown>;
   onError?: ServerErrorHandler;
   onMessageIgnored?: (message: SocketIO_RPC) => void;
 }

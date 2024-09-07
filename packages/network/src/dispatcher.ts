@@ -1,21 +1,13 @@
-export function createDispatcher<
-  OutgoingProcedures extends AnyProcedures,
-  IncomingProcedures extends AnyProcedures,
->(
+export function createDispatcher<OutgoingProcedures extends AnyProcedures>(
   call: CallFn<OutgoingProcedures>,
-  subscribe = noop as SubscribeFn<IncomingProcedures>,
-): Dispatcher<OutgoingProcedures, IncomingProcedures> {
-  return new Proxy({} as Dispatcher<OutgoingProcedures, IncomingProcedures>, {
+): Dispatcher<OutgoingProcedures> {
+  return new Proxy({} as Dispatcher<OutgoingProcedures>, {
     get(_, propertyName: string) {
-      function procedure(
+      async function procedure(
         ...args: Parameters<OutgoingProcedures[keyof OutgoingProcedures]>
       ) {
         return call(propertyName, ...args);
       }
-
-      procedure.subscribe = (
-        handler: IncomingProcedures[keyof IncomingProcedures],
-      ) => subscribe(propertyName, handler);
 
       return procedure;
     },
@@ -33,17 +25,10 @@ type ProcedureDefinition<Args extends unknown[], Output> = (
   ...args: Args
 ) => ProcedureOutput<Output>;
 
-export type Dispatcher<
-  OutgoingProcedures extends AnyProcedures,
-  IncomingProcedures extends AnyProcedures,
-> = {
+export type Dispatcher<OutgoingProcedures extends AnyProcedures> = {
   [ProcedureName in keyof OutgoingProcedures]: RPC<
     OutgoingProcedures[ProcedureName]
   >;
-} & {
-  [ProcedureName in keyof IncomingProcedures]: {
-    subscribe(handler: IncomingProcedures[ProcedureName]): Unsubscribe;
-  };
 };
 
 type RPC<Definition> =
@@ -57,14 +42,3 @@ export type CallFn<Procedures extends AnyProcedures = AnyProcedures> = <
   procedureName: ProcedureName,
   ...args: Parameters<Procedures[ProcedureName]>
 ) => Promise<ReturnType<Procedures[ProcedureName]>>;
-
-export type SubscribeFn<Procedures extends AnyProcedures = AnyProcedures> = <
-  ProcedureName extends keyof Procedures,
->(
-  procedureName: ProcedureName,
-  handler: Procedures[ProcedureName],
-) => Unsubscribe;
-
-const noop = () => () => {};
-
-export type Unsubscribe = () => void;

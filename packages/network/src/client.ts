@@ -81,23 +81,18 @@ function createModuleDispatcher<State, StateUpdate>(
   socket: ClientSocket<State>,
   options: ClientOptions<State, StateUpdate>,
 ) {
-  return createDispatcher(
-    async (procedureName, ...[input]) => {
-      const serializedResponse = await socket.emitWithAck(
-        "rpc",
-        options.serializeRPC({
-          moduleName: String(moduleName),
-          procedureName: String(procedureName),
-          input,
-        }),
-      );
+  return createDispatcher(async (procedureName, ...[input]) => {
+    const serializedResponse = await socket.emitWithAck(
+      "rpc",
+      options.serializeRPC({
+        moduleName: String(moduleName),
+        procedureName: String(procedureName),
+        input,
+      }),
+    );
 
-      return options.parseRPCOutput(serializedResponse) as never;
-    },
-    () => {
-      throw new Error("Subscriptions are not supported on the client");
-    },
-  );
+    return options.parseRPCOutput(serializedResponse) as never;
+  });
 }
 
 export interface BuiltInClientState {
@@ -127,7 +122,7 @@ type ClientModuleRecord<Procedures extends AnyModuleDefinitionRecord> = {
 };
 
 type ClientModule<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
-  Dispatcher<ClientToServerProcedures<Procedures>, {}>;
+  Dispatcher<ClientToServerProcedures<Procedures>>;
 
 type ClientToServerProcedures<Procedures extends AnyProcedureRecord> = {
   [ProcedureName in ProcedureNamesForType<

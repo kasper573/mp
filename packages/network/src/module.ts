@@ -3,44 +3,11 @@ import type { Dispatcher, ProcedureOutput } from "./dispatcher";
 import { createDispatcher } from "./dispatcher";
 
 export function createModule<Procedures extends AnyProcedureRecord>(
-  procedures: Procedures,
+  procedureHandlers: Procedures,
 ): Module<Procedures> {
-  const procedureHandlers = new Map<
-    keyof Procedures,
-    Set<AnyProcedureHandler>
-  >();
-
   // A module is essentially just a dispatcher
-  const dispatcher = createDispatcher(
-    async (...[procedureName, procedurePayload]) => {
-      let outputForBuiltInHandler;
-
-      const handlersForProcedure = procedureHandlers.get(procedureName);
-      if (handlersForProcedure) {
-        Array.from(handlersForProcedure).map((handler) => {
-          const output = handler(procedurePayload);
-          if (handler === procedures[procedureName].handler) {
-            outputForBuiltInHandler = output;
-          }
-        });
-      }
-
-      return outputForBuiltInHandler as never;
-    },
-    (procedureName, handler) => {
-      let handlers = procedureHandlers.get(procedureName);
-      if (!handlers) {
-        handlers = new Set();
-        procedureHandlers.set(procedureName, handlers);
-      }
-      handlers.add(handler);
-      return () => handlers.delete(handler);
-    },
-  );
-
-  // But with predefined procedure handlers
-  Object.entries(procedures).forEach(([name, { handler }]) =>
-    dispatcher[name].subscribe(handler),
+  const dispatcher = createDispatcher((...[procedureName, procedurePayload]) =>
+    procedureHandlers[procedureName].handler(procedurePayload),
   );
 
   return new Proxy(dispatcher as Module<Procedures>, {
@@ -48,7 +15,7 @@ export function createModule<Procedures extends AnyProcedureRecord>(
       // It has the ability to inspect the type of an procedure
       if (prop === procedureTypeGetter) {
         return (procedureName: keyof Procedures) =>
-          procedures[procedureName].type;
+          procedureHandlers[procedureName].type;
       } else {
         // And everything else a dispatcher can do
         return target[prop];
@@ -60,7 +27,7 @@ export function createModule<Procedures extends AnyProcedureRecord>(
 const procedureTypeGetter = "$getProcedureType" as const;
 
 export type Module<Procedures extends AnyProcedureRecord = AnyProcedureRecord> =
-  Dispatcher<ModuleProcedures<Procedures>, ModuleProcedures<Procedures>> & {
+  Dispatcher<ModuleProcedures<Procedures>> & {
     [procedureTypeGetter](procedureName: keyof Procedures): ProcedureType;
   };
 

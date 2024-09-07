@@ -1,3 +1,4 @@
+import type { ProcedureOutput } from "./dispatcher";
 import type {
   ProcedureDefinition,
   ProcedureHandler,
@@ -16,13 +17,30 @@ export class Factory<Context> {
     return createModule(procedures);
   }
 
-  procedure = new ModuleProcedureFactory<
-    Context,
-    "client-to-server",
-    void,
-    void
-  >("client-to-server");
+  procedure: ModuleProcedureFactory<Context, "client-to-server", void, void>;
+
+  constructor({
+    middleware = passThroughMiddleware,
+  }: FactoryOptions<Context> = {}) {
+    this.procedure = new ModuleProcedureFactory(
+      "client-to-server",
+      middleware as ModuleMiddleware<void, void, Context>,
+    );
+  }
 }
+
+export interface FactoryOptions<Context> {
+  middleware?: ModuleMiddleware<unknown, unknown, Context>;
+}
+
+export type ModuleMiddleware<Input, Output, Context> = (
+  payload: ProcedurePayload<Input, Context>,
+  next: ModuleMiddlewareNext<Input, Output, Context>,
+) => ProcedureOutput<Output>;
+
+export type ModuleMiddlewareNext<Input, Output, Context> = (
+  payload: ProcedurePayload<Input, Context>,
+) => ProcedureOutput<Output>;
 
 class ModuleProcedureFactory<
   Context,
@@ -30,21 +48,37 @@ class ModuleProcedureFactory<
   Input,
   Output,
 > {
-  constructor(private _type: Type) {}
+  constructor(
+    private _type: Type,
+    private _middleware: ModuleMiddleware<Input, Output, Context>,
+  ) {}
 
   input<NewInput>() {
     return new ModuleProcedureFactory<Context, Type, NewInput, Output>(
       this._type,
+      this._middleware as unknown as ModuleMiddleware<
+        NewInput,
+        Output,
+        Context
+      >,
     );
   }
 
   type<NewType extends ProcedureType>(newType: NewType) {
-    return new ModuleProcedureFactory<Context, NewType, Input, Output>(newType);
+    return new ModuleProcedureFactory<Context, NewType, Input, Output>(
+      newType,
+      this._middleware,
+    );
   }
 
   output<NewOutput>() {
     return new ModuleProcedureFactory<Context, Type, Input, NewOutput>(
       this._type,
+      this._middleware as unknown as ModuleMiddleware<
+        Input,
+        NewOutput,
+        Context
+      >,
     );
   }
 
@@ -54,7 +88,13 @@ class ModuleProcedureFactory<
       isVoidOrUndefined<Output>
     >
   ): ProcedureDefinition<Type, ProcedurePayload<Input, Context>, Output> {
-    return { type: this._type, handler: handler ?? (noop as never) };
+    const next: ModuleMiddlewareNext<Input, Output, Context> =
+      handler ?? (noop as never);
+    return {
+      type: this._type,
+      handler: (payload) =>
+        this._middleware(payload as ProcedurePayload<Input, Context>, next),
+    };
   }
 }
 
@@ -64,3 +104,8 @@ type OptionalHandlerWhen<
 > = Condition extends true ? [handler?: Param] : [handler: Param];
 
 const noop = () => {};
+
+const passThroughMiddleware = <Input, Output, Context>(
+  payload: ProcedurePayload<Input, Context>,
+  next: ModuleMiddlewareNext<Input, Output, Context>,
+) => next(payload);
