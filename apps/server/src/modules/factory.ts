@@ -15,7 +15,11 @@ export const t = new Factory<ServerContext>({
       case "server":
         return next(req);
       case "client":
-        await globalRequestLimit.consume(payload.clientId);
+        try {
+          await globalRequestLimit.consume(payload.clientId);
+        } catch (e) {
+          throw new Error("Rate limit exceeded");
+        }
         return next(req);
     }
   },
