@@ -60,46 +60,52 @@ export class Server<
         });
       };
 
+      let connectContext;
       try {
+        connectContext = await socketContext();
         await onConnection?.(
           socket.recovered ? "recovered" : "new",
-          await socketContext(),
+          connectContext,
         );
-      } catch (e) {
-        onError?.(e, "connection");
+      } catch (error) {
+        onError?.({ type: "connection", error, context: connectContext });
       }
 
       socket.once("disconnect", async (reason) => {
+        let disconnectContext;
         try {
-          await onDisconnect?.(reason, await socketContext());
-        } catch (e) {
-          onError?.(e, "disconnect");
+          disconnectContext = await socketContext();
+          await onDisconnect?.(reason, disconnectContext);
+        } catch (error) {
+          onError?.({ type: "disconnect", error, context: disconnectContext });
         }
       });
 
       socket.on("rpc", async (serializedRPC, respondWithOutput) => {
-        let message;
+        let rpc;
+        let rpcContext;
         try {
-          message = parseRPC(serializedRPC);
-          const { moduleName, procedureName, input } = message;
+          rpc = parseRPC(serializedRPC);
+          const { moduleName, procedureName, input } = rpc;
           const module = modules[moduleName];
 
           if (module.$getProcedureType(procedureName) !== "client-to-server") {
-            onMessageIgnored?.(message);
+            onMessageIgnored?.(rpc);
             return;
           }
 
+          rpcContext = await socketContext();
           const output: unknown = await module[procedureName]({
             input,
-            context: await socketContext(),
+            context: rpcContext,
           });
 
           respondWithOutput(serializeRPCResponse({ ok: true, output }));
-        } catch (e) {
+        } catch (error) {
           respondWithOutput(
-            serializeRPCResponse({ ok: false, error: String(e) }),
+            serializeRPCResponse({ ok: false, error: String(error) }),
           );
-          onError?.(e, "message", message);
+          onError?.({ type: "rpc", error, rpc, context: rpcContext });
         }
       });
     });
@@ -139,7 +145,7 @@ export interface CreateServerOptions<
     reason: DisconnectReason,
     context: ServerContext,
   ) => void | undefined | Promise<unknown>;
-  onError?: ServerErrorHandler;
+  onError?: ServerErrorHandler<ServerContext>;
   onMessageIgnored?: (message: SocketIO_RPC) => void;
 }
 
@@ -148,10 +154,17 @@ export interface CreateContextOptions<ClientId extends string> {
   auth?: SocketIO_Auth;
 }
 
-export type ServerErrorHandler = (
-  error: unknown,
-  procedure: "connection" | "disconnect" | "message",
-  message?: SocketIO_RPC,
+export interface ServerError<ServerContext, Type = ServerErrorType> {
+  error: unknown;
+  type: Type;
+  rpc?: SocketIO_RPC;
+  context?: ServerContext;
+}
+
+export type ServerErrorType = "connection" | "disconnect" | "rpc";
+
+export type ServerErrorHandler<ServerContext> = (
+  error: ServerError<ServerContext>,
 ) => void;
 
 export type { DisconnectReason };

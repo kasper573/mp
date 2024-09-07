@@ -4,7 +4,7 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/state";
 import createCors from "cors";
-import type { CreateContextOptions } from "@mp/network/server";
+import type { CreateContextOptions, ServerError } from "@mp/network/server";
 import { Server } from "@mp/network/server";
 import type { TimeSpan } from "@mp/time";
 import { createGlobalModule } from "./modules/global";
@@ -115,7 +115,7 @@ async function main(opt: CliOptions) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
     } catch (error) {
-      onError(error, "tick");
+      onError({ type: "tick", error, context: tickContext });
     }
   }
 
@@ -169,8 +169,18 @@ async function main(opt: CliOptions) {
     };
   }
 
-  function onError(e: unknown, type: string, message?: unknown) {
-    logger.chain(type).error(...(message ? [message, e] : [e]));
+  function onError({
+    type,
+    rpc,
+    error,
+    context,
+  }: ServerError<ServerContext, string>) {
+    const id =
+      context?.source.payload.type === "client"
+        ? context.source.payload.clientId
+        : "server invocation";
+    const args: unknown[] = [id, rpc, error].filter(Boolean);
+    logger.chain(type).error(...args);
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
