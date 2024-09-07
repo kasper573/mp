@@ -65,16 +65,6 @@ jobs:
       - name: Load docker-compose file into environment
         run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
 
-      - name: Upload custom nginx configuration files
-        uses: easingthemes/ssh-deploy@v5.1.0
-        with:
-          REMOTE_HOST: ${{ vars.DIGITALOCEAN_SSH_HOST }}
-          REMOTE_USER: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
-          SSH_PRIVATE_KEY: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-          SOURCE: "nginx/"
-          TARGET: "/var/lib/docker/volumes/root_proxy-data/_data/nginx/custom/"
-          ARGS: "-rlgoDzvc -i --delete"
-
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
         with:
