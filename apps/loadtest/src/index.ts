@@ -52,9 +52,10 @@ async function loadTestWebSockets() {
     range(connections).map(async (clientNr) => {
       const client = new Client<ServerModules, ClientState, ClientStateUpdate>({
         url: wsServerUrl,
+        rpcTimeout: 5000,
         createInitialState: () => ({ characters: new Map() }),
         parseStateUpdate: serialization.stateUpdate.parse,
-        parseRPCOutput: serialization.rpc.parse,
+        parseRPCResponse: serialization.rpc.parse,
         createNextState: (_, nextState) => nextState,
         serializeRPC: serialization.rpc.serialize,
         getAuth: () => ({

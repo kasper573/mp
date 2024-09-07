@@ -8,6 +8,7 @@ import type {
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
   SocketIO_RPC as SocketIO_RPC,
+  SocketIO_RPCResponse,
   SocketIO_ServerToClientEvents,
 } from "./socket";
 
@@ -37,7 +38,7 @@ export class Server<
       modules,
       createContext,
       parseRPC,
-      serializeRPCOutput,
+      serializeRPCResponse,
       onError,
       onMessageIgnored,
       onConnection,
@@ -93,8 +94,11 @@ export class Server<
             context: await socketContext(),
           });
 
-          respondWithOutput(serializeRPCOutput(output));
+          respondWithOutput(serializeRPCResponse({ ok: true, output }));
         } catch (e) {
+          respondWithOutput(
+            serializeRPCResponse({ ok: false, error: String(e) }),
+          );
           onError?.(e, "message", message);
         }
       });
@@ -125,7 +129,7 @@ export interface CreateServerOptions<
   ) => ServerContext | Promise<ServerContext>;
   parseRPC: SocketIO_DTOParser<SocketIO_RPC>;
   parseAuth?: (auth: Record<string, string>) => SocketIO_Auth | undefined;
-  serializeRPCOutput: SocketIO_DTOSerializer<unknown>;
+  serializeRPCResponse: SocketIO_DTOSerializer<SocketIO_RPCResponse<unknown>>;
   serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
   onConnection?: (
     reason: ConnectReason,

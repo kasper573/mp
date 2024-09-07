@@ -64,7 +64,7 @@ async function main(opt: CliOptions) {
   const socketServer = new Server({
     createContext: createServerContext,
     modules,
-    serializeRPCOutput: serialization.rpc.serialize,
+    serializeRPCResponse: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
     parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),

@@ -1,7 +1,9 @@
 export interface SocketIO_ClientToServerEvents {
   rpc: (
     rpc: SocketIO_DTO<SocketIO_RPC>,
-    respondWithOutput: (output: SocketIO_DTO<unknown>) => void,
+    respondWithOutput: (
+      output: SocketIO_DTO<SocketIO_RPCResponse<unknown>>,
+    ) => void,
   ) => void;
 }
 
@@ -10,6 +12,10 @@ export interface SocketIO_RPC {
   procedureName: string;
   input: unknown;
 }
+
+export type SocketIO_RPCResponse<Output> =
+  | { ok: true; output: Output }
+  | { ok: false; error: string };
 
 export interface SocketIO_ServerToClientEvents<StateUpdate> {
   stateUpdate: (update: SocketIO_DTO<StateUpdate>) => void;

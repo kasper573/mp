@@ -15,10 +15,10 @@ import { createDispatcher } from "./dispatcher";
 import type {
   SocketIO_Auth,
   SocketIO_ClientToServerEvents,
-  SocketIO_DTO,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
   SocketIO_RPC,
+  SocketIO_RPCResponse,
   SocketIO_ServerToClientEvents,
 } from "./socket";
 
@@ -83,20 +83,20 @@ function createModuleDispatcher<State, StateUpdate>(
   options: ClientOptions<State, StateUpdate>,
 ) {
   return createDispatcher(async (procedureName, ...[input]) => {
-    const serializedResponse: unknown = await socket
-      .timeout(options.rpcTimeout)
-      .emitWithAck(
-        "rpc",
-        options.serializeRPC({
-          moduleName: String(moduleName),
-          procedureName: String(procedureName),
-          input,
-        }),
-      );
+    const serializedResponse = await socket.emitWithAck(
+      "rpc",
+      options.serializeRPC({
+        moduleName: String(moduleName),
+        procedureName: String(procedureName),
+        input,
+      }),
+    );
 
-    return options.parseRPCOutput(
-      serializedResponse as SocketIO_DTO<unknown>,
-    ) as never;
+    const response = options.parseRPCResponse(serializedResponse);
+    if (!response.ok) {
+      throw new Error(response.error);
+    }
+    return response.output as never;
   });
 }
 
@@ -109,7 +109,7 @@ export interface ClientOptions<State, StateUpdate> {
   url: string;
   rpcTimeout: number;
   serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
-  parseRPCOutput: SocketIO_DTOParser<unknown>;
+  parseRPCResponse: SocketIO_DTOParser<SocketIO_RPCResponse<unknown>>;
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
