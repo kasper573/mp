@@ -21,6 +21,7 @@
     "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/transformer": "workspace:*",
     "cors": "2.8.5",

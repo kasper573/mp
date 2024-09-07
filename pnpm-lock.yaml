@@ -120,6 +120,9 @@ importers:
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../../packages/tiled-loader
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@mp/transformer':
         specifier: workspace:*
         version: link:../../packages/transformer
@@ -210,6 +213,12 @@ importers:
 
   packages/pixi:
     dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../time
       pixi.js:
         specifier: 8.3.3
         version: 8.3.3
@@ -226,15 +235,15 @@ importers:
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../time
       dijkstrajs:
         specifier: 1.0.3
         version: 1.0.3
       neverthrow:
         specifier: 7.0.0
         version: 7.0.0
-      timespan-ts:
-        specifier: 1.0.3
-        version: 1.0.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -261,6 +270,16 @@ importers:
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/time:
+    dependencies:
+      timespan-ts:
+        specifier: 1.0.3
+        version: 1.0.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

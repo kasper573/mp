@@ -1,5 +1,5 @@
 import type { VectorLike } from "@mp/math";
-import type { TimeSpan } from "timespan-ts";
+import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath(
   coords: VectorLike,

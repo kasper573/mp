@@ -1,4 +1,4 @@
-import type { TimeSpan } from "@mp/state";
+import type { TimeSpan } from "@mp/time";
 import {
   findPath,
   moveAlongPath,

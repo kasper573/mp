@@ -1,9 +1,9 @@
 import { type AreaId } from "@mp/state";
 import { Application } from "@mp/pixi";
 import { api, getMyFakeCharacterId } from "../api";
+import { Engine } from "../../../../packages/pixi/src/engine";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
-import { Engine } from "./Engine";
 
 export function createGame(
   areaLoader: AreaLoader,

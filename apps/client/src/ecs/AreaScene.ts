@@ -1,14 +1,14 @@
 import { dNodeFromVector, type AreaResource } from "@mp/state";
 import type { Character, CharacterId } from "@mp/server";
-import { Cleanup, Container } from "@mp/pixi";
+import { Cleanup, Container, Matrix } from "@mp/pixi";
 import { snapTileVector } from "@mp/state";
 import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
+import { Engine } from "@mp/pixi";
 import { api, getMyFakeCharacterId } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
-import { Engine } from "./Engine";
 
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
@@ -123,7 +123,8 @@ export class AreaScene extends Container {
 
     if (char.id === this.myCharacterId) {
       Engine.instance.camera.update(this.tiledRenderer, pos);
-      this.setFromMatrix(Engine.instance.camera.transform);
+
+      this.setFromMatrix(new Matrix(...Engine.instance.camera.transform.data));
     }
 
     actor.interpolator.configure(pos, {

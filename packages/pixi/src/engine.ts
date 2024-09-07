@@ -1,7 +1,6 @@
-import { Vector } from "@mp/math";
-import { TimeSpan } from "@mp/state";
-import type { Application, FederatedPointerEvent } from "@mp/pixi";
-import { Camera } from "./camera";
+import { Vector, Camera } from "@mp/math";
+import { TimeSpan } from "@mp/time";
+import type { Application, FederatedPointerEvent } from "pixi.js";
 
 export class Engine {
   public static instance: Engine;

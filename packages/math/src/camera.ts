@@ -1,6 +1,7 @@
-import { clamp, Vector } from "@mp/math";
-import type { Size } from "@mp/pixi";
-import { Matrix } from "@mp/pixi";
+import { clamp } from "./clamp";
+import { Matrix } from "./matrix";
+import type { Size } from "./size";
+import { Vector } from "./vector";
 
 export class Camera {
   private position = new Vector(0, 0);

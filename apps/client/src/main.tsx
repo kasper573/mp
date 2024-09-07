@@ -4,7 +4,7 @@ import { StrictMode } from "react";
 import { QueryClient } from "@tanstack/react-query";
 import { Providers } from "./ui/Providers";
 import { UI } from "./ui/UI";
-import { createGame } from "./ecs/Game";
+import { createGame } from "./ecs/game";
 import { AreaLoader } from "./ecs/AreaLoader";
 
 const queryClient = new QueryClient({

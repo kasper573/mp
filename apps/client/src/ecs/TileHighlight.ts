@@ -3,7 +3,7 @@ import type { TiledResource } from "@mp/state";
 import { snapTileVector } from "@mp/state";
 import { Graphics } from "@mp/pixi";
 import { isVectorInGraph, type DGraph } from "@mp/state";
-import { Engine } from "./Engine";
+import { Engine } from "../../../../packages/pixi/src/engine";
 
 export class TileHighlight extends Graphics {
   constructor(

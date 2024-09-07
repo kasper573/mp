@@ -9,7 +9,7 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/state";
 import { Graphics } from "@mp/pixi";
-import { Engine } from "./Engine";
+import { Engine } from "../../../../packages/pixi/src/engine";
 
 export class DGraphDebugUI extends Graphics {
   private pathToDraw: Path = [];

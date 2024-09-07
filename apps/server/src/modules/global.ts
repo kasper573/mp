@@ -1,5 +1,5 @@
 import type { DisconnectReason, ConnectReason } from "@mp/network/server";
-import type { TimeSpan } from "@mp/state";
+import type { TimeSpan } from "@mp/time";
 import { t } from "./factory";
 
 export type GlobalModule = ReturnType<typeof createGlobalModule>;

@@ -6,4 +6,3 @@ export * from "./FileReference";
 export * from "./TiledResource";
 export * from "./Branded";
 export * from "neverthrow";
-export { TimeSpan } from "timespan-ts";
