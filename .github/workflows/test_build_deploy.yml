@@ -73,6 +73,7 @@ jobs:
           SSH_PRIVATE_KEY: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           SOURCE: "nginx/"
           TARGET: "/var/lib/docker/volumes/root_proxy-data/_data/nginx/custom/"
+          ARGS: "-rlgoDzvc -i --delete"
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
