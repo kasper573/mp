@@ -55,6 +55,7 @@ export class Engine {
     this.app.stage.on("pointermove", this.onPointerMove);
     this.app.stage.on("pointerdown", this.onPointerDown);
     this.app.stage.on("pointerup", this.onPointerUp);
+    this.app.ticker.add(this.onTick);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
 
@@ -66,19 +67,23 @@ export class Engine {
     this.app.stage.off("pointermove", this.onPointerMove);
     this.app.stage.off("pointerdown", this.onPointerDown);
     this.app.stage.off("pointerup", this.onPointerUp);
+    this.app.ticker.remove(this.onTick);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
   }
 
   private onPointerMove = (e: FederatedPointerEvent) => {
     this.input.pointer.lastScreenPosition = new Vector(e.clientX, e.clientY);
-    this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
-      this.input.pointer.lastScreenPosition,
-    );
   };
 
   private onPointerDown = () => (this.input.pointer.isDown = true);
   private onPointerUp = () => (this.input.pointer.isDown = false);
+
+  private onTick = () => {
+    this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
+      this.input.pointer.lastScreenPosition,
+    );
+  };
 
   private onKeyDown = (e: KeyboardEvent) => {
     this.heldKeys.add(e.key as KeyName);
