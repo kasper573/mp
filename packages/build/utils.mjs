@@ -10,10 +10,14 @@ export function inferInternalPackages(projectRoot) {
     path.resolve(projectRoot, "package.json"),
     "utf-8",
   );
-  const packageJson = JSON.parse(packageJsonString) as Record<string, unknown>;
+  /**
+   * @type {unknown}
+   */
+  const packageJson = JSON.parse(packageJsonString);
   const internalPackages = [];
   const { dependencies, devDependencies, peerDependencies } = packageJson;
   for (const deps of [dependencies, devDependencies, peerDependencies]) {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
     for (const [packageName, packageVersion] of Object.entries(deps ?? {})) {
       if (
         String(packageVersion).startsWith("workspace:") &&
