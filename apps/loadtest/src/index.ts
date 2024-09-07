@@ -11,7 +11,7 @@ import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
 const { httpServerUrl, wsServerUrl, connections, requests } = readCliOptions();
-main();
+void main();
 
 async function main() {
   const start = performance.now();

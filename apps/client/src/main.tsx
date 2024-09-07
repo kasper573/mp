@@ -21,7 +21,7 @@ const areaLoader = new AreaLoader();
 const ui = createRoot(document.querySelector("div#ui")!);
 const game = createGame(areaLoader, (debugText) => renderUI({ debugText }));
 
-game.init({
+void game.init({
   container: document.querySelector("div#tiled")!,
   resizeTo: window,
 });

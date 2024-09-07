@@ -80,7 +80,7 @@ export class AreaScene extends Container {
     }
 
     if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
-      api.modules.world.move(tilePos);
+      void api.modules.world.move(tilePos);
       this.lastSentPos = tilePos;
     }
   };
