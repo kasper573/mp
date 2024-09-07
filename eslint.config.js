@@ -1,5 +1,3 @@
-// @ts-check
-
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
@@ -18,6 +16,14 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommended,
+  {
+    languageOptions: {
+      parserOptions: {
+        projectService: true,
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
   {
     rules: {
       "no-undef": "off", // Gives false negatives. We already have typescript to catch these.
@@ -42,6 +48,8 @@ export default tseslint.config(
 
       // {} is useful as empty set
       "@typescript-eslint/ban-types": "off",
+
+      "@typescript-eslint/no-floating-promises": "error",
     },
   },
 );
