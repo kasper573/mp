@@ -24,6 +24,7 @@
     "@commitlint/config-conventional": "19.2.2",
     "@eslint/js": "^9.7.0",
     "@types/eslint__js": "^8.42.3",
+    "@mp/tsconfig": "workspace:*",
     "eslint": "9.7.0",
     "eslint-plugin-import": "2.29.1",
     "eslint-plugin-unused-imports": "4.0.0",
@@ -31,7 +32,7 @@
     "prettier": "3.3.3",
     "turbo": "2.0.6",
     "typescript": "^5.5.3",
-    "typescript-eslint": "^7.16.1"
+    "typescript-eslint": "8.4.0"
   },
   "engines": {
     "node": "20.10.0"
