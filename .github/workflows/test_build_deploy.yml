@@ -72,7 +72,7 @@ jobs:
           REMOTE_USER: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
           SSH_PRIVATE_KEY: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
           SOURCE: "nginx/"
-          TARGET: "/var/lib/docker/volumes/root_proxy-data/_data/custom/"
+          TARGET: "/var/lib/docker/volumes/root_proxy-data/_data/nginx/custom/"
 
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
