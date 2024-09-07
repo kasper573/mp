@@ -15,6 +15,7 @@ import { createDispatcher } from "./dispatcher";
 import type {
   SocketIO_Auth,
   SocketIO_ClientToServerEvents,
+  SocketIO_DTO,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
   SocketIO_RPC,
@@ -82,16 +83,20 @@ function createModuleDispatcher<State, StateUpdate>(
   options: ClientOptions<State, StateUpdate>,
 ) {
   return createDispatcher(async (procedureName, ...[input]) => {
-    const serializedResponse = await socket.emitWithAck(
-      "rpc",
-      options.serializeRPC({
-        moduleName: String(moduleName),
-        procedureName: String(procedureName),
-        input,
-      }),
-    );
+    const serializedResponse: unknown = await socket
+      .timeout(options.rpcTimeout)
+      .emitWithAck(
+        "rpc",
+        options.serializeRPC({
+          moduleName: String(moduleName),
+          procedureName: String(procedureName),
+          input,
+        }),
+      );
 
-    return options.parseRPCOutput(serializedResponse) as never;
+    return options.parseRPCOutput(
+      serializedResponse as SocketIO_DTO<unknown>,
+    ) as never;
   });
 }
 
@@ -102,6 +107,7 @@ export interface BuiltInClientState {
 
 export interface ClientOptions<State, StateUpdate> {
   url: string;
+  rpcTimeout: number;
   serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
   parseRPCOutput: SocketIO_DTOParser<unknown>;
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;

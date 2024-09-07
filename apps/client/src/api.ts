@@ -10,6 +10,7 @@ import { env } from "./env";
 
 export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   url: env.serverUrl,
+  rpcTimeout: 5000,
   createInitialState: () => ({ characters: new Map() }),
   parseStateUpdate: serialization.stateUpdate.parse,
   parseRPCOutput: serialization.rpc.parse,
