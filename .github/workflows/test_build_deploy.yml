@@ -65,17 +65,6 @@ jobs:
       - name: Load docker-compose file into environment
         run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
 
-      # - name: Upload custom nginx configuration files
-      #   uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
-      #   with:
-      #     host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
-      #     username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
-      #     key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
-      #     source: "nginx/*"
-      #     target: /data/nginx/custom/
-      #     strip_components: 1
-      #     rm: true
-
       - name: Deploy to Digital Ocean droplet via SSH action
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -95,3 +84,14 @@ jobs:
             docker compose run devtools pnpm -F server db:migrate
             docker system prune -f
             docker image prune -af
+
+     - name: Upload custom nginx configuration files
+        uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
+        with:
+          host: ${{ vars.DIGITALOCEAN_SSH_HOST }}
+          username: ${{ vars.DIGITALOCEAN_SSH_USERNAME }}
+          key: ${{ secrets.DIGITALOCEAN_SSH_KEY }}
+          source: "nginx/*"
+          target: /data/nginx/custom/
+          strip_components: 1
+          rm: true
