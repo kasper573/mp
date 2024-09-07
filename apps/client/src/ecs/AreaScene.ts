@@ -10,6 +10,8 @@ import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
 
+const throttledMove = throttle(api.modules.world.move, 100);
+
 export class AreaScene extends Container {
   private cleanups = new Cleanup();
   private tiledRenderer: TiledRenderer;
@@ -80,7 +82,7 @@ export class AreaScene extends Container {
     }
 
     if (!this.lastSentPos || !this.lastSentPos.equals(tilePos)) {
-      void api.modules.world.move(tilePos);
+      void throttledMove(tilePos);
       this.lastSentPos = tilePos;
     }
   };
@@ -136,4 +138,19 @@ export class AreaScene extends Container {
       this.debugUI.showPath(char.path);
     }
   }
+}
+
+// TODO this should probably be centralized/generalized inside the network client if done more than just here
+function throttle<T extends (...args: never[]) => unknown>(
+  fn: T,
+  ms: number,
+): (...args: Parameters<T>) => void {
+  let last = 0;
+  return (...args: Parameters<T>) => {
+    const now = Date.now();
+    if (now - last > ms) {
+      last = now;
+      fn(...args);
+    }
+  };
 }
