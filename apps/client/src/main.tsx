@@ -3,9 +3,11 @@ import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { dark } from "@mp/style/themes/dark.css";
+import { ClerkProvider } from "@clerk/clerk-react";
 import { createRouter } from "./router";
 import { ErrorFallback } from "./components/ErrorFallback";
 import * as styles from "./main.css";
+import { env } from "./env";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -28,8 +30,13 @@ const reactRoot = createRoot(rootElement);
 
 reactRoot.render(
   <StrictMode>
-    <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />
-    </QueryClientProvider>
+    <ClerkProvider
+      publishableKey={env.clerk.publishableKey}
+      afterSignOutUrl="/"
+    >
+      <QueryClientProvider client={queryClient}>
+        <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />
+      </QueryClientProvider>
+    </ClerkProvider>
   </StrictMode>,
 );

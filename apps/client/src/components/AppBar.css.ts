@@ -5,6 +5,7 @@ export const nav = atoms({
   color: "info.face",
   display: "flex",
   flexDirection: "row",
+  alignItems: "center",
   gap: "2xl",
   padding: "xl",
 });

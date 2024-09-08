@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@clerk/clerk-react": "^5.7.0",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",
