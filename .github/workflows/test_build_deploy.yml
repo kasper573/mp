@@ -43,6 +43,7 @@ jobs:
         run: pnpm build
         env:
           NODE_ENV: production
+          MP_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Log in with Docker
         uses: docker/login-action@v3
