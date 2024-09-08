@@ -46,7 +46,9 @@ async function main(opt: CliOptions) {
   expressApp.use(createCors({ origin: opt.corsOrigin }));
   expressApp.use(opt.publicPath, express.static(opt.publicDir));
   if (opt.clientDir !== undefined) {
+    const indexFile = path.resolve(opt.clientDir, "index.html");
     expressApp.use("/", express.static(opt.clientDir));
+    expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
   const modules = createModules({
