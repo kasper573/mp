@@ -3,7 +3,7 @@ import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { dark } from "@mp/style/themes/dark.css";
-import { ClerkProvider } from "@clerk/clerk-react";
+import { ClerkProvider } from "@mp/auth/react";
 import { createRouter } from "./router";
 import { ErrorFallback } from "./components/ErrorFallback";
 import * as styles from "./main.css";

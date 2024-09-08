@@ -1,4 +1,4 @@
-import { useAuth, useClerk } from "@clerk/clerk-react";
+import { useAuth, useClerk } from "@mp/auth/react";
 import { Link } from "@tanstack/react-router";
 import { useSyncExternalStore } from "react";
 import { api } from "../api";
