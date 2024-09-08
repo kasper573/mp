@@ -11,6 +11,8 @@ export function createGame({
   resizeTo,
 }: GameOptions): Game {
   const canvas = document.createElement("canvas");
+  Engine.replace(canvas);
+
   const app = new Application();
 
   const changeArea = createAreaChanger(app, (id) =>
@@ -32,7 +34,6 @@ export function createGame({
 
   void initPromise.then(() => {
     app.stage.interactive = true;
-    Engine.replace(canvas);
   });
 
   return {
