@@ -20,8 +20,10 @@ const queryClient = new QueryClient({
 document.documentElement.classList.add(dark);
 
 const router = createRouter();
+
 const rootElement = document.querySelector("div#root")!;
 rootElement.classList.add(styles.root);
+
 const reactRoot = createRoot(rootElement);
 
 reactRoot.render(
