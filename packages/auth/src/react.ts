@@ -1,1 +1,1 @@
-export * from "@clerk/clerk-react";
+export { useAuth, useClerk, ClerkProvider } from "@clerk/clerk-react";
