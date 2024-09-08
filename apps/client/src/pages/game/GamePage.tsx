@@ -1,8 +1,9 @@
-import type { CSSProperties, DependencyList } from "react";
+import type { DependencyList } from "react";
 import { useEffect, useRef, useState } from "react";
 import { AreaLoader } from "../../game/AreaLoader";
 import { createGame } from "../../game/game";
 import { DebugText } from "./DebugText";
+import * as styles from "./GamePage.css";
 
 const areaLoader = new AreaLoader();
 
@@ -19,19 +20,12 @@ export default function GamePage() {
   }, [areaLoader, container]);
 
   return (
-    <>
-      <div ref={setContainer} style={styles.container} />
+    <div className={styles.container}>
+      <div ref={setContainer} className={styles.container} />
       <DebugText debugText={debugText} />
-    </>
+    </div>
   );
 }
-
-const styles = {
-  container: {
-    width: "100%",
-    height: "100%",
-  },
-} satisfies Record<string, CSSProperties>;
 
 interface Disposable {
   dispose(): void;
