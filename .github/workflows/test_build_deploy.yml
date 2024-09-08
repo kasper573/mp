@@ -42,7 +42,7 @@ jobs:
           NODE_ENV: production
           MP_CORS_ORIGIN: https:\/\/(.*\.)?k573.dev
           MP_SERVER_URL: wss://k573.dev
-          MP_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
+          MP_AUTH_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Log in with Docker
         uses: docker/login-action@v3

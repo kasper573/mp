@@ -54,13 +54,16 @@ export function readCliOptions(argv = process.argv) {
       default: "*",
       description: "The CORS origin to allow",
     })
+    .option("authSecretKey", {
+      type: "string",
+      description: "The secret key for the auth server",
+    })
     .option("tickInterval", {
       type: "number",
       default: 1000 / 60,
       description: "The server tick interval in milliseconds",
       coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
     })
-
     .option("persistInterval", {
       type: "number",
       default: 1000,

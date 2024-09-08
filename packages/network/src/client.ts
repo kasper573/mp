@@ -38,7 +38,16 @@ export class Client<
     this.socket = io(options.url, {
       transports: ["websocket"],
       // The socket.js typedefs force an object, but in reality it can be undefined
-      auth: (resolve) => resolve(options.getAuth?.() as object),
+      auth: (resolve) => {
+        const res = options.getAuth?.();
+        if (res instanceof Promise) {
+          void res.then((auth) => {
+            resolve(auth as object);
+          });
+        } else {
+          resolve(res as object);
+        }
+      },
     });
 
     this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(
@@ -113,7 +122,10 @@ export interface ClientOptions<State, StateUpdate> {
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
-  getAuth?: () => SocketIO_Auth | undefined;
+  getAuth?: () =>
+    | SocketIO_Auth
+    | undefined
+    | Promise<SocketIO_Auth | undefined>;
 }
 
 export type { SocketIO_DTO } from "./socket";

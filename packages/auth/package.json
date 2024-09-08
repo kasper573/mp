@@ -4,15 +4,15 @@
   "type": "module",
   "private": true,
   "exports": {
-    "./react": {
-      "import": "./dist/react.js",
-      "require": "./dist/react.js",
-      "types": "./dist/react.d.ts"
+    "./client": {
+      "import": "./dist/client.js",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
     },
-    "./node": {
-      "import": "./dist/node.js",
-      "require": "./dist/node.js",
-      "types": "./dist/node.d.ts"
+    "./server": {
+      "import": "./dist/server.js",
+      "require": "./dist/server.js",
+      "types": "./dist/server.d.ts"
     }
   },
   "files": [
@@ -23,10 +23,14 @@
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@clerk/clerk-react": "^5.7.0",
+    "@clerk/clerk-js": "5.20.0",
     "@clerk/clerk-sdk-node": "5.0.35"
   },
+  "peerDependencies": {
+    "react": "18.3.1"
+  },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/react": "18.3.3"
   }
 }

@@ -1,5 +1,6 @@
 import type { DependencyList } from "react";
 import { useEffect, useRef, useState } from "react";
+import { useAuthState } from "@mp/auth/client";
 import { AreaLoader } from "../../game/AreaLoader";
 import { createGame } from "../../game/game";
 import { DebugText } from "./DebugText";
@@ -8,12 +9,13 @@ import * as styles from "./GamePage.css";
 const areaLoader = new AreaLoader();
 
 export default function GamePage() {
+  const { isSignedIn } = useAuthState();
   const [resizeTo, setResizeTo] = useState<HTMLDivElement | null>(null);
   const [debugText, setDebugText] = useState("");
 
   useDisposable(
     () =>
-      resizeTo
+      resizeTo && isSignedIn
         ? createGame({
             container: resizeTo,
             resizeTo,
@@ -21,8 +23,12 @@ export default function GamePage() {
             debug: setDebugText,
           })
         : undefined,
-    [areaLoader, resizeTo],
+    [areaLoader, resizeTo, isSignedIn],
   );
+
+  if (!isSignedIn) {
+    return <div>Sign in to play</div>;
+  }
 
   return (
     <div className={styles.container}>
