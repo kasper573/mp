@@ -1,5 +1,5 @@
 import { createTheme } from "@vanilla-extract/css";
-import { theme } from "../src/theme.css";
+import { themeContract } from "../src/theme.css";
 import { palette } from "../src/tokens";
 
 const darkValues = {
@@ -58,4 +58,4 @@ const darkValues = {
   },
 };
 
-export const dark: string = createTheme(theme, darkValues);
+export const dark: string = createTheme(themeContract, darkValues);

@@ -1,6 +1,6 @@
 import type { CSSProperties } from "@vanilla-extract/css";
 import { flattened } from "./flattened";
-import { theme } from "./theme.css";
+import { themeContract } from "./theme.css";
 import { inter } from "./fonts/inter/inter.css";
 
 const cssDefaults = {
@@ -102,7 +102,7 @@ export const palette = {
 };
 
 export const colors = {
-  ...flattened(theme.color),
+  ...flattened(themeContract.color),
   transparent: "transparent",
   current: "currentColor",
   ...cssDefaults,
@@ -157,16 +157,16 @@ export const fontFaces = {
 };
 
 export const typography = {
-  caption: { fontFamily: fontFaces.default, fontSize: 10 },
-  label: { fontFamily: fontFaces.default, fontSize: 11 },
-  body: { fontFamily: fontFaces.default, fontSize: 12 },
+  caption: { fontFamily: fontFaces.default, fontSize: 11 },
+  label: { fontFamily: fontFaces.default, fontSize: 12 },
+  body: { fontFamily: fontFaces.default, fontSize: 14 },
   body2: { fontFamily: fontFaces.default, fontSize: 13 },
   h1: { fontFamily: fontFaces.default, fontSize: 24 },
-  h2: { fontFamily: fontFaces.default, fontSize: 20 },
-  h3: { fontFamily: fontFaces.default, fontSize: 18 },
-  h4: { fontFamily: fontFaces.default, fontSize: 16 },
-  h5: { fontFamily: fontFaces.default, fontSize: 14 },
-  h6: { fontFamily: fontFaces.default, fontSize: 12 },
+  h2: { fontFamily: fontFaces.default, fontSize: 22 },
+  h3: { fontFamily: fontFaces.default, fontSize: 20 },
+  h4: { fontFamily: fontFaces.default, fontSize: 18 },
+  h5: { fontFamily: fontFaces.default, fontSize: 16 },
+  h6: { fontFamily: fontFaces.default, fontSize: 14 },
 } satisfies Record<string, CSSProperties>;
 
 export const borders = {
