@@ -36,13 +36,12 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install/
 
-      - name: Load production build args into environment
-        run: echo "$(cat production-build-args.env)" >> $GITHUB_ENV
-
       - name: Build application
         run: pnpm build
         env:
           NODE_ENV: production
+          MP_CORS_ORIGIN: https:\/\/(.*\.)?k573.dev
+          MP_SERVER_URL: wss://k573.dev
           MP_CLERK_PUBLISHABLE_KEY: ${{ secrets.CLERK_PUBLISHABLE_KEY }}
 
       - name: Log in with Docker
