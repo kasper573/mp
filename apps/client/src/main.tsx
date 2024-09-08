@@ -2,8 +2,10 @@ import { createRoot } from "react-dom/client";
 import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
+import { dark } from "@mp/style/themes/dark.css";
 import { createRouter } from "./router";
 import { ErrorFallback } from "./components/ErrorFallback";
+import * as styles from "./main.css";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -15,9 +17,14 @@ const queryClient = new QueryClient({
   },
 });
 
+document.documentElement.classList.add(dark);
+
 const router = createRouter();
-const root = createRoot(document.querySelector("div#root")!);
-root.render(
+const rootElement = document.querySelector("div#root")!;
+rootElement.classList.add(styles.root);
+const reactRoot = createRoot(rootElement);
+
+reactRoot.render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
       <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />

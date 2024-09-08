@@ -15,6 +15,7 @@
     "@mp/pixi": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/style": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@tanstack/react-query": "5.51.11",
