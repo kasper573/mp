@@ -8,7 +8,8 @@
   "dependencies": {
     "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
-    "@mp/logger": "workspace:*"
+    "@mp/logger": "workspace:*",
+    "@mp/state": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

@@ -117,6 +117,9 @@ importers:
       '@mp/server':
         specifier: workspace:*
         version: link:../server
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../packages/state
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

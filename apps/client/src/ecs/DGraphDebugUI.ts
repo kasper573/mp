@@ -8,8 +8,7 @@ import {
   dNodeFromVector,
   addVectorToAdjacentInGraph,
 } from "@mp/state";
-import { Graphics } from "@mp/pixi";
-import { Engine } from "../../../../packages/pixi/src/engine";
+import { Graphics, Engine } from "@mp/pixi";
 
 export class DGraphDebugUI extends Graphics {
   private pathToDraw: Path = [];

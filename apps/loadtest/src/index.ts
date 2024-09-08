@@ -6,7 +6,7 @@ import {
 } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { Logger } from "@mp/logger";
-import type { AreaId } from "../../../packages/state/src";
+import type { AreaId } from "@mp/state";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
