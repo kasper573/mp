@@ -5,7 +5,7 @@ export const debugText = recipe({
     atoms({
       whiteSpace: "pre-wrap",
       position: "absolute",
-      padding: "m",
+      padding: "l",
       borderRadius: "m",
       pointerEvents: "none",
     }),
