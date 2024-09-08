@@ -1,8 +1,8 @@
 import type { CSSProperties } from "react";
 import { useSyncExternalStore } from "react";
-import { api } from "../api";
+import { api } from "../../api";
 
-export function UI({ debugText }: { debugText?: string }) {
+export function DebugText({ debugText }: { debugText?: string }) {
   const connected = useSyncExternalStore(
     (fn) => api.connected.subscribe(fn),
     () => api.connected.value,

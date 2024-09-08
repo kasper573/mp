@@ -1,11 +1,9 @@
 import { createRoot } from "react-dom/client";
-import type { ComponentProps } from "react";
 import { StrictMode } from "react";
-import { QueryClient } from "@tanstack/react-query";
-import { Providers } from "./ui/Providers";
-import { UI } from "./ui/UI";
-import { createGame } from "./ecs/game";
-import { AreaLoader } from "./ecs/AreaLoader";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider } from "@tanstack/react-router";
+import { createRouter } from "./router";
+import { ErrorFallback } from "./components/ErrorFallback";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -17,23 +15,12 @@ const queryClient = new QueryClient({
   },
 });
 
-const areaLoader = new AreaLoader();
-const ui = createRoot(document.querySelector("div#ui")!);
-const game = createGame(areaLoader, (debugText) => renderUI({ debugText }));
-
-void game.init({
-  container: document.querySelector("div#tiled")!,
-  resizeTo: window,
-});
-
-renderUI({});
-
-function renderUI(props: ComponentProps<typeof UI>) {
-  ui.render(
-    <StrictMode>
-      <Providers queryClient={queryClient}>
-        <UI {...props} />
-      </Providers>
-    </StrictMode>,
-  );
-}
+const router = createRouter();
+const root = createRoot(document.querySelector("div#root")!);
+root.render(
+  <StrictMode>
+    <QueryClientProvider client={queryClient}>
+      <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />
+    </QueryClientProvider>
+  </StrictMode>,
+);

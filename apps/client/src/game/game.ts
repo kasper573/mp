@@ -15,22 +15,31 @@ export function createGame(
     areaLoader.require(id).then((area) => new AreaScene(area, debug)),
   );
 
-  let unsubFromState: () => void;
+  let unsubFromState: () => void = () => {};
+  let initPromise: Promise<unknown>;
 
   return {
     canvas,
     async init({ container, resizeTo }: GameInitOptions) {
       container.appendChild(canvas);
       unsubFromState = api.state.subscribe(() => void changeArea(me()?.areaId));
-      await app.init({ antialias: true, roundPixels: true, resizeTo, canvas });
+      initPromise = app.init({
+        antialias: true,
+        roundPixels: true,
+        resizeTo,
+        canvas,
+      });
+
+      await initPromise;
 
       app.stage.interactive = true;
       Engine.replace(app);
     },
-    dispose() {
+    async dispose() {
       unsubFromState();
-      app.destroy(undefined, { children: true });
       canvas.remove();
+      await initPromise;
+      app.destroy(undefined, { children: true });
     },
   };
 }
@@ -72,5 +81,5 @@ export interface GameInitOptions {
 export interface Game {
   canvas: HTMLCanvasElement;
   init(options: GameInitOptions): Promise<void>;
-  dispose(): void;
+  dispose(): Promise<void>;
 }
