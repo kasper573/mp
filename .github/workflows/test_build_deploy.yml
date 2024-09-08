@@ -41,6 +41,8 @@ jobs:
 
       - name: Build application
         run: pnpm build
+        env:
+          NODE_ENV: production
 
       - name: Log in with Docker
         uses: docker/login-action@v3
