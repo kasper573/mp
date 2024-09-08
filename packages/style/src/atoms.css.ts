@@ -4,6 +4,7 @@ import {
   borders,
   colors,
   flexes,
+  fontFaces,
   overflows,
   radius,
   shadows,
@@ -78,7 +79,11 @@ const unconditionalProperties = defineProperties({
     transform,
 
     // Regular / non-design token css properties
-    fontFamily: ["inherit", "initial"] as const,
+    fontFamily: {
+      inherit: "inherit",
+      normal: "normal",
+      ...fontFaces,
+    },
     fontWeight: ["inherit", "normal", "bold"] as const,
     fontStyle: ["inherit", "normal", "italic"] as const,
     fontSize: ["inherit", "100%"] as const,

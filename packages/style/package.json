@@ -5,22 +5,15 @@
   "license": "MIT",
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
+      "import": "./src/index.ts",
+      "require": "./src/index.ts",
+      "types": "./src/index.ts"
     },
     "./themes/*": {
-      "import": "./dist/themes/*.js",
-      "require": "./dist/themes/*.js",
-      "types": "./dist/themes/*.d.ts"
+      "import": "./themes/*.ts",
+      "require": "./themes/*.ts",
+      "types": "./themes/*.ts"
     }
-  },
-  "files": [
-    "dist"
-  ],
-  "scripts": {
-    "build": "tsc --build",
-    "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
     "@vanilla-extract/css": "1.15.5",

@@ -1,6 +1,7 @@
 import type { CSSProperties } from "@vanilla-extract/css";
 import { flattened } from "./flattened";
 import { theme } from "./theme.css";
+import { inter } from "./fonts/inter/inter.css";
 
 const cssDefaults = {
   auto: "auto",
@@ -151,17 +152,21 @@ export const shadows = {
   m: "0px 4px 8px rgba(0, 0, 0, 0.1)",
 };
 
+export const fontFaces = {
+  default: inter,
+};
+
 export const typography = {
-  caption: { fontSize: 10 },
-  label: { fontSize: 11 },
-  body: { fontSize: 12 },
-  body2: { fontSize: 13 },
-  h1: { fontSize: 24 },
-  h2: { fontSize: 20 },
-  h3: { fontSize: 18 },
-  h4: { fontSize: 16 },
-  h5: { fontSize: 14 },
-  h6: { fontSize: 12 },
+  caption: { fontFamily: fontFaces.default, fontSize: 10 },
+  label: { fontFamily: fontFaces.default, fontSize: 11 },
+  body: { fontFamily: fontFaces.default, fontSize: 12 },
+  body2: { fontFamily: fontFaces.default, fontSize: 13 },
+  h1: { fontFamily: fontFaces.default, fontSize: 24 },
+  h2: { fontFamily: fontFaces.default, fontSize: 20 },
+  h3: { fontFamily: fontFaces.default, fontSize: 18 },
+  h4: { fontFamily: fontFaces.default, fontSize: 16 },
+  h5: { fontFamily: fontFaces.default, fontSize: 14 },
+  h6: { fontFamily: fontFaces.default, fontSize: 12 },
 } satisfies Record<string, CSSProperties>;
 
 export const borders = {
