@@ -4,10 +4,12 @@ import { api, getMyFakeCharacterId } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
 
-export function createGame(
-  areaLoader: AreaLoader,
-  debug: (text: string) => void,
-): Game {
+export function createGame({
+  areaLoader,
+  debug,
+  container,
+  resizeTo,
+}: GameOptions): Game {
   const canvas = document.createElement("canvas");
   const app = new Application();
 
@@ -15,31 +17,33 @@ export function createGame(
     areaLoader.require(id).then((area) => new AreaScene(area, debug)),
   );
 
-  let unsubFromState: () => void = () => {};
-  let initPromise: Promise<unknown>;
+  container.appendChild(canvas);
+
+  const unsubFromState = api.state.subscribe(
+    () => void changeArea(me()?.areaId),
+  );
+
+  const initPromise = app.init({
+    antialias: true,
+    roundPixels: true,
+    resizeTo,
+    canvas,
+  });
+
+  void initPromise.then(() => {
+    app.stage.interactive = true;
+    Engine.replace(canvas);
+  });
 
   return {
     canvas,
-    async init({ container, resizeTo }: GameInitOptions) {
-      container.appendChild(canvas);
-      unsubFromState = api.state.subscribe(() => void changeArea(me()?.areaId));
-      initPromise = app.init({
-        antialias: true,
-        roundPixels: true,
-        resizeTo,
-        canvas,
-      });
-
-      await initPromise;
-
-      app.stage.interactive = true;
-      Engine.replace(app);
-    },
     async dispose() {
+      Engine.instance.stop();
       unsubFromState();
       canvas.remove();
-      await initPromise;
-      app.destroy(undefined, { children: true });
+      await initPromise.then(() => {
+        app.destroy(undefined, { children: true });
+      });
     },
   };
 }
@@ -73,13 +77,14 @@ function createAreaChanger(
   };
 }
 
-export interface GameInitOptions {
+export interface GameOptions {
+  areaLoader: AreaLoader;
+  debug: (text: string) => void;
   container: HTMLElement;
   resizeTo: HTMLElement | Window;
 }
 
 export interface Game {
   canvas: HTMLCanvasElement;
-  init(options: GameInitOptions): Promise<void>;
   dispose(): Promise<void>;
 }

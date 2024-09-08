@@ -8,20 +8,25 @@ import * as styles from "./GamePage.css";
 const areaLoader = new AreaLoader();
 
 export default function GamePage() {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [resizeTo, setResizeTo] = useState<HTMLDivElement | null>(null);
   const [debugText, setDebugText] = useState("");
 
-  useDisposable(() => {
-    if (container) {
-      const game = createGame(areaLoader, setDebugText);
-      void game.init({ container, resizeTo: container });
-      return game;
-    }
-  }, [areaLoader, container]);
+  useDisposable(
+    () =>
+      resizeTo
+        ? createGame({
+            container: resizeTo,
+            resizeTo,
+            areaLoader,
+            debug: setDebugText,
+          })
+        : undefined,
+    [areaLoader, resizeTo],
+  );
 
   return (
     <div className={styles.container}>
-      <div ref={setContainer} className={styles.container} />
+      <div ref={setResizeTo} className={styles.container} />
       <DebugText debugText={debugText} />
     </div>
   );
