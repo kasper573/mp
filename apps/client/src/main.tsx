@@ -3,11 +3,11 @@ import { StrictMode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider } from "@tanstack/react-router";
 import { dark } from "@mp/style/themes/dark.css";
-import { ClerkProvider } from "@clerk/clerk-react";
+import { AuthContext } from "@mp/auth/client";
 import { createRouter } from "./router";
 import { ErrorFallback } from "./components/ErrorFallback";
 import * as styles from "./main.css";
-import { env } from "./env";
+import { authClient } from "./api";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -18,6 +18,8 @@ const queryClient = new QueryClient({
     },
   },
 });
+
+void authClient.load();
 
 document.documentElement.classList.add(dark);
 
@@ -30,13 +32,10 @@ const reactRoot = createRoot(rootElement);
 
 reactRoot.render(
   <StrictMode>
-    <ClerkProvider
-      publishableKey={env.clerk.publishableKey}
-      afterSignOutUrl="/"
-    >
+    <AuthContext.Provider value={authClient}>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />
       </QueryClientProvider>
-    </ClerkProvider>
+    </AuthContext.Provider>
   </StrictMode>,
 );

@@ -1,6 +1,6 @@
-import { useAuth, useClerk } from "@clerk/clerk-react";
 import { Link } from "@tanstack/react-router";
-import { useSyncExternalStore } from "react";
+import { useContext, useSyncExternalStore } from "react";
+import { useAuthState, AuthContext } from "@mp/auth/client";
 import { api } from "../api";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
@@ -10,8 +10,8 @@ export default function AppBar() {
     (fn) => api.connected.subscribe(fn),
     () => api.connected.value,
   );
-  const { isSignedIn, signOut } = useAuth();
-  const clerk = useClerk();
+  const auth = useContext(AuthContext);
+  const { isSignedIn } = useAuthState();
   return (
     <nav className={styles.nav}>
       <Link to="/">Home</Link>
@@ -23,9 +23,9 @@ export default function AppBar() {
       />
 
       {isSignedIn ? (
-        <Button onClick={() => void signOut()}>Sign out</Button>
+        <Button onClick={() => void auth.signOut()}>Sign out</Button>
       ) : (
-        <Button onClick={() => void clerk.redirectToSignIn()}>Sign in</Button>
+        <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>
       )}
     </nav>
   );

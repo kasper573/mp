@@ -1,3 +1,4 @@
+import "dotenv-flow/config";
 import path from "path";
 import http from "http";
 import { Logger } from "@mp/logger";
@@ -7,6 +8,7 @@ import createCors from "cors";
 import type { CreateContextOptions, ServerError } from "@mp/network/server";
 import { Server } from "@mp/network/server";
 import type { TimeSpan } from "@mp/time";
+import { createAuthClient } from "@mp/auth/server";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import {
@@ -24,7 +26,9 @@ import { setAsyncInterval } from "./asyncInterval";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
-  logger.info(serverTextHeader(opt));
+  logger.info(serverTextHeader());
+
+  const auth = createAuthClient({ secretKey: opt.authSecretKey });
 
   const db = createDBClient(opt.databaseUrl);
 
@@ -154,19 +158,20 @@ async function main(opt: CliOptions) {
     };
   }
 
-  function createServerContext({
+  async function createServerContext({
     clientId,
-    auth,
-  }: CreateContextOptions<ClientId>): ServerContext {
-    if (!auth) {
+    auth: clientAuth,
+  }: CreateContextOptions<ClientId>): Promise<ServerContext> {
+    if (!clientAuth) {
       throw new Error(`Client ${clientId} is not authenticated`);
     }
+    const { sub } = await auth.verifyToken(clientAuth.token);
     return {
       world,
       source: new ServerContextSource({
         type: "client",
         clientId,
-        characterId: getCharacterIdByAuthToken(auth.token),
+        characterId: getCharacterIdByAuthToken(sub),
       }),
     };
   }
@@ -205,7 +210,7 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
   };
 }
 
-function serverTextHeader(options: CliOptions) {
+function serverTextHeader() {
   return `
 =====================================================
 #                                                   #
@@ -215,10 +220,6 @@ function serverTextHeader(options: CliOptions) {
 #                ██║╚██╔╝██║ ██╔═══╝                #
 #                ██║ ╚═╝ ██║ ██║                    #
 #                ╚═╝     ╚═╝ ╚═╝                    #
-=====================================================
-${Object.entries(options)
-  .map(([k, v]) => `- ${k}: ${String(v)}`)
-  .join("\n")}
 =====================================================`;
 }
 

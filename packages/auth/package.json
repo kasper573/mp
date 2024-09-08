@@ -1,0 +1,36 @@
+{
+  "name": "@mp/auth",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    "./client": {
+      "import": "./dist/client.js",
+      "require": "./dist/client.js",
+      "types": "./dist/client.d.ts"
+    },
+    "./server": {
+      "import": "./dist/server.js",
+      "require": "./dist/server.js",
+      "types": "./dist/server.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput"
+  },
+  "dependencies": {
+    "@clerk/clerk-js": "5.20.0",
+    "@clerk/clerk-sdk-node": "5.0.35"
+  },
+  "peerDependencies": {
+    "react": "18.3.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/react": "18.3.3"
+  }
+}

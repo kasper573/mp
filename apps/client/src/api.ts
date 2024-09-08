@@ -5,9 +5,12 @@ import {
   type ServerModules,
 } from "@mp/server";
 import { Client } from "@mp/network/client";
-import { v4 as uuid } from "uuid";
+import { AuthClient } from "@mp/auth/client";
 import { env } from "./env";
 
+export const authClient = new AuthClient(env.auth.publishableKey);
+
+// TODO this should not be a singleton
 export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   url: env.serverUrl,
   rpcTimeout: 5000,
@@ -16,14 +19,12 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   parseRPCResponse: serialization.rpc.parse,
   createNextState: (_, nextState) => nextState,
   serializeRPC: serialization.rpc.serialize,
-  getAuth: () => ({ token: getMyFakeCharacterId() }),
+  async getAuth() {
+    const token = await authClient.session?.getToken();
+    return token ? { token } : undefined;
+  },
 });
 
 export function getMyFakeCharacterId(): CharacterId {
-  let existingId = localStorage.getItem("userId");
-  if (!existingId) {
-    existingId = uuid();
-    localStorage.setItem("userId", existingId);
-  }
-  return existingId as CharacterId;
+  return authClient.user?.id as CharacterId;
 }
