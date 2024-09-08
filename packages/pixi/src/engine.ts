@@ -1,18 +1,19 @@
 import { Vector, Camera } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import type { Application, FederatedPointerEvent } from "pixi.js";
 
 export class Engine {
   public static instance: Engine;
 
   public camera: Camera;
 
-  static replace(app: Application) {
+  private tickIntervalId?: NodeJS.Timeout;
+
+  static replace(viewport: HTMLCanvasElement) {
     if (Engine.instance) {
       Engine.instance.stop();
     }
 
-    Engine.instance = new Engine(app);
+    Engine.instance = new Engine(viewport);
     Engine.instance.start();
   }
 
@@ -26,7 +27,7 @@ export class Engine {
 
   input = {
     pointer: {
-      lastScreenPosition: new Vector(0, 0),
+      lastViewportPosition: new Vector(0, 0),
       lastWorldPosition: new Vector(0, 0),
       isDown: false,
     },
@@ -36,8 +37,8 @@ export class Engine {
     },
   };
 
-  private constructor(private app: Application) {
-    this.camera = new Camera(app.canvas);
+  private constructor(private viewport: HTMLCanvasElement) {
+    this.camera = new Camera(viewport);
   }
 
   private nextFrame: FrameRequestCallback = () => {
@@ -52,10 +53,10 @@ export class Engine {
   };
 
   private start() {
-    this.app.stage.on("pointermove", this.onPointerMove);
-    this.app.stage.on("pointerdown", this.onPointerDown);
-    this.app.stage.on("pointerup", this.onPointerUp);
-    this.app.ticker.add(this.onTick);
+    this.viewport.addEventListener("pointermove", this.onPointerMove);
+    this.viewport.addEventListener("pointerdown", this.onPointerDown);
+    this.viewport.addEventListener("pointerup", this.onPointerUp);
+    this.tickIntervalId = setInterval(this.onTick, 1000 / 60);
     window.addEventListener("keydown", this.onKeyDown);
     window.addEventListener("keyup", this.onKeyUp);
 
@@ -63,17 +64,17 @@ export class Engine {
     requestAnimationFrame(this.nextFrame);
   }
 
-  private stop() {
-    this.app.stage.off("pointermove", this.onPointerMove);
-    this.app.stage.off("pointerdown", this.onPointerDown);
-    this.app.stage.off("pointerup", this.onPointerUp);
-    this.app.ticker.remove(this.onTick);
+  stop() {
+    this.viewport.addEventListener("pointermove", this.onPointerMove);
+    this.viewport.addEventListener("pointerdown", this.onPointerDown);
+    this.viewport.addEventListener("pointerup", this.onPointerUp);
+    clearInterval(this.tickIntervalId);
     window.removeEventListener("keydown", this.onKeyDown);
     window.removeEventListener("keyup", this.onKeyUp);
   }
 
-  private onPointerMove = (e: FederatedPointerEvent) => {
-    this.input.pointer.lastScreenPosition = new Vector(e.clientX, e.clientY);
+  private onPointerMove = (e: PointerEvent) => {
+    this.input.pointer.lastViewportPosition = new Vector(e.offsetX, e.offsetY);
   };
 
   private onPointerDown = () => (this.input.pointer.isDown = true);
@@ -81,7 +82,7 @@ export class Engine {
 
   private onTick = () => {
     this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
-      this.input.pointer.lastScreenPosition,
+      this.input.pointer.lastViewportPosition,
     );
   };
 

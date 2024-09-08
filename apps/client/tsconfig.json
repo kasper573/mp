@@ -3,6 +3,7 @@
   "include": ["src", "./vite.config.mjs"],
   "exclude": ["../server/public"],
   "compilerOptions": {
-    "allowJs": true
+    "allowJs": true,
+    "jsx": "react-jsx"
   }
 }

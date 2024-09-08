@@ -33,6 +33,10 @@ export class AreaLoader {
     this.cache.set(id, promise);
     return promise;
   }
+
+  dispose() {
+    this.cache.clear();
+  }
 }
 
 async function loadJson(url: string) {

@@ -5,15 +5,23 @@ import type { WorldModule } from "./world/module";
 import type { AreaModule } from "./area/module";
 
 export type GlobalModule = ReturnType<typeof createGlobalModule>;
-export function createGlobalModule(modules: {
+export function createGlobalModule({
+  world,
+}: {
   world: WorldModule;
   area: AreaModule;
 }) {
   return t.module({
-    connect: t.procedure.input<ConnectReason>().create(),
-    disconnect: t.procedure.input<DisconnectReason>().create(),
+    connect: t.procedure.input<ConnectReason>().create(async (payload) => {
+      await world.join(payload);
+    }),
+    disconnect: t.procedure
+      .input<DisconnectReason>()
+      .create(async (payload) => {
+        await world.leave(payload);
+      }),
     tick: t.procedure.input<TimeSpan>().create(async (payload) => {
-      await modules.world.tick(payload);
+      await world.tick(payload);
     }),
   });
 }

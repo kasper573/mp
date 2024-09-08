@@ -32,7 +32,7 @@ export class DGraphDebugUI extends Graphics {
 
   override _onRender = () => {
     const {
-      pointer: { lastWorldPosition, lastScreenPosition },
+      pointer: { lastWorldPosition, lastViewportPosition },
       keyboard,
     } = Engine.instance.input;
 
@@ -69,7 +69,7 @@ export class DGraphDebugUI extends Graphics {
 
       const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
       const text = [
-        `screen: ${vecToString(lastScreenPosition)}`,
+        `viewport: ${vecToString(lastViewportPosition)}`,
         `world: ${vecToString(lastWorldPosition)}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
