@@ -9,6 +9,7 @@ import { AuthClient } from "@mp/auth/client";
 import { env } from "./env";
 
 export const authClient = new AuthClient(env.auth.publishableKey);
+const loadPromise = authClient.load();
 
 // TODO this should not be a singleton
 export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
@@ -20,6 +21,7 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   createNextState: (_, nextState) => nextState,
   serializeRPC: serialization.rpc.serialize,
   async getAuth() {
+    await loadPromise;
     const token = await authClient.session?.getToken();
     return token ? { token } : undefined;
   },

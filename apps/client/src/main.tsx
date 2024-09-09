@@ -19,8 +19,6 @@ const queryClient = new QueryClient({
   },
 });
 
-void authClient.load();
-
 document.documentElement.classList.add(dark);
 
 const router = createRouter();
