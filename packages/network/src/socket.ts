@@ -8,6 +8,7 @@ export interface SocketIO_ClientToServerEvents {
 }
 
 export interface SocketIO_RPC {
+  headers: SocketIO_Headers | undefined;
   moduleName: string;
   procedureName: string;
   input: unknown;
@@ -33,6 +34,4 @@ export type SocketIO_DTO<T = any> = (Uint8Array | string) & {
   __brand__: "SocketIO_DTO";
 };
 
-export interface SocketIO_Auth {
-  token: string;
-}
+export type SocketIO_Headers = { [key: string]: string | undefined | null };

@@ -12,9 +12,7 @@ export function createGlobalModule({
   area: AreaModule;
 }) {
   return t.module({
-    connect: t.procedure.input<ConnectReason>().create(async (payload) => {
-      await world.join(payload);
-    }),
+    connect: t.procedure.input<ConnectReason>().create(),
     disconnect: t.procedure
       .input<DisconnectReason>()
       .create(async (payload) => {

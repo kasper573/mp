@@ -1,6 +1,6 @@
-import { type AreaId } from "@mp/state";
+import { computed, type AreaId } from "@mp/state";
 import { Application, Engine } from "@mp/pixi";
-import { api, getMyFakeCharacterId } from "../api";
+import { api, myCharacterId } from "../api";
 import type { AreaLoader } from "./AreaLoader";
 import { AreaScene } from "./AreaScene";
 
@@ -21,9 +21,7 @@ export function createGame({
 
   container.appendChild(canvas);
 
-  const unsubFromState = api.state.subscribe(
-    () => void changeArea(me()?.areaId),
-  );
+  const stopChangingAreas = myAreaId.subscribe((id) => void changeArea(id));
 
   const initPromise = app.init({
     antialias: true,
@@ -40,7 +38,7 @@ export function createGame({
     canvas,
     async dispose() {
       Engine.instance.stop();
-      unsubFromState();
+      stopChangingAreas();
       canvas.remove();
       await initPromise.then(() => {
         app.destroy(undefined, { children: true });
@@ -49,9 +47,9 @@ export function createGame({
   };
 }
 
-function me() {
-  return api.state.value.characters.get(getMyFakeCharacterId());
-}
+const myAreaId = computed(
+  () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
+);
 
 // TODO refactor
 function createAreaChanger(

@@ -11,27 +11,22 @@ import type { TimeSpan } from "@mp/time";
 import { createAuthClient } from "@mp/auth/server";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
-import {
-  ServerContextSource,
-  type ClientId,
-  type ServerContext,
-} from "./context";
+import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { CharacterId, WorldState } from "./modules/world/schema";
+import type { WorldState } from "./modules/world/schema";
 import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { setAsyncInterval } from "./asyncInterval";
+import { ClientRegistry } from "./modules/world/ClientRegistry";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
-  const auth = createAuthClient({ secretKey: opt.authSecretKey });
-
+  const authClient = createAuthClient({ secretKey: opt.authSecretKey });
   const db = createDBClient(opt.databaseUrl);
-
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
   if (areas.isErr() || areas.value.size === 0) {
@@ -55,6 +50,7 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
+  const clients = new ClientRegistry();
   const modules = createModules({
     areas: areas.value,
     defaultAreaId,
@@ -65,36 +61,14 @@ async function main(opt: CliOptions) {
 
   const global = createGlobalModule(modules);
 
-  const characterConnections = new Map<CharacterId, Set<ClientId>>();
-
   const socketServer = new Server({
     createContext: createServerContext,
     modules,
     serializeRPCResponse: serialization.rpc.serialize,
     serializeStateUpdate: serialization.stateUpdate.serialize,
     parseRPC: serialization.rpc.parse,
-    parseAuth: (auth) => ("token" in auth ? { token: auth.token } : undefined),
-    async onConnection(input, context) {
-      const { characterId, clientId } = context.source.unwrap("client");
-      let clientIdsForCharacter = characterConnections.get(characterId);
-      if (!clientIdsForCharacter) {
-        clientIdsForCharacter = new Set();
-        characterConnections.set(characterId, clientIdsForCharacter);
-      }
-      clientIdsForCharacter.add(clientId);
-      await global.connect({ input, context });
-    },
-    async onDisconnect(input, context) {
-      const { characterId, clientId } = context.source.unwrap("client");
-      await global.disconnect({ input, context });
-      const clientIdsForCharacter = characterConnections.get(characterId);
-      if (clientIdsForCharacter) {
-        clientIdsForCharacter.delete(clientId);
-        if (clientIdsForCharacter.size === 0) {
-          characterConnections.delete(characterId);
-        }
-      }
-    },
+    onConnection: (input, context) => global.connect({ input, context }),
+    onDisconnect: (input, context) => global.disconnect({ input, context }),
     onError,
   });
 
@@ -107,10 +81,9 @@ async function main(opt: CliOptions) {
   setAsyncInterval(tick, opt.tickInterval);
   setAsyncInterval(persist, opt.persistInterval);
 
-  const tickContext: ServerContext = {
-    source: new ServerContextSource({ type: "server" }),
-    world,
-  };
+  const tickContext: ServerContext = createServerContext({
+    clientId: undefined as unknown as ClientId,
+  });
 
   async function tick(tickDelta: TimeSpan) {
     try {
@@ -136,14 +109,9 @@ async function main(opt: CliOptions) {
     const state = getClientWorldState(world);
 
     // TODO optimize by sending changes only
-    for (const id of world.characters.keys()) {
-      const clientIds = characterConnections.get(id);
-      if (clientIds) {
-        for (const id of clientIds) {
-          yield [id, state] as const;
-        }
-      } else {
-        // TODO collect metrics
+    for (const characterId of world.characters.keys()) {
+      for (const clientId of clients.getClientIds(characterId)) {
+        yield [clientId, state] as const;
       }
     }
   }
@@ -152,28 +120,17 @@ async function main(opt: CliOptions) {
     return {
       characters: new Map(
         Array.from(world.characters.entries()).filter(([id]) =>
-          characterConnections.has(id),
+          clients.hasCharacter(id),
         ),
       ),
     };
   }
 
-  async function createServerContext({
+  function createServerContext({
     clientId,
-    auth: clientAuth,
-  }: CreateContextOptions<ClientId>): Promise<ServerContext> {
-    if (!clientAuth) {
-      throw new Error(`Client ${clientId} is not authenticated`);
-    }
-    const { sub } = await auth.verifyToken(clientAuth.token);
-    return {
-      world,
-      source: new ServerContextSource({
-        type: "client",
-        clientId,
-        characterId: getCharacterIdByUserId(sub),
-      }),
-    };
+    headers,
+  }: CreateContextOptions<ClientId>): ServerContext {
+    return { world, headers, clientId, authClient, clients, logger };
   }
 
   function onError({
@@ -182,11 +139,7 @@ async function main(opt: CliOptions) {
     error,
     context,
   }: ServerError<ServerContext, string>) {
-    const id =
-      context?.source.payload.type === "client"
-        ? context.source.payload.clientId
-        : "server invocation";
-    const args: unknown[] = [id, rpc, error].filter(Boolean);
+    const args: unknown[] = [context?.clientId, rpc, error].filter(Boolean);
     logger.chain(type).error(...args);
   }
 
@@ -195,11 +148,6 @@ async function main(opt: CliOptions) {
       ? path.relative(opt.publicDir, fileInPublicDir)
       : fileInPublicDir;
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
-  }
-
-  function getCharacterIdByUserId(userId: string): CharacterId {
-    // TODO implement
-    return userId as CharacterId;
   }
 }
 

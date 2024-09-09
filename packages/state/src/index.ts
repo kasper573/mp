@@ -6,3 +6,4 @@ export * from "./FileReference";
 export * from "./TiledResource";
 export * from "./Branded";
 export * from "neverthrow";
+export * from "@preact/signals-core";

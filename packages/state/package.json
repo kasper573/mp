@@ -9,6 +9,7 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
+    "@preact/signals-core": "1.7.0",
     "dijkstrajs": "1.0.3",
     "neverthrow": "7.0.0"
   },

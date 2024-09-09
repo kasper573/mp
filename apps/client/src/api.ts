@@ -1,17 +1,20 @@
 import type { CharacterId, ClientStateUpdate } from "@mp/server";
 import {
   serialization,
+  tokenHeaderName,
   type ClientState,
   type ServerModules,
 } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
+import { signal } from "@mp/state";
 import { env } from "./env";
+
+// TODO this module should not be a singleton
 
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
 
-// TODO this should not be a singleton
 export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   url: env.serverUrl,
   rpcTimeout: 5000,
@@ -20,13 +23,17 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   parseRPCResponse: serialization.rpc.parse,
   createNextState: (_, nextState) => nextState,
   serializeRPC: serialization.rpc.serialize,
-  async getAuth() {
+  async getHeaders() {
     await loadPromise;
-    const token = await authClient.session?.getToken();
-    return token ? { token } : undefined;
+    return { [tokenHeaderName]: await authClient.session?.getToken() };
   },
 });
 
-export function getMyFakeCharacterId(): CharacterId {
-  return authClient.user?.id as CharacterId;
-}
+export const myCharacterId = signal<CharacterId | undefined>(undefined);
+api.connected.subscribe((connected) => {
+  if (connected) {
+    void api.modules.world.join().then((id) => (myCharacterId.value = id));
+  } else {
+    myCharacterId.value = undefined;
+  }
+});

@@ -9,18 +9,16 @@ const globalRequestLimit = new RateLimiterMemory({
 
 export const t = new Factory<ServerContext>({
   async middleware(req, next) {
-    const { payload } = req.context.source;
-
-    switch (payload.type) {
-      case "server":
-        return next(req);
-      case "client":
-        try {
-          await globalRequestLimit.consume(payload.clientId);
-        } catch (e) {
-          throw new Error("Rate limit exceeded");
-        }
-        return next(req);
+    const { clientId } = req.context;
+    if (clientId) {
+      try {
+        await globalRequestLimit.consume(clientId);
+      } catch (e) {
+        throw new Error("Rate limit exceeded");
+      }
+      return next(req);
+    } else {
+      return next(req);
     }
   },
 });

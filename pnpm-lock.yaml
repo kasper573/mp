@@ -306,6 +306,9 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../time
+      '@preact/signals-core':
+        specifier: 1.7.0
+        version: 1.7.0
       dijkstrajs:
         specifier: 1.0.3
         version: 1.0.3

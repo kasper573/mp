@@ -13,3 +13,5 @@ export const serialization = {
   >,
   rpc: jsonTransformer as unknown as AbstractTransformer<SocketIO_DTO>,
 };
+
+export const tokenHeaderName = "token";

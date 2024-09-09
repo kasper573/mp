@@ -13,10 +13,10 @@ import type {
 import type { Dispatcher } from "./dispatcher";
 import { createDispatcher } from "./dispatcher";
 import type {
-  SocketIO_Auth,
   SocketIO_ClientToServerEvents,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
+  SocketIO_Headers,
   SocketIO_RPC,
   SocketIO_RPCResponse,
   SocketIO_ServerToClientEvents,
@@ -35,20 +35,7 @@ export class Client<
   readonly state: ReadonlySignal<State> = computed(() => this._state.value);
 
   constructor(private options: ClientOptions<State, StateUpdate>) {
-    this.socket = io(options.url, {
-      transports: ["websocket"],
-      // The socket.js typedefs force an object, but in reality it can be undefined
-      auth: (resolve) => {
-        const res = options.getAuth?.();
-        if (res instanceof Promise) {
-          void res.then((auth) => {
-            resolve(auth as object);
-          });
-        } else {
-          resolve(res as object);
-        }
-      },
-    });
+    this.socket = io(options.url, { transports: ["websocket"] });
 
     this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(
       this.socket,
@@ -92,9 +79,11 @@ function createModuleDispatcher<State, StateUpdate>(
   options: ClientOptions<State, StateUpdate>,
 ) {
   return createDispatcher(async (procedureName, ...[input]) => {
+    const headers = await options.getHeaders?.();
     const serializedResponse = await socket.emitWithAck(
       "rpc",
       options.serializeRPC({
+        headers,
         moduleName: String(moduleName),
         procedureName: String(procedureName),
         input,
@@ -122,10 +111,10 @@ export interface ClientOptions<State, StateUpdate> {
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
   createNextState: (state: State, update: StateUpdate) => State;
   createInitialState: () => State;
-  getAuth?: () =>
-    | SocketIO_Auth
-    | undefined
-    | Promise<SocketIO_Auth | undefined>;
+  getHeaders?: () =>
+    | SocketIO_Headers
+    | Promise<SocketIO_Headers | undefined>
+    | undefined;
 }
 
 export type { SocketIO_DTO } from "./socket";

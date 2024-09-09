@@ -5,7 +5,7 @@ import { snapTileVector } from "@mp/state";
 import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import { Engine } from "@mp/pixi";
-import { api, getMyFakeCharacterId } from "../api";
+import { api, myCharacterId } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
@@ -19,10 +19,6 @@ export class AreaScene extends Container {
   private characterContainer = new Container();
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
-
-  get myCharacterId() {
-    return getMyFakeCharacterId();
-  }
 
   constructor(
     private readonly area: AreaResource,
@@ -123,7 +119,7 @@ export class AreaScene extends Container {
     const pos = this.area.tiled.tileCoordToWorld(char.coords);
     const path = char.path?.map(this.area.tiled.tileCoordToWorld) ?? [];
 
-    if (char.id === this.myCharacterId) {
+    if (char.id === myCharacterId.value) {
       Engine.instance.camera.update(this.tiledRenderer, pos);
 
       this.setFromMatrix(new Matrix(...Engine.instance.camera.transform.data));
@@ -134,7 +130,7 @@ export class AreaScene extends Container {
       speed: this.area.tiled.tileUnitToWorld(char.speed),
     });
 
-    if (char.path && char.id === this.myCharacterId) {
+    if (char.path && char.id === myCharacterId.value) {
       this.debugUI.showPath(char.path);
     }
   }

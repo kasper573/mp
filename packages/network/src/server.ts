@@ -3,10 +3,10 @@ import type { DisconnectReason } from "socket.io";
 
 import { type AnyModuleDefinitionRecord, type ModuleRecord } from "./module";
 import type {
-  SocketIO_Auth,
   SocketIO_ClientToServerEvents,
   SocketIO_DTOParser,
   SocketIO_DTOSerializer,
+  SocketIO_Headers,
   SocketIO_RPC as SocketIO_RPC,
   SocketIO_RPCResponse,
   SocketIO_ServerToClientEvents,
@@ -53,10 +53,10 @@ export class Server<
     this.listen = (...args) => this.wss.listen(...args);
 
     this.wss.on("connection", async (socket) => {
-      const socketContext = () => {
+      const socketContext = (headers?: SocketIO_Headers) => {
         return createContext({
           clientId: socket.id as ClientId,
-          auth: options.parseAuth?.(socket.handshake.auth),
+          headers,
         });
       };
 
@@ -86,7 +86,7 @@ export class Server<
         let rpcContext;
         try {
           rpc = parseRPC(serializedRPC);
-          const { moduleName, procedureName, input } = rpc;
+          const { moduleName, procedureName, input, headers } = rpc;
           const module = modules[moduleName];
 
           if (module.$getProcedureType(procedureName) !== "client-to-server") {
@@ -94,7 +94,7 @@ export class Server<
             return;
           }
 
-          rpcContext = await socketContext();
+          rpcContext = await socketContext(headers);
           const output: unknown = await module[procedureName]({
             input,
             context: rpcContext,
@@ -134,7 +134,6 @@ export interface CreateServerOptions<
     options: CreateContextOptions<ClientId>,
   ) => ServerContext | Promise<ServerContext>;
   parseRPC: SocketIO_DTOParser<SocketIO_RPC>;
-  parseAuth?: (auth: Record<string, string>) => SocketIO_Auth | undefined;
   serializeRPCResponse: SocketIO_DTOSerializer<SocketIO_RPCResponse<unknown>>;
   serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
   onConnection?: (
@@ -151,7 +150,7 @@ export interface CreateServerOptions<
 
 export interface CreateContextOptions<ClientId extends string> {
   clientId: ClientId;
-  auth?: SocketIO_Auth;
+  headers?: SocketIO_Headers;
 }
 
 export interface ServerError<ServerContext, Type = ServerErrorType> {
