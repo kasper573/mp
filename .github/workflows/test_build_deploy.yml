@@ -82,7 +82,7 @@ jobs:
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
             docker compose pull
-            docker compose up -d --remove-orphans --env-file .env
+            docker compose --env-file .env up -d --remove-orphans
             docker compose run devtools pnpm -F server db:migrate
             docker system prune -f
             docker image prune -af
