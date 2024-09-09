@@ -23,7 +23,7 @@ services:
       MP_HOSTNAME: "k573.dev"
       MP_CORS_ORIGIN: "k573.dev"
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
-      MY_AUTH_SECRET_KEY: ${MY_AUTH_SECRET_KEY}
+      MY_AUTH_SECRET_KEY: ${MY_AUTH_SECRET_KEY:?auth_secret_key_missing}
   proxy:
     build:
       dockerfile: Dockerfile.proxy
