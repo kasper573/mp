@@ -25,7 +25,7 @@ async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
-  const authClient = createAuthClient({ secretKey: opt.authSecretKey });
+  const auth = createAuthClient({ secretKey: opt.authSecretKey });
   const db = createDBClient(opt.databaseUrl);
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
@@ -55,7 +55,6 @@ async function main(opt: CliOptions) {
     areas: areas.value,
     defaultAreaId,
     state: world,
-    logger: logger.chain("module"),
     createUrl,
   });
 
@@ -130,7 +129,15 @@ async function main(opt: CliOptions) {
     clientId,
     headers,
   }: CreateContextOptions<ClientId>): ServerContext {
-    return { world, headers, clientId, authClient, clients, logger };
+    const who = clientId ? `client ${clientId}` : "server";
+    return {
+      world,
+      headers,
+      clientId,
+      auth,
+      logger: logger.chain(who),
+      clients,
+    };
   }
 
   function onError({

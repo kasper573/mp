@@ -7,15 +7,10 @@ export async function auth({
   clients,
   clientId,
   headers,
-  authClient,
-  logger,
+  auth,
 }: ServerContext): Promise<CharacterId> {
   if (!clientId) {
     throw new Error("Cannot authenticate client without clientId");
-  }
-  const characterId = clients.getCharacterId(clientId);
-  if (characterId) {
-    return characterId;
   }
 
   const token = headers?.[tokenHeaderName];
@@ -24,15 +19,8 @@ export async function auth({
   }
 
   try {
-    logger.info("Authenticating client", clientId);
-    const { sub } = await authClient.verifyToken(token);
+    const { sub } = await auth.verifyToken(token);
     const characterId = sub as CharacterId;
-    logger.info(
-      "Successfully authenticated client",
-      clientId,
-      "as",
-      characterId,
-    );
     clients.set(clientId, characterId);
     return characterId;
   } catch (error) {

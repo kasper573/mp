@@ -15,8 +15,12 @@ export function createGlobalModule({
     connect: t.procedure.input<ConnectReason>().create(),
     disconnect: t.procedure
       .input<DisconnectReason>()
-      .create(async (payload) => {
-        await world.leave(payload);
+      .create(({ input: reason, context: { clientId, logger, clients } }) => {
+        logger.info("Client disconnected", { reason });
+        if (clientId) {
+          logger.info("Removing from client registry");
+          clients.delete(clientId);
+        }
       }),
     tick: t.procedure.input<TimeSpan>().create(async (payload) => {
       await world.tick(payload);

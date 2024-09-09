@@ -1,6 +1,5 @@
 import type { inferModuleDefinitions } from "@mp/network/server";
 import type { UrlFactory } from "@mp/state";
-import type { Logger } from "@mp/logger";
 import type { WorldModuleDependencies } from "./world/module";
 import { createWorldModule } from "./world/module";
 import { createAreaModule } from "./area/module";
@@ -12,7 +11,7 @@ export function createModules({
   createUrl,
   ...dependencies
 }: WorldModuleDependencies & { createUrl: UrlFactory }) {
-  const world = createWorldModule(withLogger(dependencies, "world"));
+  const world = createWorldModule(dependencies);
   const area = createAreaModule(createUrl);
 
   return {
@@ -27,10 +26,3 @@ export function createModules({
 export type ServerModules = inferModuleDefinitions<
   ReturnType<typeof createModules>
 >;
-
-function withLogger<T extends { logger: Logger }>(deps: T, name: string): T {
-  return {
-    ...deps,
-    logger: deps.logger.chain(name),
-  };
-}

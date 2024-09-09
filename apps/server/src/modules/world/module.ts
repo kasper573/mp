@@ -6,8 +6,6 @@ import {
   type AreaResource,
 } from "@mp/state";
 import { Vector } from "@mp/math";
-import type { Logger } from "@mp/logger";
-import { type DisconnectReason } from "@mp/network/server";
 import { t } from "../factory";
 import { auth } from "../../middlewares/auth";
 import type { CharacterId, WorldState } from "./schema";
@@ -16,7 +14,6 @@ export interface WorldModuleDependencies {
   state: WorldState;
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
-  logger: Logger;
   characterKeepAliveTimeout?: TimeSpan;
 }
 
@@ -25,7 +22,6 @@ export function createWorldModule({
   state,
   areas,
   defaultAreaId,
-  logger,
 }: WorldModuleDependencies) {
   return t.module({
     tick: t.procedure
@@ -60,13 +56,13 @@ export function createWorldModule({
         const char = state.characters.get(characterId);
 
         if (!char) {
-          logger.error("Character not found", characterId);
+          context.logger.error("Character not found", characterId);
           return;
         }
 
         const area = areas.get(char.areaId);
         if (!area) {
-          logger.error("Area not found", char.areaId);
+          context.logger.error("Area not found", char.areaId);
           return;
         }
 
@@ -86,7 +82,7 @@ export function createWorldModule({
 
       let player = state.characters.get(characterId);
       if (!player) {
-        logger.info("Character created", characterId);
+        context.logger.info("Character created", characterId);
 
         const area = areas.get(defaultAreaId);
         if (!area) {
@@ -106,20 +102,10 @@ export function createWorldModule({
         player.coords = area.start.copy();
         state.characters.set(player.id, player);
       } else {
-        logger.info("Character reclaimed", characterId);
+        context.logger.info("Character reclaimed", characterId);
       }
 
       return characterId;
     }),
-
-    leave: t.procedure
-      .type("server-only")
-      .input<DisconnectReason>()
-      .create(({ input: reason, context: { clientId, clients } }) => {
-        if (clientId) {
-          logger.info("Client disconnected", { clientId, reason });
-          clients.delete(clientId);
-        }
-      }),
   });
 }

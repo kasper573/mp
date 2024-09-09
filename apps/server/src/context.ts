@@ -8,8 +8,8 @@ export interface ServerContext {
   world: WorldState;
   headers?: Record<string, string | undefined | null>;
   clientId?: ClientId;
+  auth: AuthClient;
   clients: ClientRegistry;
-  authClient: AuthClient;
   logger: Logger;
 }
 
