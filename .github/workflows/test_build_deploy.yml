@@ -40,10 +40,8 @@ jobs:
         run: pnpm build
         env:
           NODE_ENV: production
-          MP_CORS_ORIGIN: https:\/\/(.*\.)?k573.dev
           MP_SERVER_URL: wss://k573.dev
           MP_AUTH_PUBLISHABLE_KEY: ${{ secrets.AUTH_PUBLISHABLE_KEY }}
-          MP_AUTH_SECRET_KEY: ${{ secrets.AUTH_SECRET_KEY }}
 
       - name: Log in with Docker
         uses: docker/login-action@v3
@@ -82,6 +80,7 @@ jobs:
             cat base64.txt | base64 --decode > docker-compose.yaml
             rm base64.txt
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
+            echo "MP_AUTH_SECRET_KEY=${{ secrets.AUTH_SECRET_KEY }}" >> .env
             docker compose pull
             docker compose up -d --remove-orphans
             docker compose run devtools pnpm -F server db:migrate

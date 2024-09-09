@@ -14,6 +14,7 @@ ENV MP_PORT=
 ENV MP_HOSTNAME=
 ENV MP_CORS_ORIGIN=
 ENV MP_DATABASE_URL=
+ENV MP_AUTH_SECRET_KEY=
 
 CMD node server \
   --clientDir=/app/client \

@@ -26,7 +26,7 @@ import { setAsyncInterval } from "./asyncInterval";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
-  logger.info(serverTextHeader());
+  logger.info(serverTextHeader(opt));
 
   const auth = createAuthClient({ secretKey: opt.authSecretKey });
 
@@ -171,7 +171,7 @@ async function main(opt: CliOptions) {
       source: new ServerContextSource({
         type: "client",
         clientId,
-        characterId: getCharacterIdByAuthToken(sub),
+        characterId: getCharacterIdByUserId(sub),
       }),
     };
   }
@@ -197,9 +197,9 @@ async function main(opt: CliOptions) {
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 
-  function getCharacterIdByAuthToken(authToken: string): CharacterId {
+  function getCharacterIdByUserId(userId: string): CharacterId {
     // TODO implement
-    return authToken as CharacterId;
+    return userId as CharacterId;
   }
 }
 
@@ -210,7 +210,7 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
   };
 }
 
-function serverTextHeader() {
+function serverTextHeader(options: CliOptions) {
   return `
 =====================================================
 #                                                   #
@@ -220,6 +220,17 @@ function serverTextHeader() {
 #                ██║╚██╔╝██║ ██╔═══╝                #
 #                ██║ ╚═╝ ██║ ██║                    #
 #                ╚═╝     ╚═╝ ╚═╝                    #
+=====================================================
+hostname: ${options.hostname}
+listenHostname: ${options.listenHostname}
+authSecretKey: ${options.authSecretKey ? "set" : "not set"}
+databaseUrl: ${options.databaseUrl}
+port: ${options.port}
+publicDir: ${options.publicDir}
+clientDir: ${options.clientDir}
+corsOrigin: ${options.corsOrigin}
+Tick interval: ${options.tickInterval.totalMilliseconds}ms
+Persist interval: ${options.persistInterval.totalMilliseconds}ms
 =====================================================`;
 }
 
