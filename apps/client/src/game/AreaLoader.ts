@@ -11,7 +11,6 @@ export class AreaLoader {
     relativePath: relativeURL,
   });
 
-  // TODO result type
   async require(id: AreaId): Promise<AreaResource> {
     let promise = this.cache.get(id);
     if (promise) {

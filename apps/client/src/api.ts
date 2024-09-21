@@ -10,8 +10,6 @@ import { AuthClient } from "@mp/auth/client";
 import { signal } from "@mp/state";
 import { env } from "./env";
 
-// TODO this module should not be a singleton
-
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
 

@@ -45,16 +45,13 @@ function rectangle(obj: RectangleObject, pos: Vector): boolean {
 }
 
 function polygon(obj: PolygonObject, pos: Vector): boolean {
-  // TODO
   return false;
 }
 
 function polyline(obj: PolylineObject, pos: Vector): boolean {
-  // TODO
   return false;
 }
 
 function text(obj: TextObject, pos: Vector): boolean {
-  // TODO
   return false;
 }

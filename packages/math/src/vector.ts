@@ -1,4 +1,3 @@
-// TODO immutable vectors
 export class Vector implements VectorLike {
   constructor(
     public x: number,

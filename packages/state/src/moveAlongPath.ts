@@ -28,8 +28,6 @@ export function moveAlongPath(
       coords.y += (destination.y - coords.y) * percentage;
       break;
     }
-
-    // TODO add new coordinate to travelled path when implementing collision detection
   }
 
   return {

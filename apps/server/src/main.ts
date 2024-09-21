@@ -92,7 +92,6 @@ async function main(opt: CliOptions) {
 
   async function tick(tickDelta: TimeSpan) {
     try {
-      // TODO ticks should be synchronous
       await global.tick({ input: tickDelta, context: tickContext });
 
       for (const [clientId, stateUpdate] of getStateUpdates()) {
@@ -113,7 +112,6 @@ async function main(opt: CliOptions) {
   function* getStateUpdates() {
     const state = getClientWorldState(world);
 
-    // TODO optimize by sending changes only
     for (const characterId of world.characters.keys()) {
       for (const clientId of clients.getClientIds(characterId)) {
         yield [clientId, state] as const;

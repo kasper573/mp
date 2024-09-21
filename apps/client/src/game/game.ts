@@ -51,7 +51,6 @@ const myAreaId = computed(
   () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
 );
 
-// TODO refactor
 function createAreaChanger(
   app: Application,
   loadScene: (id: AreaId) => Promise<AreaScene>,

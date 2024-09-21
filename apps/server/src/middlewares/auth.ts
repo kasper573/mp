@@ -2,7 +2,6 @@ import type { ServerContext } from "../context";
 import type { CharacterId } from "../package";
 import { tokenHeaderName } from "../serialization";
 
-// TODO implement per-procedure middleware support and use it here
 export async function auth({
   clients,
   clientId,

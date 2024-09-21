@@ -136,7 +136,6 @@ export class AreaScene extends Container {
   }
 }
 
-// TODO this should probably be centralized/generalized inside the network client if done more than just here
 function throttle<T extends (...args: never[]) => unknown>(
   fn: T,
   ms: number,
