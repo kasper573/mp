@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch --env-file .env src/main.ts --clear-screen=false",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
