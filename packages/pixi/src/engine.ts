@@ -1,5 +1,6 @@
 import { Vector, Camera } from "@mp/math";
 import { TimeSpan } from "@mp/time";
+import { createHeldKeysInterface } from "./heldKeys";
 
 export class Engine {
   public static instance: Engine;
@@ -17,7 +18,7 @@ export class Engine {
     Engine.instance.start();
   }
 
-  private heldKeys = new Set<KeyName>();
+  private heldKeys = createHeldKeysInterface<KeyName>();
   private previousFrame = performance.now();
   private isRunning = false;
 
@@ -32,8 +33,13 @@ export class Engine {
       isDown: false,
     },
     keyboard: {
-      isHeld: (key: KeyName) => this.heldKeys.has(key),
-      subscribe: subscribeToKey,
+      heldKeys: this.heldKeys.signal,
+      isHeld: (key: KeyName) => this.heldKeys.signal.value.has(key),
+      subscribe: (key: KeyName, callback: (isDown: boolean) => void) => {
+        return this.heldKeys.signal.subscribe((keys) => {
+          callback(keys.has(key));
+        });
+      },
     },
   };
 
@@ -53,24 +59,22 @@ export class Engine {
   };
 
   private start() {
+    this.heldKeys.start();
     this.viewport.addEventListener("pointermove", this.onPointerMove);
     this.viewport.addEventListener("pointerdown", this.onPointerDown);
     this.viewport.addEventListener("pointerup", this.onPointerUp);
     this.tickIntervalId = setInterval(this.onTick, 1000 / 60);
-    window.addEventListener("keydown", this.onKeyDown);
-    window.addEventListener("keyup", this.onKeyUp);
 
     this.isRunning = true;
     requestAnimationFrame(this.nextFrame);
   }
 
   stop() {
+    this.heldKeys.stop();
     this.viewport.addEventListener("pointermove", this.onPointerMove);
     this.viewport.addEventListener("pointerdown", this.onPointerDown);
     this.viewport.addEventListener("pointerup", this.onPointerUp);
     clearInterval(this.tickIntervalId);
-    window.removeEventListener("keydown", this.onKeyDown);
-    window.removeEventListener("keyup", this.onKeyUp);
   }
 
   private onPointerMove = (e: PointerEvent) => {
@@ -84,36 +88,6 @@ export class Engine {
     this.input.pointer.lastWorldPosition = this.camera.screenToWorld(
       this.input.pointer.lastViewportPosition,
     );
-  };
-
-  private onKeyDown = (e: KeyboardEvent) => {
-    this.heldKeys.add(e.key as KeyName);
-  };
-
-  private onKeyUp = (e: KeyboardEvent) => {
-    this.heldKeys.delete(e.key as KeyName);
-  };
-}
-
-function subscribeToKey(key: KeyName, callback: (isHeld: boolean) => void) {
-  let isHeld = false;
-  const onDown = (e: KeyboardEvent) => {
-    if (e.key === key && !isHeld) {
-      isHeld = true;
-      callback(true);
-    }
-  };
-  const onUp = (e: KeyboardEvent) => {
-    if (e.key === key && isHeld) {
-      isHeld = false;
-      callback(false);
-    }
-  };
-  window.addEventListener("keydown", onDown);
-  window.addEventListener("keyup", onUp);
-  return () => {
-    window.removeEventListener("keydown", onDown);
-    window.removeEventListener("keyup", onUp);
   };
 }
 
