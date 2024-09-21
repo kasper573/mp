@@ -5,17 +5,15 @@ import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import { Engine } from "@mp/pixi";
 import { api, myCharacterId } from "../api";
+import { debugText } from "./DebugText";
 import { CharacterActor } from "./CharacterActor";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 import { TileHighlight } from "./TileHighlight";
 
 const throttledMove = throttle(api.modules.world.move, 100);
 
-export function createScene(
-  area: AreaResource,
-  renderDebugText: (text: string) => void,
-): AreaScene {
-  return new AreaScene(area, renderDebugText);
+export function createScene(area: AreaResource): AreaScene {
+  return new AreaScene(area);
 }
 
 class AreaScene extends Container {
@@ -26,10 +24,7 @@ class AreaScene extends Container {
   private debugUI!: DGraphDebugUI;
   private lastSentPos?: Vector;
 
-  constructor(
-    private readonly area: AreaResource,
-    private renderDebugText: (text: string) => void,
-  ) {
+  constructor(private readonly area: AreaResource) {
     super({ interactive: true });
 
     this.tiledRenderer = new TiledRenderer(area.tiled.map);
@@ -45,7 +40,7 @@ class AreaScene extends Container {
     this.debugUI = new DGraphDebugUI(
       area.dGraph,
       area.tiled,
-      this.renderDebugText,
+      (text) => (debugText.value = text),
     );
     this.debugUI.zIndex = 1000;
     this.addChild(this.debugUI);

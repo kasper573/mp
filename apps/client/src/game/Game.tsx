@@ -5,15 +5,11 @@ import { api, myCharacterId } from "../api";
 import { createScene } from "./AreaScene";
 import { loadAreaResource } from "./loadAreaResource";
 
-export interface GameProps {
-  setDebugText: (text: string) => void;
-}
-
 const myAreaId = computed(
   () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
 );
 
-export function Game({ setDebugText }: GameProps) {
+export function Game() {
   const [areaId] = useSignal(myAreaId);
   const {
     data: area,
@@ -34,5 +30,5 @@ export function Game({ setDebugText }: GameProps) {
     return <div>Area not found</div>;
   }
 
-  return <Scene create={createScene} dependencies={[area, setDebugText]} />;
+  return <Scene create={createScene} dependencies={[area]} />;
 }
