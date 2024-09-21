@@ -49,7 +49,7 @@ export function createGame({
 }
 
 const myAreaId = computed(
-  () => api.state.value.characters.get(myCharacterId.value)?.areaId,
+  () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
 );
 
 function createAreaChanger(
