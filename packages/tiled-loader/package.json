@@ -14,7 +14,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/transformer": "workspace:*"
+    "@mp/transformer": "workspace:*",
+    "@mp/state": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

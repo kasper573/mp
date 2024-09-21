@@ -1,5 +1,5 @@
-import type { TiledResource } from "@mp/state";
-import { snapTileVector } from "@mp/state";
+import type { TiledResource } from "@mp/data";
+import { snapTileVector } from "@mp/data";
 import { Vector, type Path } from "@mp/math";
 import {
   type DNode,
@@ -7,7 +7,7 @@ import {
   vectorFromDNode,
   dNodeFromVector,
   addVectorToAdjacentInGraph,
-} from "@mp/state";
+} from "@mp/data";
 import { Graphics, Engine } from "@mp/pixi";
 
 export class DGraphDebugUI extends Graphics {

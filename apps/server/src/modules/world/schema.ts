@@ -1,4 +1,4 @@
-import type { AreaId, Branded } from "@mp/state";
+import type { AreaId, Branded } from "@mp/data";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import type { Path } from "@mp/math";
 import { branded } from "../../db/types/branded";

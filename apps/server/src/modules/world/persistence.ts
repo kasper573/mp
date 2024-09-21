@@ -2,7 +2,10 @@ import { err, ok, type Result } from "@mp/state";
 import type { DBClient } from "../../db/client";
 import { characterTable, type WorldState } from "./schema";
 
-export async function persistWorldState(db: DBClient, state: WorldState) {
+export async function persistWorldState(
+  db: DBClient,
+  state: WorldState,
+): Promise<Result<void, unknown>> {
   try {
     await db.transaction((tx) =>
       Promise.all([
@@ -14,9 +17,9 @@ export async function persistWorldState(db: DBClient, state: WorldState) {
         }),
       ]),
     );
-    return { ok: true };
+    return ok(void 0);
   } catch (error) {
-    return { ok: false, error };
+    return err(error);
   }
 }
 

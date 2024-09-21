@@ -3,7 +3,7 @@ import path from "path";
 import http from "http";
 import { Logger } from "@mp/logger";
 import express from "express";
-import { type PathToLocalFile, type UrlToPublicFile } from "@mp/state";
+import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import type { CreateContextOptions, ServerError } from "@mp/network/server";
 import { Server } from "@mp/network/server";
@@ -104,7 +104,7 @@ async function main(opt: CliOptions) {
 
   async function persist() {
     const result = await persistWorldState(db, world);
-    if (!result.ok) {
+    if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }
   }

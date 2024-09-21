@@ -16,6 +16,7 @@
     "@mp/pixi": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",

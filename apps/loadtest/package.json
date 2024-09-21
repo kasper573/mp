@@ -3,12 +3,14 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build": "tsc",
     "loadtest": "tsx src/index.ts"
   },
   "dependencies": {
     "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/state": "workspace:*"
   },
   "devDependencies": {

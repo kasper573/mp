@@ -1,4 +1,4 @@
-import type { Branded } from "@mp/state";
+import type { Branded } from "@mp/data";
 import type { AuthClient } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
 import type { WorldState } from "./modules/world/schema";

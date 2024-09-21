@@ -10,7 +10,7 @@
     }
   },
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && tsc",
     "start": "node dist/index.js",
     "dev": "tsx watch --env-file .env src/main.ts --clear-screen=false",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
@@ -22,6 +22,7 @@
     "@mp/auth": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/transformer": "workspace:*",

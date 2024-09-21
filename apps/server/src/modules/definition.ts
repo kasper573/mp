@@ -1,5 +1,5 @@
 import type { inferModuleDefinitions } from "@mp/network/server";
-import type { UrlFactory } from "@mp/state";
+import type { UrlFactory } from "@mp/data";
 import type { WorldModuleDependencies } from "./world/module";
 import { createWorldModule } from "./world/module";
 import { createAreaModule } from "./area/module";
