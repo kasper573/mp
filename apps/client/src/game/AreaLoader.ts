@@ -23,11 +23,11 @@ export class AreaLoader {
     };
 
     const tiledPromise = this.loadTiled(areaFile.url);
-    promise = tiledPromise.then(({ tiledMap, error }) => {
-      if (error || !tiledMap) {
-        throw new Error(String(error || "Failed to load area"));
+    promise = tiledPromise.then((result) => {
+      if (result.isErr()) {
+        throw result.error;
       }
-      return new AreaResource(id, new TiledResource(tiledMap));
+      return new AreaResource(id, new TiledResource(result.value));
     });
     this.cache.set(id, promise);
     return promise;

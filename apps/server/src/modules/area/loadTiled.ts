@@ -4,13 +4,11 @@ import { TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
 
 export async function loadTiled(tmxFile: string) {
-  const { error, tiledMap } = await load(tmxFile);
-  if (error || !tiledMap) {
-    throw error instanceof Error
-      ? error
-      : new Error(String(error || "Failed to load area"));
+  const result = await load(tmxFile);
+  if (result.isErr()) {
+    throw result.error;
   }
-  return new TiledResource(tiledMap);
+  return new TiledResource(result.value);
 }
 
 const loadJson = (path: string) => fs.readFile(path, "utf-8").then(JSON.parse);

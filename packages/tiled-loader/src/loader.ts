@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "@mp/state";
 import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
 import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";
@@ -14,14 +15,11 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
     try {
       const tiledMap = (await context.loadJson(mapPath)) as TiledMap;
       await reconcileTiledMap(context, tiledMap);
-      return { tiledMap };
+      return ok(tiledMap);
     } catch (error) {
-      return { error };
+      return err(error);
     }
   };
 }
 
-export interface TiledLoaderResult {
-  tiledMap?: TiledMap;
-  error?: unknown;
-}
+export type TiledLoaderResult = Result<TiledMap, unknown>;

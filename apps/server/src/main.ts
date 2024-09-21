@@ -104,7 +104,7 @@ async function main(opt: CliOptions) {
 
   async function persist() {
     const result = await persistWorldState(db, world);
-    if (!result.ok) {
+    if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }
   }
