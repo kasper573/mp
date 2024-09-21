@@ -3,6 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "scripts": {
+    "build": "tsc",
     "loadtest": "tsx src/index.ts"
   },
   "dependencies": {
