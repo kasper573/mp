@@ -1,7 +1,6 @@
-import { dNodeFromVector, type AreaResource } from "@mp/state";
+import { dNodeFromVector, snapTileVector, type AreaResource } from "@mp/data";
 import type { Character, CharacterId } from "@mp/server";
 import { Cleanup, Container, Matrix } from "@mp/pixi";
-import { snapTileVector } from "@mp/state";
 import type { Vector } from "@mp/math";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import { Engine } from "@mp/pixi";

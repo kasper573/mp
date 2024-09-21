@@ -1,9 +1,9 @@
 import type { FillStyle } from "@mp/pixi";
 import { Engine } from "@mp/pixi";
-import type { TiledResource } from "@mp/state";
-import { snapTileVector } from "@mp/state";
+import type { TiledResource } from "@mp/data";
+import { snapTileVector } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import { isVectorInGraph, type DGraph } from "@mp/state";
+import { isVectorInGraph, type DGraph } from "@mp/data";
 
 export class TileHighlight extends Graphics {
   constructor(

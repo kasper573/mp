@@ -1,7 +1,7 @@
 import type { Container } from "@mp/pixi";
 import { Engine } from "@mp/pixi";
 import type { Vector } from "@mp/math";
-import { moveAlongPath } from "@mp/state";
+import { moveAlongPath } from "@mp/data";
 
 export class Interpolator {
   private pathInterpolation?: PathIntepolation;

@@ -1,4 +1,5 @@
-import { computed, type AreaId } from "@mp/state";
+import { type AreaId } from "@mp/data";
+import { computed } from "@mp/state";
 import { Application, Engine } from "@mp/pixi";
 import { api, myCharacterId } from "../api";
 import type { AreaLoader } from "./AreaLoader";
@@ -48,7 +49,7 @@ export function createGame({
 }
 
 const myAreaId = computed(
-  () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
+  () => api.state.value.characters.get(myCharacterId.value)?.areaId,
 );
 
 function createAreaChanger(

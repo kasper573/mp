@@ -1,5 +1,5 @@
-import type { AreaId, PathToLocalFile } from "@mp/state";
-import { AreaResource, TiledResource } from "@mp/state";
+import type { AreaId, PathToLocalFile } from "@mp/data";
+import { AreaResource, TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
 import { api } from "../api";
 

@@ -3,7 +3,7 @@ import path from "path";
 import http from "http";
 import { Logger } from "@mp/logger";
 import express from "express";
-import { type PathToLocalFile, type UrlToPublicFile } from "@mp/state";
+import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import type { CreateContextOptions, ServerError } from "@mp/network/server";
 import { Server } from "@mp/network/server";

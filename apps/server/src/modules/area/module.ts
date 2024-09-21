@@ -3,7 +3,7 @@ import type {
   PathToLocalFile,
   UrlFactory,
   UrlToPublicFile,
-} from "@mp/state";
+} from "@mp/data";
 import { t } from "../factory";
 
 export type AreaModule = ReturnType<typeof createAreaModule>;

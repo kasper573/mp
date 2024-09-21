@@ -9,6 +9,7 @@
     "@mp/network": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/state": "workspace:*"
   },
   "devDependencies": {

@@ -1,6 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
-import { TiledResource } from "@mp/state";
+import { TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
 
 export async function loadTiled(tmxFile: string) {

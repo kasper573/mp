@@ -4,7 +4,7 @@ import {
   moveAlongPath,
   type AreaId,
   type AreaResource,
-} from "@mp/state";
+} from "@mp/data";
 import { Vector } from "@mp/math";
 import { t } from "../factory";
 import { auth } from "../../middlewares/auth";
