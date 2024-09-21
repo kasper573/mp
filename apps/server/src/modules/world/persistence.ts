@@ -1,3 +1,4 @@
+import { err, ok, type Result } from "@mp/state";
 import type { DBClient } from "../../db/client";
 import { characterTable, type WorldState } from "./schema";
 
@@ -19,9 +20,15 @@ export async function persistWorldState(db: DBClient, state: WorldState) {
   }
 }
 
-export async function loadWorldState(db: DBClient): Promise<WorldState> {
-  const characters = await db.select().from(characterTable);
-  return {
-    characters: new Map(characters.map((char) => [char.id, char])),
-  };
+export async function loadWorldState(
+  db: DBClient,
+): Promise<Result<WorldState, unknown>> {
+  try {
+    const characters = await db.select().from(characterTable);
+    return ok({
+      characters: new Map(characters.map((char) => [char.id, char])),
+    });
+  } catch (error) {
+    return err(error);
+  }
 }

@@ -38,7 +38,13 @@ async function main(opt: CliOptions) {
   }
 
   const defaultAreaId = Array.from(areas.value.keys())[0];
-  const world = await loadWorldState(db);
+  const result = await loadWorldState(db);
+  if (result.isErr()) {
+    logger.error("Failed to load world state", result.error);
+    process.exit(1);
+  }
+
+  const world = result.value;
 
   const expressApp = express();
   expressApp.use(createExpressLogger(logger.chain("http")));
