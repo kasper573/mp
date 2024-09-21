@@ -6,7 +6,7 @@ import { createTextureLookup, loadTiledMapSpritesheets } from "./spritesheet";
 
 export class TiledRenderer extends LayerContainer {
   private layerViews: LayerContainer[] = [];
-  private spritesheets: TiledSpritesheetRecord = {};
+  private spritesheets?: TiledSpritesheetRecord;
   private debugUIEnabled = false;
 
   constructor(private map: TiledMap) {
@@ -22,10 +22,12 @@ export class TiledRenderer extends LayerContainer {
   };
 
   private deactivate = () => {
-    for (const spritesheet of Object.values(this.spritesheets)) {
-      spritesheet.destroy();
+    if (this.spritesheets) {
+      for (const spritesheet of Object.values(this.spritesheets)) {
+        spritesheet.destroy();
+      }
     }
-    this.spritesheets = {};
+    delete this.spritesheets;
     this.removeLayerViews();
   };
 
@@ -49,6 +51,10 @@ export class TiledRenderer extends LayerContainer {
   };
 
   private upsertLayerViews() {
+    if (!this.spritesheets) {
+      return;
+    }
+
     const factory = new LayerViewFactory(
       this.map,
       createTextureLookup(this.spritesheets),
