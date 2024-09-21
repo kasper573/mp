@@ -152,7 +152,12 @@ async function main(opt: CliOptions) {
     error,
     context,
   }: ServerError<ServerContext, string>) {
-    const args: unknown[] = [context?.clientId, rpc, error].filter(Boolean);
+    const args: unknown[] = [
+      context?.clientId,
+      rpc ? `${rpc.moduleName}.${rpc.procedureName}` : undefined,
+      rpc ? rpc.input : undefined,
+      error,
+    ].filter(Boolean);
     logger.chain(type).error(...args);
   }
 
