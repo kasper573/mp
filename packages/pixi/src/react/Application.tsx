@@ -51,7 +51,9 @@ export function Application({ resizeTo, children }: ApplicationProps) {
         {app && (
           <div style={styles.content}>
             <ApplicationContext.Provider value={app}>
-              {children}
+              <EngineContext.Provider value={Engine.instance}>
+                {children}
+              </EngineContext.Provider>
             </ApplicationContext.Provider>
           </div>
         )}
@@ -75,6 +77,14 @@ export const ApplicationContext = createContext<PixiApplication>(
   new Proxy({} as PixiApplication, {
     get() {
       throw new Error("ApplicationContext not provided");
+    },
+  }),
+);
+
+export const EngineContext = createContext<Engine>(
+  new Proxy({} as Engine, {
+    get() {
+      throw new Error("EngineContext not provided");
     },
   }),
 );
