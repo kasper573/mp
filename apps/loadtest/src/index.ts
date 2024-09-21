@@ -1,4 +1,4 @@
-import type { CharacterId, ClientStateUpdate } from "@mp/server";
+import type { ClientStateUpdate } from "@mp/server";
 import {
   serialization,
   type ClientState,
@@ -58,9 +58,6 @@ async function loadTestWebSockets() {
         parseRPCResponse: serialization.rpc.parse,
         createNextState: (_, nextState) => nextState,
         serializeRPC: serialization.rpc.serialize,
-        getAuth: () => ({
-          token: `loadtest_client_${clientNr}` as CharacterId,
-        }),
       });
 
       const results = await Promise.allSettled(
