@@ -1,5 +1,5 @@
 import { Application as PixiApplication } from "pixi.js";
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { createContext, useEffect, useState } from "react";
 import { Engine } from "../engine";
 
@@ -22,7 +22,7 @@ export function Application({ resizeTo, children }: ApplicationProps) {
 
     const app = new PixiApplication();
 
-    container.appendChild(canvas);
+    container.prepend(canvas);
 
     const initPromise = app.init({
       antialias: true,
@@ -47,15 +47,29 @@ export function Application({ resizeTo, children }: ApplicationProps) {
 
   return (
     <>
-      <div ref={setContainer} />
-      {app && (
-        <ApplicationContext.Provider value={app}>
-          {children}
-        </ApplicationContext.Provider>
-      )}
+      <div style={styles.container} ref={setContainer}>
+        {app && (
+          <div style={styles.content}>
+            <ApplicationContext.Provider value={app}>
+              {children}
+            </ApplicationContext.Provider>
+          </div>
+        )}
+      </div>
     </>
   );
 }
+
+const styles = {
+  container: {
+    position: "relative",
+  },
+  content: {
+    pointerEvents: "none",
+    position: "absolute",
+    inset: 0,
+  },
+} satisfies Record<string, CSSProperties>;
 
 export const ApplicationContext = createContext<PixiApplication>(
   new Proxy({} as PixiApplication, {
