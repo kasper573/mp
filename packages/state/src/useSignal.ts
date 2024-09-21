@@ -1,9 +1,10 @@
-import type { Signal } from "@preact/signals-core";
-import { useCallback, useEffect, useState } from "react";
+import { type Signal } from "@preact/signals-core";
+import { useSignals } from "@preact/signals-react/runtime";
+import { useCallback } from "react";
+export { useSignalEffect, useComputed } from "@preact/signals-react/runtime";
 
 export function useSignal<T>(signal: Signal<T>): [T, (value: T) => void] {
-  const [value, setValueInComponent] = useState(signal.value);
-  useEffect(() => signal.subscribe(setValueInComponent), [signal]);
+  useSignals();
   const setValue = useCallback((value: T) => (signal.value = value), [signal]);
-  return [value, setValue];
+  return [signal.value, setValue];
 }
