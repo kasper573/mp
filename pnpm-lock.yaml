@@ -312,16 +312,25 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
       '@mp/time':
         specifier: workspace:*
         version: link:../time
       pixi.js:
         specifier: 8.3.3
         version: 8.3.3
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/react':
+        specifier: 18.3.3
+        version: 18.3.3
 
   packages/state:
     dependencies:
@@ -331,10 +340,16 @@ importers:
       neverthrow:
         specifier: 7.0.0
         version: 7.0.0
+      react:
+        specifier: 18.3.1
+        version: 18.3.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/react':
+        specifier: 18.3.3
+        version: 18.3.3
 
   packages/style:
     dependencies:

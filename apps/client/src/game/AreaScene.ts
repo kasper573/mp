@@ -11,7 +11,14 @@ import { TileHighlight } from "./TileHighlight";
 
 const throttledMove = throttle(api.modules.world.move, 100);
 
-export class AreaScene extends Container {
+export function createScene(
+  area: AreaResource,
+  renderDebugText: (text: string) => void,
+): AreaScene {
+  return new AreaScene(area, renderDebugText);
+}
+
+class AreaScene extends Container {
   private cleanups = new Cleanup();
   private tiledRenderer: TiledRenderer;
   private characterActors: Map<CharacterId, CharacterActor> = new Map();
