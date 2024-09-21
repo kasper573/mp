@@ -24,6 +24,8 @@ export async function auth({
     clients.set(clientId, characterId);
     return characterId;
   } catch (error) {
-    throw new Error(`Client ${clientId} failed to authenticate`);
+    throw new Error(
+      `Client ${clientId} failed to authenticate: ${String(error)}`,
+    );
   }
 }
