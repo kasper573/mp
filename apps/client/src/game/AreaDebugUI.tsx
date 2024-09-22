@@ -12,9 +12,10 @@ import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
-import * as styles from "./DGraphDebugUI.css";
+import { myCharacter } from "../api";
+import * as styles from "./AreaDebugUI.css";
 
-export function DGraphDebugUI(props: {
+export function AreaDebugUI(props: {
   area: AreaResource;
   pathToDraw: Accessor<Path | undefined>;
 }) {
@@ -72,6 +73,8 @@ export function DGraphDebugUI(props: {
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
         `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
+        `character: ${JSON.stringify(myCharacter(), null, 2)}`,
+        `fps deltaTime: ${engine.deltaTime.totalMilliseconds.toFixed(2)}ms`,
       ].join("\n");
       setDebugText(text);
     } else {

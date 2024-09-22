@@ -1,13 +1,13 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, For, createEffect } from "solid-js";
+import { useContext, createEffect, Index } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
 import { Container, Matrix } from "@mp/pixi";
 import { api, myCharacter } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
-import { DGraphDebugUI } from "./DGraphDebugUI";
+import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const tiledMap = () => props.area.tiled.map;
@@ -35,7 +35,7 @@ export function AreaScene(props: { area: AreaResource }) {
   createEffect(() => {
     const me = myCharacter();
     const cameraTransform = engine.camera.update(
-      renderer,
+      props.area.tiled.mapSize,
       me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
     );
     scene.setFromMatrix(new Matrix(...cameraTransform.data));
@@ -45,12 +45,12 @@ export function AreaScene(props: { area: AreaResource }) {
     <Pixi instance={scene}>
       <Pixi instance={renderer} />
       <Pixi instance={characterContainer}>
-        <For each={Array.from(api.state.characters.values())}>
+        <Index each={Array.from(api.state.characters.values())}>
           {(char) => <CharacterActor char={char} area={props.area} />}
-        </For>
+        </Index>
       </Pixi>
       <TileHighlight area={props.area} />
-      <DGraphDebugUI area={props.area} pathToDraw={() => myCharacter()?.path} />
+      <AreaDebugUI area={props.area} pathToDraw={() => myCharacter()?.path} />
     </Pixi>
   );
 }
