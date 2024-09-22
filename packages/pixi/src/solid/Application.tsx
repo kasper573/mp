@@ -36,7 +36,6 @@ export function Application(props: JSX.IntrinsicElements["div"]) {
             </ContainerContext.Provider>
           </EngineContext.Provider>
         </ApplicationContext.Provider>
-        ,
       </div>
     </div>
   );
