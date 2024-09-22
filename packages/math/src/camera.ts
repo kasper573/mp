@@ -1,4 +1,3 @@
-import { clamp } from "./clamp";
 import { Matrix } from "./matrix";
 import type { Size } from "./size";
 import { Vector } from "./vector";
@@ -12,36 +11,29 @@ export class Camera {
     private readonly cameraSize: Size,
     private desiredZoom = 2,
     private maxZoom = 3,
-    private worldSize: Size = { width: 0, height: 0 },
   ) {}
 
-  resize(size: Size) {
-    this.worldSize = size;
-    this.update(this.position);
-  }
+  update(worldSize: Size, position: Vector = this.position) {
+    const scaleX = this.cameraSize.width / worldSize.width;
+    const scaleY = this.cameraSize.height / worldSize.height;
 
-  update(position: Vector = this.position): Matrix {
-    const scaleX = this.cameraSize.width / this.worldSize.width;
-    const scaleY = this.cameraSize.height / this.worldSize.height;
     const minZoom = Math.max(scaleX, scaleY);
 
-    this.zoom = clamp(this.desiredZoom, minZoom, this.maxZoom);
+    this.zoom = Math.max(minZoom, Math.min(this.maxZoom, this.desiredZoom));
 
     const halfCameraWidth = this.cameraSize.width / 2 / this.zoom;
     const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;
 
-    this.position = new Vector(
-      clamp(
-        position.x,
-        halfCameraWidth,
-        this.worldSize.width - halfCameraWidth,
-      ),
-      clamp(
-        position.y,
-        halfCameraHeight,
-        this.worldSize.height - halfCameraHeight,
-      ),
+    const clampedX = Math.max(
+      halfCameraWidth,
+      Math.min(worldSize.width - halfCameraWidth, position.x),
     );
+    const clampedY = Math.max(
+      halfCameraHeight,
+      Math.min(worldSize.height - halfCameraHeight, position.y),
+    );
+
+    this.position = new Vector(clampedX, clampedY);
 
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
@@ -58,14 +50,14 @@ export class Camera {
     return this.transform;
   }
 
-  screenToWorld(screenPos: Vector): Vector {
+  viewportToWorld(screenPos: Vector): Vector {
     return new Vector(
       (screenPos.x - this.cameraSize.width / 2) / this.zoom + this.position.x,
       (screenPos.y - this.cameraSize.height / 2) / this.zoom + this.position.y,
     );
   }
 
-  worldToScreen(worldPos: Vector): Vector {
+  worldToViewport(worldPos: Vector): Vector {
     return new Vector(
       (worldPos.x - this.position.x) * this.zoom + this.cameraSize.width / 2,
       (worldPos.y - this.position.y) * this.zoom + this.cameraSize.height / 2,

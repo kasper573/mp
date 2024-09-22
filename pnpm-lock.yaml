@@ -272,6 +272,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
 
   packages/network:
     dependencies:

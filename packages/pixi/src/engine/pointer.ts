@@ -45,7 +45,7 @@ export class PointerForCamera extends Pointer {
   constructor(viewport: HTMLElement, camera: Camera) {
     super(viewport);
     this.#worldPosition = computed(() =>
-      camera.screenToWorld(this._position.get()),
+      camera.viewportToWorld(this._position.get()),
     );
   }
 }

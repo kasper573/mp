@@ -1,6 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createMemo, For, createEffect } from "solid-js";
+import { useContext, For, createEffect } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
 import { Container, Matrix } from "@mp/pixi";
 import { api, myCharacter } from "../api";
@@ -10,13 +10,16 @@ import { getTilePosition } from "./getTilePosition";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
-  const map = () => props.area.tiled.map;
+  const tiledMap = () => props.area.tiled.map;
   const engine = useContext(EngineContext);
   const scene = new Container();
-  const renderer = new TiledRenderer(map);
-  const cameraMatrix = createMemo(() =>
-    engine.camera.update(myCharacter()?.coords),
-  );
+  const characterContainer = new Container();
+  const renderer = new TiledRenderer(tiledMap);
+  renderer.addChild(characterContainer);
+
+  createEffect(() => {
+    characterContainer.zIndex = props.area.characterLayerIndex;
+  });
 
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
@@ -26,27 +29,26 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    const { map } = props.area.tiled;
-    engine.camera.resize({
-      width: map.width * map.tilewidth,
-      height: map.height * map.tileheight,
-    });
-  });
-
-  createEffect(() => {
     renderer.toggleDebugUI(engine.keyboard.keysHeld.has("Shift"));
   });
 
   createEffect(() => {
-    scene.setFromMatrix(new Matrix(...cameraMatrix().data));
+    const me = myCharacter();
+    const cameraTransform = engine.camera.update(
+      renderer,
+      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
+    );
+    scene.setFromMatrix(new Matrix(...cameraTransform.data));
   });
 
   return (
     <Pixi instance={scene}>
       <Pixi instance={renderer} />
-      <For each={Array.from(api.state.characters.values())}>
-        {(char) => <CharacterActor char={char} area={props.area} />}
-      </For>
+      <Pixi instance={characterContainer}>
+        <For each={Array.from(api.state.characters.values())}>
+          {(char) => <CharacterActor char={char} area={props.area} />}
+        </For>
+      </Pixi>
       <TileHighlight area={props.area} />
       <DGraphDebugUI area={props.area} pathToDraw={() => myCharacter()?.path} />
     </Pixi>
