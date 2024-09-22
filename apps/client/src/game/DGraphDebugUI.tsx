@@ -10,14 +10,15 @@ import {
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
-import { createEffect, useContext } from "solid-js";
+import { createEffect, createSignal, useContext } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
-import { setDebugText } from "./DebugText";
+import * as styles from "./DGraphDebugUI.css";
 
 export function DGraphDebugUI(props: {
   area: AreaResource;
   pathToDraw: Accessor<Path | undefined>;
 }) {
+  const [debugText, setDebugText] = createSignal("");
   const engine = useContext(EngineContext);
   const gfx = new Graphics();
 
@@ -77,7 +78,13 @@ export function DGraphDebugUI(props: {
     }
   });
 
-  return <Pixi instance={gfx} />;
+  return (
+    <Pixi instance={gfx}>
+      <span class={styles.debugText({ visible: !!debugText() })}>
+        {debugText()}
+      </span>
+    </Pixi>
+  );
 }
 
 function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
