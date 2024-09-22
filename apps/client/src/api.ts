@@ -57,9 +57,17 @@ function applyStateUpdate(state: ClientState, update: ClientStateUpdate) {
 
   for (const updatedId of prevCharacterIds.intersection(nextCharacterIds)) {
     const existing = state.characters.get(updatedId)!;
-    const { coords, ...rest } = update.characters.get(updatedId)!;
+    const updated = update.characters.get(updatedId)!;
+    if (isStructurallyEqual(existing, updated)) {
+      continue;
+    }
+    const { coords, ...rest } = updated;
     existing.coords.x = coords.x;
     existing.coords.y = coords.y;
     Object.assign(existing, rest);
   }
+}
+
+function isStructurallyEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
