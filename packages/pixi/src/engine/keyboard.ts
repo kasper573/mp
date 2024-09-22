@@ -1,4 +1,4 @@
-import { atom } from "@mp/state";
+import { atom, produce } from "@mp/state";
 
 export class Keyboard {
   readonly #heldKeys = atom(new Set<KeyName>());
@@ -19,10 +19,21 @@ export class Keyboard {
 
   isHeld = (key: KeyName) => this.heldKeys.has(key);
 
-  private onDown = (e: KeyboardEvent) =>
-    this.#heldKeys.get().add(e.key as KeyName);
-  private onUp = (e: KeyboardEvent) =>
-    this.#heldKeys.get().delete(e.key as KeyName);
+  private onDown = (e: KeyboardEvent) => {
+    this.#heldKeys.set(
+      produce((set: Set<KeyName>) => {
+        set.add(e.key as KeyName);
+      }),
+    );
+  };
+
+  private onUp = (e: KeyboardEvent) => {
+    this.#heldKeys.set(
+      produce((set: Set<KeyName>) => {
+        set.delete(e.key as KeyName);
+      }),
+    );
+  };
 }
 
 export type KeyName = "Shift" | "Control";
