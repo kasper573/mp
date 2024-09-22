@@ -47,11 +47,11 @@ const styles = {
     position: "relative",
   },
   content: {
-    pointerEvents: "none",
+    "pointer-events": "none",
     position: "absolute",
     inset: 0,
   },
-} as const;
+} satisfies Record<string, JSX.CSSProperties>;
 
 export const ApplicationContext = createContext<PixiApplication>(
   new Proxy({} as PixiApplication, {
