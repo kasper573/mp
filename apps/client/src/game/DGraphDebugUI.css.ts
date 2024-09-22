@@ -8,6 +8,7 @@ export const debugText = recipe({
       padding: "l",
       borderRadius: "m",
       pointerEvents: "none",
+      userSelect: "none",
     }),
     {
       top: 8,

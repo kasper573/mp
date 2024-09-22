@@ -71,6 +71,7 @@ export function DGraphDebugUI(props: {
         `world: ${vecToString(worldPosition)}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
+        `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       ].join("\n");
       setDebugText(text);
     } else {
