@@ -20,7 +20,7 @@ export function Game() {
       fallback={(error: unknown) => <ErrorFallback error={error} />}
     >
       <Suspense fallback={<>Loading...</>}>
-        {query.data && <AreaScene area={query.data} />}
+        {query.data && <AreaScene area={() => query.data} />}
       </Suspense>
     </ErrorBoundary>
   );

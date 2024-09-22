@@ -1,5 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
+import type { Accessor } from "solid-js";
 import { useContext, createEffect, Index } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
 import { Container, Matrix } from "@mp/pixi";
@@ -9,8 +10,8 @@ import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
 import { AreaDebugUI } from "./AreaDebugUI";
 
-export function AreaScene(props: { area: AreaResource }) {
-  const tiledMap = () => props.area.tiled.map;
+export function AreaScene(props: { area: Accessor<AreaResource> }) {
+  const tiledMap = () => props.area().tiled.map;
   const engine = useContext(EngineContext);
   const scene = new Container();
   const characterContainer = new Container();
@@ -18,11 +19,14 @@ export function AreaScene(props: { area: AreaResource }) {
   renderer.addChild(characterContainer);
 
   createEffect(() => {
-    characterContainer.zIndex = props.area.characterLayerIndex;
+    characterContainer.zIndex = props.area().characterLayerIndex;
   });
 
   createEffect(() => {
-    const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
+    const { tilePosition, isValidTarget } = getTilePosition(
+      props.area(),
+      engine,
+    );
     if (engine.pointer.isDown && isValidTarget) {
       throttledMove(tilePosition);
     }
@@ -35,8 +39,8 @@ export function AreaScene(props: { area: AreaResource }) {
   createEffect(() => {
     const me = myCharacter();
     const cameraTransform = engine.camera.update(
-      props.area.tiled.mapSize,
-      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
+      props.area().tiled.mapSize,
+      me ? props.area().tiled.tileCoordToWorld(me.coords) : undefined,
     );
     scene.setFromMatrix(new Matrix(...cameraTransform.data));
   });
@@ -46,11 +50,11 @@ export function AreaScene(props: { area: AreaResource }) {
       <Pixi instance={renderer} />
       <Pixi instance={characterContainer}>
         <Index each={Array.from(api.state.characters.values())}>
-          {(char) => <CharacterActor char={char} area={props.area} />}
+          {(char) => <CharacterActor char={char} area={props.area()} />}
         </Index>
       </Pixi>
-      <TileHighlight area={props.area} />
-      <AreaDebugUI area={props.area} pathToDraw={() => myCharacter()?.path} />
+      <TileHighlight area={props.area()} />
+      <AreaDebugUI area={props.area()} pathToDraw={() => myCharacter()?.path} />
     </Pixi>
   );
 }
