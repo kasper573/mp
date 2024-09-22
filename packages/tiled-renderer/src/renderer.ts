@@ -1,4 +1,3 @@
-import { Graphics } from "@mp/pixi";
 import { type TiledMap } from "@mp/tiled-loader";
 import { LayerContainer, LayerViewFactory } from "./layer";
 import type { TiledSpritesheetRecord } from "./spritesheet";
@@ -17,7 +16,7 @@ export class TiledRenderer extends LayerContainer {
   }
 
   private activate = async () => {
-    await this.load();
+    this.spritesheets = await loadTiledMapSpritesheets(this.map());
     this.upsertLayerViews();
   };
 
@@ -29,20 +28,6 @@ export class TiledRenderer extends LayerContainer {
     }
     delete this.spritesheets;
     this.removeLayerViews();
-  };
-
-  load = async () => {
-    const loader = new Graphics();
-    loader.rect(
-      0,
-      0,
-      this.map().width * this.map().tilewidth,
-      this.map().height * this.map().tileheight,
-    );
-    loader.fill(0x0000ff);
-    this.addChild(loader);
-
-    this.spritesheets = await loadTiledMapSpritesheets(this.map());
   };
 
   toggleDebugUI = (enabled: boolean) => {
