@@ -1,11 +1,13 @@
-import { Outlet } from "@tanstack/react-router";
+import { Component, JSX, ParentComponent } from "solid-js";
 import AppBar from "./AppBar";
 
-export default function Layout() {
+const Layout: ParentComponent = (props) => {
   return (
     <>
       <AppBar />
-      <Outlet />
+      {props.children}
     </>
   );
-}
+};
+
+export default Layout;

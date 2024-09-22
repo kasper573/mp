@@ -1,28 +1,24 @@
-import { Link } from "@tanstack/react-router";
-import { useContext, useSyncExternalStore } from "react";
+import { useContext } from "solid-js";
 import { useAuthState, AuthContext } from "@mp/auth/client";
 import { api } from "../api";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
+import { Link } from "./Link";
 
 export default function AppBar() {
-  const connected = useSyncExternalStore(
-    (fn) => api.connected.subscribe(fn),
-    () => api.connected.value,
-  );
   const auth = useContext(AuthContext);
   const { isSignedIn } = useAuthState();
   return (
-    <nav className={styles.nav}>
-      <Link to="/">Home</Link>
-      <Link to="/play">Play</Link>
+    <nav class={styles.nav}>
+      <Link href="/">Home</Link>
+      <Link href="/play">Play</Link>
 
       <div
-        className={styles.connectionIndicator({ connected })}
-        title={connected ? "Connected" : "Offline"}
+        class={styles.connectionIndicator(api)}
+        title={api.connected ? "Connected" : "Offline"}
       />
 
-      {isSignedIn ? (
+      {isSignedIn() ? (
         <Button onClick={() => void auth.signOut()}>Sign out</Button>
       ) : (
         <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>

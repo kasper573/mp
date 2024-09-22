@@ -7,8 +7,8 @@ import {
 } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
-import { signal } from "@mp/state";
 import { env } from "./env";
+import { createEffect, createMemo, createSignal } from "solid-js";
 
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
@@ -27,11 +27,18 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   },
 });
 
-export const myCharacterId = signal<CharacterId | undefined>(undefined);
-api.connected.subscribe((connected) => {
-  if (connected) {
-    void api.modules.world.join().then((id) => (myCharacterId.value = id));
+export const [myCharacterId, setMyCharacterId] = createSignal<
+  CharacterId | undefined
+>(undefined);
+
+export const myCharacter = createMemo(() =>
+  api.state.characters.get(myCharacterId()!),
+);
+
+createEffect(() => {
+  if (api.connected) {
+    void api.modules.world.join().then(setMyCharacterId);
   } else {
-    myCharacterId.value = undefined;
+    setMyCharacterId(undefined);
   }
 });

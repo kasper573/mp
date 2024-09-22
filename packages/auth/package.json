@@ -27,10 +27,9 @@
     "@clerk/clerk-sdk-node": "5.0.35"
   },
   "peerDependencies": {
-    "react": "18.3.1"
+    "solid-js": "1.8.22"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "18.3.3"
+    "@mp/tsconfig": "workspace:*"
   }
 }

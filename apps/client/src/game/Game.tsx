@@ -1,31 +1,28 @@
-import { useComputedValue } from "@mp/state";
-import { skipToken, useQuery } from "@tanstack/react-query";
-import { api, myCharacterId } from "../api";
+import { skipToken, createQuery } from "@tanstack/solid-query";
+import { api, myCharacter, myCharacterId } from "../api";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
+import { createMemo } from "solid-js/types/server/reactive.js";
 
 export function Game() {
-  const areaId = useComputedValue(
-    () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
-  );
-  const {
-    data: area,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ["area", areaId],
-    queryFn: areaId ? () => loadAreaResource(areaId) : skipToken,
+  const areaId = createMemo(() => myCharacter()?.areaId);
+  const query = createQuery(() => {
+    const id = areaId();
+    return {
+      queryKey: ["area", id],
+      queryFn: id ? () => loadAreaResource(id) : skipToken,
+    };
   });
 
-  if (isLoading) {
+  if (query.isLoading) {
     return <div>Loading...</div>;
   }
-  if (error) {
-    return <div>Error: {error.message}</div>;
+  if (query.error) {
+    return <div>Error: {query.error.message}</div>;
   }
-  if (!area) {
-    return <div>Area not found: {areaId ?? "no area defined"}</div>;
+  if (!query.data) {
+    return <div>Area not found: {areaId() ?? "no area defined"}</div>;
   }
 
-  return <AreaScene area={area} />;
+  return <AreaScene area={query.data} />;
 }

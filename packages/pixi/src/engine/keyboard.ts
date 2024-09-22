@@ -1,10 +1,11 @@
-import type { ReadonlySignal } from "@mp/state";
-import { signal } from "@mp/state";
+import { createAtom } from "@mp/state";
 
 export class Keyboard {
-  readonly #heldKeys = signal(new Set<KeyName>());
+  readonly #heldKeys = createAtom(new Set<KeyName>());
 
-  readonly heldKeys: ReadonlySignal<ReadonlySet<KeyName>> = this.#heldKeys;
+  get heldKeys(): ReadonlySet<KeyName> {
+    return this.#heldKeys.get();
+  }
 
   start() {
     window.addEventListener("keydown", this.onDown);
@@ -16,18 +17,12 @@ export class Keyboard {
     window.removeEventListener("keyup", this.onUp);
   }
 
-  isHeld = (key: KeyName) => this.heldKeys.value.has(key);
-
-  subscribe = (key: KeyName, callback: (isDown: boolean) => void) => {
-    return this.heldKeys.subscribe((keys) => {
-      callback(keys.has(key));
-    });
-  };
+  isHeld = (key: KeyName) => this.heldKeys.has(key);
 
   private onDown = (e: KeyboardEvent) =>
-    this.#heldKeys.value.add(e.key as KeyName);
+    this.#heldKeys.get().add(e.key as KeyName);
   private onUp = (e: KeyboardEvent) =>
-    this.#heldKeys.value.delete(e.key as KeyName);
+    this.#heldKeys.get().delete(e.key as KeyName);
 }
 
 export type KeyName = "Shift" | "Control";

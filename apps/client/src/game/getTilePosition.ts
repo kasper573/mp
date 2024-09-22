@@ -4,7 +4,7 @@ import type { Engine } from "@mp/pixi";
 
 export function getTilePosition(area: AreaResource, engine: Engine) {
   const tilePosition = snapTileVector(
-    area.tiled.worldCoordToTile(engine.pointer.position.value),
+    area.tiled.worldCoordToTile(engine.pointer.position),
   );
   const isValidTarget = !!area.dGraph[dNodeFromVector(tilePosition)];
   return { tilePosition, isValidTarget };

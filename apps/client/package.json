@@ -14,24 +14,20 @@
     "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/pixi": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
-    "@tanstack/react-query": "5.51.11",
-    "@tanstack/react-router": "1.56.5",
-    "react": "18.3.1",
-    "react-dom": "18.3.1"
+    "@tanstack/solid-query": "5.56.2",
+    "solid-js": "1.8.22"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "@tanstack/router-devtools": "1.56.5",
-    "@types/react": "18.3.3",
-    "@types/react-dom": "18.3.0",
     "http-server": "14.1.1"
   }
 }

@@ -1,4 +1,4 @@
-import type { TiledResource } from "@mp/data";
+import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
 import { Vector, type Path } from "@mp/math";
 import {
@@ -8,79 +8,78 @@ import {
   dNodeFromVector,
   addVectorToAdjacentInGraph,
 } from "@mp/data";
-import type { Engine } from "@mp/pixi";
 import { Graphics } from "@mp/pixi";
-import { debugText } from "./DebugText";
+import { setDebugText } from "./DebugText";
+import { Accessor, useContext } from "solid-js";
+import { EngineContext, Pixi } from "@mp/pixi/solid";
+import { effect } from "solid-js/web";
 
-export class DGraphDebugUI extends Graphics {
-  private pathToDraw: Path = [];
-  private allTileCoords: Vector[];
+export function DGraphDebugUI({
+  area: { dGraph: graph, tiled },
+  pathToDraw,
+}: {
+  area: AreaResource;
+  pathToDraw: Accessor<Path | undefined>;
+}) {
+  const engine = useContext(EngineContext);
+  const allTileCoords = generateAllTileCoords(
+    tiled.map.width,
+    tiled.map.height,
+  );
 
-  constructor(
-    private graph: DGraph,
-    private tiled: TiledResource,
-    private engine: Engine,
-  ) {
-    super();
-    this.allTileCoords = generateAllTileCoords(
-      tiled.map.width,
-      tiled.map.height,
-    );
-  }
+  const gfx = new Graphics();
 
-  showPath(path: Vector[]) {
-    this.pathToDraw = path;
-  }
-
-  override _onRender = () => {
+  effect(() => {
     const {
       pointer: { worldPosition, position: viewportPosition },
       keyboard,
-    } = this.engine;
+    } = engine;
 
-    this.clear();
+    gfx.clear();
 
     if (keyboard.isHeld("Control") && keyboard.isHeld("Shift")) {
-      for (const pos of this.allTileCoords) {
-        drawDNode(this, this.tiled, this.graph, pos);
+      for (const pos of allTileCoords) {
+        drawDNode(gfx, tiled, graph, pos);
       }
     } else if (keyboard.isHeld("Control")) {
       drawDNode(
-        this,
-        this.tiled,
-        this.graph,
-        snapTileVector(this.tiled.worldCoordToTile(worldPosition.value)),
+        gfx,
+        tiled,
+        graph,
+        snapTileVector(tiled.worldCoordToTile(worldPosition)),
       );
     }
 
     if (keyboard.isHeld("Shift")) {
-      const tilePos = this.tiled.worldCoordToTile(worldPosition.value);
+      const tilePos = tiled.worldCoordToTile(worldPosition);
       drawDNode(
-        this,
-        this.tiled,
-        addVectorToAdjacentInGraph(this.graph, tilePos),
+        gfx,
+        tiled,
+        addVectorToAdjacentInGraph(graph, tilePos),
         tilePos,
-        this.tiled.tileCoordToWorld(tilePos),
+        tiled.tileCoordToWorld(tilePos),
       );
     }
 
     if (keyboard.isHeld("Shift") || keyboard.isHeld("Control")) {
-      if (this.pathToDraw.length) {
-        drawPath(this, this.tiled, this.pathToDraw);
+      if (pathToDraw()?.length) {
+        drawPath(gfx, tiled, pathToDraw() ?? []);
       }
 
-      const tilePos = this.tiled.worldCoordToTile(worldPosition.value);
+      const tilePos = tiled.worldCoordToTile(worldPosition);
       const text = [
-        `viewport: ${vecToString(viewportPosition.value)}`,
-        `world: ${vecToString(worldPosition.value)}`,
+        `viewport: ${vecToString(viewportPosition)}`,
+        `world: ${vecToString(worldPosition)}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       ].join("\n");
-      debugText.value = text;
+      setDebugText(text);
     } else {
-      debugText.value = "";
+      setDebugText("");
     }
-  };
+  });
+
+  return <Pixi instance={gfx} />;
 }
 
 function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {

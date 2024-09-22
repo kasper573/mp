@@ -12,6 +12,11 @@
       "import": "./dist/react/index.js",
       "require": "./dist/react/index.d.js",
       "types": "./dist/react/index.d.ts"
+    },
+    "./solid": {
+      "import": "./dist/solid/index.js",
+      "require": "./dist/solid/index.d.js",
+      "types": "./dist/solid/index.d.ts"
     }
   },
   "files": [
@@ -25,13 +30,10 @@
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/state": "workspace:*",
+    "solid-js": "1.8.22",
     "pixi.js": "8.3.3"
   },
-  "peerDependencies": {
-    "react": "18.3.1"
-  },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "18.3.3"
+    "@mp/tsconfig": "workspace:*"
   }
 }

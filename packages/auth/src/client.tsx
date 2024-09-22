@@ -1,5 +1,5 @@
 import { Clerk as AuthClient } from "@clerk/clerk-js";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, createSignal, onCleanup, useContext } from "solid-js";
 
 export { AuthClient };
 
@@ -16,8 +16,9 @@ export const AuthContext = createContext<AuthClient>(
  */
 export function useAuthState() {
   const auth = useContext(AuthContext);
-  const [isSignedIn, setIsSignedIn] = useState(!!auth.user);
-  useEffect(() => auth.addListener(() => setIsSignedIn(!!auth.user)), [auth]);
+  const [isSignedIn, setIsSignedIn] = createSignal(!!auth.user);
+  onCleanup(auth.addListener(() => setIsSignedIn(!!auth.user)));
+
   return {
     isSignedIn,
   };

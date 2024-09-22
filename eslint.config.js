@@ -3,6 +3,7 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
+import solidPlugin from "eslint-plugin-solid";
 
 export default tseslint.config(
   {
@@ -17,6 +18,7 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
+  ...solidPlugin.configs.recommended,
   {
     languageOptions: {
       parserOptions: {

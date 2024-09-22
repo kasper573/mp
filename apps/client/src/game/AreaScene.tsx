@@ -1,58 +1,51 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useComputedValue, useSignalEffect } from "@mp/state";
-import { useContext, useEffect } from "react";
-import { EngineContext, Pixi, Stage } from "@mp/pixi/react";
-import { api, myCharacterId } from "../api";
+import { useContext, createMemo, For, Show } from "solid-js";
+import { EngineContext, Pixi, Stage } from "@mp/pixi/solid";
+import { api, myCharacter } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
+import { effect } from "solid-js/web";
+import { DGraphDebugUI } from "./DGraphDebugUI";
 
 export function AreaScene({ area }: { area: AreaResource }) {
   const engine = useContext(EngineContext);
-  const characters = useComputedValue(() => api.state.value.characters);
-  const debugUIActive = useComputedValue(() => engine.keyboard.isHeld("Shift"));
-  const me = useComputedValue(() => characters.get(myCharacterId.value!));
-  const cameraMatrix = useComputedValue(() => engine.camera.update(me?.coords));
+  const renderer = new TiledRenderer(area.tiled.map);
+  const debugUIActive = createMemo(() => engine.keyboard.isHeld("Shift"));
+  const cameraMatrix = createMemo(() =>
+    engine.camera.update(myCharacter()?.coords),
+  );
 
-  useSignalEffect(() => {
+  effect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(area, engine);
-    if (engine.pointer.isDown.value && isValidTarget) {
+    if (engine.pointer.isDown && isValidTarget) {
       throttledMove(tilePosition);
     }
   });
 
-  useEffect(() => {
+  effect(() => {
     const { map } = area.tiled;
     engine.camera.resize({
       width: map.width * map.tilewidth,
       height: map.height * map.tileheight,
     });
-  }, [area, engine]);
+  });
+
+  effect(() => {
+    renderer.toggleDebugUI(debugUIActive());
+  });
 
   return (
     <Stage matrix={cameraMatrix}>
-      <Pixi create={TiledRenderer} map={area.tiled.map} debug={debugUIActive} />
-      {Array.from(characters.values()).map((char) => (
-        <Pixi
-          key={char.id}
-          create={CharacterActor}
-          engine={engine}
-          tileSize={area.tiled.tileSize}
-          update={(actor) => {
-            actor.interpolator.configure(
-              area.tiled.tileCoordToWorld(char.coords),
-              {
-                path: char.path?.map(area.tiled.tileCoordToWorld) ?? [],
-                speed: area.tiled.tileUnitToWorld(char.speed),
-              },
-            );
-          }}
-        />
-      ))}
+      <Pixi instance={renderer} />
+      <For each={Array.from(api.state.characters.values())}>
+        {(char) => <CharacterActor char={char} area={area} />}
+      </For>
       <TileHighlight area={area} />
-      {/* 
-      {debugUIActive && <DGraphDebugUI area={area} showPath={myChar.path} />} */}
+      <Show when={debugUIActive()}>
+        <DGraphDebugUI area={area} pathToDraw={() => myCharacter()?.path} />
+      </Show>
     </Stage>
   );
 }

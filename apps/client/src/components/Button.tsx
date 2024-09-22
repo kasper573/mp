@@ -1,10 +1,6 @@
-import { clsx } from "@mp/style";
-import type { HTMLAttributes } from "react";
+import { JSX } from "solid-js";
 import * as styles from "./Button.css";
 
-export function Button({
-  className,
-  ...rest
-}: HTMLAttributes<HTMLButtonElement>) {
-  return <button className={clsx(styles.button, className)} {...rest} />;
+export function Button(props: JSX.IntrinsicElements["button"]) {
+  return <button classList={{ [styles.button]: true }} {...props} />;
 }

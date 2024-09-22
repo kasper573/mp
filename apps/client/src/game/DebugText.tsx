@@ -1,14 +1,13 @@
-import { signal, useSignal } from "@mp/state";
+import { createSignal } from "solid-js/types/server/reactive.js";
 import * as styles from "./DebugText.css";
 
-export const debugText = signal("");
+export const [getDebugText, setDebugText] = createSignal("");
+export const isDebugTextVisible = () => !!getDebugText();
 
 export function DebugText() {
-  const [text] = useSignal(debugText);
-  if (!text) {
-    return null;
-  }
   return (
-    <span className={styles.debugText({ visible: !!debugText })}>{text}</span>
+    <span class={styles.debugText({ visible: isDebugTextVisible() })}>
+      {getDebugText()}
+    </span>
   );
 }

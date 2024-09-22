@@ -1,14 +1,6 @@
-import { Link as TanstackLink } from "@tanstack/react-router";
-import type { ComponentProps } from "react";
-import { clsx } from "@mp/style";
 import * as styles from "./Link.css";
+import { JSX } from "solid-js";
 
-function StyledLink({
-  className,
-  ...rest
-}: ComponentProps<typeof TanstackLink>) {
-  return <TanstackLink className={clsx(styles.link, className)} {...rest} />;
+export function Link(props: JSX.IntrinsicElements["a"]) {
+  return <a classList={{ [styles.link]: true }} {...props} />;
 }
-
-// Retain the original type definition to support typesafe routes
-export const Link = StyledLink as unknown as typeof TanstackLink;
