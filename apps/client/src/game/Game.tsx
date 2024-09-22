@@ -1,7 +1,7 @@
 import { skipToken, createQuery } from "@tanstack/solid-query";
 import { createMemo, ErrorBoundary, Suspense } from "solid-js";
 import { myCharacter } from "../api";
-import { ErrorFallback } from "../components/ErrorFallback";
+import { ErrorFallback } from "../ui/ErrorFallback";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
 
