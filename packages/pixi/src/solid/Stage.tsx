@@ -3,7 +3,7 @@ import { createEffect, useContext } from "solid-js";
 import type { Matrix } from "@mp/math";
 import { Matrix as PixiMatrix } from "pixi.js";
 import { ApplicationContext } from "./Application";
-import { ContainerContext } from "./Pixi";
+import { ContainerContext } from "./ContainerContext";
 
 export interface StageProps {
   matrix?: Accessor<Matrix>;

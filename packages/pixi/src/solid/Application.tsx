@@ -1,7 +1,7 @@
 import { Application as PixiApplication } from "pixi.js";
 import { createContext, onCleanup, onMount, type JSX } from "solid-js";
 import { Engine } from "../engine/engine";
-import { ContainerContext } from "./Pixi";
+import { ContainerContext } from "./ContainerContext";
 
 export function Application(props: JSX.IntrinsicElements["div"]) {
   const canvas = document.createElement("canvas");

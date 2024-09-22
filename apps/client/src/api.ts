@@ -19,7 +19,7 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
   createInitialState: () => ({ characters: new Map() }),
   parseStateUpdate: serialization.stateUpdate.parse,
   parseRPCResponse: serialization.rpc.parse,
-  createNextState: (_, nextState) => nextState,
+  applyStateUpdate,
   serializeRPC: serialization.rpc.serialize,
   async getHeaders() {
     await loadPromise;
@@ -42,3 +42,24 @@ createEffect(() => {
     setMyCharacterId(undefined);
   }
 });
+
+function applyStateUpdate(state: ClientState, update: ClientStateUpdate) {
+  const prevCharacterIds = new Set(state.characters.keys());
+  const nextCharacterIds = new Set(update.characters.keys());
+
+  for (const removedId of prevCharacterIds.difference(nextCharacterIds)) {
+    state.characters.delete(removedId);
+  }
+
+  for (const addedId of nextCharacterIds.difference(prevCharacterIds)) {
+    state.characters.set(addedId, update.characters.get(addedId)!);
+  }
+
+  for (const updatedId of prevCharacterIds.intersection(nextCharacterIds)) {
+    const existing = state.characters.get(updatedId)!;
+    const { coords, ...rest } = update.characters.get(updatedId)!;
+    existing.coords.x = coords.x;
+    existing.coords.y = coords.y;
+    Object.assign(existing, rest);
+  }
+}

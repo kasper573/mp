@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { atom, type Atom } from "@mp/state";
+import { atom, produce, type Atom } from "@mp/state";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,
@@ -50,8 +50,13 @@ export class Client<
     this._state = atom(options.createInitialState());
 
     this.socket.on("stateUpdate", (update) => {
-      this._state.set((prev) =>
-        options.createNextState(prev, options.parseStateUpdate(update)),
+      this._state.set(
+        produce<State>((prev) => {
+          options.applyStateUpdate(
+            prev as State,
+            options.parseStateUpdate(update),
+          );
+        }),
       );
     });
 
@@ -113,7 +118,7 @@ export interface ClientOptions<State, StateUpdate> {
   serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
   parseRPCResponse: SocketIO_DTOParser<SocketIO_RPCResponse<unknown>>;
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
-  createNextState: (state: State, update: StateUpdate) => State;
+  applyStateUpdate: (state: State, update: StateUpdate) => unknown;
   createInitialState: () => State;
   getHeaders?: () =>
     | SocketIO_Headers

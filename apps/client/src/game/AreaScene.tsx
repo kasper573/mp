@@ -12,6 +12,9 @@ export function AreaScene(props: { area: AreaResource }) {
   const map = () => props.area.tiled.map;
   const engine = useContext(EngineContext);
   const renderer = new TiledRenderer(map);
+  const characters = createMemo(() =>
+    Array.from(api.state.characters.values()),
+  );
   const debugUIActive = createMemo(() => engine.keyboard.isHeld("Shift"));
   const cameraMatrix = createMemo(() =>
     engine.camera.update(myCharacter()?.coords),
@@ -39,7 +42,7 @@ export function AreaScene(props: { area: AreaResource }) {
   return (
     <Stage matrix={cameraMatrix}>
       <Pixi instance={renderer} />
-      <For each={Array.from(api.state.characters.values())}>
+      <For each={characters()}>
         {(char) => <CharacterActor char={char} area={props.area} />}
       </For>
       <TileHighlight area={props.area} />

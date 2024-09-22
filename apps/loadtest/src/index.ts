@@ -56,7 +56,7 @@ async function loadTestWebSockets() {
         createInitialState: () => ({ characters: new Map() }),
         parseStateUpdate: serialization.stateUpdate.parse,
         parseRPCResponse: serialization.rpc.parse,
-        createNextState: (_, nextState) => nextState,
+        applyStateUpdate: (state, update) => Object.assign(state, update),
         serializeRPC: serialization.rpc.serialize,
       });
 

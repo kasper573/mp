@@ -1,6 +1,7 @@
 import type { ParentProps } from "solid-js";
-import { createContext, useContext, onCleanup, onMount } from "solid-js";
+import { useContext, onCleanup, onMount } from "solid-js";
 import type { Container } from "pixi.js";
+import { ContainerContext } from "./ContainerContext";
 
 export type PixiProps<
   Instance extends Container,
@@ -13,12 +14,10 @@ export function Pixi<Instance extends Container, InstanceProps extends object>(
   const parent = useContext(ContainerContext);
 
   onMount(() => {
-    //console.log("Mounted", props.instance.constructor.name);
     parent.addChild(props.instance);
   });
 
   onCleanup(() => {
-    //console.log("Destroying", props.instance.constructor.name);
     parent.removeChild(props.instance);
     props.instance.destroy();
   });
@@ -30,11 +29,3 @@ export function Pixi<Instance extends Container, InstanceProps extends object>(
     </ContainerContext.Provider>
   );
 }
-
-export const ContainerContext = createContext<Container>(
-  new Proxy({} as Container, {
-    get() {
-      throw new Error("ContainerContext not provided");
-    },
-  }),
-);
