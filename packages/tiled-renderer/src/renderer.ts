@@ -6,10 +6,10 @@ import { createTextureLookup, loadTiledMapSpritesheets } from "./spritesheet";
 
 export class TiledRenderer extends LayerContainer {
   private layerViews: LayerContainer[] = [];
-  private spritesheets: TiledSpritesheetRecord = {};
+  private spritesheets?: TiledSpritesheetRecord;
   private debugUIEnabled = false;
 
-  constructor(private map: TiledMap) {
+  constructor(private map: () => TiledMap) {
     super();
 
     this.on("added", this.activate as () => void);
@@ -22,10 +22,12 @@ export class TiledRenderer extends LayerContainer {
   };
 
   private deactivate = () => {
-    for (const spritesheet of Object.values(this.spritesheets)) {
-      spritesheet.destroy();
+    if (this.spritesheets) {
+      for (const spritesheet of Object.values(this.spritesheets)) {
+        spritesheet.destroy();
+      }
     }
-    this.spritesheets = {};
+    delete this.spritesheets;
     this.removeLayerViews();
   };
 
@@ -34,13 +36,13 @@ export class TiledRenderer extends LayerContainer {
     loader.rect(
       0,
       0,
-      this.map.width * this.map.tilewidth,
-      this.map.height * this.map.tileheight,
+      this.map().width * this.map().tilewidth,
+      this.map().height * this.map().tileheight,
     );
     loader.fill(0x0000ff);
     this.addChild(loader);
 
-    this.spritesheets = await loadTiledMapSpritesheets(this.map);
+    this.spritesheets = await loadTiledMapSpritesheets(this.map());
   };
 
   toggleDebugUI = (enabled: boolean) => {
@@ -49,16 +51,20 @@ export class TiledRenderer extends LayerContainer {
   };
 
   private upsertLayerViews() {
+    if (!this.spritesheets) {
+      return;
+    }
+
     const factory = new LayerViewFactory(
-      this.map,
+      this.map(),
       createTextureLookup(this.spritesheets),
     );
 
     this.removeLayerViews();
 
     const layers = this.debugUIEnabled
-      ? this.map.layers
-      : this.map.layers.filter((l) => l.type !== "objectgroup");
+      ? this.map().layers
+      : this.map().layers.filter((l) => l.type !== "objectgroup");
 
     this.layerViews = factory.createLayerViews(layers);
     for (const layerView of this.layerViews) {

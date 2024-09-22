@@ -1,38 +1,38 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createMemo, For, Show } from "solid-js";
+import { useContext, createMemo, For, Show, createEffect } from "solid-js";
 import { EngineContext, Pixi, Stage } from "@mp/pixi/solid";
 import { api, myCharacter } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
-import { effect } from "solid-js/web";
 import { DGraphDebugUI } from "./DGraphDebugUI";
 
-export function AreaScene({ area }: { area: AreaResource }) {
+export function AreaScene(props: { area: AreaResource }) {
+  const map = () => props.area.tiled.map;
   const engine = useContext(EngineContext);
-  const renderer = new TiledRenderer(area.tiled.map);
+  const renderer = new TiledRenderer(map);
   const debugUIActive = createMemo(() => engine.keyboard.isHeld("Shift"));
   const cameraMatrix = createMemo(() =>
     engine.camera.update(myCharacter()?.coords),
   );
 
-  effect(() => {
-    const { tilePosition, isValidTarget } = getTilePosition(area, engine);
+  createEffect(() => {
+    const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
       throttledMove(tilePosition);
     }
   });
 
-  effect(() => {
-    const { map } = area.tiled;
+  createEffect(() => {
+    const { map } = props.area.tiled;
     engine.camera.resize({
       width: map.width * map.tilewidth,
       height: map.height * map.tileheight,
     });
   });
 
-  effect(() => {
+  createEffect(() => {
     renderer.toggleDebugUI(debugUIActive());
   });
 
@@ -40,11 +40,14 @@ export function AreaScene({ area }: { area: AreaResource }) {
     <Stage matrix={cameraMatrix}>
       <Pixi instance={renderer} />
       <For each={Array.from(api.state.characters.values())}>
-        {(char) => <CharacterActor char={char} area={area} />}
+        {(char) => <CharacterActor char={char} area={props.area} />}
       </For>
-      <TileHighlight area={area} />
+      <TileHighlight area={props.area} />
       <Show when={debugUIActive()}>
-        <DGraphDebugUI area={area} pathToDraw={() => myCharacter()?.path} />
+        <DGraphDebugUI
+          area={props.area}
+          pathToDraw={() => myCharacter()?.path}
+        />
       </Show>
     </Stage>
   );

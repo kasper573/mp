@@ -1,5 +1,5 @@
 import { Application as PixiApplication } from "pixi.js";
-import { createContext, createSignal, onCleanup, type JSX } from "solid-js";
+import { createContext, onCleanup, onMount, type JSX } from "solid-js";
 import { Engine } from "../engine/engine";
 import { ContainerContext } from "./Pixi";
 
@@ -8,21 +8,18 @@ export function Application(props: JSX.IntrinsicElements["div"]) {
   const engine = new Engine(canvas);
   const app = new PixiApplication();
 
-  engine.start();
+  let initPromise: Promise<unknown>;
 
-  const initPromise = app.init({
-    antialias: true,
-    roundPixels: true,
-    canvas,
-  });
+  onMount(() => {
+    engine.start();
 
-  void initPromise.then(() => {
-    app.stage.interactive = true;
+    initPromise = app
+      .init({ antialias: true, roundPixels: true, canvas })
+      .then(() => (app.stage.interactive = true));
   });
 
   onCleanup(() => {
     engine.stop();
-    canvas.remove();
     void initPromise.then(() => {
       app.destroy(undefined, { children: true });
     });
@@ -39,6 +36,7 @@ export function Application(props: JSX.IntrinsicElements["div"]) {
             </ContainerContext.Provider>
           </EngineContext.Provider>
         </ApplicationContext.Provider>
+        ,
       </div>
     </div>
   );

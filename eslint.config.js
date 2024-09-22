@@ -3,7 +3,8 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
-import solidPlugin from "eslint-plugin-solid";
+import solid from "eslint-plugin-solid/configs/typescript";
+import * as tsParser from "@typescript-eslint/parser";
 
 export default tseslint.config(
   {
@@ -18,7 +19,6 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
-  ...solidPlugin.configs.recommended,
   {
     languageOptions: {
       parserOptions: {
@@ -51,6 +51,16 @@ export default tseslint.config(
 
       // {} is useful as empty set
       "@typescript-eslint/ban-types": "off",
+    },
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    ...solid,
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: "tsconfig.json",
+      },
     },
   },
 );

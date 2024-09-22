@@ -9,27 +9,25 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import { setDebugText } from "./DebugText";
-import { Accessor, useContext } from "solid-js";
+import type { Accessor } from "solid-js";
+import { createEffect, useContext } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
-import { effect } from "solid-js/web";
+import { setDebugText } from "./DebugText";
 
-export function DGraphDebugUI({
-  area: { dGraph: graph, tiled },
-  pathToDraw,
-}: {
+export function DGraphDebugUI(props: {
   area: AreaResource;
   pathToDraw: Accessor<Path | undefined>;
 }) {
   const engine = useContext(EngineContext);
-  const allTileCoords = generateAllTileCoords(
-    tiled.map.width,
-    tiled.map.height,
-  );
-
   const gfx = new Graphics();
 
-  effect(() => {
+  createEffect(() => {
+    const { tiled, dGraph } = props.area;
+    const allTileCoords = generateAllTileCoords(
+      tiled.map.width,
+      tiled.map.height,
+    );
+
     const {
       pointer: { worldPosition, position: viewportPosition },
       keyboard,
@@ -39,13 +37,13 @@ export function DGraphDebugUI({
 
     if (keyboard.isHeld("Control") && keyboard.isHeld("Shift")) {
       for (const pos of allTileCoords) {
-        drawDNode(gfx, tiled, graph, pos);
+        drawDNode(gfx, tiled, dGraph, pos);
       }
     } else if (keyboard.isHeld("Control")) {
       drawDNode(
         gfx,
         tiled,
-        graph,
+        dGraph,
         snapTileVector(tiled.worldCoordToTile(worldPosition)),
       );
     }
@@ -55,15 +53,15 @@ export function DGraphDebugUI({
       drawDNode(
         gfx,
         tiled,
-        addVectorToAdjacentInGraph(graph, tilePos),
+        addVectorToAdjacentInGraph(dGraph, tilePos),
         tilePos,
         tiled.tileCoordToWorld(tilePos),
       );
     }
 
     if (keyboard.isHeld("Shift") || keyboard.isHeld("Control")) {
-      if (pathToDraw()?.length) {
-        drawPath(gfx, tiled, pathToDraw() ?? []);
+      if (props.pathToDraw()?.length) {
+        drawPath(gfx, tiled, props.pathToDraw() ?? []);
       }
 
       const tilePos = tiled.worldCoordToTile(worldPosition);

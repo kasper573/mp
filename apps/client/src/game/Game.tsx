@@ -1,8 +1,9 @@
 import { skipToken, createQuery } from "@tanstack/solid-query";
+import { createMemo, ErrorBoundary, Suspense } from "solid-js";
 import { myCharacter } from "../api";
+import { ErrorFallback } from "../components/ErrorFallback";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
-import { createMemo } from "solid-js";
 
 export function Game() {
   const areaId = createMemo(() => myCharacter()?.areaId);
@@ -14,15 +15,13 @@ export function Game() {
     };
   });
 
-  if (query.isLoading) {
-    return <div>Loading...</div>;
-  }
-  if (query.error) {
-    return <div>Error: {query.error.message}</div>;
-  }
-  if (!query.data) {
-    return <div>Area not found: {areaId() ?? "no area defined"}</div>;
-  }
-
-  return <AreaScene area={query.data} />;
+  return (
+    <ErrorBoundary
+      fallback={(error: unknown) => <ErrorFallback error={error} />}
+    >
+      <Suspense fallback={<>Loading...</>}>
+        {query.data && <AreaScene area={query.data} />}
+      </Suspense>
+    </ErrorBoundary>
+  );
 }

@@ -14,7 +14,9 @@ export default function AppBar() {
       <Link href="/play">Play</Link>
 
       <div
-        class={styles.connectionIndicator(api)}
+        class={styles.connectionIndicator({
+          connected: api.connected,
+        })}
         title={api.connected ? "Connected" : "Offline"}
       />
 

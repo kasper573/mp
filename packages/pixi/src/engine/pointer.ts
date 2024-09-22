@@ -1,16 +1,17 @@
 import type { Camera } from "@mp/math";
 import { Vector } from "@mp/math";
+import type { Computed } from "@mp/state";
 import { atom, computed } from "@mp/state";
 
 export class Pointer {
-  readonly #isDown = atom(false);
-  readonly #position = atom(new Vector(0, 0));
+  protected _isDown = atom(false);
+  protected _position = atom(new Vector(0, 0));
 
   get position(): Vector {
-    return this.#position.get();
+    return this._position.get();
   }
   get isDown(): boolean {
-    return this.#isDown.get();
+    return this._isDown.get();
   }
 
   constructor(private viewport: HTMLElement) {}
@@ -27,24 +28,24 @@ export class Pointer {
     this.viewport.removeEventListener("pointerup", this.onPointerUp);
   }
 
-  private onPointerDown = () => this.#isDown.set(true);
-  private onPointerUp = () => this.#isDown.set(false);
+  private onPointerDown = () => this._isDown.set(true);
+  private onPointerUp = () => this._isDown.set(false);
   private onPointerMove = (e: PointerEvent) => {
-    this.#position.set(new Vector(e.offsetX, e.offsetY));
+    this._position.set(new Vector(e.offsetX, e.offsetY));
   };
 }
 
 export class PointerForCamera extends Pointer {
-  #worldPosition = computed(() => this.camera.screenToWorld(this.position));
+  #worldPosition: Computed<Vector>;
 
   get worldPosition(): Vector {
     return this.#worldPosition();
   }
 
-  constructor(
-    viewport: HTMLElement,
-    private camera: Camera,
-  ) {
+  constructor(viewport: HTMLElement, camera: Camera) {
     super(viewport);
+    this.#worldPosition = computed(() =>
+      camera.screenToWorld(this._position.get()),
+    );
   }
 }

@@ -1,9 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { dark } from "@mp/style/themes/dark.css";
 import { AuthContext } from "@mp/auth/client";
+import { render } from "solid-js/web";
 import * as styles from "./main.css";
 import { authClient } from "./api";
-import { render } from "solid-js/web";
 import { App } from "./App";
 
 const queryClient = new QueryClient({

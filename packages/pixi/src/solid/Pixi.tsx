@@ -1,33 +1,32 @@
-import {
-  createContext,
-  ParentProps,
-  useContext,
-  onCleanup,
-  Accessor,
-} from "solid-js";
+import type { ParentProps } from "solid-js";
+import { createContext, useContext, onCleanup, onMount } from "solid-js";
 import type { Container } from "pixi.js";
-import { effect } from "solid-js/web";
 
 export type PixiProps<
   Instance extends Container,
   Deps extends object,
 > = ParentProps<{ instance: Container }>;
 
-export function Pixi<Instance extends Container, InstanceProps extends object>({
-  instance,
-  children,
-}: PixiProps<Instance, InstanceProps>) {
+export function Pixi<Instance extends Container, InstanceProps extends object>(
+  props: PixiProps<Instance, InstanceProps>,
+) {
   const parent = useContext(ContainerContext);
-  parent.addChild(instance);
+
+  onMount(() => {
+    //console.log("Mounted", props.instance.constructor.name);
+    parent.addChild(props.instance);
+  });
 
   onCleanup(() => {
-    parent.removeChild(instance);
-    instance.destroy();
+    //console.log("Destroying", props.instance.constructor.name);
+    parent.removeChild(props.instance);
+    props.instance.destroy();
   });
 
   return (
-    <ContainerContext.Provider value={instance}>
-      {children}
+    // eslint-disable-next-line solid/reactivity
+    <ContainerContext.Provider value={props.instance}>
+      {props.children}
     </ContainerContext.Provider>
   );
 }

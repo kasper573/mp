@@ -1,35 +1,31 @@
-import type { Engine } from "@mp/pixi";
 import { Graphics } from "@mp/pixi";
-import type { Size, Vector, VectorLike } from "@mp/math";
-import { Interpolator } from "./Interpolator";
+import type { VectorLike } from "@mp/math";
 import { Pixi } from "@mp/pixi/solid";
-import { Accessor } from "solid-js";
-import { Character } from "@mp/server";
-import { effect } from "solid-js/web";
-import { AreaResource } from "@mp/data";
+import type { Character } from "@mp/server";
+import type { AreaResource } from "@mp/data";
+import { createEffect } from "solid-js";
+import { Interpolator } from "./Interpolator";
 
-export function CharacterActor({
-  char,
-  area,
-}: {
-  char: Character;
-  area: AreaResource;
-}) {
-  const gfx = new CharacterGraphics(area.tiled.tileSize);
+export function CharacterActor(props: { char: Character; area: AreaResource }) {
+  const gfx = new CharacterGraphics();
   const lerp = new Interpolator(gfx);
-  effect(() => {
-    lerp.configure(area.tiled.tileCoordToWorld(char.coords), {
-      path: char.path?.map(area.tiled.tileCoordToWorld) ?? [],
-      speed: area.tiled.tileUnitToWorld(char.speed),
+
+  createEffect(() => {
+    const { tiled } = props.area;
+    const { path, coords, speed } = props.char;
+    gfx.update(tiled.tileSize);
+    lerp.configure(tiled.tileCoordToWorld(coords), {
+      path: path?.map(tiled.tileCoordToWorld) ?? [],
+      speed: tiled.tileUnitToWorld(speed),
     });
   });
+
   return <Pixi instance={gfx} />;
 }
 
 class CharacterGraphics extends Graphics {
-  constructor(tileSize: VectorLike) {
-    super();
-
+  update(tileSize: VectorLike) {
+    this.clear();
     this.fillStyle.color = 0x00ff00;
     this.rect(-tileSize.x / 2, -tileSize.y / 2, tileSize.x, tileSize.y);
     this.fill();

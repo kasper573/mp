@@ -1,4 +1,4 @@
-import { Component, JSX, ParentComponent } from "solid-js";
+import type { ParentComponent } from "solid-js";
 import AppBar from "./AppBar";
 
 const Layout: ParentComponent = (props) => {

@@ -13,3 +13,5 @@ export interface Atom<T> {
   get: Accessor<T>;
   set: Setter<T>;
 }
+
+export type Computed<T> = () => T;

@@ -7,8 +7,8 @@ import {
 } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
-import { env } from "./env";
 import { createEffect, createMemo, createSignal } from "solid-js";
+import { env } from "./env";
 
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
