@@ -30,16 +30,16 @@ export function DGraphDebugUI(props: {
 
     const {
       pointer: { worldPosition, position: viewportPosition },
-      keyboard,
+      keyboard: { keysHeld },
     } = engine;
 
     gfx.clear();
 
-    if (keyboard.isHeld("Control") && keyboard.isHeld("Shift")) {
+    if (keysHeld.has("Control") && keysHeld.has("Shift")) {
       for (const pos of allTileCoords) {
         drawDNode(gfx, tiled, dGraph, pos);
       }
-    } else if (keyboard.isHeld("Control")) {
+    } else if (keysHeld.has("Control")) {
       drawDNode(
         gfx,
         tiled,
@@ -48,7 +48,7 @@ export function DGraphDebugUI(props: {
       );
     }
 
-    if (keyboard.isHeld("Shift")) {
+    if (keysHeld.has("Shift")) {
       const tilePos = tiled.worldCoordToTile(worldPosition);
       drawDNode(
         gfx,
@@ -59,7 +59,7 @@ export function DGraphDebugUI(props: {
       );
     }
 
-    if (keyboard.isHeld("Shift") || keyboard.isHeld("Control")) {
+    if (keysHeld.has("Shift") || keysHeld.has("Control")) {
       if (props.pathToDraw()?.length) {
         drawPath(gfx, tiled, props.pathToDraw() ?? []);
       }

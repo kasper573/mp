@@ -1,6 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createMemo, For, Show, createEffect } from "solid-js";
+import { useContext, createMemo, For, createEffect } from "solid-js";
 import { EngineContext, Pixi, Stage } from "@mp/pixi/solid";
 import { api, myCharacter } from "../api";
 import { CharacterActor } from "./CharacterActor";
@@ -15,7 +15,6 @@ export function AreaScene(props: { area: AreaResource }) {
   const characters = createMemo(() =>
     Array.from(api.state.characters.values()),
   );
-  const debugUIActive = createMemo(() => engine.keyboard.isHeld("Shift"));
   const cameraMatrix = createMemo(() =>
     engine.camera.update(myCharacter()?.coords),
   );
@@ -36,7 +35,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    renderer.toggleDebugUI(debugUIActive());
+    renderer.toggleDebugUI(engine.keyboard.keysHeld.has("Shift"));
   });
 
   return (
@@ -46,12 +45,7 @@ export function AreaScene(props: { area: AreaResource }) {
         {(char) => <CharacterActor char={char} area={props.area} />}
       </For>
       <TileHighlight area={props.area} />
-      <Show when={debugUIActive()}>
-        <DGraphDebugUI
-          area={props.area}
-          pathToDraw={() => myCharacter()?.path}
-        />
-      </Show>
+      <DGraphDebugUI area={props.area} pathToDraw={() => myCharacter()?.path} />
     </Stage>
   );
 }
