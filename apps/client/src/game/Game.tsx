@@ -1,16 +1,13 @@
-import { computed, useSignal } from "@mp/state";
+import { useComputedValue } from "@mp/state";
 import { skipToken, useQuery } from "@tanstack/react-query";
-import { Scene } from "@mp/pixi/react";
 import { api, myCharacterId } from "../api";
-import { createScene } from "./AreaScene";
 import { loadAreaResource } from "./loadAreaResource";
-
-const myAreaId = computed(
-  () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
-);
+import { AreaScene } from "./AreaScene";
 
 export function Game() {
-  const [areaId] = useSignal(myAreaId);
+  const areaId = useComputedValue(
+    () => api.state.value.characters.get(myCharacterId.value!)?.areaId,
+  );
   const {
     data: area,
     isLoading,
@@ -27,8 +24,8 @@ export function Game() {
     return <div>Error: {error.message}</div>;
   }
   if (!area) {
-    return <div>Area not found</div>;
+    return <div>Area not found: {areaId ?? "no area defined"}</div>;
   }
 
-  return <Scene create={createScene} dependencies={[area]} />;
+  return <AreaScene area={area} />;
 }

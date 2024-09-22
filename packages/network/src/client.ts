@@ -1,7 +1,7 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import type { ReadonlySignal } from "@preact/signals-core";
-import { computed, signal, type Signal } from "@preact/signals-core";
+import type { ReadonlySignal } from "@mp/state";
+import { computed, signal, type Signal } from "@mp/state";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,

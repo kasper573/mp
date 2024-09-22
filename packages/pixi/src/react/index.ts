@@ -1,2 +1,3 @@
 export * from "./Application";
-export * from "./Scene";
+export * from "./Pixi";
+export * from "./Stage";

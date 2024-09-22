@@ -1,3 +1,3 @@
 export * from "neverthrow";
 export * from "@preact/signals-core";
-export * from "./useSignal";
+export * from "./hooks";

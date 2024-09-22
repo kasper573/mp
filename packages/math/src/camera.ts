@@ -12,11 +12,17 @@ export class Camera {
     private readonly cameraSize: Size,
     private desiredZoom = 2,
     private maxZoom = 3,
+    private worldSize: Size = { width: 0, height: 0 },
   ) {}
 
-  update(worldSize: Size, position: Vector): void {
-    const scaleX = this.cameraSize.width / worldSize.width;
-    const scaleY = this.cameraSize.height / worldSize.height;
+  resize(size: Size) {
+    this.worldSize = size;
+    this.update(this.position);
+  }
+
+  update(position: Vector = this.position): Matrix {
+    const scaleX = this.cameraSize.width / this.worldSize.width;
+    const scaleY = this.cameraSize.height / this.worldSize.height;
     const minZoom = Math.max(scaleX, scaleY);
 
     this.zoom = clamp(this.desiredZoom, minZoom, this.maxZoom);
@@ -25,8 +31,16 @@ export class Camera {
     const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;
 
     this.position = new Vector(
-      clamp(position.x, halfCameraWidth, worldSize.width - halfCameraWidth),
-      clamp(position.y, halfCameraHeight, worldSize.height - halfCameraHeight),
+      clamp(
+        position.x,
+        halfCameraWidth,
+        this.worldSize.width - halfCameraWidth,
+      ),
+      clamp(
+        position.y,
+        halfCameraHeight,
+        this.worldSize.height - halfCameraHeight,
+      ),
     );
 
     const offsetX = this.position.x - halfCameraWidth;
@@ -40,6 +54,8 @@ export class Camera {
       -offsetX * this.zoom,
       -offsetY * this.zoom,
     );
+
+    return this.transform;
   }
 
   screenToWorld(screenPos: Vector): Vector {

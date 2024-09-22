@@ -8,7 +8,9 @@ import {
   dNodeFromVector,
   addVectorToAdjacentInGraph,
 } from "@mp/data";
-import { Graphics, Engine } from "@mp/pixi";
+import type { Engine } from "@mp/pixi";
+import { Graphics } from "@mp/pixi";
+import { debugText } from "./DebugText";
 
 export class DGraphDebugUI extends Graphics {
   private pathToDraw: Path = [];
@@ -17,7 +19,7 @@ export class DGraphDebugUI extends Graphics {
   constructor(
     private graph: DGraph,
     private tiled: TiledResource,
-    private renderDebugText: (text: string) => void,
+    private engine: Engine,
   ) {
     super();
     this.allTileCoords = generateAllTileCoords(
@@ -32,9 +34,9 @@ export class DGraphDebugUI extends Graphics {
 
   override _onRender = () => {
     const {
-      pointer: { lastWorldPosition, lastViewportPosition },
+      pointer: { worldPosition, position: viewportPosition },
       keyboard,
-    } = Engine.instance.input;
+    } = this.engine;
 
     this.clear();
 
@@ -47,12 +49,12 @@ export class DGraphDebugUI extends Graphics {
         this,
         this.tiled,
         this.graph,
-        snapTileVector(this.tiled.worldCoordToTile(lastWorldPosition)),
+        snapTileVector(this.tiled.worldCoordToTile(worldPosition.value)),
       );
     }
 
     if (keyboard.isHeld("Shift")) {
-      const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
+      const tilePos = this.tiled.worldCoordToTile(worldPosition.value);
       drawDNode(
         this,
         this.tiled,
@@ -67,16 +69,16 @@ export class DGraphDebugUI extends Graphics {
         drawPath(this, this.tiled, this.pathToDraw);
       }
 
-      const tilePos = this.tiled.worldCoordToTile(lastWorldPosition);
+      const tilePos = this.tiled.worldCoordToTile(worldPosition.value);
       const text = [
-        `viewport: ${vecToString(lastViewportPosition)}`,
-        `world: ${vecToString(lastWorldPosition)}`,
+        `viewport: ${vecToString(viewportPosition.value)}`,
+        `world: ${vecToString(worldPosition.value)}`,
         `tile: ${vecToString(tilePos)}`,
         `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       ].join("\n");
-      this.renderDebugText(text);
+      debugText.value = text;
     } else {
-      this.renderDebugText("");
+      debugText.value = "";
     }
   };
 }

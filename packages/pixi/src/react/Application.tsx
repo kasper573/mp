@@ -1,7 +1,8 @@
 import { Application as PixiApplication } from "pixi.js";
 import type { CSSProperties, ReactNode } from "react";
 import { createContext, useEffect, useState } from "react";
-import { Engine } from "../engine";
+import { Engine } from "../engine/engine";
+import { ContainerContext } from "./Pixi";
 
 export interface ApplicationProps {
   resizeTo?: HTMLDivElement | null;
@@ -10,7 +11,7 @@ export interface ApplicationProps {
 
 export function Application({ resizeTo, children }: ApplicationProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const [app, setApp] = useState<PixiApplication>();
+  const [instances, setInstances] = useState<[PixiApplication, Engine]>();
 
   useEffect(() => {
     if (!container) {
@@ -18,8 +19,8 @@ export function Application({ resizeTo, children }: ApplicationProps) {
     }
 
     const canvas = document.createElement("canvas");
-    Engine.replace(canvas);
-
+    const engine = new Engine(canvas);
+    engine.start();
     const app = new PixiApplication();
 
     container.prepend(canvas);
@@ -33,11 +34,11 @@ export function Application({ resizeTo, children }: ApplicationProps) {
 
     void initPromise.then(() => {
       app.stage.interactive = true;
-      setApp(app);
+      setInstances([app, engine]);
     });
 
     return () => {
-      Engine.instance.stop();
+      engine.stop();
       canvas.remove();
       void initPromise.then(() => {
         app.destroy(undefined, { children: true });
@@ -48,11 +49,13 @@ export function Application({ resizeTo, children }: ApplicationProps) {
   return (
     <>
       <div style={styles.container} ref={setContainer}>
-        {app && (
+        {instances && (
           <div style={styles.content}>
-            <ApplicationContext.Provider value={app}>
-              <EngineContext.Provider value={Engine.instance}>
-                {children}
+            <ApplicationContext.Provider value={instances[0]}>
+              <EngineContext.Provider value={instances[1]}>
+                <ContainerContext.Provider value={instances[0].stage}>
+                  {children}
+                </ContainerContext.Provider>
               </EngineContext.Provider>
             </ApplicationContext.Provider>
           </div>

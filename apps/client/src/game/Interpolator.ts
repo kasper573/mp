@@ -1,5 +1,5 @@
 import type { Container } from "@mp/pixi";
-import { Engine } from "@mp/pixi";
+import type { Engine } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { moveAlongPath } from "@mp/data";
 
@@ -7,7 +7,10 @@ export class Interpolator {
   private pathInterpolation?: PathIntepolation;
   private needsInitialPosition = true;
 
-  constructor(private target: Container) {}
+  constructor(
+    private target: Container,
+    private engine: Engine,
+  ) {}
 
   configure(
     staticPosition: Vector,
@@ -31,7 +34,7 @@ export class Interpolator {
       this.target.position,
       this.pathInterpolation.path,
       this.pathInterpolation.speed,
-      Engine.instance.ticker.deltaTime,
+      this.engine.deltaTime,
     );
 
     if (destinationReached) {
