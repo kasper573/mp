@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js/types/server/reactive.js";
+import { createSignal } from "solid-js";
 import * as styles from "./DebugText.css";
 
 export const [getDebugText, setDebugText] = createSignal("");

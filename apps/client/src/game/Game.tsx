@@ -1,8 +1,8 @@
 import { skipToken, createQuery } from "@tanstack/solid-query";
-import { api, myCharacter, myCharacterId } from "../api";
+import { myCharacter } from "../api";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
-import { createMemo } from "solid-js/types/server/reactive.js";
+import { createMemo } from "solid-js";
 
 export function Game() {
   const areaId = createMemo(() => myCharacter()?.areaId);

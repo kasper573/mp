@@ -8,11 +8,6 @@
       "require": "./dist/index.d.js",
       "types": "./dist/index.d.ts"
     },
-    "./react": {
-      "import": "./dist/react/index.js",
-      "require": "./dist/react/index.d.js",
-      "types": "./dist/react/index.d.ts"
-    },
     "./solid": {
       "import": "./dist/solid/index.js",
       "require": "./dist/solid/index.d.js",

@@ -5,8 +5,8 @@
   "private": true,
   "exports": {
     "./client": {
-      "import": "./dist/client.js",
-      "require": "./dist/client.js",
+      "import": "./dist/client.jsx",
+      "require": "./dist/client.jsx",
       "types": "./dist/client.d.ts"
     },
     "./server": {
@@ -24,9 +24,7 @@
   },
   "dependencies": {
     "@clerk/clerk-js": "5.20.0",
-    "@clerk/clerk-sdk-node": "5.0.35"
-  },
-  "peerDependencies": {
+    "@clerk/clerk-sdk-node": "5.0.35",
     "solid-js": "1.8.22"
   },
   "devDependencies": {

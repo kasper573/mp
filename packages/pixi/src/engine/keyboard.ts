@@ -1,7 +1,7 @@
-import { createAtom } from "@mp/state";
+import { atom } from "@mp/state";
 
 export class Keyboard {
-  readonly #heldKeys = createAtom(new Set<KeyName>());
+  readonly #heldKeys = atom(new Set<KeyName>());
 
   get heldKeys(): ReadonlySet<KeyName> {
     return this.#heldKeys.get();

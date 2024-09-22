@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { createAtom, type Atom } from "@mp/state";
+import { atom, type Atom } from "@mp/state";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,
@@ -46,8 +46,8 @@ export class Client<
       this.options,
     );
 
-    this._connected = createAtom(false);
-    this._state = createAtom(options.createInitialState());
+    this._connected = atom(false);
+    this._state = atom(options.createInitialState());
 
     this.socket.on("stateUpdate", (update) => {
       this._state.set((prev) =>

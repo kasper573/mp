@@ -1,11 +1,10 @@
 import type { Camera } from "@mp/math";
 import { Vector } from "@mp/math";
-import type { Atom } from "@mp/state";
-import { createAtom, createMemo } from "@mp/state";
+import { atom, computed } from "@mp/state";
 
 export class Pointer {
-  readonly #isDown = createAtom(false);
-  readonly #position = createAtom(new Vector(0, 0));
+  readonly #isDown = atom(false);
+  readonly #position = atom(new Vector(0, 0));
 
   get position(): Vector {
     return this.#position.get();
@@ -36,7 +35,7 @@ export class Pointer {
 }
 
 export class PointerForCamera extends Pointer {
-  #worldPosition = createMemo(() => this.camera.screenToWorld(this.position));
+  #worldPosition = computed(() => this.camera.screenToWorld(this.position));
 
   get worldPosition(): Vector {
     return this.#worldPosition();
