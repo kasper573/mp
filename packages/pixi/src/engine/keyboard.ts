@@ -1,10 +1,10 @@
-import { atom, produce } from "@mp/state";
+import { atom } from "@mp/state";
 
 export class Keyboard {
-  readonly #heldKeys = atom(new Set<KeyName>());
+  readonly #keysHeld = atom(new Set<KeyName>());
 
-  get heldKeys(): ReadonlySet<KeyName> {
-    return this.#heldKeys.get();
+  get keysHeld(): ReadonlySet<KeyName> {
+    return this.#keysHeld.get();
   }
 
   start() {
@@ -17,21 +17,17 @@ export class Keyboard {
     window.removeEventListener("keyup", this.onUp);
   }
 
-  isHeld = (key: KeyName) => this.heldKeys.has(key);
-
   private onDown = (e: KeyboardEvent) => {
-    this.#heldKeys.set(
-      produce((set: Set<KeyName>) => {
-        set.add(e.key as KeyName);
-      }),
+    const key = e.key as KeyName;
+    this.#keysHeld.set((current) =>
+      current.has(key) ? current : current.union(new Set([key])),
     );
   };
 
   private onUp = (e: KeyboardEvent) => {
-    this.#heldKeys.set(
-      produce((set: Set<KeyName>) => {
-        set.delete(e.key as KeyName);
-      }),
+    const key = e.key as KeyName;
+    this.#keysHeld.set((current) =>
+      current.has(key) ? current.difference(new Set([key])) : current,
     );
   };
 }
