@@ -1,9 +1,10 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { Accessor } from "solid-js";
-import { useContext, createEffect, Index } from "solid-js";
+import { useContext, createEffect, Index, createMemo } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
-import { Container, Matrix } from "@mp/pixi";
+import { createQuery } from "@tanstack/solid-query";
+import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { api, myCharacter } from "../api";
 import { CharacterActor } from "./CharacterActor";
 import { TileHighlight } from "./TileHighlight";
@@ -11,16 +12,19 @@ import { getTilePosition } from "./getTilePosition";
 import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: Accessor<AreaResource> }) {
-  const tiledMap = () => props.area().tiled.map;
   const engine = useContext(EngineContext);
-  const scene = new Container();
-  const characterContainer = new Container();
-  const renderer = new TiledRenderer(tiledMap);
-  renderer.addChild(characterContainer);
-
-  createEffect(() => {
-    characterContainer.zIndex = props.area().characterLayerIndex;
+  const cameraTransform = createMemo(() => {
+    const me = myCharacter();
+    return engine.camera.update(
+      props.area().tiled.mapSize,
+      me ? props.area().tiled.tileCoordToWorld(me.coords) : undefined,
+    );
   });
+
+  const spritesheets = createQuery(() => ({
+    queryKey: ["tiled-spritesheets", props.area().id],
+    queryFn: () => loadTiledMapSpritesheets(props.area().tiled.map),
+  }));
 
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(
@@ -32,27 +36,21 @@ export function AreaScene(props: { area: Accessor<AreaResource> }) {
     }
   });
 
-  createEffect(() => {
-    renderer.toggleDebugUI(engine.keyboard.keysHeld.has("Shift"));
-  });
-
-  createEffect(() => {
-    const me = myCharacter();
-    const cameraTransform = engine.camera.update(
-      props.area().tiled.mapSize,
-      me ? props.area().tiled.tileCoordToWorld(me.coords) : undefined,
-    );
-    scene.setFromMatrix(new Matrix(...cameraTransform.data));
-  });
-
   return (
-    <Pixi instance={scene}>
-      <Pixi instance={renderer} />
-      <Pixi instance={characterContainer}>
-        <Index each={Array.from(api.state.characters.values())}>
-          {(char) => <CharacterActor char={char} area={props.area()} />}
-        </Index>
-      </Pixi>
+    <Pixi matrix={cameraTransform()}>
+      {spritesheets.data && (
+        <TiledRenderer
+          layers={props.area().tiled.map.layers}
+          spritesheets={spritesheets.data}
+          debug={engine.keyboard.keysHeld.has("Shift")}
+        >
+          <Pixi zIndex={props.area().characterLayerIndex}>
+            <Index each={Array.from(api.state.characters.values())}>
+              {(char) => <CharacterActor char={char} area={props.area()} />}
+            </Index>
+          </Pixi>
+        </TiledRenderer>
+      )}
       <TileHighlight area={props.area()} />
       <AreaDebugUI area={props.area()} pathToDraw={() => myCharacter()?.path} />
     </Pixi>

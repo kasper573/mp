@@ -1,6 +1,6 @@
 import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
-import { EngineContext, Pixi } from "@mp/pixi/solid";
+import { Pixi, EngineContext } from "@mp/pixi/solid";
 import type { Character } from "@mp/server";
 import type { AreaResource } from "@mp/data";
 import type { Accessor } from "solid-js";
@@ -30,7 +30,7 @@ export function CharacterActor(props: {
     lerp.update(engine.deltaTime);
   });
 
-  return <Pixi instance={gfx} />;
+  return <Pixi as={gfx} />;
 }
 
 class CharacterGraphics extends Graphics {

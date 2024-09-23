@@ -2,7 +2,7 @@ import type { FillStyle } from "@mp/pixi";
 import type { AreaResource } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import { createEffect, useContext } from "solid-js";
-import { EngineContext, Pixi } from "@mp/pixi/solid";
+import { Pixi, EngineContext } from "@mp/pixi/solid";
 import type { Vector } from "@mp/math";
 import { getTilePosition } from "./getTilePosition";
 
@@ -22,7 +22,7 @@ export function TileHighlight(props: TileHighlightProps) {
     gfx.update(tileSize, isValidTarget);
   });
 
-  return <Pixi instance={gfx} />;
+  return <Pixi as={gfx} />;
 }
 
 class TileGraphics extends Graphics {

@@ -11,7 +11,8 @@
   },
   "dependencies": {
     "@mp/tiled-loader": "workspace:*",
-    "@mp/pixi": "workspace:*"
+    "@mp/pixi": "workspace:*",
+    "solid-js": "1.8.22"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

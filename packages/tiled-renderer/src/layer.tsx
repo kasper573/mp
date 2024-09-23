@@ -1,42 +1,41 @@
-import { Container } from "@mp/pixi";
 import type {
   GroupLayer,
   ImageLayer,
   Layer,
   LayerDrawOrder,
   ObjectGroupLayer,
-  TiledMap,
   TiledObject,
   TileLayer,
 } from "@mp/tiled-loader";
+import { Container } from "@mp/pixi";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureLookup } from "./spritesheet";
 
-export type LayerView = Container;
+type LayerView = Container;
 
 export class LayerViewFactory {
-  constructor(
-    private readonly tiledMap: TiledMap,
-    private readonly textureLookup: TextureLookup,
-  ) {}
+  constructor(private readonly textureLookup: TextureLookup) {}
 
-  createLayerViews(layers = this.tiledMap.layers) {
-    // layers are already in the draw order in the tiled data
-    return layers.map((layer, index) => {
-      const view = this.createLayerView(layer);
-      view.label = layer.name;
-      view.zIndex = index;
-      return view;
+  createLayerContainer(layers: Layer[]): LayerView {
+    const container = new Container({
+      isRenderGroup: true,
+      sortableChildren: true,
     });
+
+    // layers are already in the draw order in the tiled data
+    layers.forEach((layer, index) => {
+      const view = this.createLayerView(layer);
+      memorizeLayerType(view, layer);
+      view.label = layer.name;
+      container.addChildAt(view, index);
+    });
+
+    return container;
   }
 
   private createGroupLayerView(layer: GroupLayer): LayerView {
-    const container = new LayerContainer();
-    for (const childLayerView of this.createLayerViews(layer.layers)) {
-      container.addChild(childLayerView);
-    }
-    return container;
+    return this.createLayerContainer(layer.layers);
   }
 
   private createTileLayerView(layer: TileLayer): LayerView {
@@ -52,7 +51,11 @@ export class LayerViewFactory {
   }
 
   private createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {
-    const view = new LayerContainer();
+    const view = new Container({
+      isRenderGroup: true,
+      sortableChildren: true,
+    });
+
     const toSorted = createObjectSorter(layer.draworder);
 
     for (const obj of toSorted(layer.objects)) {
@@ -76,12 +79,6 @@ export class LayerViewFactory {
   }
 }
 
-export class LayerContainer extends Container {
-  constructor() {
-    super({ isRenderGroup: true, sortableChildren: true });
-  }
-}
-
 function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
   switch (order) {
     case "topdown":
@@ -92,3 +89,16 @@ function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
 }
 
 type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];
+
+// We store layer type on a symbol because pixi.js
+// containers don't have a way to attach meta data
+
+const layerTypeSymbol = Symbol("layerType");
+
+function memorizeLayerType(view: Container, layer: Layer) {
+  Reflect.set(view, layerTypeSymbol, layer.type);
+}
+
+export function getLayerType(view: Container): Layer["type"] {
+  return Reflect.get(view, layerTypeSymbol) as Layer["type"];
+}

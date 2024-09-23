@@ -5,7 +5,7 @@ import { Vector } from "./vector";
 export class Camera {
   private position = new Vector(0, 0);
   private zoom = 1;
-  readonly transform: Matrix = new Matrix();
+  transform: Matrix = new Matrix();
 
   constructor(
     private readonly cameraSize: Size,
@@ -38,14 +38,14 @@ export class Camera {
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
 
-    this.transform.set(
+    this.transform = new Matrix([
       this.zoom,
       0,
       0,
       this.zoom,
       -offsetX * this.zoom,
       -offsetY * this.zoom,
-    );
+    ]);
 
     return this.transform;
   }

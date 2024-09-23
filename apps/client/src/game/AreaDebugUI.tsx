@@ -11,7 +11,7 @@ import {
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, useContext } from "solid-js";
-import { EngineContext, Pixi } from "@mp/pixi/solid";
+import { Pixi, EngineContext } from "@mp/pixi/solid";
 import { myCharacter } from "../api";
 import * as styles from "./AreaDebugUI.css";
 
@@ -83,7 +83,7 @@ export function AreaDebugUI(props: {
   });
 
   return (
-    <Pixi instance={gfx}>
+    <Pixi as={gfx}>
       <span class={styles.debugText({ visible: !!debugText() })}>
         {debugText()}
       </span>
