@@ -1,11 +1,12 @@
 import { AuthContext } from "@mp/auth/client";
 import { QueryClientProvider } from "@tanstack/solid-query";
-import { ErrorBoundary, Suspense } from "solid-js";
-import GamePage from "./pages/game/GamePage";
+import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import Layout from "./ui/Layout";
 import { authClient, queryClient } from "./state/api";
 import { ErrorFallback } from "./ui/ErrorFallback";
 import { Loading } from "./ui/Loading";
+
+const GamePage = lazy(() => import("./pages/game/GamePage"));
 
 export default function App() {
   return (
