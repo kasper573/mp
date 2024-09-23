@@ -9,7 +9,6 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import type { Accessor } from "solid-js";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { Pixi, EngineContext } from "@mp/pixi/solid";
 import { myCharacter } from "../api";
@@ -17,7 +16,7 @@ import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathToDraw: Accessor<Path | undefined>;
+  pathToDraw: Path | undefined;
 }) {
   const [debugText, setDebugText] = createSignal("");
   const engine = useContext(EngineContext);
@@ -62,8 +61,8 @@ export function AreaDebugUI(props: {
     }
 
     if (keysHeld.has("Shift") || keysHeld.has("Control")) {
-      if (props.pathToDraw()?.length) {
-        drawPath(gfx, tiled, props.pathToDraw() ?? []);
+      if (props.pathToDraw?.length) {
+        drawPath(gfx, tiled, props.pathToDraw ?? []);
       }
 
       const tilePos = tiled.worldCoordToTile(worldPosition);

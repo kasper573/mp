@@ -1,7 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import type { Accessor } from "solid-js";
-import { useContext, createEffect, Index, createMemo } from "solid-js";
+import { useContext, createEffect, createMemo, Index } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
@@ -11,26 +10,23 @@ import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
 import { AreaDebugUI } from "./AreaDebugUI";
 
-export function AreaScene(props: { area: Accessor<AreaResource> }) {
+export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
   const cameraTransform = createMemo(() => {
     const me = myCharacter();
     return engine.camera.update(
-      props.area().tiled.mapSize,
-      me ? props.area().tiled.tileCoordToWorld(me.coords) : undefined,
+      props.area.tiled.mapSize,
+      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
     );
   });
 
   const spritesheets = createQuery(() => ({
-    queryKey: ["tiled-spritesheets", props.area().id],
-    queryFn: () => loadTiledMapSpritesheets(props.area().tiled.map),
+    queryKey: ["tiled-spritesheets", props.area.id],
+    queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
   createEffect(() => {
-    const { tilePosition, isValidTarget } = getTilePosition(
-      props.area(),
-      engine,
-    );
+    const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
       throttledMove(tilePosition);
     }
@@ -40,19 +36,19 @@ export function AreaScene(props: { area: Accessor<AreaResource> }) {
     <Pixi matrix={cameraTransform()}>
       {spritesheets.data && (
         <TiledRenderer
-          layers={props.area().tiled.map.layers}
+          layers={props.area.tiled.map.layers}
           spritesheets={spritesheets.data}
           debug={engine.keyboard.keysHeld.has("Shift")}
         >
-          <Pixi zIndex={props.area().characterLayerIndex}>
+          <Pixi zIndex={props.area.characterLayerIndex}>
             <Index each={Array.from(api.state.characters.values())}>
-              {(char) => <CharacterActor char={char} area={props.area()} />}
+              {(char) => <CharacterActor char={char} area={props.area} />}
             </Index>
           </Pixi>
         </TiledRenderer>
       )}
-      <TileHighlight area={props.area()} />
-      <AreaDebugUI area={props.area()} pathToDraw={() => myCharacter()?.path} />
+      <TileHighlight area={props.area} />
+      <AreaDebugUI area={props.area} pathToDraw={myCharacter()?.path} />
     </Pixi>
   );
 }
