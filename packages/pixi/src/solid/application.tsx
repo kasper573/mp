@@ -9,7 +9,7 @@ export function Application(props: ParentProps) {
   const engine = new Engine(canvas);
   const app = new PixiApplication();
 
-  const [initResource] = createResource(async () => {
+  const [hasInitialized] = createResource(async () => {
     await app.init({ antialias: true, roundPixels: true, canvas });
     onCleanup(() => app.destroy(undefined, { children: true }));
     return true;
@@ -21,7 +21,7 @@ export function Application(props: ParentProps) {
   return (
     <>
       {canvas}
-      {initResource() && (
+      {hasInitialized() && (
         <ApplicationContext.Provider value={app}>
           <EngineContext.Provider value={engine}>
             <ParentContext.Provider value={app.stage}>
