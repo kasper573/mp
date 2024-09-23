@@ -1,4 +1,4 @@
-import { Clerk as AuthClient } from "@clerk/clerk-js";
+import { Clerk as AuthClient } from "@clerk/clerk-js/headless";
 import { createContext, createSignal, onCleanup, useContext } from "solid-js";
 
 export { AuthClient };
