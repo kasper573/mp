@@ -10,11 +10,9 @@ export default function GamePage() {
   return (
     <Switch>
       <Match when={isSignedIn()}>
-        <div class={styles.container}>
-          <Application>
-            <Game />
-          </Application>
-        </div>
+        <Application class={styles.container}>
+          <Game />
+        </Application>
       </Match>
       <Match when={!isSignedIn()}>Sign in to play</Match>
     </Switch>
