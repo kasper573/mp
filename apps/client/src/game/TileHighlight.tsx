@@ -12,7 +12,7 @@ export interface TileHighlightProps {
 
 export function TileHighlight(props: TileHighlightProps) {
   const engine = useContext(EngineContext);
-  const gfx = new TileGraphics();
+  const gfx = new TileHighlightGraphics();
 
   createEffect(() => {
     const { tileSize } = props.area.tiled;
@@ -25,7 +25,7 @@ export function TileHighlight(props: TileHighlightProps) {
   return <Pixi as={gfx} />;
 }
 
-class TileGraphics extends Graphics {
+class TileHighlightGraphics extends Graphics {
   update(size: Vector, isVisible: boolean) {
     this.clear();
     this.fillStyle = isVisible ? visibleStyle : hiddenStyle;

@@ -40,11 +40,13 @@ export function AreaScene(props: { area: AreaResource }) {
           spritesheets={spritesheets.data}
           debug={engine.keyboard.keysHeld.has("Shift")}
         >
-          <Pixi zIndex={props.area.characterLayerIndex}>
-            <Index each={Array.from(api.state.characters.values())}>
-              {(char) => <CharacterActor char={char} area={props.area} />}
-            </Index>
-          </Pixi>
+          {{
+            [props.area.characterLayer.name]: () => (
+              <Index each={Array.from(api.state.characters.values())}>
+                {(char) => <CharacterActor char={char} area={props.area} />}
+              </Index>
+            ),
+          }}
         </TiledRenderer>
       )}
       <TileHighlight area={props.area} />

@@ -12,12 +12,14 @@ export function CharacterActor(props: {
   area: AreaResource;
 }) {
   const engine = useContext(EngineContext);
-  const gfx = new CharacterGraphics();
+  const gfx = new CharacterActorGraphics();
   const lerp = new Interpolator(gfx);
 
   createEffect(() => {
     const { tiled } = props.area;
-    const { path, coords, speed } = props.char();
+    const { path, coords, speed, id } = props.char();
+
+    gfx.label = id;
 
     gfx.update(tiled.tileSize);
     lerp.configure(tiled.tileCoordToWorld(coords), {
@@ -33,7 +35,7 @@ export function CharacterActor(props: {
   return <Pixi as={gfx} />;
 }
 
-class CharacterGraphics extends Graphics {
+class CharacterActorGraphics extends Graphics {
   update(tileSize: Vector) {
     this.clear();
     this.fillStyle.color = 0x00ff00;

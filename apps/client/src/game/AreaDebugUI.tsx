@@ -20,7 +20,7 @@ export function AreaDebugUI(props: {
 }) {
   const [debugText, setDebugText] = createSignal("");
   const engine = useContext(EngineContext);
-  const gfx = new Graphics();
+  const gfx = new AreaDebugUIGraphics();
 
   createEffect(() => {
     const { tiled, dGraph } = props.area;
@@ -89,6 +89,8 @@ export function AreaDebugUI(props: {
     </Pixi>
   );
 }
+
+class AreaDebugUIGraphics extends Graphics {}
 
 function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
   const [start, ...rest] = path.map(tiled.tileCoordToWorld);

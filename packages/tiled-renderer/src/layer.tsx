@@ -12,7 +12,7 @@ import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureLookup } from "./spritesheet";
 
-type LayerView = Container;
+export type LayerView = Container;
 
 export class LayerViewFactory {
   constructor(private readonly textureLookup: TextureLookup) {}
@@ -26,7 +26,7 @@ export class LayerViewFactory {
     // layers are already in the draw order in the tiled data
     layers.forEach((layer, index) => {
       const view = this.createLayerView(layer);
-      memorizeLayerType(view, layer);
+      memorizeLayer(view, layer);
       view.label = `${layer.type}: "${layer.name}"`;
       container.addChildAt(view, index);
     });
@@ -90,15 +90,15 @@ function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
 
 type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];
 
-// We store layer type on a symbol because pixi.js
+// We store layer instance on a symbol because pixi.js
 // containers don't have a way to attach meta data
 
-const layerTypeSymbol = Symbol("layerType");
+const layerSymbol = Symbol("layer");
 
-function memorizeLayerType(view: Container, layer: Layer) {
-  Reflect.set(view, layerTypeSymbol, layer.type);
+function memorizeLayer(view: Container, layer: Layer) {
+  Reflect.set(view, layerSymbol, layer);
 }
 
-export function getLayerType(view: Container): Layer["type"] {
-  return Reflect.get(view, layerTypeSymbol) as Layer["type"];
+export function recallLayer(view: Container): Layer {
+  return Reflect.get(view, layerSymbol) as Layer;
 }
