@@ -11,7 +11,7 @@ import {
 import { Graphics } from "@mp/pixi";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { Pixi, EngineContext } from "@mp/pixi/solid";
-import { myCharacter } from "../api";
+import { myCharacter } from "../state/signals";
 import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {

@@ -1,6 +1,6 @@
 import { skipToken, createQuery } from "@tanstack/solid-query";
 import { createMemo } from "solid-js";
-import { myCharacter } from "../api";
+import { myCharacter } from "../state/signals";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
 

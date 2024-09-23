@@ -1,7 +1,7 @@
 import type { AreaId } from "@mp/data";
 import { AreaResource, TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
-import { api } from "../api";
+import { api } from "../state/api";
 
 export async function loadAreaResource(areaId: AreaId) {
   const url = await api.modules.area.areaFileUrl(areaId);

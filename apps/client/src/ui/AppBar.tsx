@@ -1,6 +1,6 @@
 import { useContext } from "solid-js";
 import { useAuthState, AuthContext } from "@mp/auth/client";
-import { api } from "../api";
+import { api } from "../state/api";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
 import { Link } from "./Link";

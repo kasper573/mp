@@ -1,4 +1,4 @@
-import type { CharacterId, ClientStateUpdate } from "@mp/server";
+import type { ClientStateUpdate } from "@mp/server";
 import {
   serialization,
   tokenHeaderName,
@@ -7,9 +7,8 @@ import {
 } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
-import { createEffect, createMemo, createSignal } from "solid-js";
 import { QueryClient } from "@tanstack/solid-query";
-import { env } from "./env";
+import { env } from "../env";
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -36,22 +35,6 @@ export const api = new Client<ServerModules, ClientState, ClientStateUpdate>({
     await loadPromise;
     return { [tokenHeaderName]: await authClient.session?.getToken() };
   },
-});
-
-export const [myCharacterId, setMyCharacterId] = createSignal<
-  CharacterId | undefined
->(undefined);
-
-export const myCharacter = createMemo(() =>
-  api.state.characters.get(myCharacterId()!),
-);
-
-createEffect(() => {
-  if (api.connected) {
-    void api.modules.world.join().then(setMyCharacterId);
-  } else {
-    setMyCharacterId(undefined);
-  }
 });
 
 function applyStateUpdate(state: ClientState, update: ClientStateUpdate) {
