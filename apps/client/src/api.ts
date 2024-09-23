@@ -8,7 +8,18 @@ import {
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
 import { createEffect, createMemo, createSignal } from "solid-js";
+import { QueryClient } from "@tanstack/solid-query";
 import { env } from "./env";
+
+export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+    },
+  },
+});
 
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();

@@ -1,20 +1,11 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
 import { dark } from "@mp/style/themes/dark.css";
-import { AuthContext } from "@mp/auth/client";
+import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
 import * as styles from "./main.css";
-import { authClient } from "./api";
-import { App } from "./App";
+import { Loading } from "./ui/Loading";
+import { ErrorFallback } from "./ui/ErrorFallback";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-    },
-  },
-});
+const App = lazy(() => import("./App"));
 
 document.documentElement.classList.add(dark);
 
@@ -23,11 +14,11 @@ rootElement.classList.add(styles.root);
 
 render(
   () => (
-    <AuthContext.Provider value={authClient}>
-      <QueryClientProvider client={queryClient}>
+    <ErrorBoundary fallback={ErrorFallback}>
+      <Suspense fallback={<Loading />}>
         <App />
-      </QueryClientProvider>
-    </AuthContext.Provider>
+      </Suspense>
+    </ErrorBoundary>
   ),
   rootElement,
 );

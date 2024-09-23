@@ -1,7 +1,6 @@
 import { skipToken, createQuery } from "@tanstack/solid-query";
-import { createMemo, ErrorBoundary, Suspense } from "solid-js";
+import { createMemo } from "solid-js";
 import { myCharacter } from "../api";
-import { ErrorFallback } from "../ui/ErrorFallback";
 import { loadAreaResource } from "./loadAreaResource";
 import { AreaScene } from "./AreaScene";
 
@@ -15,13 +14,5 @@ export function Game() {
     };
   });
 
-  return (
-    <ErrorBoundary
-      fallback={(error: unknown) => <ErrorFallback error={error} />}
-    >
-      <Suspense fallback={<>Loading...</>}>
-        {query.data && <AreaScene area={query.data} />}
-      </Suspense>
-    </ErrorBoundary>
-  );
+  return <>{query.data && <AreaScene area={query.data} />}</>;
 }

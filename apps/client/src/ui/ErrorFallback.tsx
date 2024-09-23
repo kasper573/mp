@@ -1,11 +1,16 @@
-import { Show } from "solid-js";
+import { createEffect, Show } from "solid-js";
 
-export function ErrorFallback(props: { error?: unknown }) {
+export function ErrorFallback(error: unknown, reset: () => void) {
+  createEffect(() => {
+    // eslint-disable-next-line no-console
+    console.error(error);
+  });
+
   return (
     <>
       <h1>Oops! Something went wrong.</h1>
-      <Show when={props.error}>
-        <pre>{String(props.error)}</pre>
+      <Show when={error}>
+        <pre>{error instanceof Error ? error.stack : String(error)}</pre>
       </Show>
     </>
   );
