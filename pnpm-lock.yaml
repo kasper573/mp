@@ -300,6 +300,9 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../style
       '@mp/time':
         specifier: workspace:*
         version: link:../time
