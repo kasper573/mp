@@ -3,7 +3,7 @@ import { TiledRenderer } from "@mp/tiled-renderer";
 import { useContext, createEffect, Index } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
-import { EngineContext, Pixi } from "../../../../packages/solid-pixi/src";
+import { EngineContext, Pixi } from "@mp/solid-pixi";
 import { api } from "../state/api";
 import { myCharacter } from "../state/signals";
 import { CharacterActor } from "./CharacterActor";
