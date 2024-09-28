@@ -51,6 +51,7 @@ export default tseslint.config(
 
       // {} is useful as empty set
       "@typescript-eslint/ban-types": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
     },
   },
   {
