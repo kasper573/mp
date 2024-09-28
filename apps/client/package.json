@@ -22,7 +22,8 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@tanstack/solid-query": "5.56.2",
-    "solid-js": "1.8.22"
+    "solid-js": "1.9.1",
+    "@solidjs/router": "0.14.7"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",

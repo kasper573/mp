@@ -1,7 +1,7 @@
 import { atoms } from "@mp/style";
-import { container, dot1, dot2, dot3, dot4 } from "./Loading.css";
+import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css";
 
-export function Loading() {
+export function LoadingSpinner() {
   return (
     <div classList={{ [container]: true, [dock]: true }}>
       <div class={dot1} />

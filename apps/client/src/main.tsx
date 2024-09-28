@@ -2,7 +2,7 @@ import { dark } from "@mp/style/themes/dark.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
 import * as styles from "./main.css";
-import { Loading } from "./ui/Loading";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
 import { ErrorFallback } from "./ui/ErrorFallback";
 
 const App = lazy(() => import("./App"));
@@ -15,7 +15,7 @@ rootElement.classList.add(styles.root);
 render(
   () => (
     <ErrorBoundary fallback={ErrorFallback}>
-      <Suspense fallback={<Loading />}>
+      <Suspense fallback={<LoadingSpinner />}>
         <App />
       </Suspense>
     </ErrorBoundary>
