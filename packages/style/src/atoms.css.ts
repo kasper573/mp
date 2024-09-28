@@ -1,3 +1,4 @@
+import type { PropertiesHyphen } from "csstype";
 import { type Property } from "csstype";
 import { defineProperties, createSprinkles } from "@vanilla-extract/sprinkles";
 import {
@@ -13,6 +14,8 @@ import {
   transform,
   typography,
 } from "./tokens";
+import type { TransitionPreset } from "./animation";
+import { cssForTransition, transitionPresets } from "./animation";
 
 /**
  * The generated CSS of this file will be in the same order as the properties and values are defined,
@@ -28,9 +31,48 @@ import {
 // For more specific and advanced properties and values you can use the style() function directly.
 // This gives us a good balance between convenience and bundle size since bundle size can grow quickly with a large amount of sprinkles.
 
+// Since transitions are so commonly used we make the most common transitions available as sprinkles.
+// For more specific and advanced transitions you can use the createTransition function directly in a style() call.
+const commonTransitionGroups = {
+  transform: [
+    "top",
+    "left",
+    "right",
+    "bottom",
+    "transform",
+    "width",
+    "height",
+    "max-width",
+    "max-height",
+    "min-width",
+    "min-height",
+  ],
+  appearance: [
+    "color",
+    "background-color",
+    "border-color",
+    "box-shadow",
+    "fill",
+    "stroke",
+    "opacity",
+  ],
+} satisfies Record<string, Array<keyof PropertiesHyphen>>;
+
+const commonTransitions = Object.fromEntries(
+  Object.entries(commonTransitionGroups).flatMap(([group, propertyNames]) => {
+    return transitionPresets.map((preset) => [
+      `${group}.${preset}`,
+      cssForTransition([propertyNames, preset]),
+    ]);
+  }),
+) as {
+  [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]: string;
+};
+
 const unconditionalProperties = defineProperties({
   properties: {
     all: ["unset"] as const,
+    transition: commonTransitions,
 
     // Borders
     borderRadius: radius,
@@ -63,11 +105,11 @@ const unconditionalProperties = defineProperties({
     typography,
 
     // Transform
+    inset: sizes,
     left: sizes,
     top: sizes,
     right: sizes,
     bottom: sizes,
-    inset: sizes,
     overflowX: overflows,
     overflowY: overflows,
     width: sizes,

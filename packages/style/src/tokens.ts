@@ -198,3 +198,72 @@ export const flexes = [
 ] as const;
 
 export const overflows = ["visible", "hidden", "scroll", "auto"] as const;
+
+export type Easing = keyof typeof easings;
+export const easings = {
+  emphasized: "cubic-bezier(0.2, 0, 0, 1)",
+  emphasizedAccelerate: "cubic-bezier(0.3, 0, 0.8, 0.15)",
+  emphasizedDecelerate: "cubic-bezier(0.05, 0.7, 0.1, 1)",
+  standard: "cubic-bezier(0.2, 0, 0, 1)",
+  standardAccelerate: "cubic-bezier(0.3, 0, 1, 1)",
+  standardDecelerate: "cubic-bezier(0, 0, 0, 1)",
+  legacy: "cubic-bezier(0.4, 0, 0.2, 1)",
+  legacyAccelerate: "cubic-bezier(0.4, 0, 1, 1)",
+  legacyDecelerate: "cubic-bezier(0, 0, 0.2, 1)",
+  linear: "cubic-bezier(0, 0, 1, 1)",
+} as const;
+
+export type Duration = keyof typeof durations;
+export const durations = {
+  short1: "50ms",
+  short2: "100ms",
+  short3: "150ms",
+  short4: "200ms",
+  medium1: "250ms",
+  medium2: "300ms",
+  medium3: "350ms",
+  medium4: "400ms",
+  long1: "450ms",
+  long2: "500ms",
+  long3: "550ms",
+  long4: "600ms",
+  extraLong1: "700ms",
+  extraLong2: "800ms",
+  extraLong3: "900ms",
+  extraLong4: "1000ms",
+  extraLong5: "1500ms",
+} as const;
+
+export type Transition = {
+  duration: (typeof durations)[Duration];
+  easing: (typeof easings)[Easing];
+};
+
+export type Transitions = typeof transitions;
+export const transitions = {
+  "emphasized.beginAndEndOnScreen": {
+    duration: durations.long2,
+    easing: easings.emphasized,
+  },
+  "emphasized.enter": {
+    duration: durations.medium4,
+    easing: easings.emphasizedDecelerate,
+  },
+  "emphasized.exit": {
+    duration: durations.short4,
+    easing: easings.emphasizedAccelerate,
+  },
+
+  "standard.beginAndEndOnScreen": {
+    duration: durations.medium2,
+    easing: easings.standard,
+  },
+  "standard.enter": {
+    duration: durations.medium1,
+    easing: easings.standardDecelerate,
+  },
+  "standard.exit": {
+    duration: durations.short4,
+    easing: easings.standardAccelerate,
+  },
+} satisfies Record<string, Transition>;
