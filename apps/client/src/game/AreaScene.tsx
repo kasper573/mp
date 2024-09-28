@@ -32,7 +32,7 @@ export function AreaScene(props: { area: AreaResource }) {
       props.area.tiled.mapSize,
       me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
     );
-  })
+  });
 
   return (
     <Pixi sortableChildren matrix={engine.camera.transform}>
