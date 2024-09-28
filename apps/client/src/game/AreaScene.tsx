@@ -1,6 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createEffect, createMemo, Index } from "solid-js";
+import { useContext, createEffect, Index } from "solid-js";
 import { EngineContext, Pixi } from "@mp/pixi/solid";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
@@ -13,13 +13,6 @@ import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
-  const cameraTransform = createMemo(() => {
-    const me = myCharacter();
-    return engine.camera.update(
-      props.area.tiled.mapSize,
-      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
-    );
-  });
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],
@@ -33,8 +26,16 @@ export function AreaScene(props: { area: AreaResource }) {
     }
   });
 
+  createEffect(() => {
+    const me = myCharacter();
+    engine.camera.update(
+      props.area.tiled.mapSize,
+      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
+    );
+  })
+
   return (
-    <Pixi sortableChildren matrix={cameraTransform()}>
+    <Pixi sortableChildren matrix={engine.camera.transform}>
       {spritesheets.data && (
         <TiledRenderer
           layers={props.area.tiled.map.layers}

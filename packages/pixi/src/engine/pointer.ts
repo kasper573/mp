@@ -1,7 +1,7 @@
-import type { Camera } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { Computed } from "@mp/state";
 import { atom, computed } from "@mp/state";
+import type { Camera } from "./camera";
 
 export class Pointer {
   protected _isDown = atom(false);

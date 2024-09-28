@@ -1,19 +1,34 @@
-import { Matrix } from "./matrix";
-import type { Size } from "./size";
-import { Vector } from "./vector";
+import { Matrix, Vector } from "@mp/math";
+import type { Size } from "@mp/math";
+import { atom } from "@mp/state";
 
 export class Camera {
   private position = new Vector(0, 0);
   private zoom = 1;
-  transform: Matrix = new Matrix();
+  readonly #transform = atom(new Matrix());
+  readonly #cameraSize = atom<Size>({ width: 0, height: 0 });
+
+  get transform(): Matrix {
+    return this.#transform.get();
+  }
+
+  get cameraSize(): Size {
+    return this.#cameraSize.get();
+  }
+
+  set cameraSize(size: Size) {
+    this.#cameraSize.set(size);
+  }
 
   constructor(
-    private readonly cameraSize: Size,
+    initialCameraSize: Size,
     private desiredZoom = 2,
     private maxZoom = 3,
-  ) {}
+  ) {
+    this.#cameraSize.set(initialCameraSize);
+  }
 
-  update(worldSize: Size, position: Vector = this.position) {
+  update(worldSize: Size, position: Vector = this.position): void {
     const scaleX = this.cameraSize.width / worldSize.width;
     const scaleY = this.cameraSize.height / worldSize.height;
 
@@ -38,16 +53,16 @@ export class Camera {
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
 
-    this.transform = new Matrix([
-      this.zoom,
-      0,
-      0,
-      this.zoom,
-      -offsetX * this.zoom,
-      -offsetY * this.zoom,
-    ]);
-
-    return this.transform;
+    this.#transform.set(
+      new Matrix([
+        this.zoom,
+        0,
+        0,
+        this.zoom,
+        -offsetX * this.zoom,
+        -offsetY * this.zoom,
+      ]),
+    );
   }
 
   viewportToWorld(screenPos: Vector): Vector {

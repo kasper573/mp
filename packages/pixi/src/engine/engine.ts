@@ -1,6 +1,7 @@
-import { Camera } from "@mp/math";
+import type { Size } from "@mp/math";
 import { TimeSpan } from "@mp/time";
 import { atom } from "@mp/state";
+import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
 
@@ -10,14 +11,15 @@ export class Engine {
   #deltaTime = atom(TimeSpan.fromMilliseconds(0));
   pointer: PointerForCamera;
   keyboard: Keyboard;
+  #viewportSizeObserver?: ResizeObserver;
 
   readonly camera: Camera;
   get deltaTime(): TimeSpan {
     return this.#deltaTime.get();
   }
 
-  constructor(viewport: HTMLCanvasElement) {
-    this.camera = new Camera(viewport, 2, 3);
+  constructor(private readonly viewport: HTMLElement) {
+    this.camera = new Camera(elementSize(viewport), 2, 3);
     this.pointer = new PointerForCamera(viewport, this.camera);
     this.keyboard = new Keyboard();
   }
@@ -27,12 +29,16 @@ export class Engine {
     this.keyboard.start();
     this.#isRunning = true;
     requestAnimationFrame(this.nextFrame);
+    this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);
+    this.#viewportSizeObserver.observe(this.viewport);
   }
 
   stop() {
     this.pointer.stop();
     this.keyboard.stop();
     this.#isRunning = false;
+    this.#viewportSizeObserver?.disconnect();
+    this.#viewportSizeObserver = undefined;
   }
 
   private nextFrame: FrameRequestCallback = () => {
@@ -46,5 +52,20 @@ export class Engine {
     if (this.#isRunning) {
       requestAnimationFrame(this.nextFrame);
     }
+  };
+
+  private onViewportResized = () => {
+    this.camera.cameraSize = elementSize(this.viewport);
+  };
+}
+
+function elementSize(element: HTMLElement): Size {
+  return {
+    get width() {
+      return element.clientWidth;
+    },
+    get height() {
+      return element.clientHeight;
+    },
   };
 }
