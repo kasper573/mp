@@ -56,6 +56,9 @@ importers:
       '@mp/data':
         specifier: workspace:*
         version: link:../../packages/data
+      '@mp/engine':
+        specifier: workspace:*
+        version: link:../../packages/engine
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -71,6 +74,9 @@ importers:
       '@mp/server':
         specifier: workspace:*
         version: link:../server
+      '@mp/solid-pixi':
+        specifier: workspace:*
+        version: link:../../packages/solid-pixi
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -260,6 +266,22 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/engine:
+    dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../time
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/logger:
     dependencies:
       chalk:
@@ -297,21 +319,28 @@ importers:
 
   packages/pixi:
     dependencies:
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
-      '@mp/style':
-        specifier: workspace:*
-        version: link:../style
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../time
       pixi.js:
         specifier: 8.3.3
         version: 8.3.3
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/solid-pixi:
+    dependencies:
+      '@mp/engine':
+        specifier: workspace:*
+        version: link:../engine
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/pixi':
+        specifier: workspace:*
+        version: link:../pixi
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../style
       solid-js:
         specifier: 1.9.1
         version: 1.9.1
@@ -382,6 +411,9 @@ importers:
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi
+      '@mp/solid-pixi':
+        specifier: workspace:*
+        version: link:../solid-pixi
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader

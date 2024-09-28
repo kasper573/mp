@@ -2,7 +2,7 @@ import type { FillStyle } from "@mp/pixi";
 import type { AreaResource } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import { createEffect, useContext } from "solid-js";
-import { Pixi, EngineContext } from "@mp/pixi/solid";
+import { Pixi, EngineContext } from "@mp/solid-pixi";
 import type { Vector } from "@mp/math";
 import { getTilePosition } from "./getTilePosition";
 

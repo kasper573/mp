@@ -1,6 +1,6 @@
 import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
-import { Pixi, EngineContext } from "@mp/pixi/solid";
+import { Pixi, EngineContext } from "@mp/solid-pixi";
 import type { Character } from "@mp/server";
 import type { AreaResource } from "@mp/data";
 import type { Accessor } from "solid-js";

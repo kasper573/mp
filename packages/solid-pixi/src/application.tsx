@@ -1,8 +1,8 @@
-import { Application as PixiApplication } from "pixi.js";
+import { Application as PixiApplication } from "@mp/pixi";
 import type { JSX } from "solid-js";
 import { createMemo, createResource, createSignal, onCleanup } from "solid-js";
 import { clsx } from "@mp/style";
-import { Engine } from "../engine/engine";
+import { Engine } from "@mp/engine";
 import { ApplicationContext, EngineContext, ParentContext } from "./context";
 import * as styles from "./application.css";
 

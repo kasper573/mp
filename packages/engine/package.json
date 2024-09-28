@@ -1,0 +1,27 @@
+{
+  "name": "@mp/engine",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.d.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc --build",
+    "dev": "tsc --build --watch --preserveWatchOutput"
+  },
+  "dependencies": {
+    "@mp/math": "workspace:*",
+    "@mp/time": "workspace:*",
+    "@mp/state": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

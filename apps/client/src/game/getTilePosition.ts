@@ -1,6 +1,6 @@
 import type { AreaResource } from "@mp/data";
 import { dNodeFromVector, snapTileVector } from "@mp/data";
-import type { Engine } from "@mp/pixi";
+import type { Engine } from "@mp/engine";
 
 export function getTilePosition(area: AreaResource, engine: Engine) {
   const tilePosition = snapTileVector(

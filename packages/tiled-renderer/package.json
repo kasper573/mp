@@ -12,6 +12,7 @@
   "dependencies": {
     "@mp/tiled-loader": "workspace:*",
     "@mp/pixi": "workspace:*",
+    "@mp/solid-pixi": "workspace:*",
     "solid-js": "1.9.1"
   },
   "devDependencies": {

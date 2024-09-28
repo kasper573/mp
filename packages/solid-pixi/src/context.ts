@@ -1,6 +1,6 @@
-import type { Container, Application } from "pixi.js";
+import type { Container, Application } from "@mp/pixi";
+import type { Engine } from "@mp/engine";
 import { createContext } from "solid-js";
-import type { Engine } from "../engine/engine";
 
 export const ParentContext = createContext<Container>(
   new Proxy({} as Container, {

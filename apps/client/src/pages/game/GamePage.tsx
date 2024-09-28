@@ -1,5 +1,5 @@
 import { useAuthState } from "@mp/auth/client";
-import { Application } from "@mp/pixi/solid";
+import { Application } from "@mp/solid-pixi";
 import { Match, Switch } from "solid-js";
 import { atoms } from "@mp/style";
 import { Game } from "../../game/Game";
