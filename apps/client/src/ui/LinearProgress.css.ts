@@ -1,21 +1,26 @@
-import { keyframes, atoms, style, recipe } from "@mp/style";
+import { keyframes, atoms, recipe } from "@mp/style";
 
-const right = { left: "100%", right: "-90%" };
+const scale = "400%";
+
 const load = keyframes({
-  "0%": { left: "-30%", right: "100%" },
-  "60%": right,
-  "100%": right,
+  "0%": { backgroundPositionX: "0%" },
+  "100%": { backgroundPositionX: `-${scale}` },
 });
 
 export const container = recipe({
   base: [
-    { height: 5 },
     atoms({
       width: "100%",
-      backgroundColor: "secondary.active",
-      position: "relative",
       transition: "appearance.standard.beginAndEndOnScreen",
+      color: "highlight",
     }),
+    {
+      height: 5,
+      background:
+        "linear-gradient(to right, transparent 0%, currentColor 50%, transparent 100%)",
+      backgroundSize: `${scale} 100%`,
+      animation: `${load} 4.5s infinite linear`,
+    },
   ],
   variants: {
     active: {
@@ -27,14 +32,3 @@ export const container = recipe({
     active: true,
   },
 });
-
-export const filled = style([
-  atoms({
-    backgroundColor: "secondary.hover",
-    position: "absolute",
-    inset: 0,
-  }),
-  {
-    animation: `${load} 2s infinite`,
-  },
-]);

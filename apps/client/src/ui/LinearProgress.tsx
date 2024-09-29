@@ -8,8 +8,6 @@ export type LinearProgressProps = JSX.IntrinsicElements["div"] &
 
 export function LinearProgress(props: LinearProgressProps) {
   return (
-    <div role="progressbar" {...processStyleProps(props, styles.container)}>
-      <div class={styles.filled} />
-    </div>
+    <div role="progressbar" {...processStyleProps(props, styles.container)} />
   );
 }
