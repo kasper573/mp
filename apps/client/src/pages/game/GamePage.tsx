@@ -1,55 +1,28 @@
-import type { DependencyList } from "react";
-import { useEffect, useRef, useState } from "react";
 import { useAuthState } from "@mp/auth/client";
-import { AreaLoader } from "../../game/AreaLoader";
-import { createGame } from "../../game/game";
-import { DebugText } from "./DebugText";
+import { Application } from "@mp/solid-pixi";
+import { Match, Switch } from "solid-js";
+import { atoms } from "@mp/style";
+import { EngineProvider } from "@mp/engine";
+import { Game } from "../../game/Game";
 import * as styles from "./GamePage.css";
-
-const areaLoader = new AreaLoader();
 
 export default function GamePage() {
   const { isSignedIn } = useAuthState();
-  const [resizeTo, setResizeTo] = useState<HTMLDivElement | null>(null);
-  const [debugText, setDebugText] = useState("");
-
-  useDisposable(
-    () =>
-      resizeTo && isSignedIn
-        ? createGame({
-            container: resizeTo,
-            resizeTo,
-            areaLoader,
-            debug: setDebugText,
-          })
-        : undefined,
-    [areaLoader, resizeTo, isSignedIn],
-  );
-
-  if (!isSignedIn) {
-    return <div>Sign in to play</div>;
-  }
 
   return (
-    <div className={styles.container}>
-      <div ref={setResizeTo} className={styles.container} />
-      <DebugText debugText={debugText} />
-    </div>
+    <Switch>
+      <Match when={isSignedIn()}>
+        <Application class={styles.container}>
+          {({ viewport }) => (
+            <EngineProvider viewport={viewport}>
+              <Game />
+            </EngineProvider>
+          )}
+        </Application>
+      </Match>
+      <Match when={!isSignedIn()}>
+        <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
+      </Match>
+    </Switch>
   );
-}
-
-interface Disposable {
-  dispose(): void;
-}
-
-function useDisposable<T extends Disposable>(
-  createDisposable: () => T | undefined,
-  dependencyList: DependencyList,
-): void {
-  const currentRef = useRef<T>();
-  useEffect(() => {
-    const d = createDisposable();
-    currentRef.current = d;
-    return () => d?.dispose();
-  }, dependencyList);
 }

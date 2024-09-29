@@ -1,5 +1,5 @@
 import type { Container } from "@mp/pixi";
-import { Engine } from "@mp/pixi";
+import type { TimeSpan } from "@mp/time";
 import type { Vector } from "@mp/math";
 import { moveAlongPath } from "@mp/data";
 
@@ -22,7 +22,7 @@ export class Interpolator {
     }
   }
 
-  update() {
+  update(deltaTime: TimeSpan) {
     if (!this.pathInterpolation) {
       return;
     }
@@ -31,7 +31,7 @@ export class Interpolator {
       this.target.position,
       this.pathInterpolation.path,
       this.pathInterpolation.speed,
-      Engine.instance.ticker.deltaTime,
+      deltaTime,
     );
 
     if (destinationReached) {

@@ -30,10 +30,11 @@
     "eslint": "9.7.0",
     "eslint-plugin-import": "2.29.1",
     "eslint-plugin-unused-imports": "4.0.0",
+    "eslint-plugin-monorepo-cop": "1.0.2",
+    "eslint-plugin-solid": "0.14.3",
     "husky": "9.0.11",
     "prettier": "3.3.3",
     "turbo": "2.0.6",
-    "typescript": "^5.5.3",
     "typescript-eslint": "8.4.0"
   },
   "engines": {

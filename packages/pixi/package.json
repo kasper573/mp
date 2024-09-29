@@ -10,8 +10,6 @@
     }
   },
   "dependencies": {
-    "@mp/math": "workspace:*",
-    "@mp/time": "workspace:*",
     "pixi.js": "8.3.3"
   },
   "devDependencies": {

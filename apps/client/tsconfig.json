@@ -4,6 +4,7 @@
   "exclude": ["../server/public"],
   "compilerOptions": {
     "allowJs": true,
-    "jsx": "react-jsx"
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js"
   }
 }

@@ -1,5 +1,5 @@
 import { Vector } from "@mp/math";
-import type { TiledObject } from "@mp/tiled-loader";
+import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { snapTileVector, type TiledResource } from "./TiledResource";
 import type { DNode } from "./findPath";
 import { vectorFromDNode, type DGraph } from "./findPath";
@@ -14,19 +14,16 @@ export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
   readonly dGraph: DGraph;
-  readonly characterLayerIndex: number;
+  readonly characterLayer: Layer;
 
   constructor(
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
-    const characterLayer = this.tiled.getTileLayers("Characters")[0];
-    this.characterLayerIndex = characterLayer
-      ? this.tiled.map.layers.indexOf(characterLayer)
-      : this.tiled.map.layers.length;
+    this.characterLayer = this.tiled.getTileLayers(characterLayerName)[0];
 
-    if (this.characterLayerIndex === -1) {
-      throw new Error("Characters layer must be at top level");
+    if (!this.characterLayer) {
+      throw new Error(`Map must have a '${characterLayerName}' layer`);
     }
 
     this.objects = this.tiled.getObjects();
@@ -48,6 +45,8 @@ export class AreaResource {
     );
   }
 }
+
+const characterLayerName = "Characters";
 
 function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,

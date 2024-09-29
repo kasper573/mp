@@ -3,6 +3,9 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
+import solid from "eslint-plugin-solid/configs/typescript";
+import * as tsParser from "@typescript-eslint/parser";
+import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
 
 export default tseslint.config(
   {
@@ -17,6 +20,8 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+  monorepoCopPlugin.configs.recommended,
   {
     languageOptions: {
       parserOptions: {
@@ -35,6 +40,7 @@ export default tseslint.config(
     plugins: {
       import: importPlugin,
       "unused-imports": unusedImportsPlugin,
+      "monorepo-cop": monorepoCopPlugin,
     },
     rules: {
       // Consistent order of imports makes a modules dependencies easier to grasp mentally for humans
@@ -49,6 +55,17 @@ export default tseslint.config(
 
       // {} is useful as empty set
       "@typescript-eslint/ban-types": "off",
+      "@typescript-eslint/no-empty-object-type": "off",
+    },
+  },
+  {
+    files: ["**/*.{ts,tsx}"],
+    ...solid,
+    languageOptions: {
+      parser: tsParser,
+      parserOptions: {
+        project: "tsconfig.json",
+      },
     },
   },
 );

@@ -1,39 +1,24 @@
-import { createRoot } from "react-dom/client";
-import { StrictMode } from "react";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { RouterProvider } from "@tanstack/react-router";
 import { dark } from "@mp/style/themes/dark.css";
-import { AuthContext } from "@mp/auth/client";
-import { createRouter } from "./router";
-import { ErrorFallback } from "./components/ErrorFallback";
+import { ErrorBoundary, lazy, Suspense } from "solid-js";
+import { render } from "solid-js/web";
 import * as styles from "./main.css";
-import { authClient } from "./api";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
+import { ErrorFallback } from "./ui/ErrorFallback";
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
-    },
-  },
-});
+const App = lazy(() => import("./App"));
 
 document.documentElement.classList.add(dark);
-
-const router = createRouter();
 
 const rootElement = document.querySelector("div#root")!;
 rootElement.classList.add(styles.root);
 
-const reactRoot = createRoot(rootElement);
-
-reactRoot.render(
-  <StrictMode>
-    <AuthContext.Provider value={authClient}>
-      <QueryClientProvider client={queryClient}>
-        <RouterProvider router={router} defaultErrorComponent={ErrorFallback} />
-      </QueryClientProvider>
-    </AuthContext.Provider>
-  </StrictMode>,
+render(
+  () => (
+    <ErrorBoundary fallback={ErrorFallback}>
+      <Suspense fallback={<LoadingSpinner />}>
+        <App />
+      </Suspense>
+    </ErrorBoundary>
+  ),
+  rootElement,
 );

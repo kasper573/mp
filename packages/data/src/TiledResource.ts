@@ -1,3 +1,4 @@
+import type { Size } from "@mp/math";
 import { Vector } from "@mp/math";
 import type {
   TiledMap,
@@ -10,8 +11,16 @@ import type {
 
 export class TiledResource {
   constructor(public readonly map: TiledMap) {}
+
   get tileSize() {
     return new Vector(this.map.tilewidth, this.map.tileheight);
+  }
+
+  get mapSize(): Size {
+    return {
+      width: this.map.width * this.map.tilewidth,
+      height: this.map.height * this.map.tileheight,
+    };
   }
 
   worldCoordToTile = ({ x, y }: Vector): Vector => {

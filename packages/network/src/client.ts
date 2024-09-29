@@ -1,7 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import type { ReadonlySignal } from "@preact/signals-core";
-import { computed, signal, type Signal } from "@preact/signals-core";
+import { atom, produce, type Atom } from "@mp/state";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,
@@ -27,12 +26,17 @@ export class Client<
   State,
   StateUpdate,
 > {
-  private _state: Signal<State>;
+  private _state: Atom<State>;
+  private _connected: Atom<boolean>;
   private socket: ClientSocket<StateUpdate>;
 
   readonly modules: ClientModuleRecord<ModuleDefinitions>;
-  readonly connected = signal(false);
-  readonly state: ReadonlySignal<State> = computed(() => this._state.value);
+  get connected(): boolean {
+    return this._connected.get();
+  }
+  get state(): State {
+    return this._state.get();
+  }
 
   constructor(private options: ClientOptions<State, StateUpdate>) {
     this.socket = io(options.url, { transports: ["websocket"] });
@@ -42,17 +46,22 @@ export class Client<
       this.options,
     );
 
-    this._state = signal(options.createInitialState());
+    this._connected = atom(false);
+    this._state = atom(options.createInitialState());
 
     this.socket.on("stateUpdate", (update) => {
-      this._state.value = options.createNextState(
-        this._state.value,
-        options.parseStateUpdate(update),
+      this._state.set(
+        produce<State>((prev) => {
+          options.applyStateUpdate(
+            prev as State,
+            options.parseStateUpdate(update),
+          );
+        }),
       );
     });
 
-    this.socket.on("connect", () => (this.connected.value = true));
-    this.socket.on("disconnect", () => (this.connected.value = false));
+    this.socket.on("connect", () => this._connected.set(true));
+    this.socket.on("disconnect", () => this._connected.set(false));
   }
 
   dispose() {
@@ -109,7 +118,7 @@ export interface ClientOptions<State, StateUpdate> {
   serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
   parseRPCResponse: SocketIO_DTOParser<SocketIO_RPCResponse<unknown>>;
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
-  createNextState: (state: State, update: StateUpdate) => State;
+  applyStateUpdate: (state: State, update: StateUpdate) => unknown;
   createInitialState: () => State;
   getHeaders?: () =>
     | SocketIO_Headers
