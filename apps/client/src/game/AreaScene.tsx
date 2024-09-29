@@ -42,6 +42,7 @@ export function AreaScene(props: { area: AreaResource }) {
           layers={props.area.tiled.map.layers}
           spritesheets={spritesheets.data}
           debug={engine.keyboard.keysHeld.has("Shift")}
+          label={props.area.id}
         >
           {{
             [props.area.characterLayer.name]: () => (

@@ -18,7 +18,7 @@ export class LayerViewFactory {
   constructor(private readonly textureLookup: TextureLookup) {}
 
   createLayerContainer(layers: Layer[]): LayerView {
-    const container = new Container({
+    const container = new TileRendererContainer({
       isRenderGroup: true,
       sortableChildren: true,
     });
@@ -39,7 +39,7 @@ export class LayerViewFactory {
   }
 
   private createTileLayerView(layer: TileLayer): LayerView {
-    const container = new Container({ isRenderGroup: true });
+    const container = new TileRendererContainer({ isRenderGroup: true });
     for (const tile of layer.tiles) {
       container.addChild(createTileSprite(tile, this.textureLookup));
     }
@@ -51,7 +51,7 @@ export class LayerViewFactory {
   }
 
   private createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {
-    const view = new Container({
+    const view = new TileRendererContainer({
       isRenderGroup: true,
       sortableChildren: true,
     });
@@ -87,6 +87,9 @@ function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
       return (objects) => objects;
   }
 }
+
+// We use a separate class purely for debug purposes as it provides a name for pixijs devtools
+class TileRendererContainer extends Container {}
 
 type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];
 

@@ -12,6 +12,7 @@ export interface TileRendererProps {
   spritesheets: TiledSpritesheetRecord;
   debug?: boolean;
   children?: ChildrenByLayerName;
+  label?: string;
 }
 
 export function TiledRenderer(props: TileRendererProps) {
@@ -33,7 +34,7 @@ export function TiledRenderer(props: TileRendererProps) {
 
   return (
     <>
-      <Pixi as={container()} />
+      <Pixi as={container()} label={props.label} />
       <For each={Object.entries(props.children ?? {})}>
         {([name, childrenForLabel]) => {
           const layerView = container().children.find(
