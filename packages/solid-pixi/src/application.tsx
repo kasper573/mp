@@ -1,13 +1,14 @@
 import { Application as PixiApplication } from "@mp/pixi";
 import type { JSX } from "solid-js";
 import { createMemo, createResource, createSignal, onCleanup } from "solid-js";
-import { processStyleProps } from "@mp/style";
 import { ApplicationContext, ParentContext } from "./context";
-import * as styles from "./application.css";
 
 export interface ApplicationProps
-  extends Omit<JSX.IntrinsicElements["div"], "children"> {
+  extends Omit<JSX.IntrinsicElements["div"], "children" | "style"> {
   children: ({ viewport }: { viewport: HTMLElement }) => JSX.Element;
+  // Omitting the `style` prop from `div` because I don't know
+  // how to properly merge two solid-js style values
+  style?: JSX.CSSProperties;
 }
 
 export function Application(props: ApplicationProps) {
@@ -43,7 +44,7 @@ export function Application(props: ApplicationProps) {
       return (
         <ApplicationContext.Provider value={app}>
           <ParentContext.Provider value={app.stage}>
-            <div class={styles.content}>{props.children({ viewport })}</div>
+            <div style={styles.content}>{props.children({ viewport })}</div>
           </ParentContext.Provider>
         </ApplicationContext.Provider>
       );
@@ -51,9 +52,23 @@ export function Application(props: ApplicationProps) {
   };
 
   return (
-    <div ref={setViewport} {...processStyleProps(props, styles.container)}>
+    <div
+      ref={setViewport}
+      {...props}
+      style={{ ...styles.container, ...props.style }}
+    >
       <canvas ref={setCanvas} />
       {content()}
     </div>
   );
 }
+
+const styles = {
+  content: {
+    position: "absolute",
+    inset: 0,
+  },
+  container: {
+    position: "relative",
+  },
+} satisfies Record<string, JSX.CSSProperties>;

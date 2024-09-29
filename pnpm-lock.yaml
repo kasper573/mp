@@ -338,9 +338,6 @@ importers:
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi
-      '@mp/style':
-        specifier: workspace:*
-        version: link:../style
       solid-js:
         specifier: 1.9.1
         version: 1.9.1
