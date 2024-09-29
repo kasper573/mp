@@ -18,7 +18,6 @@
   },
   "dependencies": {
     "@mp/pixi": "workspace:*",
-    "@mp/math": "workspace:*",
     "@mp/style": "workspace:*",
     "solid-js": "1.9.1"
   },

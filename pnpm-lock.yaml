@@ -335,9 +335,6 @@ importers:
 
   packages/solid-pixi:
     dependencies:
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi

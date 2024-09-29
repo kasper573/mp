@@ -36,7 +36,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   return (
-    <Pixi sortableChildren matrix={engine.camera.transform}>
+    <Pixi sortableChildren matrix={engine.camera.transform.data}>
       {spritesheets.data && (
         <TiledRenderer
           layers={props.area.tiled.map.layers}

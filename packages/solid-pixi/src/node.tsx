@@ -2,13 +2,12 @@ import type { ParentProps } from "solid-js";
 import { useContext, onCleanup, createEffect, onMount } from "solid-js";
 import { Container } from "@mp/pixi";
 import { Matrix as PixiMatrix } from "@mp/pixi";
-import type { Matrix } from "@mp/math";
 import { ParentContext } from "./context";
 
 export interface PixiProps extends ParentProps {
   as?: Container;
   zIndex?: number;
-  matrix?: Matrix;
+  matrix?: number[];
   isRenderGroup?: boolean;
   sortableChildren?: boolean;
   label?: string;
@@ -32,7 +31,7 @@ export function Pixi(props: PixiProps) {
 
   createEffect(() => {
     if (props.matrix) {
-      instance.setFromMatrix(new PixiMatrix(...props.matrix.data));
+      instance.setFromMatrix(new PixiMatrix(...props.matrix));
     }
   });
 
