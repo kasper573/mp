@@ -1,22 +1,25 @@
 import { Application as PixiApplication } from "@mp/pixi";
 import type { JSX } from "solid-js";
 import { createMemo, createResource, createSignal, onCleanup } from "solid-js";
-import { clsx } from "@mp/style";
-import { Engine } from "@mp/engine";
-import { ApplicationContext, EngineContext, ParentContext } from "./context";
+import { processStyleProps } from "@mp/style";
+import { ApplicationContext, ParentContext } from "./context";
 import * as styles from "./application.css";
 
-export function Application(props: JSX.IntrinsicElements["div"]) {
+export interface ApplicationProps
+  extends Omit<JSX.IntrinsicElements["div"], "children"> {
+  children: ({ viewport }: { viewport: HTMLElement }) => JSX.Element;
+}
+
+export function Application(props: ApplicationProps) {
   const [getViewport, setViewport] = createSignal<HTMLElement | null>(null);
   const [getCanvas, setCanvas] = createSignal<HTMLCanvasElement | null>(null);
   const elements = createMemo(() => [getViewport(), getCanvas()] as const);
 
-  const [instances] = createResource(elements, async ([viewport, canvas]) => {
+  const [getApp] = createResource(elements, async ([viewport, canvas]) => {
     if (!viewport || !canvas) {
       return;
     }
 
-    const engine = new Engine(viewport);
     const app = new PixiApplication();
 
     await app.init({
@@ -26,32 +29,31 @@ export function Application(props: JSX.IntrinsicElements["div"]) {
       canvas,
     });
 
-    engine.start();
-
     onCleanup(() => {
-      engine.stop();
       app.destroy(undefined, { children: true });
     });
 
-    return { engine, app };
+    return app;
   });
 
-  return (
-    <div
-      ref={setViewport}
-      {...props}
-      class={clsx(styles.container, props.class)}
-    >
-      <canvas ref={setCanvas} />
-      {instances.state === "ready" && instances.latest && (
-        <ApplicationContext.Provider value={instances.latest.app}>
-          <EngineContext.Provider value={instances.latest.engine}>
-            <ParentContext.Provider value={instances.latest.app.stage}>
-              <div class={styles.content}>{props.children}</div>
-            </ParentContext.Provider>
-          </EngineContext.Provider>
+  const content = () => {
+    const viewport = getViewport();
+    const app = getApp();
+    if (viewport && app) {
+      return (
+        <ApplicationContext.Provider value={app}>
+          <ParentContext.Provider value={app.stage}>
+            <div class={styles.content}>{props.children({ viewport })}</div>
+          </ParentContext.Provider>
         </ApplicationContext.Provider>
-      )}
+      );
+    }
+  };
+
+  return (
+    <div ref={setViewport} {...processStyleProps(props, styles.container)}>
+      <canvas ref={setCanvas} />
+      {content()}
     </div>
   );
 }

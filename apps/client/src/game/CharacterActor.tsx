@@ -1,10 +1,11 @@
 import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
-import { Pixi, EngineContext } from "@mp/solid-pixi";
+import { Pixi } from "@mp/solid-pixi";
 import type { Character } from "@mp/server";
 import type { AreaResource } from "@mp/data";
 import type { Accessor } from "solid-js";
 import { createEffect, useContext } from "solid-js";
+import { EngineContext } from "@mp/engine";
 import { Interpolator } from "./Interpolator";
 
 export function CharacterActor(props: {

@@ -19,7 +19,8 @@
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/state": "workspace:*",
+    "solid-js": "1.9.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

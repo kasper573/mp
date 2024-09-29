@@ -2,8 +2,9 @@ import type { FillStyle } from "@mp/pixi";
 import type { AreaResource } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import { createEffect, useContext } from "solid-js";
-import { Pixi, EngineContext } from "@mp/solid-pixi";
+import { Pixi } from "@mp/solid-pixi";
 import type { Vector } from "@mp/math";
+import { EngineContext } from "@mp/engine";
 import { getTilePosition } from "./getTilePosition";
 
 export interface TileHighlightProps {

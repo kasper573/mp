@@ -280,6 +280,9 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../time
+      solid-js:
+        specifier: 1.9.1
+        version: 1.9.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -332,9 +335,6 @@ importers:
 
   packages/solid-pixi:
     dependencies:
-      '@mp/engine':
-        specifier: workspace:*
-        version: link:../engine
       '@mp/math':
         specifier: workspace:*
         version: link:../math

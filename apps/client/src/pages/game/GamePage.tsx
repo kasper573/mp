@@ -2,6 +2,7 @@ import { useAuthState } from "@mp/auth/client";
 import { Application } from "@mp/solid-pixi";
 import { Match, Switch } from "solid-js";
 import { atoms } from "@mp/style";
+import { EngineProvider } from "@mp/engine";
 import { Game } from "../../game/Game";
 import * as styles from "./GamePage.css";
 
@@ -12,7 +13,11 @@ export default function GamePage() {
     <Switch>
       <Match when={isSignedIn()}>
         <Application class={styles.container}>
-          <Game />
+          {({ viewport }) => (
+            <EngineProvider viewport={viewport}>
+              <Game />
+            </EngineProvider>
+          )}
         </Application>
       </Match>
       <Match when={!isSignedIn()}>
