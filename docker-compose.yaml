@@ -40,11 +40,11 @@ services:
     volumes:
       - proxy-data:/data
       - letsencrypt-data:/etc/letsencrypt
-  devtools:
+  db-migrations:
     build:
-      dockerfile: Dockerfile.devtools
+      dockerfile: Dockerfile.db-migrations
       context: .
-    image: ghcr.io/kasper573/mp-devtools:latest
+    image: ghcr.io/kasper573/mp-db-migrations:latest
     environment:
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
 volumes:

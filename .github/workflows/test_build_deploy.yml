@@ -83,6 +83,6 @@ jobs:
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
             docker compose pull
             docker compose --env-file .env up -d --remove-orphans
-            docker compose run devtools pnpm -F server db:migrate
+            docker compose run db-migrations
             docker system prune -f
             docker image prune -af

@@ -25,6 +25,8 @@ async function main(opt: CliOptions) {
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
+  logger.info("Hello world");
+
   const auth = createAuthClient({ secretKey: opt.authSecretKey });
   const db = createDBClient(opt.databaseUrl);
   const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
