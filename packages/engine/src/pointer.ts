@@ -4,34 +4,34 @@ import { atom, computed } from "@mp/state";
 import type { Camera } from "./camera";
 
 export class Pointer {
-  protected _isDown = atom(false);
-  protected _position = atom(new Vector(0, 0));
+  readonly #isDown = atom(false);
+  readonly #position = atom(new Vector(0, 0));
 
   get position(): Vector {
-    return this._position.get();
+    return this.#position.get();
   }
   get isDown(): boolean {
-    return this._isDown.get();
+    return this.#isDown.get();
   }
 
-  constructor(private viewport: HTMLElement) {}
+  constructor(private target: HTMLElement) {}
 
   start() {
-    this.viewport.addEventListener("pointermove", this.onPointerMove);
-    this.viewport.addEventListener("pointerdown", this.onPointerDown);
-    this.viewport.addEventListener("pointerup", this.onPointerUp);
+    this.target.addEventListener("pointermove", this.onPointerMove);
+    this.target.addEventListener("pointerdown", this.onPointerDown);
+    this.target.addEventListener("pointerup", this.onPointerUp);
   }
 
   stop() {
-    this.viewport.removeEventListener("pointermove", this.onPointerMove);
-    this.viewport.removeEventListener("pointerdown", this.onPointerDown);
-    this.viewport.removeEventListener("pointerup", this.onPointerUp);
+    this.target.removeEventListener("pointermove", this.onPointerMove);
+    this.target.removeEventListener("pointerdown", this.onPointerDown);
+    this.target.removeEventListener("pointerup", this.onPointerUp);
   }
 
-  private onPointerDown = () => this._isDown.set(true);
-  private onPointerUp = () => this._isDown.set(false);
+  private onPointerDown = () => this.#isDown.set(true);
+  private onPointerUp = () => this.#isDown.set(false);
   private onPointerMove = (e: PointerEvent) => {
-    this._position.set(new Vector(e.offsetX, e.offsetY));
+    this.#position.set(new Vector(e.offsetX, e.offsetY));
   };
 }
 
@@ -42,10 +42,8 @@ export class PointerForCamera extends Pointer {
     return this.#worldPosition();
   }
 
-  constructor(viewport: HTMLElement, camera: Camera) {
-    super(viewport);
-    this.#worldPosition = computed(() =>
-      camera.viewportToWorld(this._position.get()),
-    );
+  constructor(target: HTMLElement, camera: Camera) {
+    super(target);
+    this.#worldPosition = computed(() => camera.viewportToWorld(this.position));
   }
 }
