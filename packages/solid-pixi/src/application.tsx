@@ -1,6 +1,6 @@
 import { Application as PixiApplication } from "@mp/pixi";
 import type { JSX } from "solid-js";
-import { createEffect, onCleanup } from "solid-js";
+import { createResource, onCleanup } from "solid-js";
 import { ParentContext } from "./context";
 
 export interface ApplicationProps
@@ -17,21 +17,18 @@ export function Application(props: ApplicationProps) {
 
   const app = new PixiApplication();
 
-  createEffect(() => {
+  createResource(async () => {
     // We wait for the next tick to ensure that the viewport and canvas is in the DOM
-    const initPromise = nextTick().then(() =>
-      app.init({
-        antialias: true,
-        resizeTo: viewport,
-        roundPixels: true,
-        canvas,
-      }),
-    );
+    await nextTick();
 
-    onCleanup(async () => {
-      await initPromise;
-      app.destroy(undefined, { children: true });
+    await app.init({
+      antialias: true,
+      resizeTo: viewport,
+      roundPixels: true,
+      canvas,
     });
+
+    onCleanup(() => app.destroy(undefined, { children: true }));
   });
 
   return (
@@ -49,16 +46,9 @@ export function Application(props: ApplicationProps) {
 }
 
 const styles = {
-  content: {
-    position: "absolute",
-    inset: 0,
-  },
-  canvas: {
-    position: "absolute",
-  },
-  container: {
-    position: "relative",
-  },
+  content: { position: "absolute", inset: 0 },
+  canvas: { position: "absolute" },
+  container: { position: "relative" },
 } satisfies Record<string, JSX.CSSProperties>;
 
 const nextTick = () => new Promise((resolve) => setTimeout(resolve, 1000));
