@@ -18,12 +18,15 @@ export function Application(props: ApplicationProps) {
   const app = new PixiApplication();
 
   createEffect(() => {
-    const initPromise = app.init({
-      antialias: true,
-      resizeTo: viewport,
-      roundPixels: true,
-      canvas,
-    });
+    // We wait for the next tick to ensure that the viewport and canvas is in the DOM
+    const initPromise = nextTick().then(() =>
+      app.init({
+        antialias: true,
+        resizeTo: viewport,
+        roundPixels: true,
+        canvas,
+      }),
+    );
 
     onCleanup(async () => {
       await initPromise;
