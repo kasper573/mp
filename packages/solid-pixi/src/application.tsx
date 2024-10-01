@@ -32,14 +32,20 @@ export function Application(props: ApplicationProps) {
         return;
       }
 
-      await app.init({
+      const initPromise = app.init({
         antialias: true,
         resizeTo: viewport,
         roundPixels: true,
         canvas,
       });
 
-      onCleanup(() => app.destroy(undefined, { children: true }));
+      onCleanup(async () => {
+        await initPromise;
+        app.destroy(undefined, { children: true });
+      });
+
+      await initPromise;
+
       return true;
     },
   );
