@@ -83,7 +83,7 @@ jobs:
             rm base64.txt
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
-            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" > .env
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             docker compose pull
             docker compose --env-file .env up -d --remove-orphans
             docker compose run db-migrations
