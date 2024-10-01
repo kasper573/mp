@@ -70,8 +70,7 @@ export function AreaDebugUI(props: {
 
       const tilePos = tiled.worldCoordToTile(worldPosition);
       const text = [
-        `build (client): ${env.buildVersion}`,
-        `build (server): ${serverVersion.data}`,
+        `build: (client: ${env.buildVersion}, server: ${serverVersion.status})`,
         `viewport: ${vecToString(viewportPosition)}`,
         `world: ${vecToString(worldPosition)}`,
         `tile: ${vecToString(tilePos)}`,
