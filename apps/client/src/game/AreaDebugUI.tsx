@@ -9,9 +9,10 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import { createEffect, createSignal, useContext } from "solid-js";
+import { createEffect, createMemo, Show, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
+import type { Character } from "@mp/server";
 import { myCharacter, useServerVersion } from "../state/signals";
 import { env } from "../env";
 import * as styles from "./AreaDebugUI.css";
@@ -20,27 +21,41 @@ export function AreaDebugUI(props: {
   area: AreaResource;
   pathToDraw: Path | undefined;
 }) {
-  const [debugText, setDebugText] = createSignal("");
   const engine = useContext(EngineContext);
-  const gfx = new AreaDebugUIGraphics();
-  const serverVersion = useServerVersion();
+  const isVisible = createMemo(
+    () =>
+      engine.keyboard.keysHeld.has("Control") ||
+      engine.keyboard.keysHeld.has("Shift"),
+  );
+
+  return (
+    <Pixi label="AreaDebugUI" isRenderGroup>
+      <Show when={isVisible()}>
+        <DebugDGraph area={props.area} />
+        <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
+        <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+      </Show>
+    </Pixi>
+  );
+}
+
+function DebugDGraph(props: { area: AreaResource }) {
+  const gfx = new Graphics();
+  const engine = useContext(EngineContext);
+  const allTileCoords = createMemo(() =>
+    generateAllTileCoords(
+      props.area.tiled.map.width,
+      props.area.tiled.map.height,
+    ),
+  );
 
   createEffect(() => {
-    const { tiled, dGraph } = props.area;
-    const allTileCoords = generateAllTileCoords(
-      tiled.map.width,
-      tiled.map.height,
-    );
-
-    const {
-      pointer: { worldPosition, position: viewportPosition },
-      keyboard: { keysHeld },
-    } = engine;
-
     gfx.clear();
+    const { tiled, dGraph } = props.area;
+    const { keysHeld } = engine.keyboard;
 
     if (keysHeld.has("Control") && keysHeld.has("Shift")) {
-      for (const pos of allTileCoords) {
+      for (const pos of allTileCoords()) {
         drawDNode(gfx, tiled, dGraph, pos);
       }
     } else if (keysHeld.has("Control")) {
@@ -48,12 +63,10 @@ export function AreaDebugUI(props: {
         gfx,
         tiled,
         dGraph,
-        snapTileVector(tiled.worldCoordToTile(worldPosition)),
+        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
       );
-    }
-
-    if (keysHeld.has("Shift")) {
-      const tilePos = tiled.worldCoordToTile(worldPosition);
+    } else if (keysHeld.has("Shift")) {
+      const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
       drawDNode(
         gfx,
         tiled,
@@ -62,39 +75,44 @@ export function AreaDebugUI(props: {
         tiled.tileCoordToWorld(tilePos),
       );
     }
+  });
 
-    if (keysHeld.has("Shift") || keysHeld.has("Control")) {
-      if (props.pathToDraw?.length) {
-        drawPath(gfx, tiled, props.pathToDraw ?? []);
-      }
+  return <Pixi label="DGraphDebugUI" as={gfx} />;
+}
 
-      const tilePos = tiled.worldCoordToTile(worldPosition);
-      const text = [
-        `build: (client: ${env.buildVersion}, server: ${serverVersion.status})`,
-        `viewport: ${vecToString(viewportPosition)}`,
-        `world: ${vecToString(worldPosition)}`,
-        `tile: ${vecToString(tilePos)}`,
-        `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
-        `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-        `character: ${JSON.stringify(myCharacter(), null, 2)}`,
-        `fps deltaTime: ${engine.deltaTime.totalMilliseconds.toFixed(2)}ms`,
-      ].join("\n");
-      setDebugText(text);
-    } else {
-      setDebugText("");
+function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
+  const gfx = new Graphics();
+
+  createEffect(() => {
+    gfx.clear();
+    if (props.path?.length) {
+      drawPath(gfx, props.tiled, props.path);
     }
   });
 
-  return (
-    <Pixi as={gfx}>
-      <span class={styles.debugText({ visible: !!debugText() })}>
-        {debugText()}
-      </span>
-    </Pixi>
-  );
+  return <Pixi label="PathDebugUI" as={gfx} />;
 }
 
-class AreaDebugUIGraphics extends Graphics {}
+function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
+  const engine = useContext(EngineContext);
+  const serverVersion = useServerVersion();
+  const text = createMemo(() => {
+    const { worldPosition, position: viewportPosition } = engine.pointer;
+    const tilePos = props.tiled.worldCoordToTile(worldPosition);
+    return [
+      `build: (client: ${env.buildVersion}, server: ${serverVersion.data})`,
+      `viewport: ${vecToString(viewportPosition)}`,
+      `world: ${vecToString(worldPosition)}`,
+      `tile: ${vecToString(tilePos)}`,
+      `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
+      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
+      `character: ${JSON.stringify(trimCharacterInfo(myCharacter()), null, 2)}`,
+      `fps deltaTime: ${engine.deltaTime.totalMilliseconds.toFixed(2)}ms`,
+    ].join("\n");
+  });
+
+  return <span class={styles.debugText}>{text()}</span>;
+}
 
 function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
   const [start, ...rest] = path.map(tiled.tileCoordToWorld);
@@ -115,7 +133,7 @@ function drawDNode(
   tilePos: Vector,
   start = tiled.tileCoordToWorld(tilePos),
 ) {
-  for (const [neighbor, cost] of Object.entries(
+  for (const [neighbor] of Object.entries(
     graph[dNodeFromVector(tilePos)] ?? {},
   )) {
     const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
@@ -124,19 +142,8 @@ function drawDNode(
     ctx.lineTo(end.x, end.y);
     ctx.strokeStyle = { width: 2, color: "red" };
     ctx.stroke();
-
     ctx.strokeStyle = { width: 1, color: "black" };
-    //ctx.strokeText(costToString(cost!), end.x, end.y, 10);
   }
-}
-
-function costToString(cost: number): string {
-  const hasFractions = cost % 1 !== 0;
-  return hasFractions ? cost.toFixed(1) : cost.toString();
-}
-
-function vecToString(v: Vector): string {
-  return `(${v.x.toFixed(1)},${v.y.toFixed(1)})`;
 }
 
 function generateAllTileCoords(width: number, height: number): Vector[] {
@@ -147,4 +154,18 @@ function generateAllTileCoords(width: number, height: number): Vector[] {
     }
   }
   return result;
+}
+
+function trimCharacterInfo(char?: Character) {
+  return (
+    char && {
+      ...char,
+      coords: vecToString(char.coords),
+      path: char.path?.map(vecToString).join(" -> "),
+    }
+  );
+}
+
+function vecToString(v: Vector): string {
+  return `${v.x.toFixed(1)}, ${v.y.toFixed(1)}`;
 }
