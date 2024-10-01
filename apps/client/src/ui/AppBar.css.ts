@@ -1,14 +1,20 @@
-import { atoms, globalStyle, recipe, tokens } from "@mp/style";
+import { atoms, globalStyle, recipe, tokens, style } from "@mp/style";
 
-export const nav = atoms({
-  backgroundColor: "info.base",
-  color: "info.face",
+const row = atoms({
   display: "flex",
   flexDirection: "row",
   alignItems: "center",
   gap: "2xl",
-  padding: "xl",
 });
+
+export const nav = style([
+  row,
+  atoms({
+    backgroundColor: "info.base",
+    color: "info.face",
+    padding: "xl",
+  }),
+]);
 
 globalStyle(`${nav} a`, {
   color: "inherit",
@@ -17,12 +23,18 @@ globalStyle(`${nav} a`, {
   ...tokens.typography.body2,
 });
 
+export const right = style([
+  row,
+  atoms({
+    marginLeft: "auto",
+  }),
+]);
+
 export const connectionIndicator = recipe({
   base: atoms({
     width: "s",
     height: "s",
     borderRadius: "circle",
-    marginLeft: "auto",
     border: "thin",
   }),
   variants: {
