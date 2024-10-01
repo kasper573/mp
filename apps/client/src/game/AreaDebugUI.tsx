@@ -12,7 +12,10 @@ import { Graphics } from "@mp/pixi";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
+import { createQuery } from "@tanstack/solid-query";
 import { myCharacter } from "../state/signals";
+import { env } from "../env";
+import { api } from "../state/api";
 import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {
@@ -22,6 +25,11 @@ export function AreaDebugUI(props: {
   const [debugText, setDebugText] = createSignal("");
   const engine = useContext(EngineContext);
   const gfx = new AreaDebugUIGraphics();
+
+  const serverVersion = createQuery(() => ({
+    queryKey: ["server-version"],
+    queryFn: () => api.modules.system.buildVersion(),
+  }));
 
   createEffect(() => {
     const { tiled, dGraph } = props.area;
@@ -68,6 +76,8 @@ export function AreaDebugUI(props: {
 
       const tilePos = tiled.worldCoordToTile(worldPosition);
       const text = [
+        `build (client): ${env.buildVersion}`,
+        `build (server): ${serverVersion.data}`,
         `viewport: ${vecToString(viewportPosition)}`,
         `world: ${vecToString(worldPosition)}`,
         `tile: ${vecToString(tilePos)}`,

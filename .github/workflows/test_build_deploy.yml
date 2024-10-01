@@ -7,6 +7,7 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_USERNAME: ${{ github.actor }}
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+  BUILD_VERSION: ${{ github.run_number }}
 
 jobs:
   conventions:
@@ -42,6 +43,7 @@ jobs:
           NODE_ENV: production
           MP_SERVER_URL: wss://k573.dev
           MP_AUTH_PUBLISHABLE_KEY: ${{ secrets.AUTH_PUBLISHABLE_KEY }}
+          MP_BUILD_VERSION: ${{ env.BUILD_VERSION }}
 
       - name: Log in with Docker
         uses: docker/login-action@v3
@@ -81,6 +83,7 @@ jobs:
             rm base64.txt
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" > .env
             docker compose pull
             docker compose --env-file .env up -d --remove-orphans
             docker compose run db-migrations

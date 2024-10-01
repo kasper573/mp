@@ -4,4 +4,5 @@ export const env = {
   auth: {
     publishableKey: import.meta.env.MP_AUTH_PUBLISHABLE_KEY as string,
   },
+  buildVersion: import.meta.env.MP_BUILD_VERSION as string,
 };

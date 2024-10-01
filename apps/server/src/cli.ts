@@ -76,6 +76,11 @@ export function readCliOptions(argv = process.argv) {
       description: "The URL to the database",
       demandOption: true,
     })
+    .option("buildVersion", {
+      type: "string",
+      description: "The version of the build",
+      demandOption: true,
+    })
     .parseSync();
 
   // Remove some yargs internals

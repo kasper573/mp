@@ -64,6 +64,7 @@ async function main(opt: CliOptions) {
     defaultAreaId,
     state: world,
     createUrl,
+    buildVersion: opt.buildVersion,
   });
 
   const global = createGlobalModule(modules);
