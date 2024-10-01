@@ -188,6 +188,7 @@ function serverTextHeader(options: CliOptions) {
 #                ██║ ╚═╝ ██║ ██║                    #
 #                ╚═╝     ╚═╝ ╚═╝                    #
 =====================================================
+buildVersion: ${options.buildVersion}
 hostname: ${options.hostname}
 listenHostname: ${options.listenHostname}
 authSecretKey: ${options.authSecretKey ? "set" : "not set"}
