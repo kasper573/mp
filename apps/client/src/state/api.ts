@@ -10,12 +10,15 @@ import { AuthClient } from "@mp/auth/client";
 import { QueryClient } from "@tanstack/solid-query";
 import { env } from "../env";
 
+const staleTime = 60_000;
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      refetchOnWindowFocus: false,
-      refetchOnMount: false,
-      refetchOnReconnect: false,
+      refetchOnWindowFocus: true,
+      refetchOnMount: true,
+      refetchOnReconnect: true,
+      staleTime,
+      refetchInterval: env.mode === "production" ? staleTime : false,
     },
   },
 });
