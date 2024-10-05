@@ -2,7 +2,7 @@
 
 A retro, point and click, hack and slash online rpg.
 
-This is a pet project that I'm working on over the weekends over at https://www.twitch.tv/kasper_573. 
+This is a pet project that I'm working on over the weekends over at https://www.twitch.tv/kasper_573.
 
 I'm doing this project for fun and to teach myself more about multiplayer game development.
 
