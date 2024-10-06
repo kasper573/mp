@@ -5,7 +5,7 @@ import { createEffect, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import type { Vector } from "@mp/math";
 import { EngineContext } from "@mp/engine";
-import { getTilePosition } from "./getTilePosition";
+import { getTilePosition } from "../../state/getTilePosition";
 
 export interface TileHighlightProps {
   area: AreaResource;

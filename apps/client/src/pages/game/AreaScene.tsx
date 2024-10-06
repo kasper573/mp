@@ -6,17 +6,17 @@ import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
-import { api } from "../state/api";
-import { myCharacter } from "../state/signals";
+import { api } from "../../state/api";
+import { myCharacter } from "../../state/signals";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords";
+import { getTilePosition } from "../../state/getTilePosition";
+import { dedupe, throttle } from "../../state/functionComposition";
 import {
   AutoPositionedCharacterActor,
   ManuallyPositionedCharacterActor,
 } from "./CharacterActor";
-import { useAnimatedCoords } from "./useAnimatedCoords";
 import { TileHighlight } from "./TileHighlight";
-import { getTilePosition } from "./getTilePosition";
 import { AreaDebugUI } from "./AreaDebugUI";
-import { dedupe, throttle } from "./functionComposition";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);

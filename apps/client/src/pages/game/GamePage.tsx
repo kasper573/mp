@@ -1,13 +1,24 @@
 import { useAuthState } from "@mp/auth/client";
 import { Application } from "@mp/solid-pixi";
-import { Match, Switch } from "solid-js";
+import { Match, Switch, Show, createMemo } from "solid-js";
 import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
-import { Game } from "../../game/Game";
+import { createQuery } from "@tanstack/solid-query";
+import { loadAreaResource } from "../../state/loadAreaResource";
+import { myCharacter } from "../../state/signals";
 import * as styles from "./GamePage.css";
+import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const { isSignedIn } = useAuthState();
+  const areaId = createMemo(() => myCharacter()?.areaId);
+  const query = createQuery(() => {
+    const id = areaId();
+    return {
+      queryKey: ["area", id],
+      queryFn: () => (id ? loadAreaResource(id) : null),
+    };
+  });
 
   return (
     <Switch>
@@ -15,7 +26,9 @@ export default function GamePage() {
         <Application class={styles.container}>
           {({ viewport }) => (
             <EngineProvider viewport={viewport}>
-              <Game />
+              <Show when={query.data} keyed>
+                {(data) => <AreaScene area={data} />}
+              </Show>
             </EngineProvider>
           )}
         </Application>
