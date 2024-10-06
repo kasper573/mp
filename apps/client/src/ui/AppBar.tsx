@@ -19,6 +19,7 @@ export default function AppBar() {
     <nav class={styles.nav}>
       <Link href="/">Home</Link>
       <Link href="/play">Play</Link>
+      <Link href="/spring">Spring</Link>
 
       <LinearProgress class={dock({ position: "top" })} active={isRouting()} />
 

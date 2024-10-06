@@ -3,6 +3,7 @@ import { lazy } from "solid-js";
 
 export const routes: RouteDefinition[] = [
   { path: "/play", component: lazy(() => import("./pages/game/GamePage")) },
+  { path: "/spring", component: lazy(() => import("./pages/SpringTester")) },
   { path: "/", component: lazy(() => import("./pages/HomePage")) },
   { path: "*404", component: lazy(() => import("./pages/NotFound")) },
 ];

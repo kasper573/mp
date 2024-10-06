@@ -1,10 +1,11 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createEffect, Index, createMemo, Show } from "solid-js";
+import { useContext, createEffect, Index, Show, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
-import { EngineContext } from "@mp/engine";
+import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
+import { Vector } from "@mp/math";
 import { api } from "../state/api";
 import { myCharacter } from "../state/signals";
 import {
@@ -28,8 +29,16 @@ export function AreaScene(props: { area: AreaResource }) {
   const myCoords = useAnimatedCoords(myCharacter);
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
-    return coords ? props.area.tiled.tileCoordToWorld(coords) : undefined;
+    return coords ? props.area.tiled.tileCoordToWorld(coords) : Vector.zero;
   });
+  const cameraPos = useSpring(
+    new VectorSpring(myWorldPos, () => ({
+      stiffness: 80,
+      damping: 40,
+      mass: 1,
+      precision: 0.1,
+    })),
+  );
 
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
@@ -39,7 +48,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    engine.camera.update(props.area.tiled.mapSize, myWorldPos());
+    engine.camera.update(props.area.tiled.mapSize, cameraPos());
   });
 
   return (
