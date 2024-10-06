@@ -9,10 +9,19 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import { createEffect, createMemo, Show, useContext } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+  useContext,
+} from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
+import type { TimeSpan } from "@mp/time";
 import { myCharacter, useServerVersion } from "../state/signals";
 import { env } from "../env";
 import * as styles from "./AreaDebugUI.css";
@@ -96,6 +105,10 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
 function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
+  const [deltaTime, setDeltaTime] = createSignal<TimeSpan>();
+
+  onMount(() => onCleanup(engine.addFrameCallback(setDeltaTime)));
+
   const text = createMemo(() => {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
@@ -107,7 +120,8 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       `character: ${JSON.stringify(trimCharacterInfo(myCharacter()), null, 2)}`,
-      `fps deltaTime: ${engine.deltaTime.totalMilliseconds.toFixed(2)}ms`,
+      `frame time: ${deltaTime()?.totalMilliseconds.toFixed(2)}ms`,
+      `frame callbacks: ${engine.frameCallbackCount}`,
     ].join("\n");
   });
 

@@ -1,16 +1,21 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createEffect, Index } from "solid-js";
+import { useContext, createEffect, Index, createMemo, Show } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import { api } from "../state/api";
 import { myCharacter } from "../state/signals";
-import { CharacterActor } from "./CharacterActor";
+import {
+  AutoPositionedCharacterActor,
+  ManuallyPositionedCharacterActor,
+} from "./CharacterActor";
+import { useAnimatedCoords } from "./useAnimatedCoords";
 import { TileHighlight } from "./TileHighlight";
 import { getTilePosition } from "./getTilePosition";
 import { AreaDebugUI } from "./AreaDebugUI";
+import { dedupe, throttle } from "./functionComposition";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
@@ -20,6 +25,12 @@ export function AreaScene(props: { area: AreaResource }) {
     queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
+  const myCoords = useAnimatedCoords(myCharacter);
+  const myWorldPos = createMemo(() => {
+    const coords = myCoords();
+    return coords ? props.area.tiled.tileCoordToWorld(coords) : undefined;
+  });
+
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
@@ -28,11 +39,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    const me = myCharacter();
-    engine.camera.update(
-      props.area.tiled.mapSize,
-      me ? props.area.tiled.tileCoordToWorld(me.coords) : undefined,
-    );
+    engine.camera.update(props.area.tiled.mapSize, myWorldPos());
   });
 
   return (
@@ -51,7 +58,25 @@ export function AreaScene(props: { area: AreaResource }) {
           {{
             [props.area.characterLayer.name]: () => (
               <Index each={Array.from(api.state.characters.values())}>
-                {(char) => <CharacterActor char={char} area={props.area} />}
+                {(char) => {
+                  const isMe = () => char().id === myCharacter()?.id;
+                  return (
+                    <>
+                      <Show when={isMe()}>
+                        <ManuallyPositionedCharacterActor
+                          tileSize={props.area.tiled.tileSize}
+                          position={myWorldPos()}
+                        />
+                      </Show>
+                      <Show when={!isMe()}>
+                        <AutoPositionedCharacterActor
+                          tiled={props.area.tiled}
+                          char={char()}
+                        />
+                      </Show>
+                    </>
+                  );
+                }}
               </Index>
             ),
           }}
@@ -66,32 +91,3 @@ export function AreaScene(props: { area: AreaResource }) {
 const throttledMove = dedupe(throttle(api.modules.world.move, 100), (a, b) =>
   a.equals(b),
 );
-
-function throttle<T extends (...args: never[]) => unknown>(
-  fn: T,
-  ms: number,
-): (...args: Parameters<T>) => void {
-  let last = 0;
-  return (...args: Parameters<T>) => {
-    const now = Date.now();
-    if (now - last > ms) {
-      last = now;
-      fn(...args);
-    }
-  };
-}
-
-function dedupe<Input, Output>(
-  fn: (input: Input) => Output,
-  isEqual: (a: Input, b: Input) => boolean,
-): (input: Input) => Output {
-  let previous: { input: Input; output: Output } | undefined;
-  return (input: Input): Output => {
-    if (previous && isEqual(previous.input, input)) {
-      return previous.output;
-    }
-    const output = fn(input);
-    previous = { input, output };
-    return output;
-  };
-}

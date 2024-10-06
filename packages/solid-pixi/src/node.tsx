@@ -10,6 +10,7 @@ export interface PixiProps extends ParentProps {
   matrix?: number[];
   isRenderGroup?: boolean;
   sortableChildren?: boolean;
+  position?: { x: number; y: number };
   label?: string;
 }
 
@@ -27,6 +28,12 @@ export function Pixi(props: PixiProps) {
     instance.isRenderGroup = props.isRenderGroup ?? false;
     instance.sortableChildren = props.sortableChildren ?? false;
     instance.label = props.label ?? "";
+  });
+
+  createEffect(() => {
+    if (props.position) {
+      instance.position.set(props.position.x, props.position.y);
+    }
   });
 
   createEffect(() => {

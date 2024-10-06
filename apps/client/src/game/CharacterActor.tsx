@@ -2,45 +2,44 @@ import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { Character } from "@mp/server";
-import type { AreaResource } from "@mp/data";
-import type { Accessor } from "solid-js";
-import { createEffect, useContext } from "solid-js";
-import { EngineContext } from "@mp/engine";
-import { Interpolator } from "./Interpolator";
+import type { TiledResource } from "@mp/data";
+import { createEffect, Show } from "solid-js";
+import { useAnimatedCoords } from "./useAnimatedCoords";
 
-export function CharacterActor(props: {
-  char: Accessor<Character>;
-  area: AreaResource;
+export function AutoPositionedCharacterActor(props: {
+  tiled: TiledResource;
+  char: Character;
 }) {
-  const engine = useContext(EngineContext);
-  const gfx = new CharacterActorGraphics();
-  const lerp = new Interpolator(gfx);
-
-  createEffect(() => {
-    const { tiled } = props.area;
-    const { path, coords, speed, id } = props.char();
-
-    gfx.label = id;
-
-    gfx.update(tiled.tileSize);
-    lerp.configure(tiled.tileCoordToWorld(coords), {
-      path: path?.map(tiled.tileCoordToWorld) ?? [],
-      speed: tiled.tileUnitToWorld(speed),
-    });
-  });
-
-  createEffect(() => {
-    lerp.update(engine.deltaTime);
-  });
-
-  return <Pixi as={gfx} />;
+  const coords = useAnimatedCoords(() => props.char);
+  return (
+    <Show when={coords()}>
+      {(coords) => (
+        <ManuallyPositionedCharacterActor
+          tileSize={props.tiled.tileSize}
+          position={props.tiled.tileCoordToWorld(coords())}
+        />
+      )}
+    </Show>
+  );
 }
 
-class CharacterActorGraphics extends Graphics {
-  update(tileSize: Vector) {
-    this.clear();
-    this.fillStyle.color = 0x00ff00;
-    this.rect(-tileSize.x / 2, -tileSize.y / 2, tileSize.x, tileSize.y);
-    this.fill();
-  }
+export function ManuallyPositionedCharacterActor(props: {
+  tileSize: Vector;
+  position?: Vector;
+}) {
+  const gfx = new Graphics();
+
+  createEffect(() => {
+    const { x: width, y: height } = props.tileSize;
+    gfx.clear();
+    gfx.fillStyle.color = 0x00ff00;
+    gfx.rect(-width / 2, -height / 2, width, height);
+    gfx.fill();
+  });
+
+  return (
+    <Show when={props.position}>
+      {(pos) => <Pixi label="CharacterActor" as={gfx} position={pos()} />}
+    </Show>
+  );
 }

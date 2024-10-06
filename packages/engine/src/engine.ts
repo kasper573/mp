@@ -1,6 +1,5 @@
 import type { Size } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import { atom } from "@mp/state";
 import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
@@ -8,15 +7,16 @@ import { Keyboard } from "./keyboard";
 export class Engine {
   #previousFrame = performance.now();
   #isRunning = false;
-  #deltaTime = atom(TimeSpan.fromMilliseconds(0));
   pointer: PointerForCamera;
   keyboard: Keyboard;
   #viewportSizeObserver?: ResizeObserver;
+  #frameCallbacks = new Set<(deltaTime: TimeSpan) => void>();
+
+  get frameCallbackCount() {
+    return this.#frameCallbacks.size;
+  }
 
   readonly camera: Camera;
-  get deltaTime(): TimeSpan {
-    return this.#deltaTime.get();
-  }
 
   constructor(private readonly viewport: HTMLElement) {
     this.camera = new Camera(elementSize(viewport), 2, 3);
@@ -41,13 +41,23 @@ export class Engine {
     this.#viewportSizeObserver = undefined;
   }
 
+  // Note: Explicit callback based frame reactivity because implicit
+  // reactivity for rendering is error prone and hard to reason about.
+  addFrameCallback(callback: (deltaTime: TimeSpan) => void) {
+    this.#frameCallbacks.add(callback);
+    return () => this.#frameCallbacks.delete(callback);
+  }
+
   private nextFrame: FrameRequestCallback = () => {
     const thisFrame = performance.now();
     const deltaTime = TimeSpan.fromMilliseconds(
       thisFrame - this.#previousFrame,
     );
     this.#previousFrame = thisFrame;
-    this.#deltaTime.set(deltaTime);
+
+    for (const callback of this.#frameCallbacks) {
+      callback(deltaTime);
+    }
 
     if (this.#isRunning) {
       requestAnimationFrame(this.nextFrame);

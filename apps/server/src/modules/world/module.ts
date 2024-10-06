@@ -30,7 +30,15 @@ export function createWorldModule({
       .create(({ input: delta }) => {
         for (const char of state.characters.values()) {
           if (char.path) {
-            moveAlongPath(char.coords, char.path, char.speed, delta);
+            const { destinationReached } = moveAlongPath(
+              char.coords,
+              char.path,
+              char.speed,
+              delta,
+            );
+            if (destinationReached) {
+              char.path = undefined;
+            }
           }
 
           const area = areas.get(char.areaId);
@@ -42,7 +50,7 @@ export function createWorldModule({
               if (targetArea) {
                 char.areaId = targetArea.id;
                 char.coords = targetArea.start.copy();
-                char.path = [];
+                char.path = undefined;
               }
             }
           }
