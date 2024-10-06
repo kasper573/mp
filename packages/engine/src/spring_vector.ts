@@ -1,6 +1,7 @@
 import { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import type { Computed } from "@mp/state";
+import { batch } from "@mp/state";
 import { computed } from "@mp/state";
 import type { SpringLike, SpringOptions } from "./spring";
 import { Spring } from "./spring";
@@ -29,7 +30,9 @@ export class VectorSpring implements SpringLike<Vector> {
       : "moving";
 
   update = (dt: TimeSpan) => {
-    this.xSpring.update(dt);
-    this.ySpring.update(dt);
+    batch(() => {
+      this.xSpring.update(dt);
+      this.ySpring.update(dt);
+    });
   };
 }

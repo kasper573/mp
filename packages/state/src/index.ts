@@ -11,7 +11,7 @@ export function atom<T>(initial: T): Atom<T> {
   return { get, set };
 }
 
-export { createMemo as computed } from "solid-js";
+export { createMemo as computed, batch } from "solid-js";
 export { produce } from "immer";
 
 export interface Atom<T> {

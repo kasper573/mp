@@ -1,5 +1,5 @@
 import type { Computed } from "@mp/state";
-import { atom, computed } from "@mp/state";
+import { atom, computed, batch } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring implements SpringLike<number> {
@@ -33,13 +33,15 @@ export class Spring implements SpringLike<number> {
     const dampingForce = -damping * this.velocity.get();
     const acceleration = (force + dampingForce) / mass;
 
-    this.velocity.set((prev) => prev + acceleration * dt.totalSeconds);
-    this.#value.set((prev) => prev + this.velocity.get() * dt.totalSeconds);
+    batch(() => {
+      this.velocity.set((prev) => prev + acceleration * dt.totalSeconds);
+      this.#value.set((prev) => prev + this.velocity.get() * dt.totalSeconds);
 
-    if (this.state() === "settled") {
-      this.#value.set(currentTarget);
-      this.velocity.set(0);
-    }
+      if (this.state() === "settled") {
+        this.#value.set(currentTarget);
+        this.velocity.set(0);
+      }
+    });
   };
 }
 
