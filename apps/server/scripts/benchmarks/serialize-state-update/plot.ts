@@ -32,8 +32,7 @@ if (require.main === module) {
   }
 }
 
-type CLIOptions = ReturnType<typeof readCliOptions>;
-export function readCliOptions(argv = process.argv) {
+function readCliOptions(argv = process.argv) {
   return yargs(hideBin(argv))
     .option("implementation", {
       alias: "i",

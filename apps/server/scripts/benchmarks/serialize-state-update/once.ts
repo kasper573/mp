@@ -1,19 +1,19 @@
-import { Vector } from "@mp/math";
 import type { AreaId } from "@mp/data";
-import { hideBin } from "yargs/helpers";
-import yargs from "yargs";
 import { Logger } from "@mp/logger";
-import {
-  serialization,
-  type Character,
-  type CharacterId,
-  type WorldState,
-} from "../../../src/package";
-import { jsonSerialization } from "../../../src/jsonSerialization";
+import { Vector } from "@mp/math";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
+import { cborSerialization } from "../../../src/serialization/cbor";
+import { jsonSerialization } from "../../../src/serialization/json";
+import type {
+  Character,
+  CharacterId,
+  WorldState,
+} from "../../../src/modules/world/schema";
 
 export const implementations = {
   json: jsonSerialization.stateUpdate.serialize,
-  cbor: serialization.stateUpdate.serialize,
+  cbor: cborSerialization.stateUpdate.serialize,
 } satisfies Record<string, StateSerializer>;
 
 type ImplementationName = keyof typeof implementations;
@@ -91,7 +91,6 @@ function range(n: number): number[] {
   return Array.from({ length: n }, (_, i) => i);
 }
 
-type CLIOptions = ReturnType<typeof readCliOptions>;
 export function readCliOptions(argv = process.argv) {
   return yargs(hideBin(argv))
     .option("stateSize", {

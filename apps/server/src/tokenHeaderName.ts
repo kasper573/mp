@@ -1,0 +1,1 @@
+export const tokenHeaderName = "token";

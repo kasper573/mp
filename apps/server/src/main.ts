@@ -16,12 +16,12 @@ import { createModules } from "./modules/definition";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import type { WorldState } from "./modules/world/schema";
-import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
+import { serialization } from "./serialization/selected";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
