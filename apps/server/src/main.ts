@@ -58,8 +58,6 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
-  expressApp.get("/ping", (_, res) => res.sendStatus(200));
-
   const clients = new ClientRegistry();
   const modules = createModules({
     areas: areas.value,

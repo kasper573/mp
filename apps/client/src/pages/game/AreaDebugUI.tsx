@@ -22,7 +22,7 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
-import { myCharacter, ping, useServerVersion } from "../../state/signals";
+import { myCharacter, useServerVersion } from "../../state/signals";
 import { env } from "../../env";
 import { api } from "../../state/api";
 import * as styles from "./AreaDebugUI.css";
@@ -124,7 +124,6 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `character: ${JSON.stringify(trimCharacterInfo(myCharacter()), null, 2)}`,
       `frame time: ${deltaTime()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
-      `ping: ${ping().totalMilliseconds}ms`,
       `server tick: ${serverTick().toFixed(2)}ms`,
     ].join("\n");
   });
