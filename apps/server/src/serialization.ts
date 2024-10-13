@@ -4,19 +4,14 @@ import type { SocketIO_DTO } from "@mp/network/server";
 import { Vector } from "@mp/math";
 import type { ClientStateUpdate } from "./context";
 
-const vectorTag = 9001;
-cborTransformer.registerEncoder(Vector, ({ x, y }) => [vectorTag, [x, y]]);
-cborTransformer.registerDecoder(vectorTag, (tag) => {
-  const [x, y] = tag.contents as [number, number];
-  return new Vector(x, y);
+cborTransformer.registerTag(9001, Vector, {
+  encode: ({ x, y }) => [x, y],
+  decode: ([x, y]) => new Vector(x, y),
 });
 
-const mapTag = 9002;
-cborTransformer.registerEncoder(Map, (map) => {
-  return [mapTag, [...map.entries()]];
-});
-cborTransformer.registerDecoder(mapTag, (tag) => {
-  return new Map(tag.contents as Array<[unknown, unknown]>);
+cborTransformer.registerTag(9002, Map, {
+  encode: (map) => [...map.entries()],
+  decode: (entries) => new Map(entries),
 });
 
 export const serialization = {
