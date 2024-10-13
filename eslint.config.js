@@ -97,6 +97,9 @@ export default tseslint.config(
 
       // Ternary bad
       "unicorn/prefer-ternary": "off",
+
+      // Collides with prettier
+      "unicorn/number-literal-case": "off",
     },
   },
 );
