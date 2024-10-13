@@ -29,7 +29,7 @@ export type SocketIO_DTOSerializer<T = any> = (value: T) => SocketIO_DTO<T>;
 export type SocketIO_DTOParser<T = any> = (data: SocketIO_DTO<T>) => T;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type SocketIO_DTO<T = any> = (Uint8Array | string) & {
+export type SocketIO_DTO<T = any> = (ArrayBuffer | string) & {
   T?: T;
   __brand__: "SocketIO_DTO";
 };

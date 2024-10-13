@@ -13,6 +13,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "cbor2": "1.7.0",
     "pako": "2.1.0",
     "superjson": "2.2.1"
   },
