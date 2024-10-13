@@ -16,7 +16,8 @@
     "db:reset": "drizzle-kit generate && drizzle-kit push",
     "db:migrate": "drizzle-kit migrate",
     "benchmark": "tsx scripts/benchmarks/serialize-state-update/once.ts",
-    "benchmark:plot": "tsx scripts/benchmarks/serialize-state-update/plot.ts"
+    "benchmark:plot": "tsx scripts/benchmarks/serialize-state-update/plot.ts",
+    "benchmark:snapshot": "tsx scripts/benchmarks/serialize-state-update/snapshot.ts"
   },
   "dependencies": {
     "@mp/logger": "workspace:*",

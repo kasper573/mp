@@ -25,8 +25,15 @@ export function benchmark(
   iterations: number,
   implementation: ImplementationName,
 ) {
+  return benchmarkState(generateState(stateSize), iterations, implementation);
+}
+
+export function benchmarkState(
+  state: WorldState,
+  iterations: number,
+  implementation: ImplementationName,
+) {
   const serialize = implementations[implementation];
-  const state = generateState(stateSize);
   const size = serializedSize(serialize(state));
 
   const times: number[] = [];
