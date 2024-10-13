@@ -58,6 +58,8 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
+  expressApp.get("/ping", (_, res) => res.sendStatus(200));
+
   const clients = new ClientRegistry();
   const modules = createModules({
     areas: areas.value,
@@ -97,7 +99,7 @@ async function main(opt: CliOptions) {
     try {
       await global.tick({ input: tickDelta, context: tickContext });
 
-      for (const [clientId, stateUpdate] of getStateUpdates()) {
+      for (const [clientId, stateUpdate] of getStateUpdates(tickDelta)) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
     } catch (error) {
@@ -112,8 +114,8 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function* getStateUpdates() {
-    const state = getClientWorldState(world);
+  function* getStateUpdates(tickDelta: TimeSpan) {
+    const state = getClientWorldState(world, tickDelta);
 
     for (const characterId of world.characters.keys()) {
       for (const clientId of clients.getClientIds(characterId)) {
@@ -122,8 +124,12 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function getClientWorldState(world: WorldState): WorldState {
+  function getClientWorldState(
+    world: WorldState,
+    tickDelta: TimeSpan,
+  ): WorldState {
     return {
+      serverTick: tickDelta.totalMilliseconds,
       characters: new Map(
         [...world.characters.entries()].filter(([id]) =>
           clients.hasCharacter(id),

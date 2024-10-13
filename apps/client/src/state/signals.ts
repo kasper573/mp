@@ -1,6 +1,7 @@
 import type { CharacterId } from "@mp/server";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
+import { TimeSpan } from "@mp/time";
 import { env } from "../env";
 import { api } from "./api";
 
@@ -11,6 +12,8 @@ export const [myCharacterId, setMyCharacterId] = createSignal<
 export const myCharacter = createMemo(() =>
   api.state.characters.get(myCharacterId()!),
 );
+
+export const [ping, setPing] = createSignal(TimeSpan.fromMilliseconds(0));
 
 createEffect(() => {
   if (api.connected) {
@@ -39,3 +42,19 @@ export const useVersionCompatibility = () => {
 
   return compatibility;
 };
+
+async function updatePing() {
+  try {
+    const start = performance.now();
+    const res = await fetch(`http://localhost:4000/ping`);
+    await res.text();
+    const end = performance.now();
+    setPing(TimeSpan.fromMilliseconds(end - start));
+  } finally {
+    setTimeout(() => {
+      void updatePing();
+    }, 1000);
+  }
+}
+
+void updatePing();

@@ -44,6 +44,8 @@ function applyStateUpdate(state: ClientState, update: ClientStateUpdate) {
   const prevCharacterIds = new Set(state.characters.keys());
   const nextCharacterIds = new Set(update.characters.keys());
 
+  state.serverTick = update.serverTick;
+
   for (const removedId of prevCharacterIds.difference(nextCharacterIds)) {
     state.characters.delete(removedId);
   }

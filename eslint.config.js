@@ -77,6 +77,7 @@ export default tseslint.config(
       "unicorn/no-array-callback-reference": "off",
       "unicorn/prefer-global-this": "off",
       "unicorn/filename-case": "off",
+      "unicorn/no-array-reduce": "off",
 
       // Typescript already catches these type of errors
       "unicorn/switch-case-braces": "off",
