@@ -1,7 +1,7 @@
-import { Clerk as AuthClient } from "@clerk/clerk-js/headless";
+import type { Clerk as AuthClient } from "@clerk/clerk-js/headless";
 import { createContext, createSignal, onCleanup, useContext } from "solid-js";
 
-export { AuthClient };
+
 
 export const AuthContext = createContext<AuthClient>(
   new Proxy({} as AuthClient, {
@@ -23,3 +23,5 @@ export function useAuthState() {
     isSignedIn,
   };
 }
+
+export {Clerk as AuthClient} from "@clerk/clerk-js/headless";

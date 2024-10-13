@@ -1,4 +1,4 @@
-import path from "path";
+import path from "node:path";
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
 import { TimeSpan } from "@mp/time";

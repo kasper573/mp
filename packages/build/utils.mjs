@@ -1,5 +1,5 @@
-import * as fs from "fs";
-import * as path from "path";
+import * as fs from "node:fs";
+import path from "node:path";
 
 /**
  * @param {string} projectRoot
@@ -8,7 +8,7 @@ import * as path from "path";
 export function inferInternalPackages(projectRoot) {
   const packageJsonString = fs.readFileSync(
     path.resolve(projectRoot, "package.json"),
-    "utf-8",
+    "utf8",
   );
   /**
    * @type {unknown}

@@ -3,18 +3,20 @@ import { atom } from "@mp/state";
 export class Keyboard {
   readonly #keysHeld = atom(new Set<KeyName>());
 
+  constructor(private window: Window) {}
+
   get keysHeld(): ReadonlySet<KeyName> {
     return this.#keysHeld.get();
   }
 
   start() {
-    window.addEventListener("keydown", this.onDown);
-    window.addEventListener("keyup", this.onUp);
+    this.window.addEventListener("keydown", this.onDown);
+    this.window.addEventListener("keyup", this.onUp);
   }
 
   stop() {
-    window.removeEventListener("keydown", this.onDown);
-    window.removeEventListener("keyup", this.onUp);
+    this.window.removeEventListener("keydown", this.onDown);
+    this.window.removeEventListener("keyup", this.onUp);
   }
 
   private onDown = (e: KeyboardEvent) => {

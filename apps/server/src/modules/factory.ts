@@ -13,7 +13,7 @@ export const t = new Factory<ServerContext>({
     if (clientId) {
       try {
         await globalRequestLimit.consume(clientId);
-      } catch (e) {
+      } catch {
         throw new Error("Rate limit exceeded");
       }
       return next(req);

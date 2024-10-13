@@ -16,18 +16,24 @@ export * from "./renderer";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {
-    case "ellipse":
+    case "ellipse": {
       return createEllipseGraphics(obj);
-    case "point":
+    }
+    case "point": {
       return createPointGraphics(obj);
-    case "polygon":
+    }
+    case "polygon": {
       return createPolygonGraphics(obj);
-    case "polyline":
+    }
+    case "polyline": {
       return createPolylineGraphics(obj);
-    case "text":
+    }
+    case "text": {
       return createTextRenderer(obj);
-    case "rectangle":
+    }
+    case "rectangle": {
       return createRectangleGraphics(obj);
+    }
   }
 }
 

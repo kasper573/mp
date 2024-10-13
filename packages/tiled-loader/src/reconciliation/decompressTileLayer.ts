@@ -40,7 +40,7 @@ export function decompressTileLayer(
 
   const tileLookup = new Map(
     map.tilesets.flatMap((tileset) =>
-      Array.from(tileset.tiles.values()).map((tile) => {
+      [...tileset.tiles.values()].map((tile) => {
         const gid = localToGlobalId(tileset.firstgid, tile.id);
         return [gid, { tile, tileset }] as const;
       }),

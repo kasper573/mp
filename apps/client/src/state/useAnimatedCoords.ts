@@ -39,7 +39,7 @@ export function useAnimatedCoords(
     const { coords, path, speed } = c;
 
     const newCoords = new Vector(coords.x, coords.y);
-    const newPath = path.slice();
+    const newPath = [...path];
     const { destinationReached } = moveAlongPath(
       newCoords,
       newPath,

@@ -89,7 +89,7 @@ export function createWorldModule({
       const characterId = await auth(context);
 
       let player = state.characters.get(characterId);
-      if (!player) {
+      if (player === undefined) {
         context.logger.info("Character created", characterId);
 
         const area = areas.get(defaultAreaId);

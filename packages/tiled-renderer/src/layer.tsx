@@ -24,12 +24,12 @@ export class LayerViewFactory {
     });
 
     // layers are already in the draw order in the tiled data
-    layers.forEach((layer, index) => {
+    for (const [index, layer] of layers.entries()) {
       const view = this.createLayerView(layer);
       memorizeLayer(view, layer);
       view.label = `${layer.type}: "${layer.name}"`;
       container.addChildAt(view, index);
-    });
+    }
 
     return container;
   }

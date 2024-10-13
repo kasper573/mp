@@ -25,8 +25,17 @@ export async function reconcileTileset(
 
   tileset.image = reconcileFilePath(context, tileset.image);
 
-  tileset.terrains?.forEach(reconcileProperties);
-  tileset.wangsets?.forEach(reconcileProperties);
+  if (tileset.terrains) {
+    for (const terrain of tileset.terrains) {
+      reconcileProperties(terrain);
+    }
+  }
+
+  if (tileset.wangsets) {
+    for (const wangset of tileset.wangsets) {
+      reconcileProperties(wangset);
+    }
+  }
 
   // The original tileset data is a list of tiles, but we want them mapped by GID
   const tiles = new Map<LocalTileId, TilesetTile>();

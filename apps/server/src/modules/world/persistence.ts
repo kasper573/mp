@@ -8,14 +8,14 @@ export async function persistWorldState(
 ): Promise<Result<void, unknown>> {
   try {
     await db.transaction((tx) =>
-      Promise.all([
-        ...Array.from(state.characters.values()).map((char) => {
+      Promise.all(
+        [...state.characters.values()].map((char) => {
           return tx.insert(characterTable).values(char).onConflictDoUpdate({
             target: characterTable.id,
             set: char,
           });
         }),
-      ]),
+      ),
     );
     return ok(void 0);
   } catch (error) {

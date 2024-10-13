@@ -1,4 +1,6 @@
-import { createClerkClient as createAuthClient } from "@clerk/clerk-sdk-node";
+import type { createClerkClient as createAuthClient } from "@clerk/clerk-sdk-node";
 
-export { createAuthClient };
+
 export type AuthClient = ReturnType<typeof createAuthClient>;
+
+export {createClerkClient as createAuthClient} from "@clerk/clerk-sdk-node";

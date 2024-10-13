@@ -1,6 +1,8 @@
+#!/usr/bin/env node
+
 import "dotenv-flow/config";
-import path from "path";
-import http from "http";
+import path from "node:path";
+import http from "node:http";
 import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
@@ -37,7 +39,7 @@ async function main(opt: CliOptions) {
     process.exit(1);
   }
 
-  const defaultAreaId = Array.from(areas.value.keys())[0];
+  const defaultAreaId = [...areas.value.keys()][0];
   const result = await loadWorldState(db);
   if (result.isErr()) {
     logger.error("Failed to load world state", result.error);
@@ -123,7 +125,7 @@ async function main(opt: CliOptions) {
   function getClientWorldState(world: WorldState): WorldState {
     return {
       characters: new Map(
-        Array.from(world.characters.entries()).filter(([id]) =>
+        [...world.characters.entries()].filter(([id]) =>
           clients.hasCharacter(id),
         ),
       ),

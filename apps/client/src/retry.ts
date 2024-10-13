@@ -9,9 +9,9 @@ export async function tryUntilSuccess(
   for (let n = 0; n <= lastAttempt; n++) {
     try {
       await operation();
-    } catch (e) {
+    } catch (error) {
       if (n === lastAttempt) {
-        throw e;
+        throw error;
       }
 
       await wait(options.delay);

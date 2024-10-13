@@ -6,7 +6,7 @@ import { api } from "./api";
 
 export const [myCharacterId, setMyCharacterId] = createSignal<
   CharacterId | undefined
->(undefined);
+>();
 
 export const myCharacter = createMemo(() =>
   api.state.characters.get(myCharacterId()!),

@@ -1,5 +1,5 @@
-import path from "path";
-import fs from "fs/promises";
+import path from "node:path";
+import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
 import { type Result, ok, err } from "@mp/state";
 import { AreaResource } from "@mp/data";

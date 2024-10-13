@@ -36,7 +36,7 @@ async function loadTilesetSpritesheet(
   tileset: Tileset,
   tileSize: { width: number; height: number },
 ): Promise<TiledSpritesheet> {
-  const tiles = Array.from(tileset.tiles.values());
+  const tiles = [...tileset.tiles.values()];
 
   const animationsWithDuration = new Map(
     tiles
@@ -60,7 +60,7 @@ async function loadTilesetSpritesheet(
       scale: 1,
     },
     animations: Object.fromEntries(
-      Array.from(animationsWithDuration.entries()).map(([id, frames]) => [
+      [...animationsWithDuration.entries()].map(([id, frames]) => [
         String(id),
         frames.map((frame) => String(frame.id)),
       ]),

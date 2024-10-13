@@ -6,6 +6,7 @@ import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import solid from "eslint-plugin-solid/configs/typescript";
 import * as tsParser from "@typescript-eslint/parser";
 import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
+import eslintPluginUnicorn from "eslint-plugin-unicorn";
 
 export default tseslint.config(
   {
@@ -66,6 +67,35 @@ export default tseslint.config(
       parserOptions: {
         project: "tsconfig.json",
       },
+    },
+  },
+  eslintPluginUnicorn.configs["flat/recommended"],
+  {
+    rules: {
+      // I don't mind these
+      "unicorn/prevent-abbreviations": "off",
+      "unicorn/no-array-callback-reference": "off",
+      "unicorn/prefer-global-this": "off",
+      "unicorn/filename-case": "off",
+
+      // Typescript already catches these type of errors
+      "unicorn/switch-case-braces": "off",
+
+      // Sometimes null has to be used
+      "unicorn/no-null": "off",
+
+      // Gives false negatives, warns about non DOM functions
+      "unicorn/prefer-dom-node-remove": "off",
+      "unicorn/require-array-join-separator": "off",
+
+      // It's not worth the effort, some tooling does require it
+      "unicorn/prefer-module": "off",
+
+      // I'm too lazy to enable top level await right now
+      "unicorn/prefer-top-level-await": "off",
+
+      // Ternary bad
+      "unicorn/prefer-ternary": "off",
     },
   },
 );
