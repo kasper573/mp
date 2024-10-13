@@ -1,6 +1,6 @@
 import type { ServerContext } from "../context";
 import type { CharacterId } from "../package";
-import { tokenHeaderName } from "../serialization";
+import { tokenHeaderName } from "../tokenHeaderName";
 
 export async function auth({
   clients,

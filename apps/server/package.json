@@ -14,7 +14,10 @@
     "start": "node dist/index.js",
     "dev": "tsx watch --env-file .env src/main.ts --clear-screen=false",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate"
+    "db:migrate": "drizzle-kit migrate",
+    "benchmark": "tsx scripts/benchmarks/serialize-state-update/once.ts",
+    "benchmark:plot": "tsx scripts/benchmarks/serialize-state-update/plot.ts",
+    "benchmark:snapshot": "tsx scripts/benchmarks/serialize-state-update/snapshot.ts"
   },
   "dependencies": {
     "@mp/logger": "workspace:*",

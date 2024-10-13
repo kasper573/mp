@@ -24,6 +24,7 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import { myCharacter, useServerVersion } from "../../state/signals";
 import { env } from "../../env";
+import { api } from "../../state/api";
 import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {
@@ -106,6 +107,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [deltaTime, setDeltaTime] = createSignal<TimeSpan>();
+  const serverTick = createMemo(() => api.state.serverTick ?? 0);
 
   onMount(() => onCleanup(engine.addFrameCallback(setDeltaTime)));
 
@@ -122,6 +124,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `character: ${JSON.stringify(trimCharacterInfo(myCharacter()), null, 2)}`,
       `frame time: ${deltaTime()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
+      `server tick: ${serverTick().toFixed(2)}ms`,
     ].join("\n");
   });
 

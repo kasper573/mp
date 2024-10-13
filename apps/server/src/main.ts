@@ -16,12 +16,12 @@ import { createModules } from "./modules/definition";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import type { WorldState } from "./modules/world/schema";
-import { serialization } from "./serialization";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
+import { serialization } from "./serialization/selected";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
@@ -97,7 +97,7 @@ async function main(opt: CliOptions) {
     try {
       await global.tick({ input: tickDelta, context: tickContext });
 
-      for (const [clientId, stateUpdate] of getStateUpdates()) {
+      for (const [clientId, stateUpdate] of getStateUpdates(tickDelta)) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
     } catch (error) {
@@ -112,8 +112,8 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function* getStateUpdates() {
-    const state = getClientWorldState(world);
+  function* getStateUpdates(tickDelta: TimeSpan) {
+    const state = getClientWorldState(world, tickDelta);
 
     for (const characterId of world.characters.keys()) {
       for (const clientId of clients.getClientIds(characterId)) {
@@ -122,8 +122,12 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function getClientWorldState(world: WorldState): WorldState {
+  function getClientWorldState(
+    world: WorldState,
+    tickDelta: TimeSpan,
+  ): WorldState {
     return {
+      serverTick: tickDelta.totalMilliseconds,
       characters: new Map(
         [...world.characters.entries()].filter(([id]) =>
           clients.hasCharacter(id),

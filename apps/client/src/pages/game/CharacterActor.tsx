@@ -32,7 +32,7 @@ export function ManuallyPositionedCharacterActor(props: {
   createEffect(() => {
     const { x: width, y: height } = props.tileSize;
     gfx.clear();
-    gfx.fillStyle.color = 0x00_FF_00;
+    gfx.fillStyle.color = 0x00_ff_00;
     gfx.rect(-width / 2, -height / 2, width, height);
     gfx.fill();
   });

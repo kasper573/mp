@@ -166,10 +166,9 @@ export type ServerErrorHandler<ServerContext> = (
   error: ServerError<ServerContext>,
 ) => void;
 
-
 export type { inferModuleDefinitions } from "./module";
 export type { SocketIO_DTO } from "./socket";
 
 export type ConnectReason = "new" | "recovered";
 
-export {type DisconnectReason} from "socket.io";
+export { type DisconnectReason } from "socket.io";

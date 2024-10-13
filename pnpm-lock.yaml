@@ -437,6 +437,9 @@ importers:
 
   packages/transformer:
     dependencies:
+      cbor2:
+        specifier: 1.7.0
+        version: 1.7.0
       pako:
         specifier: 2.1.0
         version: 2.1.0
@@ -2111,6 +2114,10 @@ packages:
 
   caniuse-lite@1.0.30001658:
     resolution: {integrity: sha512-N2YVqWbJELVdrnsW5p+apoQyYt51aBMSsBZki1XZEfeBCexcM/sf4xiAHcXQBkuOwJBXtWF7aW1sYX6tKebPHw==}
+
+  cbor2@1.7.0:
+    resolution: {integrity: sha512-/xTBkiy6NGfW3NVMHMJpIKGwMgxtwfzmLGh81PpvGeBKP2Tjkg9i8IAly1bImbFsNbGevs8MFP8Oadsq7DMSLg==}
+    engines: {node: '>=18'}
 
   chai@5.1.1:
     resolution: {integrity: sha512-pT1ZgP8rPNqUgieVaEY+ryQr6Q4HXNg8Ei9UnLUrjN4IA7dvQC5JB+/kxVcPNDHyBcc/26CXPkbNzq3qwrOEKA==}
@@ -6190,6 +6197,8 @@ snapshots:
   callsites@3.1.0: {}
 
   caniuse-lite@1.0.30001658: {}
+
+  cbor2@1.7.0: {}
 
   chai@5.1.1:
     dependencies:
