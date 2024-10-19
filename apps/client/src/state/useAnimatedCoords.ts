@@ -10,19 +10,33 @@ import {
   createEffect,
   onCleanup,
   useContext,
+  batch,
 } from "solid-js";
 
 /**
  * Creates a vector signal that lerps each frame along the current path
  */
 export function useAnimatedCoords(
-  input: Accessor<Config | undefined>,
+  getExternal: Accessor<External | undefined>,
 ): Accessor<Vector | undefined> {
   const engine = useContext(EngineContext);
-  const [config, setConfig] = createSignal<Config | undefined>(input());
-  const isMoving = createMemo(() => !!config()?.path);
+  const isMoving = createMemo(() => !!getExternal()?.path);
+  const externalCoords = createMemo(() => getExternal()?.coords);
+  const [getCoords, setCoords] = createSignal(getExternal()?.coords);
+  const [getPath, setPath] = createSignal(getExternal()?.path);
 
-  createEffect(() => setConfig(input()));
+  createEffect(() => {
+    if (!isMoving()) {
+      setCoords(externalCoords());
+    }
+  });
+
+  createEffect(() => {
+    const external = getExternal();
+    if (external?.path) {
+      setPath(external.path);
+    }
+  });
 
   createEffect(() => {
     if (isMoving()) {
@@ -31,35 +45,32 @@ export function useAnimatedCoords(
   });
 
   function onFrame(deltaTime: TimeSpan) {
-    const c = config();
-    if (!c?.path) {
+    const path = getPath();
+    const external = getExternal();
+    const coords = getCoords();
+    if (!path || !external || !coords) {
       return;
     }
-
-    const { coords, path, speed } = c;
 
     const newCoords = new Vector(coords.x, coords.y);
     const newPath = [...path];
     const { destinationReached } = moveAlongPath(
       newCoords,
       newPath,
-      speed,
+      external.speed,
       deltaTime,
     );
 
-    setConfig({
-      coords: newCoords,
-      path: destinationReached ? undefined : newPath,
-      speed,
+    batch(() => {
+      setCoords(newCoords);
+      setPath(destinationReached ? undefined : newPath);
     });
   }
 
-  const coords = createMemo(() => config()?.coords);
-
-  return coords;
+  return getCoords;
 }
 
-type Config = {
+type External = {
   coords: Vector;
   path?: Path;
   speed: number;
