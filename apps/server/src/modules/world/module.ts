@@ -8,10 +8,11 @@ import {
 import { Vector } from "@mp/math";
 import { t } from "../factory";
 import { auth } from "../../middlewares/auth";
+import type { StateAccess } from "../../state";
 import type { CharacterId, WorldState } from "./schema";
 
 export interface WorldModuleDependencies {
-  state: WorldState;
+  state: StateAccess<WorldState>;
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
   characterKeepAliveTimeout?: TimeSpan;
@@ -19,7 +20,7 @@ export interface WorldModuleDependencies {
 
 export type WorldModule = ReturnType<typeof createWorldModule>;
 export function createWorldModule({
-  state,
+  state: accessState,
   areas,
   defaultAreaId,
 }: WorldModuleDependencies) {
@@ -28,92 +29,102 @@ export function createWorldModule({
       .type("server-only")
       .input<TimeSpan>()
       .create(({ input: delta }) => {
-        for (const char of state.characters.values()) {
-          if (char.path) {
-            const { destinationReached } = moveAlongPath(
-              char.coords,
-              char.path,
-              char.speed,
-              delta,
-            );
-            if (destinationReached) {
-              char.path = undefined;
-            }
-          }
-
-          const area = areas.get(char.areaId);
-          if (area) {
-            for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
-              const targetArea = areas.get(
-                hit.object.properties.get("goto")?.value as AreaId,
+        accessState((state) => {
+          for (const char of Object.values(state.characters)) {
+            if (char.path) {
+              const { destinationReached } = moveAlongPath(
+                char.coords,
+                char.path,
+                char.speed,
+                delta,
               );
-              if (targetArea) {
-                char.areaId = targetArea.id;
-                char.coords = targetArea.start.copy();
+              if (destinationReached) {
                 char.path = undefined;
               }
             }
+
+            const area = areas.get(char.areaId);
+            if (area) {
+              for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
+                const targetArea = areas.get(
+                  hit.object.properties.get("goto")?.value as AreaId,
+                );
+                if (targetArea) {
+                  char.areaId = targetArea.id;
+                  char.coords = targetArea.start.copy();
+                  char.path = undefined;
+                }
+              }
+            }
           }
-        }
+        });
       }),
 
     move: t.procedure
       .input<Vector>()
       .create(async ({ input: { x, y }, context }) => {
         const characterId = await auth(context);
-        const char = state.characters.get(characterId);
+        accessState((state) => {
+          const char = state.characters[characterId];
 
-        if (!char) {
-          context.logger.error("Character not found", characterId);
-          return;
-        }
-
-        const area = areas.get(char.areaId);
-        if (!area) {
-          context.logger.error("Area not found", char.areaId);
-          return;
-        }
-
-        const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
-        if (idx !== undefined && idx !== -1) {
-          char.path = char.path?.slice(0, idx + 1);
-        } else {
-          const newPath = findPath(char.coords, new Vector(x, y), area.dGraph);
-          if (newPath) {
-            char.path = newPath;
+          if (!char) {
+            context.logger.error("Character not found", characterId);
+            return;
           }
-        }
+
+          const area = areas.get(char.areaId);
+          if (!area) {
+            context.logger.error("Area not found", char.areaId);
+            return;
+          }
+
+          const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
+          if (idx !== undefined && idx !== -1) {
+            char.path = char.path?.slice(0, idx + 1);
+          } else {
+            const newPath = findPath(
+              char.coords,
+              new Vector(x, y),
+              area.dGraph,
+            );
+            if (newPath) {
+              char.path = newPath;
+            }
+          }
+        });
       }),
 
     join: t.procedure.output<CharacterId>().create(async ({ context }) => {
       const characterId = await auth(context);
 
-      let player = state.characters.get(characterId);
-      if (player === undefined) {
-        context.logger.info("Character created", characterId);
+      return accessState((state) => {
+        let player = state.characters[characterId];
+        if (player === undefined) {
+          context.logger.info("Character created", characterId);
 
-        const area = areas.get(defaultAreaId);
-        if (!area) {
-          throw new Error(
-            "Could not create character, default area not found: " +
-              defaultAreaId,
-          );
+          const area = areas.get(defaultAreaId);
+          if (!area) {
+            throw new Error(
+              "Could not create character, default area not found: " +
+                defaultAreaId,
+            );
+          }
+
+          player = {
+            areaId: area.id,
+            coords: new Vector(0, 0),
+            id: characterId,
+            path: [],
+            speed: 3,
+          };
+          player.coords = area.start.copy();
+          state.characters[player.id] = player;
+        } else {
+          context.logger.info("Character reclaimed", characterId);
         }
 
-        player = {
-          areaId: area.id,
-          coords: new Vector(0, 0),
-          id: characterId,
-          path: [],
-          speed: 3,
-        };
-        player.coords = area.start.copy();
-        state.characters.set(player.id, player);
-      } else {
-        context.logger.info("Character reclaimed", characterId);
-      }
-
-      return characterId;
+        return characterId;
+      });
     }),
   });
 }

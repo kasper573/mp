@@ -12,7 +12,7 @@ export function atom<T>(initial: T): Atom<T> {
 }
 
 export { createMemo as computed, batch } from "solid-js";
-export { produce } from "immer";
+export { produce, type Patch } from "immer";
 
 export interface Atom<T> {
   get: Accessor<T>;

@@ -3,9 +3,10 @@ import type { AuthClient } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
 import type { WorldState } from "./modules/world/schema";
 import type { ClientRegistry } from "./modules/world/ClientRegistry";
+import type { StateAccess, StateUpdate } from "./state";
 
 export interface ServerContext {
-  world: WorldState;
+  accessWorldState: StateAccess<WorldState>;
   headers?: Record<string, string | undefined | null>;
   clientId?: ClientId;
   auth: AuthClient;
@@ -17,4 +18,4 @@ export type ClientId = Branded<string, "ClientId">;
 
 export type ClientState = WorldState;
 
-export type ClientStateUpdate = WorldState;
+export type ClientStateUpdate = StateUpdate;

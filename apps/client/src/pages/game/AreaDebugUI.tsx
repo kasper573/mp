@@ -22,9 +22,8 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
-import { myCharacter, useServerVersion } from "../../state/signals";
+import { myCharacter, useServerVersion, worldState } from "../../state/signals";
 import { env } from "../../env";
-import { api } from "../../state/api";
 import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {
@@ -107,7 +106,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [deltaTime, setDeltaTime] = createSignal<TimeSpan>();
-  const serverTick = createMemo(() => api.state.serverTick ?? 0);
+  const serverTick = createMemo(() => worldState().serverTick ?? 0);
 
   onMount(() => onCleanup(engine.addFrameCallback(setDeltaTime)));
 

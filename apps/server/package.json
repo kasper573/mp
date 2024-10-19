@@ -20,17 +20,18 @@
     "benchmark:snapshot": "tsx scripts/benchmarks/serialize-state-update/snapshot.ts"
   },
   "dependencies": {
+    "@automerge/automerge": "^2.2.8",
+    "@mp/auth": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/auth": "workspace:*",
     "@mp/network": "workspace:*",
     "@mp/state": "workspace:*",
-    "@mp/data": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/transformer": "workspace:*",
-    "dotenv-flow": "4.1.0",
     "cors": "2.8.5",
+    "dotenv-flow": "4.1.0",
     "drizzle-orm": "^0.33.0",
     "express": "4.19.2",
     "postgres": "^3.4.4",
@@ -43,6 +44,7 @@
     "@types/cors": "2.8.17",
     "@types/express": "4.17.21",
     "@types/yargs": "17.0.33",
-    "drizzle-kit": "^0.24.2"
+    "drizzle-kit": "^0.24.2",
+    "type-fest": "4.26.1"
   }
 }

@@ -15,13 +15,14 @@ import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { WorldState } from "./modules/world/schema";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { serialization } from "./serialization/selected";
+import { createServerState } from "./state";
+import type { WorldState } from "./package";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
@@ -40,13 +41,11 @@ async function main(opt: CliOptions) {
   }
 
   const defaultAreaId = [...areas.value.keys()][0];
-  const result = await loadWorldState(db);
-  if (result.isErr()) {
-    logger.error("Failed to load world state", result.error);
+  const initialWorldState = await loadWorldState(db);
+  if (initialWorldState.isErr()) {
+    logger.error("Failed to load world state", initialWorldState.error);
     process.exit(1);
   }
-
-  const world = result.value;
 
   const expressApp = express();
   expressApp.use(createExpressLogger(logger.chain("http")));
@@ -58,11 +57,15 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
+  const worldState = createServerState<WorldState, ClientId>(
+    initialWorldState.value,
+  );
+
   const clients = new ClientRegistry();
   const modules = createModules({
     areas: areas.value,
     defaultAreaId,
-    state: world,
+    state: worldState.access,
     createUrl,
     buildVersion: opt.buildVersion,
   });
@@ -95,9 +98,15 @@ async function main(opt: CliOptions) {
 
   async function tick(tickDelta: TimeSpan) {
     try {
+      worldState.access((state) => {
+        state.serverTick = tickDelta.totalMilliseconds;
+      });
+
       await global.tick({ input: tickDelta, context: tickContext });
 
-      for (const [clientId, stateUpdate] of getStateUpdates(tickDelta)) {
+      for (const [clientId, stateUpdate] of worldState.flush(
+        clients.getClientIds(),
+      )) {
         socketServer.sendStateUpdate(clientId, stateUpdate);
       }
     } catch (error) {
@@ -106,34 +115,11 @@ async function main(opt: CliOptions) {
   }
 
   async function persist() {
-    const result = await persistWorldState(db, world);
+    const state = worldState.access((state) => state);
+    const result = await persistWorldState(db, state);
     if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }
-  }
-
-  function* getStateUpdates(tickDelta: TimeSpan) {
-    const state = getClientWorldState(world, tickDelta);
-
-    for (const characterId of world.characters.keys()) {
-      for (const clientId of clients.getClientIds(characterId)) {
-        yield [clientId, state] as const;
-      }
-    }
-  }
-
-  function getClientWorldState(
-    world: WorldState,
-    tickDelta: TimeSpan,
-  ): WorldState {
-    return {
-      serverTick: tickDelta.totalMilliseconds,
-      characters: new Map(
-        [...world.characters.entries()].filter(([id]) =>
-          clients.hasCharacter(id),
-        ),
-      ),
-    };
   }
 
   function createServerContext({
@@ -142,7 +128,7 @@ async function main(opt: CliOptions) {
   }: CreateContextOptions<ClientId>): ServerContext {
     const who = clientId ? `client ${clientId}` : "server";
     return {
-      world,
+      accessWorldState: worldState.access,
       headers,
       clientId,
       auth,

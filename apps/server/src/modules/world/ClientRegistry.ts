@@ -30,11 +30,14 @@ export class ClientRegistry {
     return this.clientsByCharacter.has(characterId);
   }
 
-  getClientIds(characterId: CharacterId): ReadonlySet<ClientId> {
-    return (
-      this.clientsByCharacter.get(characterId) ??
-      (emptySet as ReadonlySet<ClientId>)
-    );
+  getClientIds(characterId?: CharacterId): ReadonlySet<ClientId> {
+    if (characterId !== undefined) {
+      return (
+        this.clientsByCharacter.get(characterId) ??
+        (emptySet as ReadonlySet<ClientId>)
+      );
+    }
+    return new Set(this.charactersByClient.keys());
   }
 
   getCharacterId(clientId: ClientId): CharacterId | undefined {

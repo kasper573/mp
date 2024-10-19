@@ -1,15 +1,19 @@
-import type { CharacterId } from "@mp/server";
+import type { ClientId, ClientState } from "@mp/server";
+import { createClientState, type CharacterId } from "@mp/server";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
 import { api } from "./api";
 
+export const { access: worldState, applyStateUpdate: applyWorldStateUpdate } =
+  createClientState<ClientState, ClientId>({ characters: {} });
+
 export const [myCharacterId, setMyCharacterId] = createSignal<
   CharacterId | undefined
 >();
 
-export const myCharacter = createMemo(() =>
-  api.state.characters.get(myCharacterId()!),
+export const myCharacter = createMemo(
+  () => worldState().characters[myCharacterId()!],
 );
 
 createEffect(() => {

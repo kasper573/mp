@@ -7,7 +7,7 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { api } from "../../state/api";
-import { myCharacter } from "../../state/signals";
+import { myCharacter, worldState } from "../../state/signals";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
 import { dedupe, throttle } from "../../state/functionComposition";
@@ -66,7 +66,7 @@ export function AreaScene(props: { area: AreaResource }) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={[...api.state.characters.values()]}>
+              <Index each={Object.values(worldState().characters)}>
                 {(char) => {
                   const isMe = () => char().id === myCharacter()?.id;
                   return (

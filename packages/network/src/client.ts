@@ -1,6 +1,6 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import { atom, produce, type Atom } from "@mp/state";
+import { atom, type Atom } from "@mp/state";
 import type {
   AnyProcedureDefinition,
   AnyProcedureRecord,
@@ -23,10 +23,8 @@ import type {
 
 export class Client<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
-  State,
   StateUpdate,
 > {
-  private _state: Atom<State>;
   private _connected: Atom<boolean>;
   private socket: ClientSocket<StateUpdate>;
 
@@ -34,30 +32,19 @@ export class Client<
   get connected(): boolean {
     return this._connected.get();
   }
-  get state(): State {
-    return this._state.get();
-  }
 
-  constructor(private options: ClientOptions<State, StateUpdate>) {
+  constructor(private options: ClientOptions<StateUpdate>) {
     this.socket = io(options.url, { transports: ["websocket"] });
 
-    this.modules = createModuleInterface<ModuleDefinitions, State, StateUpdate>(
+    this.modules = createModuleInterface<ModuleDefinitions, StateUpdate>(
       this.socket,
       this.options,
     );
 
     this._connected = atom(false);
-    this._state = atom(options.createInitialState());
 
     this.socket.on("stateUpdate", (update) => {
-      this._state.set(
-        produce<State>((prev) => {
-          options.applyStateUpdate(
-            prev as State,
-            options.parseStateUpdate(update),
-          );
-        }),
-      );
+      options.applyStateUpdate(options.parseStateUpdate(update));
     });
 
     this.socket.on("connect", () => this._connected.set(true));
@@ -71,21 +58,20 @@ export class Client<
 
 function createModuleInterface<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
-  State,
   StateUpdate,
 >(
-  socket: ClientSocket<State>,
-  options: ClientOptions<State, StateUpdate>,
+  socket: ClientSocket<StateUpdate>,
+  options: ClientOptions<StateUpdate>,
 ): ClientModuleRecord<ModuleDefinitions> {
   return new Proxy({} as ClientModuleRecord<ModuleDefinitions>, {
     get: (_, moduleName) => createModuleDispatcher(moduleName, socket, options),
   });
 }
 
-function createModuleDispatcher<State, StateUpdate>(
+function createModuleDispatcher<StateUpdate>(
   moduleName: PropertyKey,
-  socket: ClientSocket<State>,
-  options: ClientOptions<State, StateUpdate>,
+  socket: ClientSocket<StateUpdate>,
+  options: ClientOptions<StateUpdate>,
 ) {
   return createDispatcher(async (procedureName, ...[input]) => {
     const headers = await options.getHeaders?.();
@@ -112,14 +98,13 @@ export interface BuiltInClientState {
   clientId?: Socket["id"];
 }
 
-export interface ClientOptions<State, StateUpdate> {
+export interface ClientOptions<StateUpdate> {
   url: string;
   rpcTimeout: number;
   serializeRPC: SocketIO_DTOSerializer<SocketIO_RPC>;
   parseRPCResponse: SocketIO_DTOParser<SocketIO_RPCResponse<unknown>>;
   parseStateUpdate: SocketIO_DTOParser<StateUpdate>;
-  applyStateUpdate: (state: State, update: StateUpdate) => unknown;
-  createInitialState: () => State;
+  applyStateUpdate: (update: StateUpdate) => unknown;
   getHeaders?: () =>
     | SocketIO_Headers
     | Promise<SocketIO_Headers | undefined>
@@ -128,8 +113,8 @@ export interface ClientOptions<State, StateUpdate> {
 
 export type { SocketIO_DTO } from "./socket";
 
-type ClientSocket<State> = Socket<
-  SocketIO_ServerToClientEvents<State>,
+type ClientSocket<StateUpdate> = Socket<
+  SocketIO_ServerToClientEvents<StateUpdate>,
   SocketIO_ClientToServerEvents
 >;
 
