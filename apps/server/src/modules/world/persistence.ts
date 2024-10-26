@@ -1,11 +1,10 @@
 import { err, ok, type Result } from "@mp/state";
-import type { ReadonlyDeep } from "type-fest";
 import type { DBClient } from "../../db/client";
 import { characterTable, type WorldState } from "./schema";
 
 export async function persistWorldState(
   db: DBClient,
-  state: ReadonlyDeep<WorldState>,
+  state: WorldState,
 ): Promise<Result<void, unknown>> {
   try {
     await db.transaction((tx) =>

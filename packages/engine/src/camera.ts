@@ -1,9 +1,9 @@
-import { Matrix, Vector } from "@mp/math";
-import type { Size } from "@mp/math";
+import { Matrix, vec } from "@mp/math";
+import type { Size, Vector } from "@mp/math";
 import { atom } from "@mp/state";
 
 export class Camera {
-  private position = new Vector(0, 0);
+  private position = vec(0, 0);
   private zoom = 1;
   readonly #transform = atom(new Matrix());
   readonly #cameraSize = atom<Size>({ width: 0, height: 0 });
@@ -48,7 +48,7 @@ export class Camera {
       Math.min(worldSize.height - halfCameraHeight, position.y),
     );
 
-    this.position = new Vector(clampedX, clampedY);
+    this.position = vec(clampedX, clampedY);
 
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
@@ -66,14 +66,14 @@ export class Camera {
   }
 
   viewportToWorld(screenPos: Vector): Vector {
-    return new Vector(
+    return vec(
       (screenPos.x - this.cameraSize.width / 2) / this.zoom + this.position.x,
       (screenPos.y - this.cameraSize.height / 2) / this.zoom + this.position.y,
     );
   }
 
   worldToViewport(worldPos: Vector): Vector {
-    return new Vector(
+    return vec(
       (worldPos.x - this.position.x) * this.zoom + this.cameraSize.width / 2,
       (worldPos.y - this.position.y) * this.zoom + this.cameraSize.height / 2,
     );

@@ -1,7 +1,7 @@
 import { moveAlongPath } from "@mp/data";
 import { EngineContext } from "@mp/engine";
-import type { Path } from "@mp/math";
-import { Vector } from "@mp/math";
+import type { Path, Vector } from "@mp/math";
+import { vec } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
@@ -52,7 +52,7 @@ export function useAnimatedCoords(
       return;
     }
 
-    const newCoords = new Vector(coords.x, coords.y);
+    const newCoords = vec(coords.x, coords.y);
     const newPath = [...path];
     const { destinationReached } = moveAlongPath(
       newCoords,

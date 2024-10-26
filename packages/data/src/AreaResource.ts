@@ -1,4 +1,5 @@
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
+import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { snapTileVector, type TiledResource } from "./TiledResource";
 import type { DNode } from "./findPath";
@@ -32,7 +33,7 @@ export class AreaResource {
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
 
     this.start = startObj
-      ? snapTileVector(tiled.worldCoordToTile(Vector.from(startObj)))
+      ? snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)))
       : vectorFromDNode(Object.keys(this.dGraph)[0] as DNode);
   }
 

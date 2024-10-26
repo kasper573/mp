@@ -1,4 +1,5 @@
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
+import { vec, vec_add, vec_distance } from "@mp/math";
 import { snapTileVector } from "./TiledResource";
 import { find_path } from "./dijkstra";
 
@@ -38,19 +39,19 @@ export function dNodeFromVector({ x, y }: Vector): DNode {
 
 export function vectorFromDNode(node: DNode): Vector {
   const [x, y] = node.split("|").map(Number);
-  return new Vector(x, y);
+  return vec(x, y);
 }
 
 export function addVectorToAdjacentInGraph(graph: DGraph, v: Vector): DGraph {
   const updatedGraph = { ...graph };
-  const nodeAsVector = new Vector(v.x, v.y);
+  const nodeAsVector = vec(v.x, v.y);
   const adjacent = adjacentVectors(v);
   updatedGraph[dNodeFromVector(v)] = Object.fromEntries(
     adjacent
       .filter((adjacent) => isVectorInGraph(graph, adjacent))
       .map((adjacent) => [
         dNodeFromVector(adjacent),
-        nodeAsVector.distance(adjacent),
+        vec_distance(nodeAsVector, adjacent),
       ]),
   );
   return updatedGraph;
@@ -63,9 +64,9 @@ function adjacentVectors(fractional: Vector): Vector[] {
 
   return [
     from,
-    from.add(new Vector(xOffset, 0)),
-    from.add(new Vector(0, yOffset)),
-    from.add(new Vector(xOffset, yOffset)),
+    vec_add(from, vec(xOffset, 0)),
+    vec_add(from, vec(0, yOffset)),
+    vec_add(from, vec(xOffset, yOffset)),
   ];
 }
 

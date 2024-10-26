@@ -1,9 +1,9 @@
 import type { Branded } from "@mp/data";
 import type { AuthClient } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
+import type { StateAccess } from "@mp/transformer";
 import type { WorldState } from "./modules/world/schema";
 import type { ClientRegistry } from "./modules/world/ClientRegistry";
-import type { StateAccess, StateUpdate } from "./state";
 
 export interface ServerContext {
   accessWorldState: StateAccess<WorldState>;
@@ -15,7 +15,3 @@ export interface ServerContext {
 }
 
 export type ClientId = Branded<string, "ClientId">;
-
-export type ClientState = WorldState;
-
-export type ClientStateUpdate = StateUpdate;

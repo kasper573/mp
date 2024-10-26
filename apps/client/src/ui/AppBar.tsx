@@ -2,8 +2,7 @@ import { Show, useContext } from "solid-js";
 import { useAuthState, AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
-import { api } from "../state/api";
-import { useVersionCompatibility } from "../state/signals";
+import { connected, useVersionCompatibility } from "../state/signals";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
 import { Link } from "./Link";
@@ -30,10 +29,8 @@ export default function AppBar() {
         </Show>
 
         <div
-          class={styles.connectionIndicator({
-            connected: api.connected,
-          })}
-          title={api.connected ? "Connected" : "Offline"}
+          class={styles.connectionIndicator({ connected: connected() })}
+          title={connected() ? "Connected" : "Offline"}
         />
 
         {isSignedIn() ? (

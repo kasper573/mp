@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/transformer": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/network": "workspace:*",

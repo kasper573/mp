@@ -1,10 +1,9 @@
-import type { ClientStateUpdate } from "@mp/server";
-import { serialization, tokenHeaderName, type ServerModules } from "@mp/server";
+import { rpcSerializer, tokenHeaderName, type ServerModules } from "@mp/server";
 import { Client } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
 import { QueryClient } from "@tanstack/solid-query";
 import { env } from "../env";
-import { applyWorldStateUpdate } from "./signals";
+import { applyWorldStateUpdate, setConnected } from "./signals";
 
 const staleTime = 60_000;
 export const queryClient = new QueryClient({
@@ -22,15 +21,16 @@ export const queryClient = new QueryClient({
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
 
-export const api = new Client<ServerModules, ClientStateUpdate>({
+export const api = new Client<ServerModules>({
   url: env.serverUrl,
   rpcTimeout: 5000,
-  parseStateUpdate: serialization.stateUpdate.parse,
-  parseRPCResponse: serialization.rpc.parse,
+  parseRPCResponse: rpcSerializer.parse,
   applyStateUpdate: applyWorldStateUpdate,
-  serializeRPC: serialization.rpc.serialize,
+  serializeRPC: rpcSerializer.serialize,
   async getHeaders() {
     await loadPromise;
     return { [tokenHeaderName]: await authClient.session?.getToken() };
   },
+  onConnect: () => setConnected(true),
+  onDisconnect: () => setConnected(false),
 });

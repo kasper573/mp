@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@mp/network": "workspace:*",
+    "@mp/transformer": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/data": "workspace:*",

@@ -1,9 +1,5 @@
-import type { ClientStateUpdate } from "@mp/server";
-import {
-  serialization,
-  type ClientState,
-  type ServerModules,
-} from "@mp/server";
+import { rpcSerializer, type ServerModules } from "@mp/server";
+import { createClientCRDT } from "@mp/transformer";
 import { Client } from "@mp/network/client";
 import { Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
@@ -50,14 +46,13 @@ async function loadTestHTTP() {
 async function loadTestWebSockets() {
   await Promise.all(
     range(connections).map(async (clientNr) => {
-      const client = new Client<ServerModules, ClientState, ClientStateUpdate>({
+      const state = createClientCRDT({ characters: new Map() });
+      const client = new Client<ServerModules>({
         url: wsServerUrl,
         rpcTimeout: 5000,
-        createInitialState: () => ({ characters: new Map() }),
-        parseStateUpdate: serialization.stateUpdate.parse,
-        parseRPCResponse: serialization.rpc.parse,
-        applyStateUpdate: (state, update) => Object.assign(state, update),
-        serializeRPC: serialization.rpc.serialize,
+        parseRPCResponse: rpcSerializer.parse,
+        applyStateUpdate: state.update,
+        serializeRPC: rpcSerializer.serialize,
       });
 
       const results = await Promise.allSettled(

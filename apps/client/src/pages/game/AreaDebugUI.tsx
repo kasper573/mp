@@ -1,6 +1,7 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
-import { Vector, type Path } from "@mp/math";
+import type { Vector } from "@mp/math";
+import { vec, type Path } from "@mp/math";
 import {
   type DNode,
   type DGraph,
@@ -166,7 +167,7 @@ function generateAllTileCoords(width: number, height: number): Vector[] {
   const result: Vector[] = [];
   for (let x = 0; x < width; x++) {
     for (let y = 0; y < height; y++) {
-      result.push(new Vector(x, y));
+      result.push(vec(x, y));
     }
   }
   return result;

@@ -1,27 +1,22 @@
-export class Vector implements VectorLike {
-  constructor(
-    public x: number,
-    public y: number,
-  ) {}
+export const vec_distance = (a: Vector, b: Vector): number =>
+  Math.hypot(a.x - b.x, a.y - b.y);
 
-  distance = (v: Vector) => Math.hypot(this.x - v.x, this.y - v.y);
+export const vec_add = (a: Vector, b: Vector): Vector =>
+  vec(a.x + b.x, a.y + b.y);
 
-  add = (v: Vector) => new Vector(this.x + v.x, this.y + v.y);
+export const vec_scale = (v: Vector, s: number | Vector): Vector =>
+  typeof s === "number" ? vec(v.x * s, v.y * s) : vec(v.x * s.x, v.y * s.y);
 
-  scale = (s: number | Vector) =>
-    typeof s === "number"
-      ? new Vector(this.x * s, this.y * s)
-      : new Vector(this.x * s.x, this.y * s.y);
+export const vec_copy = (v: Vector): Vector => vec(v.x, v.y);
 
-  copy = () => new Vector(this.x, this.y);
+export const vec_equals = (a: Vector, b: Vector): boolean =>
+  a.x === b.x && a.y === b.y;
 
-  equals = (v: Vector) => this.x === v.x && this.y === v.y;
+export const vec = (x: number, y: number): Vector => ({ x, y });
 
-  static from = (v: VectorLike) => new Vector(v.x, v.y);
-  static zero = new Vector(0, 0);
-}
+export const vec_zero: Vector = Object.freeze(vec(0, 0));
 
-export interface VectorLike {
+export interface Vector {
   x: number;
   y: number;
 }

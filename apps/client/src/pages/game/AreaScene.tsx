@@ -5,7 +5,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import { Vector } from "@mp/math";
+import { vec_equals, vec_zero } from "@mp/math";
 import { api } from "../../state/api";
 import { myCharacter, worldState } from "../../state/signals";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
@@ -29,7 +29,7 @@ export function AreaScene(props: { area: AreaResource }) {
   const myCoords = useAnimatedCoords(myCharacter);
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
-    return coords ? props.area.tiled.tileCoordToWorld(coords) : Vector.zero;
+    return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
   });
   const cameraPos = useSpring(
     new VectorSpring(myWorldPos, () => ({
@@ -97,6 +97,4 @@ export function AreaScene(props: { area: AreaResource }) {
   );
 }
 
-const throttledMove = dedupe(throttle(api.modules.world.move, 100), (a, b) =>
-  a.equals(b),
-);
+const throttledMove = dedupe(throttle(api.modules.world.move, 100), vec_equals);

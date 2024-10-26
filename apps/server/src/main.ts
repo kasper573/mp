@@ -11,6 +11,7 @@ import type { CreateContextOptions, ServerError } from "@mp/network/server";
 import { Server } from "@mp/network/server";
 import type { TimeSpan } from "@mp/time";
 import { createAuthClient } from "@mp/auth/server";
+import { createServerCRDT } from "@mp/transformer";
 import { createGlobalModule } from "./modules/global";
 import { createModules } from "./modules/definition";
 import { type ClientId, type ServerContext } from "./context";
@@ -20,9 +21,8 @@ import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
-import { serialization } from "./serialization/selected";
-import { createServerState } from "./state";
 import type { WorldState } from "./package";
+import { rpcSerializer } from "./serialization";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
@@ -57,7 +57,7 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
-  const worldState = createServerState<WorldState, ClientId>(
+  const worldState = createServerCRDT<WorldState, ClientId>(
     initialWorldState.value,
   );
 
@@ -75,9 +75,8 @@ async function main(opt: CliOptions) {
   const socketServer = new Server({
     createContext: createServerContext,
     modules,
-    serializeRPCResponse: serialization.rpc.serialize,
-    serializeStateUpdate: serialization.stateUpdate.serialize,
-    parseRPC: serialization.rpc.parse,
+    serializeRPCResponse: rpcSerializer.serialize,
+    parseRPC: rpcSerializer.parse,
     onConnection: (input, context) => global.connect({ input, context }),
     onDisconnect: (input, context) => global.disconnect({ input, context }),
     onError,
@@ -116,7 +115,7 @@ async function main(opt: CliOptions) {
 
   async function persist() {
     const state = worldState.access((state) => state);
-    const result = await persistWorldState(db, state);
+    const result = await persistWorldState(db, state as WorldState);
     if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }

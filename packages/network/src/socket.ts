@@ -18,8 +18,8 @@ export type SocketIO_RPCResponse<Output> =
   | { ok: true; output: Output }
   | { ok: false; error: string };
 
-export interface SocketIO_ServerToClientEvents<StateUpdate> {
-  stateUpdate: (update: SocketIO_DTO<StateUpdate>) => void;
+export interface SocketIO_ServerToClientEvents {
+  stateUpdate: (update: Uint8Array) => void;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

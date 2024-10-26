@@ -15,11 +15,13 @@
   "dependencies": {
     "cbor2": "1.7.0",
     "pako": "2.1.0",
-    "superjson": "2.2.1"
+    "superjson": "2.2.1",
+    "@automerge/automerge": "2.2.8"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/pako": "2.0.3",
+    "type-fest": "4.26.1",
     "vitest": "2.0.3"
   }
 }

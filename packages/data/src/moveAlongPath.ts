@@ -1,9 +1,9 @@
-import type { VectorLike } from "@mp/math";
+import type { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath(
-  coords: VectorLike,
-  path: ShiftableArray<VectorLike>,
+  coords: Vector,
+  path: ShiftableArray<Vector>,
   speed: number,
   delta: TimeSpan,
 ): { destinationReached: boolean } {

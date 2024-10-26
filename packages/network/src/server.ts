@@ -15,12 +15,11 @@ import type {
 export class Server<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
-  StateUpdate,
   ClientId extends string = string,
 > {
   private wss: SocketServer<
     SocketIO_ClientToServerEvents,
-    SocketIO_ServerToClientEvents<StateUpdate>,
+    SocketIO_ServerToClientEvents,
     object
   >;
 
@@ -30,7 +29,6 @@ export class Server<
     protected readonly options: CreateServerOptions<
       ModuleDefinitions,
       ServerContext,
-      StateUpdate,
       ClientId
     >,
   ) {
@@ -111,9 +109,9 @@ export class Server<
     });
   }
 
-  sendStateUpdate(clientId: ClientId, update: StateUpdate) {
+  sendStateUpdate(clientId: ClientId, update: Uint8Array) {
     const socket = this.wss.sockets.sockets.get(clientId);
-    socket?.emit("stateUpdate", this.options.serializeStateUpdate(update));
+    socket?.emit("stateUpdate", update);
   }
 
   close() {
@@ -126,7 +124,6 @@ export { Factory } from "./factory";
 export interface CreateServerOptions<
   ModuleDefinitions extends AnyModuleDefinitionRecord,
   ServerContext,
-  StateUpdate,
   ClientId extends string,
 > {
   modules: ModuleRecord<ModuleDefinitions>;
@@ -135,7 +132,6 @@ export interface CreateServerOptions<
   ) => ServerContext | Promise<ServerContext>;
   parseRPC: SocketIO_DTOParser<SocketIO_RPC>;
   serializeRPCResponse: SocketIO_DTOSerializer<SocketIO_RPCResponse<unknown>>;
-  serializeStateUpdate: SocketIO_DTOSerializer<StateUpdate>;
   onConnection?: (
     reason: ConnectReason,
     context: ServerContext,

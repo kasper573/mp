@@ -5,10 +5,11 @@ import {
   type AreaId,
   type AreaResource,
 } from "@mp/data";
-import { Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
+import { vec, vec_copy } from "@mp/math";
+import type { StateAccess } from "@mp/transformer";
 import { t } from "../factory";
 import { auth } from "../../middlewares/auth";
-import type { StateAccess } from "../../state";
 import type { CharacterId, WorldState } from "./schema";
 
 export interface WorldModuleDependencies {
@@ -51,7 +52,7 @@ export function createWorldModule({
                 );
                 if (targetArea) {
                   char.areaId = targetArea.id;
-                  char.coords = targetArea.start.copy();
+                  char.coords = vec_copy(targetArea.start);
                   char.path = undefined;
                 }
               }
@@ -82,11 +83,7 @@ export function createWorldModule({
           if (idx !== undefined && idx !== -1) {
             char.path = char.path?.slice(0, idx + 1);
           } else {
-            const newPath = findPath(
-              char.coords,
-              new Vector(x, y),
-              area.dGraph,
-            );
+            const newPath = findPath(char.coords, vec(x, y), area.dGraph);
             if (newPath) {
               char.path = newPath;
             }
@@ -112,12 +109,12 @@ export function createWorldModule({
 
           player = {
             areaId: area.id,
-            coords: new Vector(0, 0),
+            coords: vec(0, 0),
             id: characterId,
             path: [],
             speed: 3,
           };
-          player.coords = area.start.copy();
+          player.coords = vec_copy(area.start);
           state.characters[player.id] = player;
         } else {
           context.logger.info("Character reclaimed", characterId);

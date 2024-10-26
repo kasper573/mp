@@ -1,3 +1,4 @@
+import { vec_distance } from "@mp/math";
 import { type TiledResource } from "./TiledResource";
 import type { DNode } from "./findPath";
 import { dNodeFromVector, type DGraph } from "./findPath";
@@ -26,9 +27,9 @@ export function dGraphFromTiled(tiled: TiledResource): DGraph {
     for (const neighbor of walkableTileCoords) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
-      const distance = tile.distance(neighbor);
+      const distance = vec_distance(tile, neighbor);
       if (distance === 1 || distance === Math.SQRT2) {
-        neighbors[dNodeFromVector(neighbor)] = tile.distance(neighbor);
+        neighbors[dNodeFromVector(neighbor)] = vec_distance(tile, neighbor);
       }
     }
     graph[dNodeFromVector(tile)] = neighbors;
