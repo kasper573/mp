@@ -1,9 +1,15 @@
 import type { Socket } from "socket.io-client";
 import { io } from "socket.io-client";
-import type { SocketIO_Headers } from "./socket";
+import type {
+  SocketIO_ClientToServerEvents,
+  SocketIO_ServerToClientEvents,
+} from "./socket";
 
 export class SocketClient {
-  private socket: Socket;
+  private socket: Socket<
+    SocketIO_ServerToClientEvents,
+    SocketIO_ClientToServerEvents
+  >;
 
   constructor(options: SocketClientOptions) {
     this.socket = io(options.url, { transports: ["websocket"] });
@@ -12,23 +18,18 @@ export class SocketClient {
     this.socket.on("disconnect", options.onDisconnect ?? noop);
   }
 
+  authenticate(authToken: string) {
+    this.socket.emit("authenticate", authToken);
+  }
+
   dispose() {
     this.socket.disconnect();
   }
 }
 
-export interface SocketClientState {
-  connected: boolean;
-  clientId?: Socket["id"];
-}
-
 export interface SocketClientOptions {
   url: string;
   applyStateUpdate: (update: Uint8Array) => unknown;
-  getHeaders?: () =>
-    | SocketIO_Headers
-    | Promise<SocketIO_Headers | undefined>
-    | undefined;
   onConnect?: () => void;
   onDisconnect?: () => void;
 }

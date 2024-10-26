@@ -97,26 +97,24 @@ async function main(opt: CliOptions) {
 
   const clients = new ClientRegistry();
 
-  const socketServer = new SocketServer<ServerContext, SocketClientId>({
-    createContext: ({ headers, clientId }) =>
-      createServerContext(
-        clientId as unknown as HttpSessionId,
-        headers?.[tokenHeaderName] as AuthToken,
-      ),
-    async onConnection(clientId, reason, { authToken }) {
-      if (!authToken) {
-        throw new Error("Socket connection not allowed without auth token");
+  const socketServer = new SocketServer<SocketClientId>({
+    async onAuthenticate(clientId, authToken) {
+      try {
+        const { sub } = await auth.verifyToken(authToken);
+        const userId = sub as UserId;
+        logger.info("Client authenticated", { clientId, userId });
+        clients.associateClientWithUser(clientId, userId);
+      } catch (error) {
+        logger.error("Client authentication failed", { clientId, error });
       }
-      const { sub } = await auth.verifyToken(authToken);
-      const userId = sub as UserId;
-      logger.info("Client connected", { clientId, reason, userId });
-      clients.associateClientWithUser(clientId, userId);
+    },
+    onConnection(clientId, reason) {
+      logger.info("Client connected", { clientId, reason });
     },
     onDisconnect(clientId, reason) {
       logger.info("Client disconnected", { clientId, reason });
       clients.deleteClient(clientId);
     },
-    onError: ({ type, error }) => logger.chain(type).error(error),
   });
 
   const httpServer = http.createServer(expressApp);

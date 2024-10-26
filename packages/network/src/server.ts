@@ -1,18 +1,25 @@
-import { Server as SocketIOServer } from "socket.io";
 import type { DisconnectReason } from "socket.io";
-import type { SocketIO_Headers } from "./socket";
+import { Server as SocketIOServer } from "socket.io";
+import type {
+  SocketIO_ClientToServerEvents,
+  SocketIO_ServerToClientEvents,
+} from "./socket";
 
-export class SocketServer<ServerContext, ClientId extends string = string> {
-  private wss: SocketIOServer;
+export class SocketServer<ClientId extends string = string> {
+  private wss: SocketIOServer<
+    SocketIO_ClientToServerEvents,
+    SocketIO_ServerToClientEvents
+  >;
 
   listen: SocketIOServer["listen"];
 
-  constructor(
-    protected readonly options: SocketServerOptions<ServerContext, ClientId>,
-  ) {
-    const { createContext, onError, onConnection, onDisconnect } = options;
+  constructor(protected readonly options: SocketServerOptions<ClientId>) {
+    const { onAuthenticate, onConnection, onDisconnect } = options;
 
-    this.wss = new SocketIOServer({
+    this.wss = new SocketIOServer<
+      SocketIO_ClientToServerEvents,
+      SocketIO_ServerToClientEvents
+    >({
       transports: ["websocket"],
       connectionStateRecovery: {},
     });
@@ -21,34 +28,16 @@ export class SocketServer<ServerContext, ClientId extends string = string> {
 
     this.wss.on("connection", async (socket) => {
       const clientId = socket.id as ClientId;
-      const socketContext = (headers?: SocketIO_Headers) => {
-        return createContext({
-          clientId,
-          headers,
-        });
-      };
 
-      let connectContext;
-      try {
-        connectContext = await socketContext();
-        await onConnection?.(
-          clientId,
-          socket.recovered ? "recovered" : "new",
-          connectContext,
-        );
-      } catch (error) {
-        onError?.({ type: "connection", error, context: connectContext });
-      }
+      await onConnection?.(clientId, socket.recovered ? "recovered" : "new");
 
-      socket.once("disconnect", async (reason) => {
-        let disconnectContext;
-        try {
-          disconnectContext = await socketContext();
-          await onDisconnect?.(clientId, reason, disconnectContext);
-        } catch (error) {
-          onError?.({ type: "disconnect", error, context: disconnectContext });
-        }
-      });
+      socket.on("authenticate", (authToken: string) =>
+        onAuthenticate?.(clientId, authToken),
+      );
+
+      socket.once("disconnect", async (reason) =>
+        onDisconnect?.(clientId, reason),
+      );
     });
   }
 
@@ -62,42 +51,20 @@ export class SocketServer<ServerContext, ClientId extends string = string> {
   }
 }
 
-export interface SocketServerOptions<ServerContext, ClientId extends string> {
-  createContext: (
-    clientInfo: SocketServerClientInfo<ClientId>,
-  ) => ServerContext | Promise<ServerContext>;
+export interface SocketServerOptions<ClientId extends string> {
+  onAuthenticate?: (
+    clientId: ClientId,
+    authToken: string,
+  ) => void | undefined | Promise<unknown>;
   onConnection?: (
     clientId: ClientId,
     reason: SocketServerConnectReason,
-    context: ServerContext,
   ) => void | undefined | Promise<unknown>;
   onDisconnect?: (
     clientId: ClientId,
     reason: DisconnectReason,
-    context: ServerContext,
   ) => void | undefined | Promise<unknown>;
-  onError?: SocketServerErrorHandler<ServerContext>;
 }
-
-export interface SocketServerClientInfo<ClientId extends string> {
-  clientId: ClientId;
-  headers?: SocketIO_Headers;
-}
-
-export interface SocketServerError<
-  ServerContext,
-  Type = SocketServerErrorType,
-> {
-  error: unknown;
-  type: Type;
-  context?: ServerContext;
-}
-
-export type SocketServerErrorType = "connection" | "disconnect" | "rpc";
-
-export type SocketServerErrorHandler<ServerContext> = (
-  error: SocketServerError<ServerContext>,
-) => void;
 
 export type SocketServerConnectReason = "new" | "recovered";
 

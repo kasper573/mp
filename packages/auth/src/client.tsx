@@ -15,11 +15,10 @@ export const AuthContext = createContext<AuthClient>(
 export function useAuthState() {
   const auth = useContext(AuthContext);
   const [isSignedIn, setIsSignedIn] = createSignal(!!auth.user);
+
   onCleanup(auth.addListener(() => setIsSignedIn(!!auth.user)));
 
-  return {
-    isSignedIn,
-  };
+  return { isSignedIn };
 }
 
 export { Clerk as AuthClient } from "@clerk/clerk-js/headless";
