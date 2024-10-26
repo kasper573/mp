@@ -5,7 +5,6 @@ import path from "node:path";
 import http from "node:http";
 import { Logger } from "@mp/logger";
 import express from "express";
-import expressSession from "express-session";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import { SocketServer } from "@mp/network/server";
@@ -49,6 +48,7 @@ async function main(opt: CliOptions) {
   }
 
   const expressApp = express();
+
   expressApp.use(createExpressLogger(logger.chain("http")));
   expressApp.use(createCors({ origin: opt.corsOrigin }));
   expressApp.use(opt.publicPath, express.static(opt.publicDir));
@@ -85,12 +85,11 @@ async function main(opt: CliOptions) {
 
   expressApp.use(
     "/api",
-    expressSession(),
     trpcExpress.createExpressMiddleware({
       router: apiRouter,
       createContext: ({ req }) =>
         createServerContext(
-          req.sessionID as HttpSessionId,
+          `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
           req.headers[tokenHeaderName] as AuthToken,
         ),
     }),
