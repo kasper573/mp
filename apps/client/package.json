@@ -23,7 +23,6 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
-    "@mp/transformer": "workspace:*",
     "@solidjs/router": "0.14.7",
     "@tanstack/solid-query": "5.56.2",
     "@trpc/client": "11.0.0-rc.593",

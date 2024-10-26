@@ -1,7 +1,7 @@
 import type { WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import type { StateUpdate } from "@mp/transformer";
-import { createClientCRDT } from "@mp/transformer";
+import type { StateUpdate } from "@mp/network/client";
+import { createClientCRDT } from "@mp/network/client";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";

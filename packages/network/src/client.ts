@@ -34,4 +34,7 @@ export interface SocketClientOptions {
   onDisconnect?: () => void;
 }
 
+export { createClientCRDT } from "./crdt";
+export type { ClientCRDT, StateAccess, StateUpdate } from "./crdt";
+
 const noop = () => {};

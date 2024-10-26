@@ -9,7 +9,7 @@ import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import { SocketServer } from "@mp/network/server";
 import { createAuthClient } from "@mp/auth/server";
-import { createServerCRDT } from "@mp/transformer";
+import { createServerCRDT } from "@mp/network/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { WorldState } from "./modules/world/schema";
 import type { AuthToken, HttpSessionId, UserId } from "./context";

@@ -7,7 +7,7 @@ import {
 } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
-import type { StateAccess } from "@mp/transformer";
+import type { StateAccess } from "@mp/network/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import type { Ticker } from "../../Ticker";

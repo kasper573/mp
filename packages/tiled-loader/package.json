@@ -14,11 +14,12 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/transformer": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/state": "workspace:*",
+    "pako": "2.1.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@types/pako": "2.0.3",
     "vitest": "2.0.3"
   }
 }

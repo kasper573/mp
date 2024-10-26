@@ -1,4 +1,4 @@
-import { createClientCRDT } from "@mp/transformer";
+import { createClientCRDT } from "@mp/network/client";
 import { SocketClient } from "@mp/network/client";
 import { Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";

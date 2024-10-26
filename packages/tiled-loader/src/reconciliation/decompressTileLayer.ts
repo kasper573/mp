@@ -10,7 +10,7 @@ import type {
   TiledData,
   Encoding,
 } from "@mp/tiled-loader";
-import { decoders, decompressors } from "@mp/transformer";
+import { decoders, decompressors } from "../transformers";
 
 export function decompressTileLayer(
   layer: CompressedTileLayer,

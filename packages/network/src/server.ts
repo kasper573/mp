@@ -69,3 +69,6 @@ export interface SocketServerOptions<ClientId extends string> {
 export type SocketServerConnectReason = "new" | "recovered";
 
 export { type DisconnectReason as SocketServerDisconnectReason } from "socket.io";
+
+export { createServerCRDT } from "./crdt";
+export type { ServerCRDT, StateAccess, StateUpdate } from "./crdt";
