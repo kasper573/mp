@@ -66,7 +66,7 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("persistInterval", {
       type: "number",
-      default: 1000,
+      default: 5000,
       description:
         "How often (in milliseconds) to save the world state to the database",
       coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),

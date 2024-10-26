@@ -5,7 +5,7 @@ import { createClientCRDT } from "@mp/transformer";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
-import { api } from "./api";
+import { trpc } from "./api";
 
 const crdt = createClientCRDT<WorldState>({ characters: {} });
 
@@ -31,7 +31,7 @@ export const [connected, setConnected] = createSignal(false);
 
 createEffect(() => {
   if (connected()) {
-    void api.modules.world.join().then(setMyCharacterId);
+    void trpc.world.join.mutate().then(setMyCharacterId);
   } else {
     setMyCharacterId(undefined);
   }
@@ -40,7 +40,7 @@ createEffect(() => {
 export const useServerVersion = () =>
   createQuery(() => ({
     queryKey: ["server-version"],
-    queryFn: () => api.modules.system.buildVersion(),
+    queryFn: () => trpc.system.buildVersion.query(),
   }));
 
 export const useVersionCompatibility = () => {

@@ -12,7 +12,8 @@
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/data": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/state": "workspace:*",
+    "@trpc/client": "11.0.0-rc.593"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

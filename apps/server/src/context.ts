@@ -6,12 +6,15 @@ import type { WorldState } from "./modules/world/schema";
 import type { ClientRegistry } from "./modules/world/ClientRegistry";
 
 export interface ServerContext {
+  sessionId: HttpSessionId;
   accessWorldState: StateAccess<WorldState>;
-  headers?: Record<string, string | undefined | null>;
-  clientId?: ClientId;
+  authToken?: AuthToken;
   auth: AuthClient;
   clients: ClientRegistry;
   logger: Logger;
 }
 
-export type ClientId = Branded<string, "ClientId">;
+export type UserId = Branded<string, "UserId">;
+export type AuthToken = Branded<string, "AuthToken">;
+export type HttpSessionId = Branded<string, "HttpSessionId">;
+export type SocketClientId = Branded<string, "SocketClientId">;

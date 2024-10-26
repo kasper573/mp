@@ -5,24 +5,25 @@ import path from "node:path";
 import http from "node:http";
 import { Logger } from "@mp/logger";
 import express from "express";
+import expressSession from "express-session";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import type { CreateContextOptions, ServerError } from "@mp/network/server";
-import { Server } from "@mp/network/server";
-import type { TimeSpan } from "@mp/time";
+import { SocketServer } from "@mp/network/server";
 import { createAuthClient } from "@mp/auth/server";
 import { createServerCRDT } from "@mp/transformer";
-import { createGlobalModule } from "./modules/global";
-import { createModules } from "./modules/definition";
-import { type ClientId, type ServerContext } from "./context";
+import * as trpcExpress from "@trpc/server/adapters/express";
+import type { WorldState } from "./modules/world/schema";
+import type { AuthToken, HttpSessionId, UserId } from "./context";
+import { type SocketClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
-import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
-import type { WorldState } from "./package";
-import { rpcSerializer } from "./serialization";
+import { createRootRouter } from "./modules/router";
+import type { TickMiddlewareOpts } from "./Ticker";
+import { Ticker } from "./Ticker";
+import { tokenHeaderName } from "./tokenHeaderName";
 
 async function main(opt: CliOptions) {
   const logger = new Logger(console);
@@ -51,35 +52,72 @@ async function main(opt: CliOptions) {
   expressApp.use(createExpressLogger(logger.chain("http")));
   expressApp.use(createCors({ origin: opt.corsOrigin }));
   expressApp.use(opt.publicPath, express.static(opt.publicDir));
+
   if (opt.clientDir !== undefined) {
     const indexFile = path.resolve(opt.clientDir, "index.html");
     expressApp.use("/", express.static(opt.clientDir));
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
-  const worldState = createServerCRDT<WorldState, ClientId>(
+  const worldState = createServerCRDT<WorldState, SocketClientId>(
     initialWorldState.value,
+    deriveWorldStateForClient,
   );
 
-  const clients = new ClientRegistry();
-  const modules = createModules({
+  const persistTicker = new Ticker({
+    middleware: persist,
+    interval: opt.persistInterval,
+  });
+
+  const ticker = new Ticker({
+    middleware: serverTickMiddleware,
+    interval: opt.tickInterval,
+  });
+
+  const apiRouter = createRootRouter({
     areas: areas.value,
     defaultAreaId,
     state: worldState.access,
     createUrl,
     buildVersion: opt.buildVersion,
+    ticker,
   });
 
-  const global = createGlobalModule(modules);
+  expressApp.use(
+    "/api",
+    expressSession(),
+    trpcExpress.createExpressMiddleware({
+      router: apiRouter,
+      createContext: ({ req }) =>
+        createServerContext(
+          req.sessionID as HttpSessionId,
+          req.headers[tokenHeaderName] as AuthToken,
+        ),
+    }),
+  );
 
-  const socketServer = new Server({
-    createContext: createServerContext,
-    modules,
-    serializeRPCResponse: rpcSerializer.serialize,
-    parseRPC: rpcSerializer.parse,
-    onConnection: (input, context) => global.connect({ input, context }),
-    onDisconnect: (input, context) => global.disconnect({ input, context }),
-    onError,
+  const clients = new ClientRegistry();
+
+  const socketServer = new SocketServer<ServerContext, SocketClientId>({
+    createContext: ({ headers, clientId }) =>
+      createServerContext(
+        clientId as unknown as HttpSessionId,
+        headers?.[tokenHeaderName] as AuthToken,
+      ),
+    async onConnection(clientId, reason, { authToken }) {
+      if (!authToken) {
+        throw new Error("Socket connection not allowed without auth token");
+      }
+      const { sub } = await auth.verifyToken(authToken);
+      const userId = sub as UserId;
+      logger.info("Client connected", { clientId, reason, userId });
+      clients.associateClientWithUser(clientId, userId);
+    },
+    onDisconnect(clientId, reason) {
+      logger.info("Client disconnected", { clientId, reason });
+      clients.deleteClient(clientId);
+    },
+    onError: ({ type, error }) => logger.chain(type).error(error),
   });
 
   const httpServer = http.createServer(expressApp);
@@ -88,30 +126,8 @@ async function main(opt: CliOptions) {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  setAsyncInterval(tick, opt.tickInterval);
-  setAsyncInterval(persist, opt.persistInterval);
-
-  const tickContext: ServerContext = createServerContext({
-    clientId: undefined as unknown as ClientId,
-  });
-
-  async function tick(tickDelta: TimeSpan) {
-    try {
-      worldState.access((state) => {
-        state.serverTick = tickDelta.totalMilliseconds;
-      });
-
-      await global.tick({ input: tickDelta, context: tickContext });
-
-      for (const [clientId, stateUpdate] of worldState.flush(
-        clients.getClientIds(),
-      )) {
-        socketServer.sendStateUpdate(clientId, stateUpdate);
-      }
-    } catch (error) {
-      onError({ type: "tick", error, context: tickContext });
-    }
-  }
+  persistTicker.start();
+  ticker.start();
 
   async function persist() {
     const state = worldState.access((state) => state);
@@ -121,34 +137,52 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function createServerContext({
-    clientId,
-    headers,
-  }: CreateContextOptions<ClientId>): ServerContext {
-    const who = clientId ? `client ${clientId}` : "server";
-    return {
-      accessWorldState: worldState.access,
-      headers,
-      clientId,
-      auth,
-      logger: logger.chain(who),
-      clients,
-    };
+  function serverTickMiddleware({ delta, next }: TickMiddlewareOpts) {
+    try {
+      worldState.access((state) => {
+        state.serverTick = delta.totalMilliseconds;
+      });
+
+      next(delta);
+
+      for (const [clientId, stateUpdate] of worldState.flush(
+        clients.getClientIds(),
+      )) {
+        socketServer.sendStateUpdate(clientId, stateUpdate);
+      }
+    } catch (error) {
+      logger.chain("tick").error(error);
+    }
   }
 
-  function onError({
-    type,
-    rpc,
-    error,
-    context,
-  }: ServerError<ServerContext, string>) {
-    const args: unknown[] = [
-      context?.clientId,
-      rpc ? `${rpc.moduleName}.${rpc.procedureName}` : undefined,
-      rpc ? rpc.input : undefined,
-      error,
-    ].filter(Boolean);
-    logger.chain(type).error(...args);
+  function deriveWorldStateForClient(
+    state: WorldState,
+    clientId: SocketClientId,
+  ) {
+    const characterId = clients.getCharacterId(clientId);
+    if (!characterId) {
+      throw new Error(
+        "Could not derive world state for client: client has no associated character",
+      );
+    }
+
+    // TODO use character id to derive state for client
+
+    return state;
+  }
+
+  function createServerContext(
+    sessionId: HttpSessionId,
+    authToken: ServerContext["authToken"],
+  ): ServerContext {
+    return {
+      sessionId,
+      accessWorldState: worldState.access,
+      authToken,
+      auth,
+      logger,
+      clients,
+    };
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {

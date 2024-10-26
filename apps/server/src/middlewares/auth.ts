@@ -1,30 +1,18 @@
-import type { ServerContext } from "../context";
-import type { CharacterId } from "../package";
-import { tokenHeaderName } from "../tokenHeaderName";
+import type { UserId } from "../context";
+import { t } from "../trpc";
 
-export async function auth({
-  clients,
-  clientId,
-  headers,
-  auth,
-}: ServerContext): Promise<CharacterId> {
-  if (!clientId) {
-    throw new Error("Cannot authenticate client without clientId");
-  }
+export function auth() {
+  return t.middleware(async ({ ctx, next }) => {
+    const { authToken, auth } = ctx;
+    if (!authToken) {
+      throw new Error(`Client provided no auth token`);
+    }
 
-  const token = headers?.[tokenHeaderName];
-  if (!token) {
-    throw new Error(`Client ${clientId} provided no auth token`);
-  }
-
-  try {
-    const { sub } = await auth.verifyToken(token);
-    const characterId = sub as CharacterId;
-    clients.set(clientId, characterId);
-    return characterId;
-  } catch (error) {
-    throw new Error(
-      `Client ${clientId} failed to authenticate: ${String(error)}`,
-    );
-  }
+    try {
+      const { sub } = await auth.verifyToken(authToken);
+      return next({ ctx: { ...ctx, userId: sub as UserId } });
+    } catch (error) {
+      throw new Error(`Client failed to authenticate: ${String(error)}`);
+    }
+  });
 }

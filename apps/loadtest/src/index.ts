@@ -1,8 +1,10 @@
-import { rpcSerializer, type ServerModules } from "@mp/server";
 import { createClientCRDT } from "@mp/transformer";
-import { Client } from "@mp/network/client";
+import { SocketClient } from "@mp/network/client";
 import { Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
+import type { RootRouter } from "@mp/server";
+import { transformer } from "@mp/server";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
@@ -47,17 +49,18 @@ async function loadTestWebSockets() {
   await Promise.all(
     range(connections).map(async (clientNr) => {
       const state = createClientCRDT({ characters: new Map() });
-      const client = new Client<ServerModules>({
+      const client = new SocketClient({
         url: wsServerUrl,
-        rpcTimeout: 5000,
-        parseRPCResponse: rpcSerializer.parse,
         applyStateUpdate: state.update,
-        serializeRPC: rpcSerializer.serialize,
+      });
+
+      const trpc = createTRPCClient<RootRouter>({
+        links: [httpBatchLink({ url: `${httpServerUrl}/api`, transformer })],
       });
 
       const results = await Promise.allSettled(
         range(requests).map(() =>
-          client.modules.area.areaFileUrl("forest" as AreaId),
+          trpc.area.areaFileUrl.query("forest" as AreaId),
         ),
       );
 

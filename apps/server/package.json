@@ -26,10 +26,12 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/transformer": "workspace:*",
+    "@trpc/server": "11.0.0-rc.593",
     "cors": "2.8.5",
     "dotenv-flow": "4.1.0",
     "drizzle-orm": "^0.33.0",
     "express": "4.19.2",
+    "express-session": "1.18.1",
     "postgres": "^3.4.4",
     "rate-limiter-flexible": "^5.0.3",
     "yargs": "17.7.2"
@@ -39,6 +41,7 @@
     "@mp/tsconfig": "workspace:*",
     "@types/cors": "2.8.17",
     "@types/express": "4.17.21",
+    "@types/express-session": "1.18.0",
     "@types/yargs": "17.0.33",
     "drizzle-kit": "^0.24.2"
   }

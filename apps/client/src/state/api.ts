@@ -1,7 +1,11 @@
-import { rpcSerializer, tokenHeaderName, type ServerModules } from "@mp/server";
-import { Client } from "@mp/network/client";
+import { tokenHeaderName } from "@mp/server";
+import { SocketClient } from "@mp/network/client";
 import { AuthClient } from "@mp/auth/client";
 import { QueryClient } from "@tanstack/solid-query";
+
+import type { RootRouter } from "@mp/server";
+import { transformer } from "@mp/server";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { env } from "../env";
 import { applyWorldStateUpdate, setConnected } from "./signals";
 
@@ -21,16 +25,28 @@ export const queryClient = new QueryClient({
 export const authClient = new AuthClient(env.auth.publishableKey);
 const loadPromise = authClient.load();
 
-export const api = new Client<ServerModules>({
-  url: env.serverUrl,
-  rpcTimeout: 5000,
-  parseRPCResponse: rpcSerializer.parse,
+export const api = new SocketClient({
+  url: env.wsUrl,
   applyStateUpdate: applyWorldStateUpdate,
-  serializeRPC: rpcSerializer.serialize,
   async getHeaders() {
     await loadPromise;
     return { [tokenHeaderName]: await authClient.session?.getToken() };
   },
   onConnect: () => setConnected(true),
   onDisconnect: () => setConnected(false),
+});
+
+export const trpc = createTRPCClient<RootRouter>({
+  links: [
+    httpBatchLink({
+      url: env.apiUrl,
+      transformer,
+      async headers() {
+        await loadPromise;
+        return {
+          [tokenHeaderName]: (await authClient.session?.getToken()) ?? "",
+        };
+      },
+    }),
+  ],
 });

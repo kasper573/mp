@@ -1,10 +1,10 @@
 import type { AreaId } from "@mp/data";
 import { AreaResource, TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
-import { api } from "./api";
+import { trpc } from "./api";
 
 export async function loadAreaResource(areaId: AreaId) {
-  const url = await api.modules.area.areaFileUrl(areaId);
+  const url = await trpc.area.areaFileUrl.query(areaId);
   const result = await loadTiled(url);
   return new AreaResource(areaId, new TiledResource(result._unsafeUnwrap()));
 }

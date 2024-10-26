@@ -5,9 +5,10 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
+import type { Vector } from "@mp/math";
 import { vec_equals, vec_zero } from "@mp/math";
-import { api } from "../../state/api";
-import { myCharacter, worldState } from "../../state/signals";
+import { trpc } from "../../state/api";
+import { myCharacter, myCharacterId, worldState } from "../../state/signals";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
 import { dedupe, throttle } from "../../state/functionComposition";
@@ -97,4 +98,11 @@ export function AreaScene(props: { area: AreaResource }) {
   );
 }
 
-const throttledMove = dedupe(throttle(api.modules.world.move, 100), vec_equals);
+const throttledMove = dedupe(
+  throttle(
+    ({ x, y }: Vector) =>
+      trpc.world.move.mutate({ characterId: myCharacterId()!, x, y }),
+    100,
+  ),
+  vec_equals,
+);

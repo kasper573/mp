@@ -3,10 +3,13 @@ import * as Automerge from "@automerge/automerge";
 
 export function createServerCRDT<T extends Record<string, unknown>, Id>(
   initialState: T,
+  filterState: (state: T, clientId: Id) => T,
 ): ServerCRDT<T, Id> {
   let document = Automerge.from(initialState);
 
   const syncStates = new Map<Id, Automerge.SyncState>();
+
+  // TODO use filterState to only emit a subset of the state
 
   return {
     access(change) {
