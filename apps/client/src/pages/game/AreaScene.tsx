@@ -7,7 +7,7 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec_equals, vec_zero } from "@mp/math";
-import { trpc } from "../../state/api";
+import { trpc } from "../../clients/trpc";
 import { myCharacter, myCharacterId, worldState } from "../../state/signals";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";

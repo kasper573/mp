@@ -1,7 +1,7 @@
 import type { AreaId } from "@mp/data";
 import { AreaResource, TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
-import { trpc } from "./api";
+import { trpc } from "../clients/trpc";
 
 export async function loadAreaResource(areaId: AreaId) {
   const url = await trpc.area.areaFileUrl.query(areaId);

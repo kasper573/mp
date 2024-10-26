@@ -5,7 +5,7 @@ import { createClientCRDT } from "@mp/transformer";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
-import { trpc } from "./api";
+import { trpc } from "../clients/trpc";
 
 const crdt = createClientCRDT<WorldState>({ characters: {} });
 
