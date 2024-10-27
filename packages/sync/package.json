@@ -12,6 +12,11 @@
       "import": "./dist/server.js",
       "require": "./dist/server.js",
       "types": "./dist/server.d.ts"
+    },
+    "./wasm": {
+      "import": "./dist/wasm.js",
+      "require": "./dist/wasm.js",
+      "types": "./dist/wasm.d.ts"
     }
   },
   "files": [
@@ -22,9 +27,9 @@
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
-    "@automerge/automerge": "2.2.9-alpha.2",
-    "@automerge/automerge-repo": "2.0.0-alpha.13",
-    "@automerge/automerge-repo-network-websocket": "2.0.0-alpha.13",
+    "@automerge/automerge": "2.2.8",
+    "@automerge/automerge-repo": "1.2.1",
+    "@automerge/automerge-repo-network-websocket": "1.2.1",
     "@mp/state": "workspace:*",
     "uuid": "11.0.0",
     "ws": "8.18.0"

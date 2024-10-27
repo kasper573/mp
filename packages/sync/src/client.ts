@@ -1,5 +1,5 @@
-import type { DocHandle } from "@automerge/automerge-repo";
-import { Repo } from "@automerge/automerge-repo";
+import type { DocHandle } from "@automerge/automerge-repo/slim";
+import { Repo } from "@automerge/automerge-repo/slim";
 import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
 import { authenticateEvent, documentId } from "./shared";
 
