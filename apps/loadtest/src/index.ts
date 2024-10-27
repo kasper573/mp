@@ -8,7 +8,8 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
-const { httpServerUrl, wsServerUrl, connections, requests } = readCliOptions();
+const { httpServerUrl, apiServerUrl, wsServerUrl, connections, requests } =
+  readCliOptions();
 void main();
 
 async function main() {
@@ -55,7 +56,7 @@ async function loadTestWebSockets() {
       });
 
       const trpc = createTRPCClient<RootRouter>({
-        links: [httpBatchLink({ url: `${httpServerUrl}/api`, transformer })],
+        links: [httpBatchLink({ url: apiServerUrl, transformer })],
       });
 
       const results = await Promise.allSettled(

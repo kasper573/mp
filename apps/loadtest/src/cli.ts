@@ -20,6 +20,12 @@ export function readCliOptions(argv = process.argv) {
       default: "http://localhost:3002",
       demandOption: true,
     })
+    .option("apiServerUrl", {
+      alias: "as",
+      type: "string",
+      default: "http://localhost:3002/api",
+      demandOption: true,
+    })
     .option("wsServerUrl", {
       alias: "ws",
       type: "string",
