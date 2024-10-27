@@ -20,8 +20,12 @@ export class SyncClient<State> {
     this.handle = this.repo.find(documentId);
     this.handle.on("change", this.emitCurrentDocument);
     this.handle.on("delete", this.emitCurrentDocument);
-    this.wsAdapter.on("ready", onConnect);
-    this.wsAdapter.on("close", onDisconnect);
+    if (!this.wsAdapter.socket) {
+      throw new Error("WebSocket connection failed");
+    }
+
+    this.wsAdapter.socket.on("open", onConnect);
+    this.wsAdapter.socket.on("close", onDisconnect);
 
     void this.handle.doc().then(this.emitCurrentDocument);
   }
@@ -38,8 +42,6 @@ export class SyncClient<State> {
   }
 
   dispose() {
-    this.wsAdapter.off("ready");
-    this.wsAdapter.off("close");
     this.handle.off("change");
     this.handle.off("delete");
     this.repo.delete(documentId);
