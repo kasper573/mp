@@ -1,5 +1,5 @@
 {
-  "name": "@mp/network",
+  "name": "@mp/sync",
   "version": "0.0.0",
   "private": true,
   "exports": {
@@ -19,19 +19,17 @@
   ],
   "scripts": {
     "build": "tsc --build",
-    "test": "vitest run",
-    "test:watch": "vitest",
     "dev": "tsc --build --watch --preserveWatchOutput"
   },
   "dependencies": {
+    "@automerge/automerge-repo": "1.2.1",
+    "@automerge/automerge-repo-network-websocket": "1.2.1",
     "@mp/state": "workspace:*",
-    "@automerge/automerge": "2.2.8",
-    "socket.io": "4.7.5",
-    "socket.io-client": "4.7.5"
+    "ws": "8.18.0",
+    "uuid": "11.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "type-fest": "4.26.1",
-    "vitest": "2.0.3"
+    "@types/ws": "8.5.12"
   }
 }

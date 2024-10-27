@@ -7,13 +7,12 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import { SocketServer } from "@mp/network/server";
 import { createAuthClient } from "@mp/auth/server";
-import { createServerCRDT } from "@mp/network/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
+import { SyncServer } from "@mp/sync/server";
 import type { WorldState } from "./modules/world/schema";
 import type { AuthToken, HttpSessionId, UserId } from "./context";
-import { type SocketClientId, type ServerContext } from "./context";
+import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
@@ -59,10 +58,32 @@ async function main(opt: CliOptions) {
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
-  const worldState = createServerCRDT<WorldState, SocketClientId>(
-    initialWorldState.value,
-    deriveWorldStateForClient,
-  );
+  const httpServer = http.createServer(expressApp);
+
+  const worldState = new SyncServer<WorldState, ClientId>({
+    initialState: initialWorldState.value,
+    filterState: deriveWorldStateForClient,
+    httpServer,
+    log: logger.info,
+    peerId: "@mp/server",
+    async onAuthenticate(clientId, authToken) {
+      try {
+        const { sub } = await auth.verifyToken(authToken);
+        const userId = sub as UserId;
+        logger.info("Client authenticated", { clientId, userId });
+        clients.associateClientWithUser(clientId, userId);
+      } catch (error) {
+        logger.error("Client authentication failed", { clientId, error });
+      }
+    },
+    onConnection(clientId) {
+      logger.info("Client connected", clientId);
+    },
+    onDisconnect(clientId) {
+      logger.info("Client disconnected", clientId);
+      clients.deleteClient(clientId);
+    },
+  });
 
   const persistTicker = new Ticker({
     middleware: persist,
@@ -97,28 +118,6 @@ async function main(opt: CliOptions) {
 
   const clients = new ClientRegistry();
 
-  const socketServer = new SocketServer<SocketClientId>({
-    async onAuthenticate(clientId, authToken) {
-      try {
-        const { sub } = await auth.verifyToken(authToken);
-        const userId = sub as UserId;
-        logger.info("Client authenticated", { clientId, userId });
-        clients.associateClientWithUser(clientId, userId);
-      } catch (error) {
-        logger.error("Client authentication failed", { clientId, error });
-      }
-    },
-    onConnection(clientId, reason) {
-      logger.info("Client connected", { clientId, reason });
-    },
-    onDisconnect(clientId, reason) {
-      logger.info("Client disconnected", { clientId, reason });
-      clients.deleteClient(clientId);
-    },
-  });
-
-  const httpServer = http.createServer(expressApp);
-  socketServer.listen(httpServer);
   httpServer.listen(opt.port, opt.listenHostname, () => {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
@@ -128,7 +127,7 @@ async function main(opt: CliOptions) {
 
   async function persist() {
     const state = worldState.access((state) => state);
-    const result = await persistWorldState(db, state as WorldState);
+    const result = await persistWorldState(db, state);
     if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }
@@ -141,21 +140,12 @@ async function main(opt: CliOptions) {
       });
 
       next(delta);
-
-      for (const [clientId, stateUpdate] of worldState.flush(
-        clients.getClientIds(),
-      )) {
-        socketServer.sendStateUpdate(clientId, stateUpdate);
-      }
     } catch (error) {
       logger.chain("tick").error(error);
     }
   }
 
-  function deriveWorldStateForClient(
-    state: WorldState,
-    clientId: SocketClientId,
-  ) {
+  function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
     const characterId = clients.getCharacterId(clientId);
     if (!characterId) {
       throw new Error(

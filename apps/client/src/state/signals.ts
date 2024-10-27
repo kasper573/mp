@@ -1,30 +1,29 @@
 import type { WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import type { StateUpdate } from "@mp/network/client";
-import { createClientCRDT } from "@mp/network/client";
+import { SyncClient } from "@mp/sync/client";
 import { createEffect, createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
 import { trpc } from "../clients/trpc";
 
-const crdt = createClientCRDT<WorldState>({ characters: {} });
+export const syncClient = new SyncClient<WorldState>({
+  url: env.wsUrl,
+  onConnect: () => setConnected(true),
+  onDisconnect: () => setConnected(false),
+});
 
-const [worldState, setWorldState] = createSignal(crdt.access());
+const [worldState, setWorldState] = createSignal(syncClient.getState());
 
 export { worldState };
 
-export function applyWorldStateUpdate(update: StateUpdate) {
-  crdt.update(update);
-  const doc = crdt.access();
-  setWorldState(doc);
-}
+syncClient.subscribe(setWorldState);
 
 export const [myCharacterId, setMyCharacterId] = createSignal<
   CharacterId | undefined
 >();
 
 export const myCharacter = createMemo(
-  () => worldState().characters[myCharacterId()!],
+  () => worldState()?.characters[myCharacterId()!],
 );
 
 export const [connected, setConnected] = createSignal(false);

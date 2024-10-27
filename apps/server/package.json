@@ -21,7 +21,7 @@
     "@mp/data": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/network": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",

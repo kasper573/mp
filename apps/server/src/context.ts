@@ -1,7 +1,7 @@
 import type { Branded } from "@mp/data";
 import type { AuthClient } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
-import type { StateAccess } from "@mp/network/server";
+import type { StateAccess } from "@mp/sync/server";
 import type { WorldState } from "./modules/world/schema";
 import type { ClientRegistry } from "./modules/world/ClientRegistry";
 
@@ -17,4 +17,4 @@ export interface ServerContext {
 export type UserId = Branded<string, "UserId">;
 export type AuthToken = Branded<string, "AuthToken">;
 export type HttpSessionId = Branded<string, "HttpSessionId">;
-export type SocketClientId = Branded<string, "SocketClientId">;
+export type ClientId = Branded<string, "ClientId">;

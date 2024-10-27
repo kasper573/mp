@@ -14,7 +14,7 @@
     "@mp/engine": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/network": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/pixi": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/solid-pixi": "workspace:*",

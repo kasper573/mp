@@ -6,13 +6,13 @@ import { EngineProvider } from "@mp/engine";
 import { createQuery } from "@tanstack/solid-query";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { myCharacter } from "../../state/signals";
-import { useSocketClient } from "../../clients/socket";
+import { useSyncClient } from "../../clients/sync";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const { isSignedIn } = useAuthState();
-  useSocketClient();
+  useSyncClient();
 
   const areaId = createMemo(() => myCharacter()?.areaId);
   const query = createQuery(() => {

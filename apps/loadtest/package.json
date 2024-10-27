@@ -7,7 +7,7 @@
     "loadtest": "tsx src/index.ts"
   },
   "dependencies": {
-    "@mp/network": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/data": "workspace:*",

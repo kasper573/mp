@@ -107,7 +107,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [deltaTime, setDeltaTime] = createSignal<TimeSpan>();
-  const serverTick = createMemo(() => worldState().serverTick ?? 0);
+  const serverTick = createMemo(() => worldState()?.serverTick ?? 0);
 
   onMount(() => onCleanup(engine.addFrameCallback(setDeltaTime)));
 

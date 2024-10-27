@@ -1,10 +1,10 @@
-import type { SocketClientId, UserId } from "../../context";
+import type { ClientId, UserId } from "../../context";
 import type { CharacterId } from "./schema";
 
 export class ClientRegistry {
   private entries: ClientEntry[] = [];
 
-  associateClientWithUser(clientId: SocketClientId, userId: UserId) {
+  associateClientWithUser(clientId: ClientId, userId: UserId) {
     if (!this.entries.some((entry) => entry.clientId)) {
       this.entries.push({ clientId, userId });
     }
@@ -21,25 +21,25 @@ export class ClientRegistry {
     this.entries.push({ userId, characterId });
   }
 
-  deleteClient(clientId: SocketClientId) {
+  deleteClient(clientId: ClientId) {
     this.entries = this.entries.filter((entry) => entry.clientId === clientId);
   }
 
-  getCharacterId(clientId: SocketClientId): CharacterId | undefined {
+  getCharacterId(clientId: ClientId): CharacterId | undefined {
     return this.entries.find((entry) => entry.clientId === clientId)
       ?.characterId;
   }
 
-  getClientIds(): ReadonlySet<SocketClientId> {
+  getClientIds(): ReadonlySet<ClientId> {
     return this.entries.reduce(
       (set, entry) => (entry.clientId ? set.add(entry.clientId) : set),
-      new Set<SocketClientId>(),
+      new Set<ClientId>(),
     );
   }
 }
 
 interface ClientEntry {
-  clientId?: SocketClientId;
+  clientId?: ClientId;
   characterId?: CharacterId;
   userId?: UserId;
 }

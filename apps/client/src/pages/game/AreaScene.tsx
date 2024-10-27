@@ -67,7 +67,7 @@ export function AreaScene(props: { area: AreaResource }) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={Object.values(worldState().characters)}>
+              <Index each={Object.values(worldState()?.characters ?? [])}>
                 {(char) => {
                   const isMe = () => char().id === myCharacter()?.id;
                   return (

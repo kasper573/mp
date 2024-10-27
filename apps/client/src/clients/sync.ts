@@ -1,20 +1,12 @@
-import { SocketClient } from "@mp/network/client";
 import { AuthContext } from "@mp/auth/client";
 import { createEffect, createSignal, onCleanup, useContext } from "solid-js";
-import { env } from "../env";
-import { applyWorldStateUpdate, setConnected } from "../state/signals";
+import { syncClient } from "../state/signals";
 import { fetchAuthToken } from "./auth";
 
-export function useSocketClient() {
+export function useSyncClient() {
   const [getToken, setToken] = createSignal<string | undefined>();
 
   const authClient = useContext(AuthContext);
-  const socketClient = new SocketClient({
-    url: env.wsUrl,
-    applyStateUpdate: applyWorldStateUpdate,
-    onConnect: () => setConnected(true),
-    onDisconnect: () => setConnected(false),
-  });
 
   function refreshToken() {
     void fetchAuthToken(authClient).then(setToken);
@@ -23,12 +15,12 @@ export function useSocketClient() {
   createEffect(() => {
     const token = getToken();
     if (token) {
-      socketClient.authenticate(token);
+      syncClient.authenticate(token);
     }
   });
 
   onCleanup(authClient.addListener(refreshToken));
-  onCleanup(() => socketClient.dispose());
+  onCleanup(() => syncClient.dispose());
 
-  return socketClient;
+  return syncClient;
 }

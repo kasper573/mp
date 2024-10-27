@@ -1,5 +1,3 @@
-import { createClientCRDT } from "@mp/network/client";
-import { SocketClient } from "@mp/network/client";
 import { Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
@@ -8,8 +6,7 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
-const { httpServerUrl, apiServerUrl, wsServerUrl, connections, requests } =
-  readCliOptions();
+const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
 void main();
 
 async function main() {
@@ -17,7 +14,7 @@ async function main() {
   logger.info(`Load testing ${requests} requests x ${connections} connections`);
 
   await loadTestHTTP();
-  await loadTestWebSockets();
+  await loadTestRPC();
 
   const end = performance.now();
 
@@ -46,15 +43,9 @@ async function loadTestHTTP() {
   );
 }
 
-async function loadTestWebSockets() {
+async function loadTestRPC() {
   await Promise.all(
     range(connections).map(async (clientNr) => {
-      const state = createClientCRDT({ characters: new Map() });
-      const client = new SocketClient({
-        url: wsServerUrl,
-        applyStateUpdate: state.update,
-      });
-
       const trpc = createTRPCClient<RootRouter>({
         links: [httpBatchLink({ url: apiServerUrl, transformer })],
       });
@@ -69,9 +60,8 @@ async function loadTestWebSockets() {
       const failures = results.filter((r) => r.status === "rejected").length;
 
       logger.info(
-        `WebSocket test ${clientNr} done: ${successes} successes, ${failures} failures`,
+        `RPC test ${clientNr} done: ${successes} successes, ${failures} failures`,
       );
-      client.dispose();
     }),
   );
 }
