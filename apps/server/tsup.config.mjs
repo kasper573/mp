@@ -6,7 +6,6 @@ export default defineConfig(__dirname, {
   target: "node20",
   bundle: true,
   splitting: false,
-  minify: true,
   entry: { index: "src/main.ts" },
   dts: false,
   noExternal: [/.*/],
