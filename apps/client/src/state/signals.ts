@@ -7,6 +7,7 @@ import { env } from "../env";
 import { trpc } from "../clients/trpc";
 
 export const syncClient = new SyncClient<WorldState>({
+  initialState: { characters: {} },
   url: env.wsUrl,
   onConnect: () => setConnected(true),
   onDisconnect: () => setConnected(false),

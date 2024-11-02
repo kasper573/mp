@@ -1,7 +1,7 @@
-import type { DocHandle } from "@automerge/automerge-repo/slim";
-import { Repo } from "@automerge/automerge-repo/slim";
+import type { DocHandle } from "@automerge/automerge-repo";
+import { Repo } from "@automerge/automerge-repo";
 import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
-import { authenticateEvent, documentId } from "./shared";
+import { authenticateEvent } from "./shared";
 
 export class SyncClient<State> {
   private wsAdapter: BrowserWebSocketClientAdapter;
@@ -10,14 +10,15 @@ export class SyncClient<State> {
   private subscriptions = new Set<SyncClientSubscription<State>>();
 
   constructor({
+    initialState,
     url,
     onConnect = noop,
     onDisconnect = noop,
-  }: SyncClientOptions) {
+  }: SyncClientOptions<State>) {
     this.wsAdapter = new BrowserWebSocketClientAdapter(url);
     this.repo = new Repo({ network: [this.wsAdapter] });
 
-    this.handle = this.repo.find(documentId);
+    this.handle = this.repo.create(initialState);
     this.handle.on("change", this.emitCurrentDocument);
     this.handle.on("delete", this.emitCurrentDocument);
     if (!this.wsAdapter.socket) {
@@ -44,7 +45,7 @@ export class SyncClient<State> {
   dispose() {
     this.handle.off("change");
     this.handle.off("delete");
-    this.repo.delete(documentId);
+    this.repo.delete(this.handle.url);
     this.wsAdapter.disconnect();
   }
 
@@ -65,7 +66,8 @@ export class SyncClient<State> {
   };
 }
 
-export interface SyncClientOptions {
+export interface SyncClientOptions<State> {
+  initialState: State;
   url: string;
   onConnect?: () => void;
   onDisconnect?: () => void;

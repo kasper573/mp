@@ -5,7 +5,7 @@ import { WebSocketServer } from "ws";
 import { Repo } from "@automerge/automerge-repo/slim";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import { v4 as uuid } from "uuid";
-import { authenticateEvent, documentId } from "./shared";
+import { authenticateEvent } from "./shared";
 
 export class SyncServer<State, ClientId extends string> {
   private repo: Repo;
@@ -14,7 +14,6 @@ export class SyncServer<State, ClientId extends string> {
 
   constructor(private options: SyncServerOptions<State, ClientId>) {
     this.wss = new WebSocketServer({ server: options.httpServer });
-
     this.repo = new Repo({
       network: [new NodeWSServerAdapter(this.wss)],
       peerId: options.peerId as PeerId,
@@ -34,8 +33,8 @@ export class SyncServer<State, ClientId extends string> {
   };
 
   dispose() {
+    this.repo.delete(this.handle.url);
     this.wss.off("connection", this.onConnection);
-    this.repo.delete(documentId);
     this.wss.close();
   }
 

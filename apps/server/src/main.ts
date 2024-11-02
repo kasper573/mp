@@ -63,6 +63,10 @@ async function main(opt: CliOptions) {
 
   await initializeSyncWasm();
 
+  httpServer.listen(opt.port, opt.listenHostname, () => {
+    logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
+  });
+
   const worldState = new SyncServer<WorldState, ClientId>({
     initialState: initialWorldState.value,
     filterState: deriveWorldStateForClient,
@@ -120,10 +124,6 @@ async function main(opt: CliOptions) {
   );
 
   const clients = new ClientRegistry();
-
-  httpServer.listen(opt.port, opt.listenHostname, () => {
-    logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
-  });
 
   persistTicker.start();
   ticker.start();
