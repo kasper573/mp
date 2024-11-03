@@ -20,5 +20,10 @@
     "target": "ESNext",
     "noEmit": true
   },
-  "exclude": ["node_modules", "${configDir}dist", "${configDir}.cache"]
+  "exclude": ["node_modules", "${configDir}dist", "${configDir}.cache"],
+  "include": [
+    "${configDir}*.ts",
+    "${configDir}src/**/*.ts",
+    "${configDir}src/**/*.tsx"
+  ]
 }

@@ -4,27 +4,27 @@
   "private": true,
   "exports": {
     "./client": {
-      "import": "./dist/client.js",
-      "require": "./dist/client.js",
-      "types": "./dist/client.d.ts"
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.cjs"
     },
     "./server": {
-      "import": "./dist/server.js",
-      "require": "./dist/server.js",
-      "types": "./dist/server.d.ts"
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.cjs"
     },
     "./wasm": {
-      "import": "./dist/wasm.js",
-      "require": "./dist/wasm.js",
-      "types": "./dist/wasm.d.ts"
+      "types": "./dist/wasm.d.ts",
+      "import": "./dist/wasm.mjs",
+      "require": "./dist/wasm.cjs"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc --build",
-    "dev": "tsc --build --watch --preserveWatchOutput"
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@automerge/automerge": "2.2.8",
@@ -36,6 +36,7 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*",
     "@types/ws": "8.5.12"
   }
 }

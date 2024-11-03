@@ -4,17 +4,17 @@
   "private": true,
   "exports": {
     ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.d.js",
-      "types": "./dist/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc --build",
-    "dev": "tsc --build --watch --preserveWatchOutput"
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@mp/math": "workspace:*",
@@ -23,6 +23,7 @@
     "solid-js": "1.9.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*"
   }
 }

@@ -4,10 +4,14 @@
   "private": true,
   "exports": {
     ".": {
-      "import": "./src/index.ts",
-      "require": "./src/index.ts",
-      "types": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@mp/tiled-loader": "workspace:*",
@@ -16,6 +20,7 @@
     "solid-js": "1.9.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*"
   }
 }

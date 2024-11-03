@@ -123,6 +123,8 @@ async function main(opt: CliOptions) {
     }),
   );
 
+  // A lil' comment
+
   const clients = new ClientRegistry();
 
   persistTicker.start();
