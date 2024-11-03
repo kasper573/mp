@@ -29,7 +29,10 @@ export function createGameClient(authClient: AuthClient): GameClient {
 
   const areaId = createMemo(() => character()?.areaId);
 
-  onCleanup(() => syncClient.dispose());
+  createEffect(() => {
+    syncClient.start();
+    onCleanup(() => syncClient.stop());
+  });
 
   createEffect(() => onCleanup(syncClient.subscribe(setWorldState)));
 

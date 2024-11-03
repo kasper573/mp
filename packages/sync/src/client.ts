@@ -6,9 +6,8 @@ import { authenticateEvent } from "./shared";
 export class SyncClient<State> {
   private wsAdapter: BrowserWebSocketClientAdapter;
   private repo: Repo;
-  private handle: DocHandle<State>;
+  private handle?: DocHandle<State>;
   private subscriptions = new Set<SyncClientSubscription<State>>();
-  private isDisposed = false;
 
   get socket(): WebSocket | undefined {
     // This assertion is a workaround of automerge using isomorphic-ws,
@@ -19,15 +18,9 @@ export class SyncClient<State> {
     return this.wsAdapter.socket as unknown as WebSocket;
   }
 
-  constructor({ initialState, url }: SyncClientOptions<State>) {
-    this.wsAdapter = new BrowserWebSocketClientAdapter(url);
+  constructor(private options: SyncClientOptions<State>) {
+    this.wsAdapter = new BrowserWebSocketClientAdapter(options.url);
     this.repo = new Repo({ network: [this.wsAdapter] });
-
-    this.handle = this.repo.create(initialState);
-    this.handle.on("change", this.emitCurrentDocument);
-    this.handle.on("delete", this.emitCurrentDocument);
-
-    void this.handle.doc().then(this.emitCurrentDocument);
   }
 
   authenticate(authToken: string) {
@@ -37,14 +30,22 @@ export class SyncClient<State> {
   }
 
   getState(): State | undefined {
-    return this.handle.docSync();
+    return this.handle?.docSync();
   }
 
-  dispose() {
-    if (this.isDisposed) {
-      throw new Error("Already disposed");
+  start() {
+    this.handle = this.repo.create(this.options.initialState);
+    this.handle.on("change", this.emitCurrentDocument);
+    this.handle.on("delete", this.emitCurrentDocument);
+
+    void this.handle.doc().then(this.emitCurrentDocument);
+  }
+
+  stop() {
+    if (!this.handle) {
+      throw new Error("Cannot stop a client that hasn't started");
     }
-    this.isDisposed = true;
+
     this.handle.off("change");
     this.handle.off("delete");
     this.repo.delete(this.handle.url);
