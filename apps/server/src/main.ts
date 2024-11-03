@@ -10,7 +10,6 @@ import createCors from "cors";
 import { createAuthClient } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
-import { initializeSyncWasm } from "@mp/sync/wasm";
 import type { WorldState } from "./modules/world/schema";
 import type { AuthToken, HttpSessionId, UserId } from "./context";
 import { type ClientId, type ServerContext } from "./context";
@@ -60,8 +59,6 @@ async function main(opt: CliOptions) {
   }
 
   const httpServer = http.createServer(expressApp);
-
-  await initializeSyncWasm();
 
   httpServer.listen(opt.port, opt.listenHostname, () => {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);

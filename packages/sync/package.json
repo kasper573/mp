@@ -12,11 +12,6 @@
       "types": "./dist/server.d.ts",
       "import": "./dist/server.mjs",
       "require": "./dist/server.cjs"
-    },
-    "./wasm": {
-      "types": "./dist/wasm.d.ts",
-      "import": "./dist/wasm.mjs",
-      "require": "./dist/wasm.cjs"
     }
   },
   "files": [

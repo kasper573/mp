@@ -1,8 +1,8 @@
 import { type Server } from "node:http";
-import type { DocHandle, PeerId } from "@automerge/automerge-repo/slim";
+import type { DocHandle, PeerId } from "@automerge/automerge-repo";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
-import { Repo } from "@automerge/automerge-repo/slim";
+import { Repo } from "@automerge/automerge-repo";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import { v4 as uuid } from "uuid";
 import { authenticateEvent } from "./shared";
