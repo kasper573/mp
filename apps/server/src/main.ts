@@ -191,15 +191,15 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
 
 function serverTextHeader(options: CliOptions) {
   return `
-=====================================================
-#                                                   #
-#                ███╗   ███╗ ██████╗                #
-#                ████╗ ████║ ██╔══██╗               #
-#                ██╔████╔██║ ██████╔╝               #
-#                ██║╚██╔╝██║ ██╔═══╝                #
-#                ██║ ╚═╝ ██║ ██║                    #
-#                ╚═╝     ╚═╝ ╚═╝                    #
-=====================================================
+===============================
+#                             #
+#     ███╗   ███╗ ██████╗     #
+#     ████╗ ████║ ██╔══██╗    #
+#     ██╔████╔██║ ██████╔╝    #
+#     ██║╚██╔╝██║ ██╔═══╝     #
+#     ██║ ╚═╝ ██║ ██║         #
+#     ╚═╝     ╚═╝ ╚═╝         #
+===============================
 buildVersion: ${options.buildVersion}
 hostname: ${options.hostname}
 listenHostname: ${options.listenHostname}
