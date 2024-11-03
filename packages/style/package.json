@@ -5,15 +5,19 @@
   "license": "MIT",
   "exports": {
     ".": {
-      "import": "./src/index.ts",
-      "require": "./src/index.ts",
-      "types": "./src/index.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     },
     "./themes/*": {
-      "import": "./themes/*.ts",
-      "require": "./themes/*.ts",
-      "types": "./themes/*.ts"
+      "types": "./dist/themes/*.d.ts",
+      "import": "./dist/themes/*.mjs",
+      "require": "./dist/themes/*.cjs"
     }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@vanilla-extract/css": "1.15.5",
@@ -24,6 +28,7 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*",
     "csstype": "3.1.3"
   }
 }

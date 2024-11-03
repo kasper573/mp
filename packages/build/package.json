@@ -3,6 +3,27 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
+  "exports": {
+    "./tsup": {
+      "types": "./dist/tsup.d.ts",
+      "import": "./dist/tsup.mjs",
+      "require": "./dist/tsup.cjs"
+    },
+    "./utils": {
+      "types": "./dist/utils.d.ts",
+      "import": "./dist/utils.mjs",
+      "require": "./dist/utils.cjs"
+    },
+    "./vite": {
+      "types": "./dist/vite.d.ts",
+      "import": "./dist/vite.mjs",
+      "require": "./dist/vite.cjs"
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@vanilla-extract/vite-plugin": "4.0.15",

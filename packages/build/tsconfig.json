@@ -1,7 +1,1 @@
-{
-  "extends": ["@mp/tsconfig/node.json"],
-  "include": ["./*.mjs"],
-  "compilerOptions": {
-    "allowJs": true
-  }
-}
+{ "extends": "@mp/tsconfig/node.json" }

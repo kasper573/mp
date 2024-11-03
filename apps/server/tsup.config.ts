@@ -1,6 +1,6 @@
-import { defineConfig } from "@mp/build/tsup.mjs";
+import { defineConfig } from "@mp/build/tsup";
 
-export default defineConfig(__dirname, {
+export default defineConfig({
   outExtension: () => ({ js: `.js` }),
   format: "cjs",
   target: "node20",

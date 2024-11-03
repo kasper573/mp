@@ -1,4 +1,1 @@
-{
-  "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "themes"]
-}
+{ "extends": "@mp/tsconfig/node.json" }

@@ -5,10 +5,7 @@ import solid from "vite-plugin-solid";
 import wasm from "vite-plugin-wasm";
 import topLevelAwait from "vite-plugin-top-level-await";
 
-/**
- * @param {string} projectRoot
- */
-export function defineConfig(projectRoot) {
+export function defineConfig(projectRoot: string) {
   return defineViteConfig({
     plugins: [
       vanillaExtractPlugin(),
