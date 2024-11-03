@@ -1,7 +1,10 @@
 import { defineConfig } from "@mp/build/tsup";
 
 export default defineConfig({
+  format: "esm",
+  target: "node20",
   entry: { index: "src/main.ts" },
+  outExtension: () => ({ js: ".mjs" }),
   // Nothing needs the typesecript declaration files of the server app
   dts: false,
   // Building for production means bundling everything into a docker image,
@@ -9,10 +12,7 @@ export default defineConfig({
   // so we only do it in production.
   ...(process.env.PROD
     ? {
-        outExtension: () => ({ js: `.js` }),
         noExternal: [/.*/],
-        format: "cjs",
-        target: "node20",
         bundle: true,
         splitting: false,
       }
