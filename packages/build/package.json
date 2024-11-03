@@ -27,7 +27,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@vanilla-extract/vite-plugin": "4.0.15",
-    "tsup": "8.1.0",
+    "tsup": "8.3.5",
     "vite": "5.2.13",
     "vite-plugin-top-level-await": "1.4.4",
     "vite-plugin-checker": "0.6.4",

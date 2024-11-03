@@ -1,6 +1,6 @@
 import { createTheme } from "@vanilla-extract/css";
-import { themeContract } from "../theme.css";
-import { palette } from "../tokens";
+import { themeContract } from "../src/theme.css";
+import { palette } from "../src/tokens";
 
 const darkValues = {
   color: {

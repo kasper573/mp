@@ -1,12 +1,7 @@
 import { defineConfig } from "@mp/build/tsup";
 
 export default defineConfig({
-  outExtension: () => ({ js: `.js` }),
-  format: "cjs",
-  target: "node20",
-  bundle: true,
-  splitting: false,
   entry: { index: "src/main.ts" },
+  // Nothing needs the typesecript declaration files of the server app
   dts: false,
-  noExternal: [/.*/],
 });
