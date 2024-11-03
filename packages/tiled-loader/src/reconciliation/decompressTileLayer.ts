@@ -1,15 +1,17 @@
-import { localToGlobalId, readGlobalIdBuffer } from "@mp/tiled-loader";
+import { localToGlobalId, readGlobalIdBuffer } from "../gid";
+import type { Chunk } from "../schema/chunk";
 import type {
-  TileLayerTile,
-  TiledMap,
   TileNumber,
-  SharedLayerProperties,
-  CommonTileLayerProperties,
-  Chunk,
   Compression,
   TiledData,
   Encoding,
-} from "@mp/tiled-loader";
+} from "../schema/common";
+import type {
+  TileLayerTile,
+  SharedLayerProperties,
+  CommonTileLayerProperties,
+} from "../schema/layer";
+import type { TiledMap } from "../schema/map";
 import { decoders, decompressors } from "../transformers";
 
 export function decompressTileLayer(
