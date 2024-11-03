@@ -33,7 +33,7 @@ export function createWorldRouter({
   doesCurrentRequestHaveAccessToClient,
 }: WorldRouterDependencies) {
   ticker.subscribe((delta) => {
-    accessState((state) => {
+    accessState("world.ticker", (state) => {
       for (const char of Object.values(state.characters)) {
         if (char.path) {
           const { destinationReached } = moveAlongPath(
@@ -69,7 +69,7 @@ export function createWorldRouter({
       .input(schemaFor<{ characterId: CharacterId } & Vector>())
       .use(auth())
       .mutation(({ input: { characterId, x, y }, ctx: { logger } }) =>
-        accessState((state) => {
+        accessState(`world.move`, (state) => {
           const char = state.characters[characterId];
 
           if (!char) {
@@ -100,7 +100,7 @@ export function createWorldRouter({
       .output(schemaFor<CharacterId>())
       .use(auth())
       .mutation(({ input: clientId, ctx: { userId, clients, logger } }) =>
-        accessState((state) => {
+        accessState("world.join", (state) => {
           if (!doesCurrentRequestHaveAccessToClient(clientId)) {
             throw new TRPCError({
               code: "UNAUTHORIZED",

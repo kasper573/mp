@@ -19,7 +19,6 @@ import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
-import type { TickMiddlewareOpts } from "./Ticker";
 import { Ticker } from "./Ticker";
 import { tokenHeaderName } from "./tokenHeaderName";
 
@@ -64,7 +63,7 @@ async function main(opt: CliOptions) {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  const worldState = new SyncServer<WorldState, ClientId>({
+  const worldState = new SyncServer<WorldState>({
     initialState: initialWorldState.value,
     filterState: deriveWorldStateForClient,
     httpServer,
@@ -83,10 +82,7 @@ async function main(opt: CliOptions) {
     interval: opt.persistInterval,
   });
 
-  const ticker = new Ticker({
-    middleware: serverTickMiddleware,
-    interval: opt.tickInterval,
-  });
+  const ticker = new Ticker({ interval: opt.tickInterval });
 
   const apiRouter = createRootRouter({
     areas: areas.value,
@@ -112,26 +108,14 @@ async function main(opt: CliOptions) {
 
   const clients = new ClientRegistry();
 
-  persistTicker.start();
+  //persistTicker.start();
   ticker.start();
 
   async function persist() {
-    const state = worldState.access((state) => state);
+    const state = worldState.access("persist", (state) => state);
     const result = await persistWorldState(db, state);
     if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
-    }
-  }
-
-  function serverTickMiddleware({ delta, next }: TickMiddlewareOpts) {
-    try {
-      worldState.access((state) => {
-        state.serverTick = delta.totalMilliseconds;
-      });
-
-      next(delta);
-    } catch (error) {
-      logger.chain("tick").error(error);
     }
   }
 
@@ -146,11 +130,6 @@ async function main(opt: CliOptions) {
     // TODO use character id to derive state for client
 
     return state;
-  }
-
-  function doesCurrentRequestHaveAccessToClient(clientId: ClientId) {
-    // TODO implement
-    return true;
   }
 
   function createServerContext(
@@ -173,6 +152,11 @@ async function main(opt: CliOptions) {
       : fileInPublicDir;
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
+}
+
+function doesCurrentRequestHaveAccessToClient(clientId: ClientId) {
+  // TODO implement
+  return true;
 }
 
 function createExpressLogger(logger: Logger): express.RequestHandler {
