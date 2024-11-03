@@ -33,7 +33,7 @@ export class Ticker {
       this.lastTickTime === undefined ? 0 : now - this.lastTickTime;
     this.lastTickTime = now;
     const delta = TimeSpan.fromMilliseconds(deltaMys / 1000);
-    this.options.middleware({ delta, next: this.emit });
+    this.options.middleware?.({ delta, next: this.emit });
   };
 
   private emit = (delta: TimeSpan) => {
@@ -51,7 +51,7 @@ export interface TickMiddlewareOpts {
 export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
 
 export interface TickerOptions {
-  middleware: TickMiddleware;
+  middleware?: TickMiddleware;
   interval: TimeSpan;
 }
 
