@@ -24,9 +24,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
 
   const [worldState, setWorldState] = createSignal(syncClient.getState());
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-
   const character = createMemo(() => worldState()?.characters[characterId()!]);
-
   const areaId = createMemo(() => character()?.areaId);
 
   createEffect(() => {
