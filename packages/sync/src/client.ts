@@ -5,8 +5,8 @@ import { v4 as uuid } from "uuid";
 import type { ClientId } from "./shared";
 
 export class SyncClient<State> {
-  private wsAdapter: BrowserWebSocketClientAdapter;
-  private repo: Repo;
+  private wsAdapter?: BrowserWebSocketClientAdapter;
+  private repo?: Repo;
   private handle?: DocHandle<State>;
   private subscriptions = new Set<SyncClientSubscription<State>>();
 
@@ -14,11 +14,6 @@ export class SyncClient<State> {
 
   constructor(private options: SyncClientOptions<State>) {
     this.clientId = uuid() as ClientId;
-    this.wsAdapter = new BrowserWebSocketClientAdapter(options.url);
-    this.repo = new Repo({
-      network: [this.wsAdapter],
-      peerId: this.clientId,
-    });
   }
 
   getState(): State | undefined {
@@ -26,6 +21,11 @@ export class SyncClient<State> {
   }
 
   start() {
+    this.wsAdapter = new BrowserWebSocketClientAdapter(this.options.url);
+    this.repo = new Repo({
+      network: [this.wsAdapter],
+      peerId: this.clientId,
+    });
     this.handle = this.repo.create(this.options.initialState);
     this.handle.on("change", this.emitCurrentDocument);
     this.handle.on("delete", this.emitCurrentDocument);
@@ -34,14 +34,17 @@ export class SyncClient<State> {
   }
 
   stop() {
-    if (!this.handle) {
+    if (!this.handle || !this.wsAdapter || !this.repo) {
       throw new Error("Cannot stop a client that hasn't started");
     }
 
+    this.wsAdapter.disconnect();
     this.handle.off("change");
     this.handle.off("delete");
     this.repo.delete(this.handle.url);
-    this.wsAdapter.disconnect();
+    this.wsAdapter = undefined;
+    this.repo = undefined;
+    this.handle = undefined;
   }
 
   subscribe = (handler: SyncClientSubscription<State>) => {
