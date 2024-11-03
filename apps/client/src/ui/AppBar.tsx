@@ -2,7 +2,7 @@ import { Show, useContext } from "solid-js";
 import { useAuthState, AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
-import { connected, useVersionCompatibility } from "../state/signals";
+import { useVersionCompatibility } from "../state/signals";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
 import { Link } from "./Link";
@@ -27,11 +27,6 @@ export default function AppBar() {
           There is a new version available{" "}
           <Button onClick={() => window.location.reload()}>Reload</Button>
         </Show>
-
-        <div
-          class={styles.connectionIndicator({ connected: connected() })}
-          title={connected() ? "Connected" : "Offline"}
-        />
 
         {isSignedIn() ? (
           <Button onClick={() => void auth.signOut()}>Sign out</Button>

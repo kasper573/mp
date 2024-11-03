@@ -5,14 +5,17 @@ import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
 import { createQuery } from "@tanstack/solid-query";
 import { loadAreaResource } from "../../state/loadAreaResource";
-import { myCharacter } from "../../state/signals";
+import { myCharacter, setMyCharacterId } from "../../state/signals";
 import { useSyncClient } from "../../clients/sync";
+import { trpc } from "../../clients/trpc";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const { isSignedIn } = useAuthState();
   useSyncClient();
+
+  void trpc.world.join.mutate().then(setMyCharacterId);
 
   const areaId = createMemo(() => myCharacter()?.areaId);
   const query = createQuery(() => {

@@ -1,4 +1,4 @@
-import { atoms, globalStyle, recipe, tokens, style } from "@mp/style";
+import { atoms, globalStyle, tokens, style } from "@mp/style";
 
 const row = atoms({
   display: "flex",
@@ -29,24 +29,3 @@ export const right = style([
     marginLeft: "auto",
   }),
 ]);
-
-export const connectionIndicator = recipe({
-  base: atoms({
-    width: "s",
-    height: "s",
-    borderRadius: "circle",
-    border: "thin",
-  }),
-  variants: {
-    connected: {
-      true: atoms({
-        backgroundColor: "success.base",
-        borderColor: "success.face_subtle",
-      }),
-      false: atoms({
-        backgroundColor: "error.base",
-        borderColor: "error.face_subtle",
-      }),
-    },
-  },
-});

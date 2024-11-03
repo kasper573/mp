@@ -1,7 +1,7 @@
 import type { WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
 import { SyncClient } from "@mp/sync/client";
-import { createEffect, createMemo, createSignal } from "solid-js";
+import { createMemo, createSignal } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
 import { trpc } from "../clients/trpc";
@@ -28,14 +28,6 @@ export const myCharacter = createMemo(
 );
 
 export const [connected, setConnected] = createSignal(false);
-
-createEffect(() => {
-  if (connected()) {
-    void trpc.world.join.mutate().then(setMyCharacterId);
-  } else {
-    setMyCharacterId(undefined);
-  }
-});
 
 export const useServerVersion = () =>
   createQuery(() => ({
