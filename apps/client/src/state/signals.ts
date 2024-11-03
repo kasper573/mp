@@ -9,8 +9,6 @@ import { trpc } from "../clients/trpc";
 export const syncClient = new SyncClient<WorldState>({
   initialState: { characters: {} },
   url: env.wsUrl,
-  onConnect: () => setConnected(true),
-  onDisconnect: () => setConnected(false),
 });
 
 const [worldState, setWorldState] = createSignal(syncClient.getState());
@@ -26,8 +24,6 @@ export const [myCharacterId, setMyCharacterId] = createSignal<
 export const myCharacter = createMemo(
   () => worldState()?.characters[myCharacterId()!],
 );
-
-export const [connected, setConnected] = createSignal(false);
 
 export const useServerVersion = () =>
   createQuery(() => ({

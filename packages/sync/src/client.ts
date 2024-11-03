@@ -8,34 +8,32 @@ export class SyncClient<State> {
   private repo: Repo;
   private handle: DocHandle<State>;
   private subscriptions = new Set<SyncClientSubscription<State>>();
+  private isDisposed = false;
 
-  constructor({
-    initialState,
-    url,
-    onConnect = noop,
-    onDisconnect = noop,
-  }: SyncClientOptions<State>) {
+  get socket(): WebSocket | undefined {
+    // This assertion is a workaround of automerge using isomorphic-ws,
+    // which automatically uses the @types/ws installed in this package.
+    // However, @types/ws is installed for the server module, which actually uses the ws
+    // module. But on the client, ws isn't being used.
+    // In reality the browser WebSocket API is being used.
+    return this.wsAdapter.socket as unknown as WebSocket;
+  }
+
+  constructor({ initialState, url }: SyncClientOptions<State>) {
     this.wsAdapter = new BrowserWebSocketClientAdapter(url);
     this.repo = new Repo({ network: [this.wsAdapter] });
 
     this.handle = this.repo.create(initialState);
     this.handle.on("change", this.emitCurrentDocument);
     this.handle.on("delete", this.emitCurrentDocument);
-    if (!this.wsAdapter.socket) {
-      throw new Error("WebSocket connection failed");
-    }
-
-    this.wsAdapter.socket.on("open", onConnect);
-    this.wsAdapter.socket.on("close", onDisconnect);
 
     void this.handle.doc().then(this.emitCurrentDocument);
   }
 
   authenticate(authToken: string) {
-    const { socket } = this.wsAdapter;
-    if (socket) {
-      socket.emit(authenticateEvent, authToken);
-    }
+    this.socket?.dispatchEvent(
+      new CustomEvent(authenticateEvent, { detail: authToken }),
+    );
   }
 
   getState(): State | undefined {
@@ -43,6 +41,10 @@ export class SyncClient<State> {
   }
 
   dispose() {
+    if (this.isDisposed) {
+      throw new Error("Already disposed");
+    }
+    this.isDisposed = true;
     this.handle.off("change");
     this.handle.off("delete");
     this.repo.delete(this.handle.url);
@@ -69,8 +71,6 @@ export class SyncClient<State> {
 export interface SyncClientOptions<State> {
   initialState: State;
   url: string;
-  onConnect?: () => void;
-  onDisconnect?: () => void;
 }
 
 export type SyncClientSubscription<State> = (state: State) => void;
