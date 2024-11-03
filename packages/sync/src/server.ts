@@ -39,9 +39,9 @@ export class SyncServer<State, ClientId extends string> {
   }
 
   private onConnection = (socket: WebSocket) => {
-    void handleSocket(socket);
-
     const { onAuthenticate, onConnection, onDisconnect } = this.options;
+
+    void handleSocket(socket);
 
     async function handleSocket(socket: WebSocket) {
       const clientId = uuid() as ClientId;
