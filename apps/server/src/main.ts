@@ -11,7 +11,7 @@ import { createAuthClient } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import type { WorldState } from "./modules/world/schema";
-import type { AuthToken, HttpSessionId, UserId } from "./context";
+import type { AuthToken, HttpSessionId } from "./context";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import { readCliOptions, type CliOptions } from "./cli";
@@ -69,17 +69,6 @@ async function main(opt: CliOptions) {
     filterState: deriveWorldStateForClient,
     httpServer,
     log: logger.info,
-    peerId: "@mp/server",
-    async onAuthenticate(clientId, authToken) {
-      try {
-        const { sub } = await auth.verifyToken(authToken);
-        const userId = sub as UserId;
-        logger.info("Client authenticated", { clientId, userId });
-        clients.associateClientWithUser(clientId, userId);
-      } catch (error) {
-        logger.error("Client authentication failed", { clientId, error });
-      }
-    },
     onConnection(clientId) {
       logger.info("Client connected", clientId);
     },
@@ -106,6 +95,7 @@ async function main(opt: CliOptions) {
     createUrl,
     buildVersion: opt.buildVersion,
     ticker,
+    doesCurrentRequestHaveAccessToClient,
   });
 
   expressApp.use(
@@ -119,8 +109,6 @@ async function main(opt: CliOptions) {
         ),
     }),
   );
-
-  // A lil' comment
 
   const clients = new ClientRegistry();
 
@@ -158,6 +146,11 @@ async function main(opt: CliOptions) {
     // TODO use character id to derive state for client
 
     return state;
+  }
+
+  function doesCurrentRequestHaveAccessToClient(clientId: ClientId) {
+    // TODO implement
+    return true;
   }
 
   function createServerContext(

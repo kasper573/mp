@@ -1,1 +1,1 @@
-export const authenticateEvent = "authenticate";
+export type { PeerId as ClientId } from "@automerge/automerge-repo";

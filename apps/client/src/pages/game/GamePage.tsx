@@ -11,7 +11,7 @@ import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
-  const gameClient = createGameClient(auth);
+  const gameClient = createGameClient();
 
   const area = createQuery(() => {
     const id = gameClient.areaId();

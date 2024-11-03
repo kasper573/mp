@@ -9,14 +9,13 @@ import {
   createSignal,
   onCleanup,
 } from "solid-js";
-import type { AuthClient } from "@mp/auth/client";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
 import { env } from "../env";
 import { dedupe, throttle } from "../state/functionComposition";
 import { trpc } from "./trpc";
 
-export function createGameClient(authClient: AuthClient): GameClient {
+export function createGameClient(): GameClient {
   const syncClient = new SyncClient<WorldState>({
     initialState: { characters: {} },
     url: env.wsUrl,
@@ -34,14 +33,8 @@ export function createGameClient(authClient: AuthClient): GameClient {
 
   createEffect(() => onCleanup(syncClient.subscribe(setWorldState)));
 
-  createEffect(() => {
-    const token = authClient.token();
-    if (token) {
-      syncClient.authenticate(token);
-    }
-  });
-
-  const join = () => trpc.world.join.mutate().then(setCharacterId);
+  const join = () =>
+    trpc.world.join.mutate(syncClient.clientId).then(setCharacterId);
 
   const serverTick = createMemo(() => worldState()?.serverTick ?? 0);
 

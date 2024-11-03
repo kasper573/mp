@@ -17,4 +17,4 @@ export interface ServerContext {
 export type UserId = Branded<string, "UserId">;
 export type AuthToken = Branded<string, "AuthToken">;
 export type HttpSessionId = Branded<string, "HttpSessionId">;
-export type ClientId = Branded<string, "ClientId">;
+export type { ClientId } from "@mp/sync/server";
