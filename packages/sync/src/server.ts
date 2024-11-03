@@ -11,22 +11,22 @@ import type { ClientId } from "./shared";
 
 export class SyncServer<State> {
   private repo: Repo;
-  private wsAdapter: NodeWSServerAdapter;
+  private wssAdapter: NodeWSServerAdapter;
   private handle: DocHandle<State>;
 
   constructor(private options: SyncServerOptions<State, ClientId>) {
-    this.wsAdapter = new NodeWSServerAdapter(
+    this.wssAdapter = new NodeWSServerAdapter(
       new WebSocketServer({ server: options.httpServer }),
     );
 
     this.repo = new Repo({
-      network: [this.wsAdapter],
+      network: [this.wssAdapter],
       sharePolicy: () => Promise.resolve(false),
     });
 
     this.handle = this.repo.create(options.initialState);
-    this.wsAdapter.on("peer-candidate", this.onConnection);
-    this.wsAdapter.on("peer-disconnected", this.onDisconnect);
+    this.wssAdapter.on("peer-candidate", this.onConnection);
+    this.wssAdapter.on("peer-disconnected", this.onDisconnect);
   }
 
   access: StateAccess<State> = (reference, mutateFn) => {
@@ -42,7 +42,7 @@ export class SyncServer<State> {
   };
 
   dispose() {
-    this.wsAdapter.disconnect();
+    this.wssAdapter.disconnect();
   }
 
   private onConnection = ({ peerId }: PeerCandidatePayload) => {
