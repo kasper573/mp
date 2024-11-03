@@ -1,6 +1,6 @@
 import { Clerk } from "@clerk/clerk-js/headless";
 import type { Accessor } from "solid-js";
-import { createContext, createSignal, onCleanup } from "solid-js";
+import { createContext, createMemo, createSignal, onCleanup } from "solid-js";
 
 export const AuthContext = createContext<AuthClient>(
   new Proxy({} as AuthClient, {
@@ -10,36 +10,29 @@ export const AuthContext = createContext<AuthClient>(
   }),
 );
 
-export interface AuthState {
-  isSignedIn: boolean;
-  token?: string;
-}
+export type AuthToken = string;
 
 export interface AuthClient
   extends Pick<Clerk, "signOut" | "redirectToSignIn"> {
-  state: Accessor<AuthState>;
-  refresh(): Promise<AuthState>;
+  token: Accessor<AuthToken | undefined>;
+  isSignedIn: Accessor<boolean>;
+  refresh(): Promise<AuthToken | undefined>;
 }
 
 export function createAuthClient(publishableKey: string): AuthClient {
   const clerk = new Clerk(publishableKey);
   const clerkReady = clerk.load();
-  const [state, setState] = createSignal<AuthState>({
-    isSignedIn: !!clerk.user,
-  });
+  const [token, setToken] = createSignal<AuthToken>();
+  const isSignedIn = createMemo(() => !!token());
 
   async function refresh() {
     await clerkReady;
-    const token = await clerk.session?.getToken();
-    const state: AuthState = {
-      isSignedIn: !!clerk.user,
-      token: token ?? undefined,
-    };
-    setState(state);
-    return state;
+    const token = (await clerk.session?.getToken()) ?? undefined;
+    setToken(token);
+    return token;
   }
 
   onCleanup(clerk.addListener(() => void refresh()));
 
-  return { ...clerk, state, refresh };
+  return { ...clerk, token, isSignedIn, refresh };
 }

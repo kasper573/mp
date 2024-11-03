@@ -35,7 +35,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
   createEffect(() => onCleanup(syncClient.subscribe(setWorldState)));
 
   createEffect(() => {
-    const { token } = authClient.state();
+    const token = authClient.token();
     if (token) {
       syncClient.authenticate(token);
     }

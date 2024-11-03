@@ -27,7 +27,7 @@ export default function AppBar() {
           <Button onClick={() => window.location.reload()}>Reload</Button>
         </Show>
 
-        {auth.state().isSignedIn ? (
+        {auth.isSignedIn() ? (
           <Button onClick={() => void auth.signOut()}>Sign out</Button>
         ) : (
           <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>

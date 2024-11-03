@@ -25,7 +25,7 @@ export default function GamePage() {
 
   return (
     <Switch>
-      <Match when={auth.state().isSignedIn}>
+      <Match when={auth.isSignedIn()}>
         <Application class={styles.container}>
           {({ viewport }) => (
             <EngineProvider viewport={viewport}>
@@ -36,7 +36,7 @@ export default function GamePage() {
           )}
         </Application>
       </Match>
-      <Match when={!auth.state().isSignedIn}>
+      <Match when={!auth.isSignedIn()}>
         <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
       </Match>
     </Switch>
