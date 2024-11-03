@@ -1,6 +1,6 @@
 {
   "extends": "@mp/tsconfig/vite.json",
-  "include": ["src", "./vite.config.mjs"],
+  "include": ["src", "vite.config.ts"],
   "exclude": ["../server/public"],
   "compilerOptions": {
     "allowJs": true,
