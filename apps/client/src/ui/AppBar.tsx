@@ -1,8 +1,8 @@
 import { Show, useContext } from "solid-js";
-import { useAuthState, AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
-import { useVersionCompatibility } from "../state/signals";
+import { useVersionCompatibility } from "../state/useServerVersion";
 import * as styles from "./AppBar.css";
 import { Button } from "./Button";
 import { Link } from "./Link";
@@ -11,7 +11,6 @@ import { LinearProgress } from "./LinearProgress";
 export default function AppBar() {
   const isRouting = useIsRouting();
   const auth = useContext(AuthContext);
-  const { isSignedIn } = useAuthState();
   const versionCompatibility = useVersionCompatibility();
 
   return (
@@ -28,7 +27,7 @@ export default function AppBar() {
           <Button onClick={() => window.location.reload()}>Reload</Button>
         </Show>
 
-        {isSignedIn() ? (
+        {auth.state().isSignedIn ? (
           <Button onClick={() => void auth.signOut()}>Sign out</Button>
         ) : (
           <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>

@@ -1,45 +1,43 @@
-import { useAuthState } from "@mp/auth/client";
 import { Application } from "@mp/solid-pixi";
-import { Match, Switch, Show, createMemo } from "solid-js";
+import { Match, Switch, Show, useContext } from "solid-js";
 import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
+import { AuthContext } from "@mp/auth/client";
+
 import { createQuery } from "@tanstack/solid-query";
+import { createGameClient } from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
-import { myCharacter, setMyCharacterId } from "../../state/signals";
-import { useSyncClient } from "../../clients/sync";
-import { trpc } from "../../clients/trpc";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
-  const { isSignedIn } = useAuthState();
-  useSyncClient();
+  const auth = useContext(AuthContext);
+  const gameClient = createGameClient(auth);
 
-  void trpc.world.join.mutate().then(setMyCharacterId);
-
-  const areaId = createMemo(() => myCharacter()?.areaId);
-  const query = createQuery(() => {
-    const id = areaId();
+  const area = createQuery(() => {
+    const id = gameClient.areaId();
     return {
       queryKey: ["area", id],
       queryFn: () => (id ? loadAreaResource(id) : null),
     };
   });
 
+  void gameClient.join();
+
   return (
     <Switch>
-      <Match when={isSignedIn()}>
+      <Match when={auth.state().isSignedIn}>
         <Application class={styles.container}>
           {({ viewport }) => (
             <EngineProvider viewport={viewport}>
-              <Show when={query.data} keyed>
+              <Show when={area.data} keyed>
                 {(data) => <AreaScene area={data} />}
               </Show>
             </EngineProvider>
           )}
         </Application>
       </Match>
-      <Match when={!isSignedIn()}>
+      <Match when={!auth.state().isSignedIn}>
         <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
       </Match>
     </Switch>

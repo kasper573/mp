@@ -5,13 +5,10 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import type { Vector } from "@mp/math";
-import { vec_equals, vec_zero } from "@mp/math";
-import { trpc } from "../../clients/trpc";
-import { myCharacter, myCharacterId, worldState } from "../../state/signals";
+import { vec_zero } from "@mp/math";
+import { GameClientContext } from "../../clients/game";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
-import { dedupe, throttle } from "../../state/functionComposition";
 import {
   AutoPositionedCharacterActor,
   ManuallyPositionedCharacterActor,
@@ -21,13 +18,14 @@ import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
+  const gameClient = useContext(GameClientContext);
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],
     queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
-  const myCoords = useAnimatedCoords(myCharacter);
+  const myCoords = useAnimatedCoords(gameClient.character);
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
     return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
@@ -44,7 +42,7 @@ export function AreaScene(props: { area: AreaResource }) {
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
-      throttledMove(tilePosition);
+      gameClient.move(tilePosition);
     }
   });
 
@@ -67,9 +65,11 @@ export function AreaScene(props: { area: AreaResource }) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={Object.values(worldState()?.characters ?? [])}>
+              <Index
+                each={Object.values(gameClient.worldState()?.characters ?? [])}
+              >
                 {(char) => {
-                  const isMe = () => char().id === myCharacter()?.id;
+                  const isMe = () => char().id === gameClient.characterId();
                   return (
                     <>
                       <Show when={isMe()}>
@@ -93,16 +93,10 @@ export function AreaScene(props: { area: AreaResource }) {
         </TiledRenderer>
       )}
       <TileHighlight area={props.area} />
-      <AreaDebugUI area={props.area} pathToDraw={myCharacter()?.path} />
+      <AreaDebugUI
+        area={props.area}
+        pathToDraw={gameClient.character()?.path}
+      />
     </Pixi>
   );
 }
-
-const throttledMove = dedupe(
-  throttle(
-    ({ x, y }: Vector) =>
-      trpc.world.move.mutate({ characterId: myCharacterId()!, x, y }),
-    100,
-  ),
-  vec_equals,
-);
