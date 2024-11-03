@@ -1,5 +1,6 @@
 import type { Options } from "tsup";
 import { defineConfig as defineTsupConfig } from "tsup";
+import { solidPlugin } from "esbuild-plugin-solid";
 
 export function defineConfig(options: Options) {
   return defineTsupConfig((config) => ({
@@ -11,8 +12,7 @@ export function defineConfig(options: Options) {
     outExtension: ({ format }) => ({
       js: format === "cjs" ? `.cjs` : `.mjs`,
     }),
+    esbuildPlugins: [solidPlugin()],
     ...options,
   }));
 }
-
-export { solidPlugin } from "esbuild-plugin-solid";
