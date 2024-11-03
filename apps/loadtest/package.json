@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "loadtest": "tsx src/index.ts"
+    "loadtest": "ts-node src/index.ts"
   },
   "dependencies": {
     "@mp/sync": "workspace:*",
