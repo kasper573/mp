@@ -14,3 +14,5 @@ export function defineConfig(options: Options) {
     ...options,
   }));
 }
+
+export { solidPlugin } from "esbuild-plugin-solid";
