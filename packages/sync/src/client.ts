@@ -1,4 +1,4 @@
-import type { DocHandle } from "@automerge/automerge-repo";
+import type { DocHandle, DocumentPayload } from "@automerge/automerge-repo";
 import { Repo } from "@automerge/automerge-repo";
 import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
 import { v4 as uuid } from "uuid";
@@ -12,7 +12,7 @@ export class SyncClient<State> {
 
   readonly clientId: ClientId;
 
-  constructor(private options: SyncClientOptions<State>) {
+  constructor(private url: string) {
     this.clientId = uuid() as ClientId;
   }
 
@@ -21,16 +21,12 @@ export class SyncClient<State> {
   }
 
   start() {
-    this.wsAdapter = new BrowserWebSocketClientAdapter(this.options.url);
+    this.wsAdapter = new BrowserWebSocketClientAdapter(this.url);
     this.repo = new Repo({
       network: [this.wsAdapter],
       peerId: this.clientId,
     });
-    this.handle = this.repo.create(this.options.initialState);
-    this.handle.on("change", this.emitCurrentDocument);
-    this.handle.on("delete", this.emitCurrentDocument);
-
-    void this.handle.doc().then(this.emitCurrentDocument);
+    this.repo.on("document", this.acceptDocument);
   }
 
   stop() {
@@ -40,8 +36,6 @@ export class SyncClient<State> {
 
     this.wsAdapter.disconnect();
     this.handle.off("change");
-    this.handle.off("delete");
-    this.repo.delete(this.handle.url);
     this.wsAdapter = undefined;
     this.repo = undefined;
     this.handle = undefined;
@@ -52,23 +46,19 @@ export class SyncClient<State> {
     return () => this.subscriptions.delete(handler);
   };
 
-  private emitCurrentDocument = () => {
-    const state = this.getState();
-    if (!state) {
-      return;
-    }
+  private acceptDocument = ({ handle }: DocumentPayload) => {
+    this.handle = handle;
+    this.handle.on("change", this.emitCurrentDocument);
+    void this.handle.doc().then(this.emitCurrentDocument);
+  };
 
+  private emitCurrentDocument = () => {
     for (const handler of this.subscriptions) {
-      handler(state);
+      handler(this.getState());
     }
   };
 }
 
-export interface SyncClientOptions<State> {
-  initialState: State;
-  url: string;
-}
-
-export type SyncClientSubscription<State> = (state: State) => void;
+export type SyncClientSubscription<State> = (state?: State) => void;
 
 export * from "./shared";

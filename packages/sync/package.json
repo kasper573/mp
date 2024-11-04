@@ -26,6 +26,7 @@
     "@automerge/automerge-repo": "1.2.1",
     "@automerge/automerge-repo-network-websocket": "1.2.1",
     "@mp/state": "workspace:*",
+    "immer": "10.1.1",
     "uuid": "11.0.0",
     "ws": "8.18.0"
   },

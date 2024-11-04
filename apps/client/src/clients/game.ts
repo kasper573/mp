@@ -16,10 +16,7 @@ import { dedupe, throttle } from "../state/functionComposition";
 import { trpc } from "./trpc";
 
 export function createGameClient(): GameClient {
-  const syncClient = new SyncClient<WorldState>({
-    initialState: { characters: {} },
-    url: env.wsUrl,
-  });
+  const syncClient = new SyncClient<WorldState>(env.wsUrl);
 
   const [worldState, setWorldState] = createSignal(syncClient.getState());
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
