@@ -19,8 +19,7 @@
   },
   "dependencies": {
     "neverthrow": "7.0.0",
-    "solid-js": "1.9.1",
-    "immer": "10.1.1"
+    "solid-js": "1.9.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
