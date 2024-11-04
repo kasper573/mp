@@ -25,7 +25,11 @@ export class SyncClient<State> {
       throw new Error("Cannot start a client that has already started");
     }
     this.wsAdapter = new BrowserWebSocketClientAdapter(this.url);
-    this.repo = new Repo({ network: [this.wsAdapter], peerId: this.clientId });
+    this.repo = new Repo({
+      network: [this.wsAdapter],
+      peerId: this.clientId,
+      sharePolicy: () => Promise.resolve(false),
+    });
     this.repo.on("document", this.acceptDocument);
   }
 
@@ -39,6 +43,7 @@ export class SyncClient<State> {
     this.repo.off("document");
     this.wsAdapter = undefined;
     this.repo = undefined;
+    this.handle = undefined;
   }
 
   subscribe = (handler: SyncClientSubscription<State>) => {
