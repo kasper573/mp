@@ -11,8 +11,6 @@ import { produceWithPatches, enablePatches } from "immer";
 import { toJS } from "@automerge/automerge";
 import type { ClientId } from "./shared";
 
-enablePatches();
-
 export class SyncServer<State> {
   private repo: Repo;
   private wssAdapter: NodeWSServerAdapter;
@@ -27,6 +25,10 @@ export class SyncServer<State> {
     this.handle = this.repo.create(options.initialState);
     this.wssAdapter.on("peer-candidate", this.onConnection);
     this.wssAdapter.on("peer-disconnected", this.onDisconnect);
+
+    if (this.options.log) {
+      enablePatches();
+    }
   }
 
   access: StateAccess<State> = (reference, mutateFn) => {
@@ -68,14 +70,20 @@ export interface SyncServerOptions<State, ClientId extends string> {
   httpServer: Server;
   initialState: State;
   filterState: (state: State, clientId: ClientId) => State;
-  log: typeof console.log;
+  log?: typeof console.log;
   onConnection?: (clientId: ClientId) => void | undefined | Promise<unknown>;
   onDisconnect?: (clientId: ClientId) => void | undefined | Promise<unknown>;
 }
 
 export type StateAccess<State> = <Result>(
+  /**
+   * An explanation of what the access is for, for logging purposes.
+   */
   reference: string,
-  mutateFn: (draft: State) => Result,
+  /**
+   * Read or modify the state.
+   */
+  stateHandler: (draft: State) => Result,
 ) => Result;
 
 export * from "./shared";
