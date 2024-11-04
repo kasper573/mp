@@ -80,7 +80,7 @@ export function createWorldRouter({
 
           const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
           if (idx !== undefined && idx !== -1) {
-            char.path = char.path?.slice(0, idx + 1);
+            char.path?.splice(idx + 1);
           } else {
             const newPath = findPath(char.coords, vec(x, y), area.dGraph);
             if (newPath) {
