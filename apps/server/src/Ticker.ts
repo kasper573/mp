@@ -4,8 +4,11 @@ export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
   private intervalId?: NodeJS.Timeout;
   private lastTickTime?: number;
+  private middleware: TickMiddleware;
 
-  constructor(private options: TickerOptions) {}
+  constructor(private options: TickerOptions) {
+    this.middleware = options.middleware ?? noopMiddleware;
+  }
 
   subscribe(fn: TickEventHandler): Unsubscribe {
     this.subscriptions.add(fn);
@@ -33,7 +36,7 @@ export class Ticker {
       this.lastTickTime === undefined ? 0 : now - this.lastTickTime;
     this.lastTickTime = now;
     const delta = TimeSpan.fromMilliseconds(deltaMys / 1000);
-    this.options.middleware?.({ delta, next: this.emit });
+    this.middleware({ delta, next: this.emit });
   };
 
   private emit = (delta: TimeSpan) => {
@@ -58,3 +61,5 @@ export interface TickerOptions {
 export type Unsubscribe = () => void;
 
 export type TickEventHandler = (delta: TimeSpan) => void;
+
+const noopMiddleware: TickMiddleware = ({ delta, next }) => next(delta);
