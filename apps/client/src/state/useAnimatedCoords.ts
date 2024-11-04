@@ -54,16 +54,11 @@ export function useAnimatedCoords(
 
     const newCoords = vec(coords.x, coords.y);
     const newPath = [...path];
-    const { destinationReached } = moveAlongPath(
-      newCoords,
-      newPath,
-      external.speed,
-      deltaTime,
-    );
+    moveAlongPath(newCoords, newPath, external.speed, deltaTime);
 
     batch(() => {
       setCoords(newCoords);
-      setPath(destinationReached ? undefined : newPath);
+      setPath(newPath.length > 0 ? newPath : undefined);
     });
   }
 

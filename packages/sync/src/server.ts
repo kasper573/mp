@@ -7,8 +7,7 @@ import type {
 import { WebSocketServer } from "ws";
 import { Repo } from "@automerge/automerge-repo";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
-import { produceWithPatches, enablePatches } from "immer";
-import { toJS } from "@automerge/automerge";
+import type { PatchCallback } from "@automerge/automerge";
 import type { ClientId } from "./shared";
 
 export class SyncServer<State> {
@@ -16,7 +15,7 @@ export class SyncServer<State> {
   private wssAdapter: NodeWSServerAdapter;
   private handle: DocHandle<State>;
 
-  constructor(private options: SyncServerOptions<State, ClientId>) {
+  constructor(private options: SyncServerOptions<State>) {
     this.wssAdapter = new NodeWSServerAdapter(
       new WebSocketServer({ server: options.httpServer }),
     );
@@ -25,23 +24,16 @@ export class SyncServer<State> {
     this.handle = this.repo.create(options.initialState);
     this.wssAdapter.on("peer-candidate", this.onConnection);
     this.wssAdapter.on("peer-disconnected", this.onDisconnect);
-
-    if (this.options.log) {
-      enablePatches();
-    }
   }
 
-  access: StateAccess<State> = (reference, mutateFn) => {
+  access: StateAccess<State> = (message, mutateFn) => {
     let result!: ReturnType<typeof mutateFn>;
-    this.handle.change((state) => {
-      if (this.options.log) {
-        const mutations = this.getStateMutations(mutateFn);
-        if (mutations.length > 0) {
-          this.options.log("[SyncServer]", reference, mutations);
-        }
-      }
-      result = mutateFn(state);
-    });
+    this.handle.change(
+      (state) => {
+        result = mutateFn(state);
+      },
+      { patchCallback: this.options.patchCallback },
+    );
     return result;
   };
 
@@ -56,21 +48,13 @@ export class SyncServer<State> {
   private onDisconnect = ({ peerId }: PeerDisconnectedPayload) => {
     void this.options.onDisconnect?.(peerId);
   };
-
-  private getStateMutations(mutateFn: (draft: State) => unknown) {
-    const doc = this.handle.docSync();
-    const [, mutations] = produceWithPatches(doc ? toJS(doc) : {}, (draft) => {
-      mutateFn(draft as State);
-    });
-    return mutations;
-  }
 }
 
-export interface SyncServerOptions<State, ClientId extends string> {
+export interface SyncServerOptions<State> {
   httpServer: Server;
   initialState: State;
   filterState: (state: State, clientId: ClientId) => State;
-  log?: typeof console.log;
+  patchCallback?: PatchCallback<State>;
   onConnection?: (clientId: ClientId) => void | undefined | Promise<unknown>;
   onDisconnect?: (clientId: ClientId) => void | undefined | Promise<unknown>;
 }

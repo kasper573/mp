@@ -19,10 +19,11 @@ import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
-import { Ticker } from "./Ticker";
+import { createDynamicDeltaFn, Ticker } from "./Ticker";
 import { tokenHeaderName } from "./tokenHeaderName";
 
 async function main(opt: CliOptions) {
+  const delta = createDynamicDeltaFn(() => performance.now());
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
@@ -67,7 +68,9 @@ async function main(opt: CliOptions) {
     initialState: initialWorldState.value,
     filterState: deriveWorldStateForClient,
     httpServer,
-    log: logger.info,
+    patchCallback: opt.logSyncPatches
+      ? (patches) => logger.chain("sync").info(patches)
+      : undefined,
     onConnection(clientId) {
       logger.info("Client connected", clientId);
     },
@@ -78,11 +81,15 @@ async function main(opt: CliOptions) {
   });
 
   const persistTicker = new Ticker({
+    delta,
     middleware: persist,
     interval: opt.persistInterval,
   });
 
-  const ticker = new Ticker({ interval: opt.tickInterval });
+  const ticker = new Ticker({
+    interval: opt.tickInterval,
+    delta,
+  });
 
   const apiRouter = createRootRouter({
     areas: areas.value,
@@ -108,7 +115,7 @@ async function main(opt: CliOptions) {
 
   const clients = new ClientRegistry();
 
-  //persistTicker.start();
+  persistTicker.start();
   ticker.start();
 
   async function persist() {

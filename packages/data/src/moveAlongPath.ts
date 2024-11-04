@@ -1,4 +1,4 @@
-import type { Vector } from "@mp/math";
+import { vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath(
@@ -6,33 +6,24 @@ export function moveAlongPath(
   path: ShiftableArray<Vector>,
   speed: number,
   delta: TimeSpan,
-): { destinationReached: boolean } {
-  const pathLengthBefore = path.length;
-
-  let distance = speed * delta.totalSeconds;
-  while (path.length > 0 && distance > 0) {
+): void {
+  let distanceToMove = speed * delta.totalSeconds;
+  while (path.length > 0 && distanceToMove > 0) {
     const destination = path[0];
-    const distanceToDestination = Math.hypot(
-      destination.x - coords.x,
-      destination.y - coords.y,
-    );
+    const distanceToDestination = vec_distance(destination, coords);
 
-    if (distance > distanceToDestination) {
-      distance -= distanceToDestination;
+    if (distanceToMove > distanceToDestination) {
+      distanceToMove -= distanceToDestination;
       const { x, y } = path.shift()!;
       coords.x = x;
       coords.y = y;
     } else {
-      const percentage = distance / distanceToDestination;
+      const percentage = distanceToMove / distanceToDestination;
       coords.x += (destination.x - coords.x) * percentage;
       coords.y += (destination.y - coords.y) * percentage;
       break;
     }
   }
-
-  return {
-    destinationReached: path.length === 0 && pathLengthBefore > 0,
-  };
 }
 
 interface ShiftableArray<T> extends ArrayLike<T> {

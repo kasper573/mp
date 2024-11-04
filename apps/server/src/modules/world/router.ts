@@ -36,14 +36,9 @@ export function createWorldRouter({
     accessState("world.ticker", (state) => {
       for (const char of Object.values(state.characters)) {
         if (char.path) {
-          const { destinationReached } = moveAlongPath(
-            char.coords,
-            char.path,
-            char.speed,
-            delta,
-          );
-          if (destinationReached) {
-            char.path = undefined;
+          moveAlongPath(char.coords, char.path, char.speed, delta);
+          if (!char.path?.length) {
+            delete char.path;
           }
         }
 
@@ -56,7 +51,7 @@ export function createWorldRouter({
             if (targetArea) {
               char.areaId = targetArea.id;
               char.coords = vec_copy(targetArea.start);
-              char.path = undefined;
+              delete char.path;
             }
           }
         }
