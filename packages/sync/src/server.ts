@@ -32,7 +32,7 @@ export class SyncServer<State> {
       (state) => {
         result = mutateFn(state);
       },
-      { patchCallback: this.options.patchCallback },
+      { patchCallback: this.options.patchCallback, message },
     );
     return result;
   };
