@@ -9,7 +9,7 @@ export async function persistWorldState(
   try {
     await db.transaction((tx) =>
       Promise.all(
-        [...state.characters.values()].map((char) => {
+        Object.values(state.characters).map((char) => {
           return tx.insert(characterTable).values(char).onConflictDoUpdate({
             target: characterTable.id,
             set: char,
@@ -29,7 +29,7 @@ export async function loadWorldState(
   try {
     const characters = await db.select().from(characterTable);
     return ok({
-      characters: new Map(characters.map((char) => [char.id, char])),
+      characters: Object.fromEntries(characters.map((char) => [char.id, char])),
     });
   } catch (error) {
     return err(error);

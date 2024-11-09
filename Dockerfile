@@ -17,6 +17,6 @@ ENV MP_DATABASE_URL=
 ENV MP_AUTH_SECRET_KEY=
 ENV MP_BUILD_VERSION=
 
-CMD node server \
+CMD node --enable-source-maps server/index.mjs \
   --clientDir=/app/client \
   --publicDir=/app/public

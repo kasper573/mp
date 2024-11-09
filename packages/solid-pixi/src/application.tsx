@@ -41,6 +41,7 @@ export function Application(props: ApplicationProps) {
 
       onCleanup(async () => {
         await initPromise;
+        markDestroyed(app);
         app.destroy(undefined, { children: true });
       });
 
@@ -51,11 +52,11 @@ export function Application(props: ApplicationProps) {
   );
 
   createEffect(() => {
-    if (isInitialized()) {
-      // We need to resize the app after initializing because we assign a viewport
-      // that has not yet been added to the DOM to the pixi initializer.
-      // When this effect runs the vieport has been added to the DOM and we can resize the app
-      // to ensure the initial size is correct. Pixi will properly handle future resizes.
+    // We need to resize the app after initializing because we assign a viewport
+    // that has not yet been added to the DOM to the pixi initializer.
+    // When this effect runs the vieport has been added to the DOM and we can resize the app
+    // to ensure the initial size is correct. Pixi will properly handle future resizes.
+    if (isInitialized() && !isAppDestroyed(app)) {
       app.resize();
     }
   });
@@ -83,3 +84,13 @@ const styles = {
   canvas: { position: "absolute" },
   container: { position: "relative" },
 } satisfies Record<string, JSX.CSSProperties>;
+
+const destroyedSymbol = Symbol("destroyed");
+
+function isAppDestroyed(app: PixiApplication) {
+  return !!Reflect.get(app, destroyedSymbol);
+}
+
+function markDestroyed(app: PixiApplication) {
+  Reflect.set(app, destroyedSymbol, true);
+}

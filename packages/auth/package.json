@@ -5,22 +5,22 @@
   "private": true,
   "exports": {
     "./client": {
-      "import": "./dist/client.jsx",
-      "require": "./dist/client.jsx",
-      "types": "./dist/client.d.ts"
+      "types": "./dist/client.d.ts",
+      "import": "./dist/client.mjs",
+      "require": "./dist/client.cjs"
     },
     "./server": {
-      "import": "./dist/server.js",
-      "require": "./dist/server.js",
-      "types": "./dist/server.d.ts"
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.mjs",
+      "require": "./dist/server.cjs"
     }
   },
   "files": [
     "dist"
   ],
   "scripts": {
-    "build": "tsc --build",
-    "dev": "tsc --build --watch --preserveWatchOutput"
+    "build": "tsup",
+    "dev": "tsup --watch"
   },
   "dependencies": {
     "@clerk/clerk-js": "5.20.0",
@@ -28,6 +28,7 @@
     "solid-js": "1.9.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*"
   }
 }

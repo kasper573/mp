@@ -1,1 +1,1 @@
-{ "extends": ["@mp/tsconfig/node.json", "@mp/tsconfig/tsc.json"] }
+{ "extends": "@mp/tsconfig/node.json" }

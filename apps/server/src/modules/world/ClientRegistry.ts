@@ -1,45 +1,47 @@
-import type { ClientId } from "../../context";
+import type { ClientId, UserId } from "../../context";
 import type { CharacterId } from "./schema";
 
 export class ClientRegistry {
-  private clientsByCharacter = new Map<CharacterId, Set<ClientId>>();
-  private charactersByClient = new Map<ClientId, CharacterId>();
+  private entries: ClientEntry[] = [];
 
-  set(clientId: ClientId, characterId: CharacterId) {
-    let clients = this.clientsByCharacter.get(characterId);
-    if (!clients) {
-      clients = new Set();
-      this.clientsByCharacter.set(characterId, clients);
-    }
-    clients.add(clientId);
-    this.charactersByClient.set(clientId, characterId);
-  }
-
-  delete(clientId: ClientId) {
-    this.charactersByClient.delete(clientId);
-    for (const clients of this.clientsByCharacter.values()) {
-      clients.delete(clientId);
+  associateClientWithUser(clientId: ClientId, userId: UserId) {
+    if (!this.entries.some((entry) => entry.clientId)) {
+      this.entries.push({ clientId, userId });
     }
   }
 
-  hasClient(clientId: ClientId): boolean {
-    return this.charactersByClient.has(clientId);
+  associateUserWithCharacter(userId: UserId, characterId: CharacterId) {
+    for (const entry of this.entries) {
+      if (entry.userId === userId) {
+        entry.characterId = characterId;
+        return;
+      }
+    }
+
+    this.entries.push({ userId, characterId });
   }
 
-  hasCharacter(characterId: CharacterId): boolean {
-    return this.clientsByCharacter.has(characterId);
-  }
-
-  getClientIds(characterId: CharacterId): ReadonlySet<ClientId> {
-    return (
-      this.clientsByCharacter.get(characterId) ??
-      (emptySet as ReadonlySet<ClientId>)
-    );
+  deleteClient(clientId: ClientId) {
+    this.entries = this.entries.filter((entry) => entry.clientId === clientId);
   }
 
   getCharacterId(clientId: ClientId): CharacterId | undefined {
-    return this.charactersByClient.get(clientId);
+    return this.entries.find((entry) => entry.clientId === clientId)
+      ?.characterId;
   }
+
+  getClientIds(): ReadonlySet<ClientId> {
+    return this.entries.reduce(
+      (set, entry) => (entry.clientId ? set.add(entry.clientId) : set),
+      new Set<ClientId>(),
+    );
+  }
+}
+
+interface ClientEntry {
+  clientId?: ClientId;
+  characterId?: CharacterId;
+  userId?: UserId;
 }
 
 const emptySet: ReadonlySet<unknown> = new Set();

@@ -1,16 +1,12 @@
-import type { ClientStateUpdate } from "@mp/server";
-import {
-  serialization,
-  type ClientState,
-  type ServerModules,
-} from "@mp/server";
-import { Client } from "@mp/network/client";
 import { Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
+import type { RootRouter } from "@mp/server";
+import { transformer } from "@mp/server";
+import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger(console);
-const { httpServerUrl, wsServerUrl, connections, requests } = readCliOptions();
+const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
 void main();
 
 async function main() {
@@ -18,7 +14,7 @@ async function main() {
   logger.info(`Load testing ${requests} requests x ${connections} connections`);
 
   await loadTestHTTP();
-  await loadTestWebSockets();
+  await loadTestRPC();
 
   const end = performance.now();
 
@@ -47,22 +43,16 @@ async function loadTestHTTP() {
   );
 }
 
-async function loadTestWebSockets() {
+async function loadTestRPC() {
   await Promise.all(
     range(connections).map(async (clientNr) => {
-      const client = new Client<ServerModules, ClientState, ClientStateUpdate>({
-        url: wsServerUrl,
-        rpcTimeout: 5000,
-        createInitialState: () => ({ characters: new Map() }),
-        parseStateUpdate: serialization.stateUpdate.parse,
-        parseRPCResponse: serialization.rpc.parse,
-        applyStateUpdate: (state, update) => Object.assign(state, update),
-        serializeRPC: serialization.rpc.serialize,
+      const trpc = createTRPCClient<RootRouter>({
+        links: [httpBatchLink({ url: apiServerUrl, transformer })],
       });
 
       const results = await Promise.allSettled(
         range(requests).map(() =>
-          client.modules.area.areaFileUrl("forest" as AreaId),
+          trpc.area.areaFileUrl.query("forest" as AreaId),
         ),
       );
 
@@ -70,9 +60,8 @@ async function loadTestWebSockets() {
       const failures = results.filter((r) => r.status === "rejected").length;
 
       logger.info(
-        `WebSocket test ${clientNr} done: ${successes} successes, ${failures} failures`,
+        `RPC test ${clientNr} done: ${successes} successes, ${failures} failures`,
       );
-      client.dispose();
     }),
   );
 }

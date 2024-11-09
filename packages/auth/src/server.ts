@@ -1,5 +1,24 @@
-import type { createClerkClient as createAuthClient } from "@clerk/clerk-sdk-node";
+import type { ClerkOptions } from "@clerk/clerk-sdk-node";
+import { createClerkClient } from "@clerk/clerk-sdk-node";
+import type { AuthToken, UserId } from "./shared";
 
-export type AuthClient = ReturnType<typeof createAuthClient>;
+export interface NodeAuthClientOptions
+  extends Pick<ClerkOptions, "secretKey"> {}
 
-export { createClerkClient as createAuthClient } from "@clerk/clerk-sdk-node";
+export interface NodeAuthClient {
+  verifyToken(token: AuthToken): Promise<{ userId: UserId }>;
+}
+
+export function createAuthClient(
+  options: NodeAuthClientOptions,
+): NodeAuthClient {
+  const clerk = createClerkClient(options);
+  return {
+    async verifyToken(token) {
+      const { sub } = await clerk.verifyToken(token);
+      return { userId: sub as UserId };
+    },
+  };
+}
+
+export * from "./shared";

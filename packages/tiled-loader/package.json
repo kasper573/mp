@@ -4,21 +4,25 @@
   "private": true,
   "exports": {
     ".": {
-      "import": "./src/index.js",
-      "require": "./src/index.js",
-      "types": "./src/index.d.ts"
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
     }
   },
   "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/transformer": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/state": "workspace:*",
+    "pako": "2.1.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*",
+    "@types/pako": "2.0.3",
     "vitest": "2.0.3"
   }
 }

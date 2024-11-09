@@ -17,9 +17,9 @@ export interface Character extends DBCharacter {
   path?: Path;
 }
 
-export interface WorldState {
-  characters: Map<CharacterId, Character>;
+export type WorldState = {
+  characters: Record<CharacterId, Character>;
   serverTick?: number;
-}
+};
 
 export type CharacterId = Branded<string, "CharacterId">;

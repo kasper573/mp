@@ -1,5 +1,5 @@
-import type { Size } from "@mp/math";
-import { Vector } from "@mp/math";
+import type { Size, Vector } from "@mp/math";
+import { vec } from "@mp/math";
 import type {
   TiledMap,
   TileLayerTile,
@@ -13,7 +13,7 @@ export class TiledResource {
   constructor(public readonly map: TiledMap) {}
 
   get tileSize() {
-    return new Vector(this.map.tilewidth, this.map.tileheight);
+    return vec(this.map.tilewidth, this.map.tileheight);
   }
 
   get mapSize(): Size {
@@ -24,17 +24,11 @@ export class TiledResource {
   }
 
   worldCoordToTile = ({ x, y }: Vector): Vector => {
-    return new Vector(
-      x / this.map.tilewidth - 0.5,
-      y / this.map.tileheight - 0.5,
-    );
+    return vec(x / this.map.tilewidth - 0.5, y / this.map.tileheight - 0.5);
   };
 
   tileCoordToWorld = ({ x, y }: Vector): Vector => {
-    return new Vector(
-      (x + 0.5) * this.map.tilewidth,
-      (y + 0.5) * this.map.tileheight,
-    );
+    return vec((x + 0.5) * this.map.tilewidth, (y + 0.5) * this.map.tileheight);
   };
 
   tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
@@ -47,7 +41,7 @@ export class TiledResource {
       this.map.layers
         .flatMap((layer) => filterTileLayerTiles(layer, all))
         .map((layerTile) => ({
-          pos: new Vector(layerTile.x, layerTile.y),
+          pos: vec(layerTile.x, layerTile.y),
           propertyValue: getValue(layerTile),
         })),
       ({ pos: { x, y } }) => `${x}|${y}`,
@@ -91,7 +85,7 @@ export class TiledResource {
 }
 
 export function snapTileVector({ x, y }: Vector): Vector {
-  return new Vector(Math.floor(x + 0.5), Math.floor(y + 0.5));
+  return vec(Math.floor(x + 0.5), Math.floor(y + 0.5));
 }
 
 function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {

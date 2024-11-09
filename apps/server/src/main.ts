@@ -7,23 +7,23 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import type { CreateContextOptions, ServerError } from "@mp/network/server";
-import { Server } from "@mp/network/server";
-import type { TimeSpan } from "@mp/time";
 import { createAuthClient } from "@mp/auth/server";
-import { createGlobalModule } from "./modules/global";
-import { createModules } from "./modules/definition";
+import * as trpcExpress from "@trpc/server/adapters/express";
+import { SyncServer } from "@mp/sync/server";
+import type { WorldState } from "./modules/world/schema";
+import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { WorldState } from "./modules/world/schema";
 import { readCliOptions, type CliOptions } from "./cli";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
-import { setAsyncInterval } from "./asyncInterval";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
-import { serialization } from "./serialization/selected";
+import { createRootRouter } from "./modules/router";
+import { createDynamicDeltaFn, Ticker } from "./Ticker";
+import { tokenHeaderName } from "./tokenHeaderName";
 
 async function main(opt: CliOptions) {
+  const delta = createDynamicDeltaFn(() => performance.now());
   const logger = new Logger(console);
   logger.info(serverTextHeader(opt));
 
@@ -40,130 +40,130 @@ async function main(opt: CliOptions) {
   }
 
   const defaultAreaId = [...areas.value.keys()][0];
-  const result = await loadWorldState(db);
-  if (result.isErr()) {
-    logger.error("Failed to load world state", result.error);
+  const initialWorldState = await loadWorldState(db);
+  if (initialWorldState.isErr()) {
+    logger.error("Failed to load world state", initialWorldState.error);
     process.exit(1);
   }
 
-  const world = result.value;
-
   const expressApp = express();
+
   expressApp.use(createExpressLogger(logger.chain("http")));
   expressApp.use(createCors({ origin: opt.corsOrigin }));
   expressApp.use(opt.publicPath, express.static(opt.publicDir));
+
   if (opt.clientDir !== undefined) {
     const indexFile = path.resolve(opt.clientDir, "index.html");
     expressApp.use("/", express.static(opt.clientDir));
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
 
-  const clients = new ClientRegistry();
-  const modules = createModules({
-    areas: areas.value,
-    defaultAreaId,
-    state: world,
-    createUrl,
-    buildVersion: opt.buildVersion,
-  });
-
-  const global = createGlobalModule(modules);
-
-  const socketServer = new Server({
-    createContext: createServerContext,
-    modules,
-    serializeRPCResponse: serialization.rpc.serialize,
-    serializeStateUpdate: serialization.stateUpdate.serialize,
-    parseRPC: serialization.rpc.parse,
-    onConnection: (input, context) => global.connect({ input, context }),
-    onDisconnect: (input, context) => global.disconnect({ input, context }),
-    onError,
-  });
-
   const httpServer = http.createServer(expressApp);
-  socketServer.listen(httpServer);
+
   httpServer.listen(opt.port, opt.listenHostname, () => {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  setAsyncInterval(tick, opt.tickInterval);
-  setAsyncInterval(persist, opt.persistInterval);
-
-  const tickContext: ServerContext = createServerContext({
-    clientId: undefined as unknown as ClientId,
+  const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
+    initialState: initialWorldState.value,
+    filterState: deriveWorldStateForClient,
+    httpServer,
+    patchCallback: opt.logSyncPatches
+      ? (patches) => logger.chain("sync").info(patches)
+      : undefined,
+    onConnection: handleSyncServerConnection,
+    onDisconnect(clientId) {
+      logger.info("Client disconnected", clientId);
+      clients.deleteClient(clientId);
+    },
   });
 
-  async function tick(tickDelta: TimeSpan) {
-    try {
-      await global.tick({ input: tickDelta, context: tickContext });
+  const persistTicker = new Ticker({
+    delta,
+    middleware: persist,
+    interval: opt.persistInterval,
+  });
 
-      for (const [clientId, stateUpdate] of getStateUpdates(tickDelta)) {
-        socketServer.sendStateUpdate(clientId, stateUpdate);
-      }
-    } catch (error) {
-      onError({ type: "tick", error, context: tickContext });
-    }
-  }
+  const ticker = new Ticker({
+    interval: opt.tickInterval,
+    delta,
+  });
+
+  const apiRouter = createRootRouter({
+    areas: areas.value,
+    defaultAreaId,
+    state: worldState.access,
+    createUrl,
+    buildVersion: opt.buildVersion,
+    ticker,
+  });
+
+  expressApp.use(
+    "/api",
+    trpcExpress.createExpressMiddleware({
+      router: apiRouter,
+      createContext: ({ req }) =>
+        createServerContext(
+          `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
+          String(req.headers[tokenHeaderName]) as ServerContext["authToken"],
+        ),
+    }),
+  );
+
+  const clients = new ClientRegistry();
+
+  persistTicker.start();
+  ticker.start();
 
   async function persist() {
-    const result = await persistWorldState(db, world);
+    const state = worldState.access("persist", (state) => state);
+    const result = await persistWorldState(db, state);
     if (result.isErr()) {
       logger.error("Failed to persist world state", result.error);
     }
   }
 
-  function* getStateUpdates(tickDelta: TimeSpan) {
-    const state = getClientWorldState(world, tickDelta);
-
-    for (const characterId of world.characters.keys()) {
-      for (const clientId of clients.getClientIds(characterId)) {
-        yield [clientId, state] as const;
-      }
+  function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
+    const characterId = clients.getCharacterId(clientId);
+    if (!characterId) {
+      throw new Error(
+        "Could not derive world state for client: client has no associated character",
+      );
     }
+
+    return state;
   }
 
-  function getClientWorldState(
-    world: WorldState,
-    tickDelta: TimeSpan,
-  ): WorldState {
+  function createServerContext(
+    sessionId: HttpSessionId,
+    authToken: ServerContext["authToken"],
+  ): ServerContext {
     return {
-      serverTick: tickDelta.totalMilliseconds,
-      characters: new Map(
-        [...world.characters.entries()].filter(([id]) =>
-          clients.hasCharacter(id),
-        ),
-      ),
-    };
-  }
-
-  function createServerContext({
-    clientId,
-    headers,
-  }: CreateContextOptions<ClientId>): ServerContext {
-    const who = clientId ? `client ${clientId}` : "server";
-    return {
-      world,
-      headers,
-      clientId,
+      sessionId,
+      accessWorldState: worldState.access,
+      authToken,
       auth,
-      logger: logger.chain(who),
+      logger,
       clients,
     };
   }
 
-  function onError({
-    type,
-    rpc,
-    error,
-    context,
-  }: ServerError<ServerContext, string>) {
-    const args: unknown[] = [
-      context?.clientId,
-      rpc ? `${rpc.moduleName}.${rpc.procedureName}` : undefined,
-      rpc ? rpc.input : undefined,
-      error,
-    ].filter(Boolean);
-    logger.chain(type).error(...args);
+  async function handleSyncServerConnection(
+    clientId: ClientId,
+    { token }: SyncServerConnectionMetaData,
+  ) {
+    logger.info("Client connected", clientId);
+    try {
+      const { userId } = await auth.verifyToken(token);
+      clients.associateClientWithUser(clientId, userId);
+      logger.info("Client verified and associated with user", {
+        clientId,
+        userId,
+      });
+    } catch {
+      logger.info("Client connection rejected", clientId);
+      worldState.disconnectClient(clientId);
+    }
   }
 
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
@@ -183,15 +183,15 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
 
 function serverTextHeader(options: CliOptions) {
   return `
-=====================================================
-#                                                   #
-#                ███╗   ███╗ ██████╗                #
-#                ████╗ ████║ ██╔══██╗               #
-#                ██╔████╔██║ ██████╔╝               #
-#                ██║╚██╔╝██║ ██╔═══╝                #
-#                ██║ ╚═╝ ██║ ██║                    #
-#                ╚═╝     ╚═╝ ╚═╝                    #
-=====================================================
+===============================
+#                             #
+#     ███╗   ███╗ ██████╗     #
+#     ████╗ ████║ ██╔══██╗    #
+#     ██╔████╔██║ ██████╔╝    #
+#     ██║╚██╔╝██║ ██╔═══╝     #
+#     ██║ ╚═╝ ██║ ██║         #
+#     ╚═╝     ╚═╝ ╚═╝         #
+===============================
 buildVersion: ${options.buildVersion}
 hostname: ${options.hostname}
 listenHostname: ${options.listenHostname}

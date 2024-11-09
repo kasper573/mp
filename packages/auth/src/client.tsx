@@ -1,25 +1,39 @@
-import type { Clerk as AuthClient } from "@clerk/clerk-js/headless";
-import { createContext, createSignal, onCleanup, useContext } from "solid-js";
+import { Clerk } from "@clerk/clerk-js/headless";
+import type { Accessor } from "solid-js";
+import { createContext, createMemo, createSignal, onCleanup } from "solid-js";
+import type { AuthToken } from "./shared";
 
-export const AuthContext = createContext<AuthClient>(
-  new Proxy({} as AuthClient, {
+export const AuthContext = createContext<BrowserAuthClient>(
+  new Proxy({} as BrowserAuthClient, {
     get() {
       throw new Error("AuthContext must be provided");
     },
   }),
 );
 
-/**
- * Stateful reactive wrapper around commonly used auth state
- */
-export function useAuthState() {
-  const auth = useContext(AuthContext);
-  const [isSignedIn, setIsSignedIn] = createSignal(!!auth.user);
-  onCleanup(auth.addListener(() => setIsSignedIn(!!auth.user)));
-
-  return {
-    isSignedIn,
-  };
+export interface BrowserAuthClient
+  extends Pick<Clerk, "signOut" | "redirectToSignIn"> {
+  token: Accessor<AuthToken | undefined>;
+  isSignedIn: Accessor<boolean>;
+  refresh(): Promise<AuthToken | undefined>;
 }
 
-export { Clerk as AuthClient } from "@clerk/clerk-js/headless";
+export function createAuthClient(publishableKey: string): BrowserAuthClient {
+  const clerk = new Clerk(publishableKey);
+  const clerkReady = clerk.load();
+  const [token, setToken] = createSignal<AuthToken>();
+  const isSignedIn = createMemo(() => !!token());
+
+  async function refresh() {
+    await clerkReady;
+    const token = (await clerk.session?.getToken()) as AuthToken | undefined;
+    setToken(token);
+    return token;
+  }
+
+  onCleanup(clerk.addListener(() => void refresh()));
+
+  return { ...clerk, token, isSignedIn, refresh };
+}
+
+export * from "./shared";

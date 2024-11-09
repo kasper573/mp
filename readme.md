@@ -12,7 +12,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - maps: [Tiled](https://www.mapeditor.org/) (+custom [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) + [drizzle orm](https://orm.drizzle.team/)
-- network: [socket.io](https://socket.io/)
+- network: [ws](https://www.npmjs.com/package/ws) and [automerge](https://automerge.org/)
 - auth: [clerk](https://clerk.com/)
 
 The rest is custom.

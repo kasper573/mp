@@ -3,7 +3,7 @@ import type { AreaResource } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import { createEffect, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
-import type { Vector } from "@mp/math";
+import { vec_scale, type Vector } from "@mp/math";
 import { EngineContext } from "@mp/engine";
 import { getTilePosition } from "../../state/getTilePosition";
 
@@ -18,7 +18,7 @@ export function TileHighlight(props: TileHighlightProps) {
   createEffect(() => {
     const { tileSize } = props.area.tiled;
     const { isValidTarget, tilePosition } = getTilePosition(props.area, engine);
-    const { x, y } = tilePosition.scale(tileSize);
+    const { x, y } = vec_scale(tilePosition, tileSize);
     gfx.position.set(x, y);
     gfx.update(tileSize, isValidTarget);
   });

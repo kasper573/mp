@@ -3,14 +3,26 @@
   "version": "0.0.0",
   "sideEffects": false,
   "license": "MIT",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch"
+  },
   "dependencies": {
     "neverthrow": "7.0.0",
-    "solid-js": "1.9.1",
-    "immer": "10.1.1"
+    "solid-js": "1.9.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@mp/build": "workspace:*"
   }
 }

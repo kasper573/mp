@@ -10,31 +10,30 @@
     }
   },
   "scripts": {
-    "build": "tsup && tsc",
-    "start": "node dist/index.js",
-    "dev": "tsx watch --env-file .env src/main.ts --clear-screen=false",
+    "build": "PROD=true tsup && tsc",
+    "dev:tsup": "tsup --watch",
+    "dev:node": "node --watch --enable-source-maps dist/index.mjs",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"tsup,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:tsup\" \"pnpm dev:node\"",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
-    "db:migrate": "drizzle-kit migrate",
-    "benchmark": "tsx scripts/benchmarks/serialize-state-update/once.ts",
-    "benchmark:plot": "tsx scripts/benchmarks/serialize-state-update/plot.ts",
-    "benchmark:snapshot": "tsx scripts/benchmarks/serialize-state-update/snapshot.ts"
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
+    "@mp/auth": "workspace:*",
+    "@mp/data": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/auth": "workspace:*",
-    "@mp/network": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/state": "workspace:*",
-    "@mp/data": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
-    "@mp/transformer": "workspace:*",
-    "dotenv-flow": "4.1.0",
+    "@trpc/server": "11.0.0-rc.593",
     "cors": "2.8.5",
+    "dotenv-flow": "4.1.0",
     "drizzle-orm": "^0.33.0",
     "express": "4.19.2",
     "postgres": "^3.4.4",
     "rate-limiter-flexible": "^5.0.3",
+    "superjson": "2.2.1",
     "yargs": "17.7.2"
   },
   "devDependencies": {
@@ -43,6 +42,7 @@
     "@types/cors": "2.8.17",
     "@types/express": "4.17.21",
     "@types/yargs": "17.0.33",
-    "drizzle-kit": "^0.24.2"
+    "drizzle-kit": "^0.24.2",
+    "concurrently": "9.0.1"
   }
 }
