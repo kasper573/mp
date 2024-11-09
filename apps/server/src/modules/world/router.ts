@@ -8,11 +8,9 @@ import {
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
-import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import type { Ticker } from "../../Ticker";
-import type { ClientId } from "../../context";
 import type { CharacterId, WorldState } from "./schema";
 
 export interface WorldRouterDependencies {
@@ -20,7 +18,6 @@ export interface WorldRouterDependencies {
   areas: Map<AreaId, AreaResource>;
   defaultAreaId: AreaId;
   characterKeepAliveTimeout?: TimeSpan;
-  doesCurrentRequestHaveAccessToClient: (clientId: ClientId) => boolean;
   ticker: Ticker;
 }
 
@@ -30,7 +27,6 @@ export function createWorldRouter({
   areas,
   defaultAreaId,
   ticker,
-  doesCurrentRequestHaveAccessToClient,
 }: WorldRouterDependencies) {
   ticker.subscribe((delta) => {
     accessState("world.ticker", (state) => {
@@ -91,21 +87,10 @@ export function createWorldRouter({
       ),
 
     join: t.procedure
-      .input(schemaFor<ClientId>())
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ input: clientId, ctx: { userId, clients, logger } }) =>
+      .mutation(({ ctx: { userId, clients, logger } }) =>
         accessState("world.join", (state) => {
-          if (!doesCurrentRequestHaveAccessToClient(clientId)) {
-            throw new TRPCError({
-              code: "UNAUTHORIZED",
-              message: "No access to client id",
-            });
-          }
-
-          clients.associateClientWithUser(clientId, userId);
-          logger.info("Client associated with user", { clientId, userId });
-
           // TODO don't use user id as character id
           const characterId = userId as unknown as CharacterId;
           let player = state.characters[characterId];

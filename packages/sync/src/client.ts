@@ -1,18 +1,25 @@
-import type { DocHandle, DocumentPayload } from "@automerge/automerge-repo";
+import type {
+  DocHandle,
+  DocumentPayload,
+  PeerMetadata,
+} from "@automerge/automerge-repo";
 import { Repo } from "@automerge/automerge-repo";
 import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
 import { v4 as uuid } from "uuid";
-import type { ClientId } from "./shared";
+import { customPeerMetaDataKey, type ClientId } from "./shared";
 
-export class SyncClient<State> {
-  private wsAdapter?: BrowserWebSocketClientAdapter;
+export class SyncClient<State, ConnectionMetaData> {
+  private wsAdapter?: WSClientAdapterWithCustomMetaData<ConnectionMetaData>;
   private repo?: Repo;
   private handle?: DocHandle<State>;
   private stateSubscriptions = new Set<SyncClientSubscription<State>>();
 
   readonly clientId: ClientId;
 
-  constructor(private url: string) {
+  constructor(
+    private url: string,
+    private getConnectionMetaData: () => ConnectionMetaData,
+  ) {
     this.clientId = uuid() as ClientId;
   }
 
@@ -24,12 +31,18 @@ export class SyncClient<State> {
     if (this.repo) {
       throw new Error("Cannot start a client that has already started");
     }
-    this.wsAdapter = new BrowserWebSocketClientAdapter(this.url);
+
+    this.wsAdapter = new WSClientAdapterWithCustomMetaData(
+      this.url,
+      this.getConnectionMetaData,
+    );
+
     this.repo = new Repo({
       network: [this.wsAdapter],
       peerId: this.clientId,
       sharePolicy: () => Promise.resolve(false),
     });
+
     this.repo.on("document", this.acceptDocument);
   }
 
@@ -63,6 +76,24 @@ export class SyncClient<State> {
       handler(this.getState());
     }
   };
+}
+
+class WSClientAdapterWithCustomMetaData<
+  Custom,
+> extends BrowserWebSocketClientAdapter {
+  constructor(
+    serverUrl: string,
+    private getCustom?: () => Custom,
+  ) {
+    super(serverUrl);
+  }
+
+  override connect(peerId: ClientId, peerMetadata?: PeerMetadata) {
+    super.connect(peerId, {
+      ...peerMetadata,
+      [customPeerMetaDataKey]: this.getCustom?.(),
+    } as PeerMetadata);
+  }
 }
 
 export type SyncClientSubscription<State> = (state?: State) => void;

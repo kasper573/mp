@@ -1,4 +1,8 @@
-import type { Character, WorldState } from "@mp/server";
+import type {
+  Character,
+  SyncServerConnectionMetaData,
+  WorldState,
+} from "@mp/server";
 import { type CharacterId } from "@mp/server";
 import { SyncClient } from "@mp/sync/client";
 import type { Accessor } from "solid-js";
@@ -11,27 +15,18 @@ import {
 } from "solid-js";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
+import type { AuthClient } from "@mp/auth/client";
 import { env } from "../env";
 import { dedupe, throttle } from "../state/functionComposition";
 import { trpc } from "./trpc";
 
-export function createGameClient(): GameClient {
-  const syncClient = new SyncClient<WorldState>(env.wsUrl);
-
-  const [worldState, setWorldState] = createSignal(syncClient.getState());
+export function createGameClient(authClient: AuthClient): GameClient {
+  const worldState = createWorldStateSignal(authClient);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(() => worldState()?.characters[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
 
-  createEffect(() => {
-    syncClient.start();
-    onCleanup(() => syncClient.stop());
-  });
-
-  createEffect(() => onCleanup(syncClient.subscribe(setWorldState)));
-
-  const join = () =>
-    trpc.world.join.mutate(syncClient.clientId).then(setCharacterId);
+  const join = async () => trpc.world.join.mutate().then(setCharacterId);
 
   const serverTick = createMemo(() => worldState()?.serverTick ?? 0);
 
@@ -54,6 +49,38 @@ export function createGameClient(): GameClient {
     join,
     move,
   };
+}
+
+function createWorldStateSignal(authClient: AuthClient) {
+  const [worldState, setWorldState] = createSignal<WorldState>();
+  const syncClient = createMemo(() => {
+    const token = authClient.token();
+    if (!token) {
+      return;
+    }
+
+    return new SyncClient<WorldState, SyncServerConnectionMetaData>(
+      env.wsUrl,
+      () => ({ token }),
+    );
+  });
+
+  createEffect(() => {
+    const client = syncClient();
+    if (client) {
+      client.start();
+      onCleanup(() => client.stop());
+    }
+  });
+
+  createEffect(() => {
+    const client = syncClient();
+    if (client) {
+      onCleanup(client.subscribe(setWorldState));
+    }
+  });
+
+  return worldState;
 }
 
 export const GameClientContext = createContext<GameClient>(

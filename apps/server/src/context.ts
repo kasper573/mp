@@ -8,13 +8,16 @@ import type { ClientRegistry } from "./modules/world/ClientRegistry";
 export interface ServerContext {
   sessionId: HttpSessionId;
   accessWorldState: StateAccess<WorldState>;
-  authToken?: AuthToken;
+  authToken?: string;
   auth: AuthClient;
   clients: ClientRegistry;
   logger: Logger;
 }
 
 export type UserId = Branded<string, "UserId">;
-export type AuthToken = Branded<string, "AuthToken">;
 export type HttpSessionId = Branded<string, "HttpSessionId">;
 export type { ClientId } from "@mp/sync/server";
+
+export interface SyncServerConnectionMetaData {
+  token: string;
+}

@@ -11,7 +11,11 @@ import { createAuthClient } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import type { WorldState } from "./modules/world/schema";
-import type { AuthToken, HttpSessionId } from "./context";
+import type {
+  HttpSessionId,
+  SyncServerConnectionMetaData,
+  UserId,
+} from "./context";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import { readCliOptions, type CliOptions } from "./cli";
@@ -64,16 +68,14 @@ async function main(opt: CliOptions) {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
   });
 
-  const worldState = new SyncServer<WorldState>({
+  const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     initialState: initialWorldState.value,
     filterState: deriveWorldStateForClient,
     httpServer,
     patchCallback: opt.logSyncPatches
       ? (patches) => logger.chain("sync").info(patches)
       : undefined,
-    onConnection(clientId) {
-      logger.info("Client connected", clientId);
-    },
+    onConnection: handleSyncServerConnection,
     onDisconnect(clientId) {
       logger.info("Client disconnected", clientId);
       clients.deleteClient(clientId);
@@ -98,7 +100,6 @@ async function main(opt: CliOptions) {
     createUrl,
     buildVersion: opt.buildVersion,
     ticker,
-    doesCurrentRequestHaveAccessToClient,
   });
 
   expressApp.use(
@@ -108,7 +109,7 @@ async function main(opt: CliOptions) {
       createContext: ({ req }) =>
         createServerContext(
           `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
-          req.headers[tokenHeaderName] as AuthToken,
+          String(req.headers[tokenHeaderName]),
         ),
     }),
   );
@@ -151,17 +152,31 @@ async function main(opt: CliOptions) {
     };
   }
 
+  async function handleSyncServerConnection(
+    clientId: ClientId,
+    { token }: SyncServerConnectionMetaData,
+  ) {
+    logger.info("Client connected", clientId);
+    try {
+      const { sub } = await auth.verifyToken(token);
+      const userId = sub as UserId;
+      clients.associateClientWithUser(clientId, userId);
+      logger.info("Client verified and associated with user", {
+        clientId,
+        userId,
+      });
+    } catch {
+      logger.info("Client connection rejected", clientId);
+      worldState.disconnectClient(clientId);
+    }
+  }
+
   function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(opt.publicDir, fileInPublicDir)
       : fileInPublicDir;
     return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
-}
-
-function doesCurrentRequestHaveAccessToClient(clientId: ClientId) {
-  // TODO implement
-  return true;
 }
 
 function createExpressLogger(logger: Logger): express.RequestHandler {

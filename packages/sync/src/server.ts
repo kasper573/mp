@@ -8,14 +8,14 @@ import { WebSocketServer } from "ws";
 import { Repo } from "@automerge/automerge-repo";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import type { PatchCallback } from "@automerge/automerge";
-import type { ClientId } from "./shared";
+import { customPeerMetaDataKey, type ClientId } from "./shared";
 
-export class SyncServer<State> {
+export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
   private wssAdapter: NodeWSServerAdapter;
   private handle: DocHandle<State>;
 
-  constructor(private options: SyncServerOptions<State>) {
+  constructor(private options: SyncServerOptions<State, ConnectionMetaData>) {
     this.wssAdapter = new NodeWSServerAdapter(
       new WebSocketServer({ server: options.httpServer }),
     );
@@ -41,8 +41,15 @@ export class SyncServer<State> {
     this.wssAdapter.disconnect();
   }
 
-  private onConnection = ({ peerId }: PeerCandidatePayload) => {
-    void this.options.onConnection?.(peerId);
+  disconnectClient(clientId: ClientId) {
+    this.wssAdapter.sockets[clientId]?.close();
+  }
+
+  private onConnection = ({ peerId, peerMetadata }: PeerCandidatePayload) => {
+    void this.options.onConnection?.(
+      peerId,
+      Reflect.get(peerMetadata, customPeerMetaDataKey) as ConnectionMetaData,
+    );
   };
 
   private onDisconnect = ({ peerId }: PeerDisconnectedPayload) => {
@@ -50,12 +57,15 @@ export class SyncServer<State> {
   };
 }
 
-export interface SyncServerOptions<State> {
+export interface SyncServerOptions<State, ConnectionMetaData> {
   httpServer: Server;
   initialState: State;
   filterState: (state: State, clientId: ClientId) => State;
   patchCallback?: PatchCallback<State>;
-  onConnection?: (clientId: ClientId) => void | undefined | Promise<unknown>;
+  onConnection?: (
+    clientId: ClientId,
+    meta: ConnectionMetaData,
+  ) => void | undefined | Promise<unknown>;
   onDisconnect?: (clientId: ClientId) => void | undefined | Promise<unknown>;
 }
 
