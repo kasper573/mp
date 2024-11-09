@@ -22,16 +22,16 @@
     "dev": "tsup --watch"
   },
   "dependencies": {
-    "@automerge/automerge": "2.2.8",
-    "@automerge/automerge-repo": "1.2.1",
-    "@automerge/automerge-repo-network-websocket": "1.2.1",
+    "@automerge/automerge": "2.2.9-alpha.2",
+    "@automerge/automerge-repo": "2.0.0-alpha.14",
+    "@automerge/automerge-repo-network-websocket": "2.0.0-alpha.14",
     "@mp/state": "workspace:*",
     "uuid": "11.0.0",
     "ws": "8.18.0"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
     "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
     "@types/ws": "8.5.12"
   }
 }

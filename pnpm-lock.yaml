@@ -416,14 +416,14 @@ importers:
   packages/sync:
     dependencies:
       '@automerge/automerge':
-        specifier: 2.2.8
-        version: 2.2.8
+        specifier: 2.2.9-alpha.2
+        version: 2.2.9-alpha.2
       '@automerge/automerge-repo':
-        specifier: 1.2.1
-        version: 1.2.1(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+        specifier: 2.0.0-alpha.14
+        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
       '@automerge/automerge-repo-network-websocket':
-        specifier: 1.2.1
-        version: 1.2.1(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+        specifier: 2.0.0-alpha.14
+        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
       '@mp/state':
         specifier: workspace:*
         version: link:../state
@@ -522,14 +522,17 @@ packages:
   '@asamuzakjp/dom-selector@2.0.2':
     resolution: {integrity: sha512-x1KXOatwofR6ZAYzXRBL5wrdV0vwNxlTCK9NCuLqAzQYARqGcvFwiJA6A1ERuh+dgeA4Dxm3JBYictIes+SqUQ==}
 
-  '@automerge/automerge-repo-network-websocket@1.2.1':
-    resolution: {integrity: sha512-n4sI6l51iBf0edWtX+vhk+sc8wJL72IVZl682SvzRHakA5CzyNZiC8sVzc142zRT3RDN12jCWGpwA2Voq6EXsQ==}
+  '@automerge/automerge-repo-network-websocket@2.0.0-alpha.14':
+    resolution: {integrity: sha512-dvcIee9QJktvdV5PHNbnf+aKRqic/ptuy2GCZuQtaCzzpe17xMk9i4yuSnW6hQ1Wu7VXUGf4eHhrq7ArnySwww==}
 
-  '@automerge/automerge-repo@1.2.1':
-    resolution: {integrity: sha512-uEBr4bM01aSWkEt2tDKQxfW0Pahz2zbTTn4sRJfeKJlAg2SLr4QepFJ+3Tp4CNEkkU485olfnKYf6gt7uilMZQ==}
+  '@automerge/automerge-repo@2.0.0-alpha.14':
+    resolution: {integrity: sha512-nAI2YczFxKqotcuWf50kgHdpW+vZ1dMd0K86TP99qdN8vMM+YYu/TIrEseq7uzwJC/VF/KTtwdwBCuK77+zsGw==}
 
   '@automerge/automerge@2.2.8':
     resolution: {integrity: sha512-kP6Z9lIkNeIGe/jhF8SUQAgUMwVjtXCBL0eZEgQGCoWvPNTPcg8fnQco28XkYBrfkkuqiEUAbdHhJmSp0y79ug==}
+
+  '@automerge/automerge@2.2.9-alpha.2':
+    resolution: {integrity: sha512-058IOtIx7+xAzKr8Kzt4QIj6mYJiAkc+w4plpaJiSHn5qhix+YwVmRa37iGWGBLayfUBHFqKShEqKSytfLRj9w==}
 
   '@babel/code-frame@7.24.7':
     resolution: {integrity: sha512-BcYH1CVJBO9tvyIZ2jVeXgSIMvGZ2FDRvDdOIVQyuklNKSsx+eppDEBq/g47Ayw+RqNFE+URvOShmf+f/qwAlA==}
@@ -5093,11 +5096,11 @@ snapshots:
       is-potential-custom-element-name: 1.0.1
     optional: true
 
-  '@automerge/automerge-repo-network-websocket@1.2.1(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
+  '@automerge/automerge-repo-network-websocket@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
     dependencies:
-      '@automerge/automerge-repo': 1.2.1(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+      '@automerge/automerge-repo': 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
       cbor-x: 1.6.0
-      debug: 4.3.5
+      debug: 4.3.7
       eventemitter3: 5.0.1
       isomorphic-ws: 5.0.0(ws@8.18.0)
       ws: 8.18.0
@@ -5110,12 +5113,12 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@automerge/automerge-repo@1.2.1(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
+  '@automerge/automerge-repo@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
     dependencies:
       '@automerge/automerge': 2.2.8
       bs58check: 3.0.1
       cbor-x: 1.6.0
-      debug: 4.3.5
+      debug: 4.3.7
       eventemitter3: 5.0.1
       fast-sha256: 1.3.0
       tiny-typed-emitter: 2.1.0
@@ -5130,6 +5133,10 @@ snapshots:
       - typescript
 
   '@automerge/automerge@2.2.8':
+    dependencies:
+      uuid: 9.0.1
+
+  '@automerge/automerge@2.2.9-alpha.2':
     dependencies:
       uuid: 9.0.1
 
