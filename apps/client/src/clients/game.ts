@@ -15,12 +15,12 @@ import {
 } from "solid-js";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth/client";
+import type { BrowserAuthClient } from "@mp/auth/client";
 import { env } from "../env";
 import { dedupe, throttle } from "../state/functionComposition";
 import { trpc } from "./trpc";
 
-export function createGameClient(authClient: AuthClient): GameClient {
+export function createGameClient(authClient: BrowserAuthClient): GameClient {
   const worldState = createWorldStateSignal(authClient);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(() => worldState()?.characters[characterId()!]);
@@ -51,7 +51,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
   };
 }
 
-function createWorldStateSignal(authClient: AuthClient) {
+function createWorldStateSignal(authClient: BrowserAuthClient) {
   const [worldState, setWorldState] = createSignal<WorldState>();
   const syncClient = createMemo(() => {
     const token = authClient.token();

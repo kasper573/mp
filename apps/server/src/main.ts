@@ -11,11 +11,7 @@ import { createAuthClient } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import type { WorldState } from "./modules/world/schema";
-import type {
-  HttpSessionId,
-  SyncServerConnectionMetaData,
-  UserId,
-} from "./context";
+import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
 import { type ClientId, type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import { readCliOptions, type CliOptions } from "./cli";
@@ -109,7 +105,7 @@ async function main(opt: CliOptions) {
       createContext: ({ req }) =>
         createServerContext(
           `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
-          String(req.headers[tokenHeaderName]),
+          String(req.headers[tokenHeaderName]) as ServerContext["authToken"],
         ),
     }),
   );
@@ -158,8 +154,7 @@ async function main(opt: CliOptions) {
   ) {
     logger.info("Client connected", clientId);
     try {
-      const { sub } = await auth.verifyToken(token);
-      const userId = sub as UserId;
+      const { userId } = await auth.verifyToken(token);
       clients.associateClientWithUser(clientId, userId);
       logger.info("Client verified and associated with user", {
         clientId,

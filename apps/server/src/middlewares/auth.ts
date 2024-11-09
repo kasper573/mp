@@ -1,4 +1,3 @@
-import type { UserId } from "../context";
 import { t } from "../trpc";
 
 export function auth() {
@@ -9,8 +8,8 @@ export function auth() {
     }
 
     try {
-      const { sub } = await auth.verifyToken(authToken);
-      return next({ ctx: { ...ctx, userId: sub as UserId } });
+      const { userId } = await auth.verifyToken(authToken);
+      return next({ ctx: { ...ctx, userId } });
     } catch (error) {
       throw new Error(`Client failed to authenticate: ${String(error)}`);
     }
