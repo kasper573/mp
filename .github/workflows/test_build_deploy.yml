@@ -46,12 +46,10 @@ jobs:
 
       - name: Build and push Docker images
         run: |
-          docker compose build
+          docker compose build \
+            --build-arg MP_BUILD_VERSION=${{ env.BUILD_VERSION }} \
+            --build-arg MP_AUTH_PUBLISHABLE_KEY=${{ secrets.AUTH_PUBLISHABLE_KEY }}
           docker compose push
-        env:
-          NODE_ENV: production
-          MP_BUILD_VERSION: ${{ env.BUILD_VERSION }}
-          MP_AUTH_PUBLISHABLE_KEY: ${{ secrets.AUTH_PUBLISHABLE_KEY }}
 
   deploy:
     needs: [conventions, test, build]
