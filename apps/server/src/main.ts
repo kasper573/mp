@@ -134,8 +134,6 @@ async function main(opt: CliOptions) {
       );
     }
 
-    // TODO use character id to derive state for client
-
     return state;
   }
 
