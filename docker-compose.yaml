@@ -14,10 +14,13 @@ services:
   app:
     build:
       context: .
+      args:
+        MP_API_URL: "https://k573.dev/api"
+        MP_WS_URL: "wss://k573.dev"
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
-      - "8080"
+      - 8080
     environment:
       MP_PORT: 8080
       MP_HOSTNAME: "k573.dev"
