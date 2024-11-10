@@ -57,16 +57,6 @@ async function main(opt: CliOptions) {
 
   const httpServer = http.createServer(expressApp);
 
-  if (opt.clientDir !== undefined) {
-    const indexFile = path.resolve(opt.clientDir, "index.html");
-    expressApp.use("/", express.static(opt.clientDir));
-    expressApp.get("*", (_, res) => res.sendFile(indexFile));
-  }
-
-  httpServer.listen(opt.port, opt.listenHostname, () => {
-    logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
-  });
-
   const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     initialState: initialWorldState.value,
     filterState: deriveWorldStateForClient,
@@ -112,6 +102,16 @@ async function main(opt: CliOptions) {
         ),
     }),
   );
+
+  if (opt.clientDir !== undefined) {
+    const indexFile = path.resolve(opt.clientDir, "index.html");
+    expressApp.use("/", express.static(opt.clientDir));
+    expressApp.get("*", (_, res) => res.sendFile(indexFile));
+  }
+
+  httpServer.listen(opt.port, opt.listenHostname, () => {
+    logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
+  });
 
   const clients = new ClientRegistry();
 
