@@ -35,12 +35,12 @@ export function createClientEnvMiddleware(
   opt: CliOptions,
 ): express.RequestHandler {
   return (req, res, next) => {
-    if (req.url !== clientEnvApiPath) {
-      return next();
+    if (req.path === clientEnvApiPath) {
+      const js = `window["${clientEnvGlobalVarName}"] = ${JSON.stringify(getClientEnv(opt))};`;
+      res.setHeader("Content-Type", "application/javascript");
+      res.send(js);
+    } else {
+      next();
     }
-
-    const js = `window["${clientEnvGlobalVarName}"] = ${JSON.stringify(getClientEnv(opt))};`;
-    res.setHeader("Content-Type", "application/javascript");
-    res.send(js);
   };
 }
