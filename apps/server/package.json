@@ -3,17 +3,17 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "types": "./src/package.ts",
   "exports": {
     ".": {
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
+      "types": "./dist/package.d.ts",
+      "import": "./dist/package.mjs",
+      "require": "./dist/package.cjs"
     }
   },
   "scripts": {
     "build": "tsup && tsc",
     "dev:tsup": "tsup --watch",
-    "dev:node": "node --watch --enable-source-maps dist/index.mjs",
+    "dev:node": "DOTENV_CONFIG_PATH=../../.env node --watch --enable-source-maps dist/index.mjs",
     "dev": "concurrently -k -p \"[{name}]\" -n \"tsup,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:tsup\" \"pnpm dev:node\"",
     "start": "node --enable-source-maps dist/index.mjs",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
@@ -30,7 +30,7 @@
     "@mp/time": "workspace:*",
     "@trpc/server": "11.0.0-rc.593",
     "cors": "2.8.5",
-    "dotenv-flow": "4.1.0",
+    "dotenv": "16.4.5",
     "drizzle-orm": "^0.33.0",
     "express": "4.19.2",
     "postgres": "^3.4.4",

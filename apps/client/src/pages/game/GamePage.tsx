@@ -11,6 +11,21 @@ import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
+
+  return (
+    <Switch>
+      <Match when={auth.isSignedIn()}>
+        <Game />
+      </Match>
+      <Match when={!auth.isSignedIn()}>
+        <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
+      </Match>
+    </Switch>
+  );
+}
+
+function Game() {
+  const auth = useContext(AuthContext);
   const gameClient = createGameClient(auth);
 
   const area = createQuery(() => {
@@ -22,25 +37,17 @@ export default function GamePage() {
   });
 
   void gameClient.join();
-
   return (
     <GameClientContext.Provider value={gameClient}>
-      <Switch>
-        <Match when={auth.isSignedIn()}>
-          <Application class={styles.container}>
-            {({ viewport }) => (
-              <EngineProvider viewport={viewport}>
-                <Show when={area.data} keyed>
-                  {(data) => <AreaScene area={data} />}
-                </Show>
-              </EngineProvider>
-            )}
-          </Application>
-        </Match>
-        <Match when={!auth.isSignedIn()}>
-          <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
-        </Match>
-      </Switch>
+      <Application class={styles.container}>
+        {({ viewport }) => (
+          <EngineProvider viewport={viewport}>
+            <Show when={area.data} keyed>
+              {(data) => <AreaScene area={data} />}
+            </Show>
+          </EngineProvider>
+        )}
+      </Application>
     </GameClientContext.Provider>
   );
 }

@@ -17,13 +17,11 @@ export function readCliOptions(argv = process.argv) {
     .option("httpServerUrl", {
       alias: "hs",
       type: "string",
-      default: "http://localhost:3002",
       demandOption: true,
     })
     .option("apiServerUrl", {
       alias: "as",
       type: "string",
-      default: "http://localhost:3002/api",
       demandOption: true,
     })
     .option("connections", {

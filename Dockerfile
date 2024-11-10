@@ -8,16 +8,8 @@ FROM base AS build
 COPY . /usr/mp-src
 WORKDIR /usr/mp-src
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
-ARG MP_API_URL=
-ARG MP_WS_URL=
-ARG MP_BUILD_VERSION=
-ARG MP_AUTH_PUBLISHABLE_KEY=
-ENV MP_API_URL=$MP_API_URL
-ENV MP_WS_URL=$MP_WS_URL
-ENV MP_BUILD_VERSION=$MP_BUILD_VERSION
-ENV MP_AUTH_PUBLISHABLE_KEY=$MP_AUTH_PUBLISHABLE_KEY
 ENV NODE_ENV=production
-RUN pnpm build
+RUN pnpm build 
 RUN pnpm deploy --filter=server --prod /usr/pnpm-deploy/server
 
 FROM base AS server

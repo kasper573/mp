@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite --host 0.0.0.0 --port 3002 --clearScreen false",
+    "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -32,6 +32,7 @@
     "@mp/build": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "http-server": "14.1.1"
+    "http-server": "14.1.1",
+    "dotenv": "16.4.5"
   }
 }

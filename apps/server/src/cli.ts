@@ -39,9 +39,15 @@ export function readCliOptions(argv = process.argv) {
       default: 4000,
       description: "The port to listen on",
     })
+    .option("ssl", {
+      type: "boolean",
+      default: false,
+      description:
+        "Whether SSL is enabled. Used for determining the protocol for public urls",
+    })
     .option("hostname", {
       type: "string",
-      default: "localhost:4000",
+      default: "localhost",
       description: "The public accessable hostname. Used for generating URLs",
     })
     .option("listenHostname", {
@@ -57,10 +63,16 @@ export function readCliOptions(argv = process.argv) {
     .option("authSecretKey", {
       type: "string",
       description: "The secret key for the auth server",
+      demandOption: true,
+    })
+    .option("authPublishableKey", {
+      type: "string",
+      description: "The publishable key for the auth server",
+      demandOption: true,
     })
     .option("tickInterval", {
       type: "number",
-      default: 1000 / 60,
+      default: 50,
       description: "The server tick interval in milliseconds",
       coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
     })
@@ -79,11 +91,13 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("databaseUrl", {
       type: "string",
+      default: "postgres://mp:mp@localhost:5432/mp",
       description: "The URL to the database",
       demandOption: true,
     })
     .option("buildVersion", {
       type: "string",
+      default: "dev",
       description: "The version of the build",
       demandOption: true,
     })

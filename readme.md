@@ -26,3 +26,12 @@ The rest is custom.
 - Dead simple client
   - little to no optimistic operations (maybe some lerping)
   - subscribe to state changes, render them.
+
+## Getting started
+
+- Install Node 20+
+- Clone this repository
+- Run `corepack enable`
+- Run `pnpm install`
+- Copy `.env-example` > `.env` and update its values
+- Run `pnpm dev`

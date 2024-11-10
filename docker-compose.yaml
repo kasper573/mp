@@ -14,9 +14,6 @@ services:
   app:
     build:
       context: .
-      args:
-        MP_API_URL: "https://k573.dev/api"
-        MP_WS_URL: "wss://k573.dev"
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
@@ -25,6 +22,7 @@ services:
       MP_PORT: 8080
       MP_HOSTNAME: "k573.dev"
       MP_CORS_ORIGIN: "k573.dev"
+      MP_SSL: true
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
       MP_AUTH_SECRET_KEY: ${MP_AUTH_SECRET_KEY}
       MP_BUILD_VERSION: ${MP_BUILD_VERSION}

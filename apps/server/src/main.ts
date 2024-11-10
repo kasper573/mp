@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import "dotenv-flow/config";
+import "dotenv/config";
 import path from "node:path";
 import http from "node:http";
 import { Logger } from "@mp/logger";
@@ -21,6 +21,8 @@ import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { createDynamicDeltaFn, Ticker } from "./Ticker";
 import { tokenHeaderName } from "./tokenHeaderName";
+import { createClientEnvMiddleware } from "./clientEnv";
+import { trpcEndpointPath } from "./settings";
 
 async function main(opt: CliOptions) {
   const delta = createDynamicDeltaFn(() => performance.now());
@@ -48,17 +50,18 @@ async function main(opt: CliOptions) {
 
   const expressApp = express();
 
+  expressApp.use(createClientEnvMiddleware(opt));
   expressApp.use(createExpressLogger(logger.chain("http")));
   expressApp.use(createCors({ origin: opt.corsOrigin }));
   expressApp.use(opt.publicPath, express.static(opt.publicDir));
+
+  const httpServer = http.createServer(expressApp);
 
   if (opt.clientDir !== undefined) {
     const indexFile = path.resolve(opt.clientDir, "index.html");
     expressApp.use("/", express.static(opt.clientDir));
     expressApp.get("*", (_, res) => res.sendFile(indexFile));
   }
-
-  const httpServer = http.createServer(expressApp);
 
   httpServer.listen(opt.port, opt.listenHostname, () => {
     logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
@@ -99,7 +102,7 @@ async function main(opt: CliOptions) {
   });
 
   expressApp.use(
-    "/api",
+    trpcEndpointPath,
     trpcExpress.createExpressMiddleware({
       router: apiRouter,
       createContext: ({ req }) =>
@@ -170,7 +173,7 @@ async function main(opt: CliOptions) {
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(opt.publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${opt.hostname}${opt.publicPath}${relativePath}` as UrlToPublicFile;
+    return `//${opt.hostname}:${opt.port}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 }
 

@@ -1,3 +1,15 @@
-import { defineConfig } from "@mp/build/vite";
+import { clientEnvApiPath } from "@mp/server";
+import { defineConfig, handlebars } from "@mp/build/vite";
 
-export default defineConfig();
+const envFileUrl =
+  process.env.NODE_ENV === "production"
+    ? clientEnvApiPath
+    : `http://localhost:4000${clientEnvApiPath}`;
+
+export default defineConfig({
+  plugins: [
+    handlebars({
+      context: { envFileUrl },
+    }),
+  ],
+});
