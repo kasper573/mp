@@ -2,7 +2,7 @@
 services:
   mp:
     build:
-      dockerfile: ./docker/Dockerfile
+      dockerfile: ./docker/Dockerfile.mp
       context: ..
     image: ghcr.io/kasper573/mp:latest
     restart: always
