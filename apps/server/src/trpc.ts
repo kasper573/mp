@@ -1,6 +1,6 @@
 import { initTRPC } from "@trpc/server";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { transformer } from "./transformer";
+import { transformer } from "./shared";
 import type { ServerContext } from "./context";
 import { consumeLimiterWithContext } from "./middlewares/rateLimit";
 

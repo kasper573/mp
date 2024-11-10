@@ -4,16 +4,7 @@ import {
   clientEnvApiPath,
   clientEnvGlobalVarName,
   trpcEndpointPath,
-} from "./settings";
-
-export function getClientEnv(opt: CliOptions): ClientEnv {
-  return {
-    apiUrl: `${opt.httpBaseUrl}${trpcEndpointPath}`,
-    wsUrl: opt.wsBaseUrl,
-    authPublishableKey: opt.authPublishableKey,
-    buildVersion: opt.buildVersion,
-  };
-}
+} from "./shared";
 
 /**
  * Runtime environment variables that the server exposes to the client
@@ -23,6 +14,15 @@ export interface ClientEnv {
   wsUrl: string;
   authPublishableKey: string;
   buildVersion: string;
+}
+
+export function getClientEnv(opt: CliOptions): ClientEnv {
+  return {
+    apiUrl: `${opt.httpBaseUrl}${trpcEndpointPath}`,
+    wsUrl: opt.wsBaseUrl,
+    authPublishableKey: opt.authPublishableKey,
+    buildVersion: opt.buildVersion,
+  };
 }
 
 export function createClientEnvMiddleware(

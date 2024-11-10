@@ -20,9 +20,9 @@ import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
-import { tokenHeaderName } from "./tokenHeaderName";
+import { tokenHeaderName } from "./shared";
 import { createClientEnvMiddleware } from "./clientEnv";
-import { trpcEndpointPath } from "./settings";
+import { trpcEndpointPath } from "./shared";
 
 async function main(opt: CliOptions) {
   const delta = createDynamicDeltaFn(() => performance.now());
