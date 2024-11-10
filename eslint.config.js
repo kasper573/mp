@@ -12,9 +12,10 @@ export default tseslint.config(
   {
     // Ignores must be defined as the only key in the config object to be interpreted as global ignores
     ignores: [
-      "**/node_modules/",
-      "**/dist/",
-      "**/.turbo/",
+      "**/node_modules/**",
+      "**/out/**",
+      "**/dist/**",
+      "**/.turbo/**",
       "pnpm-lock.yaml",
       "**/apps/server/public/tilesets/**",
     ],
