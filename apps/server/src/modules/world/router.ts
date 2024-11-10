@@ -1,4 +1,4 @@
-import type { TimeSpan } from "@mp/time";
+import type { Ticker, TimeSpan } from "@mp/time";
 import {
   findPath,
   moveAlongPath,
@@ -10,7 +10,6 @@ import { vec, vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import type { Ticker } from "../../Ticker";
 import type { CharacterId, WorldState } from "./schema";
 
 export interface WorldRouterDependencies {

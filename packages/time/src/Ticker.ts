@@ -1,4 +1,4 @@
-import { TimeSpan } from "@mp/time";
+import { TimeSpan } from "timespan-ts";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
