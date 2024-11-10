@@ -36,18 +36,18 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("port", {
       type: "number",
-      default: 4000,
+      default: 8080,
       description: "The port to listen on",
     })
     .option("httpBaseUrl", {
       type: "string",
-      default: "http://localhost:4000",
+      default: "http://localhost:8080",
       description:
         "Used for generating public accessible urls to the http server",
     })
     .option("wsBaseUrl", {
       type: "string",
-      default: "ws://localhost:4000",
+      default: "ws://localhost:8080",
       description:
         "Used for generating public accessible urls to the websocket server",
     })
