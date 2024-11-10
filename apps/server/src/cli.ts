@@ -51,7 +51,19 @@ export function readCliOptions(argv = process.argv) {
       description:
         "Used for generating public accessible urls to the websocket server",
     })
-    .option("listenHostname", {
+    .option("metricsScrapePort", {
+      type: "number",
+      default: 9999,
+      description: "The port for the metrics scrape server to listen on",
+    })
+    .option("metricsScrapeHostname", {
+      type: "string",
+      // It's typically best to only listen to localhost to avoid exposing metrics to the internet
+      // Only prometheus will be scraping metrics inside the docker network.
+      default: "localhost",
+      description: "The hostname for the metrics scrape server to listen on",
+    })
+    .option("hostname", {
       type: "string",
       default: "0.0.0.0",
       description: "The hostname for the server to listen on",

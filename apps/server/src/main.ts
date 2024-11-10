@@ -24,6 +24,8 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { createClientEnvMiddleware } from "./clientEnv";
 import { trpcEndpointPath } from "./shared";
+import { createMetricsRegistry } from "./modules/metrics/registry";
+import { createMetricsScrapeMiddleware } from "./modules/metrics/scrapeMiddleware";
 
 const opt = readCliOptions();
 const logger = new Logger(console);
@@ -39,6 +41,7 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
+const metrics = createMetricsRegistry();
 const clients = new ClientRegistry();
 const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
@@ -50,13 +53,19 @@ if (initialWorldState.isErr()) {
   process.exit(1);
 }
 
-const expressApp = express();
-expressApp.use(createClientEnvMiddleware(opt));
-expressApp.use(createExpressLogger(logger.chain("http")));
-expressApp.use(createCors({ origin: opt.corsOrigin }));
-expressApp.use(opt.publicPath, express.static(opt.publicDir));
+const expressLogger = createExpressLogger(logger.chain("http"));
 
-const httpServer = http.createServer(expressApp);
+const webServer = express()
+  .use(createClientEnvMiddleware(opt))
+  .use(expressLogger)
+  .use(createCors({ origin: opt.corsOrigin }))
+  .use(opt.publicPath, express.static(opt.publicDir));
+
+const httpServer = http.createServer(webServer);
+
+const metricsScrapeServer = express()
+  .use(expressLogger)
+  .use(createMetricsScrapeMiddleware(metrics));
 
 const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   initialState: initialWorldState.value,
@@ -89,7 +98,7 @@ const apiRouter = createRootRouter({
   ticker,
 });
 
-expressApp.use(
+webServer.use(
   trpcEndpointPath,
   trpcExpress.createExpressMiddleware({
     router: apiRouter,
@@ -103,13 +112,23 @@ expressApp.use(
 
 if (opt.clientDir !== undefined) {
   const indexFile = path.resolve(opt.clientDir, "index.html");
-  expressApp.use("/", express.static(opt.clientDir));
-  expressApp.get("*", (_, res) => res.sendFile(indexFile));
+  webServer.use("/", express.static(opt.clientDir));
+  webServer.get("*", (_, res) => res.sendFile(indexFile));
 }
 
-httpServer.listen(opt.port, opt.listenHostname, () => {
-  logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
+httpServer.listen(opt.port, opt.hostname, () => {
+  logger.info(`Http server listening on ${opt.hostname}:${opt.port}`);
 });
+
+metricsScrapeServer.listen(
+  opt.metricsScrapePort,
+  opt.metricsScrapeHostname,
+  () => {
+    logger.info(
+      `Metrics scrape server listening on ${opt.metricsScrapeHostname}:${opt.metricsScrapePort}`,
+    );
+  },
+);
 
 persistTicker.start();
 ticker.start();
@@ -191,12 +210,14 @@ function serverTextHeader(options: CliOptions) {
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
 buildVersion: ${options.buildVersion}
+hostname: ${options.hostname}
+port: ${options.port}
+authSecretKey: ${options.authSecretKey ? "set" : "not set"}
+metricsScrapePort: ${options.metricsScrapePort}
+metricsScrapeHostname: ${options.metricsScrapeHostname}
+databaseUrl: ${options.databaseUrl}
 httpBaseUrl: ${options.httpBaseUrl}
 wsBaseUrl: ${options.wsBaseUrl}
-listenHostname: ${options.listenHostname}
-authSecretKey: ${options.authSecretKey ? "set" : "not set"}
-databaseUrl: ${options.databaseUrl}
-port: ${options.port}
 publicDir: ${options.publicDir}
 clientDir: ${options.clientDir}
 corsOrigin: ${options.corsOrigin}
