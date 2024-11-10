@@ -2,6 +2,8 @@
   "extends": "@mp/tsconfig/node.json",
   "include": ["src", "./drizzle.config.js", "tsup.config.ts"],
   "compilerOptions": {
-    "allowJs": true
+    "allowJs": true,
+    "module": "Preserve",
+    "target": "es2017"
   }
 }
