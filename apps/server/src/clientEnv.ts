@@ -7,11 +7,9 @@ import {
 } from "./settings";
 
 export function getClientEnv(opt: CliOptions): ClientEnv {
-  const httpProtocol = opt.ssl ? "https" : "http";
-  const wsProtocol = opt.ssl ? "wss" : "ws";
   return {
-    apiUrl: `${httpProtocol}://${opt.hostname}:${opt.port}${trpcEndpointPath}`,
-    wsUrl: `${wsProtocol}://${opt.hostname}:${opt.port}`,
+    apiUrl: `${opt.httpBaseUrl}${trpcEndpointPath}`,
+    wsUrl: opt.wsBaseUrl,
     auth: {
       publishableKey: opt.authPublishableKey,
     },

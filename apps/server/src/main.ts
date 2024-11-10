@@ -86,7 +86,7 @@ async function main(opt: CliOptions) {
     areas: areas.value,
     defaultAreaId,
     state: worldState.access,
-    createUrl,
+    createUrl: urlToPublicFile,
     buildVersion: opt.buildVersion,
     ticker,
   });
@@ -169,11 +169,11 @@ async function main(opt: CliOptions) {
     }
   }
 
-  function createUrl(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
+  function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
     const relativePath = path.isAbsolute(fileInPublicDir)
       ? path.relative(opt.publicDir, fileInPublicDir)
       : fileInPublicDir;
-    return `//${opt.hostname}:${opt.port}${opt.publicPath}${relativePath}` as UrlToPublicFile;
+    return `${opt.httpBaseUrl}${opt.publicPath}${relativePath}` as UrlToPublicFile;
   }
 }
 
@@ -196,7 +196,8 @@ function serverTextHeader(options: CliOptions) {
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
 buildVersion: ${options.buildVersion}
-hostname: ${options.hostname}
+httpBaseUrl: ${options.httpBaseUrl}
+wsBaseUrl: ${options.wsBaseUrl}
 listenHostname: ${options.listenHostname}
 authSecretKey: ${options.authSecretKey ? "set" : "not set"}
 databaseUrl: ${options.databaseUrl}

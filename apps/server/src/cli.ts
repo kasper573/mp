@@ -39,16 +39,17 @@ export function readCliOptions(argv = process.argv) {
       default: 4000,
       description: "The port to listen on",
     })
-    .option("ssl", {
-      type: "boolean",
-      default: false,
-      description:
-        "Whether SSL is enabled. Used for determining the protocol for public urls",
-    })
-    .option("hostname", {
+    .option("httpBaseUrl", {
       type: "string",
-      default: "localhost",
-      description: "The public accessable hostname. Used for generating URLs",
+      default: "http://localhost:4000",
+      description:
+        "Used for generating public accessible urls to the http server",
+    })
+    .option("wsBaseUrl", {
+      type: "string",
+      default: "ws://localhost:4000",
+      description:
+        "Used for generating public accessible urls to the websocket server",
     })
     .option("listenHostname", {
       type: "string",
