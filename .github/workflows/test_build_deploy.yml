@@ -59,15 +59,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Upload docker compose runtime dependencies
-        uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
+        uses: burnett01/rsync-deployments@7.0.1
         with:
-          host: ${{ vars.DEPLOY_SSH_HOST }}
-          username: ${{ vars.DEPLOY_SSH_USERNAME }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
-          source: "docker/*"
-          target: ~/docker
-          strip_components: 1
-          rm: true
+          switches: -avz --delete
+          path: docker/
+          remote_path: ~/docker
+          remote_host: ${{ secrets.DEPLOY_SSH_HOST }}
+          remote_user: ${{ secrets.DEPLOY_SSH_USERNAME }}
+          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
 
       - name: Deploy via SSH action
         uses: appleboy/ssh-action@v1.0.3
