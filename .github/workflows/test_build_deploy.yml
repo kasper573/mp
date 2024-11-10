@@ -46,9 +46,7 @@ jobs:
 
       - name: Build and push Docker images
         run: |
-          docker compose build \
-            --build-arg MP_BUILD_VERSION=${{ env.BUILD_VERSION }} \
-            --build-arg MP_AUTH_PUBLISHABLE_KEY=${{ secrets.AUTH_PUBLISHABLE_KEY }}
+          docker compose build
           docker compose push
 
   deploy:
@@ -77,6 +75,7 @@ jobs:
             rm base64.txt
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
+            echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             docker compose pull
             docker compose --env-file .env up -d --remove-orphans
