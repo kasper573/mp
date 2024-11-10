@@ -83,7 +83,7 @@ jobs:
             echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             docker compose pull
-            docker compose --env-file .env up -d --remove-orphans
+            docker compose --env-file .env up -d --remove-orphans --no-build
             docker compose run db-migrations
             docker system prune -f
             docker image prune -af
