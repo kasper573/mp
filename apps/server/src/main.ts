@@ -39,6 +39,7 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
+const clients = new ClientRegistry();
 const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
 const db = createDBClient(opt.databaseUrl);
@@ -50,7 +51,6 @@ if (initialWorldState.isErr()) {
 }
 
 const expressApp = express();
-
 expressApp.use(createClientEnvMiddleware(opt));
 expressApp.use(createExpressLogger(logger.chain("http")));
 expressApp.use(createCors({ origin: opt.corsOrigin }));
@@ -78,10 +78,7 @@ const persistTicker = new Ticker({
   interval: opt.persistInterval,
 });
 
-const ticker = new Ticker({
-  interval: opt.tickInterval,
-  delta,
-});
+const ticker = new Ticker({ interval: opt.tickInterval, delta });
 
 const apiRouter = createRootRouter({
   areas: areas.value,
@@ -113,8 +110,6 @@ if (opt.clientDir !== undefined) {
 httpServer.listen(opt.port, opt.listenHostname, () => {
   logger.info(`Server listening on ${opt.listenHostname}:${opt.port}`);
 });
-
-const clients = new ClientRegistry();
 
 persistTicker.start();
 ticker.start();
