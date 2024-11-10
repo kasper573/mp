@@ -1,4 +1,5 @@
-import type { ClientId, UserId } from "../../context";
+import type { UserId } from "@mp/auth/server";
+import type { ClientId } from "@mp/sync/server";
 import type { CharacterId } from "./schema";
 
 export class ClientRegistry {

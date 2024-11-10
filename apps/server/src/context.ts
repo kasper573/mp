@@ -15,8 +15,6 @@ export interface ServerContext {
 }
 
 export type HttpSessionId = Branded<string, "HttpSessionId">;
-export type { UserId } from "@mp/auth/server";
-export type { ClientId } from "@mp/sync/server";
 
 export interface SyncServerConnectionMetaData {
   token: AuthToken;
