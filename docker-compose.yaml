@@ -16,7 +16,7 @@ services:
       MP_WS_BASE_URL: "wss://k573.dev"
       MP_CORS_ORIGIN: "k573.dev"
       MP_HOSTNAME: "k573.dev"
-      MP_DATABASE_URL: "postgres://mp:mp@pg:8081/mp"
+      MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
       MP_AUTH_SECRET_KEY: ${MP_AUTH_SECRET_KEY}
       MP_AUTH_PUBLISHABLE_KEY: ${MP_AUTH_PUBLISHABLE_KEY}
       MP_BUILD_VERSION: ${MP_BUILD_VERSION}
@@ -28,7 +28,7 @@ services:
       POSTGRES_PASSWORD: mp
       POSTGRES_DB: mp
     ports:
-      - 8081
+      - 5432
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
   prometheus:
@@ -73,7 +73,7 @@ services:
       context: .
     image: ghcr.io/kasper573/mp-db-migrations:latest
     environment:
-      MP_DATABASE_URL: "postgres://mp:mp@pg:8081/mp"
+      MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
 volumes:
   proxy-data:
   letsencrypt-data:
