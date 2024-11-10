@@ -57,8 +57,16 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Load docker-compose file into environment
-        run: echo "DOCKER_COMPOSE_BASE64=$(cat docker-compose.yaml | base64 -w 0)" >> $GITHUB_ENV
+      - name: Upload docker compose runtime dependencies
+        uses: appleboy/scp-action@98930d398ce425af0148ea8a0e3295cd04fe2b7a
+        with:
+          host: ${{ vars.DEPLOY_SSH_HOST }}
+          username: ${{ vars.DEPLOY_SSH_USERNAME }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          source: "docker/*"
+          target: ~/docker
+          strip_components: 1
+          rm: true
 
       - name: Deploy via SSH action
         uses: appleboy/ssh-action@v1.0.3
@@ -66,13 +74,10 @@ jobs:
           host: ${{ vars.DEPLOY_SSH_HOST }}
           username: ${{ vars.DEPLOY_SSH_USERNAME }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD,DOCKER_COMPOSE_BASE64
+          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD
           script_stop: true
           script: |
-            cd ~
-            echo $DOCKER_COMPOSE_BASE64 > base64.txt
-            cat base64.txt | base64 --decode > docker-compose.yaml
-            rm base64.txt
+            cd ~/docker
             echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
             echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env
