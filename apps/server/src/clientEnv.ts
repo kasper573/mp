@@ -10,9 +10,7 @@ export function getClientEnv(opt: CliOptions): ClientEnv {
   return {
     apiUrl: `${opt.httpBaseUrl}${trpcEndpointPath}`,
     wsUrl: opt.wsBaseUrl,
-    auth: {
-      publishableKey: opt.authPublishableKey,
-    },
+    authPublishableKey: opt.authPublishableKey,
     buildVersion: opt.buildVersion,
   };
 }
@@ -21,12 +19,10 @@ export function getClientEnv(opt: CliOptions): ClientEnv {
  * Runtime environment variables that the server exposes to the client
  */
 export interface ClientEnv {
-  buildVersion: string;
   apiUrl: string;
   wsUrl: string;
-  auth: {
-    publishableKey: string;
-  };
+  authPublishableKey: string;
+  buildVersion: string;
 }
 
 export function createClientEnvMiddleware(
