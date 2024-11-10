@@ -53,9 +53,10 @@ services:
   grafana:
     image: grafana/grafana:10.4.12
     ports:
-      - 3000:3000
+      - 3000
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SERVER_ROOT_URL=https://grafana.k573.dev
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
