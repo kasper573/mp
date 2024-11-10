@@ -56,16 +56,13 @@ if (initialWorldState.isErr()) {
 const expressLogger = createExpressLogger(logger.chain("http"));
 
 const webServer = express()
-  .use(createClientEnvMiddleware(opt))
   .use(expressLogger)
+  .use(createClientEnvMiddleware(opt))
+  .use(createMetricsScrapeMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir));
 
 const httpServer = http.createServer(webServer);
-
-const metricsScrapeServer = express()
-  .use(expressLogger)
-  .use(createMetricsScrapeMiddleware(metrics));
 
 const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   initialState: initialWorldState.value,
@@ -117,18 +114,8 @@ if (opt.clientDir !== undefined) {
 }
 
 httpServer.listen(opt.port, opt.hostname, () => {
-  logger.info(`Http server listening on ${opt.hostname}:${opt.port}`);
+  logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });
-
-metricsScrapeServer.listen(
-  opt.metricsScrapePort,
-  opt.metricsScrapeHostname,
-  () => {
-    logger.info(
-      `Metrics scrape server listening on ${opt.metricsScrapeHostname}:${opt.metricsScrapePort}`,
-    );
-  },
-);
 
 persistTicker.start();
 ticker.start();
@@ -213,8 +200,6 @@ buildVersion: ${options.buildVersion}
 hostname: ${options.hostname}
 port: ${options.port}
 authSecretKey: ${options.authSecretKey ? "set" : "not set"}
-metricsScrapePort: ${options.metricsScrapePort}
-metricsScrapeHostname: ${options.metricsScrapeHostname}
 databaseUrl: ${options.databaseUrl}
 httpBaseUrl: ${options.httpBaseUrl}
 wsBaseUrl: ${options.wsBaseUrl}

@@ -2,7 +2,8 @@
 services:
   mp:
     build:
-      context: .
+      dockerfile: ./docker/Dockerfile
+      context: ..
     image: ghcr.io/kasper573/mp-app:latest
     restart: always
     ports:
@@ -11,7 +12,10 @@ services:
       - pg
     environment:
       MP_PORT: 8080
-      MP_METRICS_SCRAPE_PORT: 6000
+      # MP_HTTP_BASE_URL: "http://localhost:8080"
+      # MP_WS_BASE_URL: "ws://localhost:8080"
+      # MP_CORS_ORIGIN: "*"
+      # MP_HOSTNAME: "0.0.0.0"
       MP_HTTP_BASE_URL: "https://k573.dev"
       MP_WS_BASE_URL: "wss://k573.dev"
       MP_CORS_ORIGIN: "k573.dev"
@@ -44,7 +48,7 @@ services:
   grafana:
     image: grafana/grafana:10.4.12
     ports:
-      - 3000
+      - 3000:3000
     environment:
       - GF_SECURITY_ADMIN_PASSWORD=admin
     volumes:
@@ -52,10 +56,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
   proxy:
-    build:
-      dockerfile: Dockerfile.proxy
-      context: .
-    image: ghcr.io/kasper573/mp-proxy:latest
+    image: jc21/nginx-proxy-manager:2.11.3
     restart: always
     ports:
       - "80:80"
@@ -67,10 +68,11 @@ services:
     volumes:
       - proxy-data:/data
       - letsencrypt-data:/etc/letsencrypt
+      - ./nginx:/data/nginx/custom
   db-migrations:
     build:
-      dockerfile: Dockerfile.db-migrations
-      context: .
+      dockerfile: ./docker/Dockerfile.db-migrations
+      context: ..
     image: ghcr.io/kasper573/mp-db-migrations:latest
     environment:
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"

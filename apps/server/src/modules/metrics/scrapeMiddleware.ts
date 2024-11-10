@@ -5,7 +5,7 @@ export function createMetricsScrapeMiddleware(
   registry: MetricsRegistry,
 ): express.RequestHandler {
   return (req, res, next) => {
-    if (req.path === "/metrics") {
+    if (isAllowedToAccessMetrics(req) && req.path === "/metrics") {
       res.set("Content-Type", "text/plain");
       registry
         .metrics()
@@ -15,4 +15,8 @@ export function createMetricsScrapeMiddleware(
       next();
     }
   };
+}
+
+function isAllowedToAccessMetrics(req: express.Request) {
+  return req.ip?.startsWith("127.") || req.ip?.startsWith("172.");
 }
