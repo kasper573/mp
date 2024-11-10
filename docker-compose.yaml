@@ -25,6 +25,7 @@ services:
       MP_SSL: true
       MP_DATABASE_URL: "postgres://mp:mp@pg:5432/mp"
       MP_AUTH_SECRET_KEY: ${MP_AUTH_SECRET_KEY}
+      MP_AUTH_PUBLISHABLE_KEY: ${MP_AUTH_PUBLISHABLE_KEY}
       MP_BUILD_VERSION: ${MP_BUILD_VERSION}
   proxy:
     build:
