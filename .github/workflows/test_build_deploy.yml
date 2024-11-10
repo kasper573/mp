@@ -84,6 +84,6 @@ jobs:
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             docker compose pull
             docker compose --env-file .env up -d --remove-orphans --no-build
-            docker compose run db-migrations
+            docker compose run migrations
             docker system prune -f
             docker image prune -af
