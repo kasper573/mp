@@ -45,16 +45,11 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
+const clients = new ClientRegistry();
 const metricsRegistry = new MetricsRegistry();
 collectDefaultMetrics({ register: metricsRegistry });
+collectUserMetrics(metricsRegistry, clients);
 
-const activePlayerCountMetric = new MetricsGague({
-  name: "active_player_count",
-  help: "Number of active players",
-  registers: [metricsRegistry],
-});
-
-const clients = new ClientRegistry();
 const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
 const db = createDBClient(opt.databaseUrl);
@@ -85,7 +80,6 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     : undefined,
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
-    activePlayerCountMetric.dec();
     logger.info("Client disconnected", clientId);
     clients.deleteClient(clientId);
   },
@@ -170,7 +164,6 @@ async function handleSyncServerConnection(
   clientId: ClientId,
   { token }: SyncServerConnectionMetaData,
 ) {
-  activePlayerCountMetric.inc();
   logger.info("Client connected", clientId);
   try {
     const { userId } = await auth.verifyToken(token);
@@ -197,6 +190,38 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
     logger.info(req.method, req.url);
     next();
   };
+}
+
+function collectUserMetrics(
+  registry: MetricsRegistry,
+  clients: ClientRegistry,
+) {
+  new MetricsGague({
+    name: "active_user_count",
+    help: "Number of users currently connected",
+    registers: [registry],
+    collect() {
+      this.set(clients.getUserCount());
+    },
+  });
+
+  new MetricsGague({
+    name: "active_character_count",
+    help: "Number of player characters currently active",
+    registers: [registry],
+    collect() {
+      this.set(clients.getCharacterCount());
+    },
+  });
+
+  new MetricsGague({
+    name: "active_client_count",
+    help: "Number of active websocket connections",
+    registers: [registry],
+    collect() {
+      this.set(clients.getClientCount());
+    },
+  });
 }
 
 function serverTextHeader(options: CliOptions) {

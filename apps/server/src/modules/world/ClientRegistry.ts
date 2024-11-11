@@ -37,6 +37,18 @@ export class ClientRegistry {
       new Set<ClientId>(),
     );
   }
+
+  getCharacterCount() {
+    return this.entries.filter((entry) => entry.characterId).length;
+  }
+
+  getUserCount() {
+    return this.entries.filter((entry) => entry.userId).length;
+  }
+
+  getClientCount() {
+    return this.entries.filter((entry) => entry.clientId).length;
+  }
 }
 
 interface ClientEntry {
