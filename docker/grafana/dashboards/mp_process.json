@@ -892,7 +892,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -913,6 +913,6 @@
   "timezone": "",
   "title": "MP (process)",
   "uid": "PTSqcpJWk",
-  "version": 7,
+  "version": 9,
   "weekStart": ""
 }

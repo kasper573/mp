@@ -23299,7 +23299,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -23320,6 +23320,6 @@
   "timezone": "browser",
   "title": "System",
   "uid": "rYdddlPWk",
-  "version": 4,
+  "version": 6,
   "weekStart": ""
 }
