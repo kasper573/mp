@@ -12,6 +12,12 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
 import { Ticker, createDynamicDeltaFn } from "@mp/time";
+import {
+  collectDefaultMetrics,
+  createMetricsScrapeMiddleware,
+  MetricsGague,
+  MetricsRegistry,
+} from "@mp/metrics";
 import type { WorldState } from "./modules/world/schema";
 import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
 import { type ServerContext } from "./context";
@@ -24,11 +30,6 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { createClientEnvMiddleware } from "./clientEnv";
 import { trpcEndpointPath } from "./shared";
-import {
-  createMetricsRegistry,
-  MetricsGague,
-} from "./modules/metrics/registry";
-import { createMetricsScrapeMiddleware } from "./modules/metrics/scrapeMiddleware";
 
 const opt = readCliOptions();
 const logger = new Logger(console);
@@ -44,7 +45,8 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
-const metricsRegistry = createMetricsRegistry();
+const metricsRegistry = new MetricsRegistry();
+collectDefaultMetrics({ register: metricsRegistry });
 
 const activePlayerCountMetric = new MetricsGague({
   name: "active_player_count",

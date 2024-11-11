@@ -21,7 +21,7 @@ The rest is custom.
 
 - CI/CD
 - As replicable as possible. Clone and run, containerized deploy.
-- [Ridiculously modular](packages). What can i say, I like separation of concerns.
+- [Modular and encapsulated concerns](packages).
 - Authorative server
 - Dead simple client
   - little to no optimistic operations (maybe some lerping)
