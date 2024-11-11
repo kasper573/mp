@@ -15,6 +15,7 @@ import { Ticker, createDynamicDeltaFn } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
+  MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
 } from "@mp/metrics";
@@ -50,6 +51,15 @@ const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 collectUserMetrics(metrics, clients);
+
+new MetricsGague({
+  name: "process_uptime_seconds",
+  help: "Time since the process started in seconds",
+  registers: [metrics],
+  collect() {
+    this.set(process.uptime());
+  },
+});
 
 const tickBuckets = [
   0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 7, 10, 12, 16, 24, 36, 48, 65, 100, 200,
