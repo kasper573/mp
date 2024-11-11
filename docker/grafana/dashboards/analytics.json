@@ -241,15 +241,14 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "exemplar": false,
-          "expr": "server_tick_duration",
-          "format": "time_series",
+          "expr": "server_tick_interval",
           "fullMetaSearch": false,
+          "hide": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "duration",
+          "legendFormat": "interval",
           "range": true,
-          "refId": "A",
+          "refId": "B",
           "useBackend": false
         },
         {
@@ -259,14 +258,16 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "server_tick_interval",
+          "exemplar": false,
+          "expr": "histogram_quantile(0.95, sum by(le) (rate(server_tick_duration_bucket[$__rate_interval])))",
+          "format": "time_series",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
           "instant": false,
-          "legendFormat": "interval",
+          "legendFormat": "duration",
           "range": true,
-          "refId": "B",
+          "refId": "C",
           "useBackend": false
         }
       ],
@@ -288,6 +289,6 @@
   "timezone": "browser",
   "title": "Analytics",
   "uid": "ae3kps81booaoe",
-  "version": 14,
+  "version": 18,
   "weekStart": ""
 }
