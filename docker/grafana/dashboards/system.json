@@ -23190,7 +23190,7 @@
       "type": "row"
     }
   ],
-  "refresh": "1m",
+  "refresh": "auto",
   "revision": 1,
   "schemaVersion": 39,
   "tags": ["linux"],
@@ -23318,8 +23318,8 @@
     "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
   },
   "timezone": "browser",
-  "title": "System (node_exporter)",
+  "title": "System",
   "uid": "rYdddlPWk",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }

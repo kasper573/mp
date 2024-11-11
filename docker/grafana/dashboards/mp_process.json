@@ -857,6 +857,7 @@
       }
     }
   ],
+  "refresh": "auto",
   "schemaVersion": 39,
   "tags": ["nodejs"],
   "templating": {
@@ -891,7 +892,7 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {
@@ -912,6 +913,6 @@
   "timezone": "",
   "title": "MP (process)",
   "uid": "PTSqcpJWk",
-  "version": 3,
+  "version": 7,
   "weekStart": ""
 }
