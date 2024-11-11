@@ -15,7 +15,6 @@ import { Ticker, createDynamicDeltaFn } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
-  MetricsGague,
   MetricsRegistry,
 } from "@mp/metrics";
 import type { WorldState } from "./modules/world/schema";
@@ -30,6 +29,7 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { createClientEnvMiddleware } from "./clientEnv";
 import { trpcEndpointPath } from "./shared";
+import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 
 const opt = readCliOptions();
 const logger = new Logger(console);
@@ -46,9 +46,9 @@ if (areas.isErr() || areas.value.size === 0) {
 }
 
 const clients = new ClientRegistry();
-const metricsRegistry = new MetricsRegistry();
-collectDefaultMetrics({ register: metricsRegistry });
-collectUserMetrics(metricsRegistry, clients);
+const metrics = new MetricsRegistry();
+collectDefaultMetrics({ register: metrics });
+collectUserMetrics(metrics, clients);
 
 const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
@@ -65,13 +65,16 @@ const expressLogger = createExpressLogger(logger.chain("http"));
 const webServer = express()
   .use(expressLogger)
   .use(createClientEnvMiddleware(opt))
-  .use(createMetricsScrapeMiddleware(metricsRegistry))
+  .use(createMetricsScrapeMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir));
 
 const httpServer = http.createServer(webServer);
 
-const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
+export const worldState = new SyncServer<
+  WorldState,
+  SyncServerConnectionMetaData
+>({
   initialState: initialWorldState.value,
   filterState: deriveWorldStateForClient,
   httpServer,
@@ -190,38 +193,6 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
     logger.info(req.method, req.url);
     next();
   };
-}
-
-function collectUserMetrics(
-  registry: MetricsRegistry,
-  clients: ClientRegistry,
-) {
-  new MetricsGague({
-    name: "active_user_count",
-    help: "Number of users currently connected",
-    registers: [registry],
-    collect() {
-      this.set(clients.getUserCount());
-    },
-  });
-
-  new MetricsGague({
-    name: "active_character_count",
-    help: "Number of player characters currently active",
-    registers: [registry],
-    collect() {
-      this.set(clients.getCharacterCount());
-    },
-  });
-
-  new MetricsGague({
-    name: "active_client_count",
-    help: "Number of active websocket connections",
-    registers: [registry],
-    collect() {
-      this.set(clients.getClientCount());
-    },
-  });
 }
 
 function serverTextHeader(options: CliOptions) {

@@ -45,10 +45,6 @@ export class ClientRegistry {
   getUserCount() {
     return this.entries.filter((entry) => entry.userId).length;
   }
-
-  getClientCount() {
-    return this.entries.filter((entry) => entry.clientId).length;
-  }
 }
 
 interface ClientEntry {

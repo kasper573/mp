@@ -15,6 +15,10 @@ export class SyncServer<State, ConnectionMetaData> {
   private wssAdapter: NodeWSServerAdapter;
   private handle: DocHandle<State>;
 
+  get clientIds(): ClientId[] {
+    return Object.keys(this.wssAdapter.sockets) as ClientId[];
+  }
+
   constructor(private options: SyncServerOptions<State, ConnectionMetaData>) {
     this.wssAdapter = new NodeWSServerAdapter(
       new WebSocketServer({ server: options.httpServer }),
