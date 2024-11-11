@@ -79,4 +79,3 @@ volumes:
   proxy-data:
   letsencrypt-data:
   grafana-storage:
-  pnpm-store:
