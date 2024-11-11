@@ -19,7 +19,7 @@
           "uid": "PBFA97CFB590B2093"
         },
         "enable": true,
-        "expr": "delta(process_uptime_seconds[5m]) < 0",
+        "expr": "process_uptime_seconds < 60",
         "iconColor": "red",
         "name": "Server Restarts"
       }
@@ -299,6 +299,6 @@
   "timezone": "browser",
   "title": "Analytics",
   "uid": "ae3kps81booaoe",
-  "version": 7,
+  "version": 9,
   "weekStart": ""
 }
