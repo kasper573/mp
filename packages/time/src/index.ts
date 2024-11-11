@@ -1,2 +1,3 @@
 export { TimeSpan } from "timespan-ts";
-export * from "./Ticker";
+export * from "./ticker";
+export * from "./measure";

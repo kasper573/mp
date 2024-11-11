@@ -11,7 +11,7 @@ import { createAuthClient } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
-import { Ticker, createDynamicDeltaFn } from "@mp/time";
+import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
@@ -80,7 +80,6 @@ const tickDurationMetric = new MetricsHistogram({
   buckets: tickBuckets,
 });
 
-const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
 const db = createDBClient(opt.databaseUrl);
 const defaultAreaId = [...areas.value.keys()][0];
@@ -119,21 +118,18 @@ export const worldState = new SyncServer<
 });
 
 const persistTicker = new Ticker({
-  delta,
   middleware: persist,
   interval: opt.persistInterval,
 });
 
 const ticker = new Ticker({
   interval: opt.tickInterval,
-  delta,
   middleware({ delta: tickInterval, next }) {
     try {
       tickIntervalMetric.observe(tickInterval.totalMilliseconds);
-      const start = performance.now();
+      const getMeasurement = measureTimeSpan();
       next(tickInterval);
-      const tickDuration = performance.now() - start;
-      tickDurationMetric.observe(tickDuration);
+      tickDurationMetric.observe(getMeasurement().totalMilliseconds);
     } catch (error) {
       logger.error("Error in server tick", error);
     }

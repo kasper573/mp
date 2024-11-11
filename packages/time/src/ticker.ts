@@ -1,12 +1,15 @@
-import { TimeSpan } from "timespan-ts";
+import type { TimeSpan } from "timespan-ts";
+import { measureTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
   private intervalId?: NodeJS.Timeout;
   private middleware: TickMiddleware;
+  private delta: () => TimeSpan;
 
   constructor(private options: TickerOptions) {
     this.middleware = options.middleware ?? noopMiddleware;
+    this.delta = createDeltaFn();
   }
 
   subscribe(fn: TickEventHandler): Unsubscribe {
@@ -30,8 +33,7 @@ export class Ticker {
   }
 
   private tick = () => {
-    const delta = this.options.delta();
-    this.middleware({ delta, next: this.emit });
+    this.middleware({ delta: this.delta(), next: this.emit });
   };
 
   private emit = (delta: TimeSpan) => {
@@ -40,24 +42,6 @@ export class Ticker {
     }
   };
 }
-
-export function createDynamicDeltaFn(
-  getCurrentTimeMS: () => number,
-): TickerDeltaFn {
-  let last = getCurrentTimeMS();
-  return () => {
-    const now = getCurrentTimeMS();
-    const delta = TimeSpan.fromMilliseconds(now - last);
-    last = now;
-    return delta;
-  };
-}
-
-export function createFixedDeltaFn(fixedDelta: TimeSpan): TickerDeltaFn {
-  return () => fixedDelta;
-}
-
-export type TickerDeltaFn = () => TimeSpan;
 
 export interface TickMiddlewareOpts {
   delta: TimeSpan;
@@ -68,7 +52,6 @@ export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
 
 export interface TickerOptions {
   middleware?: TickMiddleware;
-  delta: TickerDeltaFn;
   interval: TimeSpan;
 }
 
@@ -77,3 +60,12 @@ export type Unsubscribe = () => void;
 export type TickEventHandler = (delta: TimeSpan) => void;
 
 const noopMiddleware: TickMiddleware = ({ delta, next }) => next(delta);
+
+function createDeltaFn(): () => TimeSpan {
+  let stopMeasuring = measureTimeSpan();
+  return () => {
+    const delta = stopMeasuring();
+    stopMeasuring = measureTimeSpan();
+    return delta;
+  };
+}
