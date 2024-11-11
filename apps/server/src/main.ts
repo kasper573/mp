@@ -15,7 +15,6 @@ import { Ticker, createDynamicDeltaFn } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
-  MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
 } from "@mp/metrics";
@@ -52,20 +51,23 @@ const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 collectUserMetrics(metrics, clients);
 
-const tickIntervalMetric = new MetricsGague({
+const tickBuckets = [
+  0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 7, 10, 12, 16, 24, 36, 48, 65, 100, 200,
+  400, 600, 800, 1000,
+];
+
+const tickIntervalMetric = new MetricsHistogram({
   name: "server_tick_interval",
   help: "Time between each server tick in milliseconds",
   registers: [metrics],
+  buckets: tickBuckets,
 });
 
 const tickDurationMetric = new MetricsHistogram({
   name: "server_tick_duration",
   help: "Time taken to process each server tick in milliseconds",
   registers: [metrics],
-  buckets: [
-    0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 7, 10, 12, 16, 24, 36, 48, 65, 100, 200,
-    400, 600, 800, 1000,
-  ],
+  buckets: tickBuckets,
 });
 
 const delta = createDynamicDeltaFn(() => performance.now());
@@ -117,7 +119,7 @@ const ticker = new Ticker({
   delta,
   middleware({ delta: tickInterval, next }) {
     try {
-      tickIntervalMetric.set(tickInterval.totalMilliseconds);
+      tickIntervalMetric.observe(tickInterval.totalMilliseconds);
       const start = performance.now();
       next(tickInterval);
       const tickDuration = performance.now() - start;
