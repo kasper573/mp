@@ -24,7 +24,10 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { createClientEnvMiddleware } from "./clientEnv";
 import { trpcEndpointPath } from "./shared";
-import { createMetricsRegistry } from "./modules/metrics/registry";
+import {
+  createMetricsRegistry,
+  MetricsGague,
+} from "./modules/metrics/registry";
 import { createMetricsScrapeMiddleware } from "./modules/metrics/scrapeMiddleware";
 
 const opt = readCliOptions();
@@ -41,7 +44,14 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
-const metrics = createMetricsRegistry();
+const metricsRegistry = createMetricsRegistry();
+
+const activePlayerCountMetric = new MetricsGague({
+  name: "active_player_count",
+  help: "Number of active players",
+  registers: [metricsRegistry],
+});
+
 const clients = new ClientRegistry();
 const delta = createDynamicDeltaFn(() => performance.now());
 const auth = createAuthClient({ secretKey: opt.authSecretKey });
@@ -58,7 +68,7 @@ const expressLogger = createExpressLogger(logger.chain("http"));
 const webServer = express()
   .use(expressLogger)
   .use(createClientEnvMiddleware(opt))
-  .use(createMetricsScrapeMiddleware(metrics))
+  .use(createMetricsScrapeMiddleware(metricsRegistry))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir));
 
@@ -73,6 +83,7 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     : undefined,
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
+    activePlayerCountMetric.dec();
     logger.info("Client disconnected", clientId);
     clients.deleteClient(clientId);
   },
@@ -157,6 +168,7 @@ async function handleSyncServerConnection(
   clientId: ClientId,
   { token }: SyncServerConnectionMetaData,
 ) {
+  activePlayerCountMetric.inc();
   logger.info("Client connected", clientId);
   try {
     const { userId } = await auth.verifyToken(token);

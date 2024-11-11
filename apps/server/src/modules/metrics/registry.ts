@@ -7,4 +7,5 @@ export function createMetricsRegistry() {
   return register;
 }
 
+export { Gauge as MetricsGague } from "prom-client";
 export { type Registry as MetricsRegistry } from "prom-client";
