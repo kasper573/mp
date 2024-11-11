@@ -14,8 +14,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - database: [postgres](https://www.postgresql.org/) + [drizzle orm](https://orm.drizzle.team/)
 - network: [ws](https://www.npmjs.com/package/ws) and [automerge](https://automerge.org/)
 - auth: [clerk](https://clerk.com/)
-
-The rest is custom.
+- metrics: [grafana](https://grafana.com/) + [prometheus](https://prometheus.io/)
 
 ## (very loose) Design goals
 
