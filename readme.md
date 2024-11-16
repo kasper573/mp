@@ -28,9 +28,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 ## Getting started
 
-- Install Node 20+
+- Install [Docker](https://www.docker.com/)
 - Clone this repository
-- Run `corepack enable`
-- Run `pnpm install`
-- Copy `.env-example` > `.env` and update its values
-- Run `pnpm dev`
+- Create `docker/.env.local` and provide the required secrets
+- Run `cd docker && ENV=dev docker compose up -d`

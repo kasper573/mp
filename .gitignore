@@ -30,13 +30,16 @@ pnpm-error.log*
 .idea
 .vscode
 
+# Auto generated traefik files
+docker/traefik/letsencrypt
+#docker/traefik/certs
+
 # Disallow non-pnpm lockfiles
 yarn.lock
 package-lock.json
 
 # local env files
-.env
-.env*.local
+.env.*local
 
 # turbo
 .turbo

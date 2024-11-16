@@ -4,7 +4,7 @@ import { defineConfig, handlebars } from "@mp/build/vite";
 const envFileUrl =
   process.env.NODE_ENV === "production"
     ? clientEnvApiPath
-    : `http://localhost:8080${clientEnvApiPath}`;
+    : `http://k573.localhost${clientEnvApiPath}`;
 
 export default defineConfig({
   plugins: [

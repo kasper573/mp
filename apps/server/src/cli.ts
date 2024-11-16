@@ -36,18 +36,18 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("port", {
       type: "number",
-      default: 8080,
+      default: 9999,
       description: "The port to listen on",
     })
     .option("httpBaseUrl", {
       type: "string",
-      default: "http://localhost:8080",
+      default: "http://k573.localhost",
       description:
         "Used for generating public accessible urls to the http server",
     })
     .option("wsBaseUrl", {
       type: "string",
-      default: "ws://localhost:8080",
+      default: "wss://k573.localhost",
       description:
         "Used for generating public accessible urls to the websocket server",
     })
@@ -92,7 +92,7 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("databaseUrl", {
       type: "string",
-      default: "postgres://mp:mp@localhost:5432/mp",
+      default: "postgres://mp:mp@mp:5432/mp",
       description: "The URL to the database",
       demandOption: true,
     })

@@ -1,0 +1,11 @@
+{
+    email admin@k573.dev
+}
+
+grafana.k573.dev {
+    reverse_proxy http://grafana:3000
+}
+
+k573.dev {
+    reverse_proxy http://mp:9999
+}
