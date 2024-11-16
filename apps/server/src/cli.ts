@@ -18,48 +18,48 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("clientDir", {
       type: "string",
-      description:
-        "If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.",
+      description: "Serves the client from this directory",
       coerce: (p: string) => (p ? path.resolve(p) : undefined),
+      demandOption: true,
     })
     .option("publicDir", {
       type: "string",
-      default: "public",
+      demandOption: true,
       description: "The directory to serve static files from",
       coerce: (p: string) => path.resolve(p),
     })
     .option("publicPath", {
       type: "string",
-      default: "/public/",
+      demandOption: true,
       description:
         "The relative path after the hostname where the public dir will be exposed",
     })
     .option("port", {
       type: "number",
-      default: 9999,
       description: "The port to listen on",
+      demandOption: true,
     })
     .option("httpBaseUrl", {
       type: "string",
-      default: "http://k573.localhost",
       description:
         "Used for generating public accessible urls to the http server",
+      demandOption: true,
     })
     .option("wsBaseUrl", {
       type: "string",
-      default: "wss://k573.localhost",
       description:
         "Used for generating public accessible urls to the websocket server",
+      demandOption: true,
     })
     .option("hostname", {
       type: "string",
-      default: "0.0.0.0",
       description: "The hostname for the server to listen on",
+      demandOption: true,
     })
     .option("corsOrigin", {
       type: "string",
-      default: "*",
       description: "The CORS origin to allow",
+      demandOption: true,
     })
     .option("authSecretKey", {
       type: "string",
@@ -73,32 +73,30 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("tickInterval", {
       type: "number",
-      default: 50,
       description: "The server tick interval in milliseconds",
       coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
+      demandOption: true,
     })
     .option("persistInterval", {
       type: "number",
-      default: 5000,
       description:
         "How often (in milliseconds) to save the world state to the database",
       coerce: (ms: number) => TimeSpan.fromMilliseconds(ms),
+      demandOption: true,
     })
     .option("logSyncPatches", {
       type: "boolean",
-      default: false,
       description:
         "Whether to log server state changes that are sent to clients",
+      demandOption: true,
     })
     .option("databaseUrl", {
       type: "string",
-      default: "postgres://mp:mp@mp:5432/mp",
       description: "The URL to the database",
       demandOption: true,
     })
     .option("buildVersion", {
       type: "string",
-      default: "dev",
       description: "The version of the build",
       demandOption: true,
     })
