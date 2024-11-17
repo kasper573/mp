@@ -1,5 +1,5 @@
-name: "Install dependencies"
-description: "Install dependencies"
+name: "Install node things"
+description: "Install node, pnpm and local node packages"
 runs:
   using: "composite"
   steps:
