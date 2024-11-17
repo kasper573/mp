@@ -1,13 +1,13 @@
 x-env-files: &env_files
   - .env.shared
-  - .env.${ENV}
+  - .env.${DOCKER_COMPOSE_ENV}
   - .env.local
 services:
   mp:
     build:
       dockerfile: ./docker/Dockerfile.mp
       context: ..
-    image: ghcr.io/kasper573/mp-server:latest
+    image: ${DOCKER_REPOSITORY_URL:-local}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     env_file: *env_files
     depends_on:
@@ -16,7 +16,7 @@ services:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
-    image: ghcr.io/kasper573/mp-migrations:latest
+    image: ${DOCKER_REPOSITORY_URL:-local}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     env_file: *env_files
   pg:
     image: postgres:16.4
@@ -44,14 +44,14 @@ services:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    image: ghcr.io/kasper573/mp-caddy:latest
+    image: ${DOCKER_REPOSITORY_URL:-local}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy/Caddyfile.${ENV}:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile.${DOCKER_COMPOSE_ENV}:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
     env_file: *env_files

@@ -7,7 +7,9 @@ env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_USERNAME: ${{ github.actor }}
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-  BUILD_VERSION: ${{ github.run_number }}
+  DOCKER_REGISTRY_URL: ghcr.io/${{ github.actor }}
+  DOCKER_COMPOSE_ENV: prod
+  DOCKER_IMAGE_VERSION: ${{ github.run_number }}
 
 jobs:
   conventions:
@@ -74,16 +76,15 @@ jobs:
           host: ${{ vars.DEPLOY_SSH_HOST }}
           username: ${{ vars.DEPLOY_SSH_USERNAME }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: DOCKER_REGISTRY,DOCKER_USERNAME,DOCKER_PASSWORD
+          envs: DOCKER_REGISTRY_URL,DOCKER_COMPOSE_ENV,DOCKER_IMAGE_VERSION
           script_stop: true
           script: |
             cd ~/docker
-            echo $DOCKER_PASSWORD | docker login $(echo $DOCKER_REGISTRY) -u $(echo $DOCKER_USERNAME) --password-stdin
-            echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env
-            echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env
-            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
+            echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env.local
+            echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env.local
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env.local
             docker compose pull
-            docker compose --env-file .env up -d --remove-orphans --no-build
+            docker compose up -d --remove-orphans --no-build
             docker compose run migrations
             docker system prune -f
             docker image prune -af
