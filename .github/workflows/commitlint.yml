@@ -12,7 +12,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: ./.github/workflows/composites/install/
+      - uses: ./.github/workflows/composites/install_node_things/
 
       - name: Determine if merge commit
         id: merge
