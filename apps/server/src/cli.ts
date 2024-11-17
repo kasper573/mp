@@ -38,7 +38,7 @@ export function readCliOptions(argv = process.argv) {
       type: "number",
       demandOption: true,
       description:
-        "The max age of files served from the public directory in milliseconds",
+        "The max age of files served from the public directory in seconds",
     })
     .option("port", {
       type: "number",

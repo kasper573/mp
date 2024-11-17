@@ -92,7 +92,7 @@ if (initialWorldState.isErr()) {
 const expressLogger = createExpressLogger(logger.chain("http"));
 
 const expressStaticConfig = {
-  maxAge: opt.publicMaxAge,
+  maxAge: opt.publicMaxAge * 1000,
 };
 
 const webServer = express()
