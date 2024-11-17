@@ -19,8 +19,7 @@
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prepare": "husky",
-    "postinstall": "pnpm build:packages",
-    "compose": "cd docker && ENV=dev docker compose"
+    "postinstall": "pnpm build:packages"
   },
   "devDependencies": {
     "@commitlint/cli": "19.3.0",
