@@ -8,7 +8,7 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp
       context: ..
-    image: ${DOCKER_REPOSITORY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
     restart: always
     env_file: *env_files
     depends_on:
@@ -17,7 +17,7 @@ services:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
-    image: ${DOCKER_REPOSITORY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
     env_file: *env_files
   pg:
     image: postgres:16.4
@@ -45,7 +45,7 @@ services:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    image: ${DOCKER_REPOSITORY_URL}/mp-caddy:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL}/mp-caddy:${DOCKER_IMAGE_VERSION}
     restart: unless-stopped
     ports:
       - "80:80"
