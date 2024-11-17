@@ -91,12 +91,16 @@ if (initialWorldState.isErr()) {
 
 const expressLogger = createExpressLogger(logger.chain("http"));
 
+const expressStaticConfig = {
+  maxAge: opt.publicMaxAge,
+};
+
 const webServer = express()
   .use(expressLogger)
   .use(createClientEnvMiddleware(opt))
   .use(createMetricsScrapeMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
-  .use(opt.publicPath, express.static(opt.publicDir));
+  .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
 
 const httpServer = http.createServer(webServer);
 
@@ -159,7 +163,7 @@ webServer.use(
 
 if (opt.clientDir !== undefined) {
   const indexFile = path.resolve(opt.clientDir, "index.html");
-  webServer.use("/", express.static(opt.clientDir));
+  webServer.use("/", express.static(opt.clientDir, expressStaticConfig));
   webServer.get("*", (_, res) => res.sendFile(indexFile));
 }
 
@@ -256,6 +260,7 @@ wsBaseUrl: ${options.wsBaseUrl}
 publicDir: ${options.publicDir}
 clientDir: ${options.clientDir}
 corsOrigin: ${options.corsOrigin}
+publicMaxAge: ${options.publicMaxAge}
 Tick interval: ${options.tickInterval.totalMilliseconds}ms
 Persist interval: ${options.persistInterval.totalMilliseconds}ms
 =====================================================`;

@@ -34,6 +34,12 @@ export function readCliOptions(argv = process.argv) {
       description:
         "The relative path after the hostname where the public dir will be exposed",
     })
+    .option("publicMaxAge", {
+      type: "number",
+      demandOption: true,
+      description:
+        "The max age of files served from the public directory in milliseconds",
+    })
     .option("port", {
       type: "number",
       description: "The port to listen on",
