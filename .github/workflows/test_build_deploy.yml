@@ -79,6 +79,7 @@ jobs:
           script_stop: true
           script: |
             cd ~/docker
+            echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env.local
             echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env.local
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env.local
