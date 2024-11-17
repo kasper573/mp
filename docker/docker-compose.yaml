@@ -28,6 +28,7 @@ services:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
     env_file: *env_files
   node_exporter:
     image: prom/node-exporter:v1.8.2
@@ -35,7 +36,7 @@ services:
   grafana:
     image: grafana/grafana:10.4.12
     volumes:
-      - grafana-storage:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
     env_file: *env_files
@@ -56,8 +57,7 @@ services:
     env_file: *env_files
 
 volumes:
-  proxy-data:
-  letsencrypt-data:
-  grafana-storage:
+  grafana-data:
   caddy-data:
   caddy-config:
+  prometheus-data:
