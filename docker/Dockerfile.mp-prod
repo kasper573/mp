@@ -16,7 +16,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # build application and prepare necessary node_modules for server
 ENV NODE_ENV=production
-ENV MP_CLIENT_URI_TO_SERVER=
+ENV MP_CLIENT_URI_TO_SERVER=""
 RUN pnpm build 
 RUN pnpm deploy --filter=server --prod /usr/pnpm-deploy/server
 
