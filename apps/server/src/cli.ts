@@ -18,9 +18,9 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("clientDir", {
       type: "string",
-      description: "Serves the client from this directory",
+      description:
+        "If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.",
       coerce: (p: string) => (p ? path.resolve(p) : undefined),
-      demandOption: true,
     })
     .option("publicDir", {
       type: "string",
