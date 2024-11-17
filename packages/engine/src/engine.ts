@@ -5,12 +5,13 @@ import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
 
 export class Engine {
-  #previousFrame = performance.now();
+  #previousFrameTime = performance.now();
+  #previousFrameDuration = TimeSpan.Zero;
   #isRunning = false;
   pointer: PointerForCamera;
   keyboard: Keyboard;
   #viewportSizeObserver?: ResizeObserver;
-  #frameCallbacks = new Set<(deltaTime: TimeSpan) => void>();
+  #frameCallbacks = new Set<FrameCallback>();
 
   get frameCallbackCount() {
     return this.#frameCallbacks.size;
@@ -43,21 +44,25 @@ export class Engine {
 
   // Note: Explicit callback based frame reactivity because implicit
   // reactivity for rendering is error prone and hard to reason about.
-  addFrameCallback(callback: (deltaTime: TimeSpan) => void) {
+  addFrameCallback(callback: FrameCallback) {
     this.#frameCallbacks.add(callback);
     return () => this.#frameCallbacks.delete(callback);
   }
 
   private nextFrame: FrameRequestCallback = () => {
-    const thisFrame = performance.now();
-    const deltaTime = TimeSpan.fromMilliseconds(
-      thisFrame - this.#previousFrame,
+    const thisFrameTime = performance.now();
+    const timeSinceLastFrame = TimeSpan.fromMilliseconds(
+      thisFrameTime - this.#previousFrameTime,
     );
-    this.#previousFrame = thisFrame;
+    this.#previousFrameTime = thisFrameTime;
 
     for (const callback of this.#frameCallbacks) {
-      callback(deltaTime);
+      callback(timeSinceLastFrame, this.#previousFrameDuration);
     }
+
+    this.#previousFrameDuration = TimeSpan.fromMilliseconds(
+      performance.now() - thisFrameTime,
+    );
 
     if (this.#isRunning) {
       requestAnimationFrame(this.nextFrame);
@@ -79,3 +84,8 @@ function elementSize(element: HTMLElement): Size {
     },
   };
 }
+
+export type FrameCallback = (
+  deltaTime: TimeSpan,
+  previousFrameDuration: TimeSpan,
+) => unknown;

@@ -28,8 +28,6 @@ export function createGameClient(authClient: BrowserAuthClient): GameClient {
 
   const join = async () => trpc.world.join.mutate().then(setCharacterId);
 
-  const serverTick = createMemo(() => worldState()?.serverTick ?? 0);
-
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
@@ -42,7 +40,6 @@ export function createGameClient(authClient: BrowserAuthClient): GameClient {
 
   return {
     worldState,
-    serverTick,
     areaId,
     characterId,
     character,
@@ -93,7 +90,6 @@ export const GameClientContext = createContext<GameClient>(
 
 export interface GameClient {
   worldState: Accessor<WorldState | undefined>;
-  serverTick: Accessor<number>;
   areaId: Accessor<AreaId | undefined>;
   characterId: Accessor<CharacterId | undefined>;
   character: Accessor<Character | undefined>;

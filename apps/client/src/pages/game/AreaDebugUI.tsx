@@ -11,6 +11,7 @@ import {
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import {
+  batch,
   createEffect,
   createMemo,
   createSignal,
@@ -108,10 +109,19 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   const gameClient = useContext(GameClientContext);
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
-  const [deltaTime, setDeltaTime] = createSignal<TimeSpan>();
-  const serverTick = createMemo(() => gameClient.worldState()?.serverTick ?? 0);
+  const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
+  const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 
-  onMount(() => onCleanup(engine.addFrameCallback(setDeltaTime)));
+  onMount(() =>
+    onCleanup(
+      engine.addFrameCallback((interval, duration) =>
+        batch(() => {
+          setFrameInterval(interval);
+          setFrameDuration(duration);
+        }),
+      ),
+    ),
+  );
 
   const text = createMemo(() => {
     const { worldPosition, position: viewportPosition } = engine.pointer;
@@ -124,9 +134,9 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       `character: ${JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)}`,
-      `frame time: ${deltaTime()?.totalMilliseconds.toFixed(2)}ms`,
+      `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
+      `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
-      `server tick: ${serverTick().toFixed(2)}ms`,
     ].join("\n");
   });
 

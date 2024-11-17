@@ -19,7 +19,6 @@ export interface Character extends DBCharacter {
 
 export type WorldState = {
   characters: Record<CharacterId, Character>;
-  serverTick?: number;
 };
 
 export type CharacterId = Branded<string, "CharacterId">;
