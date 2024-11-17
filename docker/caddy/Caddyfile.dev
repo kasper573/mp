@@ -7,5 +7,9 @@ grafana.k573.localhost {
 }
 
 k573.localhost {
+    reverse_proxy http://mp:5173
+}
+
+api.k573.localhost {
     reverse_proxy http://mp:9999
 }

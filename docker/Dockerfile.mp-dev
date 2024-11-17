@@ -1,0 +1,23 @@
+FROM node:20.10.0-alpine3.19 AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+
+FROM base AS builder
+RUN adduser -D -s /bin/sh -u 1001 app
+USER app
+WORKDIR /workdir
+
+# install most of node dependencies
+COPY --chown=app:app pnpm-lock.yaml .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+# copy source code and install any node dependencies missed by pnpm fetch
+COPY --chown=app:app . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# build application and prepare necessary node_modules for server
+ENV NODE_ENV=development
+ENV MP_PUBLIC_DIR=/workdir/apps/server/public
+
+CMD [ "pnpm", "dev" ]

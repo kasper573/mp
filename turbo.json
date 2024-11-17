@@ -11,6 +11,7 @@
       "dependsOn": ["^build", "^test"]
     },
     "dev": {
+      "env": ["NODE_ENV", "MP_*"],
       "cache": false,
       "persistent": true
     }

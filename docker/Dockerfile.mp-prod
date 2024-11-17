@@ -4,7 +4,7 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
 
 FROM base AS builder
-WORKDIR /usr/mp-src
+WORKDIR /workdir
 
 # install most of node dependencies
 COPY pnpm-lock.yaml .npmrc ./
@@ -16,17 +16,18 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # build application and prepare necessary node_modules for server
 ENV NODE_ENV=production
+ENV MP_CLIENT_URI_TO_SERVER=
 RUN pnpm build 
 RUN pnpm deploy --filter=server --prod /usr/pnpm-deploy/server
 
 FROM base AS runner
-COPY --from=builder /usr/pnpm-deploy/server /prod/server
-COPY --from=builder /usr/mp-src/apps/server/public /prod/public
-COPY --from=builder /usr/mp-src/apps/server/dist /prod/server
-COPY --from=builder /usr/mp-src/apps/client/dist /prod/client
-WORKDIR /prod/server
+COPY --from=builder /usr/pnpm-deploy/server /workdir/server
+COPY --from=builder /workdir/apps/server/public /workdir/public
+COPY --from=builder /workdir/apps/server/dist /workdir/server
+COPY --from=builder /workdir/apps/client/dist /workdir/client
+WORKDIR /workdir/server
 
-ENV MP_CLIENT_DIR=/prod/client
-ENV MP_PUBLIC_DIR=/prod/public
+ENV MP_CLIENT_DIR=/workdir/client
+ENV MP_PUBLIC_DIR=/workdir/public
 
 CMD [ "pnpm", "start" ]

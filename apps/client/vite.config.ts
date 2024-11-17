@@ -1,15 +1,16 @@
 import { clientEnvApiPath } from "@mp/server";
 import { defineConfig, handlebars } from "@mp/build/vite";
 
-const envFileUrl =
-  process.env.NODE_ENV === "production"
-    ? clientEnvApiPath
-    : `http://k573.localhost${clientEnvApiPath}`;
+if (!process.env.MP_CLIENT_URI_TO_SERVER) {
+  throw new Error("env var MP_CLIENT_URI_TO_SERVER is required");
+}
 
 export default defineConfig({
   plugins: [
     handlebars({
-      context: { envFileUrl },
+      context: {
+        envFileUrl: `${process.env.MP_CLIENT_URI_TO_SERVER}${clientEnvApiPath}`,
+      },
     }),
   ],
 });

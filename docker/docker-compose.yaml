@@ -6,8 +6,15 @@ x-env-files: &env_files
 services:
   mp:
     build:
-      dockerfile: ./docker/Dockerfile.mp
+      dockerfile: ./docker/Dockerfile.mp-${DOCKER_COMPOSE_ENV}
       context: ..
+    develop:
+      watch:
+        - action: sync
+          path: ..
+          target: /workdir
+        - action: rebuild
+          path: ../pnpm-lock.yaml
     image: ${DOCKER_REGISTRY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
     restart: always
     env_file: *env_files

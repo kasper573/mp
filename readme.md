@@ -31,5 +31,5 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Install [Docker](https://www.docker.com/)
 - Clone this repository
 - Create `docker/.env.local` and provide the required secrets
-- Run `ENV=dev docker compose -f docker/docker-compose.yml up -d`
+- Run `ENV=dev docker compose up --watch`
 - Run `./docker/installcert.sh`
