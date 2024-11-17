@@ -19,14 +19,14 @@ services:
     restart: always
     env_file: *env_files
     depends_on:
-      - pg
+      - postgres
   migrations:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
     env_file: *env_files
-  pg:
+  postgres:
     image: postgres:16.4
     restart: always
     volumes:
