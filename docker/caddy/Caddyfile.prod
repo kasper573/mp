@@ -1,11 +1,24 @@
 {
     email admin@k573.dev
+	order rate_limit before basicauth
+}
+
+(common_rate_limit) {
+    rate_limit {
+        zone dynamic_zone {
+            key {http.request.remote_ip}
+            events 100
+            window 5s
+        }
+    }
 }
 
 grafana.k573.dev {
+    import common_rate_limit
     reverse_proxy http://grafana:3000
 }
 
 k573.dev {
+    import common_rate_limit
     reverse_proxy http://mp:9999
 }

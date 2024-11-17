@@ -7,10 +7,8 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp
       context: ..
-    image: ghcr.io/kasper573/mp:latest
+    image: ghcr.io/kasper573/mp-server:latest
     restart: always
-    ports:
-      - 9999
     env_file: *env_files
     depends_on:
       - pg
@@ -23,34 +21,29 @@ services:
   pg:
     image: postgres:16.4
     restart: always
-    ports:
-      - 5432
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     env_file: *env_files
   prometheus:
     image: prom/prometheus:v2.55.1
-    ports:
-      - 9090
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
     env_file: *env_files
   node_exporter:
     image: prom/node-exporter:v1.8.2
-    ports:
-      - 9100
     env_file: *env_files
   grafana:
     image: grafana/grafana:10.4.12
-    ports:
-      - 3000
     volumes:
       - grafana-storage:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
     env_file: *env_files
   caddy:
-    image: caddy:2.8.4
+    build:
+      dockerfile: ./Dockerfile.caddy
+      context: .
+    image: ghcr.io/kasper573/mp-caddy:latest
     restart: unless-stopped
     ports:
       - "80:80"
