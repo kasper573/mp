@@ -40,6 +40,11 @@ export function readCliOptions(argv = process.argv) {
       description:
         "The max age of files served from the public directory in seconds",
     })
+    .option("trustProxy", {
+      type: "boolean",
+      description: "Should the http servevr trust the X-Forwarded-For header",
+      demandOption: true,
+    })
     .option("port", {
       type: "number",
       description: "The port to listen on",

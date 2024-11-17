@@ -96,6 +96,7 @@ const expressStaticConfig = {
 };
 
 const webServer = express()
+  .set("trust proxy", opt.trustProxy)
   .use(expressLogger)
   .use(createClientEnvMiddleware(opt))
   .use(createMetricsScrapeMiddleware(metrics))
