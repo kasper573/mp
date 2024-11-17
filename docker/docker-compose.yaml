@@ -16,8 +16,8 @@ services:
       - pg
   migrations:
     build:
-      dockerfile: ./docker/Dockerfile.migrations
-      context: ..
+      dockerfile: ../../docker/Dockerfile.migrations
+      context: ../apps/server
     image: ghcr.io/kasper573/mp-migrations:latest
     env_file: *env_files
   pg:

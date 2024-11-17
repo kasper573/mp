@@ -3,14 +3,14 @@ WORKDIR /app
 
 # Install drizzle
 RUN apk add jq
-COPY apps/server/package.json ./
+COPY ./package.json ./
 RUN KIT_VER=$(jq -r '.devDependencies["drizzle-kit"]' package.json) && \
     ORM_VER=$(jq -r '.dependencies["drizzle-orm"]' package.json) && \
     PG_VER=$(jq -r '.dependencies.postgres' package.json) && \
     npm install -g drizzle-kit@$KIT_VER drizzle-orm@$ORM_VER postgres@$PG_VER
 
 # Copy migrations
-COPY apps/server/drizzle.config.js .
-COPY apps/server/drizzle/ ./drizzle/
+COPY ./drizzle.config.js .
+COPY ./drizzle/ ./drizzle/
 
 CMD ["drizzle-kit", "migrate"]
