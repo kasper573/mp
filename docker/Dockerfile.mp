@@ -3,7 +3,7 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack enable pnpm
 
-FROM base as builder
+FROM base AS builder
 WORKDIR /usr/mp-src
 
 # install most of node dependencies
@@ -25,7 +25,6 @@ COPY --from=builder /usr/mp-src/apps/server/public /prod/public
 COPY --from=builder /usr/mp-src/apps/server/dist /prod/server
 COPY --from=builder /usr/mp-src/apps/client/dist /prod/client
 WORKDIR /prod/server
-EXPOSE 8000
 
 ENV MP_CLIENT_DIR=/prod/client
 ENV MP_PUBLIC_DIR=/prod/public
