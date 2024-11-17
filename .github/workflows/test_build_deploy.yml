@@ -79,10 +79,18 @@ jobs:
           script_stop: true
           script: |
             cd ~/docker
-            echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
+
+            # Set production host env vars
+            echo "DOCKER_COMPOSE_ENV=\"${{ env.DOCKER_COMPOSE_ENV }}\"" > .env
+            echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" >> .env
+            echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
+
+            # Set production container env vars   
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env.local
             echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env.local
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env.local
+
+            echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull
             docker compose up -d --remove-orphans --no-build
             docker compose run migrations
