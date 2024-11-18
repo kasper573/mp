@@ -3,6 +3,7 @@ x-env-files: &env_files
   - .env.${DOCKER_COMPOSE_ENV}
   - path: .env.local
     required: false
+
 services:
   mp:
     build:
@@ -17,30 +18,64 @@ services:
           path: ../pnpm-lock.yaml
     image: ${DOCKER_REGISTRY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
     restart: always
-    env_file: *env_files
     depends_on:
       - postgres
+    env_file: *env_files
+
   migrations:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
     env_file: *env_files
+
+  authentik-server:
+    image: ghcr.io/goauthentik/server:2024.10.2
+    command: server
+    volumes:
+      - ./authentik/media:/media
+      - ./authentik/templates:/templates
+    depends_on:
+      - postgres
+      - redis
+    env_file: *env_files
+
+  authentik-worker:
+    image: ghcr.io/goauthentik/server:2024.10.2
+    command: worker
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./authentik/media:/media
+      - ./authentik/templates:/templates
+    depends_on:
+      - postgres
+      - redis
+    user: root # See https://goauthentik.io/docs/outposts/integrations/docker
+    env_file: *env_files
+
   postgres:
     image: postgres:16.4
     restart: always
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     env_file: *env_files
+
+  redis:
+    image: redis:7.4.1
+    restart: always
+    env_file: *env_files
+
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     env_file: *env_files
+
   node_exporter:
     image: prom/node-exporter:v1.8.2
     env_file: *env_files
+
   grafana:
     image: grafana/grafana:10.4.12
     volumes:
@@ -48,6 +83,7 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
     env_file: *env_files
+
   caddy:
     build:
       dockerfile: ./Dockerfile.caddy
@@ -59,7 +95,8 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy/Caddyfile.${DOCKER_COMPOSE_ENV}:/etc/caddy/Caddyfile
+      - ./caddy/base.Caddyfile:/etc/caddy/base.Caddyfile
+      - ./caddy/${DOCKER_COMPOSE_ENV}.Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
     env_file: *env_files
