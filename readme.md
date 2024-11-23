@@ -33,6 +33,8 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Create `docker/.env.local` and provide the required secrets
 - Run `ENV=dev docker compose up --watch`
 - Run `./docker/installcert.sh`
+  > You may need to add the root certificate manually to your browser depending on which browser you are using.
+- Visit `https://mp.localhost` in your browser
 
 > Tip: You can also add a `/docker/.env` file that contains `ENV=dev` to avoid having to prepent every docker command with ENV.
 
