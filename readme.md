@@ -34,6 +34,8 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Run `ENV=dev docker compose up --watch`
 - Run `./docker/installcert.sh`
 
+> Tip: You can also add a `/docker/.env` file that contains `ENV=dev` to avoid having to prepent every docker command with ENV.
+
 ## Deploying to production
 
 The github actions workflow is already deployment ready but requires you to configure a few secrets and variables:
