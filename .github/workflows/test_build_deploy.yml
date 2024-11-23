@@ -89,6 +89,7 @@ jobs:
             echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env.local
             echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env.local
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env.local
+            echo "MP_DOMAIN=\"${{ vars.MP_DOMAIN }}\"" >> .env.local
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull
