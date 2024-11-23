@@ -33,3 +33,28 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Create `docker/.env.local` and provide the required secrets
 - Run `ENV=dev docker compose up --watch`
 - Run `./docker/installcert.sh`
+
+## Deploying to production
+
+The github actions workflow is already deployment ready but requires you to configure a few secrets and variables:
+
+Variables:
+
+```
+DEPLOY_SSH_HOST
+DEPLOY_SSH_USERNAME
+
+# the public domain your deploy target is accessible from
+# will be used by reverse proxy to set up all routing
+MP_DOMAIN
+```
+
+Secrets:
+
+```
+DEPLOY_SSH_KEY
+
+# clerk secret and publishable keys
+AUTH_SECRET_KEY
+AUTH_PUBLISHABLE_KEY
+```
