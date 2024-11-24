@@ -16,7 +16,7 @@ services:
           target: /workdir
         - action: rebuild
           path: ../pnpm-lock.yaml
-    image: ${DOCKER_REGISTRY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     depends_on:
       - postgres
@@ -26,14 +26,14 @@ services:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
-    image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     env_file: *env_files
 
   keycloak:
     build:
       dockerfile: ./Dockerfile.keycloak
       context: .
-    image: ${DOCKER_REGISTRY_URL}/mp-keycloak:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-keycloak:${DOCKER_IMAGE_VERSION:-latest}
     command: start --optimized --import-realm
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import
@@ -74,7 +74,7 @@ services:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    image: ${DOCKER_REGISTRY_URL}/mp-caddy:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "80:80"
