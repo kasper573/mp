@@ -7,7 +7,7 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import { createAuthClient } from "@mp/auth/server";
+import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
@@ -80,7 +80,12 @@ const tickDurationMetric = new MetricsHistogram({
   buckets: tickBuckets,
 });
 
-const auth = createAuthClient({ secretKey: opt.authSecretKey });
+const auth = createAuthServer({
+  audience: opt.authAudience,
+  issuer: opt.authIssuer,
+  jwksUri: opt.authJwksUri,
+  algorithms: opt.authJwtAlgorithms,
+});
 const db = createDBClient(opt.databaseUrl);
 const defaultAreaId = [...areas.value.keys()][0];
 const initialWorldState = await loadWorldState(db);
@@ -213,17 +218,23 @@ async function handleSyncServerConnection(
   { token }: SyncServerConnectionMetaData,
 ) {
   logger.info("Client connected", clientId);
-  try {
-    const { userId } = await auth.verifyToken(token);
-    clients.associateClientWithUser(clientId, userId);
-    logger.info("Client verified and associated with user", {
+
+  const verifyResult = await auth.verifyToken(token);
+  if (!verifyResult.ok) {
+    logger.info(
+      "Could not verify client authentication token",
       clientId,
-      userId,
-    });
-  } catch {
-    logger.info("Client connection rejected", clientId);
+      verifyResult.error,
+    );
     worldState.disconnectClient(clientId);
+    return;
   }
+
+  clients.associateClientWithUser(clientId, verifyResult.user.id);
+  logger.info("Client verified and associated with user", {
+    clientId,
+    userId: verifyResult.user.id,
+  });
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
@@ -254,7 +265,6 @@ function serverTextHeader(options: CliOptions) {
 buildVersion: ${options.buildVersion}
 hostname: ${options.hostname}
 port: ${options.port}
-authSecretKey: ${options.authSecretKey ? "set" : "not set"}
 databaseUrl: ${options.databaseUrl}
 httpBaseUrl: ${options.httpBaseUrl}
 wsBaseUrl: ${options.wsBaseUrl}

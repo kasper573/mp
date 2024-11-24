@@ -51,14 +51,14 @@ export function createGameClient(authClient: BrowserAuthClient): GameClient {
 function createWorldStateSignal(authClient: BrowserAuthClient) {
   const [worldState, setWorldState] = createSignal<WorldState>();
   const syncClient = createMemo(() => {
-    const token = authClient.token();
-    if (!token) {
+    const user = authClient.user();
+    if (!user) {
       return;
     }
 
     return new SyncClient<WorldState, SyncServerConnectionMetaData>(
       env.wsUrl,
-      () => ({ token }),
+      () => ({ token: user.token }),
     );
   });
 

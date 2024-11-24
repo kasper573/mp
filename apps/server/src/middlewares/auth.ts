@@ -7,11 +7,11 @@ export function auth() {
       throw new Error(`Client provided no auth token`);
     }
 
-    try {
-      const { userId } = await auth.verifyToken(authToken);
-      return next({ ctx: { ...ctx, userId } });
-    } catch (error) {
-      throw new Error(`Client failed to authenticate: ${String(error)}`);
+    const result = await auth.verifyToken(authToken);
+    if (!result.ok) {
+      throw new Error(`Client failed to authenticate: ${result.error}`);
     }
+
+    return next({ ctx: { ...ctx, user: result.user } });
   });
 }

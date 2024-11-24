@@ -15,8 +15,8 @@ export const trpc = createTRPCClient<RootRouter>({
         if (!authClient) {
           throw new Error("An auth client instance must be given to trpc");
         }
-        const token = await authClient.refresh();
-        return { [tokenHeaderName]: token ?? "" };
+        const user = await authClient.refresh();
+        return { [tokenHeaderName]: user?.token ?? "" };
       },
     }),
   ],

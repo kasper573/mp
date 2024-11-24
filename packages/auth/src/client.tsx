@@ -1,7 +1,14 @@
-import { Clerk } from "@clerk/clerk-js/headless";
+import type { User } from "oidc-client-ts";
+import { UserManager } from "oidc-client-ts";
 import type { Accessor } from "solid-js";
-import { createContext, createMemo, createSignal, onCleanup } from "solid-js";
-import type { AuthToken } from "./shared";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from "solid-js";
+import type { AuthToken, UserId, UserIdentity } from "./shared";
 
 export const AuthContext = createContext<BrowserAuthClient>(
   new Proxy({} as BrowserAuthClient, {
@@ -11,29 +18,73 @@ export const AuthContext = createContext<BrowserAuthClient>(
   }),
 );
 
-export interface BrowserAuthClient
-  extends Pick<Clerk, "signOut" | "redirectToSignIn"> {
-  token: Accessor<AuthToken | undefined>;
+export interface BrowserAuthClient {
+  user: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
-  refresh(): Promise<AuthToken | undefined>;
+  refresh(): Promise<UserIdentity | undefined>;
+  signOut(): Promise<void>;
+  redirectToSignIn(): Promise<void>;
+  signInCallback(): Promise<UserIdentity | undefined>;
 }
 
-export function createAuthClient(publishableKey: string): BrowserAuthClient {
-  const clerk = new Clerk(publishableKey);
-  const clerkReady = clerk.load();
-  const [token, setToken] = createSignal<AuthToken>();
-  const isSignedIn = createMemo(() => !!token());
+export interface BrowserAuthClientOptions {
+  authority: string;
+  audience: string;
+  redirectUri: string;
+}
+
+export function createAuthClient(
+  settings: BrowserAuthClientOptions,
+): BrowserAuthClient {
+  const userManager = new UserManager({
+    authority: settings.authority,
+    client_id: settings.audience,
+    redirect_uri: settings.redirectUri,
+  });
+  const [user, setUser] = createSignal<UserIdentity>();
+  const isSignedIn = createMemo(() => !!user());
+
+  createEffect(() => {
+    const subscriptions = [
+      userManager.events.addUserLoaded((user) => {
+        setUser(extractIdentity(user));
+      }),
+      userManager.events.addUserUnloaded(() => {
+        setUser(undefined);
+      }),
+    ];
+
+    onCleanup(() => {
+      for (const unsub of subscriptions) {
+        unsub();
+      }
+    });
+  });
 
   async function refresh() {
-    await clerkReady;
-    const token = (await clerk.session?.getToken()) as AuthToken | undefined;
-    setToken(token);
-    return token;
+    const identity = extractIdentity(await userManager.getUser());
+    setUser(identity);
+    return identity;
   }
 
-  onCleanup(clerk.addListener(() => void refresh()));
+  return {
+    user,
+    isSignedIn,
+    refresh,
+    signOut: () => userManager.signoutRedirect(),
+    redirectToSignIn: () => userManager.signinRedirect(),
+    signInCallback: () => userManager.signinCallback().then(extractIdentity),
+  };
+}
 
-  return { ...clerk, token, isSignedIn, refresh };
+function extractIdentity(user?: User | null): UserIdentity | undefined {
+  if (!user) {
+    return;
+  }
+  return {
+    id: user.profile.sub as UserId,
+    token: user.access_token as AuthToken,
+  };
 }
 
 export * from "./shared";

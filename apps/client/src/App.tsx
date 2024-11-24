@@ -7,7 +7,7 @@ import { createQueryClient } from "./clients/query";
 import { env } from "./env";
 import { giveAuthClientToTRPC } from "./clients/trpc";
 
-const authClient = createAuthClient(env.authPublishableKey);
+const authClient = createAuthClient(env.auth);
 const queryClient = createQueryClient();
 
 giveAuthClientToTRPC(authClient);

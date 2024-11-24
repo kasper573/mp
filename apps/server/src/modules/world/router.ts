@@ -88,10 +88,10 @@ export function createWorldRouter({
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ ctx: { userId, clients, logger } }) =>
+      .mutation(({ ctx: { user, clients, logger } }) =>
         accessState("world.join", (state) => {
           // TODO don't use user id as character id
-          const characterId = userId as unknown as CharacterId;
+          const characterId = user.id as unknown as CharacterId;
           let player = state.characters[characterId];
           if (player === undefined) {
             logger.info("Character created", characterId);
@@ -104,7 +104,7 @@ export function createWorldRouter({
               );
             }
 
-            clients.associateUserWithCharacter(userId, characterId);
+            clients.associateUserWithCharacter(user.id, characterId);
 
             player = {
               areaId: area.id,

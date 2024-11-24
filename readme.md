@@ -13,7 +13,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) + [drizzle orm](https://orm.drizzle.team/)
 - network: [ws](https://www.npmjs.com/package/ws) and [automerge](https://automerge.org/)
-- auth: [clerk](https://clerk.com/)
+- auth: [keycloak]https://www.keycloak.org/)
 - metrics: [grafana](https://grafana.com/) + [prometheus](https://prometheus.io/)
 
 ## (very loose) Design goals
