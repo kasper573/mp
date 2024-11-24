@@ -35,3 +35,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Run `./docker/installcert.sh`
   > You may need to add the root certificate manually to your browser depending on which browser you are using.
 - Visit `https://mp.localhost` in your browser
+
+## Docker
+
+All docker concerns reside in [/docker](/docker) and should be very loosely coupled with the rest of the codebase. Docker should only be aware of application and package build/dev tasks, their output artifacts and environment variables.
