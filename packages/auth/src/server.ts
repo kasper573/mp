@@ -34,18 +34,20 @@ export function createAuthServer({
 
   function verifyAndDecode(token: string) {
     return new Promise<JwtPayload>((resolve, reject) => {
-      jwt.verify(
-        token,
-        getKey,
-        { audience, issuer, algorithms },
-        (err, decoded) => {
-          if (err) {
-            reject(err);
-          } else {
-            resolve(decoded as JwtPayload);
-          }
-        },
-      );
+      jwt.verify(token, getKey, { issuer, algorithms }, (err, decoded) => {
+        if (err) {
+          return reject(err);
+        }
+
+        // Keycloak uses `azp` instead of `aud` for the audience claim
+        const payload = decoded as JwtPayload;
+        if (payload.azp !== audience) {
+          reject(new Error(`Invalid audience: ${payload.azp}`));
+          return;
+        }
+
+        resolve(payload);
+      });
     });
   }
 
@@ -78,10 +80,8 @@ type VerifyTokenResult =
 
 export * from "./shared";
 
+// Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [
-  "HS256",
-  "HS384",
-  "HS512",
   "RS256",
   "RS384",
   "RS512",
