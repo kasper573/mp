@@ -34,6 +34,9 @@ services:
       dockerfile: ./Dockerfile.keycloak
       context: .
     image: ${DOCKER_REGISTRY_URL}/mp-keycloak:${DOCKER_IMAGE_VERSION}
+    command: start --optimized --import-realm
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
     env_file: *env_files
 
   postgres:
