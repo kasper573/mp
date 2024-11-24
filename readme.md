@@ -37,28 +37,3 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Visit `https://mp.localhost` in your browser
 
 > Tip: You can also add a `/docker/.env` file that contains `ENV=dev` to avoid having to prepent every docker command with ENV.
-
-## Deploying to production
-
-The github actions workflow is already deployment ready but requires you to configure a few secrets and variables:
-
-Variables:
-
-```
-DEPLOY_SSH_HOST
-DEPLOY_SSH_USERNAME
-
-# the public domain your deploy target is accessible from
-# will be used by reverse proxy to set up all routing
-MP_DOMAIN
-```
-
-Secrets:
-
-```
-DEPLOY_SSH_KEY
-
-# clerk secret and publishable keys
-AUTH_SECRET_KEY
-AUTH_PUBLISHABLE_KEY
-```
