@@ -1,6 +1,6 @@
 x-env-files: &env_files
-  - .env.shared
   - .env.${DOCKER_COMPOSE_ENV}
+  - .env.shared
   - path: .env.local
     required: false
 
@@ -29,28 +29,11 @@ services:
     image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
     env_file: *env_files
 
-  authentik-server:
-    image: ghcr.io/goauthentik/server:2024.10.2
-    command: server
-    volumes:
-      - ./authentik/media:/media
-      - ./authentik/templates:/templates
-    depends_on:
-      - postgres
-      - redis
-    env_file: *env_files
-
-  authentik-worker:
-    image: ghcr.io/goauthentik/server:2024.10.2
-    command: worker
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./authentik/media:/media
-      - ./authentik/templates:/templates
-    depends_on:
-      - postgres
-      - redis
-    user: root # See https://goauthentik.io/docs/outposts/integrations/docker
+  keycloak:
+    build:
+      dockerfile: ./Dockerfile.keycloak
+      context: .
+    image: ${DOCKER_REGISTRY_URL}/mp-keycloak:${DOCKER_IMAGE_VERSION}
     env_file: *env_files
 
   postgres:

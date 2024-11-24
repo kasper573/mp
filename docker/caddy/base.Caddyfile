@@ -7,5 +7,5 @@ grafana.{$MP_DOMAIN} {
 }
 
 auth.{$MP_DOMAIN} {
-    reverse_proxy authentik-server:9000
+    reverse_proxy keycloak:8080
 }
