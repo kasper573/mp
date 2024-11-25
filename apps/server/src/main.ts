@@ -50,7 +50,6 @@ if (areas.isErr() || areas.value.size === 0) {
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
-collectUserMetrics(metrics, clients);
 
 new MetricsGague({
   name: "process_uptime_seconds",
@@ -110,10 +109,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-export const worldState = new SyncServer<
-  WorldState,
-  SyncServerConnectionMetaData
->({
+const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   initialState: initialWorldState.value,
   filterState: deriveWorldStateForClient,
   httpServer,
@@ -126,6 +122,8 @@ export const worldState = new SyncServer<
     clients.deleteClient(clientId);
   },
 });
+
+collectUserMetrics(metrics, clients, worldState);
 
 const persistTicker = new Ticker({
   middleware: persist,
@@ -189,10 +187,13 @@ async function persist() {
 }
 
 function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
-  const characterId = clients.getCharacterId(clientId);
-  if (!characterId) {
+  const userId = clients.getUserId(clientId);
+  const char = Object.values(state.characters).find(
+    (char) => char.userId === userId,
+  );
+  if (!char) {
     throw new Error(
-      "Could not derive world state for client: client has no associated character",
+      "Could not derive world state for client: user has no associated character",
     );
   }
 
