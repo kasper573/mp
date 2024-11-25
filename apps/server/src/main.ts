@@ -11,7 +11,7 @@ import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
-import { measureTimeSpan, Ticker } from "@mp/time";
+import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
@@ -263,17 +263,16 @@ function serverTextHeader(options: CliOptions) {
 #     ██║ ╚═╝ ██║ ██║         #
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
-buildVersion: ${options.buildVersion}
-hostname: ${options.hostname}
-port: ${options.port}
-databaseUrl: ${options.databaseUrl}
-httpBaseUrl: ${options.httpBaseUrl}
-wsBaseUrl: ${options.wsBaseUrl}
-publicDir: ${options.publicDir}
-clientDir: ${options.clientDir}
-corsOrigin: ${options.corsOrigin}
-publicMaxAge: ${options.publicMaxAge}
-Tick interval: ${options.tickInterval.totalMilliseconds}ms
-Persist interval: ${options.persistInterval.totalMilliseconds}ms
+${Object.entries(options)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
+  .join("\n")}
 =====================================================`;
+}
+
+function optionValueToString(value: unknown) {
+  if (value instanceof TimeSpan) {
+    return `${value.totalMilliseconds}ms`;
+  }
+  return String(value);
 }
