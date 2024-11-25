@@ -210,6 +210,7 @@ function createServerContext(
     auth,
     logger,
     clients,
+    exposeErrorDetails: opt.exposeErrorDetails,
   };
 }
 

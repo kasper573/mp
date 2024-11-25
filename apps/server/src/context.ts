@@ -12,6 +12,7 @@ export interface ServerContext {
   auth: AuthServer;
   clients: ClientRegistry;
   logger: Logger;
+  exposeErrorDetails: boolean;
 }
 
 export type HttpSessionId = Branded<string, "HttpSessionId">;

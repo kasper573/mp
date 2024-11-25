@@ -143,6 +143,11 @@ export function readCliOptions(argv = process.argv) {
       description: "The version of the build",
       demandOption: true,
     })
+    .option("exposeErrorDetails", {
+      type: "boolean",
+      description: "Whether to expose detailed error information to clients",
+      demandOption: true,
+    })
     .parseSync();
 
   // Remove some yargs internals
