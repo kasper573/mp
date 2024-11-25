@@ -51,7 +51,7 @@ jobs:
 
       - name: Push docker images
         if: github.ref_name == 'main'
-        run cd docker && docker compose push
+        run: cd docker && docker compose push
 
   deploy:
     needs: [conventions, test, build]
