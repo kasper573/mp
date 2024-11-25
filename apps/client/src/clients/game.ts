@@ -51,7 +51,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
 function createWorldStateSignal(authClient: AuthClient) {
   const [worldState, setWorldState] = createSignal<WorldState>();
   const syncClient = createMemo(() => {
-    const user = authClient.user();
+    const user = authClient.identity();
     if (!user) {
       return;
     }

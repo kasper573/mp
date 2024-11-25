@@ -19,9 +19,9 @@ export const AuthContext = createContext<AuthClient>(
 );
 
 export interface AuthClient {
-  user: Accessor<UserIdentity | undefined>;
+  identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
-  refresh(): Promise<UserIdentity | undefined>;
+  refresh(): Promise<void>;
   signOut(): Promise<void>;
   redirectToSignIn(): Promise<void>;
   signInCallback(): Promise<UserIdentity | undefined>;
@@ -64,11 +64,10 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
 
   async function refresh() {
     handleUpdatedUser(await userManager.getUser());
-    return identity();
   }
 
   return {
-    user: identity,
+    identity,
     isSignedIn,
     refresh,
     signOut: () => userManager.signoutRedirect(),
