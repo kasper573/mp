@@ -1,5 +1,5 @@
 import type * as express from "express";
-import type { BrowserAuthClientOptions } from "@mp/auth/client";
+import type { AuthClientOptions } from "@mp/auth/client";
 import type { CliOptions } from "./cli";
 import {
   clientEnvApiPath,
@@ -14,7 +14,7 @@ export interface ClientEnv {
   apiUrl: string;
   wsUrl: string;
   buildVersion: string;
-  auth: BrowserAuthClientOptions & {
+  auth: AuthClientOptions & {
     callbackPath: string;
   };
 }

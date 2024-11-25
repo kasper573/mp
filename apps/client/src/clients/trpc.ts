@@ -1,10 +1,10 @@
 import type { RootRouter } from "@mp/server";
 import { transformer, tokenHeaderName } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import type { BrowserAuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/auth/client";
 import { env } from "../env";
 
-let authClient: BrowserAuthClient | undefined;
+let authClient: AuthClient | undefined;
 
 export const trpc = createTRPCClient<RootRouter>({
   links: [
@@ -22,6 +22,6 @@ export const trpc = createTRPCClient<RootRouter>({
   ],
 });
 
-export function giveAuthClientToTRPC(client: BrowserAuthClient) {
+export function giveAuthClientToTRPC(client: AuthClient) {
   authClient = client;
 }

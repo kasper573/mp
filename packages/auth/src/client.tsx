@@ -10,15 +10,15 @@ import {
 } from "solid-js";
 import type { AuthToken, UserId, UserIdentity } from "./shared";
 
-export const AuthContext = createContext<BrowserAuthClient>(
-  new Proxy({} as BrowserAuthClient, {
+export const AuthContext = createContext<AuthClient>(
+  new Proxy({} as AuthClient, {
     get() {
       throw new Error("AuthContext must be provided");
     },
   }),
 );
 
-export interface BrowserAuthClient {
+export interface AuthClient {
   user: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
   refresh(): Promise<UserIdentity | undefined>;
@@ -27,15 +27,13 @@ export interface BrowserAuthClient {
   signInCallback(): Promise<UserIdentity | undefined>;
 }
 
-export interface BrowserAuthClientOptions {
+export interface AuthClientOptions {
   authority: string;
   audience: string;
   redirectUri: string;
 }
 
-export function createAuthClient(
-  settings: BrowserAuthClientOptions,
-): BrowserAuthClient {
+export function createAuthClient(settings: AuthClientOptions): AuthClient {
   const userManager = new UserManager({
     authority: settings.authority,
     client_id: settings.audience,
