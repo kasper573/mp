@@ -1,7 +1,3 @@
-{
-    email admin@{$MP_DOMAIN}
-}
-
 grafana.{$MP_DOMAIN} {
     reverse_proxy http://grafana:3000
 }
