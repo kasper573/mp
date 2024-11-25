@@ -1,9 +1,9 @@
-import base.Caddyfile
-
 {
 	order rate_limit before basicauth
     email admin@{$MP_DOMAIN}
 }
+
+import base.Caddyfile
 
 (common_rate_limit) {
     rate_limit {
