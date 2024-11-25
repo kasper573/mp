@@ -19,7 +19,7 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     depends_on:
-      - postgres
+      - migrations
     env_file: *env_files
 
   migrations:
@@ -27,6 +27,8 @@ services:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
+    depends_on:
+      - postgres
     env_file: *env_files
 
   keycloak:

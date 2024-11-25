@@ -88,7 +88,7 @@ jobs:
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull
+            docker compose down
             docker compose up -d --remove-orphans --no-build
-            docker compose run migrations
             docker system prune -f
             docker image prune -af
