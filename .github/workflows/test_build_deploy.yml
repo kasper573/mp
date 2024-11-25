@@ -46,11 +46,12 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker images
-        run: |
-          cd docker
-          docker compose build
-          docker compose push
+      - name: Build docker images
+        run: cd docker && docker compose build
+
+      - name: Push docker images
+        if: github.ref_name == 'main'
+        run cd docker && docker compose push
 
   deploy:
     needs: [conventions, test, build]
