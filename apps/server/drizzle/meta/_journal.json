@@ -57,6 +57,13 @@
       "when": 1725200365899,
       "tag": "0007_smart_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1732511569801,
+      "tag": "0008_nosy_scrambler",
+      "breakpoints": true
     }
   ]
 }

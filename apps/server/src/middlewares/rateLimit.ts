@@ -1,5 +1,6 @@
 import type { IRateLimiterOptions } from "rate-limiter-flexible";
 import { RateLimiterMemory } from "rate-limiter-flexible";
+import { TRPCError } from "@trpc/server";
 import { t } from "../trpc";
 import type { ServerContext } from "../context";
 
@@ -19,8 +20,11 @@ export async function consumeLimiterWithContext(
   if (sessionId) {
     try {
       await limiter.consume(sessionId);
-    } catch {
-      throw new Error("Rate limit exceeded");
+    } catch (error) {
+      throw new TRPCError({
+        code: "TOO_MANY_REQUESTS",
+        message: `Rate limit exceeded: ${String(error)}`,
+      });
     }
   }
 }

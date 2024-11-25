@@ -1,17 +1,21 @@
+import { TRPCError } from "@trpc/server";
 import { t } from "../trpc";
 
 export function auth() {
   return t.middleware(async ({ ctx, next }) => {
     const { authToken, auth } = ctx;
     if (!authToken) {
-      throw new Error(`Client provided no auth token`);
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: "No token provided",
+      });
     }
 
-    try {
-      const { userId } = await auth.verifyToken(authToken);
-      return next({ ctx: { ...ctx, userId } });
-    } catch (error) {
-      throw new Error(`Client failed to authenticate: ${String(error)}`);
+    const result = await auth.verifyToken(authToken);
+    if (!result.ok) {
+      throw new TRPCError({ code: "UNAUTHORIZED", message: result.error });
     }
+
+    return next({ ctx: { ...ctx, user: result.user } });
   });
 }

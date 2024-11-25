@@ -11,6 +11,7 @@ env:
   DOCKER_COMPOSE_ENV: prod
   DOCKER_IMAGE_VERSION: latest
   BUILD_VERSION: ${{ github.run_number }}
+  MP_DOMAIN: ${{ vars.MP_DOMAIN }}
 
 jobs:
   conventions:
@@ -45,11 +46,12 @@ jobs:
           username: ${{ env.DOCKER_USERNAME }}
           password: ${{ env.DOCKER_PASSWORD }}
 
-      - name: Build and push Docker images
-        run: |
-          cd docker
-          docker compose build
-          docker compose push
+      - name: Build docker images
+        run: cd docker && docker compose build
+
+      - name: Push docker images
+        if: github.ref_name == 'main'
+        run: cd docker && docker compose push
 
   deploy:
     needs: [conventions, test, build]
@@ -75,7 +77,6 @@ jobs:
           host: ${{ vars.DEPLOY_SSH_HOST }}
           username: ${{ vars.DEPLOY_SSH_USERNAME }}
           key: ${{ secrets.DEPLOY_SSH_KEY }}
-          envs: DOCKER_REGISTRY_URL,DOCKER_COMPOSE_ENV,DOCKER_IMAGE_VERSION
           script_stop: true
           script: |
             cd ~/docker
@@ -84,11 +85,8 @@ jobs:
             echo "DOCKER_COMPOSE_ENV=\"${{ env.DOCKER_COMPOSE_ENV }}\"" > .env
             echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" >> .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
-
-            # Set production container env vars   
-            echo "MP_AUTH_SECRET_KEY=\"${{ secrets.AUTH_SECRET_KEY }}\"" > .env.local
-            echo "MP_AUTH_PUBLISHABLE_KEY=\"${{ secrets.AUTH_PUBLISHABLE_KEY }}\"" >> .env.local
-            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env.local
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
+            echo "MP_DOMAIN=\"${{ env.MP_DOMAIN }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull

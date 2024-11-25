@@ -1,11 +1,13 @@
 import type { MetricsRegistry } from "@mp/metrics";
 import { MetricsGague } from "@mp/metrics";
-import { worldState } from "../../main";
+import type { SyncServer } from "@mp/sync/server";
 import type { ClientRegistry } from "./ClientRegistry";
+import type { WorldState } from "./schema";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
+  worldState: SyncServer<WorldState, unknown>,
 ) {
   new MetricsGague({
     name: "active_user_count",
@@ -21,7 +23,9 @@ export function collectUserMetrics(
     help: "Number of player characters currently active",
     registers: [registry],
     collect() {
-      this.set(clients.getCharacterCount());
+      worldState.access("collectUserMetrics", (state) => {
+        this.set(Object.values(state.characters).length);
+      });
     },
   });
 

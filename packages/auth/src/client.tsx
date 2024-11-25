@@ -1,39 +1,94 @@
-import { Clerk } from "@clerk/clerk-js/headless";
+import type { User } from "oidc-client-ts";
+import { UserManager } from "oidc-client-ts";
 import type { Accessor } from "solid-js";
-import { createContext, createMemo, createSignal, onCleanup } from "solid-js";
-import type { AuthToken } from "./shared";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from "solid-js";
+import type { AuthToken, UserId, UserIdentity } from "./shared";
 
-export const AuthContext = createContext<BrowserAuthClient>(
-  new Proxy({} as BrowserAuthClient, {
+export const AuthContext = createContext<AuthClient>(
+  new Proxy({} as AuthClient, {
     get() {
       throw new Error("AuthContext must be provided");
     },
   }),
 );
 
-export interface BrowserAuthClient
-  extends Pick<Clerk, "signOut" | "redirectToSignIn"> {
-  token: Accessor<AuthToken | undefined>;
+export interface AuthClient {
+  identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
-  refresh(): Promise<AuthToken | undefined>;
+  refresh(): Promise<void>;
+  signOut(): Promise<void>;
+  redirectToSignIn(): Promise<void>;
+  signInCallback(): Promise<UserIdentity | undefined>;
 }
 
-export function createAuthClient(publishableKey: string): BrowserAuthClient {
-  const clerk = new Clerk(publishableKey);
-  const clerkReady = clerk.load();
-  const [token, setToken] = createSignal<AuthToken>();
-  const isSignedIn = createMemo(() => !!token());
+export interface AuthClientOptions {
+  authority: string;
+  audience: string;
+  redirectUri: string;
+}
 
-  async function refresh() {
-    await clerkReady;
-    const token = (await clerk.session?.getToken()) as AuthToken | undefined;
-    setToken(token);
-    return token;
+export function createAuthClient(settings: AuthClientOptions): AuthClient {
+  const userManager = new UserManager({
+    authority: settings.authority,
+    client_id: settings.audience,
+    redirect_uri: settings.redirectUri,
+  });
+  const [identity, setIdentity] = createSignal<UserIdentity>();
+  const isSignedIn = createMemo(() => !!identity());
+
+  function handleUpdatedUser(updatedUser?: User | null) {
+    const updatedIdentity = extractIdentity(updatedUser);
+    if (!isEqual(updatedIdentity, identity())) {
+      setIdentity(updatedIdentity);
+    }
   }
 
-  onCleanup(clerk.addListener(() => void refresh()));
+  createEffect(() => {
+    const subscriptions = [
+      userManager.events.addUserLoaded(handleUpdatedUser),
+      userManager.events.addUserUnloaded(handleUpdatedUser),
+    ];
 
-  return { ...clerk, token, isSignedIn, refresh };
+    onCleanup(() => {
+      for (const unsub of subscriptions) {
+        unsub();
+      }
+    });
+  });
+
+  async function refresh() {
+    handleUpdatedUser(await userManager.getUser());
+  }
+
+  return {
+    identity,
+    isSignedIn,
+    refresh,
+    signOut: () => userManager.signoutRedirect(),
+    redirectToSignIn: () => userManager.signinRedirect(),
+    signInCallback: () => userManager.signinCallback().then(extractIdentity),
+  };
+}
+
+function extractIdentity(user?: User | null): UserIdentity | undefined {
+  if (!user) {
+    return;
+  }
+  return {
+    id: user.profile.sub as UserId,
+    token: user.access_token as AuthToken,
+  };
+}
+
+// A bit lazy, but it's not a lot of data and it changes infrequently, so it's fine
+function isEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export * from "./shared";

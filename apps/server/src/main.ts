@@ -7,11 +7,11 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import { createAuthClient } from "@mp/auth/server";
+import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
-import { measureTimeSpan, Ticker } from "@mp/time";
+import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
@@ -50,7 +50,6 @@ if (areas.isErr() || areas.value.size === 0) {
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
-collectUserMetrics(metrics, clients);
 
 new MetricsGague({
   name: "process_uptime_seconds",
@@ -80,7 +79,12 @@ const tickDurationMetric = new MetricsHistogram({
   buckets: tickBuckets,
 });
 
-const auth = createAuthClient({ secretKey: opt.authSecretKey });
+const auth = createAuthServer({
+  audience: opt.authAudience,
+  issuer: opt.authIssuer,
+  jwksUri: opt.authJwksUri,
+  algorithms: opt.authJwtAlgorithms,
+});
 const db = createDBClient(opt.databaseUrl);
 const defaultAreaId = [...areas.value.keys()][0];
 const initialWorldState = await loadWorldState(db);
@@ -105,10 +109,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-export const worldState = new SyncServer<
-  WorldState,
-  SyncServerConnectionMetaData
->({
+const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   initialState: initialWorldState.value,
   filterState: deriveWorldStateForClient,
   httpServer,
@@ -121,6 +122,8 @@ export const worldState = new SyncServer<
     clients.deleteClient(clientId);
   },
 });
+
+collectUserMetrics(metrics, clients, worldState);
 
 const persistTicker = new Ticker({
   middleware: persist,
@@ -184,10 +187,13 @@ async function persist() {
 }
 
 function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
-  const characterId = clients.getCharacterId(clientId);
-  if (!characterId) {
+  const userId = clients.getUserId(clientId);
+  const char = Object.values(state.characters).find(
+    (char) => char.userId === userId,
+  );
+  if (!char) {
     throw new Error(
-      "Could not derive world state for client: client has no associated character",
+      "Could not derive world state for client: user has no associated character",
     );
   }
 
@@ -205,6 +211,7 @@ function createServerContext(
     auth,
     logger,
     clients,
+    exposeErrorDetails: opt.exposeErrorDetails,
   };
 }
 
@@ -213,17 +220,23 @@ async function handleSyncServerConnection(
   { token }: SyncServerConnectionMetaData,
 ) {
   logger.info("Client connected", clientId);
-  try {
-    const { userId } = await auth.verifyToken(token);
-    clients.associateClientWithUser(clientId, userId);
-    logger.info("Client verified and associated with user", {
+
+  const verifyResult = await auth.verifyToken(token);
+  if (!verifyResult.ok) {
+    logger.info(
+      "Could not verify client authentication token",
       clientId,
-      userId,
-    });
-  } catch {
-    logger.info("Client connection rejected", clientId);
+      verifyResult.error,
+    );
     worldState.disconnectClient(clientId);
+    return;
   }
+
+  clients.associateClientWithUser(clientId, verifyResult.user.id);
+  logger.info("Client verified and associated with user", {
+    clientId,
+    userId: verifyResult.user.id,
+  });
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
@@ -251,18 +264,16 @@ function serverTextHeader(options: CliOptions) {
 #     ██║ ╚═╝ ██║ ██║         #
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
-buildVersion: ${options.buildVersion}
-hostname: ${options.hostname}
-port: ${options.port}
-authSecretKey: ${options.authSecretKey ? "set" : "not set"}
-databaseUrl: ${options.databaseUrl}
-httpBaseUrl: ${options.httpBaseUrl}
-wsBaseUrl: ${options.wsBaseUrl}
-publicDir: ${options.publicDir}
-clientDir: ${options.clientDir}
-corsOrigin: ${options.corsOrigin}
-publicMaxAge: ${options.publicMaxAge}
-Tick interval: ${options.tickInterval.totalMilliseconds}ms
-Persist interval: ${options.persistInterval.totalMilliseconds}ms
+${Object.entries(options)
+  .sort(([a], [b]) => a.localeCompare(b))
+  .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
+  .join("\n")}
 =====================================================`;
+}
+
+function optionValueToString(value: unknown) {
+  if (value instanceof TimeSpan) {
+    return `${value.totalMilliseconds}ms`;
+  }
+  return String(value);
 }

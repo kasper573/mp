@@ -1,8 +1,9 @@
 x-env-files: &env_files
-  - .env.shared
-  - .env.${DOCKER_COMPOSE_ENV}
-  - path: .env.local
+  - path: .env
     required: false
+  - .env.${DOCKER_COMPOSE_ENV}
+  - .env.shared
+
 services:
   mp:
     build:
@@ -15,32 +16,52 @@ services:
           target: /workdir
         - action: rebuild
           path: ../pnpm-lock.yaml
-    image: ${DOCKER_REGISTRY_URL}/mp-server:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
-    env_file: *env_files
     depends_on:
-      - pg
+      - postgres
+    env_file: *env_files
+
   migrations:
     build:
       dockerfile: ../../docker/Dockerfile.migrations
       context: ../apps/server
-    image: ${DOCKER_REGISTRY_URL}/mp-migrations:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     env_file: *env_files
-  pg:
+
+  keycloak:
+    build:
+      dockerfile: ./Dockerfile.keycloak
+      context: .
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-keycloak:${DOCKER_IMAGE_VERSION:-latest}
+    command: start --optimized --import-realm
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
+    env_file: *env_files
+
+  postgres:
     image: postgres:16.4
     restart: always
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     env_file: *env_files
+
+  redis:
+    image: redis:7.4.1
+    restart: always
+    env_file: *env_files
+
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
     env_file: *env_files
+
   node_exporter:
     image: prom/node-exporter:v1.8.2
     env_file: *env_files
+
   grafana:
     image: grafana/grafana:10.4.12
     volumes:
@@ -48,18 +69,20 @@ services:
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
     env_file: *env_files
+
   caddy:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    image: ${DOCKER_REGISTRY_URL}/mp-caddy:${DOCKER_IMAGE_VERSION}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
       - "80:80"
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy/Caddyfile.${DOCKER_COMPOSE_ENV}:/etc/caddy/Caddyfile
+      - ./caddy/base.Caddyfile:/etc/caddy/base.Caddyfile
+      - ./caddy/${DOCKER_COMPOSE_ENV}.Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
     env_file: *env_files

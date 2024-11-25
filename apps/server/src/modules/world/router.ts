@@ -8,6 +8,7 @@ import {
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
+import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import type { CharacterId, WorldState } from "./schema";
@@ -58,19 +59,30 @@ export function createWorldRouter({
     move: t.procedure
       .input(schemaFor<{ characterId: CharacterId } & Vector>())
       .use(auth())
-      .mutation(({ input: { characterId, x, y }, ctx: { logger } }) =>
+      .mutation(({ input: { characterId, x, y }, ctx: { user } }) =>
         accessState(`world.move`, (state) => {
           const char = state.characters[characterId];
 
+          if (char.userId !== user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "You don't have access to this character",
+            });
+          }
+
           if (!char) {
-            logger.error("Character not found", characterId);
-            return;
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Character not found",
+            });
           }
 
           const area = areas.get(char.areaId);
           if (!area) {
-            logger.error("Area not found", char.areaId);
-            return;
+            throw new TRPCError({
+              code: "INTERNAL_SERVER_ERROR",
+              message: `Characters current area not found: ${char.areaId}`,
+            });
           }
 
           const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
@@ -88,10 +100,10 @@ export function createWorldRouter({
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ ctx: { userId, clients, logger } }) =>
+      .mutation(({ ctx: { user, clients, logger } }) =>
         accessState("world.join", (state) => {
           // TODO don't use user id as character id
-          const characterId = userId as unknown as CharacterId;
+          const characterId = user.id as unknown as CharacterId;
           let player = state.characters[characterId];
           if (player === undefined) {
             logger.info("Character created", characterId);
@@ -104,14 +116,13 @@ export function createWorldRouter({
               );
             }
 
-            clients.associateUserWithCharacter(userId, characterId);
-
             player = {
               areaId: area.id,
               coords: vec(0, 0),
               id: characterId,
               path: [],
               speed: 3,
+              userId: user.id,
             };
             player.coords = vec_copy(area.start);
             state.characters[player.id] = player;

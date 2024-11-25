@@ -2,6 +2,8 @@ import path from "node:path";
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
 import { TimeSpan } from "@mp/time";
+import type { AuthAlgorithm } from "@mp/auth/server";
+import { authAlgorithms } from "@mp/auth/server";
 
 export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
@@ -72,14 +74,44 @@ export function readCliOptions(argv = process.argv) {
       description: "The CORS origin to allow",
       demandOption: true,
     })
-    .option("authSecretKey", {
+    .option("authIssuer", {
       type: "string",
-      description: "The secret key for the auth server",
+      description: "OIDC issuer",
       demandOption: true,
     })
-    .option("authPublishableKey", {
+    .option("authAudience", {
       type: "string",
-      description: "The publishable key for the auth server",
+      description: "OIDC audience",
+      demandOption: true,
+    })
+    .option("authJwksUri", {
+      type: "string",
+      description: "OIDC JWKS URI",
+      demandOption: true,
+    })
+    .option("authJwtAlgorithms", {
+      type: "string",
+      array: true,
+      description: "OIDC JWT algorithms",
+      demandOption: true,
+      coerce: (algs: string[]) => {
+        for (const alg of algs) {
+          if (!authAlgorithms.includes(alg as AuthAlgorithm)) {
+            throw new Error(`Invalid algorithm: ${alg}`);
+          }
+        }
+        return algs as AuthAlgorithm[];
+      },
+    })
+    .option("authRedirectUri", {
+      type: "string",
+      description: "The full URI that OIDC should redirect back to",
+      demandOption: true,
+    })
+    .option("authCallbackPath", {
+      type: "string",
+      description:
+        "The relative path the web server should serve the OIDC redirect callback at",
       demandOption: true,
     })
     .option("tickInterval", {
@@ -109,6 +141,11 @@ export function readCliOptions(argv = process.argv) {
     .option("buildVersion", {
       type: "string",
       description: "The version of the build",
+      demandOption: true,
+    })
+    .option("exposeErrorDetails", {
+      type: "boolean",
+      description: "Whether to expose detailed error information to clients",
       demandOption: true,
     })
     .parseSync();

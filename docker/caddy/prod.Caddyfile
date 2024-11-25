@@ -1,5 +1,6 @@
+import base.Caddyfile
+
 {
-    email admin@k573.dev
 	order rate_limit before basicauth
 }
 
@@ -13,12 +14,7 @@
     }
 }
 
-grafana.k573.dev {
-    import common_rate_limit
-    reverse_proxy http://grafana:3000
-}
-
-k573.dev {
+$env.{$MP_DOMAIN} {
     import common_rate_limit
     reverse_proxy http://mp:9999
 }

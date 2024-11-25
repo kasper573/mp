@@ -23,12 +23,13 @@
     "dev": "tsup --watch"
   },
   "dependencies": {
-    "@clerk/clerk-js": "5.20.0",
-    "@clerk/clerk-sdk-node": "5.0.35",
+    "oidc-client-ts": "3.1.0",
+    "jose": "5.9.6",
     "solid-js": "1.9.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@mp/build": "workspace:*"
+    "@mp/build": "workspace:*",
+    "@types/jsonwebtoken": "9.0.7"
   }
 }

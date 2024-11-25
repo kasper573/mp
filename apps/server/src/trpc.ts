@@ -4,7 +4,21 @@ import { transformer } from "./shared";
 import type { ServerContext } from "./context";
 import { consumeLimiterWithContext } from "./middlewares/rateLimit";
 
-const trpc = initTRPC.context<ServerContext>().create({ transformer });
+const trpc = initTRPC.context<ServerContext>().create({
+  transformer,
+  errorFormatter: ({ shape, ctx }) => {
+    if (ctx?.exposeErrorDetails) {
+      return shape;
+    }
+
+    // Hide error details
+    return {
+      ...shape,
+      data: { ...shape.data, path: null, stack: null },
+      message: "An error occurred",
+    };
+  },
+});
 
 export const schemaFor = <T>() => ({ parse: (input: unknown) => input as T });
 
