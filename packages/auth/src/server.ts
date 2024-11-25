@@ -1,6 +1,4 @@
-import type { GetPublicKeyOrSecret, JwtPayload } from "jsonwebtoken";
-import jwt from "jsonwebtoken";
-import createJwksClient from "jwks-rsa";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 import type { AuthToken, UserId, UserIdentity } from "./shared";
 
 export interface AuthServerOptions {
@@ -20,44 +18,26 @@ export function createAuthServer({
   audience,
   algorithms,
 }: AuthServerOptions): AuthServer {
-  const jwks = createJwksClient({ jwksUri, cache: true });
-
-  const getKey: GetPublicKeyOrSecret = (header, callback) => {
-    jwks.getSigningKey(header.kid, (err, key) => {
-      if (err) {
-        callback(err);
-      } else {
-        callback(null, key?.getPublicKey());
-      }
-    });
-  };
-
-  function verifyAndDecode(token: string) {
-    return new Promise<JwtPayload>((resolve, reject) => {
-      jwt.verify(token, getKey, { issuer, algorithms }, (err, decoded) => {
-        if (err) {
-          return reject(err);
-        }
-
-        // Keycloak uses `azp` instead of `aud` for the audience claim
-        const payload = decoded as JwtPayload;
-        if (payload.azp !== audience) {
-          reject(new Error(`Invalid audience: ${payload.azp}`));
-          return;
-        }
-
-        resolve(payload);
-      });
-    });
-  }
+  const jwks = createRemoteJWKSet(new URL(jwksUri));
 
   return {
     async verifyToken(token) {
       let jwtPayload;
       try {
-        jwtPayload = await verifyAndDecode(token);
+        const { payload } = await jwtVerify(token, jwks, {
+          issuer,
+          algorithms,
+        });
+        jwtPayload = payload;
       } catch (error) {
         return { ok: false, error: String(error) };
+      }
+
+      if (jwtPayload.azp !== audience) {
+        return {
+          ok: false,
+          error: `Token azp "${String(jwtPayload.azp)}" is invalid`,
+        };
       }
 
       if (!jwtPayload.sub) {
