@@ -39,17 +39,20 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     client_id: settings.audience,
     redirect_uri: settings.redirectUri,
   });
-  const [user, setUser] = createSignal<UserIdentity>();
-  const isSignedIn = createMemo(() => !!user());
+  const [identity, setIdentity] = createSignal<UserIdentity>();
+  const isSignedIn = createMemo(() => !!identity());
+
+  function handleUpdatedUser(updatedUser?: User | null) {
+    const updatedIdentity = extractIdentity(updatedUser);
+    if (!isEqual(updatedIdentity, identity())) {
+      setIdentity(updatedIdentity);
+    }
+  }
 
   createEffect(() => {
     const subscriptions = [
-      userManager.events.addUserLoaded((user) => {
-        setUser(extractIdentity(user));
-      }),
-      userManager.events.addUserUnloaded(() => {
-        setUser(undefined);
-      }),
+      userManager.events.addUserLoaded(handleUpdatedUser),
+      userManager.events.addUserUnloaded(handleUpdatedUser),
     ];
 
     onCleanup(() => {
@@ -60,13 +63,12 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
   });
 
   async function refresh() {
-    const identity = extractIdentity(await userManager.getUser());
-    setUser(identity);
-    return identity;
+    handleUpdatedUser(await userManager.getUser());
+    return identity();
   }
 
   return {
-    user,
+    user: identity,
     isSignedIn,
     refresh,
     signOut: () => userManager.signoutRedirect(),
@@ -83,6 +85,11 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
     id: user.profile.sub as UserId,
     token: user.access_token as AuthToken,
   };
+}
+
+// A bit lazy, but it's not a lot of data and it changes infrequently, so it's fine
+function isEqual(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
 }
 
 export * from "./shared";
