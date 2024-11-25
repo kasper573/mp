@@ -1,8 +1,8 @@
 x-env-files: &env_files
+  - path: .env
+    required: false
   - .env.${DOCKER_COMPOSE_ENV}
   - .env.shared
-  - path: .env.local
-    required: false
 
 services:
   mp:
