@@ -11,6 +11,7 @@ env:
   DOCKER_COMPOSE_ENV: prod
   DOCKER_IMAGE_VERSION: latest
   BUILD_VERSION: ${{ github.run_number }}
+  MP_DOMAIN: ${{ vars.MP_DOMAIN }}
 
 jobs:
   conventions:
@@ -85,6 +86,7 @@ jobs:
             echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" >> .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
             echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
+            echo "MP_DOMAIN=\"${{ env.MP_DOMAIN }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull

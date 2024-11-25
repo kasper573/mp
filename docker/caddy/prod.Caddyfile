@@ -14,7 +14,7 @@ import base.Caddyfile
     }
 }
 
-$env.{$MP_DOMAIN} {
+{$MP_DOMAIN} {
     import common_rate_limit
     reverse_proxy http://mp:9999
 }
