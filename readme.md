@@ -39,3 +39,9 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 ## Docker
 
 All docker concerns reside in [/docker](/docker) and should be very loosely coupled with the rest of the codebase. Docker should only be aware of application and package build/dev tasks, their output artifacts and environment variables.
+
+# Production deployment
+
+This repository comes with a github actions workflow that performs automatic deployments whenever the main branch receives updates. It's a simple deploy script designed to deploy to a single remote machine. It logs in to your remote machine via ssh and updates or initializes the docker stack utilizing the same docker compose file as in development but with production environment variables provided via github action variables and secrets.
+
+Review the workflow to see which variables and secrets you need to provide.
