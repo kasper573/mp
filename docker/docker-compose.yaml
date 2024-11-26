@@ -89,6 +89,10 @@ services:
       - caddy-config:/config
     env_file: *env_files
 
+  smtp:
+    image: namshi/smtp:latest
+    env_file: *env_files
+
 volumes:
   grafana-data:
   caddy-data:

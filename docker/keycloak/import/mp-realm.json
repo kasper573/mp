@@ -1586,7 +1586,20 @@
     "xXSSProtection": "1; mode=block",
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
-  "smtpServer": {},
+  "smtpServer": {
+    "password": "${KC_SMTP_PASSWORD}",
+    "replyToDisplayName": "",
+    "starttls": "false",
+    "auth": "${KC_SMTP_AUTH}",
+    "port": "${KC_SMTP_PORT}",
+    "host": "${KC_SMTP_HOST}",
+    "replyTo": "",
+    "from": "${KC_SMTP_FROM}",
+    "fromDisplayName": "${KC_SMTP_FROM_DISPLAY_NAME}",
+    "envelopeFrom": "",
+    "ssl": "false",
+    "user": "${KC_SMTP_USER}"
+  },
   "loginTheme": "keycloak.v2",
   "accountTheme": "keycloak.v3",
   "adminTheme": "keycloak.v2",
