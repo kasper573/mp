@@ -10,6 +10,8 @@ dotenv.config({
 
 const baseURL = `https://${process.env.MP_DOMAIN}`;
 
+console.log("baseURL", baseURL);
+
 export default defineConfig({
   testDir: "./tests",
   fullyParallel: true,
