@@ -22,6 +22,7 @@ export default defineConfig({
     baseURL,
     trace: "on-first-retry",
     video: "on-first-retry",
+    ignoreHTTPSErrors: true,
   },
 
   projects: [
