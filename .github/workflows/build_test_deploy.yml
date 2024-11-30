@@ -22,11 +22,12 @@ jobs:
       - run: pnpm lint
       - run: pnpm format
 
-  test:
+  unit-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install_node_things/
+      - run: pnpm build
       - run: pnpm test
 
   build:
@@ -49,12 +50,16 @@ jobs:
       - name: Build docker images
         run: cd docker && docker compose build
 
+      - uses: ./.github/workflows/composites/install_node_things/
+      - name: Run end to end tests
+        run: pnpm -F @mp/e2e start
+
       - name: Push docker images
         if: github.ref_name == 'main'
         run: cd docker && docker compose push
 
   deploy:
-    needs: [conventions, build, test]
+    needs: [conventions, build, unit-test]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:

@@ -31,7 +31,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --build`,
+    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
     stdout: "pipe",
     stderr: "pipe",
     url: baseURL,
