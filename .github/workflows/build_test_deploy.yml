@@ -70,9 +70,7 @@ jobs:
         if: always()
         with:
           name: playwright
-          path: |
-            **/.playwright/**
-            !node_modules/**
+          path: ./apps/e2e/.playwright/
 
   deploy:
     needs: [conventions, build, test-unit, test-e2e]
