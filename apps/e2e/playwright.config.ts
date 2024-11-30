@@ -10,6 +10,10 @@ dotenv.config({
 
 const baseURL = `https://${process.env.MP_DOMAIN}`;
 
+console.log(
+  "THIS_ONLY_EXISTS_IN_TEST_ENV",
+  process.env.THIS_ONLY_EXISTS_IN_TEST_ENV,
+);
 console.log("baseURL", baseURL);
 
 export default defineConfig({
