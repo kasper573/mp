@@ -9,6 +9,9 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp-${DOCKER_COMPOSE_ENV}
       context: ..
+      args:
+        TURBO_TOKEN: ${TURBO_TOKEN:-}
+        TURBO_TEAM: ${TURBO_TEAM:-}
     develop:
       watch:
         - action: sync
