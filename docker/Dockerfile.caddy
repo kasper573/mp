@@ -1,10 +1,5 @@
-FROM alpine:3.18 AS plugin-cache
-RUN apk add --no-cache git
-RUN git clone https://github.com/mholt/caddy-ratelimit /plugins/caddy-ratelimit
-
 FROM caddy:2.8.4-builder AS builder
-COPY --from=plugin-cache /plugins/caddy-ratelimit /build/plugins/caddy-ratelimit
-RUN xcaddy build --with github.com/mholt/caddy-ratelimit=/build/plugins/caddy-ratelimit
-
+RUN xcaddy build --with github.com/mholt/caddy-ratelimit
+ 
 FROM caddy:2.8.4
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
