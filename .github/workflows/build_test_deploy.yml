@@ -60,7 +60,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install_node_things/
       - run: pnpm dlx playwright install --with-deps
-        run: pnpm -F @mp/e2e start
+      - run: pnpm -F @mp/e2e start
 
   deploy:
     needs: [conventions, build, test-unit, test-e2e]
