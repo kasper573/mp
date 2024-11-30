@@ -70,7 +70,8 @@ jobs:
         if: always()
         with:
           name: playwright
-          path: "**/.playwright/**"
+          path: ./apps/e2e/.playwright/
+          include-hidden-files: true
 
   deploy:
     needs: [conventions, build, test-unit, test-e2e]
