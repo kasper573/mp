@@ -1,21 +1,21 @@
 {
-	order rate_limit before basicauth
+	# order rate_limit before basicauth
     email admin@{$MP_DOMAIN}
 }
 
 import base.Caddyfile
 
-(common_rate_limit) {
-    rate_limit {
-        zone dynamic_zone {
-            key {http.request.remote_ip}
-            events 100
-            window 5s
-        }
-    }
-}
+# (common_rate_limit) {
+#     rate_limit {
+#         zone dynamic_zone {
+#             key {http.request.remote_ip}
+#             events 100
+#             window 5s
+#         }
+#     }
+# }
 
 {$MP_DOMAIN} {
-    import common_rate_limit
+    # import common_rate_limit
     reverse_proxy http://mp:9999
 }

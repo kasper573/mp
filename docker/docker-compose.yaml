@@ -76,12 +76,13 @@ services:
     env_file: *env_files
 
   caddy:
-    build:
-      dockerfile: ./Dockerfile.caddy
-      context: .
+    # build:
+    #   dockerfile: ./Dockerfile.caddy
+    #   context: .
     command:
       ["caddy", "run", "--config", "/etc/caddy/${DOCKER_COMPOSE_ENV}.Caddyfile"]
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
+    # image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
+    image: caddy:2.9.0
     restart: unless-stopped
     ports:
       - "80:80"
