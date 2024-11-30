@@ -57,12 +57,13 @@ jobs:
   test-e2e:
     needs: [build]
     runs-on: ubuntu-latest
+    container:
+      image: mcr.microsoft.com/playwright:v1.49.0-noble
+      options: --user 1001
     steps:
       - uses: actions/checkout@v4
       - name: Install node dependencies
         uses: ./.github/workflows/composites/install_node_things/
-      - name: Install playwright dependencies
-        run: pnpm dlx playwright install --with-deps
       - name: Run end-to-end tests
         run: pnpm -F @mp/e2e start
 
