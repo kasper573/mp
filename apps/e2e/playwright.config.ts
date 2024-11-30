@@ -14,6 +14,7 @@ const outputDir = ".playwright"; // Same value should also be defined in .gitign
 const artifactsDir = path.join(outputDir, "artifacts");
 const snapshotDir = path.join(outputDir, "snapshots");
 const reportDir = path.join(outputDir, "report");
+const ignoreHTTPSErrors = true;
 
 const htmlReporter = [
   "html",
@@ -34,7 +35,7 @@ export default defineConfig({
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    ignoreHTTPSErrors: true,
+    ignoreHTTPSErrors,
   },
 
   projects: [
@@ -49,7 +50,7 @@ export default defineConfig({
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,
-    ignoreHTTPSErrors: true,
+    ignoreHTTPSErrors,
     reuseExistingServer: !process.env.CI,
   },
 });
