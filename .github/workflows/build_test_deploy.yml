@@ -50,6 +50,7 @@ jobs:
         run: cd docker && docker compose build
 
       - uses: ./.github/workflows/composites/install_node_things/
+      - run: pnpm dlx playwright install --with-deps
       - name: Run end to end tests
         run: pnpm -F @mp/e2e start
 
