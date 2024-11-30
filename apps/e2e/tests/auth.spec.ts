@@ -1,6 +1,12 @@
 import { test } from "@playwright/test";
 import { faker } from "@faker-js/faker";
 
+test.use({
+  // It can take a while for keycloak to initialize in CI,
+  // since it has to run its initial setup so we need to increase the timeout.
+  navigationTimeout: 60_000,
+});
+
 test("can register, sign in, then sign out", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: /sign in/i }).click();
