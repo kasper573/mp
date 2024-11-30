@@ -3,9 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "test": "ENV=dev playwright test",
-    "test:dev": "pnpm run test --ui",
-    "start": "cd ../../docker && ENV=dev docker compose up"
+    "test": "playwright test",
+    "test:dev": "pnpm run test --ui"
   },
   "license": "MIT",
   "devDependencies": {

@@ -2,8 +2,10 @@ import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import dotenv from "dotenv";
 
+const dockerDir = path.resolve(__dirname, "../../docker");
+
 dotenv.config({
-  path: path.resolve(__dirname, `../../docker/.env.${process.env.ENV}`),
+  path: path.resolve(dockerDir, `.env.test`),
 });
 
 const baseURL = `https://${process.env.MP_DOMAIN}`;
@@ -29,7 +31,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: "pnpm start",
+    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --build`,
     stdout: "pipe",
     stderr: "pipe",
     url: baseURL,
