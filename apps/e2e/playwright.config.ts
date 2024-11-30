@@ -34,8 +34,8 @@ export default defineConfig({
 
   webServer: {
     command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
-    stdout: "pipe",
-    stderr: "pipe",
+    stdout: "ignore",
+    stderr: "ignore",
     url: baseURL,
     ignoreHTTPSErrors: true,
     reuseExistingServer: !process.env.CI,
