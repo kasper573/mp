@@ -22,7 +22,7 @@ jobs:
       - run: pnpm lint
       - run: pnpm format
 
-  unit-test:
+  test-unit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -49,17 +49,21 @@ jobs:
       - name: Build docker images
         run: cd docker && docker compose build
 
+      - name: Push docker images
+        if: github.ref_name == 'main'
+        run: cd docker && docker compose push
+
+  test-e2e:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
       - uses: ./.github/workflows/composites/install_node_things/
       - run: pnpm dlx playwright install --with-deps
       - name: Run end to end tests
         run: pnpm -F @mp/e2e start
 
-      - name: Push docker images
-        if: github.ref_name == 'main'
-        run: cd docker && docker compose push
-
   deploy:
-    needs: [conventions, build, unit-test]
+    needs: [conventions, build, test-unit, test-e2e]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
