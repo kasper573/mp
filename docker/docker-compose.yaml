@@ -22,6 +22,7 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     depends_on:
+      - keycloak
       - migrations
     env_file: *env_files
 
