@@ -2,7 +2,7 @@ FROM node:20.10.0-alpine3.19
 WORKDIR /workdir
 
 # Install drizzle
-RUN apk add jq
+RUN apk add jq postgresql-client
 COPY ./package.json ./
 RUN KIT_VER=$(jq -r '.devDependencies["drizzle-kit"]' package.json) && \
     ORM_VER=$(jq -r '.dependencies["drizzle-orm"]' package.json) && \
@@ -13,4 +13,16 @@ RUN KIT_VER=$(jq -r '.devDependencies["drizzle-kit"]' package.json) && \
 COPY ./drizzle.config.js .
 COPY ./drizzle/ ./drizzle/
 
-CMD ["drizzle-kit", "migrate"]
+# Create wait for postgres script
+COPY <<EOF /usr/local/bin/wait-for-postgres.sh
+#!/bin/sh
+for i in $(seq 1 20); do
+  pg_isready -d "\$MP_DATABASE_URL" && exit 0 || echo "Waiting for PostgreSQL at \$MP_DATABASE_URL..."
+  sleep 1
+done
+echo "Timed out waiting for PostgreSQL" && exit 1
+EOF
+
+RUN chmod +x /usr/local/bin/wait-for-postgres.sh
+
+CMD ["sh", "-c", "/usr/local/bin/wait-for-postgres.sh && drizzle-kit migrate"]
