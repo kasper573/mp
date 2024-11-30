@@ -1,21 +1,9 @@
 import { test } from "@playwright/test";
 import { faker } from "@faker-js/faker";
 
-test.use({
-  // It can take a while for keycloak to initialize in CI,
-  // since it has to run its initial setup so we need to increase the timeout.
-  navigationTimeout: 60_000,
-});
-
 test("can register, sign in, then sign out", async ({ page }) => {
   await page.goto("/");
   await page.getByRole("link", { name: /sign in/i }).click();
-
-  // Since keycloak takes a while to start in CI, we have to explicitly wait for it to be ready.
-  // This is a bit of a hack since we now depend on the implementation detail of the auth url,
-  // but it's way simpler than figuring out how to wait for keycloak to be finished setting up.
-  await page.waitForURL(new RegExp(`auth\\.${process.env.MP_DOMAIN}`));
-
   await page.getByRole("link", { name: /register/i }).click();
 
   const username = page.getByLabel(/username/i);
