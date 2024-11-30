@@ -30,8 +30,8 @@ export default defineConfig({
 
   webServer: {
     command: "pnpm start",
-    stdout: "ignore",
-    stderr: "ignore",
+    stdout: "pipe",
+    stderr: "pipe",
     url: baseURL,
     ignoreHTTPSErrors: true,
     reuseExistingServer: !process.env.CI,
