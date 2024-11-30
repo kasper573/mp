@@ -10,7 +10,7 @@ importers:
     devDependencies:
       '@commitlint/cli':
         specifier: 19.3.0
-        version: 19.3.0(@types/node@20.14.10)(typescript@5.6.2)
+        version: 19.3.0(@types/node@22.10.1)(typescript@5.6.2)
       '@commitlint/config-conventional':
         specifier: 19.2.2
         version: 19.2.2
@@ -123,6 +123,21 @@ importers:
       http-server:
         specifier: 14.1.1
         version: 14.1.1
+
+  apps/e2e:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@playwright/test':
+        specifier: ^1.49.0
+        version: 1.49.0
+      '@types/node':
+        specifier: ^22.10.1
+        version: 22.10.1
+      dotenv:
+        specifier: 16.4.5
+        version: 16.4.5
 
   apps/loadtest:
     dependencies:
@@ -263,7 +278,7 @@ importers:
         version: link:../tsconfig
       '@vanilla-extract/vite-plugin':
         specifier: 4.0.15
-        version: 4.0.15(@types/node@20.14.10)(babel-plugin-macros@3.1.0)(vite@5.4.10(@types/node@20.14.10))
+        version: 4.0.15(@types/node@22.10.1)(babel-plugin-macros@3.1.0)(vite@5.4.10(@types/node@22.10.1))
       esbuild-plugin-solid:
         specifier: 0.6.0
         version: 0.6.0(esbuild@0.24.0)(solid-js@1.9.1)
@@ -272,22 +287,22 @@ importers:
         version: 8.3.5(@swc/core@1.7.42)(jiti@1.21.6)(postcss@8.4.47)(tsx@4.19.2)(typescript@5.6.2)(yaml@2.4.5)
       vite:
         specifier: 5.4.10
-        version: 5.4.10(@types/node@20.14.10)
+        version: 5.4.10(@types/node@22.10.1)
       vite-plugin-checker:
         specifier: 0.6.4
-        version: 0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.6.2)(vite@5.4.10(@types/node@20.14.10))
+        version: 0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.6.2)(vite@5.4.10(@types/node@22.10.1))
       vite-plugin-handlebars:
         specifier: 2.0.0
-        version: 2.0.0(@types/node@20.14.10)
+        version: 2.0.0(@types/node@22.10.1)
       vite-plugin-solid:
         specifier: 2.10.2
-        version: 2.10.2(solid-js@1.9.1)(vite@5.4.10(@types/node@20.14.10))
+        version: 2.10.2(solid-js@1.9.1)(vite@5.4.10(@types/node@22.10.1))
       vite-plugin-top-level-await:
         specifier: 1.4.4
-        version: 1.4.4(rollup@4.24.3)(vite@5.4.10(@types/node@20.14.10))
+        version: 1.4.4(rollup@4.24.3)(vite@5.4.10(@types/node@22.10.1))
       vite-plugin-wasm:
         specifier: ^3.3.0
-        version: 3.3.0(vite@5.4.10(@types/node@20.14.10))
+        version: 3.3.0(vite@5.4.10(@types/node@22.10.1))
 
   packages/data:
     dependencies:
@@ -448,10 +463,10 @@ importers:
         version: 2.2.9-alpha.2
       '@automerge/automerge-repo':
         specifier: 2.0.0-alpha.14
-        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)
       '@automerge/automerge-repo-network-websocket':
         specifier: 2.0.0-alpha.14
-        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+        version: 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)
       '@mp/state':
         specifier: workspace:*
         version: link:../state
@@ -492,7 +507,7 @@ importers:
         version: 2.0.3
       vitest:
         specifier: 2.0.3
-        version: 2.0.3(@types/node@20.14.10)(jsdom@23.2.0)
+        version: 2.0.3(@types/node@22.10.1)(jsdom@23.2.0)
 
   packages/tiled-renderer:
     dependencies:
@@ -1667,6 +1682,11 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
+  '@playwright/test@1.49.0':
+    resolution: {integrity: sha512-DMulbwQURa8rNIQrf94+jPJQ4FmOVdpE5ZppRNvWVjvhC+6sOeo28r8MgIpQRYouXRtt/FCCXU7zn20jnHR4Qw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   '@rollup/plugin-virtual@3.0.2':
     resolution: {integrity: sha512-10monEYsBp3scM4/ND4LNH5Rxvh3e/cVeL3jWTgZ2SrQ+BmUoQcopVQvnaMcOnykb1VkxUFuDAN+0FnpTFRy2A==}
     engines: {node: '>=14.0.0'}
@@ -1940,11 +1960,11 @@ packages:
   '@types/mime@1.3.5':
     resolution: {integrity: sha512-/pyBZWSLD2n0dcHE3hq8s8ZvcETHtEuF+3E7XVt0Ig2nvsVQXdghHVcEkIWjy9A0wKfTn97a/PSDYohKIlnP/w==}
 
-  '@types/node@20.14.10':
-    resolution: {integrity: sha512-MdiXf+nDuMvY0gJKxyfZ7/6UFsETO7mGKF54MVD/ekJS6HdFtpZFBgrh6Pseu64XTb2MLyFPlbW6hj8HYRQNOQ==}
-
   '@types/node@20.8.10':
     resolution: {integrity: sha512-TlgT8JntpcbmKUFzjhsyhGfP2fsiz1Mv56im6enJ905xG1DAYesxJaeSbGqQmAw8OWPdhyJGhGSQGKRNJ45u9w==}
+
+  '@types/node@22.10.1':
+    resolution: {integrity: sha512-qKgsUwfHZV2WCWLAnVP1JqnpE6Im6h3Y0+fYgMTasNQ7V++CBX5OT1as0g0f+OyubbFqhf6XVNIsmN4IIhEgGQ==}
 
   '@types/normalize-package-data@2.4.4':
     resolution: {integrity: sha512-37i+OaWTh9qeK4LSHPsyRC7NahnGotNuZvjLSgcPzblpHB3rrCJxAOgI5gCdKm7coonsaX1Of0ILiTcnZjbfxA==}
@@ -3034,6 +3054,11 @@ packages:
     resolution: {integrity: sha512-PmDi3uwK5nFuXh7XDTlVnS17xJS7vW36is2+w3xcv8SVxiB4NyATf4ctkVY5bkSjX0Y4nbvZCq1/EjtEyr9ktw==}
     engines: {node: '>=14.14'}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -3844,6 +3869,16 @@ packages:
   pkg-types@1.2.0:
     resolution: {integrity: sha512-+ifYuSSqOQ8CqP4MbZA5hDpb97n3E8SVWdJe+Wms9kj745lmd3b7EZJiqvmLwAlmRfjrI7Hi5z3kdBJ93lFNPA==}
 
+  playwright-core@1.49.0:
+    resolution: {integrity: sha512-R+3KKTQF3npy5GTiKH/T+kdhoJfJojjHESR1YEWhYuEKRVfVaxH3+4+GvXE5xyCngCxhxnykk0Vlah9v8fs3jA==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.49.0:
+    resolution: {integrity: sha512-eKpmys0UFDnfNb3vfsf8Vx2LEOtflgRebl0Im2eQQnYMA4Aqd+Zw8bEOB+7ZKvN76901mRnqdsiOGKxzVTbi7A==}
+    engines: {node: '>=18'}
+    hasBin: true
+
   pluralize@8.0.0:
     resolution: {integrity: sha512-Nc3IT5yHzflTfbjgqWcCPpo7DaKy4FnpB0l/zCAW0Tc7jxAiuqSxHasntB3D7887LSrA93kDJ9IXovxJYxyLCA==}
     engines: {node: '>=4'}
@@ -4470,6 +4505,9 @@ packages:
   undici-types@5.26.5:
     resolution: {integrity: sha512-JlCMO+ehdEIKqlFxk6IfVoAUVmgz7cU7zD/h9XZ0qzeosSHmUJVOzSQvvYSYWXkFXC+IfLKSIffhv0sVZup6pA==}
 
+  undici-types@6.20.0:
+    resolution: {integrity: sha512-Ny6QZ2Nju20vw1SRHe3d9jVu6gJ+4e3+MMpqu7pqE5HT6WsTSlce++GQmK5UXS8mzV8DSYHrQH+Xrf2jVcuKNg==}
+
   unicorn-magic@0.1.0:
     resolution: {integrity: sha512-lRfVq8fE8gz6QMBuDM6a+LO3IAzTi05H6gCVaUpir2E1Rwpo4ZUog45KpNXKC/Mn3Yb9UDuHumeFTo9iV/D9FQ==}
     engines: {node: '>=18'}
@@ -4820,9 +4858,9 @@ snapshots:
       is-potential-custom-element-name: 1.0.1
     optional: true
 
-  '@automerge/automerge-repo-network-websocket@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
+  '@automerge/automerge-repo-network-websocket@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)':
     dependencies:
-      '@automerge/automerge-repo': 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+      '@automerge/automerge-repo': 2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)
       cbor-x: 1.6.0
       debug: 4.3.7
       eventemitter3: 5.0.1
@@ -4837,7 +4875,7 @@ snapshots:
       - typescript
       - utf-8-validate
 
-  '@automerge/automerge-repo@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)':
+  '@automerge/automerge-repo@2.0.0-alpha.14(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)':
     dependencies:
       '@automerge/automerge': 2.2.8
       bs58check: 3.0.1
@@ -4846,7 +4884,7 @@ snapshots:
       eventemitter3: 5.0.1
       fast-sha256: 1.3.0
       tiny-typed-emitter: 2.1.0
-      ts-node: 10.9.2(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2)
+      ts-node: 10.9.2(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2)
       uuid: 9.0.1
       xstate: 5.18.2
     transitivePeerDependencies:
@@ -5171,11 +5209,11 @@ snapshots:
   '@cbor-extract/cbor-extract-win32-x64@2.2.0':
     optional: true
 
-  '@commitlint/cli@19.3.0(@types/node@20.14.10)(typescript@5.6.2)':
+  '@commitlint/cli@19.3.0(@types/node@22.10.1)(typescript@5.6.2)':
     dependencies:
       '@commitlint/format': 19.3.0
       '@commitlint/lint': 19.2.2
-      '@commitlint/load': 19.2.0(@types/node@20.14.10)(typescript@5.6.2)
+      '@commitlint/load': 19.2.0(@types/node@22.10.1)(typescript@5.6.2)
       '@commitlint/read': 19.2.1
       '@commitlint/types': 19.0.3
       execa: 8.0.1
@@ -5222,7 +5260,7 @@ snapshots:
       '@commitlint/rules': 19.0.3
       '@commitlint/types': 19.0.3
 
-  '@commitlint/load@19.2.0(@types/node@20.14.10)(typescript@5.6.2)':
+  '@commitlint/load@19.2.0(@types/node@22.10.1)(typescript@5.6.2)':
     dependencies:
       '@commitlint/config-validator': 19.0.3
       '@commitlint/execute-rule': 19.0.0
@@ -5230,7 +5268,7 @@ snapshots:
       '@commitlint/types': 19.0.3
       chalk: 5.3.0
       cosmiconfig: 9.0.0(typescript@5.6.2)
-      cosmiconfig-typescript-loader: 5.0.0(@types/node@20.14.10)(cosmiconfig@9.0.0(typescript@5.6.2))(typescript@5.6.2)
+      cosmiconfig-typescript-loader: 5.0.0(@types/node@22.10.1)(cosmiconfig@9.0.0(typescript@5.6.2))(typescript@5.6.2)
       lodash.isplainobject: 4.0.6
       lodash.merge: 4.6.2
       lodash.uniq: 4.5.0
@@ -5737,6 +5775,10 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
+  '@playwright/test@1.49.0':
+    dependencies:
+      playwright: 1.49.0
+
   '@rollup/plugin-virtual@3.0.2(rollup@4.24.3)':
     optionalDependencies:
       rollup: 4.24.3
@@ -5899,19 +5941,19 @@ snapshots:
   '@types/body-parser@1.19.5':
     dependencies:
       '@types/connect': 3.4.38
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/connect@3.4.38':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/conventional-commits-parser@5.0.0':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/cors@2.8.17':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/css-font-loading-module@0.0.12': {}
 
@@ -5932,7 +5974,7 @@ snapshots:
 
   '@types/express-serve-static-core@4.19.5':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       '@types/qs': 6.9.15
       '@types/range-parser': 1.2.7
       '@types/send': 0.17.4
@@ -5952,17 +5994,17 @@ snapshots:
 
   '@types/jsonwebtoken@9.0.7':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/mime@1.3.5': {}
-
-  '@types/node@20.14.10':
-    dependencies:
-      undici-types: 5.26.5
 
   '@types/node@20.8.10':
     dependencies:
       undici-types: 5.26.5
+
+  '@types/node@22.10.1':
+    dependencies:
+      undici-types: 6.20.0
 
   '@types/normalize-package-data@2.4.4': {}
 
@@ -5987,17 +6029,17 @@ snapshots:
   '@types/send@0.17.4':
     dependencies:
       '@types/mime': 1.3.5
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/serve-static@1.15.7':
     dependencies:
       '@types/http-errors': 2.0.4
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       '@types/send': 0.17.4
 
   '@types/ws@8.5.12':
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -6126,7 +6168,7 @@ snapshots:
     transitivePeerDependencies:
       - babel-plugin-macros
 
-  '@vanilla-extract/integration@7.1.10(@types/node@20.14.10)(babel-plugin-macros@3.1.0)':
+  '@vanilla-extract/integration@7.1.10(@types/node@22.10.1)(babel-plugin-macros@3.1.0)':
     dependencies:
       '@babel/core': 7.25.2
       '@babel/plugin-syntax-typescript': 7.25.4(@babel/core@7.25.2)
@@ -6138,8 +6180,8 @@ snapshots:
       find-up: 5.0.0
       javascript-stringify: 2.1.0
       mlly: 1.7.1
-      vite: 5.4.10(@types/node@20.14.10)
-      vite-node: 1.6.0(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
+      vite-node: 1.6.0(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros
@@ -6162,10 +6204,10 @@ snapshots:
     dependencies:
       '@vanilla-extract/css': 1.15.5(babel-plugin-macros@3.1.0)
 
-  '@vanilla-extract/vite-plugin@4.0.15(@types/node@20.14.10)(babel-plugin-macros@3.1.0)(vite@5.4.10(@types/node@20.14.10))':
+  '@vanilla-extract/vite-plugin@4.0.15(@types/node@22.10.1)(babel-plugin-macros@3.1.0)(vite@5.4.10(@types/node@22.10.1))':
     dependencies:
-      '@vanilla-extract/integration': 7.1.10(@types/node@20.14.10)(babel-plugin-macros@3.1.0)
-      vite: 5.4.10(@types/node@20.14.10)
+      '@vanilla-extract/integration': 7.1.10(@types/node@22.10.1)(babel-plugin-macros@3.1.0)
+      vite: 5.4.10(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@types/node'
       - babel-plugin-macros
@@ -6616,9 +6658,9 @@ snapshots:
 
   corser@2.0.1: {}
 
-  cosmiconfig-typescript-loader@5.0.0(@types/node@20.14.10)(cosmiconfig@9.0.0(typescript@5.6.2))(typescript@5.6.2):
+  cosmiconfig-typescript-loader@5.0.0(@types/node@22.10.1)(cosmiconfig@9.0.0(typescript@5.6.2))(typescript@5.6.2):
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       cosmiconfig: 9.0.0(typescript@5.6.2)
       jiti: 1.21.6
       typescript: 5.6.2
@@ -7195,7 +7237,7 @@ snapshots:
 
   eval@0.1.8:
     dependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       require-like: 0.1.2
 
   eventemitter3@4.0.7: {}
@@ -7346,6 +7388,9 @@ snapshots:
       graceful-fs: 4.2.11
       jsonfile: 6.1.0
       universalify: 2.0.1
+
+  fsevents@2.3.2:
+    optional: true
 
   fsevents@2.3.3:
     optional: true
@@ -8102,6 +8147,14 @@ snapshots:
       mlly: 1.7.1
       pathe: 1.1.2
 
+  playwright-core@1.49.0: {}
+
+  playwright@1.49.0:
+    dependencies:
+      playwright-core: 1.49.0
+    optionalDependencies:
+      fsevents: 2.3.2
+
   pluralize@8.0.0: {}
 
   portfinder@1.0.32:
@@ -8588,14 +8641,14 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  ts-node@10.9.2(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@20.14.10)(typescript@5.6.2):
+  ts-node@10.9.2(@swc/core@1.7.42)(@swc/wasm@1.7.42)(@types/node@22.10.1)(typescript@5.6.2):
     dependencies:
       '@cspotcode/source-map-support': 0.8.1
       '@tsconfig/node10': 1.0.11
       '@tsconfig/node12': 1.0.11
       '@tsconfig/node14': 1.0.3
       '@tsconfig/node16': 1.0.4
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       acorn: 8.12.1
       acorn-walk: 8.3.4
       arg: 4.1.3
@@ -8756,6 +8809,8 @@ snapshots:
 
   undici-types@5.26.5: {}
 
+  undici-types@6.20.0: {}
+
   unicorn-magic@0.1.0: {}
 
   union@0.5.0:
@@ -8806,13 +8861,13 @@ snapshots:
 
   vary@1.1.2: {}
 
-  vite-node@1.6.0(@types/node@20.14.10):
+  vite-node@1.6.0(@types/node@22.10.1):
     dependencies:
       cac: 6.7.14
       debug: 4.3.7
       pathe: 1.1.2
       picocolors: 1.1.1
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -8824,13 +8879,13 @@ snapshots:
       - supports-color
       - terser
 
-  vite-node@2.0.3(@types/node@20.14.10):
+  vite-node@2.0.3(@types/node@22.10.1):
     dependencies:
       cac: 6.7.14
       debug: 4.3.5
       pathe: 1.1.2
       tinyrainbow: 1.2.0
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -8842,7 +8897,7 @@ snapshots:
       - supports-color
       - terser
 
-  vite-plugin-checker@0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.6.2)(vite@5.4.10(@types/node@20.14.10)):
+  vite-plugin-checker@0.6.4(eslint@9.7.0)(optionator@0.9.4)(typescript@5.6.2)(vite@5.4.10(@types/node@22.10.1)):
     dependencies:
       '@babel/code-frame': 7.24.7
       ansi-escapes: 4.3.2
@@ -8855,7 +8910,7 @@ snapshots:
       semver: 7.6.2
       strip-ansi: 6.0.1
       tiny-invariant: 1.3.3
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
       vscode-languageclient: 7.0.0
       vscode-languageserver: 7.0.0
       vscode-languageserver-textdocument: 1.0.11
@@ -8865,10 +8920,10 @@ snapshots:
       optionator: 0.9.4
       typescript: 5.6.2
 
-  vite-plugin-handlebars@2.0.0(@types/node@20.14.10):
+  vite-plugin-handlebars@2.0.0(@types/node@22.10.1):
     dependencies:
       handlebars: 4.7.8
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@types/node'
       - less
@@ -8879,7 +8934,7 @@ snapshots:
       - sugarss
       - terser
 
-  vite-plugin-solid@2.10.2(solid-js@1.9.1)(vite@5.4.10(@types/node@20.14.10)):
+  vite-plugin-solid@2.10.2(solid-js@1.9.1)(vite@5.4.10(@types/node@22.10.1)):
     dependencies:
       '@babel/core': 7.25.2
       '@types/babel__core': 7.20.5
@@ -8887,39 +8942,39 @@ snapshots:
       merge-anything: 5.1.7
       solid-js: 1.9.1
       solid-refresh: 0.6.3(solid-js@1.9.1)
-      vite: 5.4.10(@types/node@20.14.10)
-      vitefu: 0.2.5(vite@5.4.10(@types/node@20.14.10))
+      vite: 5.4.10(@types/node@22.10.1)
+      vitefu: 0.2.5(vite@5.4.10(@types/node@22.10.1))
     transitivePeerDependencies:
       - supports-color
 
-  vite-plugin-top-level-await@1.4.4(rollup@4.24.3)(vite@5.4.10(@types/node@20.14.10)):
+  vite-plugin-top-level-await@1.4.4(rollup@4.24.3)(vite@5.4.10(@types/node@22.10.1)):
     dependencies:
       '@rollup/plugin-virtual': 3.0.2(rollup@4.24.3)
       '@swc/core': 1.7.42
       uuid: 10.0.0
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
     transitivePeerDependencies:
       - '@swc/helpers'
       - rollup
 
-  vite-plugin-wasm@3.3.0(vite@5.4.10(@types/node@20.14.10)):
+  vite-plugin-wasm@3.3.0(vite@5.4.10(@types/node@22.10.1)):
     dependencies:
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
 
-  vite@5.4.10(@types/node@20.14.10):
+  vite@5.4.10(@types/node@22.10.1):
     dependencies:
       esbuild: 0.21.5
       postcss: 8.4.47
       rollup: 4.24.3
     optionalDependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       fsevents: 2.3.3
 
-  vitefu@0.2.5(vite@5.4.10(@types/node@20.14.10)):
+  vitefu@0.2.5(vite@5.4.10(@types/node@22.10.1)):
     optionalDependencies:
-      vite: 5.4.10(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
 
-  vitest@2.0.3(@types/node@20.14.10)(jsdom@23.2.0):
+  vitest@2.0.3(@types/node@22.10.1)(jsdom@23.2.0):
     dependencies:
       '@ampproject/remapping': 2.3.0
       '@vitest/expect': 2.0.3
@@ -8937,11 +8992,11 @@ snapshots:
       tinybench: 2.9.0
       tinypool: 1.0.0
       tinyrainbow: 1.2.0
-      vite: 5.4.10(@types/node@20.14.10)
-      vite-node: 2.0.3(@types/node@20.14.10)
+      vite: 5.4.10(@types/node@22.10.1)
+      vite-node: 2.0.3(@types/node@22.10.1)
       why-is-node-running: 2.3.0
     optionalDependencies:
-      '@types/node': 20.14.10
+      '@types/node': 22.10.1
       jsdom: 23.2.0
     transitivePeerDependencies:
       - less

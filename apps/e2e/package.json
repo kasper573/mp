@@ -1,0 +1,17 @@
+{
+  "name": "@mp/e2e",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "test": "ENV=dev playwright test",
+    "test:dev": "pnpm run test --ui",
+    "start": "cd ../../docker && ENV=dev docker compose up"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.1",
+    "@mp/tsconfig": "workspace:*",
+    "dotenv": "16.4.5"
+  }
+}
