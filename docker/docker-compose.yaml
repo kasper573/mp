@@ -22,8 +22,10 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     depends_on:
-      - keycloak
-      - migrations
+      migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
     env_file: *env_files
 
   migrations:
@@ -32,7 +34,8 @@ services:
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
     env_file: *env_files
 
   keycloak:
@@ -44,6 +47,20 @@ services:
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import
     env_file: *env_files
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # the keycloak image itself is so bare bones for security reasons that it doesn't have curl,
+  # so we use a separate container to run healthchecks on keycloak externally.
+  keycloak-healthcheck:
+    image: curlimages/curl
+    command: ["sh", "-c", "sleep infinity"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://keycloak:9000/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 9
 
   postgres:
     image: postgres:16.4
@@ -51,6 +68,11 @@ services:
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     env_file: *env_files
+    healthcheck:
+      test: ["CMD", "pg_isready"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:7.4.1
