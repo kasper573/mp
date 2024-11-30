@@ -6,6 +6,7 @@ const dockerDir = path.resolve(__dirname, "../../docker");
 
 dotenv.config({
   path: path.resolve(dockerDir, `.env.test`),
+  override: true,
 });
 
 const baseURL = `https://${process.env.MP_DOMAIN}`;
