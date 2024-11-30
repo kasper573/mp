@@ -28,9 +28,13 @@ export default function AppBar() {
         </Show>
 
         {auth.isSignedIn() ? (
-          <Button onClick={() => void auth.signOut()}>Sign out</Button>
+          <Button role="link" onClick={() => void auth.signOut()}>
+            Sign out
+          </Button>
         ) : (
-          <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>
+          <Button role="link" onClick={() => void auth.redirectToSignIn()}>
+            Sign in
+          </Button>
         )}
       </div>
     </nav>

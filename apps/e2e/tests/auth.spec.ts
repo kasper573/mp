@@ -3,7 +3,7 @@ import { faker } from "@faker-js/faker";
 
 test("can register, sign in, then sign out", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: /sign in/i }).click();
+  await page.getByRole("link", { name: /sign in/i }).click();
   await page.getByRole("link", { name: /register/i }).click();
 
   const username = page.getByLabel(/username/i);
@@ -34,6 +34,6 @@ test("can register, sign in, then sign out", async ({ page }) => {
   const register = page.getByRole("button", { name: /register/i });
   await register.click();
 
-  await page.getByRole("button", { name: /sign out/i }).click();
+  await page.getByRole("link", { name: /sign out/i }).click();
   await page.getByRole("heading", { name: /you are logged out/i }).click();
 });
