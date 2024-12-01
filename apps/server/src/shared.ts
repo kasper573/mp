@@ -3,5 +3,3 @@
 export const clientEnvGlobalVarName = "__MP_ENV__";
 export const tokenHeaderName = "token";
 export { default as transformer } from "superjson";
-export type { ServerOptions } from "./schemas/serverOptions";
-export { type ClientEnv, clientEnvSchema } from "./schemas/clientEnv";

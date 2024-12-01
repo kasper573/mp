@@ -30,9 +30,10 @@ import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
-import { clientEnvSchema, tokenHeaderName } from "./shared";
+import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
-import { serveClientIndexWithEnv } from "./clientEnvMiddleware";
+import { clientMiddleware } from "./clientMiddleware";
+import { clientEnvSchema } from "./package";
 
 const logger = new Logger(console);
 
@@ -174,15 +175,9 @@ webServer.use(
 );
 
 if (opt.clientDir !== undefined) {
-  const indexServer = serveClientIndexWithEnv(
-    path.resolve(opt.clientDir, "index.html"),
-    clientEnvResult.value,
+  webServer.use(
+    clientMiddleware(opt.clientDir, clientEnvResult.value, expressStaticConfig),
   );
-  webServer
-    .use("/", indexServer)
-    .use("/index.html", indexServer)
-    .use("/", express.static(opt.clientDir, expressStaticConfig))
-    .get("*", indexServer);
 }
 
 httpServer.listen(opt.port, opt.hostname, () => {
