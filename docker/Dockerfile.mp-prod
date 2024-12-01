@@ -20,7 +20,6 @@ ARG TURBO_TEAM=
 ENV TURBO_TOKEN=$TURBO_TOKEN
 ENV TURBO_TEAM=$TURBO_TEAM
 ENV NODE_ENV=production
-ENV MP_CLIENT_URI_TO_SERVER=""
 RUN pnpm build 
 RUN pnpm deploy --filter=server --prod /usr/pnpm-deploy/server
 
@@ -31,7 +30,7 @@ COPY --from=builder /workdir/apps/server/dist /workdir/server
 COPY --from=builder /workdir/apps/client/dist /workdir/client
 WORKDIR /workdir/server
 
-ENV MP_CLIENT_DIR=/workdir/client
-ENV MP_PUBLIC_DIR=/workdir/public
+ENV MP_SERVER_CLIENT_DIR=/workdir/client
+ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 
 CMD [ "pnpm", "start" ]

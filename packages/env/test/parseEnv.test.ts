@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { boolean, number, object, parse, string } from "valibot";
-import { parseEnv } from "../src";
+import { parseEnv } from "../src/parseEnv";
 import {
   booleanString,
   boolish,
@@ -21,20 +21,22 @@ it("can parse nesting convention", () => {
   });
 
   const env = {
-    MP_FOO__BAR__BAZ: 42,
-    MP_FOO__BAR_HELLO: "cool",
-    MP_ROOT: true,
+    FOO__BAR__BAZ: 42,
+    FOO__BAR_HELLO: "cool",
+    ROOT: true,
   };
 
   const result = parseEnv(schema, env);
   expect(result).toEqual({
-    foo: {
-      bar: {
-        baz: 42,
+    value: {
+      foo: {
+        bar: {
+          baz: 42,
+        },
+        barHello: "cool",
       },
-      barHello: "cool",
+      root: true,
     },
-    root: true,
   });
 });
 

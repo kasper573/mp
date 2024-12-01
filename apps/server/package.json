@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/env": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",

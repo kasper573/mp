@@ -6,6 +6,6 @@ export default {
   schema: "./src/modules/*/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.MP_DATABASE_URL,
+    url: process.env.MP_SERVER_DATABASE_URL,
   },
 };

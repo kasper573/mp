@@ -1,7 +1,7 @@
-grafana.{$MP_DOMAIN} {
+grafana.{$MP_SERVER_DOMAIN} {
     reverse_proxy http://grafana:3000
 }
 
-auth.{$MP_DOMAIN} {
+auth.{$MP_SERVER_DOMAIN} {
     reverse_proxy keycloak:8080
 }

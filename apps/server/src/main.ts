@@ -19,22 +19,36 @@ import {
   MetricsHistogram,
   MetricsRegistry,
 } from "@mp/metrics";
+import { parseEnv } from "@mp/env";
 import type { WorldState } from "./modules/world/schema";
 import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import { readCliOptions, type CliOptions } from "./cli";
+import type { ServerOptions } from "./schemas/serverOptions";
+import { serverOptionsSchema } from "./schemas/serverOptions";
 import { createDBClient } from "./db/client";
 import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
-import { tokenHeaderName } from "./shared";
-import { createClientEnvMiddleware } from "./clientEnv";
-import { trpcEndpointPath } from "./shared";
+import { clientEnvSchema, tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
+import { serveClientIndexWithEnv } from "./clientEnvMiddleware";
 
-const opt = readCliOptions();
 const logger = new Logger(console);
+
+const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+if (optResult.isErr()) {
+  logger.error("Server options invalid or missing:\n", optResult.error);
+  process.exit(1);
+}
+
+const clientEnvResult = parseEnv(clientEnvSchema, process.env, "MP_CLIENT_");
+if (clientEnvResult.isErr()) {
+  logger.error("Client env invalid or missing:\n", clientEnvResult.error);
+  process.exit(1);
+}
+
+const opt = optResult.value;
 logger.info(serverTextHeader(opt));
 
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
@@ -79,12 +93,7 @@ const tickDurationMetric = new MetricsHistogram({
   buckets: tickBuckets,
 });
 
-const auth = createAuthServer({
-  audience: opt.authAudience,
-  issuer: opt.authIssuer,
-  jwksUri: opt.authJwksUri,
-  algorithms: opt.authJwtAlgorithms,
-});
+const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl);
 const defaultAreaId = [...areas.value.keys()][0];
 const initialWorldState = await loadWorldState(db);
@@ -102,7 +111,6 @@ const expressStaticConfig = {
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use(expressLogger)
-  .use(createClientEnvMiddleware(opt))
   .use(createMetricsScrapeMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
@@ -154,7 +162,7 @@ const apiRouter = createRootRouter({
 });
 
 webServer.use(
-  trpcEndpointPath,
+  opt.apiEndpointPath,
   trpcExpress.createExpressMiddleware({
     router: apiRouter,
     createContext: ({ req }) =>
@@ -166,9 +174,15 @@ webServer.use(
 );
 
 if (opt.clientDir !== undefined) {
-  const indexFile = path.resolve(opt.clientDir, "index.html");
-  webServer.use("/", express.static(opt.clientDir, expressStaticConfig));
-  webServer.get("*", (_, res) => res.sendFile(indexFile));
+  const indexServer = serveClientIndexWithEnv(
+    path.resolve(opt.clientDir, "index.html"),
+    clientEnvResult.value,
+  );
+  webServer
+    .use("/", indexServer)
+    .use("/index.html", indexServer)
+    .use("/", express.static(opt.clientDir, expressStaticConfig))
+    .get("*", indexServer);
 }
 
 httpServer.listen(opt.port, opt.hostname, () => {
@@ -253,7 +267,7 @@ function createExpressLogger(logger: Logger): express.RequestHandler {
   };
 }
 
-function serverTextHeader(options: CliOptions) {
+function serverTextHeader(options: ServerOptions) {
   return `
 ===============================
 #                             #

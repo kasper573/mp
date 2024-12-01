@@ -359,6 +359,9 @@ importers:
 
   packages/env:
     dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
       dot-prop:
         specifier: 9.0.0
         version: 9.0.0

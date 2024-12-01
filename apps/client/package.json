@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@mp/env": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/engine": "workspace:*",

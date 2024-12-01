@@ -3,7 +3,7 @@
 export type * from "./modules/world/schema";
 export type * from "./context";
 export type * from "./modules/router";
-export type * from "./clientEnv";
+export type * from "./clientEnvMiddleware";
 
 // An exception is made for the shared code between client & server
 export * from "./shared";
