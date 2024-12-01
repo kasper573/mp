@@ -9,9 +9,9 @@ env:
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   DOCKER_REGISTRY_URL: ghcr.io/${{ github.actor }}
   DOCKER_COMPOSE_ENV: prod
-  DOCKER_IMAGE_VERSION: ${{ github.run_number }}
-  BUILD_VERSION: ${{ github.run_number }}
-  MP_SERVER_DOMAIN: ${{ vars.MP_SERVER_DOMAIN }}
+  DOCKER_IMAGE_VERSION: ${{ github.sha }}
+  BUILD_VERSION: ${{ github.sha }}
+  MP_SERVER_DOMAIN: ${{ vars.MP_DOMAIN }}
 
 jobs:
   conventions:
