@@ -33,19 +33,12 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { clientMiddleware } from "./clientMiddleware";
-import { clientEnvSchema } from "./package";
 
 const logger = new Logger(console);
 
 const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 if (optResult.isErr()) {
   logger.error("Server options invalid or missing:\n", optResult.error);
-  process.exit(1);
-}
-
-const clientEnvResult = parseEnv(clientEnvSchema, process.env, "MP_CLIENT_");
-if (clientEnvResult.isErr()) {
-  logger.error("Client env invalid or missing:\n", clientEnvResult.error);
   process.exit(1);
 }
 
@@ -175,9 +168,7 @@ webServer.use(
 );
 
 if (opt.clientDir !== undefined) {
-  webServer.use(
-    clientMiddleware(opt.clientDir, clientEnvResult.value, expressStaticConfig),
-  );
+  webServer.use(clientMiddleware(opt.clientDir, expressStaticConfig));
 }
 
 httpServer.listen(opt.port, opt.hostname, () => {
