@@ -20,7 +20,6 @@ export function defineConfig({
       checker({ typescript: true }),
       ...plugins,
     ],
-    envPrefix: "MP_",
   });
 }
 

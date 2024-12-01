@@ -20,7 +20,6 @@ export default function AppBar() {
       <Link href="/spring">Spring</Link>
 
       <LinearProgress class={dock({ position: "top" })} active={isRouting()} />
-
       <div class={styles.right}>
         <Show when={versionCompatibility() === "incompatible"}>
           There is a new version available{" "}

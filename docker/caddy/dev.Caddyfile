@@ -1,13 +1,13 @@
 import base.Caddyfile
 
-prometheus.{$MP_DOMAIN} {
+prometheus.{$MP_SERVER_DOMAIN} {
     reverse_proxy http://prometheus:9090
 }
 
-{$MP_DOMAIN} {
+{$MP_SERVER_DOMAIN} {
     reverse_proxy http://mp:5173
 }
 
-api.{$MP_DOMAIN} {
+api.{$MP_SERVER_DOMAIN} {
     reverse_proxy http://mp:9999
 }
