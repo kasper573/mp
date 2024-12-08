@@ -1,7 +1,7 @@
 {
   "name": "@mp/sync-server",
   "version": "0.0.0",
-  "exports": "./smod.ts",
+  "exports": "./mod.ts",
   "imports": {
     "@automerge/automerge": "npm:@automerge/automerge@2.2.9-alpha.2",
     "@automerge/automerge-repo": "npm:@automerge/automerge-repo@2.0.0-alpha.14",
