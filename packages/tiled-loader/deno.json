@@ -1,0 +1,9 @@
+{
+  "name": "@mp/tiled-loader",
+  "version": "0.0.0",
+  "exports": "./src/index.ts",
+  "imports": {
+    "pako": "npm:pako@2.1.0",
+    "@types/pako": "npm:@types/pako@2.0.3"
+  }
+}

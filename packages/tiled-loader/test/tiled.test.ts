@@ -1,6 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
-import { expect, it } from "vitest";
+import { it } from "jsr:@std/testing/bdd";
+import { expect } from "jsr:@std/expect";
 import type { CreateTiledLoaderOptions } from "../src/loader.ts";
 import { createTiledLoader } from "../src/loader.ts";
 
