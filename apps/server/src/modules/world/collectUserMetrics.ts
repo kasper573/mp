@@ -1,13 +1,13 @@
 import type { MetricsRegistry } from "@mp/metrics";
 import { MetricsGague } from "@mp/metrics";
 import type { SyncServer } from "@mp/sync/server";
-import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldState } from "./schema";
+import type { ClientRegistry } from "./ClientRegistry.ts";
+import type { WorldState } from "./schema.ts";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  worldState: SyncServer<WorldState, unknown>,
+  worldState: SyncServer<WorldState, unknown>
 ) {
   new MetricsGague({
     name: "active_user_count",

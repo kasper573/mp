@@ -8,7 +8,7 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
-import { ParentContext } from "./context";
+import { ParentContext } from "./context.ts";
 
 export interface ApplicationProps
   extends Omit<JSX.IntrinsicElements["div"], "children" | "style"> {
@@ -48,7 +48,7 @@ export function Application(props: ApplicationProps) {
       await initPromise;
 
       return true;
-    },
+    }
   );
 
   createEffect(() => {

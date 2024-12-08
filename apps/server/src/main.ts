@@ -20,19 +20,22 @@ import {
   MetricsRegistry,
 } from "@mp/metrics";
 import { parseEnv } from "@mp/env";
-import type { WorldState } from "./modules/world/schema";
-import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
-import { type ServerContext } from "./context";
-import { loadAreas } from "./modules/area/loadAreas";
-import type { ServerOptions } from "./schemas/serverOptions";
-import { serverOptionsSchema } from "./schemas/serverOptions";
-import { createDBClient } from "./db/client";
-import { loadWorldState, persistWorldState } from "./modules/world/persistence";
-import { ClientRegistry } from "./modules/world/ClientRegistry";
-import { createRootRouter } from "./modules/router";
-import { tokenHeaderName } from "./shared";
-import { collectUserMetrics } from "./modules/world/collectUserMetrics";
-import { clientMiddleware } from "./clientMiddleware";
+import type { WorldState } from "./modules/world/schema.ts";
+import type { HttpSessionId, SyncServerConnectionMetaData } from "./context.ts";
+import { type ServerContext } from "./context.ts";
+import { loadAreas } from "./modules/area/loadAreas.ts";
+import type { ServerOptions } from "./schemas/serverOptions.ts";
+import { serverOptionsSchema } from "./schemas/serverOptions.ts";
+import { createDBClient } from "./db/client.ts";
+import {
+  loadWorldState,
+  persistWorldState,
+} from "./modules/world/persistence.ts";
+import { ClientRegistry } from "./modules/world/ClientRegistry.ts";
+import { createRootRouter } from "./modules/router.ts";
+import { tokenHeaderName } from "./shared.ts";
+import { collectUserMetrics } from "./modules/world/collectUserMetrics.ts";
+import { clientMiddleware } from "./clientMiddleware.ts";
 
 const logger = new Logger(console);
 
@@ -50,7 +53,7 @@ const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 if (areas.isErr() || areas.value.size === 0) {
   logger.error(
     "Cannot start server without areas",
-    areas.isErr() ? areas.error : "No areas found",
+    areas.isErr() ? areas.error : "No areas found"
   );
   process.exit(1);
 }
@@ -162,9 +165,9 @@ webServer.use(
     createContext: ({ req }) =>
       createServerContext(
         `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
-        String(req.headers[tokenHeaderName]) as ServerContext["authToken"],
+        String(req.headers[tokenHeaderName]) as ServerContext["authToken"]
       ),
-  }),
+  })
 );
 
 if (opt.clientDir !== undefined) {
@@ -189,11 +192,11 @@ async function persist() {
 function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
   const userId = clients.getUserId(clientId);
   const char = Object.values(state.characters).find(
-    (char) => char.userId === userId,
+    (char) => char.userId === userId
   );
   if (!char) {
     throw new Error(
-      "Could not derive world state for client: user has no associated character",
+      "Could not derive world state for client: user has no associated character"
     );
   }
 
@@ -202,7 +205,7 @@ function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
 
 function createServerContext(
   sessionId: HttpSessionId,
-  authToken: ServerContext["authToken"],
+  authToken: ServerContext["authToken"]
 ): ServerContext {
   return {
     sessionId,
@@ -217,7 +220,7 @@ function createServerContext(
 
 async function handleSyncServerConnection(
   clientId: ClientId,
-  { token }: SyncServerConnectionMetaData,
+  { token }: SyncServerConnectionMetaData
 ) {
   logger.info("Client connected", clientId);
 
@@ -226,7 +229,7 @@ async function handleSyncServerConnection(
     logger.info(
       "Could not verify client authentication token",
       clientId,
-      verifyResult.error,
+      verifyResult.error
     );
     worldState.disconnectClient(clientId);
     return;

@@ -1,5 +1,5 @@
-import type { LoaderContext } from "../context";
-import type { FilePath } from "../schema/common";
+import type { LoaderContext } from "../context.ts";
+import type { FilePath } from "../schema/common.ts";
 
 /**
  * The tiled file data contains relative file paths.
@@ -11,7 +11,7 @@ import type { FilePath } from "../schema/common";
  */
 export function reconcileFilePath(
   context: LoaderContext,
-  path: string,
+  path: string
 ): FilePath {
   return context.relativePath(path, context.basePath) as FilePath;
 }

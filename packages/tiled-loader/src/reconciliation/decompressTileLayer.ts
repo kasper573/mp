@@ -1,22 +1,22 @@
-import { localToGlobalId, readGlobalIdBuffer } from "../gid";
-import type { Chunk } from "../schema/chunk";
+import { localToGlobalId, readGlobalIdBuffer } from "../gid.ts";
+import type { Chunk } from "../schema/chunk.ts";
 import type {
   TileNumber,
   Compression,
   TiledData,
   Encoding,
-} from "../schema/common";
+} from "../schema/common.ts";
 import type {
   TileLayerTile,
   SharedLayerProperties,
   CommonTileLayerProperties,
-} from "../schema/layer";
-import type { TiledMap } from "../schema/map";
-import { decoders, decompressors } from "../transformers";
+} from "../schema/layer.ts";
+import type { TiledMap } from "../schema/map.ts";
+import { decoders, decompressors } from "../transformers.ts";
 
 export function decompressTileLayer(
   layer: CompressedTileLayer,
-  map: TiledMap,
+  map: TiledMap
 ): TileLayerTile[] {
   const { compression, encoding, data: rawData } = layer;
 
@@ -36,7 +36,7 @@ export function decompressTileLayer(
   const expectedDataSize = map.width * map.height * 4;
   if (data.length !== expectedDataSize) {
     throw new Error(
-      `Expected data length of ${expectedDataSize}, but got ${data.length}`,
+      `Expected data length of ${expectedDataSize}, but got ${data.length}`
     );
   }
 
@@ -45,8 +45,8 @@ export function decompressTileLayer(
       [...tileset.tiles.values()].map((tile) => {
         const gid = localToGlobalId(tileset.firstgid, tile.id);
         return [gid, { tile, tileset }] as const;
-      }),
-    ),
+      })
+    )
   );
 
   const tiles: TileLayerTile[] = [];
@@ -92,7 +92,7 @@ export interface CompressedTileLayer
 }
 
 export function isCompressedTileLayer(
-  layer: unknown,
+  layer: unknown
 ): layer is CompressedTileLayer {
   return (
     layer !== null &&

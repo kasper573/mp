@@ -1,4 +1,4 @@
-import type { Orientation, TileNumber } from "./common";
+import type { Orientation, TileNumber } from "./common.ts";
 
 export interface Grid {
   height: TileNumber;

@@ -1,13 +1,13 @@
-import type { LoaderContext } from "../context";
-import type { Layer, TileLayer } from "../schema/layer";
-import type { TiledMap } from "../schema/map";
-import { reconcileFilePath } from "./reconcileFilePath";
+import type { LoaderContext } from "../context.ts";
+import type { Layer, TileLayer } from "../schema/layer.ts";
+import type { TiledMap } from "../schema/map.ts";
+import { reconcileFilePath } from "./reconcileFilePath.ts";
 import {
   decompressTileLayer,
   isCompressedTileLayer,
-} from "./decompressTileLayer";
-import { reconcileObject } from "./reconcileObject";
-import { reconcileProperties } from "./reconcileProperties";
+} from "./decompressTileLayer.ts";
+import { reconcileObject } from "./reconcileObject.ts";
+import { reconcileProperties } from "./reconcileProperties.ts";
 
 /**
  * Since layers contain data that needs to be reconciled,
@@ -16,7 +16,7 @@ import { reconcileProperties } from "./reconcileProperties";
 export async function reconcileLayer(
   context: LoaderContext,
   layer: Layer,
-  map: TiledMap,
+  map: TiledMap
 ): Promise<void> {
   const promises: Promise<unknown>[] = [];
 
@@ -33,7 +33,7 @@ export async function reconcileLayer(
       break;
     case "group":
       promises.push(
-        ...layer.layers.map((child) => reconcileLayer(context, child, map)),
+        ...layer.layers.map((child) => reconcileLayer(context, child, map))
       );
       break;
     case "tilelayer": {

@@ -1,11 +1,11 @@
 import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Router } from "@solidjs/router";
-import Layout from "./ui/Layout";
-import { routes } from "./routes";
-import { createQueryClient } from "./clients/query";
-import { env } from "./env";
-import { giveAuthClientToTRPC } from "./clients/trpc";
+import Layout from "./ui/Layout.ts";
+import { routes } from "./routes.ts";
+import { createQueryClient } from "./clients/query.ts";
+import { env } from "./env.ts";
+import { giveAuthClientToTRPC } from "./clients/trpc.ts";
 
 const authClient = createAuthClient(env.auth);
 const queryClient = createQueryClient();

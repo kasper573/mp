@@ -1,10 +1,23 @@
-import type { Plugin } from "vite";
 import { clientEnvGlobalVarName, clientEnvSchema } from "@mp/server";
-import { defineConfig } from "@mp/build/vite";
 import { parseEnv } from "@mp/env";
+import type { Plugin } from "vite";
+import { defineConfig } from "vite";
+import { checker } from "vite-plugin-checker";
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
+import solid from "vite-plugin-solid";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
+import process from "node:process";
 
 export default defineConfig({
-  plugins: process.env.MP_BUNDLE_CLIENT_ENV ? [clientEnvPlugin()] : [],
+  plugins: [
+    vanillaExtractPlugin(),
+    solid(),
+    wasm(),
+    topLevelAwait(),
+    checker({ typescript: true }),
+    ...(process.env.MP_BUNDLE_CLIENT_ENV ? [clientEnvPlugin()] : []),
+  ],
 });
 
 function clientEnvPlugin(): Plugin {
@@ -17,7 +30,7 @@ function clientEnvPlugin(): Plugin {
     transformIndexHtml(html) {
       return html.replaceAll(
         "__WILL_BE_REPLACED_WITH_ENV_VARS_SCRIPT__",
-        `window["${clientEnvGlobalVarName}"] = ${JSON.stringify(res.value)};`,
+        `window["${clientEnvGlobalVarName}"] = ${JSON.stringify(res.value)};`
       );
     },
   };

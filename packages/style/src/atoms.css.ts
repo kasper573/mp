@@ -13,9 +13,9 @@ import {
   spacing,
   transform,
   typography,
-} from "./tokens";
-import type { TransitionPreset } from "./animation";
-import { cssForTransition, transitionPresets } from "./animation";
+} from "./tokens.ts";
+import type { TransitionPreset } from "./animation.ts";
+import { cssForTransition, transitionPresets } from "./animation.ts";
 
 /**
  * The generated CSS of this file will be in the same order as the properties and values are defined,
@@ -64,7 +64,7 @@ const commonTransitions = Object.fromEntries(
       `${group}.${preset}`,
       cssForTransition([propertyNames, preset]),
     ]);
-  }),
+  })
 ) as {
   [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]: string;
 };
@@ -240,5 +240,5 @@ const conditionalProperties = defineProperties({
 
 export const atoms = createSprinkles(
   unconditionalProperties,
-  conditionalProperties,
+  conditionalProperties
 );

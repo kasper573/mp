@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import path from "node:path";
 import * as express from "express";
 import { parseEnv } from "@mp/env";
-import { clientEnvGlobalVarName } from "./shared";
-import { clientEnvSchema } from "./package";
+import { clientEnvGlobalVarName } from "./shared.ts";
+import { clientEnvSchema } from "./package.ts";
 
 /**
  * Serves the prebuilt client artifacts from the given directory.
@@ -11,7 +11,7 @@ import { clientEnvSchema } from "./package";
  */
 export function clientMiddleware(
   clientDir: string,
-  staticOptions?: { maxAge?: string | number },
+  staticOptions?: { maxAge?: string | number }
 ): express.RequestHandler {
   const clientEnv = parseEnv(clientEnvSchema, process.env, "MP_CLIENT_");
   if (clientEnv.isErr()) {
@@ -20,12 +20,12 @@ export function clientMiddleware(
 
   const indexHtml = fs.readFileSync(
     path.resolve(clientDir, "index.html"),
-    "utf8",
+    "utf8"
   );
 
   const patchedHtml = indexHtml.replace(
     "__WILL_BE_REPLACED_WITH_ENV_VARS_SCRIPT__",
-    `window["${clientEnvGlobalVarName}"]=${JSON.stringify(clientEnv.value)};`,
+    `window["${clientEnvGlobalVarName}"]=${JSON.stringify(clientEnv.value)};`
   );
 
   const serveStatic = express.static(clientDir, staticOptions);

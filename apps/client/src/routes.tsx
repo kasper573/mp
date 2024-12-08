@@ -1,6 +1,6 @@
 import { type RouteDefinition } from "@solidjs/router";
 import { lazy } from "solid-js";
-import { env } from "./env";
+import { env } from "./env.ts";
 
 export const routes: RouteDefinition[] = [
   {

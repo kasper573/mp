@@ -1,13 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { boolean, number, object, parse, string } from "valibot";
-import { parseEnv } from "../src/parseEnv";
+import { parseEnv } from "../src/parseEnv.ts";
 import {
   booleanString,
   boolish,
   csv,
   numeric,
   numericString,
-} from "../src/schemas";
+} from "../src/schemas.ts";
 
 it("can parse nesting convention", () => {
   const schema = object({

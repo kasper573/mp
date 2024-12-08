@@ -1,7 +1,7 @@
 import { vec_distance } from "@mp/math";
-import { type TiledResource } from "./TiledResource";
-import type { DNode } from "./findPath";
-import { dNodeFromVector, type DGraph } from "./findPath";
+import { type TiledResource } from "./TiledResource.ts";
+import type { DNode } from "./findPath.ts";
+import { dNodeFromVector, type DGraph } from "./findPath.ts";
 
 export function dGraphFromTiled(tiled: TiledResource): DGraph {
   const graph: DGraph = {};
@@ -19,7 +19,7 @@ export function dGraphFromTiled(tiled: TiledResource): DGraph {
         }
       }
       return walkable;
-    },
+    }
   );
 
   for (const tile of walkableTileCoords) {

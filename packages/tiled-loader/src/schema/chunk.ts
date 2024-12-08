@@ -1,4 +1,4 @@
-import type { TiledData, TileNumber } from "./common";
+import type { TiledData, TileNumber } from "./common.ts";
 
 export interface Chunk {
   data: TiledData;

@@ -8,7 +8,7 @@ import { WebSocketServer } from "ws";
 import { Repo } from "@automerge/automerge-repo";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import type { PatchCallback } from "@automerge/automerge";
-import { customPeerMetaDataKey, type ClientId } from "./shared";
+import { customPeerMetaDataKey, type ClientId } from "./shared.ts";
 
 export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
@@ -21,7 +21,7 @@ export class SyncServer<State, ConnectionMetaData> {
 
   constructor(private options: SyncServerOptions<State, ConnectionMetaData>) {
     this.wssAdapter = new NodeWSServerAdapter(
-      new WebSocketServer({ server: options.httpServer }),
+      new WebSocketServer({ server: options.httpServer })
     );
 
     this.repo = new Repo({ network: [this.wssAdapter] });
@@ -36,7 +36,7 @@ export class SyncServer<State, ConnectionMetaData> {
       (state) => {
         result = mutateFn(state);
       },
-      { patchCallback: this.options.patchCallback, message },
+      { patchCallback: this.options.patchCallback, message }
     );
     return result;
   };
@@ -52,7 +52,7 @@ export class SyncServer<State, ConnectionMetaData> {
   private onConnection = ({ peerId, peerMetadata }: PeerCandidatePayload) => {
     void this.options.onConnection?.(
       peerId,
-      Reflect.get(peerMetadata, customPeerMetaDataKey) as ConnectionMetaData,
+      Reflect.get(peerMetadata, customPeerMetaDataKey) as ConnectionMetaData
     );
   };
 
@@ -68,7 +68,7 @@ export interface SyncServerOptions<State, ConnectionMetaData> {
   patchCallback?: PatchCallback<State>;
   onConnection?: (
     clientId: ClientId,
-    meta: ConnectionMetaData,
+    meta: ConnectionMetaData
   ) => void | undefined | Promise<unknown>;
   onDisconnect?: (clientId: ClientId) => void | undefined | Promise<unknown>;
 }
@@ -81,7 +81,7 @@ export type StateAccess<State> = <Result>(
   /**
    * Read or modify the state.
    */
-  stateHandler: (draft: State) => Result,
+  stateHandler: (draft: State) => Result
 ) => Result;
 
-export * from "./shared";
+export * from "./shared.ts";

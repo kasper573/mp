@@ -1,7 +1,7 @@
 import { createQuery } from "@tanstack/solid-query";
 import { createMemo } from "solid-js";
-import { trpc } from "../clients/trpc";
-import { env } from "../env";
+import { trpc } from "../clients/trpc.ts";
+import { env } from "../env.ts";
 
 export const useServerVersion = () =>
   createQuery(() => ({

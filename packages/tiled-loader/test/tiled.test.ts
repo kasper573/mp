@@ -1,8 +1,8 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { expect, it } from "vitest";
-import type { CreateTiledLoaderOptions } from "../src/loader";
-import { createTiledLoader } from "../src/loader";
+import type { CreateTiledLoaderOptions } from "../src/loader.ts";
+import { createTiledLoader } from "../src/loader.ts";
 
 const loadJson = (p: string) => fs.readFile(p, "utf8").then(JSON.parse);
 

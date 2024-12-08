@@ -3,10 +3,10 @@ import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
 import { type Result, ok, err } from "@mp/state";
 import { AreaResource } from "@mp/data";
-import { loadTiled } from "./loadTiled";
+import { loadTiled } from "./loadTiled.ts";
 
 export async function loadAreas(
-  dir: string,
+  dir: string
 ): Promise<Result<Map<AreaId, AreaResource>, unknown>> {
   try {
     const files = await fs.readdir(dir);
@@ -15,7 +15,7 @@ export async function loadAreas(
         const tmxFile = path.join(dir, file) as PathToLocalFile;
         const id = path.basename(file, path.extname(file)) as AreaId;
         return [id, new AreaResource(id, await loadTiled(tmxFile))] as const;
-      }),
+      })
     );
 
     return ok(new Map(entries));

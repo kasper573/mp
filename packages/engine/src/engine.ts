@@ -1,8 +1,8 @@
 import type { Size } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import { Camera } from "./camera";
-import { PointerForCamera } from "./pointer";
-import { Keyboard } from "./keyboard";
+import { Camera } from "./camera.ts";
+import { PointerForCamera } from "./pointer.ts";
+import { Keyboard } from "./keyboard.ts";
 
 export class Engine {
   #previousFrameTime = performance.now();
@@ -52,7 +52,7 @@ export class Engine {
   private nextFrame: FrameRequestCallback = () => {
     const thisFrameTime = performance.now();
     const timeSinceLastFrame = TimeSpan.fromMilliseconds(
-      thisFrameTime - this.#previousFrameTime,
+      thisFrameTime - this.#previousFrameTime
     );
     this.#previousFrameTime = thisFrameTime;
 
@@ -61,7 +61,7 @@ export class Engine {
     }
 
     this.#previousFrameDuration = TimeSpan.fromMilliseconds(
-      performance.now() - thisFrameTime,
+      performance.now() - thisFrameTime
     );
 
     if (this.#isRunning) {
@@ -87,5 +87,5 @@ function elementSize(element: HTMLElement): Size {
 
 export type FrameCallback = (
   deltaTime: TimeSpan,
-  previousFrameDuration: TimeSpan,
+  previousFrameDuration: TimeSpan
 ) => unknown;

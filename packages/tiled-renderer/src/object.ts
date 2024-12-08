@@ -12,7 +12,7 @@ import type {
   TiledText,
 } from "@mp/tiled-loader";
 
-export * from "./renderer";
+export * from "./renderer.ts";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {
@@ -101,7 +101,7 @@ function createTextRenderer({ text, x, y, width, rotation }: TextObject): Text {
 
 function createTextStyle(
   { bold, color, fontfamily, halign, italic, pixelsize, wrap }: TiledText,
-  width: number,
+  width: number
 ): TextStyle {
   return new TextStyle({
     fontFamily: fontfamily,

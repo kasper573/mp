@@ -11,7 +11,7 @@ import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import type { CharacterId, WorldState } from "./schema";
+import type { CharacterId, WorldState } from "./schema.ts";
 
 export interface WorldRouterDependencies {
   state: StateAccess<WorldState>;
@@ -42,7 +42,7 @@ export function createWorldRouter({
         if (area) {
           for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
             const targetArea = areas.get(
-              hit.object.properties.get("goto")?.value as AreaId,
+              hit.object.properties.get("goto")?.value as AreaId
             );
             if (targetArea) {
               char.areaId = targetArea.id;
@@ -94,7 +94,7 @@ export function createWorldRouter({
               char.path = newPath;
             }
           }
-        }),
+        })
       ),
 
     join: t.procedure
@@ -112,7 +112,7 @@ export function createWorldRouter({
             if (!area) {
               throw new Error(
                 "Could not create character, default area not found: " +
-                  defaultAreaId,
+                  defaultAreaId
               );
             }
 
@@ -131,7 +131,7 @@ export function createWorldRouter({
           }
 
           return characterId;
-        }),
+        })
       ),
   });
 }

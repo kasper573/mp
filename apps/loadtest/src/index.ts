@@ -3,7 +3,7 @@ import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
 import { transformer } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { readCliOptions } from "./cli";
+import { readCliOptions } from "./cli.ts";
 
 const logger = new Logger(console);
 const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
@@ -30,16 +30,16 @@ async function loadTestHTTP() {
           if (!res.ok) {
             throw new Error(`Error: ${res.status} ${res.statusText}`);
           }
-        }),
+        })
       );
 
       const successes = results.filter((r) => r.status === "fulfilled").length;
       const failures = results.filter((r) => r.status === "rejected").length;
 
       logger.info(
-        `HTTP test ${clientNr} done: ${successes} successes, ${failures} failures`,
+        `HTTP test ${clientNr} done: ${successes} successes, ${failures} failures`
       );
-    }),
+    })
   );
 }
 
@@ -52,17 +52,17 @@ async function loadTestRPC() {
 
       const results = await Promise.allSettled(
         range(requests).map(() =>
-          trpc.area.areaFileUrl.query("forest" as AreaId),
-        ),
+          trpc.area.areaFileUrl.query("forest" as AreaId)
+        )
       );
 
       const successes = results.filter((r) => r.status === "fulfilled").length;
       const failures = results.filter((r) => r.status === "rejected").length;
 
       logger.info(
-        `RPC test ${clientNr} done: ${successes} successes, ${failures} failures`,
+        `RPC test ${clientNr} done: ${successes} successes, ${failures} failures`
       );
-    }),
+    })
   );
 }
 

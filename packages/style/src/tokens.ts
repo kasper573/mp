@@ -1,5 +1,5 @@
 import type { CSSProperties } from "@vanilla-extract/css";
-import { flattened } from "./flattened";
+import { flattened } from "./flattened.ts";
 import { themeContract } from "./theme.css";
 import { inter } from "./fonts/inter/inter.css";
 

@@ -1,5 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
-import type { AuthToken, UserId, UserIdentity } from "./shared";
+import type { AuthToken, UserId, UserIdentity } from "./shared.ts";
 
 export interface AuthServerOptions {
   jwksUri: string;
@@ -58,7 +58,7 @@ type VerifyTokenResult =
   | { ok: true; user: UserIdentity }
   | { ok: false; error: string };
 
-export * from "./shared";
+export * from "./shared.ts";
 
 // Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [

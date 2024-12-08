@@ -1,5 +1,5 @@
-import type { LocalTileId } from "./common";
-import type { Property } from "./property";
+import type { LocalTileId } from "./common.ts";
+import type { Property } from "./property.ts";
 
 export interface Terrain {
   name: string;

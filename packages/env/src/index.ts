@@ -1,3 +1,3 @@
 export * from "valibot";
-export * from "./schemas";
-export * from "./parseEnv";
+export * from "./schemas.ts";
+export * from "./parseEnv.ts";

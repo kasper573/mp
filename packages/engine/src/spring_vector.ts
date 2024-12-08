@@ -4,8 +4,8 @@ import type { TimeSpan } from "@mp/time";
 import type { Computed } from "@mp/state";
 import { batch } from "@mp/state";
 import { computed } from "@mp/state";
-import type { SpringLike, SpringOptions } from "./spring";
-import { Spring } from "./spring";
+import type { SpringLike, SpringOptions } from "./spring.ts";
+import { Spring } from "./spring.ts";
 
 export class VectorSpring implements SpringLike<Vector> {
   private xSpring: Spring;
@@ -14,12 +14,12 @@ export class VectorSpring implements SpringLike<Vector> {
   constructor(
     getTargetValue: () => Vector,
     options: () => SpringOptions,
-    init?: Vector,
+    init?: Vector
   ) {
     this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
     this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);
     this.value = computed(() =>
-      vec(this.xSpring.value(), this.ySpring.value()),
+      vec(this.xSpring.value(), this.ySpring.value())
     );
   }
 

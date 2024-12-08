@@ -7,7 +7,7 @@ import { Application } from "@mp/solid-pixi";
 import { createGameClient, GameClientContext } from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import * as styles from "./GamePage.css";
-import { AreaScene } from "./AreaScene";
+import { AreaScene } from "./AreaScene.ts";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);

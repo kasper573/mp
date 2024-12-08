@@ -1,7 +1,7 @@
 import { err, ok, type Result } from "@mp/state";
-import type { LoaderContext } from "./context";
-import type { TiledMap } from "./schema/map";
-import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";
+import type { LoaderContext } from "./context.ts";
+import type { TiledMap } from "./schema/map.ts";
+import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap.ts";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 

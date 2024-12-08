@@ -1,8 +1,8 @@
 import type { IRateLimiterOptions } from "rate-limiter-flexible";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { TRPCError } from "@trpc/server";
-import { t } from "../trpc";
-import type { ServerContext } from "../context";
+import { t } from "../trpc.ts";
+import type { ServerContext } from "../context.ts";
 
 export function rateLimit(options: IRateLimiterOptions) {
   const limiter = new RateLimiterMemory(options);
@@ -15,7 +15,7 @@ export function rateLimit(options: IRateLimiterOptions) {
 
 export async function consumeLimiterWithContext(
   limiter: RateLimiterMemory,
-  { sessionId }: ServerContext,
+  { sessionId }: ServerContext
 ) {
   if (sessionId) {
     try {

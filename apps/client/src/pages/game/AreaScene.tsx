@@ -12,9 +12,9 @@ import { getTilePosition } from "../../state/getTilePosition";
 import {
   AutoPositionedCharacterActor,
   ManuallyPositionedCharacterActor,
-} from "./CharacterActor";
-import { TileHighlight } from "./TileHighlight";
-import { AreaDebugUI } from "./AreaDebugUI";
+} from "./CharacterActor.ts";
+import { TileHighlight } from "./TileHighlight.ts";
+import { AreaDebugUI } from "./AreaDebugUI.ts";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
@@ -36,7 +36,7 @@ export function AreaScene(props: { area: AreaResource }) {
       damping: 40,
       mass: 1,
       precision: 0.1,
-    })),
+    }))
   );
 
   createEffect(() => {

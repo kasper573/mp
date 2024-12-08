@@ -16,9 +16,9 @@ import {
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth/client";
-import { env } from "../env";
-import { dedupe, throttle } from "../state/functionComposition";
-import { trpc } from "./trpc";
+import { env } from "../env.ts";
+import { dedupe, throttle } from "../state/functionComposition.ts";
+import { trpc } from "./trpc.ts";
 
 export function createGameClient(authClient: AuthClient): GameClient {
   const worldState = createWorldStateSignal(authClient);
@@ -33,9 +33,9 @@ export function createGameClient(authClient: AuthClient): GameClient {
       // eslint-disable-next-line solid/reactivity
       ({ x, y }: Vector) =>
         trpc.world.move.mutate({ characterId: characterId()!, x, y }),
-      100,
+      100
     ),
-    vec_equals,
+    vec_equals
   );
 
   return {
@@ -58,7 +58,7 @@ function createWorldStateSignal(authClient: AuthClient) {
 
     return new SyncClient<WorldState, SyncServerConnectionMetaData>(
       env.wsUrl,
-      () => ({ token: user.token }),
+      () => ({ token: user.token })
     );
   });
 
@@ -85,7 +85,7 @@ export const GameClientContext = createContext<GameClient>(
     get() {
       throw new Error("GameClientContext not provided");
     },
-  }),
+  })
 );
 
 export interface GameClient {

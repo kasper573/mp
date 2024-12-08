@@ -1,10 +1,10 @@
 import type { UrlFactory } from "@mp/data";
-import { t } from "../trpc";
-import { createAreaRouter } from "./area/router";
-import type { SystemRouterDependencies } from "./system/router";
-import { createSystemRouter } from "./system/router";
-import type { WorldRouterDependencies } from "./world/router";
-import { createWorldRouter } from "./world/router";
+import { t } from "../trpc.ts";
+import { createAreaRouter } from "./area/router.ts";
+import type { SystemRouterDependencies } from "./system/router.ts";
+import { createSystemRouter } from "./system/router.ts";
+import type { WorldRouterDependencies } from "./world/router.ts";
+import { createWorldRouter } from "./world/router.ts";
 
 export type RootRouter = ReturnType<typeof createRootRouter>;
 

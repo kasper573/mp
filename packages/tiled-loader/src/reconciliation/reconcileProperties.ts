@@ -1,4 +1,4 @@
-import type { Property, PropertyMap } from "../schema/property";
+import type { Property, PropertyMap } from "../schema/property.ts";
 
 export function reconcileProperties(target: {
   properties: Property[] | PropertyMap;

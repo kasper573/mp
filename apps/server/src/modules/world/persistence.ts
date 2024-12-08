@@ -1,10 +1,10 @@
 import { err, ok, type Result } from "@mp/state";
 import type { DBClient } from "../../db/client";
-import { characterTable, type WorldState } from "./schema";
+import { characterTable, type WorldState } from "./schema.ts";
 
 export async function persistWorldState(
   db: DBClient,
-  state: WorldState,
+  state: WorldState
 ): Promise<Result<void, unknown>> {
   try {
     await db.transaction((tx) =>
@@ -14,8 +14,8 @@ export async function persistWorldState(
             target: characterTable.id,
             set: char,
           });
-        }),
-      ),
+        })
+      )
     );
     return ok(void 0);
   } catch (error) {
@@ -24,7 +24,7 @@ export async function persistWorldState(
 }
 
 export async function loadWorldState(
-  db: DBClient,
+  db: DBClient
 ): Promise<Result<WorldState, unknown>> {
   try {
     const characters = await db.select().from(characterTable);

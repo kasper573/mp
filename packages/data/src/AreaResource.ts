@@ -1,13 +1,13 @@
 import type { Vector } from "@mp/math";
 import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { DNode } from "./findPath";
-import { vectorFromDNode, type DGraph } from "./findPath";
-import { dGraphFromTiled } from "./dGraphFromTiled";
-import type { Branded } from "./Branded";
-import { TiledFixture } from "./TiledFixture";
-import { hitTestTiledObject } from "./hitTestTiledObject";
+import { snapTileVector, type TiledResource } from "./TiledResource.ts";
+import type { DNode } from "./findPath.ts";
+import { vectorFromDNode, type DGraph } from "./findPath.ts";
+import { dGraphFromTiled } from "./dGraphFromTiled.ts";
+import type { Branded } from "./Branded.ts";
+import { TiledFixture } from "./TiledFixture.ts";
+import { hitTestTiledObject } from "./hitTestTiledObject.ts";
 
 export type AreaId = Branded<string, "AreaId">;
 
@@ -19,7 +19,7 @@ export class AreaResource {
 
   constructor(
     readonly id: AreaId,
-    readonly tiled: TiledResource,
+    readonly tiled: TiledResource
   ) {
     this.characterLayer = this.tiled.getTileLayers(characterLayerName)[0];
 
@@ -39,10 +39,10 @@ export class AreaResource {
 
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
-    getTileCoordOfSubject: (s: Subject) => Vector,
+    getTileCoordOfSubject: (s: Subject) => Vector
   ) {
     return hitTestObjects(this.objects, subjects, (subject) =>
-      this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
+      this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject))
     );
   }
 }
@@ -52,7 +52,7 @@ const characterLayerName = "Characters";
 function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,
   subjects: Iterable<Subject>,
-  getWorldCoordOfSubject: (s: Subject) => Vector,
+  getWorldCoordOfSubject: (s: Subject) => Vector
 ): Generator<{ subject: Subject; object: TiledObject }> {
   for (const subject of subjects) {
     const worldPos = getWorldCoordOfSubject(subject);

@@ -1,9 +1,9 @@
-import type { TiledObject } from "../schema/object";
-import type { Tileset } from "../schema/tileset";
-import { reconcileProperties } from "./reconcileProperties";
+import type { TiledObject } from "../schema/object.ts";
+import type { Tileset } from "../schema/tileset.ts";
+import { reconcileProperties } from "./reconcileProperties.ts";
 
 export function reconcileObject(
-  obj: TiledObject | ObjectTemplate,
+  obj: TiledObject | ObjectTemplate
 ): TiledObject {
   if ("object" in obj) {
     throw new Error("Object template reconciliation not implemented");

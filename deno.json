@@ -1,0 +1,31 @@
+{
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "workspace": [
+    "apps/client",
+    "apps/e2e",
+    "apps/loadtest",
+    "apps/server",
+    "packages/auth",
+    "packages/data",
+    "packages/engine",
+    "packages/env",
+    "packages/logger",
+    "packages/math",
+    "packages/metrics",
+    "packages/pixi",
+    "packages/solid-pixi",
+    "packages/state",
+    "packages/style",
+    "packages/sync",
+    "packages/tiled-loader",
+    "packages/tiled-renderer",
+    "packages/time"
+  ],
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "deno.ns"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "solid-js"
+  }
+}

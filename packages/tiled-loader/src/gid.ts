@@ -1,8 +1,8 @@
-import type { GlobalTileId, LocalTileId } from "./schema/common";
+import type { GlobalTileId, LocalTileId } from "./schema/common.ts";
 
 export function readGlobalIdBuffer(
   buffer: Uint8Array,
-  offset: number,
+  offset: number
 ): {
   gid: GlobalTileId;
   newOffset: number;
@@ -50,14 +50,14 @@ export interface GlobalIdFlags {
 
 export function localToGlobalId(
   tilesetFirstGID: GlobalTileId,
-  localId: LocalTileId,
+  localId: LocalTileId
 ): GlobalTileId {
   return (tilesetFirstGID + localId) as GlobalTileId;
 }
 
 export function globalToLocalId(
   tilesetFirstGID: GlobalTileId,
-  globalId: GlobalTileId,
+  globalId: GlobalTileId
 ): LocalTileId {
   return (globalId - tilesetFirstGID) as LocalTileId;
 }
