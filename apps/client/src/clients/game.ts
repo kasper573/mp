@@ -15,7 +15,7 @@ import {
 } from "solid-js";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/auth-client";
 import { env } from "../env.ts";
 import { dedupe, throttle } from "../state/functionComposition.ts";
 import { trpc } from "./trpc.ts";

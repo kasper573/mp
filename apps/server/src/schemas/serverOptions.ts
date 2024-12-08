@@ -1,6 +1,6 @@
 import path from "node:path";
 import { TimeSpan } from "@mp/time";
-import { authAlgorithms } from "@mp/auth/server";
+import { authAlgorithms } from "@mp/auth-server";
 import type { InferOutput } from "@mp/env";
 import {
   boolish,
@@ -22,14 +22,14 @@ export const serverOptionsSchema = object({
    */
   clientDir: pipe(
     optional(string()),
-    transform((p) => p && path.resolve(p)),
+    transform((p) => p && path.resolve(p))
   ),
   /**
    * The directory to serve static files from
    */
   publicDir: pipe(
     string(),
-    transform((p) => path.resolve(p)),
+    transform((p) => path.resolve(p))
   ),
   /**
    * The relative path after the hostname where the public dir will be exposed
@@ -88,14 +88,14 @@ export const serverOptionsSchema = object({
    */
   tickInterval: pipe(
     numeric(),
-    transform((ms) => TimeSpan.fromMilliseconds(ms)),
+    transform((ms) => TimeSpan.fromMilliseconds(ms))
   ),
   /**
    * How often (in milliseconds) to save the world state to the database
    */
   persistInterval: pipe(
     numeric(),
-    transform((ms) => TimeSpan.fromMilliseconds(ms)),
+    transform((ms) => TimeSpan.fromMilliseconds(ms))
   ),
   /**
    * Whether to log server state changes that are sent to clients

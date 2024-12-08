@@ -1,5 +1,5 @@
 import { Show, useContext } from "solid-js";
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion.ts";

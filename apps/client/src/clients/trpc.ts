@@ -1,7 +1,7 @@
 import type { RootRouter } from "@mp/server";
 import { transformer, tokenHeaderName } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import type { AuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/auth-client";
 import { env } from "../env.ts";
 import { rootLogger } from "../logger.ts";
 

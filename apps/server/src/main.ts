@@ -7,7 +7,7 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import { createAuthServer } from "@mp/auth/server";
+import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";

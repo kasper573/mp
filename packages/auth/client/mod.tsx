@@ -8,7 +8,7 @@ import {
   createSignal,
   onCleanup,
 } from "solid-js";
-import type { AuthToken, UserId, UserIdentity } from "./shared.ts";
+import type { AuthToken, UserId, UserIdentity } from "../shared.ts";
 
 export const AuthContext = createContext<AuthClient>(
   new Proxy({} as AuthClient, {
@@ -91,4 +91,4 @@ function isEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-export * from "./shared.ts";
+export * from "../shared.ts";
