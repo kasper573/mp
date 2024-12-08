@@ -1,6 +1,6 @@
 {
   "tasks": {
-    "d_ev": "deno run -A --node-modules-dir npm:vite --clearScreen=false",
+    "dev": "deno run -A --node-modules-dir npm:vite --clearScreen=false",
     "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --node-modules-dir npm:vite preview",
     "serve": "deno run --allow-net --allow-read jsr:@std/http@1/file-server dist/"
@@ -9,11 +9,6 @@
     "@deno/vite-plugin": "npm:@deno/vite-plugin@^1.0.0",
     "solid-js": "npm:solid-js@^1.9.2",
     "vite": "npm:vite@^5.4.9",
-    "@vanilla-extract/vite-plugin": "npm:@vanilla-extract/vite-plugin4.0.15",
-    "vite-plugin-top-level-await": "vite-plugin-top-level-await@no1.4.4",
-    "vite-plugin-handlebars": "vite-plugin-handlebars@2.0.0",
-    "vite-plugin-checker": "vite-plugin-checker@0.6.4",
-    "vite-plugin-solid": "vite-plugin-solid@2.10.2",
-    "vite-plugin-wasm": "vite-plugin-wasm@^3.3.0"
+    "vite-plugin-solid": "npm:vite-plugin-solid@^2.10.2"
   }
 }
