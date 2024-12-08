@@ -1,4 +1,6 @@
-// Important: Do not import anything in this file,
+import process from "node:process";
+
+// Important: Do not import non-builtin dependencies or repository source code in this file,
 // since it's uploaded isolated to the server as part of deployment
 
 /** @type { import("drizzle-kit").Config } */

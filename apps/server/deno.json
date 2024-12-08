@@ -1,0 +1,25 @@
+{
+  "name": "@mp/server",
+  "version": "0.0.0",
+  "exports": "./src/package.ts",
+  "tasks": {
+    "build": "deno compile -A src/main.ts",
+    "dev": "deno run -A src/main.ts",
+    "db:reset": "deno run --node-modules-dir -A npm:drizzle-kit generate && drizzle-kit push",
+    "db:migrate": "deno run --node-modules-dir -A npm:drizzle-kit migrate"
+  },
+  "imports": {
+    "@trpc/server": "npm:@trpc/server@11.0.0-rc.593",
+    "cors": "npm:cors@2.8.5",
+    "dotenv": "npm:dotenv@16.4.5",
+    "drizzle-orm": "npm:drizzle-orm@^0.33.0",
+    "express": "npm:express@4.19.2",
+    "postgres": "npm:postgres@^3.4.4",
+    "rate-limiter-flexible": "npm:rate-limiter-flexible@^5.0.3",
+    "superjson": "npm:superjson@2.2.1",
+    "@types/cors": "npm:@types/cors@2.8.17",
+    "@types/express": "npm:@types/express@4.17.21",
+    "drizzle-kit": "npm:drizzle-kit@^0.24.2",
+    "concurrently": "npm:concurrently@9.0.1"
+  }
+}
