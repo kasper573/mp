@@ -7,7 +7,7 @@ export type CliOptions = RemoveIndexSignature<
 
 export const cliEnvPrefix = "MP";
 
-export function readCliOptions(argv = process.argv) {
+export function readCliOptions(argv = Deno.args) {
   const options = yargs(hideBin(argv))
     .env(cliEnvPrefix)
     .parserConfiguration({
