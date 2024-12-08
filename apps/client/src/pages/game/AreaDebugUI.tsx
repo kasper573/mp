@@ -27,7 +27,7 @@ import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { GameClientContext } from "../../clients/game";
-import * as styles from "./AreaDebugUI.css";
+import * as styles from "./AreaDebugUI.css.ts";
 
 export function AreaDebugUI(props: {
   area: AreaResource;
@@ -37,7 +37,7 @@ export function AreaDebugUI(props: {
   const isVisible = createMemo(
     () =>
       engine.keyboard.keysHeld.has("Control") ||
-      engine.keyboard.keysHeld.has("Shift"),
+      engine.keyboard.keysHeld.has("Shift")
   );
 
   return (
@@ -57,8 +57,8 @@ function DebugDGraph(props: { area: AreaResource }) {
   const allTileCoords = createMemo(() =>
     generateAllTileCoords(
       props.area.tiled.map.width,
-      props.area.tiled.map.height,
-    ),
+      props.area.tiled.map.height
+    )
   );
 
   createEffect(() => {
@@ -75,7 +75,7 @@ function DebugDGraph(props: { area: AreaResource }) {
         gfx,
         tiled,
         dGraph,
-        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
+        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition))
       );
     } else if (keysHeld.has("Shift")) {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
@@ -84,7 +84,7 @@ function DebugDGraph(props: { area: AreaResource }) {
         tiled,
         addVectorToAdjacentInGraph(dGraph, tilePos),
         tilePos,
-        tiled.tileCoordToWorld(tilePos),
+        tiled.tileCoordToWorld(tilePos)
       );
     }
   });
@@ -118,9 +118,9 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
         batch(() => {
           setFrameInterval(interval);
           setFrameDuration(duration);
-        }),
-      ),
-    ),
+        })
+      )
+    )
   );
 
   const text = createMemo(() => {
@@ -160,10 +160,10 @@ function drawDNode(
   tiled: TiledResource,
   graph: DGraph,
   tilePos: Vector,
-  start = tiled.tileCoordToWorld(tilePos),
+  start = tiled.tileCoordToWorld(tilePos)
 ) {
   for (const [neighbor] of Object.entries(
-    graph[dNodeFromVector(tilePos)] ?? {},
+    graph[dNodeFromVector(tilePos)] ?? {}
   )) {
     const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
     ctx.beginPath();

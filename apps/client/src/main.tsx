@@ -1,7 +1,7 @@
-import { dark } from "@mp/style/themes/dark.css";
+import { dark } from "../../../packages/style/src/themes/dark.css.ts";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
-import * as styles from "./main.css";
+import * as styles from "./main.css.ts";
 import { LoadingSpinner } from "./ui/LoadingSpinner.ts";
 import { ErrorFallback } from "./ui/ErrorFallback.ts";
 

@@ -1,5 +1,5 @@
 import { atoms } from "@mp/style";
-import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css";
+import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css.ts";
 
 export function LoadingSpinner() {
   return (

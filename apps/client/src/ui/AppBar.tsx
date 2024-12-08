@@ -3,7 +3,7 @@ import { AuthContext } from "@mp/auth-client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion.ts";
-import * as styles from "./AppBar.css";
+import * as styles from "./AppBar.css.ts";
 import { Button } from "./Button.ts";
 import { Link } from "./Link.ts";
 import { LinearProgress } from "./LinearProgress.ts";
