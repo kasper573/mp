@@ -1,3 +1,3 @@
-export * from "./application.ts";
-export * from "./node.ts";
+export * from "./application.tsx";
+export * from "./node.tsx";
 export * from "./context.ts";
