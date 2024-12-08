@@ -1,5 +1,6 @@
 {
   "tasks": {
+    "typecheck": "deno check src/main.tsx",
     "dev": "deno run -A --node-modules-dir npm:vite --clearScreen=false",
     "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --node-modules-dir npm:vite preview",
