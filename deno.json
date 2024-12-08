@@ -19,7 +19,8 @@
     "packages/solid-pixi",
     "packages/state",
     "packages/style",
-    "packages/sync",
+    "packages/sync/server",
+    "packages/sync/client",
     "packages/tiled-loader",
     "packages/tiled-renderer",
     "packages/time"

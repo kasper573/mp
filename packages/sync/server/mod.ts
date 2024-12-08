@@ -1,4 +1,4 @@
-import { type Server } from "node:http";
+import type { Server } from "node:http";
 import type {
   DocHandle,
   PeerCandidatePayload,
@@ -8,7 +8,8 @@ import { WebSocketServer } from "ws";
 import { Repo } from "@automerge/automerge-repo";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import type { PatchCallback } from "@automerge/automerge";
-import { customPeerMetaDataKey, type ClientId } from "./shared.ts";
+import { customPeerMetaDataKey } from "../shared.ts";
+import type { PeerId as ClientId } from "@automerge/automerge-repo";
 
 export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
@@ -84,4 +85,5 @@ export type StateAccess<State> = <Result>(
   stateHandler: (draft: State) => Result
 ) => Result;
 
-export * from "./shared.ts";
+export * from "../shared.ts";
+export type { ClientId };

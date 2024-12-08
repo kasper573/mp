@@ -4,7 +4,7 @@ import type {
   WorldState,
 } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import { SyncClient } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync-client";
 import type { Accessor } from "solid-js";
 import {
   createContext,

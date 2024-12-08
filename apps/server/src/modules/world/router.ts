@@ -7,7 +7,7 @@ import {
 } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
-import type { StateAccess } from "@mp/sync/server";
+import type { StateAccess } from "@mp/sync-server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";

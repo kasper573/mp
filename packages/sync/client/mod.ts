@@ -6,7 +6,8 @@ import type {
 import { Repo } from "@automerge/automerge-repo";
 import { BrowserWebSocketClientAdapter } from "@automerge/automerge-repo-network-websocket";
 import { v4 as uuid } from "uuid";
-import { customPeerMetaDataKey, type ClientId } from "./shared.ts";
+import { customPeerMetaDataKey } from "../shared.ts";
+import type { PeerId as ClientId } from "@automerge/automerge-repo";
 
 export class SyncClient<State, ConnectionMetaData> {
   private wsAdapter?: WSClientAdapterWithCustomMetaData<ConnectionMetaData>;
@@ -98,4 +99,5 @@ class WSClientAdapterWithCustomMetaData<
 
 export type SyncClientSubscription<State> = (state?: State) => void;
 
-export * from "./shared.ts";
+export * from "../shared.ts";
+export type { ClientId };

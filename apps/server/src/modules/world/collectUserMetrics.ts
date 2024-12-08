@@ -1,6 +1,6 @@
 import type { MetricsRegistry } from "@mp/metrics";
 import { MetricsGague } from "@mp/metrics";
-import type { SyncServer } from "@mp/sync/server";
+import type { SyncServer } from "@mp/sync-server";
 import type { ClientRegistry } from "./ClientRegistry.ts";
 import type { WorldState } from "./schema.ts";
 
