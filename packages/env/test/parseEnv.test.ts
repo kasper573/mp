@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, it } from "jsr:@std/testing/bdd";
+import { expect } from "jsr:@std/expect";
 import { boolean, number, object, parse, string } from "valibot";
 import { parseEnv } from "../src/parseEnv.ts";
 import {
