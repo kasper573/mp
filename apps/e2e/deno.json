@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "start": "deno run -A --env-file ../../docker/.env.test --node-modules-dir npm:playwright text"
+  },
+  "imports": {
+    "@faker-js/faker": "npm:@faker-js/faker@9.2.0",
+    "@playwright/test": "npm:@playwright/test@^1.49.0",
+    "@types/node": "npm:@types/node@^22.10.1",
+    "dotenv": "npm:dotenv16.4.5"
+  }
+}
