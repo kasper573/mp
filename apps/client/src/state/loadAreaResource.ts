@@ -21,6 +21,6 @@ async function loadJson(url: string) {
 }
 
 function relativeURL(url: string, base: string) {
-  base = base.startsWith("//") ? window.location.protocol + base : base;
+  base = base.startsWith("//") ? globalThis.location.protocol + base : base;
   return new URL(url, base).toString();
 }
