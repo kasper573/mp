@@ -1,6 +1,6 @@
 import { createEffect, Show } from "solid-js";
 
-export function ErrorFallback(error: unknown, reset: () => void) {
+export function ErrorFallback(error: unknown) {
   createEffect(() => {
     // eslint-disable-next-line no-console
     console.error(error);
