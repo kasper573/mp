@@ -26,7 +26,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
   const character = createMemo(() => worldState()?.characters[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
 
-  const join = async () => trpc.world.join.mutate().then(setCharacterId);
+  const join = () => trpc.world.join.mutate().then(setCharacterId);
 
   const move = dedupe(
     throttle(
