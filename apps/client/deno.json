@@ -14,6 +14,8 @@
     "@vanilla-extract/vite-plugin": "@vanilla-extract/vite-plugin4.0.15",
     "@solidjs/router": "npm:@solidjs/router@0.14.7",
     "@tanstack/solid-query": "npm:@tanstack/solid-query@5.56.2",
-    "@trpc/client": "npm:@trpc/client@11.0.0-rc.593"
+    "@trpc/client": "npm:@trpc/client@11.0.0-rc.593",
+    "vite-plugin-top-level-await": "npm:vite-plugin-top-level-await@^1.4.4",
+    "vite-plugin-wasm": "npm:vite-plugin-wasm@^3.3.0"
   }
 }

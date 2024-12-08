@@ -1,11 +1,20 @@
 import { defineConfig } from "vite";
 import deno from "@deno/vite-plugin";
 import solid from "vite-plugin-solid";
+import wasm from "vite-plugin-wasm";
+import topLevelAwait from "vite-plugin-top-level-await";
 //import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 
 // https://vite.dev/config/
 export default defineConfig({
-  plugins: [deno(), solid()],
+  plugins: [
+    deno(),
+    solid(),
+    // @ts-expect-error Poor typedefs in package causes not callable error
+    wasm(),
+    // @ts-expect-error Poor typedefs in package causes not callable error
+    topLevelAwait(),
+  ],
 });
 
 // import { clientEnvGlobalVarName, clientEnvSchema } from "@mp/server";
