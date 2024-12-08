@@ -1,7 +1,6 @@
 import type { CSSProperties } from "@vanilla-extract/css";
 import { flattened } from "./flattened.ts";
 import { themeContract } from "./themeContract.css.ts";
-import { inter } from "./fonts/inter/inter.css.ts";
 
 const cssDefaults = {
   auto: "auto",
@@ -153,7 +152,7 @@ export const shadows = {
 };
 
 export const fontFaces = {
-  default: inter,
+  default: "Inter",
 };
 
 export const typography = {

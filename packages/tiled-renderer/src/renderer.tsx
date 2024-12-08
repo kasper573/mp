@@ -2,8 +2,8 @@ import type { Layer } from "@mp/tiled-loader";
 import type { Accessor } from "solid-js";
 import { createEffect, createMemo, For } from "solid-js";
 import { ParentContext, Pixi } from "@mp/solid-pixi";
-import { type JSX } from "solid-js";
-import { recallLayer, LayerViewFactory } from "./layer.ts";
+import type { JSX } from "solid-js";
+import { recallLayer, LayerViewFactory } from "./layer.tsx";
 import type { TiledSpritesheetRecord } from "./spritesheet.ts";
 import { createTextureLookup } from "./spritesheet.ts";
 

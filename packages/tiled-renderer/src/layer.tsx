@@ -47,7 +47,7 @@ export class LayerViewFactory {
   }
 
   private createImageLayerView(layer: ImageLayer): LayerView {
-    throw new Error("Not implemented");
+    throw new Error("Not implemented, cannot create image layer: " + layer.name);
   }
 
   private createObjectGroupLayerView(layer: ObjectGroupLayer): LayerView {

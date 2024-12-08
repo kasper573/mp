@@ -3,6 +3,7 @@ import clsx from "clsx";
 import { splitProps } from "solid-js";
 
 export type StyledComponentProps<Recipe> =
+  // deno-lint-ignore ban-types
   Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
 
 export function processStyleProps<Props extends { class?: string }>(
@@ -34,5 +35,5 @@ export function processStyleProps<Props extends { class?: string }>(
 
 type AnyProps = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// deno-lint-ignore no-explicit-any
 type AnyRecipe = RuntimeFn<any>;

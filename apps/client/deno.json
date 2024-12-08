@@ -6,6 +6,7 @@
     "serve": "deno run --allow-net --allow-read jsr:@std/http@1/file-server dist/"
   },
   "imports": {
+    "@fontsource-variable/inter": "npm:@fontsource-variable/inter@5.1.0",
     "@deno/vite-plugin": "npm:@deno/vite-plugin@^1.0.0",
     "solid-js": "npm:solid-js@^1.9.2",
     "vite": "npm:vite@^5.4.9",

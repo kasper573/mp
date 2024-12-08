@@ -4,7 +4,7 @@ import path from "node:path";
 import http from "node:http";
 import { Logger } from "@mp/logger";
 import express from "express";
-import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
+import type { PathToLocalFile, UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
@@ -21,7 +21,7 @@ import {
 import { parseEnv } from "@mp/env";
 import type { WorldState } from "./modules/world/schema.ts";
 import type { HttpSessionId, SyncServerConnectionMetaData } from "./context.ts";
-import { type ServerContext } from "./context.ts";
+import type { ServerContext } from "./context.ts";
 import { loadAreas } from "./modules/area/loadAreas.ts";
 import type { ServerOptions } from "./schemas/serverOptions.ts";
 import { serverOptionsSchema } from "./schemas/serverOptions.ts";

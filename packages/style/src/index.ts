@@ -1,7 +1,7 @@
 export * from "@vanilla-extract/css";
 export * from "@vanilla-extract/recipes";
 export * from "clsx";
-export * from "./themes/index.ts";
+export * as themes from "./themes/index.ts";
 export * as tokens from "./tokens.ts";
 export { themeContract as theme } from "./themeContract.css.ts";
 export * from "./atoms.css.ts";
