@@ -5,13 +5,27 @@ x-env-files: &env_files
   - .env.shared
 
 services:
-  mp:
+  mp-client:
     build:
-      dockerfile: ./docker/Dockerfile.mp-${DOCKER_COMPOSE_ENV}
+      dockerfile: ./docker/Dockerfile.mp-client-${DOCKER_COMPOSE_ENV}
       context: ..
-      args:
-        TURBO_TOKEN: ${TURBO_TOKEN:-}
-        TURBO_TEAM: ${TURBO_TEAM:-}
+    develop:
+      watch:
+        - action: sync
+          path: ..
+          target: /workdir
+        - action: rebuild
+          path: ../pnpm-lock.yaml
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    depends_on:
+      - mp-server
+    env_file: *env_files
+
+  mp-server:
+    build:
+      dockerfile: ./docker/Dockerfile.mp-server-${DOCKER_COMPOSE_ENV}
+      context: ..
     develop:
       watch:
         - action: sync

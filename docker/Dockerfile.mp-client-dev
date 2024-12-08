@@ -17,12 +17,8 @@ COPY --chown=app:app . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # build application and prepare necessary node_modules for server
-ARG TURBO_TOKEN=
-ARG TURBO_TEAM=
-ENV TURBO_TOKEN=$TURBO_TOKEN
-ENV TURBO_TEAM=$TURBO_TEAM
 ENV NODE_ENV=development
 ENV MP_BUNDLE_CLIENT_ENV=true
-ENV MP_SERVER_PUBLIC_DIR=/workdir/apps/server/public
 
-CMD [ "pnpm", "dev" ]
+CMD [ "pnpm", "dev", "--filter=!@mp/server" ]
+

@@ -15,10 +15,6 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 # build application and prepare necessary node_modules for server
-ARG TURBO_TOKEN=
-ARG TURBO_TEAM=
-ENV TURBO_TOKEN=$TURBO_TOKEN
-ENV TURBO_TEAM=$TURBO_TEAM
 ENV NODE_ENV=production
 RUN pnpm build 
 RUN pnpm deploy --filter=server --prod /usr/pnpm-deploy/server
@@ -27,10 +23,8 @@ FROM base AS runner
 COPY --from=builder /usr/pnpm-deploy/server /workdir/server
 COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
-COPY --from=builder /workdir/apps/client/dist /workdir/client
 WORKDIR /workdir/server
 
-ENV MP_SERVER_CLIENT_DIR=/workdir/client
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 
 CMD [ "pnpm", "start" ]

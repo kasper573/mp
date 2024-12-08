@@ -4,7 +4,7 @@ global:
 scrape_configs:
   - job_name: "mp"
     static_configs:
-      - targets: ["mp:9999"]
+      - targets: ["mp-server:9999"]
   - job_name: "node_exporter"
     static_configs:
       - targets: ["node_exporter:9100"]

@@ -1,0 +1,22 @@
+FROM node:20.10.0-alpine3.19 AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+
+FROM base AS builder
+WORKDIR /workdir
+
+# install most of node dependencies
+COPY pnpm-lock.yaml .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+# copy source code and install any node dependencies missed by pnpm fetch
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# build app
+ENV NODE_ENV=production
+RUN pnpm build
+
+FROM nginx:alpine3.19 AS runner
+COPY --from=builder /workdir/apps/client/dist /usr/share/nginx/html
