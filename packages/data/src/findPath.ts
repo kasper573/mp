@@ -1,12 +1,12 @@
 import type { Vector } from "@mp/math";
 import { vec, vec_add, vec_distance } from "@mp/math";
 import { snapTileVector } from "./TiledResource.ts";
-import { type DijkstraGraph, find_path } from "dijkstrajs";
+import { type DijkstraGraph, find_path } from "./dijkstra.ts";
 
 export function findPath(
   start: Vector,
   target: Vector,
-  graph: DGraph
+  graph: DGraph,
 ): Vector[] | undefined {
   if (isFractionalVector(start)) {
     graph = addVectorToAdjacentInGraph(graph, start);
@@ -18,7 +18,7 @@ export function findPath(
     const res = find_path(
       graph,
       dNodeFromVector(start),
-      dNodeFromVector(target)
+      dNodeFromVector(target),
     );
 
     const [_, ...remaining] = res.map(vectorFromDNode);
@@ -51,7 +51,7 @@ export function addVectorToAdjacentInGraph(graph: DGraph, v: Vector): DGraph {
       .map((adjacent) => [
         dNodeFromVector(adjacent),
         vec_distance(nodeAsVector, adjacent),
-      ])
+      ]),
   );
   return updatedGraph;
 }
