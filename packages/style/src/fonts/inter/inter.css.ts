@@ -1,12 +1,24 @@
 import { fontFace } from "@vanilla-extract/css";
+
+// Disabling errors until this is fixed https://github.com/denoland/deno/issues/23007
+
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter100woff2 from "./inter-latin-100-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter200woff2 from "./inter-latin-200-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter300woff2 from "./inter-latin-300-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter400woff2 from "./inter-latin-400-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter500woff2 from "./inter-latin-500-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter600woff from "./inter-latin-600-normal.woff";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter900woff2 from "./inter-latin-900-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter700woff2 from "./inter-latin-700-normal.woff2";
+// @ts-expect-error - Will be handled by vanilla-extract
 import inter800woff2 from "./inter-latin-800-normal.woff2";
 
 export const inter = fontFace([

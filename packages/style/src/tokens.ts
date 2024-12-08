@@ -1,7 +1,7 @@
 import type { CSSProperties } from "@vanilla-extract/css";
 import { flattened } from "./flattened.ts";
-import { themeContract } from "./theme.css";
-import { inter } from "./fonts/inter/inter.css";
+import { themeContract } from "./themeContract.css.ts";
+import { inter } from "./fonts/inter/inter.css.ts";
 
 const cssDefaults = {
   auto: "auto",

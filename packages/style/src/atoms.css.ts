@@ -1,5 +1,5 @@
 import type { PropertiesHyphen } from "csstype";
-import { type Property } from "csstype";
+import type { Property } from "csstype";
 import { defineProperties, createSprinkles } from "@vanilla-extract/sprinkles";
 import {
   borders,
