@@ -45,7 +45,7 @@ const optResult = parseEnv(
 );
 if (optResult.isErr()) {
   logger.error("Server options invalid or missing:\n", optResult.error);
-  process.exit(1);
+  Deno.exit(1);
 }
 
 const opt = optResult.value;
@@ -58,19 +58,22 @@ if (areas.isErr() || areas.value.size === 0) {
     "Cannot start server without areas",
     areas.isErr() ? areas.error : "No areas found"
   );
-  process.exit(1);
+  Deno.exit(1);
 }
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 
+const processStartTime = new Date();
+
 new MetricsGague({
   name: "process_uptime_seconds",
   help: "Time since the process started in seconds",
   registers: [metrics],
   collect() {
-    this.set(process.uptime());
+    const uptimeMs = new Date().getTime() - processStartTime.getTime();
+    this.set(uptimeMs / 1000);
   },
 });
 
@@ -99,7 +102,7 @@ const defaultAreaId = [...areas.value.keys()][0];
 const initialWorldState = await loadWorldState(db);
 if (initialWorldState.isErr()) {
   logger.error("Failed to load world state", initialWorldState.error);
-  process.exit(1);
+  Deno.exit(1);
 }
 
 const expressLogger = createExpressLogger(logger.chain("http"));
