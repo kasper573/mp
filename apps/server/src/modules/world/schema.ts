@@ -2,8 +2,8 @@ import type { AreaId, Branded } from "@mp/data";
 import { integer, pgTable } from "drizzle-orm/pg-core";
 import type { Path } from "@mp/math";
 import type { UserId } from "@mp/auth-server";
-import { branded } from "../../db/types/branded";
-import { vector } from "../../db/types/vector";
+import { branded } from "../../db/types/branded.ts";
+import { vector } from "../../db/types/vector.ts";
 
 export const characterTable = pgTable("characters", {
   id: branded<CharacterId>("id").primaryKey(),
