@@ -4,10 +4,10 @@ import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
-import { createGameClient, GameClientContext } from "../../clients/game";
-import { loadAreaResource } from "../../state/loadAreaResource";
+import { createGameClient, GameClientContext } from "../../clients/game.ts";
+import { loadAreaResource } from "../../state/loadAreaResource.ts";
 import * as styles from "./GamePage.css.ts";
-import { AreaScene } from "./AreaScene.ts";
+import { AreaScene } from "./AreaScene.tsx";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);

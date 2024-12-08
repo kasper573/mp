@@ -4,7 +4,7 @@ import { Pixi } from "@mp/solid-pixi";
 import type { Character } from "@mp/server";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
-import { useAnimatedCoords } from "../../state/useAnimatedCoords";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords.ts";
 
 export function AutoPositionedCharacterActor(props: {
   tiled: TiledResource;

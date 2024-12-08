@@ -4,9 +4,9 @@ import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion.ts";
 import * as styles from "./AppBar.css.ts";
-import { Button } from "./Button.ts";
-import { Link } from "./Link.ts";
-import { LinearProgress } from "./LinearProgress.ts";
+import { Button } from "./Button.tsx";
+import { Link } from "./Link.tsx";
+import { LinearProgress } from "./LinearProgress.tsx";
 
 export default function AppBar() {
   const isRouting = useIsRouting();
@@ -23,7 +23,7 @@ export default function AppBar() {
       <div class={styles.right}>
         <Show when={versionCompatibility() === "incompatible"}>
           There is a new version available{" "}
-          <Button onClick={() => window.location.reload()}>Reload</Button>
+          <Button onClick={() => globalThis.location.reload()}>Reload</Button>
         </Show>
 
         {auth.isSignedIn() ? (

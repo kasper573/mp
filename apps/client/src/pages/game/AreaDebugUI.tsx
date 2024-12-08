@@ -24,9 +24,9 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
-import { env } from "../../env";
-import { useServerVersion } from "../../state/useServerVersion";
-import { GameClientContext } from "../../clients/game";
+import { env } from "../../env.ts";
+import { useServerVersion } from "../../state/useServerVersion.ts";
+import { GameClientContext } from "../../clients/game.ts";
 import * as styles from "./AreaDebugUI.css.ts";
 
 export function AreaDebugUI(props: {
