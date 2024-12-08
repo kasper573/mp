@@ -1,0 +1,8 @@
+{
+  "name": "@mp/pixi",
+  "version": "0.0.0",
+  "exports": "./src/index.ts",
+  "imports": {
+    "pixi.js": "npm:pixi.js@8.3.3"
+  }
+}
