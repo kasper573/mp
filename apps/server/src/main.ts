@@ -1,6 +1,5 @@
 #!/usr/bin/env node
 
-import "dotenv/config";
 import path from "node:path";
 import http from "node:http";
 import { Logger } from "@mp/logger";
@@ -39,7 +38,11 @@ import { clientMiddleware } from "./clientMiddleware.ts";
 
 const logger = new Logger(console);
 
-const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+const optResult = parseEnv(
+  serverOptionsSchema,
+  Deno.env.toObject(),
+  "MP_SERVER_"
+);
 if (optResult.isErr()) {
   logger.error("Server options invalid or missing:\n", optResult.error);
   process.exit(1);

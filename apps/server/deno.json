@@ -11,7 +11,6 @@
   "imports": {
     "@trpc/server": "npm:@trpc/server@11.0.0-rc.593",
     "cors": "npm:cors@2.8.5",
-    "dotenv": "npm:dotenv@16.4.5",
     "drizzle-orm": "npm:drizzle-orm@^0.33.0",
     "express": "npm:express@4.19.2",
     "postgres": "npm:postgres@^3.4.4",

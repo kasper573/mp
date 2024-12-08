@@ -13,7 +13,11 @@ export function clientMiddleware(
   clientDir: string,
   staticOptions?: { maxAge?: string | number }
 ): express.RequestHandler {
-  const clientEnv = parseEnv(clientEnvSchema, process.env, "MP_CLIENT_");
+  const clientEnv = parseEnv(
+    clientEnvSchema,
+    Deno.env.toObject(),
+    "MP_CLIENT_"
+  );
   if (clientEnv.isErr()) {
     throw new Error("Client env invalid or missing:\n" + clientEnv.error);
   }

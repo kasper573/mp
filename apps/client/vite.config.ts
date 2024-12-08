@@ -22,12 +22,12 @@ export default defineConfig({
 //     deno(),
 //     vanillaExtractPlugin(),
 //     solid(),
-//     ...(process.env.MP_BUNDLE_CLIENT_ENV ? [clientEnvPlugin()] : []),
+//     ...(Deno.env("MP_BUNDLE_CLIENT_ENV") ? [clientEnvPlugin()] : []),
 //   ],
 // });
 
 // function clientEnvPlugin(): Plugin {
-//   const res = parseEnv(clientEnvSchema, process.env, "MP_CLIENT_");
+//   const res = parseEnv(clientEnvSchema, Deno.env.toObject(), "MP_CLIENT_");
 //   if (res.isErr()) {
 //     throw new Error("Failed to parse client env:\n" + res.error);
 //   }
