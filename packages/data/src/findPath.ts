@@ -1,7 +1,7 @@
 import type { Vector } from "@mp/math";
 import { vec, vec_add, vec_distance } from "@mp/math";
 import { snapTileVector } from "./TiledResource.ts";
-import { find_path } from "./dijkstra.ts";
+import { type DijkstraGraph, find_path } from "dijkstrajs";
 
 export function findPath(
   start: Vector,
@@ -15,8 +15,7 @@ export function findPath(
   try {
     // Skip the first node in the result because it is the start node.
     // We are only interested in future nodes.
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const res: DNode[] = find_path(
+    const res = find_path(
       graph,
       dNodeFromVector(start),
       dNodeFromVector(target)
@@ -74,11 +73,7 @@ function isFractionalVector(v: Vector): boolean {
   return v.x % 1 !== 0 || v.y % 1 !== 0;
 }
 
-export type DGraph<Node extends DNode = DNode> = {
-  [nodeId in Node]?: {
-    [neighborId in Node]?: number;
-  };
-};
+export type DGraph = DijkstraGraph<DNode>;
 
 export type DNode = `${number}${typeof separator}${number}`;
 

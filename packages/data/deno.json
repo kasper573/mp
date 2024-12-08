@@ -1,0 +1,8 @@
+{
+  "name": "@mp/data",
+  "version": "0.0.0",
+  "exports": "./src/index.ts",
+  "imports": {
+    "dijkstrajs": "npm:dijkstrajs@1.0.3"
+  }
+}
