@@ -1,0 +1,10 @@
+{
+  "name": "@mp/engine",
+  "version": "0.0.0",
+  "exports": "./src/index.ts",
+  "imports": {
+    "valibot": "npm:valibot@1.0.0-beta.9",
+    "dot-prop": "npm:dot-prop@9.0.0",
+    "solid-js": "npm:solid-js@1.9.1"
+  }
+}

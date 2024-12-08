@@ -1,5 +1,5 @@
 import { createEffect, onCleanup, useContext } from "solid-js";
-import { EngineContext } from "./context.ts";
+import { EngineContext } from "./context.tsx";
 import type { SpringLike } from "./spring.ts";
 
 export function useSpring<T>(spring: SpringLike<T>) {
