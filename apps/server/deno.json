@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "exports": "./src/package.ts",
   "tasks": {
-    "build": "deno compile -A src/main.ts",
+    "build": "deno compile --output server -A src/main.ts",
     "dev": "deno run -A src/main.ts",
     "db:reset": "deno run --node-modules-dir -A npm:drizzle-kit generate && drizzle-kit push",
     "db:migrate": "deno run --node-modules-dir -A npm:drizzle-kit migrate"
