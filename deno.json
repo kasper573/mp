@@ -29,9 +29,5 @@
     "lib": ["ES2020", "DOM", "DOM.Iterable", "deno.ns"],
     "jsx": "react-jsx",
     "jsxImportSource": "solid-js"
-  },
-  "imports": {
-    "@commitlint/cli": "npm:@commitlint/cli@^19.6.0",
-    "@commitlint/config-conventional": "npm:@commitlint/config-conventional@^19.6.0"
   }
 }
