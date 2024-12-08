@@ -21,12 +21,6 @@ test-results
 *.pem
 .devmode.json
 
-# debug
-npm-debug.log*
-pnpm-debug.log*
-pnpm-error.log*
-.pnpm-debug.log*
-
 # Local files for common editors
 .idea
 .vscode
