@@ -1,4 +1,3 @@
-import type express from "express";
 import type { Registry } from "prom-client";
 
 /**
@@ -6,8 +5,8 @@ import type { Registry } from "prom-client";
  * This is the endpoint that Prometheus will scrape.
  */
 export function createMetricsScrapeMiddleware(
-  registry: Registry,
-): express.RequestHandler {
+  registry: Registry
+): RequestHandlerLike {
   return (req, res, next) => {
     if (isAllowedToAccessMetrics(req) && req.path === "/metrics") {
       res.set("Content-Type", "text/plain");
@@ -21,6 +20,21 @@ export function createMetricsScrapeMiddleware(
   };
 }
 
-function isAllowedToAccessMetrics(req: express.Request) {
+function isAllowedToAccessMetrics(req: RequestLike) {
   return req.ip?.startsWith("127.") || req.ip?.startsWith("172.");
+}
+
+interface RequestHandlerLike {
+  (req: RequestLike, res: ResponseLike, next: () => void): void;
+}
+
+interface RequestLike {
+  path?: string;
+  ip?: string;
+}
+
+interface ResponseLike {
+  set(header: string, value: string): void;
+  send(data: string): void;
+  status(code: number): ResponseLike;
 }
