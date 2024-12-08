@@ -41,7 +41,7 @@ const logger = new Logger(console);
 const optResult = parseEnv(
   serverOptionsSchema,
   Deno.env.toObject(),
-  "MP_SERVER_"
+  "MP_SERVER_",
 );
 if (optResult.isErr()) {
   logger.error("Server options invalid or missing:\n", optResult.error);
@@ -56,7 +56,7 @@ const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 if (areas.isErr() || areas.value.size === 0) {
   logger.error(
     "Cannot start server without areas",
-    areas.isErr() ? areas.error : "No areas found"
+    areas.isErr() ? areas.error : "No areas found",
   );
   Deno.exit(1);
 }
@@ -78,8 +78,28 @@ new MetricsGague({
 });
 
 const tickBuckets = [
-  0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 7, 10, 12, 16, 24, 36, 48, 65, 100, 200,
-  400, 600, 800, 1000,
+  0.01,
+  0.05,
+  0.1,
+  0.2,
+  0.5,
+  1,
+  2,
+  5,
+  7,
+  10,
+  12,
+  16,
+  24,
+  36,
+  48,
+  65,
+  100,
+  200,
+  400,
+  600,
+  800,
+  1000,
 ];
 
 const tickIntervalMetric = new MetricsHistogram({
@@ -171,9 +191,9 @@ webServer.use(
     createContext: ({ req }) =>
       createServerContext(
         `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
-        String(req.headers[tokenHeaderName]) as ServerContext["authToken"]
+        String(req.headers[tokenHeaderName]) as ServerContext["authToken"],
       ),
-  })
+  }),
 );
 
 if (opt.clientDir !== undefined) {
@@ -198,11 +218,11 @@ async function persist() {
 function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
   const userId = clients.getUserId(clientId);
   const char = Object.values(state.characters).find(
-    (char) => char.userId === userId
+    (char) => char.userId === userId,
   );
   if (!char) {
     throw new Error(
-      "Could not derive world state for client: user has no associated character"
+      "Could not derive world state for client: user has no associated character",
     );
   }
 
@@ -211,7 +231,7 @@ function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
 
 function createServerContext(
   sessionId: HttpSessionId,
-  authToken: ServerContext["authToken"]
+  authToken: ServerContext["authToken"],
 ): ServerContext {
   return {
     sessionId,
@@ -226,7 +246,7 @@ function createServerContext(
 
 async function handleSyncServerConnection(
   clientId: ClientId,
-  { token }: SyncServerConnectionMetaData
+  { token }: SyncServerConnectionMetaData,
 ) {
   logger.info("Client connected", clientId);
 
@@ -235,7 +255,7 @@ async function handleSyncServerConnection(
     logger.info(
       "Could not verify client authentication token",
       clientId,
-      verifyResult.error
+      verifyResult.error,
     );
     worldState.disconnectClient(clientId);
     return;
@@ -255,8 +275,12 @@ function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
   return `${opt.httpBaseUrl}${opt.publicPath}${relativePath}` as UrlToPublicFile;
 }
 
-function createExpressLogger(logger: Logger): express.RequestHandler {
-  return (req, _, next) => {
+function createExpressLogger(logger: Logger) {
+  return (
+    req: { method: string; url: string },
+    _: unknown,
+    next: () => void,
+  ) => {
     logger.info(req.method, req.url);
     next();
   };
@@ -273,10 +297,12 @@ function serverTextHeader(options: ServerOptions) {
 #     ██║ ╚═╝ ██║ ██║         #
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
-${Object.entries(options)
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
-  .join("\n")}
+${
+    Object.entries(options)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
+      .join("\n")
+  }
 =====================================================`;
 }
 

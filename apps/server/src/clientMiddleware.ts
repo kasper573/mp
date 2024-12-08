@@ -1,6 +1,6 @@
 import * as fs from "node:fs";
 import path from "node:path";
-import * as express from "express";
+import { static as createStatic } from "express";
 import { parseEnv } from "@mp/env";
 import { clientEnvGlobalVarName } from "./shared.ts";
 import { clientEnvSchema } from "./package.ts";
@@ -11,12 +11,12 @@ import { clientEnvSchema } from "./package.ts";
  */
 export function clientMiddleware(
   clientDir: string,
-  staticOptions?: { maxAge?: string | number }
-): express.RequestHandler {
+  staticOptions?: { maxAge?: string | number },
+): RequestHandlerLike {
   const clientEnv = parseEnv(
     clientEnvSchema,
     Deno.env.toObject(),
-    "MP_CLIENT_"
+    "MP_CLIENT_",
   );
   if (clientEnv.isErr()) {
     throw new Error("Client env invalid or missing:\n" + clientEnv.error);
@@ -24,18 +24,18 @@ export function clientMiddleware(
 
   const indexHtml = fs.readFileSync(
     path.resolve(clientDir, "index.html"),
-    "utf8"
+    "utf8",
   );
 
   const patchedHtml = indexHtml.replace(
     "__WILL_BE_REPLACED_WITH_ENV_VARS_SCRIPT__",
-    `window["${clientEnvGlobalVarName}"]=${JSON.stringify(clientEnv.value)};`
+    `window["${clientEnvGlobalVarName}"]=${JSON.stringify(clientEnv.value)};`,
   );
 
-  const serveStatic = express.static(clientDir, staticOptions);
+  const serveStatic = createStatic(clientDir, staticOptions);
   const indexPaths = new Set(["/", "/index.html"]);
 
-  function serveIndex(res: express.Response) {
+  function serveIndex(res: ResponseLike) {
     res.setHeader("Content-Type", "text/html");
     res.send(patchedHtml);
   }
@@ -51,4 +51,22 @@ export function clientMiddleware(
       });
     }
   };
+}
+
+interface RequestHandlerLike {
+  (req: RequestLike, res: ResponseLike, next: () => void): void;
+}
+
+interface RequestLike {
+  path?: string;
+  ip?: string;
+  url: string;
+}
+
+interface ResponseLike {
+  set(header: string, value: string): void;
+  send(data: string): void;
+  status(code: number): ResponseLike;
+  setHeader(header: string, value: string): void;
+  headersSent: boolean;
 }
