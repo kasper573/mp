@@ -1,4 +1,4 @@
-import { t } from "../../trpc";
+import { t } from "../../trpc.ts";
 
 export interface SystemRouterDependencies {
   buildVersion: string;

@@ -1,16 +1,16 @@
 import type { Ticker, TimeSpan } from "@mp/time";
 import {
-  findPath,
-  moveAlongPath,
   type AreaId,
   type AreaResource,
+  findPath,
+  moveAlongPath,
 } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync-server";
 import { TRPCError } from "@trpc/server";
-import { auth } from "../../middlewares/auth";
-import { schemaFor, t } from "../../trpc";
+import { auth } from "../../middlewares/auth.ts";
+import { schemaFor, t } from "../../trpc.ts";
 import type { CharacterId, WorldState } from "./schema.ts";
 
 export interface WorldRouterDependencies {
@@ -42,7 +42,7 @@ export function createWorldRouter({
         if (area) {
           for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
             const targetArea = areas.get(
-              hit.object.properties.get("goto")?.value as AreaId
+              hit.object.properties.get("goto")?.value as AreaId,
             );
             if (targetArea) {
               char.areaId = targetArea.id;
@@ -112,7 +112,7 @@ export function createWorldRouter({
             if (!area) {
               throw new Error(
                 "Could not create character, default area not found: " +
-                  defaultAreaId
+                  defaultAreaId,
               );
             }
 
