@@ -19,5 +19,6 @@ COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/server /workdir/
 
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
+ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
 CMD [ "./server" ]
