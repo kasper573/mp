@@ -48,6 +48,7 @@
       "command": "cd apps/server && deno task dev"
     },
     "dev": {
+      "command": "deno task dev:docker && deno task dev:client && deno task dev:server",
       "description": "Start docker, client and server in development mode",
       "dependencies": ["dev:docker", "dev:client", "dev:server"]
     },
@@ -60,6 +61,7 @@
       "command": "cd apps/server && deno task build"
     },
     "build": {
+      "command": "deno task build:client && deno task build:server",
       "description": "Build the client and server for production",
       "dependencies": ["build:client", "build:server"]
     }
