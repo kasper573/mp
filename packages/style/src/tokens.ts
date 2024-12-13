@@ -152,7 +152,9 @@ export const shadows = {
 };
 
 export const fontFaces = {
-  default: "Inter",
+  // This is loosely coupled with the application.
+  // The application is responsible for making fonts by these names are available
+  default: "Inter Variable",
 };
 
 export const typography = {
