@@ -51,8 +51,7 @@
     },
     "dev": {
       "command": "deno task dev:client && deno task dev:server",
-      "description": "Start client and server in development mode",
-      "dependencies": ["dev:client", "dev:server"]
+      "description": "Start client and server in development mode"
     },
     "build:client": {
       "description": "Build the client for production",
@@ -64,8 +63,7 @@
     },
     "build": {
       "command": "deno task build:client && deno task build:server",
-      "description": "Build the client and server for production",
-      "dependencies": ["build:client", "build:server"]
+      "description": "Build the client and server for production"
     }
   },
   "nodeModulesDir": "auto"
