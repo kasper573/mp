@@ -7,6 +7,8 @@ x-env-files: &env_files
 services:
   keycloak:
     env_file: *env_files
+    ports:
+      - "8080:8080"
   postgres:
     env_file: *env_files
     ports:
