@@ -12,7 +12,7 @@
     "solid-js": "npm:solid-js@^1.9.2",
     "vite": "npm:vite@^5.4.9",
     "vite-plugin-solid": "npm:vite-plugin-solid@^2.10.2",
-    "@vanilla-extract/vite-plugin": "@vanilla-extract/vite-plugin4.0.15",
+    "@vanilla-extract/vite-plugin": "npm:@vanilla-extract/vite-plugin@^4.0.18",
     "@solidjs/router": "npm:@solidjs/router@0.14.7",
     "@tanstack/solid-query": "npm:@tanstack/solid-query@5.56.2",
     "@trpc/client": "npm:@trpc/client@11.0.0-rc.593",
