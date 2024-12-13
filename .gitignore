@@ -32,6 +32,3 @@ package-lock.json
 # local env files
 .env
 .env.*local
-
-# turbo
-.turbo
