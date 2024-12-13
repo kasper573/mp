@@ -1,7 +1,7 @@
 {
   "tasks": {
     "typecheck": "deno check src/main.tsx",
-    "dev": "deno run -A --node-modules-dir npm:vite --clearScreen=false",
+    "dev": "deno run -A --env-file=../../docker/.env.dev --env-file=../../docker/.env.shared --node-modules-dir npm:vite --clearScreen=false --host",
     "build": "deno run -A --node-modules-dir npm:vite build",
     "preview": "deno run -A --node-modules-dir npm:vite preview",
     "serve": "deno run --allow-net --allow-read jsr:@std/http@1/file-server dist/"

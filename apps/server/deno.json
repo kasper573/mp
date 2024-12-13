@@ -4,7 +4,7 @@
   "exports": "./src/package.ts",
   "tasks": {
     "build": "deno compile --output server -A src/main.ts",
-    "dev": "deno run -A src/main.ts",
+    "dev": "deno run -A --env-file=../../docker/.env.dev  --env-file=../../docker/.env.shared src/main.ts",
     "db:reset": "deno run --node-modules-dir -A npm:drizzle-kit generate && drizzle-kit push",
     "db:migrate": "deno run --node-modules-dir -A npm:drizzle-kit migrate"
   },

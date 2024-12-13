@@ -21,3 +21,5 @@ services:
     env_file: *env_files
   caddy:
     env_file: *env_files
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

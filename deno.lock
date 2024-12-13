@@ -45,7 +45,6 @@
     "npm:prom-client@15.1.3": "15.1.3",
     "npm:rate-limiter-flexible@^5.0.3": "5.0.4",
     "npm:solid-js@1.9.1": "1.9.1_seroval@1.1.1",
-    "npm:solid-js@^1.9.2": "1.9.3_seroval@1.1.1",
     "npm:superjson@2.2.1": "2.2.1",
     "npm:timespan-ts@1.0.3": "1.0.3",
     "npm:uuid@11.0.0": "11.0.0",
@@ -626,7 +625,7 @@
     "@solidjs/router@0.14.7_solid-js@1.9.1__seroval@1.1.1": {
       "integrity": "sha512-agLf8AUz5XnW6+F64a4Iq+QQQobI5zGHQ/gUYd/WHSwcbnFpavbsiwRLob3YhWMXVX3sQyn4ekUN+uchMCRupw==",
       "dependencies": [
-        "solid-js@1.9.1_seroval@1.1.1"
+        "solid-js"
       ]
     },
     "@swc/core-darwin-arm64@1.10.0": {
@@ -692,7 +691,7 @@
       "integrity": "sha512-xJTtKwVJNAqCwbRi1FnA6cNzoIBdSssgbvC/DTTLSogdfj0Xur0hwNbVG3ZPEXwxgHZ2o6gqKqyVJJ5K6tgikg==",
       "dependencies": [
         "@tanstack/query-core",
-        "solid-js@1.9.1_seroval@1.1.1"
+        "solid-js"
       ]
     },
     "@trpc/client@11.0.0-rc.593_@trpc+server@11.0.0-rc.593": {
@@ -2006,21 +2005,13 @@
         "seroval-plugins"
       ]
     },
-    "solid-js@1.9.3_seroval@1.1.1": {
-      "integrity": "sha512-5ba3taPoZGt9GY3YlsCB24kCg0Lv/rie/HTD4kG6h4daZZz7+yK02xn8Vx8dLYBc9i6Ps5JwAbEiqjmKaLB3Ag==",
-      "dependencies": [
-        "csstype",
-        "seroval",
-        "seroval-plugins"
-      ]
-    },
     "solid-refresh@0.6.3_solid-js@1.9.1__seroval@1.1.1": {
       "integrity": "sha512-F3aPsX6hVw9ttm5LYlth8Q15x6MlI/J3Dn+o3EQyRTtTxidepSTwAYdozt01/YA+7ObcciagGEyXIopGZzQtbA==",
       "dependencies": [
         "@babel/generator",
         "@babel/helper-module-imports@7.25.9",
         "@babel/types",
-        "solid-js@1.9.1_seroval@1.1.1"
+        "solid-js"
       ]
     },
     "source-map-js@1.2.1": {
@@ -2186,7 +2177,7 @@
         "@types/babel__core",
         "babel-preset-solid",
         "merge-anything",
-        "solid-js@1.9.1_seroval@1.1.1",
+        "solid-js",
         "solid-refresh",
         "vite",
         "vitefu"
@@ -2266,6 +2257,9 @@
     }
   },
   "workspace": {
+    "dependencies": [
+      "npm:solid-js@1.9.1"
+    ],
     "members": {
       "apps/client": {
         "dependencies": [
@@ -2275,7 +2269,6 @@
           "npm:@tanstack/solid-query@5.56.2",
           "npm:@trpc/client@11.0.0-rc.593",
           "npm:@vanilla-extract/vite-plugin@^4.0.18",
-          "npm:solid-js@^1.9.2",
           "npm:vite-plugin-solid@^2.10.2",
           "npm:vite-plugin-top-level-await@^1.4.4",
           "npm:vite-plugin-wasm@^3.3.0",
@@ -2313,8 +2306,7 @@
       },
       "packages/auth/client": {
         "dependencies": [
-          "npm:oidc-client-ts@3.1.0",
-          "npm:solid-js@1.9.1"
+          "npm:oidc-client-ts@3.1.0"
         ]
       },
       "packages/auth/server": {
@@ -2330,7 +2322,6 @@
       "packages/engine": {
         "dependencies": [
           "npm:dot-prop@9.0.0",
-          "npm:solid-js@1.9.1",
           "npm:valibot@1.0.0-beta.9"
         ]
       },
@@ -2355,15 +2346,9 @@
           "npm:pixi.js@8.3.3"
         ]
       },
-      "packages/solid-pixi": {
-        "dependencies": [
-          "npm:solid-js@1.9.1"
-        ]
-      },
       "packages/state": {
         "dependencies": [
-          "npm:neverthrow@7.0.0",
-          "npm:solid-js@1.9.1"
+          "npm:neverthrow@7.0.0"
         ]
       },
       "packages/style": {
@@ -2373,7 +2358,6 @@
           "npm:@vanilla-extract/sprinkles@1.6.3",
           "npm:clsx@2.1.1",
           "npm:csstype@3.1.3",
-          "npm:solid-js@1.9.1",
           "npm:vite@^5.4.9"
         ]
       },
@@ -2399,11 +2383,6 @@
         "dependencies": [
           "npm:@types/pako@2.0.3",
           "npm:pako@2.1.0"
-        ]
-      },
-      "packages/tiled-renderer": {
-        "dependencies": [
-          "npm:solid-js@1.9.1"
         ]
       },
       "packages/time": {
