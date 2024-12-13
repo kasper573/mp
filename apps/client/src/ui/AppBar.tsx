@@ -1,12 +1,12 @@
 import { Show, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth-client";
-import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion.ts";
 import * as styles from "./AppBar.css.ts";
 import { Button } from "./Button.tsx";
 import { Link } from "./Link.tsx";
 import { LinearProgress } from "./LinearProgress.tsx";
+import { dock } from "../style/layout.css.ts";
 
 export default function AppBar() {
   const isRouting = useIsRouting();

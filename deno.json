@@ -18,7 +18,6 @@
     "packages/pixi",
     "packages/solid-pixi",
     "packages/state",
-    "packages/style",
     "packages/sync/server",
     "packages/sync/client",
     "packages/tiled-loader",

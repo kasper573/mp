@@ -16,6 +16,11 @@
     "@tanstack/solid-query": "npm:@tanstack/solid-query@5.56.2",
     "@trpc/client": "npm:@trpc/client@11.0.0-rc.593",
     "vite-plugin-top-level-await": "npm:vite-plugin-top-level-await@^1.4.4",
-    "vite-plugin-wasm": "npm:vite-plugin-wasm@^3.3.0"
+    "vite-plugin-wasm": "npm:vite-plugin-wasm@^3.3.0",
+    "@vanilla-extract/css": "npm:@vanilla-extract/css@1.15.5",
+    "@vanilla-extract/recipes": "npm:@vanilla-extract/recipes@0.5.5",
+    "@vanilla-extract/sprinkles": "npm:@vanilla-extract/sprinkles@1.6.3",
+    "clsx": "npm:clsx@2.1.1",
+    "csstype": "npm:csstype@3.1.3"
   }
 }

@@ -1,4 +1,6 @@
-import { atoms, globalStyle, tokens, style } from "@mp/style";
+import { globalStyle, style } from "@vanilla-extract/css";
+import { atoms } from "../style/atoms.css.ts";
+import { typography } from "../style/tokens.ts";
 
 const row = atoms({
   display: "flex",
@@ -20,7 +22,7 @@ globalStyle(`${nav} a`, {
   color: "inherit",
   textDecoration: "none",
   display: "inline-flex",
-  ...tokens.typography.body2,
+  ...typography.body2,
 });
 
 export const right = style([

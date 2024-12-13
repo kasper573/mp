@@ -1,4 +1,4 @@
-import { atoms } from "@mp/style";
+import { atoms } from "../style/atoms.css.ts";
 import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css.ts";
 
 export function LoadingSpinner() {

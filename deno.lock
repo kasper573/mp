@@ -2268,7 +2268,12 @@
           "npm:@solidjs/router@0.14.7",
           "npm:@tanstack/solid-query@5.56.2",
           "npm:@trpc/client@11.0.0-rc.593",
+          "npm:@vanilla-extract/css@1.15.5",
+          "npm:@vanilla-extract/recipes@0.5.5",
+          "npm:@vanilla-extract/sprinkles@1.6.3",
           "npm:@vanilla-extract/vite-plugin@^4.0.18",
+          "npm:clsx@2.1.1",
+          "npm:csstype@3.1.3",
           "npm:vite-plugin-solid@^2.10.2",
           "npm:vite-plugin-top-level-await@^1.4.4",
           "npm:vite-plugin-wasm@^3.3.0",
@@ -2349,16 +2354,6 @@
       "packages/state": {
         "dependencies": [
           "npm:neverthrow@7.0.0"
-        ]
-      },
-      "packages/style": {
-        "dependencies": [
-          "npm:@vanilla-extract/css@1.15.5",
-          "npm:@vanilla-extract/recipes@0.5.5",
-          "npm:@vanilla-extract/sprinkles@1.6.3",
-          "npm:clsx@2.1.1",
-          "npm:csstype@3.1.3",
-          "npm:vite@^5.4.9"
         ]
       },
       "packages/sync/client": {

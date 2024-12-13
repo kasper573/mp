@@ -1,5 +1,4 @@
 import { Match, Switch, Show, useContext } from "solid-js";
-import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery } from "@tanstack/solid-query";
@@ -8,6 +7,7 @@ import { createGameClient, GameClientContext } from "../../clients/game.ts";
 import { loadAreaResource } from "../../state/loadAreaResource.ts";
 import * as styles from "./GamePage.css.ts";
 import { AreaScene } from "./AreaScene.tsx";
+import { atoms } from "../../style/atoms.css.ts";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
