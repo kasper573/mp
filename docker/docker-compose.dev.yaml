@@ -1,0 +1,7 @@
+include:
+  - docker-compose.base.yaml 
+
+services:
+  postgres:
+    ports:
+      - "5432:5432"

@@ -5,9 +5,9 @@ prometheus.{$MP_SERVER_DOMAIN} {
 }
 
 {$MP_SERVER_DOMAIN} {
-    reverse_proxy http://mp:5173
+    reverse_proxy http://host.docker.internal:5173
 }
 
 api.{$MP_SERVER_DOMAIN} {
-    reverse_proxy http://mp:9999
+    reverse_proxy http://host.docker.internal:9999
 }

@@ -5,37 +5,6 @@ x-env-files: &env_files
   - .env.shared
 
 services:
-  mp:
-    build:
-      dockerfile: ./docker/Dockerfile.mp-${DOCKER_COMPOSE_ENV}
-      context: ..
-      args:
-        TURBO_TOKEN: ${TURBO_TOKEN:-}
-        TURBO_TEAM: ${TURBO_TEAM:-}
-    develop:
-      watch:
-        - action: sync
-          path: ..
-          target: /workdir
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
-    restart: always
-    depends_on:
-      migrations:
-        condition: service_started
-      keycloak-healthcheck:
-        condition: service_healthy
-    env_file: *env_files
-
-  migrations:
-    build:
-      dockerfile: ../../docker/Dockerfile.migrations
-      context: ../apps/server
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
-    depends_on:
-      postgres:
-        condition: service_healthy
-    env_file: *env_files
-
   keycloak:
     build:
       dockerfile: ./Dockerfile.keycloak
