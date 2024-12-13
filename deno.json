@@ -50,7 +50,7 @@
       "command": "dotenvx run -f ./docker/.env.dev ./docker/.env.shared -- deno task --cwd apps/server dev"
     },
     "dev": {
-      "command": "deno task dev:client && deno task dev:server",
+      "command": "deno task dev:client & deno task dev:server",
       "description": "Start client and server in development mode"
     },
     "build:client": {
