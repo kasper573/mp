@@ -297,18 +297,6 @@ function serverTextHeader(options: ServerOptions) {
 #     ██║ ╚═╝ ██║ ██║         #
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
-${
-    Object.entries(options)
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
-      .join("\n")
-  }
+${JSON.stringify(options, null, 2)}
 =====================================================`;
-}
-
-function optionValueToString(value: unknown) {
-  if (value instanceof TimeSpan) {
-    return `${value.totalMilliseconds}ms`;
-  }
-  return String(value);
 }
