@@ -29,6 +29,8 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 ## Development
 
 - Install [Docker](https://www.docker.com/)
+- Install [Deno](https://deno.com/)
+- Install [dotenvx](https://dotenvx.com/)
 - Clone this repository
 - Run `deno task dev`
 - Run `./docker/installcert.sh`

@@ -43,11 +43,11 @@
     },
     "dev:client": {
       "description": "Start the client in development mode",
-      "command": "cd apps/client && deno task dev"
+      "command": "dotenvx run -f ./docker/.env.dev ./docker/.env.shared -- deno task --cwd apps/client dev"
     },
     "dev:server": {
       "description": "Start the server in development mode",
-      "command": "cd apps/server && deno task dev"
+      "command": "dotenvx run -f ./docker/.env.dev ./docker/.env.shared -- deno task --cwd apps/server dev"
     },
     "dev": {
       "command": "deno task dev:client && deno task dev:server",
