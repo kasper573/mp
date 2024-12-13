@@ -1,9 +1,3 @@
-x-env-files: &env_files
-  - path: .env
-    required: false
-  - .env.${DOCKER_COMPOSE_ENV}
-  - .env.shared
-
 services:
   keycloak:
     build:
@@ -13,7 +7,6 @@ services:
     command: start --optimized --import-realm
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import
-    env_file: *env_files
     depends_on:
       postgres:
         condition: service_healthy
@@ -25,7 +18,7 @@ services:
     command: ["sh", "-c", "sleep infinity"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://keycloak:9000/health/live"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
       retries: 9
 
@@ -34,7 +27,6 @@ services:
     restart: always
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
-    env_file: *env_files
     healthcheck:
       test: ["CMD", "pg_isready"]
       interval: 10s
@@ -44,18 +36,15 @@ services:
   redis:
     image: redis:7.4.1
     restart: always
-    env_file: *env_files
 
   prometheus:
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
-    env_file: *env_files
 
   node_exporter:
     image: prom/node-exporter:v1.8.2
-    env_file: *env_files
 
   grafana:
     image: grafana/grafana:10.4.12
@@ -63,14 +52,11 @@ services:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
-    env_file: *env_files
 
   caddy:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    command:
-      ["caddy", "run", "--config", "/etc/caddy/${DOCKER_COMPOSE_ENV}.Caddyfile"]
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
@@ -81,7 +67,6 @@ services:
       - ./caddy:/etc/caddy/
       - caddy-data:/data
       - caddy-config:/config
-    env_file: *env_files
 
 volumes:
   grafana-data:

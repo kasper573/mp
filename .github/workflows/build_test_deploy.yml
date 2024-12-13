@@ -6,7 +6,6 @@ env:
   DOCKER_USERNAME: ${{ github.actor }}
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   DOCKER_REGISTRY_URL: ghcr.io/${{ github.actor }}
-  DOCKER_COMPOSE_ENV: prod
   DOCKER_IMAGE_VERSION: ${{ github.sha }}
   BUILD_VERSION: ${{ github.sha }}
   MP_SERVER_DOMAIN: ${{ vars.MP_DOMAIN }}
@@ -100,8 +99,7 @@ jobs:
             cd ~/docker
 
             # Set production host env vars
-            echo "DOCKER_COMPOSE_ENV=\"${{ env.DOCKER_COMPOSE_ENV }}\"" > .env
-            echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" >> .env
+            echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" > .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
             echo "MP_SERVER_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             echo "MP_CLIENT_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
@@ -114,6 +112,6 @@ jobs:
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             docker compose pull
             docker compose down
-            docker compose up -d --remove-orphans --no-build
+            docker compose -f docker- up -d --remove-orphans --no-build
             docker system prune -f
             docker image prune -af

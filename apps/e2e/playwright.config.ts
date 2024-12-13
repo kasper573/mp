@@ -1,7 +1,7 @@
 import * as path from "jsr:@std/path";
 import { defineConfig, devices } from "@playwright/test";
 
-const dockerDir = path.resolve(import.meta.dirname!, "../../docker");
+const rootDir = path.resolve(import.meta.dirname!, "../..");
 
 const baseURL = `https://${Deno.env.get("MP_SERVER_DOMAIN")}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
@@ -42,7 +42,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
+    command: `cd ${rootDir} && deno task test:docker`,
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,

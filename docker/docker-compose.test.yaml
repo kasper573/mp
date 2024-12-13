@@ -1,7 +1,7 @@
 x-env-files: &env_files
   - path: .env
     required: false
-  - .env.prod
+  - .env.test
   - .env.shared
 
 services:
@@ -23,3 +23,4 @@ services:
     env_file: *env_files
   migrations:
     env_file: *env_files
+
