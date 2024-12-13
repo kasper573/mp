@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => ({
     vanillaExtractPlugin(),
     ...(mode === "development" ? [clientEnvPlugin()] : []),
   ],
+  server: {
+    fs: {
+      // TODO figure out a way to specifically allow only @fontsource in deno and turn strict mode back on
+      strict: false,
+    },
+  },
 }));
 
 function clientEnvPlugin(): Plugin {
