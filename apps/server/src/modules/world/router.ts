@@ -100,7 +100,7 @@ export function createWorldRouter({
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ ctx: { user, clients, logger } }) =>
+      .mutation(({ ctx: { user, logger } }) =>
         accessState("world.join", (state) => {
           // TODO don't use user id as character id
           const characterId = user.id as unknown as CharacterId;
