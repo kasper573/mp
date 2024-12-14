@@ -11,7 +11,7 @@ import type { FilePath } from "../schema/common.ts";
  */
 export function reconcileFilePath(
   context: LoaderContext,
-  path: string
+  path: string,
 ): FilePath {
   return context.relativePath(path, context.basePath) as FilePath;
 }

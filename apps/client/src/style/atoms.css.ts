@@ -1,6 +1,6 @@
 import type { PropertiesHyphen } from "csstype";
 import type { Property } from "csstype";
-import { defineProperties, createSprinkles } from "@vanilla-extract/sprinkles";
+import { createSprinkles, defineProperties } from "@vanilla-extract/sprinkles";
 import {
   borders,
   colors,
@@ -64,9 +64,10 @@ const commonTransitions = Object.fromEntries(
       `${group}.${preset}`,
       cssForTransition([propertyNames, preset]),
     ]);
-  })
+  }),
 ) as {
-  [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]: string;
+  [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]:
+    string;
 };
 
 const unconditionalProperties = defineProperties({
@@ -240,5 +241,5 @@ const conditionalProperties = defineProperties({
 
 export const atoms = createSprinkles(
   unconditionalProperties,
-  conditionalProperties
+  conditionalProperties,
 );

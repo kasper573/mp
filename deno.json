@@ -27,6 +27,13 @@
   "imports": {
     "solid-js": "npm:solid-js@1.9.1"
   },
+  "fmt": {
+    "exclude": [
+      "apps/server/drizzle/**",
+      "docker/grafana/dashboards/**",
+      "docker/keycloak/import/**"
+    ]
+  },
   "compilerOptions": {
     "lib": ["ES2020", "DOM", "DOM.Iterable", "deno.ns"],
     "jsx": "react-jsx",

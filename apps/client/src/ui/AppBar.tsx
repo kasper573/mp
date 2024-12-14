@@ -26,15 +26,17 @@ export default function AppBar() {
           <Button onClick={() => globalThis.location.reload()}>Reload</Button>
         </Show>
 
-        {auth.isSignedIn() ? (
-          <Button role="link" onClick={() => void auth.signOut()}>
-            Sign out
-          </Button>
-        ) : (
-          <Button role="link" onClick={() => void auth.redirectToSignIn()}>
-            Sign in
-          </Button>
-        )}
+        {auth.isSignedIn()
+          ? (
+            <Button role="link" onClick={() => void auth.signOut()}>
+              Sign out
+            </Button>
+          )
+          : (
+            <Button role="link" onClick={() => void auth.redirectToSignIn()}>
+              Sign in
+            </Button>
+          )}
       </div>
     </nav>
   );

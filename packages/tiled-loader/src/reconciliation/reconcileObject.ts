@@ -3,7 +3,7 @@ import type { Tileset } from "../schema/tileset.ts";
 import { reconcileProperties } from "./reconcileProperties.ts";
 
 export function reconcileObject(
-  obj: TiledObject | ObjectTemplate
+  obj: TiledObject | ObjectTemplate,
 ): TiledObject {
   if ("object" in obj) {
     throw new Error("Object template reconciliation not implemented");

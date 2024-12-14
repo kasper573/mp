@@ -3,7 +3,7 @@ import type { Accessor } from "solid-js";
 import { createEffect, createMemo, For } from "solid-js";
 import { ParentContext, Pixi } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import { recallLayer, LayerViewFactory } from "./layer.tsx";
+import { LayerViewFactory, recallLayer } from "./layer.tsx";
 import type { TiledSpritesheetRecord } from "./spritesheet.ts";
 import { createTextureLookup } from "./spritesheet.ts";
 
@@ -24,7 +24,7 @@ export function TiledRenderer(props: TileRendererProps) {
 
   createEffect(() => {
     const objects = container().children.filter(
-      (c) => recallLayer(c).type === "objectgroup"
+      (c) => recallLayer(c).type === "objectgroup",
     );
 
     for (const obj of objects) {
@@ -38,7 +38,7 @@ export function TiledRenderer(props: TileRendererProps) {
       <For each={Object.entries(props.children ?? {})}>
         {([name, childrenForLabel]) => {
           const layerView = container().children.find(
-            (c) => recallLayer(c).name === name
+            (c) => recallLayer(c).name === name,
           );
           if (!layerView) {
             throw new Error(`Layer by name "${name}" not found.`);

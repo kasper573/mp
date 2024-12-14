@@ -1,15 +1,15 @@
 import type { GlobalIdFlags } from "../gid.ts";
 import type {
   Color,
+  FilePath,
+  GlobalTileId,
+  LayerDrawOrder,
   LayerId,
   Pixel,
   Ratio,
   RGB,
   TiledClass,
   TileNumber,
-  LayerDrawOrder,
-  FilePath,
-  GlobalTileId,
 } from "./common.ts";
 
 import type { PropertyMap } from "./property.ts";
@@ -63,8 +63,7 @@ export interface CommonTileLayerProperties {
 }
 
 export interface TileLayer
-  extends SharedLayerProperties,
-    CommonTileLayerProperties {
+  extends SharedLayerProperties, CommonTileLayerProperties {
   tiles: TileLayerTile[];
 }
 

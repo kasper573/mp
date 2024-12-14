@@ -9,8 +9,7 @@ import { createWorldRouter } from "./world/router.ts";
 export type RootRouter = ReturnType<typeof createRootRouter>;
 
 export interface RootRouterDependencies
-  extends WorldRouterDependencies,
-    SystemRouterDependencies {
+  extends WorldRouterDependencies, SystemRouterDependencies {
   createUrl: UrlFactory;
 }
 

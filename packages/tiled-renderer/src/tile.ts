@@ -4,7 +4,7 @@ import type { TextureLookup } from "./spritesheet.ts";
 
 export function createTileSprite(
   { id, flags, x, y, width, height, tile }: TileLayerTile,
-  lookup: TextureLookup
+  lookup: TextureLookup,
 ): Sprite {
   let sprite: Sprite;
   if (tile.animation) {

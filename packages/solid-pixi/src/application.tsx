@@ -48,7 +48,7 @@ export function Application(props: ApplicationProps) {
       await initPromise;
 
       return true;
-    }
+    },
   );
 
   createEffect(() => {

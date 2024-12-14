@@ -22,14 +22,14 @@ export class Keyboard {
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyName;
     this.#keysHeld.set((current) =>
-      current.has(key) ? current : current.union(new Set([key])),
+      current.has(key) ? current : current.union(new Set([key]))
     );
   };
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyName;
     this.#keysHeld.set((current) =>
-      current.has(key) ? current.difference(new Set([key])) : current,
+      current.has(key) ? current.difference(new Set([key])) : current
     );
   };
 }

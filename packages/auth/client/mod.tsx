@@ -15,7 +15,7 @@ export const AuthContext = createContext<AuthClient>(
     get() {
       throw new Error("AuthContext must be provided");
     },
-  })
+  }),
 );
 
 export interface AuthClient {

@@ -1,6 +1,6 @@
-import { ok, err } from "@mp/state";
+import { err, ok } from "@mp/state";
 import { setProperty } from "dot-prop";
-import type { BaseSchema, BaseIssue } from "valibot";
+import type { BaseIssue, BaseSchema } from "valibot";
 import { safeParse } from "valibot";
 
 export function parseEnv<

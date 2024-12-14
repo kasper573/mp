@@ -1,13 +1,13 @@
 import type { BaseIssue, BaseSchema } from "valibot";
 import {
   boolean,
-  number,
   custom,
+  number,
+  parse,
   pipe,
   string,
   transform,
   union,
-  parse,
 } from "valibot";
 
 export function boolish() {

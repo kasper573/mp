@@ -52,7 +52,7 @@ export class Engine {
   private nextFrame: FrameRequestCallback = () => {
     const thisFrameTime = performance.now();
     const timeSinceLastFrame = TimeSpan.fromMilliseconds(
-      thisFrameTime - this.#previousFrameTime
+      thisFrameTime - this.#previousFrameTime,
     );
     this.#previousFrameTime = thisFrameTime;
 
@@ -61,7 +61,7 @@ export class Engine {
     }
 
     this.#previousFrameDuration = TimeSpan.fromMilliseconds(
-      performance.now() - thisFrameTime
+      performance.now() - thisFrameTime,
     );
 
     if (this.#isRunning) {
@@ -87,5 +87,5 @@ function elementSize(element: HTMLElement): Size {
 
 export type FrameCallback = (
   deltaTime: TimeSpan,
-  previousFrameDuration: TimeSpan
+  previousFrameDuration: TimeSpan,
 ) => unknown;

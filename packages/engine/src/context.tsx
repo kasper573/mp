@@ -7,7 +7,7 @@ export const EngineContext = createContext<Engine>(
     get() {
       throw new Error("EngineContext not provided");
     },
-  })
+  }),
 );
 
 export function EngineProvider(props: ParentProps<{ viewport: HTMLElement }>) {

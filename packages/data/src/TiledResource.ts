@@ -1,12 +1,12 @@
 import type { Size, Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import type {
-  TiledMap,
-  TileLayerTile,
   Layer,
-  TileLayer,
-  TiledObject,
   TiledClass,
+  TiledMap,
+  TiledObject,
+  TileLayer,
+  TileLayerTile,
 } from "@mp/tiled-loader";
 
 export class TiledResource {
@@ -62,21 +62,21 @@ export class TiledResource {
     const predicate = (lt: TileLayerTile) =>
       lt.tile.properties.has(propertyFilter);
     return this.map.layers.flatMap((layer) =>
-      filterTileLayerTiles(layer, predicate),
+      filterTileLayerTiles(layer, predicate)
     );
   };
 
   getObjectsByClassName = (className: TiledClass): TiledObject[] => {
     const predicate = (obj: TiledObject) => obj.type === className;
     return this.map.layers.flatMap((layer) =>
-      filterTiledObjects(layer, predicate),
+      filterTiledObjects(layer, predicate)
     );
   };
 
   getTileLayers = (name: string): TileLayer[] => {
     const predicate = (layer: TileLayer) => layer.name === name;
     return this.map.layers.flatMap((layer) =>
-      filterTileLayers(layer, predicate),
+      filterTileLayers(layer, predicate)
     );
   };
 
@@ -125,7 +125,7 @@ function filterTileLayerTiles(
   switch (layer.type) {
     case "group":
       return layer.layers.flatMap((child) =>
-        filterTileLayerTiles(child, filter),
+        filterTileLayerTiles(child, filter)
       );
     case "tilelayer":
       return layer.tiles.filter(filter);

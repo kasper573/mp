@@ -1,42 +1,40 @@
 import { localToGlobalId, readGlobalIdBuffer } from "../gid.ts";
 import type { Chunk } from "../schema/chunk.ts";
 import type {
-  TileNumber,
   Compression,
-  TiledData,
   Encoding,
+  TiledData,
+  TileNumber,
 } from "../schema/common.ts";
 import type {
-  TileLayerTile,
-  SharedLayerProperties,
   CommonTileLayerProperties,
+  SharedLayerProperties,
+  TileLayerTile,
 } from "../schema/layer.ts";
 import type { TiledMap } from "../schema/map.ts";
 import { decoders, decompressors } from "../transformers.ts";
 
 export function decompressTileLayer(
   layer: CompressedTileLayer,
-  map: TiledMap
+  map: TiledMap,
 ): TileLayerTile[] {
   const { compression, encoding, data: rawData } = layer;
 
   const decode = decoders[encoding];
-  const decompress =
-    compression in decompressors
-      ? decompressors[compression as keyof typeof decompressors]
-      : <T>(data: T) => data;
+  const decompress = compression in decompressors
+    ? decompressors[compression as keyof typeof decompressors]
+    : <T>(data: T) => data;
 
-  const data: Uint8Array =
-    typeof rawData === "string"
-      ? decompress(decode(rawData))
-      : Uint8Array.from(rawData);
+  const data: Uint8Array = typeof rawData === "string"
+    ? decompress(decode(rawData))
+    : Uint8Array.from(rawData);
 
   let dataOffset = 0;
 
   const expectedDataSize = map.width * map.height * 4;
   if (data.length !== expectedDataSize) {
     throw new Error(
-      `Expected data length of ${expectedDataSize}, but got ${data.length}`
+      `Expected data length of ${expectedDataSize}, but got ${data.length}`,
     );
   }
 
@@ -46,7 +44,7 @@ export function decompressTileLayer(
         const gid = localToGlobalId(tileset.firstgid, tile.id);
         return [gid, { tile, tileset }] as const;
       })
-    )
+    ),
   );
 
   const tiles: TileLayerTile[] = [];
@@ -83,8 +81,7 @@ export function decompressTileLayer(
 }
 
 export interface CompressedTileLayer
-  extends SharedLayerProperties,
-    CommonTileLayerProperties {
+  extends SharedLayerProperties, CommonTileLayerProperties {
   chunks?: Chunk[];
   compression: Compression;
   data: TiledData;
@@ -92,7 +89,7 @@ export interface CompressedTileLayer
 }
 
 export function isCompressedTileLayer(
-  layer: unknown
+  layer: unknown,
 ): layer is CompressedTileLayer {
   return (
     layer !== null &&

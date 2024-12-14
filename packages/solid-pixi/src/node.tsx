@@ -1,5 +1,5 @@
 import type { ParentProps } from "solid-js";
-import { useContext, onCleanup, createEffect, onMount } from "solid-js";
+import { createEffect, onCleanup, onMount, useContext } from "solid-js";
 import { Container } from "@mp/pixi";
 import { Matrix as PixiMatrix } from "@mp/pixi";
 import { ParentContext } from "./context.ts";

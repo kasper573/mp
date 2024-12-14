@@ -21,5 +21,5 @@ render(
       </Suspense>
     </ErrorBoundary>
   ),
-  rootElement
+  rootElement,
 );

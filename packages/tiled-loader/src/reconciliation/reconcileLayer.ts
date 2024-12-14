@@ -16,7 +16,7 @@ import { reconcileProperties } from "./reconcileProperties.ts";
 export async function reconcileLayer(
   context: LoaderContext,
   layer: Layer,
-  map: TiledMap
+  map: TiledMap,
 ): Promise<void> {
   const promises: Promise<unknown>[] = [];
 
@@ -33,7 +33,7 @@ export async function reconcileLayer(
       break;
     case "group":
       promises.push(
-        ...layer.layers.map((child) => reconcileLayer(context, child, map))
+        ...layer.layers.map((child) => reconcileLayer(context, child, map)),
       );
       break;
     case "tilelayer": {

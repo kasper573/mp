@@ -23,4 +23,3 @@ services:
     env_file: *env_files
   migrations:
     env_file: *env_files
-

@@ -1,9 +1,9 @@
 import type {
+  Coord,
+  Degrees,
   GlobalTileId,
   ObjectId,
   Pixel,
-  Coord,
-  Degrees,
   TiledClass,
 } from "./common.ts";
 

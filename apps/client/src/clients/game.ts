@@ -33,9 +33,9 @@ export function createGameClient(authClient: AuthClient): GameClient {
       // eslint-disable-next-line solid/reactivity
       ({ x, y }: Vector) =>
         trpc.world.move.mutate({ characterId: characterId()!, x, y }),
-      100
+      100,
     ),
-    vec_equals
+    vec_equals,
   );
 
   return {
@@ -58,7 +58,7 @@ function createWorldStateSignal(authClient: AuthClient) {
 
     return new SyncClient<WorldState, SyncServerConnectionMetaData>(
       env.wsUrl,
-      () => ({ token: user.token })
+      () => ({ token: user.token }),
     );
   });
 
@@ -85,7 +85,7 @@ export const GameClientContext = createContext<GameClient>(
     get() {
       throw new Error("GameClientContext not provided");
     },
-  })
+  }),
 );
 
 export interface GameClient {

@@ -14,7 +14,7 @@ export class VectorSpring implements SpringLike<Vector> {
   constructor(
     getTargetValue: () => Vector,
     options: () => SpringOptions,
-    init?: Vector
+    init?: Vector,
   ) {
     this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
     this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);

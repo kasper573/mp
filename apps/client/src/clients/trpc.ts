@@ -1,5 +1,5 @@
 import type { RootRouter } from "@mp/server";
-import { transformer, tokenHeaderName } from "@mp/server";
+import { tokenHeaderName, transformer } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import type { AuthClient } from "@mp/auth-client";
 import { env } from "../env.ts";
@@ -25,7 +25,7 @@ export const trpc = createTRPCClient<RootRouter>({
         const result = await fetch(...args);
         if (authClient?.isSignedIn() && result.status === 401) {
           logger.info(
-            "Automatically signed out due to 401 response from server"
+            "Automatically signed out due to 401 response from server",
           );
           void authClient?.signOut();
         }

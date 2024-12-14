@@ -8,8 +8,8 @@ import type {
 import { Assets, Spritesheet } from "@mp/pixi";
 import type { FilePath, LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
-  localToGlobalId,
   type GlobalTileId,
+  localToGlobalId,
   type TiledMap,
   type Tileset,
 } from "@mp/tiled-loader";

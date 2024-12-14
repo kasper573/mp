@@ -6,7 +6,7 @@ import { reconcileProperties } from "./reconcileProperties.ts";
 
 export async function reconcileTileset(
   context: LoaderContext,
-  tileset: Tileset | TilesetFile
+  tileset: Tileset | TilesetFile,
 ): Promise<Tileset> {
   const { basePath, loadJson, relativePath } = context;
 

@@ -15,7 +15,7 @@ export function rateLimit(options: IRateLimiterOptions) {
 
 export async function consumeLimiterWithContext(
   limiter: RateLimiterMemory,
-  { sessionId }: ServerContext
+  { sessionId }: ServerContext,
 ) {
   if (sessionId) {
     try {

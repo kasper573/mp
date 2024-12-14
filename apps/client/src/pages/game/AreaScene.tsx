@@ -1,6 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createEffect, Index, Show, createMemo } from "solid-js";
+import { createEffect, createMemo, Index, Show, useContext } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -36,7 +36,7 @@ export function AreaScene(props: { area: AreaResource }) {
       damping: 40,
       mass: 1,
       precision: 0.1,
-    }))
+    })),
   );
 
   createEffect(() => {

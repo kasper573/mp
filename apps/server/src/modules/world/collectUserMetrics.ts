@@ -7,7 +7,7 @@ import type { WorldState } from "./schema.ts";
 export function collectUserMetrics<T>(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  worldState: SyncServer<WorldState, T>
+  worldState: SyncServer<WorldState, T>,
 ) {
   new MetricsGague({
     name: "active_user_count",

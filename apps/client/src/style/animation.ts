@@ -1,6 +1,6 @@
 import type {
-  PropertiesHyphen as CSSProperties,
   DataType,
+  PropertiesHyphen as CSSProperties,
   Property,
 } from "csstype";
 import { flattened } from "./flattened.ts";
@@ -26,7 +26,7 @@ export function cssForTransition<const Transitions extends Transition[]>(
         ? propertyNameOrNames
         : [propertyNameOrNames];
       return propertyNames.map(
-        (property) => `${property} ${String(transitionPresetValues[preset])}`
+        (property) => `${property} ${String(transitionPresetValues[preset])}`,
       );
     })
     .join(", ");
@@ -68,7 +68,7 @@ export function cssForAnimation<Animations extends Animation[]>(
         ]
           .filter(Boolean)
           .join(" ");
-      }
+      },
     )
     .join(", ");
 }
@@ -97,7 +97,7 @@ const cssTransitions = Object.fromEntries(
   Object.entries(tokens.transitions).map(([name, { duration, easing }]) => [
     name,
     `${duration} ${easing}`,
-  ])
+  ]),
 ) as {
   [Name in keyof tokens.Transitions]: string;
 };
@@ -105,5 +105,5 @@ const cssTransitions = Object.fromEntries(
 const transitionPresetValues = flattened(cssTransitions);
 
 export const transitionPresets = Object.keys(
-  transitionPresetValues
+  transitionPresetValues,
 ) as Array<TransitionPreset>;

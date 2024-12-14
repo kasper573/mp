@@ -1,14 +1,14 @@
 import type {
+  Coord,
+  FilePath,
   GlobalTileId,
   LocalTileId,
   ObjectAlignment,
   Pixel,
-  Coord,
   RGB,
   TiledClass,
-  TileRenderSize,
   TileNumber,
-  FilePath,
+  TileRenderSize,
 } from "./common.ts";
 import type { WangSet } from "./wang.ts";
 import type { Transformations } from "./transformations.ts";

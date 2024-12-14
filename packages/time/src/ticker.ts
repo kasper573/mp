@@ -21,7 +21,7 @@ export class Ticker {
     this.stop();
     this.intervalId = setInterval(
       this.tick,
-      this.options.interval.totalMilliseconds
+      this.options.interval.totalMilliseconds,
     );
   }
 

@@ -19,7 +19,7 @@ export class SyncClient<State, ConnectionMetaData> {
 
   constructor(
     private url: string,
-    private getConnectionMetaData: () => ConnectionMetaData
+    private getConnectionMetaData: () => ConnectionMetaData,
   ) {
     this.clientId = uuid() as ClientId;
   }
@@ -35,7 +35,7 @@ export class SyncClient<State, ConnectionMetaData> {
 
     this.wsAdapter = new WSClientAdapterWithCustomMetaData(
       this.url,
-      this.getConnectionMetaData
+      this.getConnectionMetaData,
     );
 
     this.repo = new Repo({
@@ -84,7 +84,7 @@ class WSClientAdapterWithCustomMetaData<
 > extends BrowserWebSocketClientAdapter {
   constructor(
     serverUrl: string,
-    private getCustom?: () => Custom
+    private getCustom?: () => Custom,
   ) {
     super(serverUrl);
   }

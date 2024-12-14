@@ -1,5 +1,5 @@
 import type { Computed } from "@mp/state";
-import { atom, computed, batch } from "@mp/state";
+import { atom, batch, computed } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring implements SpringLike<number> {

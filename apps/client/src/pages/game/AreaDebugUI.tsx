@@ -1,13 +1,13 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
 import type { Vector } from "@mp/math";
-import { vec, type Path } from "@mp/math";
+import { type Path, vec } from "@mp/math";
 import {
-  type DNode,
-  type DGraph,
-  vectorFromDNode,
-  dNodeFromVector,
   addVectorToAdjacentInGraph,
+  type DGraph,
+  type DNode,
+  dNodeFromVector,
+  vectorFromDNode,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import {
@@ -37,7 +37,7 @@ export function AreaDebugUI(props: {
   const isVisible = createMemo(
     () =>
       engine.keyboard.keysHeld.has("Control") ||
-      engine.keyboard.keysHeld.has("Shift")
+      engine.keyboard.keysHeld.has("Shift"),
   );
 
   return (
@@ -57,7 +57,7 @@ function DebugDGraph(props: { area: AreaResource }) {
   const allTileCoords = createMemo(() =>
     generateAllTileCoords(
       props.area.tiled.map.width,
-      props.area.tiled.map.height
+      props.area.tiled.map.height,
     )
   );
 
@@ -75,7 +75,7 @@ function DebugDGraph(props: { area: AreaResource }) {
         gfx,
         tiled,
         dGraph,
-        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition))
+        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
       );
     } else if (keysHeld.has("Shift")) {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
@@ -84,7 +84,7 @@ function DebugDGraph(props: { area: AreaResource }) {
         tiled,
         addVectorToAdjacentInGraph(dGraph, tilePos),
         tilePos,
-        tiled.tileCoordToWorld(tilePos)
+        tiled.tileCoordToWorld(tilePos),
       );
     }
   });
@@ -119,7 +119,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
           setFrameInterval(interval);
           setFrameDuration(duration);
         })
-      )
+      ),
     )
   );
 
@@ -132,8 +132,12 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
       `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
-      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)}`,
+      `camera transform: ${
+        JSON.stringify(engine.camera.transform.data, null, 2)
+      }`,
+      `character: ${
+        JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)
+      }`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
@@ -160,11 +164,13 @@ function drawDNode(
   tiled: TiledResource,
   graph: DGraph,
   tilePos: Vector,
-  start = tiled.tileCoordToWorld(tilePos)
+  start = tiled.tileCoordToWorld(tilePos),
 ) {
-  for (const [neighbor] of Object.entries(
-    graph[dNodeFromVector(tilePos)] ?? {}
-  )) {
+  for (
+    const [neighbor] of Object.entries(
+      graph[dNodeFromVector(tilePos)] ?? {},
+    )
+  ) {
     const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);

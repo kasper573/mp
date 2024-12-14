@@ -101,7 +101,7 @@ function createTextRenderer({ text, x, y, width, rotation }: TextObject): Text {
 
 function createTextStyle(
   { bold, color, fontfamily, halign, italic, pixelsize, wrap }: TiledText,
-  width: number
+  width: number,
 ): TextStyle {
   return new TextStyle({
     fontFamily: fontfamily,
