@@ -156,11 +156,7 @@ webServer
   )
   .use(createMetricsScrapeMiddleware(metrics))
   .use(cors({ origin: opt.corsOrigin }))
-  .use(
-    opt.publicPath + "*",
-    cache,
-    serveStatic({}),
-  );
+  .use(opt.publicPath + "*", cache, serveStatic({}));
 
 const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>(
   wssAdapter,
