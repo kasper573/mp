@@ -5,9 +5,6 @@
   "imports": {
     "@automerge/automerge": "npm:@automerge/automerge@2.2.9-alpha.2",
     "@automerge/automerge-repo": "npm:@automerge/automerge-repo@2.0.0-alpha.14",
-    "@automerge/automerge-repo-network-websocket": "npm:@automerge/automerge-repo-network-websocket@2.0.0-alpha.14",
-    "@types/node": "npm:@types/node@^22.10.1",
-    "ws": "npm:ws@8.18.0",
-    "@types/ws": "npm:@types/ws@8.5.12"
+    "@automerge/automerge-repo-network-websocket": "npm:@automerge/automerge-repo-network-websocket@2.0.0-alpha.14"
   }
 }

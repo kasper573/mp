@@ -1,16 +1,14 @@
 #!/usr/bin/env node
 
 import path from "node:path";
-import http from "node:http";
 import { Logger } from "@mp/logger";
-import express from "express";
 import type { PathToLocalFile, UrlToPublicFile } from "@mp/data";
-import createCors from "cors";
+
 import { createAuthServer } from "@mp/auth-server";
-import * as trpcExpress from "@trpc/server/adapters/express";
+import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import type { ClientId } from "@mp/sync-server";
-import { SyncServer } from "@mp/sync-server";
-import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
+import { SyncServer, WSServerAdapter } from "@mp/sync-server";
+import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
   createMetricsScrapeMiddleware,
@@ -34,7 +32,12 @@ import { ClientRegistry } from "./modules/world/ClientRegistry.ts";
 import { createRootRouter } from "./modules/router.ts";
 import { tokenHeaderName } from "./shared.ts";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics.ts";
-import { clientMiddleware } from "./clientMiddleware.ts";
+import { clientMiddlewares } from "./clientMiddleware.ts";
+import { type Context, Hono } from "@hono/hono";
+import { createMiddleware } from "@hono/hono/factory";
+import { cors } from "@hono/hono/cors";
+import { getConnInfo, serveStatic, upgradeWebSocket } from "@hono/hono/deno";
+import { cache as createCacheMiddleware } from "@hono/hono/cache";
 
 const logger = new Logger(console);
 
@@ -125,34 +128,55 @@ if (initialWorldState.isErr()) {
   Deno.exit(1);
 }
 
-const expressLogger = createExpressLogger(logger.chain("http"));
+const honoLogger = createHonoLogger(logger.chain("http"));
 
-const expressStaticConfig = {
-  maxAge: opt.publicMaxAge * 1000,
-};
-
-const webServer = express()
-  .set("trust proxy", opt.trustProxy)
-  .use(expressLogger)
-  .use(createMetricsScrapeMiddleware(metrics))
-  .use(createCors({ origin: opt.corsOrigin }))
-  .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
-
-const httpServer = http.createServer(webServer);
-
-const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
-  initialState: initialWorldState.value,
-  filterState: deriveWorldStateForClient,
-  httpServer,
-  patchCallback: opt.logSyncPatches
-    ? (patches) => logger.chain("sync").info(patches)
-    : undefined,
-  onConnection: handleSyncServerConnection,
-  onDisconnect(clientId) {
-    logger.info("Client disconnected", clientId);
-    clients.deleteClient(clientId);
-  },
+// TODO fix the cache, it doesn't seem to apply
+const cache = createCacheMiddleware({
+  cacheName: "mp",
+  cacheControl: `max-age=${opt.publicMaxAge * 1000}`,
+  wait: true,
 });
+
+const webServer = new Hono();
+
+if (opt.trustProxy) {
+  console.warn("trustProxy middleware is not implemented");
+}
+
+const wssAdapter = new WSServerAdapter();
+
+webServer
+  .use(honoLogger)
+  .get(
+    "/ws",
+    upgradeWebSocket(() => ({
+      onOpen: (_, { raw }) => wssAdapter.addSocket(raw!),
+      onClose: (_, { raw }) => wssAdapter.removeSocket(raw!),
+    })),
+  )
+  .use(createMetricsScrapeMiddleware(metrics))
+  .use(cors({ origin: opt.corsOrigin }))
+  .use(
+    opt.publicPath + "*",
+    cache,
+    serveStatic({}),
+  );
+
+const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>(
+  wssAdapter,
+  {
+    initialState: initialWorldState.value,
+    filterState: deriveWorldStateForClient,
+    patchCallback: opt.logSyncPatches
+      ? (patches) => logger.chain("sync").info(patches)
+      : undefined,
+    onConnection: handleSyncServerConnection,
+    onDisconnect(clientId) {
+      logger.info("Client disconnected", clientId);
+      clients.deleteClient(clientId);
+    },
+  },
+);
 
 collectUserMetrics(metrics, clients, worldState);
 
@@ -185,25 +209,28 @@ const apiRouter = createRootRouter({
 });
 
 webServer.use(
-  opt.apiEndpointPath,
-  trpcExpress.createExpressMiddleware({
-    router: apiRouter,
-    createContext: ({ req }) =>
-      createServerContext(
-        `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
-        String(req.headers[tokenHeaderName]) as ServerContext["authToken"],
-      ),
-  }),
+  (ctx) =>
+    fetchRequestHandler({
+      endpoint: opt.apiEndpointPath,
+      req: ctx.req.raw,
+      router: apiRouter,
+      createContext: () =>
+        createServerContext(
+          getSessionId(ctx),
+          ctx.req.raw.headers.get(
+            tokenHeaderName,
+          ) as ServerContext["authToken"],
+        ),
+    }),
 );
 
 if (opt.clientDir !== undefined) {
-  webServer.use(clientMiddleware(opt.clientDir, expressStaticConfig));
+  webServer.use(...clientMiddlewares(opt.clientDir, cache));
 }
 
-httpServer.listen(opt.port, opt.hostname, () => {
-  logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
-});
+logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 
+Deno.serve(opt, webServer.fetch);
 persistTicker.start();
 ticker.start();
 
@@ -275,15 +302,11 @@ function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
   return `${opt.httpBaseUrl}${opt.publicPath}${relativePath}` as UrlToPublicFile;
 }
 
-function createExpressLogger(logger: Logger) {
-  return (
-    req: { method: string; url: string },
-    _: unknown,
-    next: () => void,
-  ) => {
+function createHonoLogger(logger: Logger) {
+  return createMiddleware(async ({ req }, next) => {
     logger.info(req.method, req.url);
-    next();
-  };
+    await next();
+  });
 }
 
 function serverTextHeader(options: ServerOptions) {
@@ -299,4 +322,10 @@ function serverTextHeader(options: ServerOptions) {
 ===============================
 ${JSON.stringify(options, null, 2)}
 =====================================================`;
+}
+
+function getSessionId(ctx: Context): HttpSessionId {
+  const { address } = getConnInfo(ctx).remote;
+  const userAgent = ctx.req.raw.headers.get("user-agent") as string;
+  return `${address}-${userAgent}` as HttpSessionId;
 }
