@@ -62,7 +62,7 @@
       "command": "cd apps/server && deno task build"
     },
     "build": {
-      "command": "deno task build:client && deno task build:server",
+      "command": "deno task build:client & deno task build:server",
       "description": "Build the client and server for production"
     }
   },
