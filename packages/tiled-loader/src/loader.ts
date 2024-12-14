@@ -5,8 +5,10 @@ import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap.ts";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 
-export function createTiledLoader(options: CreateTiledLoaderOptions) {
-  return async function loadTiled(mapPath: string): Promise<TiledLoaderResult> {
+export function createTiledLoader(
+  options: CreateTiledLoaderOptions,
+): TiledLoader {
+  return async function loadTiled(mapPath) {
     const context: LoaderContext = {
       basePath: mapPath,
       ...options,
@@ -23,3 +25,4 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
 }
 
 export type TiledLoaderResult = Result<TiledMap, unknown>;
+export type TiledLoader = (mapPath: string) => Promise<TiledLoaderResult>;

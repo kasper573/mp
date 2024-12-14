@@ -18,7 +18,7 @@ export interface ApplicationProps
   style?: JSX.CSSProperties;
 }
 
-export function Application(props: ApplicationProps) {
+export function Application(props: ApplicationProps): JSX.Element {
   const [viewport, setViewport] = createSignal<HTMLElement>();
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   const elements = createMemo(() => [viewport(), canvas()] as const);

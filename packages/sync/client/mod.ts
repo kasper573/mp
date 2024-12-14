@@ -60,9 +60,11 @@ export class SyncClient<State, ConnectionMetaData> {
     this.handle = undefined;
   }
 
-  subscribe = (handler: SyncClientSubscription<State>) => {
+  subscribe = (handler: SyncClientSubscription<State>): Unsubscribe => {
     this.stateSubscriptions.add(handler);
-    return () => this.stateSubscriptions.delete(handler);
+    return (): void => {
+      this.stateSubscriptions.delete(handler);
+    };
   };
 
   private acceptDocument = ({ handle }: DocumentPayload) => {
@@ -101,3 +103,5 @@ export type SyncClientSubscription<State> = (state?: State) => void;
 
 export * from "../shared.ts";
 export type { ClientId };
+
+export type Unsubscribe = () => void;

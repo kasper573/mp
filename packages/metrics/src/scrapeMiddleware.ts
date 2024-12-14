@@ -1,7 +1,7 @@
 import type { Registry } from "prom-client";
 import { createMiddleware } from "jsr:@hono/hono/factory";
 import { getConnInfo } from "jsr:@hono/hono/deno";
-import type { Context } from "jsr:@hono/hono";
+import type { Context, MiddlewareHandler } from "jsr:@hono/hono";
 
 /**
  * Middleware that serves the metrics from the given registry.
@@ -9,9 +9,8 @@ import type { Context } from "jsr:@hono/hono";
  */
 export function createMetricsScrapeMiddleware(
   registry: Registry,
-) {
+): MiddlewareHandler {
   return createMiddleware(async (ctx, next) => {
-    ctx.req.raw;
     if (ctx.req.path === "/metrics" && isAllowedToAccessMetrics(ctx)) {
       ctx.res = new Response(await registry.metrics(), {
         status: 200,

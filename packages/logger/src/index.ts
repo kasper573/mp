@@ -6,13 +6,13 @@ export class Logger {
     private prefixes: unknown[] = [],
   ) {}
 
-  info = this.log.bind(this, "info");
+  info: LogFn = this.log.bind(this, "info");
 
-  warn = this.log.bind(this, "warn");
+  warn: LogFn = this.log.bind(this, "warn");
 
-  error = this.log.bind(this, "error");
+  error: LogFn = this.log.bind(this, "error");
 
-  chain(...newPrefixes: unknown[]) {
+  chain(...newPrefixes: unknown[]): Logger {
     return new Logger(this.impl, [...this.prefixes, ...newPrefixes]);
   }
 
@@ -27,6 +27,8 @@ export class Logger {
     );
   }
 }
+
+type LogFn = (...args: unknown[]) => void;
 
 type LogLevel = "info" | "warn" | "error";
 

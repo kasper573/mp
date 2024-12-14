@@ -20,19 +20,19 @@ const { encode, decode } = cborHelpers;
  * A web standards WebSocket compatible server adapter for automerge
  */
 export class WSServerAdapter extends NetworkAdapter {
-  sockets = new Map<PeerId, WebSocket>();
+  sockets: Map<PeerId, WebSocket> = new Map();
 
   #ready = false;
   #readyResolver?: () => void;
-  #readyPromise: Promise<void> = new Promise<void>((resolve) => {
+  #readyPromise = new Promise<void>((resolve) => {
     this.#readyResolver = resolve;
   });
 
-  isReady() {
+  isReady(): boolean {
     return this.#ready;
   }
 
-  whenReady() {
+  whenReady(): Promise<void> {
     return this.#readyPromise;
   }
 

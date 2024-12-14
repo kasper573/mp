@@ -27,7 +27,7 @@ export function csv<
   );
 }
 
-export function numericString() {
+export function numericString(): SchemaFor<number> {
   return pipe(
     string(),
     custom((value) => parseNumericString(String(value)) !== undefined),
@@ -35,7 +35,7 @@ export function numericString() {
   );
 }
 
-export function booleanString() {
+export function booleanString(): SchemaFor<boolean> {
   return pipe(
     string(),
     custom((value) => {
@@ -61,3 +61,5 @@ function parseNumericString(value: string): number | undefined {
 const yesValues = new Set(["true", "1", "yes", "on"]);
 
 const noValues = new Set(["false", "0", "no", "off"]);
+
+type SchemaFor<T> = BaseSchema<unknown, T, BaseIssue<unknown>>;
