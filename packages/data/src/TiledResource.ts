@@ -12,7 +12,7 @@ import type {
 export class TiledResource {
   constructor(public readonly map: TiledMap) {}
 
-  get tileSize() {
+  get tileSize(): Vector {
     return vec(this.map.tilewidth, this.map.tileheight);
   }
 

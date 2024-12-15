@@ -4,7 +4,7 @@ import type { TimeSpan } from "@mp/time";
 import type { Computed } from "@mp/state";
 import { batch } from "@mp/state";
 import { computed } from "@mp/state";
-import type { SpringLike, SpringOptions } from "./spring.ts";
+import type { SpringLike, SpringOptions, SpringState } from "./spring.ts";
 import { Spring } from "./spring.ts";
 
 export class VectorSpring implements SpringLike<Vector> {
@@ -25,12 +25,12 @@ export class VectorSpring implements SpringLike<Vector> {
 
   readonly value: Computed<Vector>;
 
-  state = () =>
+  state = (): SpringState =>
     this.xSpring.state() === "settled" && this.ySpring.state() === "settled"
       ? "settled"
       : "moving";
 
-  update = (dt: TimeSpan) => {
+  update = (dt: TimeSpan): void => {
     batch(() => {
       this.xSpring.update(dt);
       this.ySpring.update(dt);

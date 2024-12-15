@@ -27,6 +27,11 @@
   "imports": {
     "solid-js": "npm:solid-js@1.9.1"
   },
+  "lint": {
+    "rules": {
+      "exclude": ["no-unused-vars"]
+    }
+  },
   "fmt": {
     "exclude": [
       "apps/server/drizzle/**",

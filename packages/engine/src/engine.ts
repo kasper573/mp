@@ -13,7 +13,7 @@ export class Engine {
   #viewportSizeObserver?: ResizeObserver;
   #frameCallbacks = new Set<FrameCallback>();
 
-  get frameCallbackCount() {
+  get frameCallbackCount(): number {
     return this.#frameCallbacks.size;
   }
 
@@ -44,7 +44,7 @@ export class Engine {
 
   // Note: Explicit callback based frame reactivity because implicit
   // reactivity for rendering is error prone and hard to reason about.
-  addFrameCallback(callback: FrameCallback) {
+  addFrameCallback(callback: FrameCallback): Unsubscribe {
     this.#frameCallbacks.add(callback);
     return () => this.#frameCallbacks.delete(callback);
   }
@@ -89,3 +89,5 @@ export type FrameCallback = (
   deltaTime: TimeSpan,
   previousFrameDuration: TimeSpan,
 ) => unknown;
+
+type Unsubscribe = () => void;

@@ -10,17 +10,15 @@ import {
   union,
 } from "valibot";
 
-export function boolish() {
+export function boolish(): SchemaFor<boolean> {
   return union([boolean(), booleanString()]);
 }
 
-export function numeric() {
+export function numeric(): SchemaFor<number> {
   return union([number(), numericString()]);
 }
 
-export function csv<
-  const Schema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,
->(schema: Schema) {
+export function csv<const Item>(schema: SchemaFor<Item>): SchemaFor<Item[]> {
   return pipe(
     string(),
     transform((value) => value.split(",").map((v) => parse(schema, v.trim()))),

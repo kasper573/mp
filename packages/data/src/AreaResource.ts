@@ -40,7 +40,7 @@ export class AreaResource {
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
     getTileCoordOfSubject: (s: Subject) => Vector,
-  ) {
+  ): Generator<HitObject<Subject>> {
     return hitTestObjects(
       this.objects,
       subjects,
@@ -55,7 +55,7 @@ function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,
   subjects: Iterable<Subject>,
   getWorldCoordOfSubject: (s: Subject) => Vector,
-): Generator<{ subject: Subject; object: TiledObject }> {
+): Generator<HitObject<Subject>> {
   for (const subject of subjects) {
     const worldPos = getWorldCoordOfSubject(subject);
     for (const object of objects) {
@@ -64,4 +64,9 @@ function* hitTestObjects<Subject>(
       }
     }
   }
+}
+
+interface HitObject<Subject> {
+  subject: Subject;
+  object: TiledObject;
 }

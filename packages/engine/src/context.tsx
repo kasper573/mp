@@ -1,8 +1,8 @@
-import type { ParentProps } from "solid-js";
+import type { Context, JSXElement, ParentProps } from "solid-js";
 import { createContext, createMemo, onCleanup, Show } from "solid-js";
 import { Engine } from "./engine.ts";
 
-export const EngineContext = createContext<Engine>(
+export const EngineContext: Context<Engine> = createContext(
   new Proxy({} as Engine, {
     get() {
       throw new Error("EngineContext not provided");
@@ -10,7 +10,9 @@ export const EngineContext = createContext<Engine>(
   }),
 );
 
-export function EngineProvider(props: ParentProps<{ viewport: HTMLElement }>) {
+export function EngineProvider(
+  props: ParentProps<{ viewport: HTMLElement }>,
+): JSXElement {
   const engine = createMemo(() => {
     const engine = new Engine(props.viewport);
     engine.start();

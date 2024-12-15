@@ -1,6 +1,6 @@
 import type { User } from "oidc-client-ts";
 import { UserManager } from "oidc-client-ts";
-import type { Accessor } from "solid-js";
+import type { Accessor, Context } from "solid-js";
 import {
   createContext,
   createEffect,
@@ -10,7 +10,7 @@ import {
 } from "solid-js";
 import type { AuthToken, UserId, UserIdentity } from "../shared.ts";
 
-export const AuthContext = createContext<AuthClient>(
+export const AuthContext: Context<AuthClient> = createContext(
   new Proxy({} as AuthClient, {
     get() {
       throw new Error("AuthContext must be provided");
