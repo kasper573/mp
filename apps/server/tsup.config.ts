@@ -1,16 +1,20 @@
 import { defineConfig } from "tsup";
 
-export default defineConfig((config) => ({
-  format: "esm",
-  clean: !config.watch, // Cleaning during watch mode causes race conditions in the toolchain
+const isProd = !!process.env.PROD;
+
+export default defineConfig({
+  format: "cjs",
+  clean: true,
   dts: false, // Nothing needs the typesecript declaration files of the server app
-  minify: !config.watch, // Use watch mode as a hint that we're in development
   sourcemap: true,
-  outExtension: ({ format }) => ({
-    js: format === "cjs" ? `.cjs` : `.mjs`,
-  }),
   target: "node20",
+  platform: "node",
   entry: {
     index: "src/main.ts",
   },
-}));
+  bundle: true,
+  minify: isProd,
+  splitting: false,
+  external: ["stream"],
+  noExternal: isProd ? [/.*/] : [/^@mp\//], // Only bundle internal packages in development
+});
