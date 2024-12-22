@@ -10,8 +10,6 @@ import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket
 import type { PatchCallback } from "@automerge/automerge";
 import type { PeerId as ClientId } from "@automerge/automerge-repo";
 
-export type {ClientId};
-
 export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
   private wssAdapter: NodeWSServerAdapter;
@@ -86,4 +84,4 @@ export type StateAccess<State> = <Result>(
   stateHandler: (draft: State) => Result,
 ) => Result;
 
-export * from "../../sync-client/src/shared";
+export { type PeerId as ClientId } from "@automerge/automerge-repo";
