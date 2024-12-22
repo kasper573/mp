@@ -1,4 +1,4 @@
-import { atoms } from "../../style/atoms.css.ts";
+import { atoms } from "@mp/style";
 
 export const container = atoms({
   display: "flex",

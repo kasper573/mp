@@ -1,0 +1,10 @@
+{
+  "extends": "@mp/tsconfig/vite.json",
+  "include": ["src", "*.ts"],
+  "exclude": ["../server/public"],
+  "compilerOptions": {
+    "allowJs": true,
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js"
+  }
+}

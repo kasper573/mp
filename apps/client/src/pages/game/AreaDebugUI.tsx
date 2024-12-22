@@ -1,13 +1,13 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
 import type { Vector } from "@mp/math";
-import { type Path, vec } from "@mp/math";
+import { vec, type Path } from "@mp/math";
 import {
-  addVectorToAdjacentInGraph,
-  type DGraph,
   type DNode,
-  dNodeFromVector,
+  type DGraph,
   vectorFromDNode,
+  dNodeFromVector,
+  addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
 import {
@@ -24,10 +24,10 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
-import { env } from "../../env.ts";
-import { useServerVersion } from "../../state/useServerVersion.ts";
-import { GameClientContext } from "../../clients/game.ts";
-import * as styles from "./AreaDebugUI.css.ts";
+import { env } from "../../env";
+import { useServerVersion } from "../../state/useServerVersion";
+import { GameClientContext } from "../../clients/game";
+import * as styles from "./AreaDebugUI.css";
 
 export function AreaDebugUI(props: {
   area: AreaResource;
@@ -58,7 +58,7 @@ function DebugDGraph(props: { area: AreaResource }) {
     generateAllTileCoords(
       props.area.tiled.map.width,
       props.area.tiled.map.height,
-    )
+    ),
   );
 
   createEffect(() => {
@@ -118,9 +118,9 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
         batch(() => {
           setFrameInterval(interval);
           setFrameDuration(duration);
-        })
+        }),
       ),
-    )
+    ),
   );
 
   const text = createMemo(() => {
@@ -132,12 +132,8 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
       `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
-      `camera transform: ${
-        JSON.stringify(engine.camera.transform.data, null, 2)
-      }`,
-      `character: ${
-        JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)
-      }`,
+      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
+      `character: ${JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
@@ -166,11 +162,9 @@ function drawDNode(
   tilePos: Vector,
   start = tiled.tileCoordToWorld(tilePos),
 ) {
-  for (
-    const [neighbor] of Object.entries(
-      graph[dNodeFromVector(tilePos)] ?? {},
-    )
-  ) {
+  for (const [neighbor] of Object.entries(
+    graph[dNodeFromVector(tilePos)] ?? {},
+  )) {
     const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);

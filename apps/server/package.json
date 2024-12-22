@@ -6,8 +6,8 @@
   "exports": {
     ".": {
       "types": "./src/package.ts",
-      "import": "./dist/package.mjs",
-      "require": "./dist/package.cjs"
+      "import": "./src/package.ts",
+      "require": "./src/package.ts"
     }
   },
   "scripts": {

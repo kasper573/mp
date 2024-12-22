@@ -5,12 +5,12 @@ import { vec } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
-  batch,
-  createEffect,
-  createMemo,
   createSignal,
+  createMemo,
+  createEffect,
   onCleanup,
   useContext,
+  batch,
 } from "solid-js";
 
 /**

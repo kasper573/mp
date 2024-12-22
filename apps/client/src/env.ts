@@ -1,4 +1,4 @@
-import { type ClientEnv, clientEnvGlobalVarName } from "@mp/server";
+import { clientEnvGlobalVarName, type ClientEnv } from "@mp/server";
 
 export const env: ClientEnv = getClientEnv();
 

@@ -1,5 +1,4 @@
-import { style } from "@vanilla-extract/css";
-import { atoms } from "../../style/atoms.css.ts";
+import { style, atoms } from "@mp/style";
 
 export const debugText = style([
   atoms({

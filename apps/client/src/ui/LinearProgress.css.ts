@@ -1,6 +1,4 @@
-import { keyframes } from "@vanilla-extract/css";
-import { recipe } from "@vanilla-extract/recipes";
-import { atoms } from "../style/atoms.css.ts";
+import { keyframes, atoms, recipe } from "@mp/style";
 
 const scale = "400%";
 

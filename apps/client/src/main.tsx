@@ -1,12 +1,11 @@
-import "@fontsource-variable/inter";
+import { dark } from "@mp/style/themes/dark.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
-import * as styles from "./main.css.ts";
-import { LoadingSpinner } from "./ui/LoadingSpinner.tsx";
-import { ErrorFallback } from "./ui/ErrorFallback.tsx";
-import { dark } from "./style/themes/dark.css.ts";
+import * as styles from "./main.css";
+import { LoadingSpinner } from "./ui/LoadingSpinner";
+import { ErrorFallback } from "./ui/ErrorFallback";
 
-const App = lazy(() => import("./App.tsx"));
+const App = lazy(() => import("./App"));
 
 document.documentElement.classList.add(dark);
 

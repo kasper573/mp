@@ -16,9 +16,9 @@ import {
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth-client";
-import { env } from "../env.ts";
-import { dedupe, throttle } from "../state/functionComposition.ts";
-import { trpc } from "./trpc.ts";
+import { env } from "../env";
+import { dedupe, throttle } from "../state/functionComposition";
+import { trpc } from "./trpc";
 
 export function createGameClient(authClient: AuthClient): GameClient {
   const worldState = createWorldStateSignal(authClient);
@@ -26,7 +26,7 @@ export function createGameClient(authClient: AuthClient): GameClient {
   const character = createMemo(() => worldState()?.characters[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
 
-  const join = () => trpc.world.join.mutate().then(setCharacterId);
+  const join = async () => trpc.world.join.mutate().then(setCharacterId);
 
   const move = dedupe(
     throttle(

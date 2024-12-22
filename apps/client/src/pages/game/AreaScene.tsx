@@ -1,20 +1,20 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { createEffect, createMemo, Index, Show, useContext } from "solid-js";
+import { useContext, createEffect, Index, Show, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import { vec_zero } from "@mp/math";
-import { GameClientContext } from "../../clients/game.ts";
-import { useAnimatedCoords } from "../../state/useAnimatedCoords.ts";
-import { getTilePosition } from "../../state/getTilePosition.ts";
+import { GameClientContext } from "../../clients/game";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords";
+import { getTilePosition } from "../../state/getTilePosition";
 import {
   AutoPositionedCharacterActor,
   ManuallyPositionedCharacterActor,
-} from "./CharacterActor.tsx";
-import { TileHighlight } from "./TileHighlight.tsx";
-import { AreaDebugUI } from "./AreaDebugUI.tsx";
+} from "./CharacterActor";
+import { TileHighlight } from "./TileHighlight";
+import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);

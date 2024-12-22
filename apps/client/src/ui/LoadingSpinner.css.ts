@@ -1,4 +1,4 @@
-import { keyframes, style } from "@vanilla-extract/css";
+import { style, keyframes } from "@mp/style";
 
 const left = keyframes({
   "0%": { transform: "scale(0)" },

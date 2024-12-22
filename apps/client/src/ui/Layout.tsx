@@ -1,8 +1,8 @@
 import type { ParentProps } from "solid-js";
 import { ErrorBoundary, Suspense } from "solid-js";
-import AppBar from "./AppBar.tsx";
-import { LoadingSpinner } from "./LoadingSpinner.tsx";
-import { ErrorFallback } from "./ErrorFallback.tsx";
+import AppBar from "./AppBar";
+import { LoadingSpinner } from "./LoadingSpinner";
+import { ErrorFallback } from "./ErrorFallback";
 
 export default function Layout(props: ParentProps) {
   return (

@@ -12,6 +12,5 @@ export default defineConfig((config) => ({
   target: "node20",
   entry: {
     index: "src/main.ts",
-    package: "src/package.ts",
   },
 }));
