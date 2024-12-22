@@ -1,17 +1,17 @@
 import type { Ticker, TimeSpan } from "@mp/time";
 import {
-  type AreaId,
-  type AreaResource,
   findPath,
   moveAlongPath,
+  type AreaId,
+  type AreaResource,
 } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec, vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync-server";
 import { TRPCError } from "@trpc/server";
-import { auth } from "../../middlewares/auth.ts";
-import { schemaFor, t } from "../../trpc.ts";
-import type { CharacterId, WorldState } from "./schema.ts";
+import { auth } from "../../middlewares/auth";
+import { schemaFor, t } from "../../trpc";
+import type { CharacterId, WorldState } from "./schema";
 
 export interface WorldRouterDependencies {
   state: StateAccess<WorldState>;
@@ -94,13 +94,13 @@ export function createWorldRouter({
               char.path = newPath;
             }
           }
-        })
+        }),
       ),
 
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ ctx: { user, logger } }) =>
+      .mutation(({ ctx: { user, clients, logger } }) =>
         accessState("world.join", (state) => {
           // TODO don't use user id as character id
           const characterId = user.id as unknown as CharacterId;
@@ -131,7 +131,7 @@ export function createWorldRouter({
           }
 
           return characterId;
-        })
+        }),
       ),
   });
 }

@@ -4,7 +4,7 @@ import type {
   UrlFactory,
   UrlToPublicFile,
 } from "@mp/data";
-import { schemaFor, t } from "../../trpc.ts";
+import { schemaFor, t } from "../../trpc";
 
 export type AreaRouter = ReturnType<typeof createAreaRouter>;
 export function createAreaRouter(createUrl: UrlFactory) {
@@ -13,7 +13,7 @@ export function createAreaRouter(createUrl: UrlFactory) {
       .input(schemaFor<AreaId>())
       .output(schemaFor<UrlToPublicFile>())
       .query(({ input: areaId }) =>
-        createUrl(`areas/${areaId}.tmj` as PathToLocalFile)
+        createUrl(`areas/${areaId}.tmj` as PathToLocalFile),
       ),
   });
 }

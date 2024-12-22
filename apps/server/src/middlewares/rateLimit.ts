@@ -1,8 +1,8 @@
 import type { IRateLimiterOptions } from "rate-limiter-flexible";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { TRPCError } from "@trpc/server";
-import { t } from "../trpc.ts";
-import type { ServerContext } from "../context.ts";
+import { t } from "../trpc";
+import type { ServerContext } from "../context";
 
 export function rateLimit(options: IRateLimiterOptions) {
   const limiter = new RateLimiterMemory(options);

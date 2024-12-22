@@ -1,6 +1,6 @@
 import { err, ok, type Result } from "@mp/state";
-import type { DBClient } from "../../db/client.ts";
-import { characterTable, type WorldState } from "./schema.ts";
+import type { DBClient } from "../../db/client";
+import { characterTable, type WorldState } from "./schema";
 
 export async function persistWorldState(
   db: DBClient,
@@ -15,7 +15,7 @@ export async function persistWorldState(
             set: char,
           });
         }),
-      )
+      ),
     );
     return ok(void 0);
   } catch (error) {

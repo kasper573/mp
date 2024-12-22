@@ -1,9 +1,9 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
-import { err, ok, type Result } from "@mp/state";
+import { type Result, ok, err } from "@mp/state";
 import { AreaResource } from "@mp/data";
-import { loadTiled } from "./loadTiled.ts";
+import { loadTiled } from "./loadTiled";
 
 export async function loadAreas(
   dir: string,

@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "../trpc.ts";
+import { t } from "../trpc";
 
 export function auth() {
   return t.middleware(async ({ ctx, next }) => {

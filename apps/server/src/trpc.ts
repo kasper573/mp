@@ -1,8 +1,8 @@
 import { initTRPC } from "@trpc/server";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { transformer } from "./shared.ts";
-import type { ServerContext } from "./context.ts";
-import { consumeLimiterWithContext } from "./middlewares/rateLimit.ts";
+import { transformer } from "./shared";
+import type { ServerContext } from "./context";
+import { consumeLimiterWithContext } from "./middlewares/rateLimit";
 
 const trpc = initTRPC.context<ServerContext>().create({
   transformer,
