@@ -13,7 +13,7 @@
   "scripts": {
     "build": "tsup && tsc",
     "dev:tsup": "tsup --watch",
-    "dev:node": "node --watch --enable-source-maps dist/index.mjs",
+    "dev:node": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --watch --enable-source-maps dist/index.mjs",
     "dev": "concurrently -k -p \"[{name}]\" -n \"tsup,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:tsup\" \"pnpm dev:node\"",
     "start": "node --enable-source-maps dist/index.mjs",
     "db:reset": "drizzle-kit generate && drizzle-kit push",
