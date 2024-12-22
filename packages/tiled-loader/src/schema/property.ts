@@ -1,4 +1,4 @@
-import type { Color, ObjectId, TiledClass } from "./common.ts";
+import type { Color, ObjectId, TiledClass } from "./common";
 
 interface SpecificProperty<Type extends string, Value> {
   /**

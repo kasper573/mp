@@ -1,5 +1,5 @@
-import type { LoaderContext } from "../context.ts";
-import type { FilePath } from "../schema/common.ts";
+import type { LoaderContext } from "../context";
+import type { FilePath } from "../schema/common";
 
 /**
  * The tiled file data contains relative file paths.

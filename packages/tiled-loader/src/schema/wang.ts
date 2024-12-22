@@ -1,5 +1,5 @@
-import type { LocalTileId, TiledClass, WangColorIndex } from "./common.ts";
-import type { PropertyMap } from "./property.ts";
+import type { LocalTileId, TiledClass, WangColorIndex } from "./common";
+import type { PropertyMap } from "./property";
 
 export interface WangColor {
   class?: TiledClass;

@@ -1,6 +1,6 @@
 import { AnimatedSprite, Matrix, Sprite } from "@mp/pixi";
 import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
-import type { TextureLookup } from "./spritesheet.ts";
+import type { TextureLookup } from "./spritesheet";
 
 export function createTileSprite(
   { id, flags, x, y, width, height, tile }: TileLayerTile,

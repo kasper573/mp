@@ -1,6 +1,6 @@
-import type { TiledObject } from "../schema/object.ts";
-import type { Tileset } from "../schema/tileset.ts";
-import { reconcileProperties } from "./reconcileProperties.ts";
+import type { TiledObject } from "../schema/object";
+import type { Tileset } from "../schema/tileset";
+import { reconcileProperties } from "./reconcileProperties";
 
 export function reconcileObject(
   obj: TiledObject | ObjectTemplate,

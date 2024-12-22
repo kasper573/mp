@@ -1,13 +1,13 @@
-import type { LoaderContext } from "../context.ts";
-import type { Layer, TileLayer } from "../schema/layer.ts";
-import type { TiledMap } from "../schema/map.ts";
-import { reconcileFilePath } from "./reconcileFilePath.ts";
+import type { LoaderContext } from "../context";
+import type { Layer, TileLayer } from "../schema/layer";
+import type { TiledMap } from "../schema/map";
+import { reconcileFilePath } from "./reconcileFilePath";
 import {
   decompressTileLayer,
   isCompressedTileLayer,
-} from "./decompressTileLayer.ts";
-import { reconcileObject } from "./reconcileObject.ts";
-import { reconcileProperties } from "./reconcileProperties.ts";
+} from "./decompressTileLayer";
+import { reconcileObject } from "./reconcileObject";
+import { reconcileProperties } from "./reconcileProperties";
 
 /**
  * Since layers contain data that needs to be reconciled,

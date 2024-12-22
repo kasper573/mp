@@ -1,0 +1,29 @@
+{
+  "name": "@mp/style",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "import": "./src/index.ts",
+      "require": "./src/index.ts",
+      "types": "./src/index.ts"
+    },
+    "./themes/*": {
+      "import": "./themes/*.ts",
+      "require": "./themes/*.ts",
+      "types": "./themes/*.ts"
+    }
+  },
+  "dependencies": {
+    "@vanilla-extract/css": "1.15.5",
+    "@vanilla-extract/recipes": "0.5.5",
+    "@vanilla-extract/sprinkles": "1.6.3",
+    "clsx": "2.1.1",
+    "solid-js": "1.9.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "csstype": "3.1.3"
+  }
+}

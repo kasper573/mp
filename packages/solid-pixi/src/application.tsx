@@ -8,7 +8,7 @@ import {
   onCleanup,
   Show,
 } from "solid-js";
-import { ParentContext } from "./context.ts";
+import { ParentContext } from "./context";
 
 export interface ApplicationProps
   extends Omit<JSX.IntrinsicElements["div"], "children" | "style"> {
@@ -18,7 +18,7 @@ export interface ApplicationProps
   style?: JSX.CSSProperties;
 }
 
-export function Application(props: ApplicationProps): JSX.Element {
+export function Application(props: ApplicationProps) {
   const [viewport, setViewport] = createSignal<HTMLElement>();
   const [canvas, setCanvas] = createSignal<HTMLCanvasElement>();
   const elements = createMemo(() => [viewport(), canvas()] as const);

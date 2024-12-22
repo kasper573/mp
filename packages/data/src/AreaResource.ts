@@ -1,13 +1,13 @@
 import type { Vector } from "@mp/math";
 import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import { snapTileVector, type TiledResource } from "./TiledResource.ts";
-import type { DNode } from "./findPath.ts";
-import { type DGraph, vectorFromDNode } from "./findPath.ts";
-import { dGraphFromTiled } from "./dGraphFromTiled.ts";
-import type { Branded } from "./Branded.ts";
-import { TiledFixture } from "./TiledFixture.ts";
-import { hitTestTiledObject } from "./hitTestTiledObject.ts";
+import { snapTileVector, type TiledResource } from "./TiledResource";
+import type { DNode } from "./findPath";
+import { vectorFromDNode, type DGraph } from "./findPath";
+import { dGraphFromTiled } from "./dGraphFromTiled";
+import type { Branded } from "./Branded";
+import { TiledFixture } from "./TiledFixture";
+import { hitTestTiledObject } from "./hitTestTiledObject";
 
 export type AreaId = Branded<string, "AreaId">;
 
@@ -40,11 +40,9 @@ export class AreaResource {
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
     getTileCoordOfSubject: (s: Subject) => Vector,
-  ): Generator<HitObject<Subject>> {
-    return hitTestObjects(
-      this.objects,
-      subjects,
-      (subject) => this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
+  ) {
+    return hitTestObjects(this.objects, subjects, (subject) =>
+      this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
     );
   }
 }
@@ -55,7 +53,7 @@ function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,
   subjects: Iterable<Subject>,
   getWorldCoordOfSubject: (s: Subject) => Vector,
-): Generator<HitObject<Subject>> {
+): Generator<{ subject: Subject; object: TiledObject }> {
   for (const subject of subjects) {
     const worldPos = getWorldCoordOfSubject(subject);
     for (const object of objects) {
@@ -64,9 +62,4 @@ function* hitTestObjects<Subject>(
       }
     }
   }
-}
-
-interface HitObject<Subject> {
-  subject: Subject;
-  object: TiledObject;
 }

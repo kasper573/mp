@@ -1,8 +1,0 @@
-{
-  "name": "@mp/metrics",
-  "version": "0.0.0",
-  "exports": "./src/index.ts",
-  "imports": {
-    "prom-client": "npm:prom-client@15.1.3"
-  }
-}

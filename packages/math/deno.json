@@ -1,5 +1,0 @@
-{
-  "name": "@mp/math",
-  "version": "0.0.0",
-  "exports": "./src/index.ts"
-}

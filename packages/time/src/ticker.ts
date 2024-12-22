@@ -1,9 +1,9 @@
 import type { TimeSpan } from "timespan-ts";
-import { measureTimeSpan } from "./measure.ts";
+import { measureTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
-  private intervalId?: number;
+  private intervalId?: NodeJS.Timeout;
   private middleware: TickMiddleware;
   private delta: () => TimeSpan;
 

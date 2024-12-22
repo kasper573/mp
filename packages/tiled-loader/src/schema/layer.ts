@@ -1,20 +1,20 @@
-import type { GlobalIdFlags } from "../gid.ts";
+import type { GlobalIdFlags } from "../gid";
 import type {
   Color,
-  FilePath,
-  GlobalTileId,
-  LayerDrawOrder,
   LayerId,
   Pixel,
   Ratio,
   RGB,
   TiledClass,
   TileNumber,
-} from "./common.ts";
+  LayerDrawOrder,
+  FilePath,
+  GlobalTileId,
+} from "./common";
 
-import type { PropertyMap } from "./property.ts";
-import type { TiledObject } from "./object.ts";
-import type { Tileset, TilesetTile } from "./tileset.ts";
+import type { PropertyMap } from "./property";
+import type { TiledObject } from "./object";
+import type { Tileset, TilesetTile } from "./tileset";
 
 export interface SharedLayerProperties {
   class?: TiledClass;
@@ -63,7 +63,8 @@ export interface CommonTileLayerProperties {
 }
 
 export interface TileLayer
-  extends SharedLayerProperties, CommonTileLayerProperties {
+  extends SharedLayerProperties,
+    CommonTileLayerProperties {
   tiles: TileLayerTile[];
 }
 

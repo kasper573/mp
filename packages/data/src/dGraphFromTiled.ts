@@ -1,7 +1,7 @@
 import { vec_distance } from "@mp/math";
-import type { TiledResource } from "./TiledResource.ts";
-import type { DNode } from "./findPath.ts";
-import { type DGraph, dNodeFromVector } from "./findPath.ts";
+import { type TiledResource } from "./TiledResource";
+import type { DNode } from "./findPath";
+import { dNodeFromVector, type DGraph } from "./findPath";
 
 export function dGraphFromTiled(tiled: TiledResource): DGraph {
   const graph: DGraph = {};

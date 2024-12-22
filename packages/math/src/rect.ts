@@ -6,7 +6,7 @@ export class Rect {
     public height: number,
   ) {}
 
-  toString(): string {
+  toString() {
     return `(${this.x},${this.y},${this.width},${this.height})`;
   }
 }

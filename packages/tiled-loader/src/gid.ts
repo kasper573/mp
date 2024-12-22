@@ -1,4 +1,4 @@
-import type { GlobalTileId, LocalTileId } from "./schema/common.ts";
+import type { GlobalTileId, LocalTileId } from "./schema/common";
 
 export function readGlobalIdBuffer(
   buffer: Uint8Array,
@@ -9,7 +9,8 @@ export function readGlobalIdBuffer(
   flags: GlobalIdFlags;
 } {
   // Read the GID in little-endian byte order:
-  let i = buffer[offset] |
+  let i =
+    buffer[offset] |
     (buffer[offset + 1] << 8) |
     (buffer[offset + 2] << 16) |
     (buffer[offset + 3] << 24);

@@ -1,11 +1,11 @@
-import { err, ok } from "@mp/state";
+import { ok, err } from "@mp/state";
 import { setProperty } from "dot-prop";
-import type { BaseIssue, BaseSchema, InferOutput } from "valibot";
+import type { BaseSchema, BaseIssue } from "valibot";
 import { safeParse } from "valibot";
 
 export function parseEnv<
   const Schema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,
->(schema: Schema, env: FlatObject, prefix = ""): InferOutput<Schema> {
+>(schema: Schema, env: FlatObject, prefix = "") {
   const selected = selectProperties(env, prefix);
   const nested = flatToNestedObject(selected);
   const res = safeParse(schema, nested);

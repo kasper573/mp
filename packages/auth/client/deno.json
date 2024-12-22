@@ -1,8 +1,0 @@
-{
-  "name": "@mp/auth-client",
-  "version": "0.0.0",
-  "exports": "./mod.tsx",
-  "imports": {
-    "oidc-client-ts": "npm:oidc-client-ts@3.1.0"
-  }
-}

@@ -1,10 +1,11 @@
 import type { Layer } from "@mp/tiled-loader";
-import type { Accessor, JSXElement } from "solid-js";
+import type { Accessor } from "solid-js";
 import { createEffect, createMemo, For } from "solid-js";
 import { ParentContext, Pixi } from "@mp/solid-pixi";
-import { LayerViewFactory, recallLayer } from "./layer.tsx";
-import type { TiledSpritesheetRecord } from "./spritesheet.ts";
-import { createTextureLookup } from "./spritesheet.ts";
+import { type JSX } from "solid-js";
+import { recallLayer, LayerViewFactory } from "./layer";
+import type { TiledSpritesheetRecord } from "./spritesheet";
+import { createTextureLookup } from "./spritesheet";
 
 export interface TileRendererProps {
   layers: Layer[];
@@ -14,7 +15,7 @@ export interface TileRendererProps {
   label?: string;
 }
 
-export function TiledRenderer(props: TileRendererProps): JSXElement {
+export function TiledRenderer(props: TileRendererProps) {
   const container = createMemo(() => {
     const lookup = createTextureLookup(props.spritesheets);
     const factory = new LayerViewFactory(lookup);
@@ -54,5 +55,5 @@ export function TiledRenderer(props: TileRendererProps): JSXElement {
 }
 
 export type ChildrenByLayerName = {
-  [layerName: string]: Accessor<JSXElement>;
+  [layerName: string]: Accessor<JSX.Element>;
 };

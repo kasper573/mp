@@ -1,8 +1,8 @@
 import type { Size } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import { Camera } from "./camera.ts";
-import { PointerForCamera } from "./pointer.ts";
-import { Keyboard } from "./keyboard.ts";
+import { Camera } from "./camera";
+import { PointerForCamera } from "./pointer";
+import { Keyboard } from "./keyboard";
 
 export class Engine {
   #previousFrameTime = performance.now();
@@ -13,7 +13,7 @@ export class Engine {
   #viewportSizeObserver?: ResizeObserver;
   #frameCallbacks = new Set<FrameCallback>();
 
-  get frameCallbackCount(): number {
+  get frameCallbackCount() {
     return this.#frameCallbacks.size;
   }
 
@@ -44,7 +44,7 @@ export class Engine {
 
   // Note: Explicit callback based frame reactivity because implicit
   // reactivity for rendering is error prone and hard to reason about.
-  addFrameCallback(callback: FrameCallback): Unsubscribe {
+  addFrameCallback(callback: FrameCallback) {
     this.#frameCallbacks.add(callback);
     return () => this.#frameCallbacks.delete(callback);
   }
@@ -89,5 +89,3 @@ export type FrameCallback = (
   deltaTime: TimeSpan,
   previousFrameDuration: TimeSpan,
 ) => unknown;
-
-type Unsubscribe = () => void;

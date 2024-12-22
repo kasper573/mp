@@ -1,7 +1,5 @@
+import type express from "express";
 import type { Registry } from "prom-client";
-import { createMiddleware } from "jsr:@hono/hono/factory";
-import { getConnInfo } from "jsr:@hono/hono/deno";
-import type { Context, MiddlewareHandler } from "jsr:@hono/hono";
 
 /**
  * Middleware that serves the metrics from the given registry.
@@ -9,22 +7,20 @@ import type { Context, MiddlewareHandler } from "jsr:@hono/hono";
  */
 export function createMetricsScrapeMiddleware(
   registry: Registry,
-): MiddlewareHandler {
-  return createMiddleware(async (ctx, next) => {
-    if (ctx.req.path === "/metrics" && isAllowedToAccessMetrics(ctx)) {
-      ctx.res = new Response(await registry.metrics(), {
-        status: 200,
-        headers: {
-          "Content-Type": registry.contentType,
-        },
-      });
+): express.RequestHandler {
+  return (req, res, next) => {
+    if (isAllowedToAccessMetrics(req) && req.path === "/metrics") {
+      res.set("Content-Type", "text/plain");
+      registry
+        .metrics()
+        .then((data) => res.send(data))
+        .catch(() => res.status(500).send("Error scraping metrics"));
     } else {
-      await next();
+      next();
     }
-  });
+  };
 }
 
-function isAllowedToAccessMetrics(ctx: Context) {
-  const { address } = getConnInfo(ctx).remote;
-  return address?.startsWith("127.") || address?.startsWith("172.");
+function isAllowedToAccessMetrics(req: express.Request) {
+  return req.ip?.startsWith("127.") || req.ip?.startsWith("172.");
 }

@@ -1,0 +1,22 @@
+{
+  "name": "@mp/sync-client",
+  "version": "0.0.0",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@automerge/automerge": "2.2.9-alpha.2",
+    "@automerge/automerge-repo": "2.0.0-alpha.14",
+    "@automerge/automerge-repo-network-websocket": "2.0.0-alpha.14",
+    "@mp/state": "workspace:*",
+    "uuid": "11.0.0"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

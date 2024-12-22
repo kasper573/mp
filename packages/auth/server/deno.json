@@ -1,8 +1,0 @@
-{
-  "name": "@mp/auth-server",
-  "version": "0.0.0",
-  "exports": "./mod.ts",
-  "imports": {
-    "jose": "npm:jose@5.9.6"
-  }
-}

@@ -1,4 +1,4 @@
-import type { Branded } from "./Branded.ts";
+import type { Branded } from "./Branded";
 
 export interface FileReference {
   filepath: PathToLocalFile;

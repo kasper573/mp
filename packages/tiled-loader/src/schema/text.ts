@@ -1,4 +1,4 @@
-import type { Color } from "./common.ts";
+import type { Color } from "./common";
 
 export interface TiledText {
   bold: boolean;

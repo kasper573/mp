@@ -1,13 +1,13 @@
-import type { Atom, Computed } from "@mp/state";
-import { atom, batch, computed } from "@mp/state";
+import type { Computed } from "@mp/state";
+import { atom, computed, batch } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring implements SpringLike<number> {
-  readonly velocity: Atom<number> = atom(0);
-  readonly #value: Atom<number> = atom(0);
+  readonly velocity = atom(0);
+  readonly #value = atom(0);
   readonly state: Computed<SpringState>;
 
-  value = (): number => this.#value.get();
+  value = () => this.#value.get();
 
   constructor(
     public readonly target: () => number,
@@ -25,7 +25,7 @@ export class Spring implements SpringLike<number> {
     });
   }
 
-  update = (dt: TimeSpan): void => {
+  update = (dt: TimeSpan) => {
     const { stiffness, damping, mass } = this.options();
     const currentTarget = this.target();
     const delta = currentTarget - this.#value.get();

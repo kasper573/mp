@@ -9,10 +9,10 @@ import type {
   StaggerIndex,
   TiledClass,
   TileNumber,
-} from "./common.ts";
-import type { Layer } from "./layer.ts";
-import type { PropertyMap } from "./property.ts";
-import type { Tileset } from "./tileset.ts";
+} from "./common";
+import type { Layer } from "./layer";
+import type { PropertyMap } from "./property";
+import type { Tileset } from "./tileset";
 
 export interface SharedMapProperties {
   type: "map";

@@ -1,14 +1,12 @@
 import { err, ok, type Result } from "@mp/state";
-import type { LoaderContext } from "./context.ts";
-import type { TiledMap } from "./schema/map.ts";
-import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap.ts";
+import type { LoaderContext } from "./context";
+import type { TiledMap } from "./schema/map";
+import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 
-export function createTiledLoader(
-  options: CreateTiledLoaderOptions,
-): TiledLoader {
-  return async function loadTiled(mapPath) {
+export function createTiledLoader(options: CreateTiledLoaderOptions) {
+  return async function loadTiled(mapPath: string): Promise<TiledLoaderResult> {
     const context: LoaderContext = {
       basePath: mapPath,
       ...options,
@@ -25,4 +23,3 @@ export function createTiledLoader(
 }
 
 export type TiledLoaderResult = Result<TiledMap, unknown>;
-export type TiledLoader = (mapPath: string) => Promise<TiledLoaderResult>;

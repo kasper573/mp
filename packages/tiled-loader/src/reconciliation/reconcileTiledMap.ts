@@ -1,7 +1,7 @@
-import type { LoaderContext } from "../context.ts";
-import type { TiledMap } from "../schema/map.ts";
-import { reconcileLayer } from "./reconcileLayer.ts";
-import { reconcileTileset } from "./reconcileTileset.ts";
+import type { LoaderContext } from "../context";
+import type { TiledMap } from "../schema/map";
+import { reconcileLayer } from "./reconcileLayer";
+import { reconcileTileset } from "./reconcileTileset";
 
 /**
  * The original map data in the tiled files is almost matching our

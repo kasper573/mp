@@ -1,8 +1,0 @@
-{
-  "name": "@mp/time",
-  "version": "0.0.0",
-  "exports": "./src/index.ts",
-  "imports": {
-    "timespan-ts": "npm:timespan-ts@1.0.3"
-  }
-}

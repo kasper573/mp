@@ -1,14 +1,13 @@
-import { describe, it } from "jsr:@std/testing/bdd";
-import { expect } from "jsr:@std/expect";
+import { describe, expect, it } from "vitest";
 import { boolean, number, object, parse, string } from "valibot";
-import { parseEnv } from "../src/parseEnv.ts";
+import { parseEnv } from "../src/parseEnv";
 import {
   booleanString,
   boolish,
   csv,
   numeric,
   numericString,
-} from "../src/schemas.ts";
+} from "../src/schemas";
 
 it("can parse nesting convention", () => {
   const schema = object({

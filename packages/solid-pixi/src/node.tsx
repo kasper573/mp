@@ -1,8 +1,8 @@
-import type { JSXElement, ParentProps } from "solid-js";
-import { createEffect, onCleanup, onMount, useContext } from "solid-js";
+import type { ParentProps } from "solid-js";
+import { useContext, onCleanup, createEffect, onMount } from "solid-js";
 import { Container } from "@mp/pixi";
 import { Matrix as PixiMatrix } from "@mp/pixi";
-import { ParentContext } from "./context.ts";
+import { ParentContext } from "./context";
 
 export interface PixiProps extends ParentProps {
   as?: Container;
@@ -14,7 +14,7 @@ export interface PixiProps extends ParentProps {
   label?: string;
 }
 
-export function Pixi(props: PixiProps): JSXElement {
+export function Pixi(props: PixiProps) {
   const parent = useContext(ParentContext);
 
   // eslint-disable-next-line solid/reactivity

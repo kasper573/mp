@@ -1,14 +1,14 @@
 import type {
-  Coord,
-  Degrees,
   GlobalTileId,
   ObjectId,
   Pixel,
+  Coord,
+  Degrees,
   TiledClass,
-} from "./common.ts";
+} from "./common";
 
-import type { PropertyMap } from "./property.ts";
-import type { TiledText } from "./text.ts";
+import type { PropertyMap } from "./property";
+import type { TiledText } from "./text";
 
 export interface SharedObjectProperties {
   gid?: GlobalTileId;
