@@ -1,0 +1,7 @@
+{
+  "extends": ["@mp/tsconfig/node.json"],
+  "include": ["./eslint.config.js", "./commitlint.config.cjs"],
+  "compilerOptions": {
+    "allowJs": true
+  }
+}

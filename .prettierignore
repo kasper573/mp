@@ -1,0 +1,7 @@
+out
+dist
+pnpm-lock.yaml
+**/apps/server/public/tilesets/**
+**/apps/server/drizzle/**
+docker/grafana/dashboards
+docker/keycloak/import
