@@ -1,0 +1,22 @@
+{
+  "name": "@mp/loadtest",
+  "version": "0.0.0",
+  "private": true,
+  "scripts": {
+    "build": "tsc",
+    "loadtest": "tsx src/index.ts"
+  },
+  "dependencies": {
+    "@mp/sync-client": "workspace:*",
+    "@mp/server": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/data": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@trpc/client": "11.0.0-rc.593"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/yargs": "17.0.33",
+    "yargs": "17.7.2"
+  }
+}

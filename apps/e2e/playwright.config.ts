@@ -1,9 +1,15 @@
-import * as path from "jsr:@std/path";
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import dotenv from "dotenv";
 
-const rootDir = path.resolve(import.meta.dirname!, "../..");
+const dockerDir = path.resolve(__dirname, "../../docker");
 
-const baseURL = `https://${Deno.env.get("MP_SERVER_DOMAIN")}`;
+dotenv.config({
+  path: path.resolve(dockerDir, `.env.test`),
+  override: true,
+});
+
+const baseURL = `https://${process.env.MP_SERVER_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
 const artifactsDir = path.join(outputDir, "artifacts");
 const snapshotDir = path.join(outputDir, "snapshots");
@@ -15,17 +21,15 @@ const htmlReporter = [
   { outputFolder: reportDir, open: "never" },
 ] as const;
 
-const isCI = !!Deno.env.get("CI");
-
 export default defineConfig({
   outputDir: artifactsDir,
   snapshotDir,
   testDir: "./tests",
   fullyParallel: true,
-  forbidOnly: isCI,
-  retries: isCI ? 2 : 0,
-  workers: isCI ? 1 : undefined,
-  reporter: isCI ? [htmlReporter, ["github"]] : [htmlReporter],
+  forbidOnly: !!process.env.CI,
+  retries: process.env.CI ? 2 : 0,
+  workers: process.env.CI ? 1 : undefined,
+  reporter: process.env.CI ? [htmlReporter, ["github"]] : [htmlReporter],
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -42,11 +46,11 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${rootDir} && deno task test:docker`,
+    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,
     ignoreHTTPSErrors,
-    reuseExistingServer: !isCI,
+    reuseExistingServer: !process.env.CI,
   },
 });

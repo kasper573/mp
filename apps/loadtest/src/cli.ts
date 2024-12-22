@@ -7,7 +7,7 @@ export type CliOptions = RemoveIndexSignature<
 
 export const cliEnvPrefix = "MP";
 
-export function readCliOptions(argv = Deno.args) {
+export function readCliOptions(argv = process.argv) {
   const options = yargs(hideBin(argv))
     .env(cliEnvPrefix)
     .parserConfiguration({
@@ -45,9 +45,9 @@ export function readCliOptions(argv = Deno.args) {
 }
 
 type RemoveIndexSignature<T> = {
-  [
-    K in keyof T as K extends string ? string extends K ? never
+  [K in keyof T as K extends string
+    ? string extends K
+      ? never
       : K
-      : never
-  ]: T[K];
+    : never]: T[K];
 };

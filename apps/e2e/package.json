@@ -1,0 +1,16 @@
+{
+  "name": "@mp/e2e",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "playwright test"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@faker-js/faker": "9.2.0",
+    "@playwright/test": "^1.49.0",
+    "@types/node": "^22.10.1",
+    "@mp/tsconfig": "workspace:*",
+    "dotenv": "16.4.5"
+  }
+}
