@@ -1,6 +1,6 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "./drizzle.config.js", "tsup.config.ts"],
+  "include": ["src", "./*.js", "*.ts"],
   "compilerOptions": {
     "allowJs": true,
     "module": "Preserve",

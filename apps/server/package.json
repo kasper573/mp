@@ -11,10 +11,10 @@
     }
   },
   "scripts": {
-    "build": "tsup && tsc",
-    "dev:tsup": "tsup --watch",
+    "build": "vite build",
+    "dev:bundler": "vite build --watch",
     "dev:node": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --watch --enable-source-maps dist/index.js",
-    "dev": "concurrently -k -p \"[{name}]\" -n \"tsup,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:tsup\" \"pnpm dev:node\"",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"bundler,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:bundler\" \"pnpm dev:node\"",
     "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --enable-source-maps dist/index.js",
     "db": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- drizzle-kit"
   },
@@ -46,6 +46,6 @@
     "@types/yargs": "17.0.33",
     "drizzle-kit": "^0.24.2",
     "concurrently": "9.0.1",
-    "tsup": "8.3.5"
+    "builtin-modules": "4.0.0"
   }
 }

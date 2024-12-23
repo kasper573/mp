@@ -35,6 +35,11 @@
     "prettier": "3.3.3",
     "typescript-eslint": "8.4.0"
   },
+  "pnpm": {
+    "overrides": {
+      "iconv-lite": "0.6.3"
+    }
+  },
   "engines": {
     "node": "22.12.0"
   },
