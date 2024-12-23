@@ -13,9 +13,9 @@
   "scripts": {
     "build": "tsup && tsc",
     "dev:tsup": "tsup --watch",
-    "dev:node": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --watch --enable-source-maps dist/index.cjs",
+    "dev:node": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --watch --enable-source-maps dist/index.js",
     "dev": "concurrently -k -p \"[{name}]\" -n \"tsup,node\" -c \"yellow.bold,cyan.bold\" \"pnpm dev:tsup\" \"pnpm dev:node\"",
-    "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --enable-source-maps dist/index.cjs",
+    "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- node --enable-source-maps dist/index.js",
     "db": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- drizzle-kit"
   },
   "dependencies": {

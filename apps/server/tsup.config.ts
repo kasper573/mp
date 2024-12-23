@@ -3,7 +3,7 @@ import { defineConfig } from "tsup";
 const isProd = !!process.env.PROD;
 
 export default defineConfig({
-  format: "cjs",
+  format: "esm",
   clean: true,
   dts: false, // Nothing needs the typesecript declaration files of the server app
   sourcemap: true,
