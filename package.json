@@ -36,7 +36,7 @@
     "typescript-eslint": "8.4.0"
   },
   "engines": {
-    "node": "20.10.0"
+    "node": "22.12.0"
   },
   "packageManager": "pnpm@9.2.0+sha256.94fab213df221c55b6956b14a2264c21c6203cca9f0b3b95ff2fe9b84b120390"
 }
