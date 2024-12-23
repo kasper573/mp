@@ -7,7 +7,7 @@ export default defineConfig({
   clean: true,
   dts: false, // Nothing needs the typesecript declaration files of the server app
   sourcemap: true,
-  target: "node20",
+  target: "node22",
   platform: "node",
   entry: {
     index: "src/main.ts",
