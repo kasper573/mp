@@ -10,7 +10,7 @@ import createCors from "cors";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync-server";
-import { loadSyncServerDependencies, SyncServer } from "@mp/sync-server";
+import { SyncServer } from "@mp/sync-server";
 import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
 import {
   collectDefaultMetrics,
@@ -44,8 +44,6 @@ if (optResult.isErr()) {
 
 const opt = optResult.value;
 logger.info(serverTextHeader(opt));
-
-await loadSyncServerDependencies();
 
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 

@@ -16,9 +16,8 @@ import type { PeerId as ClientId } from "@automerge/automerge-repo/slim";
 // @ts-expect-error No types exist for this import
 import { automergeWasmBase64 } from "@automerge/automerge/automerge.wasm.base64.js";
 
-export async function loadSyncServerDependencies() {
-  return initializeBase64Wasm(automergeWasmBase64 as string);
-}
+// It is okay to void this because initializing via base64 is synchronous
+void initializeBase64Wasm(automergeWasmBase64 as string);
 
 export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
