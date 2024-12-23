@@ -15,6 +15,12 @@ export default defineConfig({
   bundle: true,
   minify: isProd,
   splitting: false,
-  external: ["stream"],
   noExternal: isProd ? [/.*/] : [/^@mp\//], // Only bundle internal packages in development
+  // Fix for https://github.com/evanw/esbuild/pull/2067
+  banner: {
+    js: [
+      `import { createRequire as createRequireGlobal } from 'module';`,
+      `const require = createRequireGlobal(import.meta.url);`,
+    ].join("\n"),
+  },
 });
