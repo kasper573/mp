@@ -37,7 +37,7 @@
   },
   "pnpm": {
     "overrides": {
-      "iconv-lite": "0.6.3"
+      "@automerge/automerge": "2.2.9-alpha.2"
     }
   },
   "engines": {
