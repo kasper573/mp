@@ -3,12 +3,22 @@ import type {
   DocHandle,
   PeerCandidatePayload,
   PeerDisconnectedPayload,
-} from "@automerge/automerge-repo";
+} from "@automerge/automerge-repo/slim";
 import { WebSocketServer } from "ws";
-import { Repo } from "@automerge/automerge-repo";
+import { Repo } from "@automerge/automerge-repo/slim";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
-import type { PatchCallback } from "@automerge/automerge";
-import type { PeerId as ClientId } from "@automerge/automerge-repo";
+import {
+  initializeBase64Wasm,
+  type PatchCallback,
+} from "@automerge/automerge/slim";
+import type { PeerId as ClientId } from "@automerge/automerge-repo/slim";
+
+// @ts-expect-error No types exist for this import
+import { automergeWasmBase64 } from "@automerge/automerge/automerge.wasm.base64.js";
+
+export async function loadSyncServerDependencies() {
+  return initializeBase64Wasm(automergeWasmBase64 as string);
+}
 
 export class SyncServer<State, ConnectionMetaData> {
   private repo: Repo;
