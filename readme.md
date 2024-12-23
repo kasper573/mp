@@ -35,10 +35,11 @@ development.
 ## Development
 
 - Install [Docker](https://www.docker.com/)
-- Install [Deno](https://deno.com/)
-- Install [dotenvx](https://dotenvx.com/)
+- Install [NodeJS](https://nodejs.org/)
 - Clone this repository
-- Run `deno task dev`
+- Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
+- Run `pnpm install`
+- Run `pnpm dev`
 - Run `./docker/installcert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
