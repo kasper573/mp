@@ -19,7 +19,9 @@ services:
     env_file: *env_files
   caddy:
     env_file: *env_files
-  mp:
+  mp-client:
+    env_file: *env_files
+  mp-server:
     env_file: *env_files
   migrations:
     env_file: *env_files

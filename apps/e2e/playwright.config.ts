@@ -9,7 +9,7 @@ dotenv.config({
   override: true,
 });
 
-const baseURL = `https://${process.env.MP_SERVER_DOMAIN}`;
+const baseURL = `https://${process.env.MP_CLIENT_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
 const artifactsDir = path.join(outputDir, "artifacts");
 const snapshotDir = path.join(outputDir, "snapshots");

@@ -21,15 +21,12 @@ function embedEnvPlugin(): Plugin {
   return {
     name: "embed-client-env",
     transformIndexHtml(html) {
-      const selectedEnv = Object.fromEntries(
+      const env = Object.fromEntries(
         Object.entries(process.env).filter(([key]) =>
           key.startsWith("MP_CLIENT_"),
         ),
       );
-      return html.replaceAll(
-        "__WILL_BE_REPLACED_WITH_ENV_VARS_SCRIPT__",
-        `window.__ENV__ = ${JSON.stringify(selectedEnv)};`,
-      );
+      return html.replaceAll("__ENV_PLACEHOLDER__", JSON.stringify(env));
     },
   };
 }

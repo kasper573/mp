@@ -1,6 +1,6 @@
 {
 	order rate_limit before basicauth
-    email admin@{$MP_SERVER_DOMAIN}
+    email admin@{$MP_DOMAIN}
 }
 
 import base.Caddyfile
@@ -15,7 +15,12 @@ import base.Caddyfile
     }
 }
 
+{$MP_CLIENT_DOMAIN} {
+    import common_rate_limit
+    reverse_proxy http://mp-client:80
+}
+
 {$MP_SERVER_DOMAIN} {
     import common_rate_limit
-    reverse_proxy http://mp:9999
+    reverse_proxy http://mp-server:9999
 }

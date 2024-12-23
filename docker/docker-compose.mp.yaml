@@ -1,7 +1,16 @@
 services:
-  mp:
+  mp-client:
     build:
-      dockerfile: ./docker/Dockerfile.mp
+      dockerfile: ./docker/Dockerfile.mp-client
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    depends_on:
+      - mp-server
+
+  mp-server:
+    build:
+      dockerfile: ./docker/Dockerfile.mp-server
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always

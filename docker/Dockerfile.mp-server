@@ -18,13 +18,11 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 ENV NODE_ENV=production
-RUN pnpm build
-
+RUN pnpm -F server build
 
 FROM base AS runner
 WORKDIR /workdir
 
-COPY --from=builder /workdir/apps/client/dist /workdir/client
 COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
 

@@ -8,7 +8,7 @@ env:
   DOCKER_REGISTRY_URL: ghcr.io/${{ github.actor }}
   DOCKER_IMAGE_VERSION: ${{ github.sha }}
   BUILD_VERSION: ${{ github.sha }}
-  MP_SERVER_DOMAIN: ${{ vars.MP_DOMAIN }}
+  MP_DOMAIN: ${{ vars.MP_DOMAIN }}
 
 jobs:
   conventions:
@@ -103,7 +103,7 @@ jobs:
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
             echo "MP_SERVER_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             echo "MP_CLIENT_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
-            echo "MP_SERVER_DOMAIN=\"${{ env.MP_SERVER_DOMAIN }}\"" >> .env
+            echo "MP_DOMAIN=\"${{ env.MP_DOMAIN }}\"" >> .env
             echo "KC_SMTP_HOST=\"${{ vars.KC_SMTP_HOST }}\"" >> .env
             echo "KC_SMTP_PORT=\"${{ vars.KC_SMTP_PORT }}\"" >> .env
             echo "KC_SMTP_USER=\"${{ vars.KC_SMTP_USER }}\"" >> .env
