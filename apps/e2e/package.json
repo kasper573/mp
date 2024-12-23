@@ -9,7 +9,6 @@
   "devDependencies": {
     "@faker-js/faker": "9.2.0",
     "@playwright/test": "^1.49.0",
-    "@types/node": "^22.10.1",
     "@mp/tsconfig": "workspace:*",
     "dotenv": "16.4.5"
   }
