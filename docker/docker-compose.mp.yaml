@@ -15,14 +15,14 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     depends_on:
-      migrations:
+      mp-migrations:
         condition: service_started
       keycloak-healthcheck:
         condition: service_healthy
 
-  migrations:
+  mp-migrations:
     build:
-      dockerfile: ../../docker/Dockerfile.migrations
+      dockerfile: ../../docker/Dockerfile.mp-migrations
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     depends_on:
