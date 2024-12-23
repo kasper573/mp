@@ -2,8 +2,8 @@ import * as fs from "node:fs";
 import path from "node:path";
 import * as express from "express";
 import { parseEnv } from "@mp/env";
-import { clientEnvGlobalVarName } from "./shared";
-import { clientEnvSchema } from "./package";
+import { clientEnvGlobalVarName } from "../shared";
+import { clientEnvSchema } from "../package";
 
 /**
  * Serves the prebuilt client artifacts from the given directory.
