@@ -1,12 +1,18 @@
+import path from "node:path";
+import type { ChildProcess } from "node:child_process";
+import { spawn } from "node:child_process";
 import esbuild from "esbuild";
 import builtinModules from "builtin-modules";
+import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
 
-const isWatchMode = process.argv.includes("--watch");
-const isProd = !!process.env.PROD;
+const isDevMode = process.argv.includes("--dev");
+const isProd = !!isDevMode;
+const outDir = path.resolve(import.meta.dirname, "dist");
+const outFile = path.resolve(outDir, "index.js");
 
-const buildOptions = {
+const buildOptions: esbuild.BuildOptions = {
   entryPoints: ["src/main.ts"],
-  outfile: "dist/index.js",
+  outfile: outFile,
   bundle: true,
   minify: isProd,
   platform: "node",
@@ -27,10 +33,32 @@ const buildOptions = {
       `const require = createRequireGlobal(import.meta.url);`,
     ].join("\n"),
   },
-} satisfies esbuild.BuildOptions;
+  plugins: [typecheckPlugin({ watch: isDevMode })],
+};
 
-if (isWatchMode) {
-  void esbuild.context(buildOptions).then((ctx) => ctx.watch());
+if (isDevMode) {
+  void devMode();
 } else {
   void esbuild.build(buildOptions);
+}
+
+async function devMode() {
+  const ctx = await esbuild.context({
+    ...buildOptions,
+    plugins: [
+      ...(buildOptions.plugins ?? []),
+      {
+        name: "restart-node-on-rebuild",
+        setup: (build) => build.onEnd(restartNode),
+      },
+    ],
+  });
+
+  await ctx.watch();
+
+  let cp: ChildProcess | undefined;
+  function restartNode() {
+    cp?.kill();
+    cp = spawn("node", ["--enable-source-maps", outDir], { stdio: "inherit" });
+  }
 }
