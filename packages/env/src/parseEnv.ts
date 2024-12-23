@@ -16,7 +16,7 @@ export function parseEnv<
 }
 
 type Primitive = string | number | boolean | null | undefined;
-type FlatObject = Record<string, Primitive>;
+export type FlatObject = Record<string, Primitive>;
 type NestedObject = { [key: string]: Primitive | NestedObject };
 
 function selectProperties(flat: FlatObject, prefix: string): FlatObject {
