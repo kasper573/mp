@@ -32,7 +32,6 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
-import { clientMiddleware } from "./express/clientMiddleware";
 
 const logger = new Logger(console);
 
@@ -166,10 +165,6 @@ webServer.use(
       ),
   }),
 );
-
-if (opt.clientDir !== undefined) {
-  webServer.use(clientMiddleware(opt.clientDir, expressStaticConfig));
-}
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
