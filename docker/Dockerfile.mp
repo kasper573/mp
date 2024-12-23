@@ -1,24 +1,34 @@
-FROM denoland/deno:2.1.3 AS base
+# Make sure to keep this version aligned with the version of the engine field in the root package.json
+FROM node:22.12.0 AS base
 
 FROM base AS builder
 WORKDIR /workdir
 
+# Enable pnpm
+RUN corepack enable
+COPY package.json .
+RUN corepack prepare
+
+# install most of node dependencies
+COPY pnpm-lock.yaml .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+# copy source code and install any node dependencies missed by pnpm fetch
 COPY . .
-RUN deno install
-ENV NODE_ENV=development
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-# TODO build for alpine
-RUN deno task build
+ENV NODE_ENV=production
+RUN pnpm build
 
-# TODO use alpine
+
 FROM base AS runner
 WORKDIR /workdir
 
 COPY --from=builder /workdir/apps/client/dist /workdir/client
 COPY --from=builder /workdir/apps/server/public /workdir/public
-COPY --from=builder /workdir/apps/server/server /workdir/
+COPY --from=builder /workdir/apps/server/dist /workdir/server
 
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
-CMD [ "./server" ]
+CMD [ "node", "./server/index.js" ]
