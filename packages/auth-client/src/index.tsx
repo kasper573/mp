@@ -91,5 +91,8 @@ function isEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-
-export type { AuthToken, UserId, UserIdentity }
+export {
+  type AuthToken,
+  type UserId,
+  type UserIdentity,
+} from "@mp/auth-server";
