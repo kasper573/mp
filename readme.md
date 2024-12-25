@@ -34,6 +34,8 @@ development.
 
 ## Development
 
+Local development is done using node and docker compose. However, we don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
+
 - Install [Docker](https://www.docker.com/)
 - Install [NodeJS](https://nodejs.org/)
 - Clone this repository
