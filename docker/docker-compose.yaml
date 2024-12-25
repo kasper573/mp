@@ -13,11 +13,6 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
-    healthcheck:
-      test: curl --fail http://localhost/ || exit 1
-      interval: 3s
-      timeout: 5s
-      retries: 9
     depends_on:
       - mp-server
 
