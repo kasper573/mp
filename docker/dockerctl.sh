@@ -3,6 +3,8 @@
 # This is a wrapper convention around docker compose.
 # It ensures that the appropriate compose files/configurations are used for the given environment.
 # Always use this script to run docker compose commands.
+# Usage:
+#  ./dockerctl.sh <environment> <regular docker-compose command and flags>
 
 COMPOSE_ENV=$1
 shift

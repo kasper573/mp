@@ -36,16 +36,21 @@ development.
 
 Local development is done using node and docker compose. However, we don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
 
+Initial setup:
+
 - Install [Docker](https://www.docker.com/)
 - Install [NodeJS](https://nodejs.org/)
 - Clone this repository
 - Run `cd docker && ./dockerctl.sh dev up -d`
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `pnpm dev`
 - Run `./docker/installcert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
+
+Before each development session:
+
+- Run `pnpm dev`
 - Visit `https://mp.localhost` in your browser
 
 ## Docker
