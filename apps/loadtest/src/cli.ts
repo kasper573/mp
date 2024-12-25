@@ -17,11 +17,13 @@ export function readCliOptions(argv = process.argv) {
     .option("httpServerUrl", {
       alias: "hs",
       type: "string",
+      default: `https://${process.env.MP_CLIENT_DOMAIN}`,
       demandOption: true,
     })
     .option("apiServerUrl", {
       alias: "as",
       type: "string",
+      default: process.env.MP_CLIENT_API_URL,
       demandOption: true,
     })
     .option("connections", {
