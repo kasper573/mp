@@ -37,7 +37,7 @@ development.
 - Install [Docker](https://www.docker.com/)
 - Install [NodeJS](https://nodejs.org/)
 - Clone this repository
-- Run `./docker/dockerctl.sh dev up -d`
+- Run `cd docker && ./dockerctl.sh dev up -d`
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
 - Run `pnpm dev`

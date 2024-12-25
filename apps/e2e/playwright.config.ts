@@ -45,7 +45,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${dockerDir}/dockerctl.sh test up --no-build`,
+    command: `cd ${dockerDir} && ./dockerctl.sh test up --no-build`,
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,

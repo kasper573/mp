@@ -45,10 +45,10 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Build docker images
-        run: ./docker/dockerctl.sh prod build
+        run: cd docker && ./dockerctl.sh prod build
 
       - name: Push docker images
-        run: ./docker/dockerctl.sh prod push
+        run: cd docker && ./dockerctl.sh prod push
 
   test-e2e:
     needs: [build]
