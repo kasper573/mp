@@ -69,7 +69,7 @@ jobs:
 
   deploy:
     needs: [conventions, build, test-unit, test-e2e]
-    #if: github.ref_name == 'main'
+    if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
