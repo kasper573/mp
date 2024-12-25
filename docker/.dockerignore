@@ -1,9 +1,6 @@
 .github
-node_modules
-.pnpm-store
 dist
 docker
-.turbo
 .env*
 .docker-compose.yaml
 Dockerfile*

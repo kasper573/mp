@@ -4,7 +4,7 @@ import type {
   WorldState,
 } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import { SyncClient } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync-client";
 import type { Accessor } from "solid-js";
 import {
   createContext,
@@ -15,7 +15,7 @@ import {
 } from "solid-js";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/auth-client";
 import { env } from "../env";
 import { dedupe, throttle } from "../state/functionComposition";
 import { trpc } from "./trpc";

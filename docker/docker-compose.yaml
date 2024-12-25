@@ -1,44 +1,48 @@
 x-env-files: &env_files
   - path: .env
     required: false
-  - .env.${DOCKER_COMPOSE_ENV}
+  - .env.${COMPOSE_ENV}
   - .env.shared
 
 services:
-  mp:
+  mp-client:
+    env_file: *env_files
     build:
-      dockerfile: ./docker/Dockerfile.mp-${DOCKER_COMPOSE_ENV}
+      dockerfile: ./docker/Dockerfile.mp-client
       context: ..
-      args:
-        TURBO_TOKEN: ${TURBO_TOKEN:-}
-        TURBO_TEAM: ${TURBO_TEAM:-}
-    develop:
-      watch:
-        - action: sync
-          path: ..
-          target: /workdir
-        - action: rebuild
-          path: ../pnpm-lock.yaml
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    depends_on:
+      - mp-server
+
+  mp-server:
+    env_file: *env_files
+    build:
+      dockerfile: ./docker/Dockerfile.mp-server
+      context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
+    profiles: ["prod", "test"]
     depends_on:
-      migrations:
+      mp-migrations:
         condition: service_started
       keycloak-healthcheck:
         condition: service_healthy
-    env_file: *env_files
 
-  migrations:
+  mp-migrations:
+    env_file: *env_files
     build:
-      dockerfile: ../../docker/Dockerfile.migrations
+      dockerfile: ../../docker/Dockerfile.mp-migrations
       context: ../apps/server
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
+    profiles: ["prod", "test"]
     depends_on:
       postgres:
         condition: service_healthy
-    env_file: *env_files
 
   keycloak:
+    env_file: *env_files
     build:
       dockerfile: ./Dockerfile.keycloak
       context: .
@@ -46,7 +50,6 @@ services:
     command: start --optimized --import-realm
     volumes:
       - ./keycloak/import:/opt/keycloak/data/import
-    env_file: *env_files
     depends_on:
       postgres:
         condition: service_healthy
@@ -54,20 +57,21 @@ services:
   # the keycloak image itself is so bare bones for security reasons that it doesn't have curl,
   # so we use a separate container to run healthchecks on keycloak externally.
   keycloak-healthcheck:
+    env_file: *env_files
     image: curlimages/curl
     command: ["sh", "-c", "sleep infinity"]
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://keycloak:9000/health/live"]
-      interval: 10s
+      interval: 3s
       timeout: 5s
       retries: 9
 
   postgres:
+    env_file: *env_files
     image: postgres:16.4
     restart: always
     volumes:
       - /var/lib/postgresql/data:/var/lib/postgresql/data
-    env_file: *env_files
     healthcheck:
       test: ["CMD", "pg_isready"]
       interval: 10s
@@ -75,35 +79,35 @@ services:
       retries: 5
 
   redis:
+    env_file: *env_files
     image: redis:7.4.1
     restart: always
-    env_file: *env_files
 
   prometheus:
+    env_file: *env_files
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
-    env_file: *env_files
 
   node_exporter:
-    image: prom/node-exporter:v1.8.2
     env_file: *env_files
+    image: prom/node-exporter:v1.8.2
 
   grafana:
+    env_file: *env_files
     image: grafana/grafana:10.4.12
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
-    env_file: *env_files
 
   caddy:
+    env_file: *env_files
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    command:
-      ["caddy", "run", "--config", "/etc/caddy/${DOCKER_COMPOSE_ENV}.Caddyfile"]
+    command: ["caddy", "run", "--config", "/etc/caddy/${COMPOSE_ENV}.Caddyfile"]
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
@@ -114,7 +118,6 @@ services:
       - ./caddy:/etc/caddy/
       - caddy-data:/data
       - caddy-config:/config
-    env_file: *env_files
 
 volumes:
   grafana-data:

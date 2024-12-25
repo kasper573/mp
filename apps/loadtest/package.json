@@ -4,10 +4,10 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "loadtest": "tsx src/index.ts"
+    "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts"
   },
   "dependencies": {
-    "@mp/sync": "workspace:*",
+    "@mp/sync-client": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/data": "workspace:*",

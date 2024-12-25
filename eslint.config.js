@@ -15,7 +15,7 @@ export default tseslint.config(
       "**/node_modules/**",
       "**/out/**",
       "**/dist/**",
-      "**/.turbo/**",
+      "**/docker/**.js",
       "pnpm-lock.yaml",
       "**/apps/server/public/tilesets/**",
     ],

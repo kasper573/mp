@@ -4,18 +4,19 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview"
+    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm tsx-vite --host 0.0.0.0",
+    "build": "pnpm tsx-vite build",
+    "preview": "pnpm tsx-vite preview",
+    "tsx-vite": "node --import tsx ./node_modules/vite/bin/vite.js"
   },
   "dependencies": {
     "@mp/env": "workspace:*",
-    "@mp/auth": "workspace:*",
+    "@mp/auth-client": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/sync": "workspace:*",
+    "@mp/sync-client": "workspace:*",
     "@mp/pixi": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/solid-pixi": "workspace:*",
@@ -30,10 +31,13 @@
     "solid-js": "1.9.1"
   },
   "devDependencies": {
-    "@mp/build": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "http-server": "14.1.1",
-    "dotenv": "16.4.5"
+    "@vanilla-extract/vite-plugin": "4.0.15",
+    "vite": "5.4.10",
+    "vite-plugin-top-level-await": "1.4.4",
+    "vite-plugin-checker": "0.6.4",
+    "vite-plugin-solid": "2.10.2",
+    "vite-plugin-wasm": "^3.3.0"
   }
 }

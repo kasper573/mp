@@ -8,6 +8,7 @@ node_modules
 # build tools
 out/
 dist
+.vite
 .cache/
 test-results
 *.timestamp*
@@ -20,12 +21,6 @@ test-results
 *.pem
 .devmode.json
 
-# debug
-npm-debug.log*
-pnpm-debug.log*
-pnpm-error.log*
-.pnpm-debug.log*
-
 # Local files for common editors
 .idea
 .vscode
@@ -34,9 +29,3 @@ pnpm-error.log*
 yarn.lock
 package-lock.json
 
-# local env files
-.env
-.env.*local
-
-# turbo
-.turbo

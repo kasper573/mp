@@ -1,7 +1,7 @@
 import { Match, Switch, Show, useContext } from "solid-js";
 import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { createQuery } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import { createGameClient, GameClientContext } from "../../clients/game";

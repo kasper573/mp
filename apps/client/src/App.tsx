@@ -1,4 +1,4 @@
-import { AuthContext, createAuthClient } from "@mp/auth/client";
+import { AuthContext, createAuthClient } from "@mp/auth-client";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Router } from "@solidjs/router";
 import Layout from "./ui/Layout";

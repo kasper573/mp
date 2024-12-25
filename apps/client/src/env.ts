@@ -1,22 +1,21 @@
-import { clientEnvGlobalVarName, type ClientEnv } from "@mp/server";
+import type { FlatObject } from "@mp/env";
+import { parseEnv } from "@mp/env";
+import { clientEnvSchema, type ClientEnv } from "@mp/server";
 
 export const env: ClientEnv = getClientEnv();
 
 function getClientEnv(): ClientEnv {
-  const envObj = Reflect.get(window, clientEnvGlobalVarName) as
-    | ClientEnv
-    | undefined;
+  const obj = Reflect.get(window, "__ENV__") as FlatObject | undefined;
 
-  if (!envObj) {
-    // eslint-disable-next-line no-console
-    console.error(
-      "Client environment not found. Falling back to empty object. Will likely result in runtime errors.",
-    );
-    return new Proxy({} as ClientEnv, {
-      get() {
-        return "client-env-missing-fallback";
-      },
-    });
+  if (!obj) {
+    throw new Error("Client env vars is missing");
   }
-  return envObj;
+
+  const res = parseEnv(clientEnvSchema, obj, "MP_CLIENT_");
+
+  if (res.isErr()) {
+    throw new Error("Invalid client env vars:\n\n" + res.error);
+  }
+
+  return res.value;
 }

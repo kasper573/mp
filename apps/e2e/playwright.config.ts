@@ -1,15 +1,9 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
-import dotenv from "dotenv";
 
 const dockerDir = path.resolve(__dirname, "../../docker");
 
-dotenv.config({
-  path: path.resolve(dockerDir, `.env.test`),
-  override: true,
-});
-
-const baseURL = `https://${process.env.MP_SERVER_DOMAIN}`;
+const baseURL = `https://${process.env.MP_CLIENT_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
 const artifactsDir = path.join(outputDir, "artifacts");
 const snapshotDir = path.join(outputDir, "snapshots");
@@ -46,7 +40,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
+    command: `cd ${dockerDir} && ./dockerctl.sh test up --no-build`,
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,

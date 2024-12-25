@@ -1,5 +1,5 @@
-import type { UserId } from "@mp/auth/server";
-import type { ClientId } from "@mp/sync/server";
+import type { UserId } from "@mp/auth-server";
+import type { ClientId } from "@mp/sync-server";
 
 export class ClientRegistry {
   private map = new Map<ClientId, UserId>();

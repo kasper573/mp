@@ -2,19 +2,15 @@
   "name": "@mp/env",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.cjs"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
     }
   },
-  "files": [
-    "dist"
-  ],
   "scripts": {
-    "build": "tsup",
-    "dev": "tsup --watch",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -25,7 +21,6 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@mp/build": "workspace:*",
     "vitest": "2.0.3"
   }
 }

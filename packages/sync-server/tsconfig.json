@@ -1,0 +1,6 @@
+{
+  "extends": "@mp/tsconfig/node.json",
+  "compilerOptions": {
+    "module": "ES2022"
+  }
+}

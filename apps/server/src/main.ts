@@ -7,14 +7,13 @@ import { Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
-import { createAuthServer } from "@mp/auth/server";
+import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import type { ClientId } from "@mp/sync/server";
-import { SyncServer } from "@mp/sync/server";
+import type { ClientId } from "@mp/sync-server";
+import { SyncServer } from "@mp/sync-server";
 import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
 import {
   collectDefaultMetrics,
-  createMetricsScrapeMiddleware,
   MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
@@ -32,7 +31,7 @@ import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
-import { clientMiddleware } from "./clientMiddleware";
+import { metricsMiddleware } from "./express/metricsMiddleware";
 
 const logger = new Logger(console);
 
@@ -105,7 +104,7 @@ const expressStaticConfig = {
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use(expressLogger)
-  .use(createMetricsScrapeMiddleware(metrics))
+  .use(metricsMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
 
@@ -166,10 +165,6 @@ webServer.use(
       ),
   }),
 );
-
-if (opt.clientDir !== undefined) {
-  webServer.use(clientMiddleware(opt.clientDir, expressStaticConfig));
-}
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);

@@ -2,16 +2,12 @@ name: Test, Build, Deploy
 on: [push]
 
 env:
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
   DOCKER_REGISTRY: ghcr.io
   DOCKER_USERNAME: ${{ github.actor }}
   DOCKER_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
   DOCKER_REGISTRY_URL: ghcr.io/${{ github.actor }}
-  DOCKER_COMPOSE_ENV: prod
   DOCKER_IMAGE_VERSION: ${{ github.sha }}
   BUILD_VERSION: ${{ github.sha }}
-  MP_SERVER_DOMAIN: ${{ vars.MP_DOMAIN }}
 
 jobs:
   conventions:
@@ -19,7 +15,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install_node_things/
-      - run: pnpm build:packages
       - run: pnpm lint
       - run: pnpm format
 
@@ -28,7 +23,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install_node_things/
-      - run: pnpm build:packages
       - run: pnpm test
 
   build:
@@ -50,10 +44,10 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Build docker images
-        run: cd docker && docker compose build
+        run: cd docker && ./dockerctl.sh prod build
 
       - name: Push docker images
-        run: cd docker && docker compose push
+        run: cd docker && ./dockerctl.sh prod push
 
   test-e2e:
     needs: [build]
@@ -81,7 +75,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Upload docker compose runtime dependencies
+      - name: Upload docker runtime dependencies
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -avz --delete
@@ -102,20 +96,19 @@ jobs:
             cd ~/docker
 
             # Set production host env vars
-            echo "DOCKER_COMPOSE_ENV=\"${{ env.DOCKER_COMPOSE_ENV }}\"" > .env
-            echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" >> .env
+            echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" > .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
             echo "MP_SERVER_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             echo "MP_CLIENT_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
-            echo "MP_SERVER_DOMAIN=\"${{ env.MP_SERVER_DOMAIN }}\"" >> .env
+            echo "MP_DOMAIN=\"${{ vars.MP_DOMAIN }}\"" >> .env
             echo "KC_SMTP_HOST=\"${{ vars.KC_SMTP_HOST }}\"" >> .env
             echo "KC_SMTP_PORT=\"${{ vars.KC_SMTP_PORT }}\"" >> .env
             echo "KC_SMTP_USER=\"${{ vars.KC_SMTP_USER }}\"" >> .env
             echo "KC_SMTP_PASSWORD=\"${{ secrets.KC_SMTP_PASSWORD }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
-            docker compose pull
-            docker compose down
-            docker compose up -d --remove-orphans --no-build
+            ./dockerctl.sh prod pull
+            ./dockerctl.sh prod down
+            ./dockerctl.sh prod up -d --remove-orphans --no-build
             docker system prune -f
             docker image prune -af
