@@ -4,10 +4,9 @@ import dotenv from "dotenv";
 
 const dockerDir = path.resolve(__dirname, "../../docker");
 
-dotenv.config({
-  path: path.resolve(dockerDir, `.env.test`),
-  override: true,
-});
+// Load the test env files just so we can get the client domain
+dotenv.config({ path: path.resolve(dockerDir, `.env.test`), override: true });
+dotenv.config({ path: path.resolve(dockerDir, `.env.shared`), override: true });
 
 const baseURL = `https://${process.env.MP_CLIENT_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
@@ -46,7 +45,7 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: `cd ${dockerDir} && DOCKER_COMPOSE_ENV=test docker compose up --no-build`,
+    command: `cd ${dockerDir}/dockerctl.sh test up --no-build`,
     stdout: "ignore",
     stderr: "ignore",
     url: baseURL,

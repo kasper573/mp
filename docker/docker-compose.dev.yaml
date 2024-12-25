@@ -1,27 +1,10 @@
-x-env-files: &env_files
-  - path: .env
-    required: false
-  - .env.dev
-  - .env.shared
-
 services:
   keycloak:
-    env_file: *env_files
     ports:
       - "8080:8080"
   postgres:
-    env_file: *env_files
     ports:
       - "5432:5432"
-  redis:
-    env_file: *env_files
-  prometheus:
-    env_file: *env_files
-  node_exporter:
-    env_file: *env_files
-  grafana:
-    env_file: *env_files
   caddy:
-    env_file: *env_files
     extra_hosts:
       - "host.docker.internal:host-gateway"

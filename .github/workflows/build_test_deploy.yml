@@ -45,10 +45,10 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Build docker images
-        run: cd docker && docker compose build
+        run: ./docker/dockerctl.sh prod build
 
       - name: Push docker images
-        run: cd docker && docker compose push
+        run: ./docker/dockerctl.sh prod push
 
   test-e2e:
     needs: [build]
@@ -76,7 +76,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Upload docker compose runtime dependencies
+      - name: Upload docker runtime dependencies
         uses: burnett01/rsync-deployments@7.0.1
         with:
           switches: -avz --delete
@@ -108,8 +108,8 @@ jobs:
             echo "KC_SMTP_PASSWORD=\"${{ secrets.KC_SMTP_PASSWORD }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
-            docker compose pull
-            docker compose down
-            docker compose up -d --remove-orphans --no-build
+            ./dockerctl.sh prod pull
+            ./dockerctl.sh prod down
+            ./dockerctl.sh prod up -d --remove-orphans --no-build
             docker system prune -f
             docker image prune -af
