@@ -20,7 +20,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 ENV NODE_ENV=production
 RUN pnpm -F client build
 
-FROM nginx:alpine3.20 AS runner
+FROM nginx:alpine3.20-slim AS runner
 WORKDIR /workdir
 
 # Copy client build to nginx
