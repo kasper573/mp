@@ -3,13 +3,12 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start": "playwright test"
+    "start": "dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- playwright test"
   },
   "license": "MIT",
   "devDependencies": {
     "@faker-js/faker": "9.2.0",
     "@playwright/test": "^1.49.0",
-    "@mp/tsconfig": "workspace:*",
-    "dotenv": "16.4.5"
+    "@mp/tsconfig": "workspace:*"
   }
 }

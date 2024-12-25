@@ -1,12 +1,7 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
-import dotenv from "dotenv";
 
 const dockerDir = path.resolve(__dirname, "../../docker");
-
-// Load the test env files just so we can get the client domain
-dotenv.config({ path: path.resolve(dockerDir, `.env.test`), override: true });
-dotenv.config({ path: path.resolve(dockerDir, `.env.shared`), override: true });
 
 const baseURL = `https://${process.env.MP_CLIENT_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
