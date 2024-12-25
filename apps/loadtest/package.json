@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "build": "tsc",
-    "loadtest": "tsx src/index.ts"
+    "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts"
   },
   "dependencies": {
     "@mp/sync-client": "workspace:*",
