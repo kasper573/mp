@@ -3,7 +3,8 @@
 import "dotenv/config";
 import path from "node:path";
 import http from "node:http";
-import { Logger } from "@mp/logger";
+import type { Logger } from "@mp/logger";
+import { chain } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
@@ -11,7 +12,7 @@ import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync-server";
 import { SyncServer } from "@mp/sync-server";
-import { measureTimeSpan, Ticker, TimeSpan } from "@mp/time";
+import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
   MetricsGague,
@@ -33,7 +34,7 @@ import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 
-const logger = new Logger(console);
+const logger = console;
 
 const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 if (optResult.isErr()) {
@@ -95,7 +96,7 @@ if (initialWorldState.isErr()) {
   process.exit(1);
 }
 
-const expressLogger = createExpressLogger(logger.chain("http"));
+const expressLogger = createExpressLogger(chain(logger, "http"));
 
 const expressStaticConfig = {
   maxAge: opt.publicMaxAge * 1000,
@@ -115,7 +116,7 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   filterState: deriveWorldStateForClient,
   httpServer,
   patchCallback: opt.logSyncPatches
-    ? (patches) => logger.chain("sync").info(patches)
+    ? (patches) => chain(logger, "sync").info(patches)
     : undefined,
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
@@ -152,11 +153,14 @@ const apiRouter = createRootRouter({
   createUrl: urlToPublicFile,
   buildVersion: opt.buildVersion,
   ticker,
+  trace: { filePath: opt.clientTraceLogPath },
 });
 
 webServer.use(
   opt.apiEndpointPath,
   trpcExpress.createExpressMiddleware({
+    onError: ({ path, error }) =>
+      logger.error(`[trpc error][${path}]: ${error.message}`),
     router: apiRouter,
     createContext: ({ req }) =>
       createServerContext(
@@ -259,16 +263,6 @@ function serverTextHeader(options: ServerOptions) {
 #     ██║ ╚═╝ ██║ ██║         #
 #     ╚═╝     ╚═╝ ╚═╝         #
 ===============================
-${Object.entries(options)
-  .sort(([a], [b]) => a.localeCompare(b))
-  .map(([key, value]) => `${key}: ${optionValueToString(value)}`)
-  .join("\n")}
+${JSON.stringify(options, null, 2)}
 =====================================================`;
-}
-
-function optionValueToString(value: unknown) {
-  if (value instanceof TimeSpan) {
-    return `${value.totalMilliseconds}ms`;
-  }
-  return String(value);
 }

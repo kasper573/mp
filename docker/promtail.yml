@@ -17,6 +17,33 @@ scrape_configs:
           job: system_logs
           __path__: /var/log/*log
 
+  - job_name: mp_client_trace
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: mp_client_trace_logs
+          __path__: ${MP_SERVER_CLIENT_TRACE_LOG_PATH}
+    pipeline_stages:
+      - json:
+          expressions:
+            ts: ts
+            build_version: buildVersion
+            type: type
+            session_id: sessionId
+            user_id: userId
+            message: message
+            stack: stack
+            args: args
+      - timestamp:
+          source: ts
+          format: ISO8601
+      - labels:
+          build_version:
+          type:
+          session_id:
+          user_id:
+
   - job_name: containers
     static_configs:
       - targets:
@@ -24,7 +51,6 @@ scrape_configs:
         labels:
           job: container_logs
           __path__: /var/lib/docker/containers/*/*log
-
     pipeline_stages:
       - json:
           expressions:

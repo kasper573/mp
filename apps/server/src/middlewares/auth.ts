@@ -19,3 +19,13 @@ export function auth() {
     return next({ ctx: { ...ctx, user: result.user } });
   });
 }
+
+export function optionalAuth() {
+  return t.middleware(async ({ ctx, next }) => {
+    const { authToken, auth } = ctx;
+    const result = authToken ? await auth.verifyToken(authToken) : undefined;
+    return next({
+      ctx: { ...ctx, user: result?.ok ? result.user : undefined },
+    });
+  });
+}

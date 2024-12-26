@@ -1,6 +1,26 @@
-import type { FlatObject } from "@mp/env";
-import { parseEnv } from "@mp/env";
-import { clientEnvSchema, type ClientEnv } from "@mp/server";
+import type { FlatObject, InferOutput } from "@mp/env";
+import { object, string, parseEnv } from "@mp/env";
+
+export type ClientEnv = InferOutput<typeof clientEnvSchema>;
+
+const clientEnvSchema = object({
+  apiUrl: string(),
+  wsUrl: string(),
+  buildVersion: string(),
+  auth: object({
+    authority: string(),
+    audience: string(),
+    /**
+     * The full URI that OIDC should redirect back to
+     */
+    redirectUri: string(),
+    /**
+     * The relative path the web server should serve the OIDC redirect callback at
+     */
+    callbackPath: string(),
+  }),
+  traceReceiverUrl: string(),
+});
 
 export const env: ClientEnv = getClientEnv();
 
