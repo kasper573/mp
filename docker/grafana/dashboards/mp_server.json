@@ -20,7 +20,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 11159,
   "graphTooltip": 0,
-  "id": 2,
+  "id": 12,
   "links": [],
   "panels": [
     {
@@ -30,7 +30,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -72,7 +72,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "irate(process_cpu_user_seconds_total{instance=~\"$instance\"}[2m]) * 100",
           "format": "time_series",
@@ -83,7 +83,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "irate(process_cpu_system_seconds_total{instance=~\"$instance\"}[2m]) * 100",
           "format": "time_series",
@@ -129,7 +129,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -171,7 +171,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_eventloop_lag_seconds{instance=~\"$instance\"}",
           "format": "time_series",
@@ -213,7 +213,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -263,7 +263,9 @@
         "justifyMode": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["mean"],
+          "calcs": [
+            "mean"
+          ],
           "fields": "/^__name__$/",
           "values": false
         },
@@ -276,7 +278,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "sum(nodejs_version_info{instance=~\"$instance\"}) by (version)",
           "format": "time_series",
@@ -293,7 +295,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -343,7 +345,9 @@
         "justifyMode": "auto",
         "orientation": "horizontal",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -356,7 +360,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "sum(changes(process_start_time_seconds{instance=~\"$instance\"}[1m]))",
           "format": "time_series",
@@ -375,7 +379,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -418,7 +422,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "process_resident_memory_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -429,7 +433,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_heap_size_total_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -440,7 +444,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_heap_size_used_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -451,7 +455,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_external_memory_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -497,7 +501,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -539,7 +543,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_active_handles_total{instance=~\"$instance\"}",
           "format": "time_series",
@@ -550,7 +554,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_active_requests_total{instance=~\"$instance\"}",
           "format": "time_series",
@@ -596,7 +600,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -639,7 +643,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_heap_space_size_total_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -685,7 +689,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -728,7 +732,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_heap_space_size_used_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -774,7 +778,7 @@
       "dashes": false,
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fill": 1,
       "fillGradient": 0,
@@ -817,7 +821,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "expr": "nodejs_heap_space_size_available_bytes{instance=~\"$instance\"}",
           "format": "time_series",
@@ -857,9 +861,10 @@
       }
     }
   ],
-  "refresh": "auto",
   "schemaVersion": 39,
-  "tags": ["nodejs"],
+  "tags": [
+    "nodejs"
+  ],
   "templating": {
     "list": [
       {
@@ -870,7 +875,7 @@
         },
         "datasource": {
           "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
+          "uid": "mimir"
         },
         "definition": "label_values(nodejs_version_info, instance)",
         "hide": 0,
@@ -908,11 +913,21 @@
       "2h",
       "1d"
     ],
-    "time_options": ["5m", "15m", "1h", "6h", "12h", "24h", "2d", "7d", "30d"]
+    "time_options": [
+      "5m",
+      "15m",
+      "1h",
+      "6h",
+      "12h",
+      "24h",
+      "2d",
+      "7d",
+      "30d"
+    ]
   },
   "timezone": "",
-  "title": "MP (process)",
+  "title": "mp-server (node process)",
   "uid": "PTSqcpJWk",
-  "version": 9,
+  "version": 2,
   "weekStart": ""
 }

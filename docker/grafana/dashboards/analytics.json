@@ -16,7 +16,7 @@
       {
         "datasource": {
           "type": "prometheus",
-          "uid": "PBFA97CFB590B2093"
+          "uid": "mimir"
         },
         "enable": true,
         "expr": "process_uptime_seconds < 60",
@@ -34,7 +34,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -113,7 +113,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -129,7 +129,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -146,7 +146,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -167,7 +167,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PBFA97CFB590B2093"
+        "uid": "mimir"
       },
       "fieldConfig": {
         "defaults": {
@@ -247,7 +247,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
@@ -264,7 +264,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PBFA97CFB590B2093"
+            "uid": "mimir"
           },
           "disableTextWrap": false,
           "editorMode": "builder",
