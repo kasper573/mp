@@ -105,6 +105,16 @@ services:
       - mimir-data:/data
     entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
 
+  # tempo:
+  #   env_file: *env_files
+  #   logging: *logging
+  #   image: grafana/tempo:2.6.1
+  #   volumes:
+  #     - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
+  #   command:
+  #     - -config.file=/etc/tempo-config/tempo.yaml
+  #     - -config.expand-env=true
+
   alloy:
     env_file: *env_files
     logging: *logging
@@ -123,6 +133,7 @@ services:
       - mimir
       - grafana
       - loki
+      #- tempo
 
   loki:
     logging: *logging

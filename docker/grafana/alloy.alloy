@@ -50,51 +50,6 @@ loki.source.file "system" {
 	legacy_positions_file = "/tmp/positions.yaml"
 }
 
-local.file_match "mp_client_trace" {
-	path_targets = [{
-		__address__ = "localhost",
-		__path__    = env("MP_SERVER_CLIENT_TRACE_LOG_PATH"),
-		job         = "mp_client_trace_logs",
-	}]
-}
-
-loki.process "mp_client_trace" {
-	forward_to = [loki.write.default.receiver]
-
-	stage.json {
-		expressions = {
-			args          = "args",
-			build_version = "buildVersion",
-			message       = "message",
-			session_id    = "sessionId",
-			stack         = "stack",
-			ts            = "ts",
-			type          = "type",
-			user_id       = "userId",
-		}
-	}
-
-	stage.timestamp {
-		source = "ts"
-		format = "ISO8601"
-	}
-
-	stage.labels {
-		values = {
-			build_version = null,
-			session_id    = null,
-			type          = null,
-			user_id       = null,
-		}
-	}
-}
-
-loki.source.file "mp_client_trace" {
-	targets               = local.file_match.mp_client_trace.targets
-	forward_to            = [loki.process.mp_client_trace.receiver]
-	legacy_positions_file = "/tmp/positions.yaml"
-}
-
 local.file_match "containers" {
 	path_targets = [{
 		__address__ = "localhost",
@@ -158,4 +113,69 @@ loki.write "default" {
 		url = "http://loki:3100/loki/api/v1/push"
 	}
 	external_labels = {}
+}
+
+
+loki.process "mp_client" {
+  forward_to = [loki.write.default.receiver]
+
+  stage.logfmt {
+      mapping = { "kind" = "", "service_name" = "", "app" = "" }
+  }
+
+  stage.labels {
+      values = { "kind" = "kind", "service_name" = "service_name", "app" = "app" }
+  }
+}
+
+faro.receiver "mp_client" {
+	extra_log_labels = {
+		app  = "mp-client",
+		kind = "",
+	}
+
+	server {
+		listen_address           = "0.0.0.0"
+		listen_port              = "18273"
+		cors_allowed_origins     = [env("MP_SERVER_CORS_ORIGIN")]
+		max_allowed_payload_size = "10MiB"
+
+		rate_limiting {
+			rate = 50
+		}
+	}
+
+	sourcemaps { }
+
+	output {
+		logs   = [loki.process.mp_client.receiver]
+		traces = [otelcol.exporter.otlp.default.input]
+	}
+}
+
+otelcol.receiver.otlp "default" {
+	grpc {
+		include_metadata = true
+	}
+
+	output {
+		metrics = []
+		logs    = []
+		traces  = [otelcol.exporter.otlp.default.input]
+	}
+}
+
+
+otelcol.exporter.otlp "default" {
+	retry_on_failure {
+		max_elapsed_time = "1m0s"
+	}
+
+	client {
+		endpoint = "tempo:3200"
+
+		tls {
+			insecure = true
+		}
+	}
 }

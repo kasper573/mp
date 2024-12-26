@@ -3,8 +3,7 @@
 import "dotenv/config";
 import path from "node:path";
 import http from "node:http";
-import type { Logger } from "@mp/logger";
-import { chain } from "@mp/logger";
+import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
@@ -34,7 +33,8 @@ import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 
-const logger = console;
+const logger = new Logger();
+logger.subscribe(consoleLoggerHandler(console));
 
 const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 if (optResult.isErr()) {
@@ -96,7 +96,7 @@ if (initialWorldState.isErr()) {
   process.exit(1);
 }
 
-const expressLogger = createExpressLogger(chain(logger, "http"));
+const expressLogger = createExpressLogger(logger);
 
 const expressStaticConfig = {
   maxAge: opt.publicMaxAge * 1000,
@@ -116,7 +116,7 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   filterState: deriveWorldStateForClient,
   httpServer,
   patchCallback: opt.logSyncPatches
-    ? (patches) => chain(logger, "sync").info(patches)
+    ? (patches) => logger.info("[sync]", patches)
     : undefined,
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
@@ -153,7 +153,6 @@ const apiRouter = createRootRouter({
   createUrl: urlToPublicFile,
   buildVersion: opt.buildVersion,
   ticker,
-  trace: { filePath: opt.clientTraceLogPath },
 });
 
 webServer.use(
@@ -247,7 +246,7 @@ function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
 
 function createExpressLogger(logger: Logger): express.RequestHandler {
   return (req, _, next) => {
-    logger.info(req.method, req.url);
+    logger.info("[http]", req.method, req.url);
     next();
   };
 }

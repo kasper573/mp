@@ -2,8 +2,3 @@
 // This should end up being primarily constants and utility functions.
 export const tokenHeaderName = "token";
 export { default as transformer } from "superjson";
-
-import { registerCustom } from "superjson";
-import { errorTransformer } from "./transformers/error";
-
-registerCustom(errorTransformer, "Error");

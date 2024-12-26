@@ -113,11 +113,4 @@ export const serverOptionsSchema = object({
    * Whether to expose detailed error information to clients
    */
   exposeErrorDetails: boolish(),
-  /**
-   * The file path to write client trace logs to
-   */
-  clientTraceLogPath: pipe(
-    string(),
-    transform((p) => path.resolve(p)),
-  ),
 });

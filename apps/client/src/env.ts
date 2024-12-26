@@ -19,7 +19,7 @@ const clientEnvSchema = object({
      */
     callbackPath: string(),
   }),
-  traceReceiverUrl: string(),
+  faroReceiverUrl: string(),
 });
 
 export const env: ClientEnv = getClientEnv();
