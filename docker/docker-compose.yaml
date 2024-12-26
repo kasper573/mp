@@ -4,9 +4,16 @@ x-env-files: &env_files
   - .env.${COMPOSE_ENV}
   - .env.shared
 
+x-logging: &logging
+  driver: json-file
+  options:
+    # Used by promtail to produce labels for Loki
+    tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+
 services:
   mp-client:
     env_file: *env_files
+    logging: *logging
     build:
       dockerfile: ./docker/Dockerfile.mp-client
       context: ..
@@ -18,6 +25,7 @@ services:
 
   mp-server:
     env_file: *env_files
+    logging: *logging
     build:
       dockerfile: ./docker/Dockerfile.mp-server
       context: ..
@@ -32,6 +40,7 @@ services:
 
   mp-migrations:
     env_file: *env_files
+    logging: *logging
     build:
       dockerfile: ../../docker/Dockerfile.mp-migrations
       context: ../apps/server
@@ -43,6 +52,7 @@ services:
 
   keycloak:
     env_file: *env_files
+    logging: *logging
     build:
       dockerfile: ./Dockerfile.keycloak
       context: .
@@ -58,6 +68,7 @@ services:
   # so we use a separate container to run healthchecks on keycloak externally.
   keycloak-healthcheck:
     env_file: *env_files
+    logging: *logging
     image: curlimages/curl
     command: ["sh", "-c", "sleep infinity"]
     healthcheck:
@@ -68,6 +79,7 @@ services:
 
   postgres:
     env_file: *env_files
+    logging: *logging
     image: postgres:16.4
     restart: always
     volumes:
@@ -80,22 +92,46 @@ services:
 
   redis:
     env_file: *env_files
+    logging: *logging
     image: redis:7.4.1
     restart: always
 
   prometheus:
     env_file: *env_files
+    logging: *logging
     image: prom/prometheus:v2.55.1
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus-data:/prometheus
 
+  promtail:
+    image: grafana/promtail:3.3.2
+    logging: *logging
+    restart: always
+    volumes:
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - /tmp:/tmp
+      - ./promtail.yml:/etc/promtail/config.yml
+    command: -config.file=/etc/promtail/config.yml
+    depends_on:
+      - loki
+
+  loki:
+    logging: *logging
+    image: grafana/loki:3.3.2
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - loki-data:/loki
+
   node_exporter:
     env_file: *env_files
+    logging: *logging
     image: prom/node-exporter:v1.8.2
 
   grafana:
     env_file: *env_files
+    logging: *logging
     image: grafana/grafana:10.4.12
     volumes:
       - grafana-data:/var/lib/grafana
@@ -104,6 +140,7 @@ services:
 
   caddy:
     env_file: *env_files
+    logging: *logging
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
@@ -121,6 +158,7 @@ services:
 
 volumes:
   grafana-data:
+  loki-data:
   caddy-data:
   caddy-config:
   prometheus-data:
