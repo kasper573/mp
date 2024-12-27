@@ -1,10 +1,10 @@
-import { createEffect, Show } from "solid-js";
+import { createEffect, Show, useContext } from "solid-js";
+import { LoggerContext } from "../logger";
 
 export function ErrorFallback(error: unknown, reset: () => void) {
-  createEffect(() => {
-    // eslint-disable-next-line no-console
-    console.error(error);
-  });
+  const logger = useContext(LoggerContext);
+
+  createEffect(() => logger.error(error));
 
   return (
     <>

@@ -80,9 +80,11 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
   if (!user) {
     return;
   }
+
   return {
     id: user.profile.sub as UserId,
     token: user.access_token as AuthToken,
+    name: user.profile.name,
   };
 }
 

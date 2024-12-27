@@ -1,8 +1,10 @@
-import { Logger } from "@mp/logger";
+import type { Logger } from "@mp/logger";
+import { createContext } from "solid-js";
 
-/**
- * The root logger for the client.
- * Refrain from logging on this instance directly.
- * Chain from it in each module to create a new logger specific to that module.
- */
-export const rootLogger = new Logger(console);
+export const LoggerContext = createContext<Logger>(
+  new Proxy({} as Logger, {
+    get() {
+      throw new Error("LoggerContext must be provided");
+    },
+  }),
+);

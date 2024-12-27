@@ -1,11 +1,13 @@
-import { Logger } from "@mp/logger";
+import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
 import { transformer } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { readCliOptions } from "./cli";
 
-const logger = new Logger(console);
+const logger = new Logger();
+logger.subscribe(consoleLoggerHandler(console));
+
 const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
 void main();
 

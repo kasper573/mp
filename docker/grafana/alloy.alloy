@@ -1,0 +1,185 @@
+prometheus.scrape "mp" {
+	targets = [{
+		__address__ = "mp-server:9999",
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "mp"
+	scrape_interval = "15s"
+}
+
+prometheus.scrape "node_exporter" {
+	targets = [{
+		__address__ = "node_exporter:9100",
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "node_exporter"
+	scrape_interval = "15s"
+}
+
+prometheus.scrape "keycloak" {
+	targets = [{
+		__address__ = "keycloak:9000",
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "keycloak"
+	scrape_interval = "15s"
+}
+
+prometheus.remote_write "default" {
+	endpoint {
+		name = "mp"
+		url  = "http://mimir:9009/api/v1/push"
+
+		queue_config { }
+
+		metadata_config { }
+	}
+}
+
+local.file_match "system" {
+	path_targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/log/*log",
+		job         = "system_logs",
+	}]
+}
+
+loki.source.file "system" {
+	targets               = local.file_match.system.targets
+	forward_to            = [loki.write.default.receiver]
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+local.file_match "containers" {
+	path_targets = [{
+		__address__ = "localhost",
+		__path__    = "/var/lib/docker/containers/*/*log",
+		job         = "container_logs",
+	}]
+}
+
+loki.process "containers" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.json {
+		expressions = {
+			attrs  = "",
+			output = "log",
+			stream = "stream",
+		}
+	}
+
+	stage.json {
+		expressions = {
+			tag = "",
+		}
+		source = "attrs"
+	}
+
+	stage.regex {
+		expression = "(?P<image_name>(?:[^|]*[^|])).(?P<container_name>(?:[^|]*[^|])).(?P<image_id>(?:[^|]*[^|])).(?P<container_id>(?:[^|]*[^|]))"
+		source     = "tag"
+	}
+
+	stage.timestamp {
+		source = "time"
+		format = "RFC3339Nano"
+	}
+
+	stage.labels {
+		values = {
+			container_id   = null,
+			container_name = null,
+			image_id       = null,
+			image_name     = null,
+			stream         = null,
+			tag            = null,
+		}
+	}
+
+	stage.output {
+		source = "output"
+	}
+}
+
+loki.source.file "containers" {
+	targets               = local.file_match.containers.targets
+	forward_to            = [loki.process.containers.receiver]
+	legacy_positions_file = "/tmp/positions.yaml"
+}
+
+loki.write "default" {
+	endpoint {
+		url = "http://loki:3100/loki/api/v1/push"
+	}
+	external_labels = {}
+}
+
+loki.process "mp_client" {
+	forward_to = [loki.write.default.receiver]
+
+	stage.logfmt {
+		mapping = {"kind" = "", "service_name" = "", "app" = ""}
+	}
+
+	stage.labels {
+		values = {
+			"kind"          = "kind",
+			"service_name"  = "service_name",
+			"app"           = "app",
+			"user_id"       = "user_id",
+			"user_username" = "user_username",
+		}
+	}
+}
+
+faro.receiver "mp_client" {
+	extra_log_labels = {
+		app  = "mp-client",
+		kind = "",
+	}
+
+	server {
+		listen_address           = "0.0.0.0"
+		listen_port              = "18273"
+		cors_allowed_origins     = [env("MP_SERVER_CORS_ORIGIN")]
+		max_allowed_payload_size = "10MiB"
+
+		rate_limiting {
+			rate = 50
+		}
+	}
+
+	sourcemaps { }
+
+	output {
+		logs   = [loki.process.mp_client.receiver]
+		traces = [otelcol.exporter.otlp.default.input]
+	}
+}
+
+otelcol.receiver.otlp "default" {
+	grpc {
+		include_metadata = true
+	}
+
+	output {
+		metrics = []
+		logs    = []
+		traces  = [otelcol.exporter.otlp.default.input]
+	}
+}
+
+otelcol.exporter.otlp "default" {
+	retry_on_failure {
+		max_elapsed_time = "1m0s"
+	}
+
+	client {
+		endpoint = "tempo:3200"
+
+		tls {
+			insecure = true
+		}
+	}
+}

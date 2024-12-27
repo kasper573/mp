@@ -5,3 +5,7 @@ grafana.{$MP_DOMAIN} {
 auth.{$MP_DOMAIN} {
     reverse_proxy keycloak:8080
 }
+
+faro.{$MP_DOMAIN} {
+    reverse_proxy alloy:18273
+}

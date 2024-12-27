@@ -96,26 +96,44 @@ services:
     image: redis:7.4.1
     restart: always
 
-  prometheus:
+  mimir:
     env_file: *env_files
     logging: *logging
-    image: prom/prometheus:v2.55.1
+    image: grafana/mimir:2.12.0
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus-data:/prometheus
+      - ./grafana/mimir.yaml:/etc/mimir/config.yaml
+      - mimir-data:/data
+    entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
 
-  promtail:
-    image: grafana/promtail:3.3.2
+  # tempo:
+  #   env_file: *env_files
+  #   logging: *logging
+  #   image: grafana/tempo:2.6.1
+  #   volumes:
+  #     - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
+  #   command:
+  #     - -config.file=/etc/tempo-config/tempo.yaml
+  #     - -config.expand-env=true
+
+  alloy:
+    env_file: *env_files
     logging: *logging
-    restart: always
+    image: grafana/alloy:v1.5.1
     volumes:
+      - ./grafana/alloy.alloy:/etc/alloy/config.alloy
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro
       - /tmp:/tmp
-      - ./promtail.yml:/etc/promtail/config.yml
-    command: -config.file=/etc/promtail/config.yml
+    entrypoint:
+      - "/bin/alloy"
+      - "run"
+      - '--config.extra-args="-config.expand-env"'
+      - /etc/alloy/config.alloy
     depends_on:
+      - mimir
+      - grafana
       - loki
+      #- tempo
 
   loki:
     logging: *logging
@@ -161,4 +179,4 @@ volumes:
   loki-data:
   caddy-data:
   caddy-config:
-  prometheus-data:
+  mimir-data:
