@@ -9,7 +9,6 @@ export default function SpringTester() {
   const [mass, setMass] = createSignal(2);
   const [precision, setPrecision] = createSignal(1);
   const [target, setTarget] = createSignal(0);
-  const [error, setError] = createSignal("");
   const options = createMemo(() => ({
     stiffness: stiffness(),
     damping: damping(),
