@@ -1,10 +1,11 @@
-prometheus.scrape "mp" {
+prometheus.scrape "mp_server" {
 	targets = [{
-		__address__ = "mp-server:9999",
+		__address__ = env("ALLOY_MP_SERVER_ADDRESS"),
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
-	job_name        = "mp"
-	scrape_interval = "15s"
+	job_name        = "mp_server"
+	scrape_interval = "5s"
+	scrape_timeout  = "4s"
 }
 
 prometheus.scrape "node_exporter" {
@@ -13,7 +14,8 @@ prometheus.scrape "node_exporter" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
-	scrape_interval = "15s"
+	scrape_interval = "5s"
+	scrape_timeout  = "4s"
 }
 
 prometheus.scrape "keycloak" {
@@ -22,12 +24,13 @@ prometheus.scrape "keycloak" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "keycloak"
-	scrape_interval = "15s"
+	scrape_interval = "5s"
+	scrape_timeout  = "4s"
 }
 
 prometheus.remote_write "default" {
 	endpoint {
-		name = "mp"
+		name = "mimir"
 		url  = "http://mimir:9009/api/v1/push"
 
 		queue_config { }
