@@ -32,21 +32,9 @@ export default function SpringTester() {
     }
   });
 
-  function triggerRenderError() {
-    setError("This is a render error");
-  }
-
-  const errorThrower = () => {
-    if (error()) {
-      throw new Error(error());
-    }
-    return null;
-  };
-
   return (
     <div style={{ padding: "20px" }}>
       <h1>Spring Tester</h1>
-      {errorThrower()}
       <Range
         label="Stiffness"
         min={50}
@@ -122,8 +110,6 @@ export default function SpringTester() {
           }}
         />
       </div>
-      <button onClick={triggerEventError}>Trigger an event error</button>
-      <button onClick={triggerRenderError}>Trigger a render error</button>
     </div>
   );
 }
@@ -172,8 +158,4 @@ function createRenderEffect(update: (dt: TimeSpan) => void) {
       requestAnimationFrame(render);
     }
   }
-}
-
-function triggerEventError() {
-  throw new Error("This is an error");
 }
