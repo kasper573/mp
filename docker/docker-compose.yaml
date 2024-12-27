@@ -159,6 +159,8 @@ services:
 
   caddy:
     env_file: *env_files
+    environment:
+      OTEL_SERVICE_NAME: caddy
     logging: *logging
     build:
       dockerfile: ./Dockerfile.caddy
