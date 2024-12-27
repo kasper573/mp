@@ -1,12 +1,11 @@
 # mp
 
-A retro, point and click, hack and slash online rpg.
+A retro, point and click, hack and slash online rpg built in [TypeScript](https://www.typescriptlang.org/).
 
 This is a pet project that I'm working on over the weekends over at
 https://www.twitch.tv/kasper_573.
 
-I'm doing this project for fun and to teach myself more about multiplayer game
-development.
+I'm doing this project for fun and to teach myself more about multiplayer game development and web development infrastructure.
 
 ## Stack
 
@@ -21,21 +20,21 @@ development.
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
 
-## (very loose) Design goals
+## Design goals
 
-- CI/CD
-- As replicable as possible. Clone and run, containerized deploy.
+- CI/CD: Lint, format, unit/e2e test in pipeline.
+- Highly replicable: Containerized deploy.
+- (near) Zero config: Just clone and run.
 - [Modular and encapsulated concerns](packages).
-- Authorative server
-- Dead simple client
+- Authorative server, dead simple client
   - little to no optimistic operations (maybe some lerping)
   - subscribe to state changes, render them.
 
 ## Development
 
-Local development is done using node and docker compose. However, we don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
+Local development is done using node and docker compose.
 
-Initial setup:
+### Initial setup (only required once)
 
 - Install [Docker](https://www.docker.com/)
 - Install [NodeJS](https://nodejs.org/)
@@ -47,10 +46,24 @@ Initial setup:
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
 
-Before each development session:
+### Before each development session
 
 - Run `pnpm dev`
 - Visit `https://mp.localhost` in your browser
+
+### If you make docker related changes
+
+You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script.
+
+### Quirks
+
+While most of there repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
+
+In development, our own apps run on the host machine and outside of the docker network, while 3rd party services run inside the docker network, contrary to production and testing where everything runs inside the docker network.
+
+> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, drizzle-kit cli, pnpm link, etc.
+
+We don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
 
 ## Docker
 
