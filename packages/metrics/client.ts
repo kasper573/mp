@@ -7,5 +7,4 @@ export {
   getWebInstrumentations,
 } from "@grafana/faro-web-sdk";
 export { TracingInstrumentation } from "@grafana/faro-web-tracing";
-export { W3CTraceContextPropagator } from "@opentelemetry/core";
 export * from "./faroLogger";
