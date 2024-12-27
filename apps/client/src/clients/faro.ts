@@ -5,16 +5,12 @@ import {
   getWebInstrumentations,
   initializeFaro,
   TracingInstrumentation,
-  W3CTraceContextPropagator,
 } from "@mp/metrics/client";
 import { useContext, onCleanup, createEffect } from "solid-js";
 import { env } from "../env";
 import { LoggerContext } from "../logger";
 
 export function createFaroClient() {
-  // TODO get traceparent from meta tag and inject into the propagator
-  const propagator = new W3CTraceContextPropagator();
-
   return initializeFaro({
     url: env.faro.receiverUrl,
     app: {
@@ -23,12 +19,7 @@ export function createFaroClient() {
     },
     instrumentations: [
       ...getWebInstrumentations(),
-      new TracingInstrumentation({
-        propagator,
-        instrumentationOptions: {
-          propagateTraceHeaderCorsUrls: [/.*/], // TODO correct
-        },
-      }),
+      new TracingInstrumentation({ instrumentationOptions: env.faro }),
     ],
   });
 }

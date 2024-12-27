@@ -21,7 +21,6 @@ auth.{$MP_DOMAIN} {
     tracing {
         span keycloak
     }
-    request_header X-Trace-Id {http.vars.trace_id}
     reverse_proxy keycloak:8080
 }
 
@@ -31,25 +30,13 @@ faro.{$MP_DOMAIN} {
 
 {$MP_CLIENT_DOMAIN} {
     import common_rate_limit
-    tracing {
-        span mp_client
-    }
-    request_header X-Trace-Id {http.vars.trace_id}
     reverse_proxy {$MP_CLIENT_PROXY_HOST}
-
-    # TODO turn these headers into <meta> tags instead
-    header {
-        X-Trace-Id {http.vars.trace_id}
-        traceparent "00-{http.vars.trace_id}-{http.request.uuid}-00"
-    }
 }
-
 
 {$MP_SERVER_DOMAIN} {
     import common_rate_limit
     tracing {
         span mp_server
     }
-    request_header X-Trace-Id {http.vars.trace_id}
     reverse_proxy {$MP_SERVER_PROXY_HOST}
 }
