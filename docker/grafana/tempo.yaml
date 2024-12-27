@@ -8,6 +8,7 @@ distributor:
     otlp:
       protocols:
         http:
+        grpc:
 
 ingester:
   trace_idle_period: "10s"

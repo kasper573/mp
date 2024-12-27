@@ -163,7 +163,7 @@ services:
     build:
       dockerfile: ./Dockerfile.caddy
       context: .
-    command: ["caddy", "run", "--config", "/etc/caddy/${COMPOSE_ENV}.Caddyfile"]
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
     ports:
@@ -171,7 +171,7 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./caddy:/etc/caddy/
+      - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
 

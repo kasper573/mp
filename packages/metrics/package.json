@@ -18,6 +18,7 @@
   "dependencies": {
     "@grafana/faro-web-sdk": "^1.12.2",
     "@grafana/faro-web-tracing": "^1.12.2",
+    "@opentelemetry/core": "^1.30.0",
     "@mp/logger": "workspace:*",
     "prom-client": "15.1.3"
   },
