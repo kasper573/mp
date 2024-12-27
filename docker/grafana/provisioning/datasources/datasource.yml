@@ -2,7 +2,7 @@ apiVersion: 1
 
 deleteDatasources:
   - name: "Mimir"
-  #- name: "Tempo"
+  - name: "Tempo"
   - name: "Loki"
 
 datasources:
@@ -16,31 +16,31 @@ datasources:
     version: 1
     editable: false
     uid: "mimir"
-    # jsonData:
-    #   exemplarTraceIdDestinations:
-    #     - datasourceUid: "tempo"
-    #       name: "TraceID"
+    jsonData:
+      exemplarTraceIdDestinations:
+        - datasourceUid: "tempo"
+          name: "TraceID"
 
-  # - name: "Tempo"
-  #   type: "tempo"
-  #   access: "proxy"
-  #   orgId: 1
-  #   url: "http://${TEMPO_HOST}:${TEMPO_PORT}"
-  #   basicAuth: false
-  #   isDefault: false
-  #   version: 1
-  #   editable: false
-  #   apiVersion: 1
-  #   uid: "tempo"
-  #   jsonData:
-  #     lokiSearch:
-  #       datasourceUid: "loki"
-  #     tracesToLogs:
-  #       datasourceUid: "loki"
-  #     nodeGraph:
-  #       enabled: "true"
-  #     serviceMap:
-  #       datasourceUid: "mimir"
+  - name: "Tempo"
+    type: "tempo"
+    access: "proxy"
+    orgId: 1
+    url: "http://tempo:3200"
+    basicAuth: false
+    isDefault: false
+    version: 1
+    editable: false
+    apiVersion: 1
+    uid: "tempo"
+    jsonData:
+      lokiSearch:
+        datasourceUid: "loki"
+      tracesToLogs:
+        datasourceUid: "loki"
+      nodeGraph:
+        enabled: "true"
+      serviceMap:
+        datasourceUid: "mimir"
   - name: "Loki"
     type: "loki"
     access: "proxy"
@@ -51,9 +51,9 @@ datasources:
     version: 1
     editable: false
     uid: "loki"
-    # jsonData:
-    #   derivedFields:
-    #     - datasourceUid: "tempo"
-    #       matcherRegex: 'traceID=(\w+)'
-    #       name: "TraceID"
-    #       url: "$${__value.raw}"
+    jsonData:
+      derivedFields:
+        - datasourceUid: "tempo"
+          matcherRegex: 'traceID=(\w+)'
+          name: "TraceID"
+          url: "$${__value.raw}"

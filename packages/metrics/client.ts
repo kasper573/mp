@@ -4,6 +4,7 @@ export {
   LogLevel,
   type Faro,
   type MetaUser as FaroUser,
+  getWebInstrumentations,
 } from "@grafana/faro-web-sdk";
-export { FaroTraceExporter } from "@grafana/faro-web-tracing";
+export { TracingInstrumentation } from "@grafana/faro-web-tracing";
 export * from "./faroLogger";

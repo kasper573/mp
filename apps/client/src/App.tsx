@@ -3,7 +3,12 @@ import { AuthContext, createAuthClient } from "@mp/auth-client";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Router } from "@solidjs/router";
 import type { FaroUser } from "@mp/metrics/client";
-import { faroLoggerHandler, initializeFaro } from "@mp/metrics/client";
+import {
+  faroLoggerHandler,
+  getWebInstrumentations,
+  initializeFaro,
+  TracingInstrumentation,
+} from "@mp/metrics/client";
 import { createEffect, onCleanup, useContext } from "solid-js";
 import Layout from "./ui/Layout";
 import { routes } from "./routes";
@@ -19,8 +24,12 @@ import { LoggerContext } from "./logger";
 // and since App.tsx is lazy loaded, this helps with initial load time.
 
 const faro = initializeFaro({
-  url: env.faroReceiverUrl,
+  url: env.faro.receiverUrl,
   app: { name: "mp-client", version: env.buildVersion },
+  instrumentations: [
+    ...getWebInstrumentations(),
+    new TracingInstrumentation({ instrumentationOptions: env.faro }),
+  ],
 });
 
 const authClient = createAuthClient(env.auth);

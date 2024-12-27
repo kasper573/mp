@@ -1,5 +1,5 @@
 import type { FlatObject, InferOutput } from "@mp/env";
-import { object, string, parseEnv } from "@mp/env";
+import { object, string, parseEnv, csv } from "@mp/env";
 
 export type ClientEnv = InferOutput<typeof clientEnvSchema>;
 
@@ -19,7 +19,10 @@ const clientEnvSchema = object({
      */
     callbackPath: string(),
   }),
-  faroReceiverUrl: string(),
+  faro: object({
+    receiverUrl: string(),
+    propagateTraceHeaderCorsUrls: csv(string()),
+  }),
 });
 
 export const env: ClientEnv = getClientEnv();
