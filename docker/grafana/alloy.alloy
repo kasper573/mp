@@ -115,17 +115,22 @@ loki.write "default" {
 	external_labels = {}
 }
 
-
 loki.process "mp_client" {
-  forward_to = [loki.write.default.receiver]
+	forward_to = [loki.write.default.receiver]
 
-  stage.logfmt {
-      mapping = { "kind" = "", "service_name" = "", "app" = "" }
-  }
+	stage.logfmt {
+		mapping = {"kind" = "", "service_name" = "", "app" = ""}
+	}
 
-  stage.labels {
-      values = { "kind" = "kind", "service_name" = "service_name", "app" = "app" }
-  }
+	stage.labels {
+		values = {
+			"kind"          = "kind",
+			"service_name"  = "service_name",
+			"app"           = "app",
+			"user_id"       = "user_id",
+			"user_username" = "user_username",
+		}
+	}
 }
 
 faro.receiver "mp_client" {
@@ -164,7 +169,6 @@ otelcol.receiver.otlp "default" {
 		traces  = [otelcol.exporter.otlp.default.input]
 	}
 }
-
 
 otelcol.exporter.otlp "default" {
 	retry_on_failure {

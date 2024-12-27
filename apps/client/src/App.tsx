@@ -1,6 +1,8 @@
+import type { UserIdentity } from "@mp/auth-client";
 import { AuthContext, createAuthClient } from "@mp/auth-client";
 import { QueryClientProvider } from "@tanstack/solid-query";
 import { Router } from "@solidjs/router";
+import type { FaroUser } from "@mp/metrics/client";
 import { faroLoggerHandler, initializeFaro } from "@mp/metrics/client";
 import { createEffect, onCleanup, useContext } from "solid-js";
 import Layout from "./ui/Layout";
@@ -29,9 +31,8 @@ giveAuthClientToTRPC(authClient);
 export default function App() {
   const logger = useContext(LoggerContext);
 
-  createEffect(() => {
-    onCleanup(logger.subscribe(faroLoggerHandler(faro)));
-  });
+  onCleanup(logger.subscribe(faroLoggerHandler(faro)));
+  createEffect(() => faro.api.setUser(deriveFaroUser(authClient.identity())));
 
   return (
     <AuthContext.Provider value={authClient}>
@@ -40,4 +41,8 @@ export default function App() {
       </QueryClientProvider>
     </AuthContext.Provider>
   );
+}
+
+function deriveFaroUser(user?: UserIdentity): FaroUser {
+  return { id: user?.id, username: user?.name };
 }
