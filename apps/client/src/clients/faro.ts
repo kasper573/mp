@@ -14,7 +14,7 @@ export function createFaroClient() {
   return initializeFaro({
     url: env.faro.receiverUrl,
     app: {
-      name: "mp_client_browser",
+      name: "mp_client",
       version: env.buildVersion,
     },
     instrumentations: [
