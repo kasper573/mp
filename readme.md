@@ -19,7 +19,7 @@ development.
 - network: [ws](https://www.npmjs.com/package/ws) and
   [automerge](https://automerge.org/)
 - auth: [keycloak](https://www.keycloak.org/)
-- analytics: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
+- observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
 
 ## (very loose) Design goals
 
