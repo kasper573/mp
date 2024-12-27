@@ -3,17 +3,17 @@ import { composeError } from "./composeError";
 export class Logger {
   private subscriptions = new Set<LoggerEventHandler>();
 
-  info(...args: unknown[]) {
+  info = (...args: unknown[]) => {
     this.emit({ type: "info", args });
-  }
+  };
 
-  warn(...args: unknown[]) {
+  warn = (...args: unknown[]) => {
     this.emit({ type: "warn", args });
-  }
+  };
 
-  error(...args: unknown[]) {
+  error = (...args: unknown[]) => {
     this.emit({ type: "error", error: composeError(args) });
-  }
+  };
 
   subscribe = (handler: LoggerEventHandler): Unsubscribe => {
     this.subscriptions.add(handler);
