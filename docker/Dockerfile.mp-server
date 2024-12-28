@@ -10,6 +10,7 @@ RUN corepack prepare
 # because of opentelemetry, which heavily relies on monkey patching
 # node modules at runtime. Bundling or transpiling will arbitrarily
 # and silently break some opentelemetry instrumentations.
+# This might be solved some day via https://github.com/open-telemetry/opentelemetry-js/issues/4174
 
 FROM base AS builder
 
