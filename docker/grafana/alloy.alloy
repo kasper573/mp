@@ -4,8 +4,7 @@ prometheus.scrape "mp_server" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "mp_server"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.scrape "node_exporter" {
@@ -14,8 +13,7 @@ prometheus.scrape "node_exporter" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.scrape "keycloak" {
@@ -24,8 +22,7 @@ prometheus.scrape "keycloak" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "keycloak"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.remote_write "default" {
