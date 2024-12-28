@@ -37,8 +37,7 @@ ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
 ENV OTEL_SERVICE_NAME="mp-server"
 ENV OTEL_SERVICE_VERSION="${MP_SERVER_BUILD_VERSION}"
-ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
-#ENV OTEL_NODE_DISABLED_INSTRUMENTATIONS="nothing-should-be-disabled"
+ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns,undici"
 
 CMD ["node", \
   "--import","@opentelemetry/auto-instrumentations-node/register",\
