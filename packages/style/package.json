@@ -2,6 +2,7 @@
   "name": "@mp/style",
   "version": "0.0.0",
   "sideEffects": false,
+  "type": "module",
   "license": "MIT",
   "exports": {
     ".": {

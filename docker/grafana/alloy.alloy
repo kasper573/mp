@@ -1,11 +1,10 @@
 prometheus.scrape "mp_server" {
 	targets = [{
-		__address__ = env("ALLOY_MP_SERVER_ADDRESS"),
+		__address__ = env("MP_SERVER_PROXY_HOST"),
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "mp_server"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.scrape "node_exporter" {
@@ -14,8 +13,7 @@ prometheus.scrape "node_exporter" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.scrape "keycloak" {
@@ -24,8 +22,7 @@ prometheus.scrape "keycloak" {
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "keycloak"
-	scrape_interval = "5s"
-	scrape_timeout  = "4s"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 }
 
 prometheus.remote_write "default" {
@@ -161,12 +158,16 @@ faro.receiver "mp_client" {
 
 	output {
 		logs   = [loki.process.mp_client.receiver]
-		traces = [otelcol.exporter.otlphttp.default.input]
+		traces = [otelcol.exporter.otlp.default.input]
 	}
 }
 
-otelcol.exporter.otlphttp "default" {
+otelcol.exporter.otlp "default" {
 	client {
-		endpoint = "http://tempo:4318"
+		endpoint = env("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT")
+
+		tls {
+			insecure = true
+		}
 	}
 }

@@ -4,8 +4,8 @@ server:
   http_listen_port: 3100
 
 limits_config:
-  ingestion_rate_mb: 10
-  ingestion_burst_size_mb: 20
+  ingestion_rate_mb: 20
+  ingestion_burst_size_mb: 30
 
 common:
   instance_addr: 127.0.0.1

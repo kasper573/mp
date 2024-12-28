@@ -17,7 +17,7 @@ import {
   MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
-} from "@mp/metrics";
+} from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
 import type { WorldState } from "./modules/world/schema";
 import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";

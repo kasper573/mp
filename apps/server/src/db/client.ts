@@ -1,15 +1,9 @@
-import type { Logger } from "@mp/logger";
-import { drizzle } from "drizzle-orm/postgres-js";
-import postgres from "postgres";
+import pg from "pg";
+import { drizzle } from "drizzle-orm/node-postgres";
 
 export type DBClient = ReturnType<typeof createDBClient>;
 
-export function createDBClient(databaseUrl: string, logger?: Logger) {
-  return drizzle(postgres(databaseUrl), {
-    logger: logger ? createDrizzleLogger(logger) : undefined,
-  });
-}
-
-function createDrizzleLogger(logger: Logger) {
-  return { logQuery: logger.info };
+export function createDBClient(connectionString: string) {
+  const pool = new pg.Pool({ connectionString });
+  return drizzle({ client: pool });
 }

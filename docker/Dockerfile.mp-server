@@ -1,13 +1,18 @@
 # Make sure to keep this version aligned with the version of the engine field in the root package.json
-FROM node:22.12.0 AS base
-
-FROM base AS builder
+FROM node:22.12.0-alpine3.21 AS base
 WORKDIR /workdir
-
-# Enable pnpm
 RUN corepack enable
 COPY package.json .
 RUN corepack prepare
+
+# Note: We use pnpm deploy instead of efficient bundling via ie. esbuild.
+# Anything that transpiles or bundles is off the table,
+# because of opentelemetry, which heavily relies on monkey patching
+# node modules at runtime. Bundling or transpiling will arbitrarily
+# and silently break some opentelemetry instrumentations.
+# This might be solved some day via https://github.com/open-telemetry/opentelemetry-js/issues/4174
+
+FROM base AS builder
 
 # install most of node dependencies
 COPY pnpm-lock.yaml .npmrc ./
@@ -17,16 +22,10 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
-ENV NODE_ENV=production
-RUN pnpm -F server build
+# collect the sources and dependencies required by the server app
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm -F server deploy pnpm-deploy
 
-FROM node:22.12.0-alpine3.21 AS runner
-WORKDIR /workdir
-
-COPY --from=builder /workdir/apps/server/public /workdir/public
-COPY --from=builder /workdir/apps/server/dist /workdir/server
-
+FROM base AS runner
+COPY --from=builder /workdir/pnpm-deploy .
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
-ENV MP_SERVER_CLIENT_DIR=/workdir/client
-
-CMD [ "node", "./server/index.js" ]
+CMD ["pnpm", "start"]

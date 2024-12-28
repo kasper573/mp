@@ -1,9 +1,0 @@
-import base.Caddyfile
-
-{$MP_CLIENT_DOMAIN} {
-    reverse_proxy http://host.docker.internal:5173
-}
-
-{$MP_SERVER_DOMAIN} {
-    reverse_proxy http://host.docker.internal:9999
-}

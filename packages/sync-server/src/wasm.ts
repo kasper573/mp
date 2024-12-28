@@ -1,8 +1,5 @@
-import path from "node:path";
-import fs from "node:fs/promises";
-import wasmUrl from "@automerge/automerge/automerge.wasm?url";
+// @ts-expect-error has no typedefs
+import { automergeWasmBase64 } from "@automerge/automerge/automerge.wasm.base64.js";
 import { next as Automerge } from "@automerge/automerge/slim";
 
-await Automerge.initializeWasm(
-  fs.readFile(path.resolve(import.meta.dirname, wasmUrl.replace("?url", ""))),
-);
+await Automerge.initializeBase64Wasm(automergeWasmBase64 as string);

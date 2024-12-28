@@ -6,8 +6,8 @@ RUN apk add jq postgresql-client
 COPY ./package.json ./
 RUN KIT_VER=$(jq -r '.devDependencies["drizzle-kit"]' package.json) && \
     ORM_VER=$(jq -r '.dependencies["drizzle-orm"]' package.json) && \
-    PG_VER=$(jq -r '.dependencies.postgres' package.json) && \
-    npm install -g drizzle-kit@$KIT_VER drizzle-orm@$ORM_VER postgres@$PG_VER
+    PG_VER=$(jq -r '.dependencies.pg' package.json) && \
+    npm install -g drizzle-kit@$KIT_VER drizzle-orm@$ORM_VER pg@$PG_VER
 
 # Copy migration scripts and configuration
 COPY ./drizzle.config.js .
