@@ -5,6 +5,9 @@ services:
   postgres:
     ports:
       - "5432:5432"
+  tempo:
+    ports:
+      - "4317:4317"
   alloy:
     extra_hosts:
       - "host.docker.internal:host-gateway"

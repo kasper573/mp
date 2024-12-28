@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
+import "./otel";
 import path from "node:path";
 import http from "node:http";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
@@ -17,7 +18,7 @@ import {
   MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
-} from "@mp/metrics";
+} from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
 import type { WorldState } from "./modules/world/schema";
 import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";

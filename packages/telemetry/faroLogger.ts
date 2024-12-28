@@ -1,9 +1,8 @@
-import type { Faro } from "@grafana/faro-web-sdk";
-import { LogLevel } from "@grafana/faro-web-sdk";
+import { type Faro, LogLevel } from "@grafana/faro-web-sdk";
 import type { LoggerEventHandler } from "@mp/logger";
 
 /**
- * An intergation between faro and @mp/logger
+ * An integration between faro and @mp/logger
  */
 export function faroLoggerHandler(faro: Faro): LoggerEventHandler {
   return (entry) => {
