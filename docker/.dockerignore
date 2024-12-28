@@ -1,5 +1,6 @@
 .github
 dist
+node_modules
 docker
 .env*
 .docker-compose.yaml
