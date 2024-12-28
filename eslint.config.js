@@ -93,9 +93,6 @@ export default tseslint.config(
       // It's not worth the effort, some tooling does require it
       "unicorn/prefer-module": "off",
 
-      // I'm too lazy to enable top level await right now
-      "unicorn/prefer-top-level-await": "off",
-
       // Ternary bad
       "unicorn/prefer-ternary": "off",
 
