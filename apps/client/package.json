@@ -4,10 +4,9 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm tsx-vite --host 0.0.0.0",
-    "build": "pnpm tsx-vite build",
-    "preview": "pnpm tsx-vite preview",
-    "tsx-vite": "node --import tsx ./node_modules/vite/bin/vite.js"
+    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "@mp/env": "workspace:*",
