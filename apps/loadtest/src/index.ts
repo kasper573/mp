@@ -9,19 +9,16 @@ const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
 const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
-void main();
 
-async function main() {
-  const start = performance.now();
-  logger.info(`Load testing ${requests} requests x ${connections} connections`);
+const start = performance.now();
+logger.info(`Load testing ${requests} requests x ${connections} connections`);
 
-  await loadTestHTTP();
-  await loadTestRPC();
+await loadTestHTTP();
+await loadTestRPC();
 
-  const end = performance.now();
+const end = performance.now();
 
-  logger.info(`Done in ${(end - start).toFixed(2)}ms`);
-}
+logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
 async function loadTestHTTP() {
   await Promise.all(
