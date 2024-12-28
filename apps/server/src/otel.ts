@@ -14,6 +14,7 @@ import {
   CompressionAlgorithm,
   getNodeAutoInstrumentations,
   WSInstrumentation,
+  FsInstrumentation,
 } from "@mp/telemetry/otel";
 import { createAddHookMessageChannel } from "import-in-the-middle";
 const { registerOptions, waitForAllMessagesAcknowledged } =
@@ -57,10 +58,9 @@ registerInstrumentations({
   tracerProvider,
   instrumentations: [
     ...getNodeAutoInstrumentations({
-      "@opentelemetry/instrumentation-pg": {
-        enhancedDatabaseReporting: true,
-      },
+      "@opentelemetry/instrumentation-pg": { enhancedDatabaseReporting: true },
     }),
+    new FsInstrumentation(),
     new WSInstrumentation(),
   ],
 });

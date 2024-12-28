@@ -4,6 +4,7 @@ export { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
 export { registerInstrumentations } from "@opentelemetry/instrumentation";
 export { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
 export { WSInstrumentation } from "opentelemetry-instrumentation-ws";
+export { FsInstrumentation } from "@opentelemetry/instrumentation-fs";
 export { Resource } from "@opentelemetry/resources";
 export {
   NodeTracerProvider,
