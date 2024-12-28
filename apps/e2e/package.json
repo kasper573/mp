@@ -1,6 +1,7 @@
 {
   "name": "@mp/e2e",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "scripts": {
     "start": "dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- playwright test"
