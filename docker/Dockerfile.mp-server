@@ -12,9 +12,17 @@ RUN corepack prepare
 # and silently break some opentelemetry instrumentations.
 
 FROM base AS builder
+
+# install most of node dependencies
+COPY pnpm-lock.yaml .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+# copy source code and install any node dependencies missed by pnpm fetch
 COPY . .
-RUN pnpm install --frozen-lockfile
-RUN pnpm -F server deploy pnpm-deploy
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# collect the sources and dependencies required by the server app
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm -F server deploy pnpm-deploy
 
 FROM base AS runner
 COPY --from=builder /workdir/pnpm-deploy .
