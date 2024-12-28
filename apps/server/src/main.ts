@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
-import "./otel";
 import path from "node:path";
 import http from "node:http";
 import { consoleLoggerHandler, Logger } from "@mp/logger";

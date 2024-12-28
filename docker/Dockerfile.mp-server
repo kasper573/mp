@@ -23,10 +23,24 @@ RUN pnpm -F server build
 FROM node:22.12.0-alpine3.21 AS runner
 WORKDIR /workdir
 
+# The zero code otel approach requires node importer/loader to be available on the system
+RUN npm install \
+    @opentelemetry/auto-instrumentations-node \
+    @opentelemetry/instrumentation \
+    @opentelemetry/api
+
 COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
 
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
-CMD [ "node", "./server/index.js" ]
+ENV OTEL_SERVICE_NAME="mp-server"
+ENV OTEL_SERVICE_VERSION="${MP_SERVER_BUILD_VERSION}"
+ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
+#ENV OTEL_NODE_DISABLED_INSTRUMENTATIONS="nothing-should-be-disabled"
+
+CMD ["node", \
+  "--import","@opentelemetry/auto-instrumentations-node/register",\
+  "--experimental-loader", "@opentelemetry/instrumentation/hook.mjs",\
+  "./server/index.js"]
