@@ -57,7 +57,7 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 ### Quirks
 
-While most of there repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
+While most of the repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
 
 In development, our own apps run on the host machine and outside of the docker network, while 3rd party services run inside the docker network, contrary to production and testing where everything runs inside the docker network.
 
