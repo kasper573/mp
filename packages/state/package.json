@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "neverthrow": "7.0.0",
-    "solid-js": "1.9.1"
+    "solid-js": "1.9.3"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

@@ -21,7 +21,7 @@
     "@vanilla-extract/recipes": "0.5.5",
     "@vanilla-extract/sprinkles": "1.6.3",
     "clsx": "2.1.1",
-    "solid-js": "1.9.1"
+    "solid-js": "1.9.3"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
