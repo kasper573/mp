@@ -1,7 +1,6 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
-import type { Vector } from "@mp/math";
-import { vec, type Path } from "@mp/math";
+import { vec, type Path, type Vector } from "@mp/math";
 import {
   type DNode,
   type DGraph,
@@ -10,6 +9,7 @@ import {
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
+import type { Accessor } from "solid-js";
 import {
   batch,
   createEffect,
@@ -27,31 +27,50 @@ import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { GameClientContext } from "../../clients/game";
+import { toggleSignal } from "../../state/toggleSignal";
+import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
+
+const visibleDGraphTypes = ["none", "all", "tile", "coord"] as const;
+type VisibleDGraphType = (typeof visibleDGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
   pathToDraw: Path | undefined;
 }) {
   const engine = useContext(EngineContext);
-  const isVisible = createMemo(
-    () =>
-      engine.keyboard.keysHeld.has("Control") ||
-      engine.keyboard.keysHeld.has("Shift"),
-  );
+  const [isVisible, toggleDebug] = toggleSignal();
+  const [visibleDGraphType, setVisibleDGraphType] =
+    createSignal<VisibleDGraphType>("none");
+
+  onCleanup(engine.keyboard.on("keydown", "F2", toggleDebug));
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
       <Show when={isVisible()}>
-        <DebugDGraph area={props.area} />
+        <DebugDGraph area={props.area} visible={visibleDGraphType} />
         <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
-        <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+        <div class={styles.debugMenu}>
+          <div>
+            Visible DGraph lines:{" "}
+            <Select
+              options={visibleDGraphTypes}
+              value={visibleDGraphType()}
+              onChange={setVisibleDGraphType}
+              on:pointerdown={(e) => e.stopPropagation()}
+            />
+          </div>
+          <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+        </div>
       </Show>
     </Pixi>
   );
 }
 
-function DebugDGraph(props: { area: AreaResource }) {
+function DebugDGraph(props: {
+  area: AreaResource;
+  visible: Accessor<VisibleDGraphType>;
+}) {
   const gfx = new Graphics();
   const engine = useContext(EngineContext);
   const allTileCoords = createMemo(() =>
@@ -64,20 +83,19 @@ function DebugDGraph(props: { area: AreaResource }) {
   createEffect(() => {
     gfx.clear();
     const { tiled, dGraph } = props.area;
-    const { keysHeld } = engine.keyboard;
 
-    if (keysHeld.has("Control") && keysHeld.has("Shift")) {
+    if (props.visible() === "all") {
       for (const pos of allTileCoords()) {
         drawDNode(gfx, tiled, dGraph, pos);
       }
-    } else if (keysHeld.has("Control")) {
+    } else if (props.visible() === "tile") {
       drawDNode(
         gfx,
         tiled,
         dGraph,
         snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
       );
-    } else if (keysHeld.has("Shift")) {
+    } else if (props.visible() === "coord") {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
       drawDNode(
         gfx,
@@ -140,7 +158,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
     ].join("\n");
   });
 
-  return <span class={styles.debugText}>{text()}</span>;
+  return <p>{text()}</p>;
 }
 
 function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {

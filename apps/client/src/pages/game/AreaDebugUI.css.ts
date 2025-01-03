@@ -1,12 +1,11 @@
 import { style, atoms } from "@mp/style";
 
-export const debugText = style([
+export const debugMenu = style([
   atoms({
     whiteSpace: "pre-wrap",
     position: "absolute",
     padding: "l",
     borderRadius: "m",
-    pointerEvents: "none",
     userSelect: "none",
   }),
   {
