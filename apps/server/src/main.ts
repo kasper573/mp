@@ -32,6 +32,7 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
+import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -55,7 +56,7 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
-const clients = new ClientRegistry();
+export const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 
@@ -182,20 +183,6 @@ async function persist() {
   if (result.isErr()) {
     logger.error("Failed to persist world state", result.error);
   }
-}
-
-function deriveWorldStateForClient(state: WorldState, clientId: ClientId) {
-  const userId = clients.getUserId(clientId);
-  const char = Object.values(state.characters).find(
-    (char) => char.userId === userId,
-  );
-  if (!char) {
-    throw new Error(
-      "Could not derive world state for client: user has no associated character",
-    );
-  }
-
-  return state;
 }
 
 function createServerContext(
