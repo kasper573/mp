@@ -1,13 +1,6 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import {
-  useContext,
-  createEffect,
-  Index,
-  Show,
-  createMemo,
-  onCleanup,
-} from "solid-js";
+import { useContext, createEffect, Index, Show, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -48,10 +41,8 @@ export function AreaScene(props: { area: AreaResource }) {
 
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
-    if (isValidTarget) {
-      onCleanup(
-        engine.pointer.on("click", () => gameClient.move(tilePosition)),
-      );
+    if (engine.pointer.isDown && isValidTarget) {
+      gameClient.move(tilePosition);
     }
   });
 

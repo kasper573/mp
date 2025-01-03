@@ -5,35 +5,32 @@ import { atom, computed } from "@mp/state";
 import type { Camera } from "./camera";
 
 export class Pointer {
+  readonly #isDown = atom(false);
   readonly #position = atom(vec(0, 0));
-  #isRunning = false;
 
   get position(): Vector {
     return this.#position.get();
   }
+  get isDown(): boolean {
+    return this.#isDown.get();
+  }
 
   constructor(private target: HTMLElement) {}
 
-  on(eventType: "click", callback: (e: MouseEvent) => unknown) {
-    const listener = (e: MouseEvent) => {
-      if (this.#isRunning) {
-        callback(e);
-      }
-    };
-    this.target.addEventListener(eventType, listener);
-    return () => this.target.removeEventListener(eventType, listener);
-  }
-
   start() {
-    this.#isRunning = true;
     this.target.addEventListener("pointermove", this.onPointerMove);
+    this.target.addEventListener("pointerdown", this.onPointerDown);
+    this.target.addEventListener("pointerup", this.onPointerUp);
   }
 
   stop() {
-    this.#isRunning = false;
     this.target.removeEventListener("pointermove", this.onPointerMove);
+    this.target.removeEventListener("pointerdown", this.onPointerDown);
+    this.target.removeEventListener("pointerup", this.onPointerUp);
   }
 
+  private onPointerDown = () => this.#isDown.set(true);
+  private onPointerUp = () => this.#isDown.set(false);
   private onPointerMove = (e: PointerEvent) => {
     const relativeX = e.clientX - this.target.offsetLeft;
     const relativeY = e.clientY - this.target.offsetTop;
