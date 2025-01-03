@@ -25,22 +25,22 @@ export class Engine {
     this.keyboard = new Keyboard(window);
   }
 
-  start() {
+  start = () => {
     this.pointer.start();
     this.keyboard.start();
     this.#isRunning = true;
     requestAnimationFrame(this.nextFrame);
     this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);
     this.#viewportSizeObserver.observe(this.viewport);
-  }
+  };
 
-  stop() {
+  stop = () => {
     this.pointer.stop();
     this.keyboard.stop();
     this.#isRunning = false;
     this.#viewportSizeObserver?.disconnect();
     this.#viewportSizeObserver = undefined;
-  }
+  };
 
   // Note: Explicit callback based frame reactivity because implicit
   // reactivity for rendering is error prone and hard to reason about.

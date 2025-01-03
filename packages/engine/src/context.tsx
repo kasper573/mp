@@ -14,7 +14,7 @@ export function EngineProvider(props: ParentProps<{ viewport: HTMLElement }>) {
   const engine = createMemo(() => {
     const engine = new Engine(props.viewport);
     engine.start();
-    onCleanup(() => engine.stop());
+    onCleanup(engine.stop);
     return engine;
   });
 
