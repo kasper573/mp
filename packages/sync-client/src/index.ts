@@ -12,7 +12,10 @@ export class SyncClient<State, ConnectionMetaData> {
   private wsAdapter?: WSClientAdapterWithCustomMetaData<ConnectionMetaData>;
   private repo?: Repo;
   private handle?: DocHandle<State>;
-  private stateSubscriptions = new Set<SyncClientSubscription<State>>();
+  private stateHandlers = new Set<EventHandler<State>>();
+  private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
+  private readyStateIntervalId?: NodeJS.Timeout;
+  private lastEmittedReadyState?: SyncClientReadyState;
 
   readonly clientId: ClientId;
 
@@ -21,6 +24,10 @@ export class SyncClient<State, ConnectionMetaData> {
     private getConnectionMetaData: () => ConnectionMetaData,
   ) {
     this.clientId = uuid() as ClientId;
+  }
+
+  getReadyState(): SyncClientReadyState {
+    return coerceReadyState(this.wsAdapter?.socket?.readyState);
   }
 
   getState(): State | undefined {
@@ -43,6 +50,7 @@ export class SyncClient<State, ConnectionMetaData> {
       sharePolicy: () => Promise.resolve(false),
     });
 
+    this.readyStateIntervalId = setInterval(this.pollReadyState, 1000);
     this.repo.on("document", this.acceptDocument);
   }
 
@@ -51,17 +59,26 @@ export class SyncClient<State, ConnectionMetaData> {
       throw new Error("Cannot stop a client that hasn't started");
     }
 
+    clearInterval(this.readyStateIntervalId);
     this.wsAdapter?.disconnect();
     this.handle?.off("change");
     this.repo.off("document");
     this.wsAdapter = undefined;
     this.repo = undefined;
     this.handle = undefined;
+    this.pollReadyState();
   }
 
-  subscribe = (handler: SyncClientSubscription<State>) => {
-    this.stateSubscriptions.add(handler);
-    return () => this.stateSubscriptions.delete(handler);
+  subscribeToState = (handler: EventHandler<State>): Unsubscribe => {
+    this.stateHandlers.add(handler);
+    return () => this.stateHandlers.delete(handler);
+  };
+
+  subscribeToReadyState = (
+    handler: EventHandler<SyncClientReadyState>,
+  ): Unsubscribe => {
+    this.readyStateHandlers.add(handler);
+    return () => this.readyStateHandlers.delete(handler);
   };
 
   private acceptDocument = ({ handle }: DocumentPayload) => {
@@ -72,11 +89,38 @@ export class SyncClient<State, ConnectionMetaData> {
   };
 
   private emitState = () => {
-    for (const handler of this.stateSubscriptions) {
+    for (const handler of this.stateHandlers) {
       handler(this.getState());
     }
   };
+
+  private pollReadyState = () => {
+    const readyState = this.getReadyState();
+    console.log("pollReadyState", readyState);
+    if (readyState !== this.lastEmittedReadyState) {
+      this.lastEmittedReadyState = readyState;
+      for (const handler of this.readyStateHandlers) {
+        handler(readyState);
+      }
+    }
+  };
 }
+
+const webSocketToSyncClientReadyState = {
+  [WebSocket.CONNECTING]: "connecting",
+  [WebSocket.OPEN]: "open",
+  [WebSocket.CLOSING]: "closing",
+  [WebSocket.CLOSED]: "closed",
+} as const;
+
+function coerceReadyState(
+  state: keyof typeof webSocketToSyncClientReadyState = WebSocket.CLOSED,
+): SyncClientReadyState {
+  return webSocketToSyncClientReadyState[state];
+}
+
+export type SyncClientReadyState =
+  (typeof webSocketToSyncClientReadyState)[keyof typeof webSocketToSyncClientReadyState];
 
 class WSClientAdapterWithCustomMetaData<
   Custom,
@@ -89,6 +133,13 @@ class WSClientAdapterWithCustomMetaData<
   }
 
   override connect(peerId: ClientId, peerMetadata?: PeerMetadata) {
+    // This is a patched behavior that seems to fix infinite reconnects.
+    // BrowserWebSocketClientAdapter creates new WebSocket instances
+    // on connection retries without closing the old ones.,
+    if (this.socket) {
+      this.disconnect();
+    }
+
     super.connect(peerId, {
       ...peerMetadata,
       custom: this.getCustom?.(),
@@ -96,6 +147,8 @@ class WSClientAdapterWithCustomMetaData<
   }
 }
 
-export type SyncClientSubscription<State> = (state?: State) => void;
-
 export { type PeerId as ClientId } from "@automerge/automerge-repo";
+
+type EventHandler<State> = (state?: State) => void;
+
+type Unsubscribe = () => void;

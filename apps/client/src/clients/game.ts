@@ -4,6 +4,7 @@ import type {
   WorldState,
 } from "@mp/server";
 import { type CharacterId } from "@mp/server";
+import type { SyncClientReadyState } from "@mp/sync-client";
 import { SyncClient } from "@mp/sync-client";
 import type { Accessor } from "solid-js";
 import {
@@ -16,15 +17,16 @@ import {
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth-client";
-import { env } from "../env";
 import { dedupe, throttle } from "../state/functionComposition";
+import { env } from "../env";
 import { trpc } from "./trpc";
 
-export function createGameClient(authClient: AuthClient): GameClient {
-  const worldState = createWorldStateSignal(authClient);
+export function createGameClient(sync: WorldStateSyncClient): GameClient {
+  const [worldState, setWorldState] = createSignal<WorldState>();
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(() => worldState()?.characters[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
+  const [readyState, setReadyState] = createSignal(sync.getReadyState());
 
   const join = async () => trpc.world.join.mutate().then(setCharacterId);
 
@@ -38,7 +40,11 @@ export function createGameClient(authClient: AuthClient): GameClient {
     vec_equals,
   );
 
+  onCleanup(sync.subscribeToState(setWorldState));
+  onCleanup(sync.subscribeToReadyState(setReadyState));
+
   return {
+    readyState,
     worldState,
     areaId,
     characterId,
@@ -48,37 +54,29 @@ export function createGameClient(authClient: AuthClient): GameClient {
   };
 }
 
-function createWorldStateSignal(authClient: AuthClient) {
-  const [worldState, setWorldState] = createSignal<WorldState>();
-  const syncClient = createMemo(() => {
-    const user = authClient.identity();
-    if (!user) {
-      return;
-    }
+export function createSyncClient(authClient: AuthClient) {
+  const token = createMemo(() => authClient.identity()?.token);
+  const connectionMetaData = () => ({ token: token() });
 
-    return new SyncClient<WorldState, SyncServerConnectionMetaData>(
-      env.wsUrl,
-      () => ({ token: user.token }),
-    );
-  });
+  const sync: WorldStateSyncClient = new SyncClient(
+    env.wsUrl,
+    connectionMetaData,
+  );
 
   createEffect(() => {
-    const client = syncClient();
-    if (client) {
-      client.start();
-      onCleanup(() => client.stop());
+    if (token()) {
+      sync.start();
+      onCleanup(() => sync.stop());
     }
   });
 
-  createEffect(() => {
-    const client = syncClient();
-    if (client) {
-      onCleanup(client.subscribe(setWorldState));
-    }
-  });
-
-  return worldState;
+  return sync;
 }
+
+export type WorldStateSyncClient = SyncClient<
+  WorldState,
+  SyncServerConnectionMetaData
+>;
 
 export const GameClientContext = createContext<GameClient>(
   new Proxy({} as GameClient, {
@@ -89,6 +87,7 @@ export const GameClientContext = createContext<GameClient>(
 );
 
 export interface GameClient {
+  readyState: Accessor<SyncClientReadyState>;
   worldState: Accessor<WorldState | undefined>;
   areaId: Accessor<AreaId | undefined>;
   characterId: Accessor<CharacterId | undefined>;
