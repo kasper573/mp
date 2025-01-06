@@ -1,11 +1,7 @@
-import type {
-  Character,
-  SyncServerConnectionMetaData,
-  WorldState,
-} from "@mp/server";
+import type { Character, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import type { SyncClientReadyState } from "@mp/sync-client";
-import { SyncClient } from "@mp/sync-client";
+import type { SyncClientReadyState } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync/client";
 import type { Accessor } from "solid-js";
 import {
   createContext,
@@ -73,10 +69,7 @@ export function createSyncClient(authClient: AuthClient) {
   return sync;
 }
 
-export type WorldStateSyncClient = SyncClient<
-  WorldState,
-  SyncServerConnectionMetaData
->;
+export type WorldStateSyncClient = SyncClient<WorldState>;
 
 export const GameClientContext = createContext<GameClient>(
   new Proxy({} as GameClient, {

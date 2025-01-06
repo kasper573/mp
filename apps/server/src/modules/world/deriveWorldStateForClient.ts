@@ -1,4 +1,4 @@
-import type { ClientId } from "@mp/sync-server";
+import type { ClientId } from "@mp/sync/server";
 import { vec_distance } from "@mp/math";
 import type { Character, WorldState } from "../../package";
 import type { ClientRegistry } from "./ClientRegistry";

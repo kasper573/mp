@@ -1,0 +1,30 @@
+{
+  "name": "@mp/sync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./client": {
+      "types": "./client.ts",
+      "import": "./client.ts",
+      "require": "./client.ts"
+    },
+    "./server": {
+      "types": "./server.ts",
+      "import": "./server.ts",
+      "require": "./server.ts"
+    }
+  },
+  "dependencies": {
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "cbor2": "1.8.0",
+    "immer": "10.1.1",
+    "uuid": "11.0.4",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/ws": "8.5.12"
+  }
+}

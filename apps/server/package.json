@@ -25,7 +25,7 @@
     "@mp/std": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/sync-server": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
