@@ -1,7 +1,7 @@
 import { createEffect, Match, Switch, useContext } from "solid-js";
 import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
-import { createQuery, skipToken } from "@tanstack/solid-query";
+import { createQuery } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import {
   createGameClient,
@@ -22,7 +22,12 @@ export default function GamePage() {
     const id = game.areaId();
     return {
       queryKey: ["area", id],
-      queryFn: id ? () => loadAreaResource(id) : skipToken,
+      queryFn: () => {
+        if (!id) {
+          throw new Error("No area id");
+        }
+        return loadAreaResource(id);
+      },
     };
   });
 
