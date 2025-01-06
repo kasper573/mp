@@ -7,7 +7,7 @@ x-env-files: &env_files
 x-logging: &logging
   driver: json-file
   options:
-    # Used by promtail to produce labels for Loki
+    # Used by alloy to produce labels for Loki
     tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
 
 services:
@@ -33,21 +33,7 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      mp-migrations:
-        condition: service_started
       keycloak-healthcheck:
-        condition: service_healthy
-
-  mp-migrations:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ../../docker/Dockerfile.mp-migrations
-      context: ../apps/server
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
-    profiles: ["prod", "test"]
-    depends_on:
-      postgres:
         condition: service_healthy
 
   keycloak:
@@ -83,9 +69,11 @@ services:
     image: postgres:16.4
     restart: always
     volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -d $$POSTGRES_DB -U $$POSTGRES_USER"]
+      test:
+        ["CMD-SHELL", "pg_isready -d $$POSTGRES_INFRA_DB -U $$POSTGRES_USER"]
       interval: 10s
       timeout: 5s
       retries: 5

@@ -2,7 +2,7 @@ import { Match, Switch, Show, useContext } from "solid-js";
 import { atoms } from "@mp/style";
 import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import { createGameClient, GameClientContext } from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
@@ -32,7 +32,7 @@ function Game() {
     const id = gameClient.areaId();
     return {
       queryKey: ["area", id],
-      queryFn: () => (id ? loadAreaResource(id) : null),
+      queryFn: id ? () => loadAreaResource(id) : skipToken,
     };
   });
 

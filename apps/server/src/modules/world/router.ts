@@ -1,4 +1,4 @@
-import type { Ticker, TimeSpan } from "@mp/time";
+import type { Ticker } from "@mp/time";
 import {
   findPath,
   moveAlongPath,
@@ -11,22 +11,22 @@ import type { StateAccess } from "@mp/sync-server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import type { CharacterId, WorldState } from "./schema";
+import { type CharacterId, type WorldState } from "./schema";
+import type { WorldService } from "./service";
 
 export interface WorldRouterDependencies {
   state: StateAccess<WorldState>;
-  areas: Map<AreaId, AreaResource>;
-  defaultAreaId: AreaId;
-  characterKeepAliveTimeout?: TimeSpan;
+  service: WorldService;
   ticker: Ticker;
+  areas: Map<AreaId, AreaResource>;
 }
 
 export type WorldRouter = ReturnType<typeof createWorldRouter>;
 export function createWorldRouter({
   state: accessState,
   areas,
-  defaultAreaId,
   ticker,
+  service,
 }: WorldRouterDependencies) {
   ticker.subscribe((delta) => {
     accessState("world.ticker", (state) => {
@@ -100,38 +100,12 @@ export function createWorldRouter({
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
-      .mutation(({ ctx: { user, clients, logger } }) =>
+      .mutation(async ({ ctx: { user } }) => {
+        const char = await service.getOrCreateCharacterForUser(user.id);
         accessState("world.join", (state) => {
-          // TODO don't use user id as character id
-          const characterId = user.id as unknown as CharacterId;
-          let player = state.characters[characterId];
-          if (player === undefined) {
-            logger.info("Character created", characterId);
-
-            const area = areas.get(defaultAreaId);
-            if (!area) {
-              throw new Error(
-                "Could not create character, default area not found: " +
-                  defaultAreaId,
-              );
-            }
-
-            player = {
-              areaId: area.id,
-              coords: vec(0, 0),
-              id: characterId,
-              path: [],
-              speed: 3,
-              userId: user.id,
-            };
-            player.coords = vec_copy(area.start);
-            state.characters[player.id] = player;
-          } else {
-            logger.info("Character reclaimed", characterId);
-          }
-
-          return characterId;
-        }),
-      ),
+          state.characters[char.id] = char;
+        });
+        return char.id;
+      }),
   });
 }

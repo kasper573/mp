@@ -13,8 +13,10 @@
   "scripts": {
     "build": "tsc",
     "start": "tsx  --import ./src/otel.ts src/main.ts",
-    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx watch src/main.ts",
-    "db": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- drizzle-kit"
+    "watch": "tsx watch src/main.ts",
+    "db": "drizzle-kit",
+    "dev": "pnpm devenv watch",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
     "@mp/auth-server": "workspace:*",

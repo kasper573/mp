@@ -1,1 +1,0 @@
-ALTER TABLE "characters" ADD COLUMN "user_id" text NOT NULL;
