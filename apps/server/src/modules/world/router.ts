@@ -63,17 +63,17 @@ export function createWorldRouter({
         accessState(`world.move`, (state) => {
           const char = state.characters[characterId];
 
-          if (char.userId !== user.id) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "You don't have access to this character",
-            });
-          }
-
           if (!char) {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "Character not found",
+            });
+          }
+
+          if (char.userId !== user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "You don't have access to this character",
             });
           }
 
