@@ -56,7 +56,7 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
-export const clients = new ClientRegistry();
+const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 
@@ -112,10 +112,14 @@ const wsServer = new WebSocketServer({
   path: opt.wsEndpointPath,
 });
 
-const syncServer = new SyncServer<WorldState, SyncServerConnectionMetaData>({
+const syncServer = new SyncServer<
+  WorldState,
+  WorldState,
+  SyncServerConnectionMetaData
+>({
   wss: wsServer,
   initialState: { characters: {} },
-  filterState: deriveWorldStateForClient,
+  createClientState: deriveWorldStateForClient(clients),
   patchCallback: opt.logSyncPatches
     ? (patches) => logger.info("[sync]", patches)
     : undefined,
@@ -134,6 +138,8 @@ const syncServer = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     clients.deleteClient(clientId);
   },
 });
+
+// restart
 
 collectUserMetrics(metrics, clients, syncServer);
 

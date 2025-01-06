@@ -15,6 +15,7 @@
     "@automerge/automerge-repo": "2.0.0-alpha.14",
     "@automerge/automerge-repo-network-websocket": "2.0.0-alpha.14",
     "@mp/state": "workspace:*",
+    "immer": "10.1.1",
     "ws": "8.18.0"
   },
   "devDependencies": {

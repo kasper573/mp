@@ -1,7 +1,7 @@
 import { createEffect, Match, Switch, useContext } from "solid-js";
 import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import {
   createGameClient,
@@ -17,17 +17,11 @@ export default function GamePage() {
   const auth = useContext(AuthContext);
   const sync = createSyncClient(auth);
   const game = createGameClient(sync);
-
   const area = createQuery(() => {
     const id = game.areaId();
     return {
       queryKey: ["area", id],
-      queryFn: () => {
-        if (!id) {
-          throw new Error("No area id available in game client");
-        }
-        return loadAreaResource(id);
-      },
+      queryFn: id ? () => loadAreaResource(id) : skipToken,
     };
   });
 
@@ -46,8 +40,25 @@ export default function GamePage() {
         <Match when={game.readyState() !== "open"}>
           <Dock position="center">Game client {game.readyState()}</Dock>
         </Match>
-        <Match when={area.isPending}>
+        <Match when={area.isLoading}>
           <Dock position="center">Loading area...</Dock>
+        </Match>
+        <Match when={!game.areaId()}>
+          <Dock position="center">
+            <p>Could not determine area id</p>
+            <pre>
+              {JSON.stringify(
+                {
+                  worldState: game.worldState() ?? null,
+                  readyState: game.readyState(),
+                  characterId: game.characterId(),
+                  areaId: game.areaId() ?? null,
+                },
+                null,
+                2,
+              )}
+            </pre>
+          </Dock>
         </Match>
         <Match when={area.data} keyed>
           {(data) => (
