@@ -12,10 +12,8 @@ export class SyncClient<State, ConnectionMetaData> {
   private wsAdapter?: WSClientAdapterWithCustomMetaData<ConnectionMetaData>;
   private repo?: Repo;
   private handle?: DocHandle<State>;
-  private stateHandlers = new Set<EventHandler<State>>();
+  private stateHandlers = new Set<EventHandler<State | undefined>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
-  private readyStateIntervalId?: NodeJS.Timeout;
-  private lastEmittedReadyState?: SyncClientReadyState;
 
   readonly clientId: ClientId;
 
@@ -44,13 +42,17 @@ export class SyncClient<State, ConnectionMetaData> {
       this.getConnectionMetaData,
     );
 
+    this.wsAdapter.onConnecting = this.emitReadyState;
+    this.wsAdapter.addListener("close", this.emitReadyState);
+    this.wsAdapter.addListener("peer-disconnected", this.emitReadyState);
+    this.wsAdapter.addListener("peer-candidate", this.emitReadyState);
+
     this.repo = new Repo({
       network: [this.wsAdapter],
       peerId: this.clientId,
       sharePolicy: () => Promise.resolve(false),
     });
 
-    this.readyStateIntervalId = setInterval(this.pollReadyState, 1000);
     this.repo.on("document", this.acceptDocument);
   }
 
@@ -59,17 +61,18 @@ export class SyncClient<State, ConnectionMetaData> {
       throw new Error("Cannot stop a client that hasn't started");
     }
 
-    clearInterval(this.readyStateIntervalId);
     this.wsAdapter?.disconnect();
+    this.wsAdapter?.removeAllListeners();
     this.handle?.off("change");
     this.repo.off("document");
     this.wsAdapter = undefined;
     this.repo = undefined;
     this.handle = undefined;
-    this.pollReadyState();
   }
 
-  subscribeToState = (handler: EventHandler<State>): Unsubscribe => {
+  subscribeToState = (
+    handler: EventHandler<State | undefined>,
+  ): Unsubscribe => {
     this.stateHandlers.add(handler);
     return () => this.stateHandlers.delete(handler);
   };
@@ -94,13 +97,10 @@ export class SyncClient<State, ConnectionMetaData> {
     }
   };
 
-  private pollReadyState = () => {
+  private emitReadyState = () => {
     const readyState = this.getReadyState();
-    if (readyState !== this.lastEmittedReadyState) {
-      this.lastEmittedReadyState = readyState;
-      for (const handler of this.readyStateHandlers) {
-        handler(readyState);
-      }
+    for (const handler of this.readyStateHandlers) {
+      handler(readyState);
     }
   };
 }
@@ -112,8 +112,10 @@ const webSocketToSyncClientReadyState = {
   [WebSocket.CLOSED]: "closed",
 } as const;
 
+type WebSocketReadyState = keyof typeof webSocketToSyncClientReadyState;
+
 function coerceReadyState(
-  state: keyof typeof webSocketToSyncClientReadyState = WebSocket.CONNECTING,
+  state: WebSocketReadyState = WebSocket.CONNECTING,
 ): SyncClientReadyState {
   return webSocketToSyncClientReadyState[state];
 }
@@ -124,6 +126,8 @@ export type SyncClientReadyState =
 class WSClientAdapterWithCustomMetaData<
   Custom,
 > extends BrowserWebSocketClientAdapter {
+  onConnecting?: () => void;
+
   constructor(
     serverUrl: string,
     private getCustom?: () => Custom,
@@ -139,6 +143,8 @@ class WSClientAdapterWithCustomMetaData<
       this.disconnect();
     }
 
+    this.onConnecting?.();
+
     super.connect(peerId, {
       ...peerMetadata,
       custom: this.getCustom?.(),
@@ -148,6 +154,6 @@ class WSClientAdapterWithCustomMetaData<
 
 export { type PeerId as ClientId } from "@automerge/automerge-repo";
 
-type EventHandler<State> = (state?: State) => void;
+type EventHandler<State> = (state: State) => void;
 
 type Unsubscribe = () => void;
