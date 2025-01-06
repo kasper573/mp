@@ -24,7 +24,7 @@ export default function GamePage() {
       queryKey: ["area", id],
       queryFn: () => {
         if (!id) {
-          throw new Error("No area id");
+          throw new Error("No area id available in game client");
         }
         return loadAreaResource(id);
       },
@@ -48,9 +48,6 @@ export default function GamePage() {
         </Match>
         <Match when={area.isPending}>
           <Dock position="center">Loading area...</Dock>
-        </Match>
-        <Match when={area.error}>
-          <Dock position="center">Error loading area</Dock>
         </Match>
         <Match when={area.data} keyed>
           {(data) => (
