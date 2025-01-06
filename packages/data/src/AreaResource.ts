@@ -1,11 +1,11 @@
 import type { Vector } from "@mp/math";
 import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
+import type { Branded } from "@mp/std";
 import { snapTileVector, type TiledResource } from "./TiledResource";
 import type { DNode } from "./findPath";
 import { vectorFromDNode, type DGraph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
-import type { Branded } from "./Branded";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
 
