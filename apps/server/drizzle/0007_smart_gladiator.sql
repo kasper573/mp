@@ -1,1 +1,0 @@
-ALTER TABLE "characters" DROP COLUMN IF EXISTS "destination";
