@@ -121,6 +121,7 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
     worldState.access("disconnect", (state) => {
       for (const char of Object.values(state.characters)) {
         if (char.userId === userId) {
+          logger.info("Removing character", char.id);
           delete state.characters[char.id];
         }
       }
@@ -231,6 +232,7 @@ async function handleSyncServerConnection(
   const char = await worldService.getCharacterForUser(verifyResult.user.id);
   if (char) {
     worldState.access("handleSyncServerConnection", (state) => {
+      logger.info("Adding character to world state", char.id);
       state.characters[char.id] = char;
     });
   }
