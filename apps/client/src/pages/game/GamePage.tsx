@@ -44,21 +44,7 @@ export default function GamePage() {
           <Dock position="center">Loading area...</Dock>
         </Match>
         <Match when={!game.areaId()}>
-          <Dock position="center">
-            <p>Could not determine area id</p>
-            <pre>
-              {JSON.stringify(
-                {
-                  worldState: game.worldState() ?? null,
-                  readyState: game.readyState(),
-                  characterId: game.characterId(),
-                  areaId: game.areaId() ?? null,
-                },
-                null,
-                2,
-              )}
-            </pre>
-          </Dock>
+          <Dock position="center">Could not determine area id</Dock>
         </Match>
         <Match when={area.data} keyed>
           {(data) => (
