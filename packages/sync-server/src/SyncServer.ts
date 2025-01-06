@@ -1,11 +1,10 @@
-import { type Server } from "node:http";
 import {
   Repo,
   type DocHandle,
   type PeerCandidatePayload,
   type PeerDisconnectedPayload,
 } from "@automerge/automerge-repo/slim";
-import { WebSocketServer } from "ws";
+import type { WebSocketServer } from "ws";
 import { NodeWSServerAdapter } from "@automerge/automerge-repo-network-websocket";
 import { type PatchCallback } from "@automerge/automerge/slim";
 import type { PeerId as ClientId } from "@automerge/automerge-repo/slim";
@@ -21,10 +20,7 @@ export class SyncServer<State, ConnectionMetaData> {
   }
 
   constructor(private options: SyncServerOptions<State, ConnectionMetaData>) {
-    this.wssAdapter = new NodeWSServerAdapter(
-      new WebSocketServer({ server: options.httpServer }),
-    );
-
+    this.wssAdapter = new NodeWSServerAdapter(options.wss);
     this.repo = new Repo({ network: [this.wssAdapter] });
     this.handle = this.repo.create(options.initialState);
     this.wssAdapter.on("peer-candidate", this.onConnection);
@@ -66,7 +62,7 @@ export class SyncServer<State, ConnectionMetaData> {
 }
 
 export interface SyncServerOptions<State, ConnectionMetaData> {
-  httpServer: Server;
+  wss: WebSocketServer;
   initialState: State;
   filterState: (state: State, clientId: ClientId) => State;
   patchCallback?: PatchCallback<State>;
@@ -87,3 +83,5 @@ export type StateAccess<State> = <Result>(
    */
   stateHandler: (draft: State) => Result,
 ) => Result;
+
+export { WebSocketServer } from "ws";

@@ -18,5 +18,5 @@ export interface ServerContext {
 export type HttpSessionId = Branded<string, "HttpSessionId">;
 
 export interface SyncServerConnectionMetaData {
-  token: AuthToken;
+  token?: AuthToken;
 }

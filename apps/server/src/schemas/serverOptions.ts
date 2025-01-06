@@ -56,6 +56,10 @@ export const serverOptionsSchema = object({
    */
   apiEndpointPath: string(),
   /**
+   * The relative path to expose the WS endpoint on
+   */
+  wsEndpointPath: string(),
+  /**
    * The hostname for the server to listen on
    */
   hostname: string(),

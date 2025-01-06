@@ -10,7 +10,7 @@ import createCors from "cors";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId } from "@mp/sync-server";
-import { SyncServer } from "@mp/sync-server";
+import { SyncServer, WebSocketServer } from "@mp/sync-server";
 import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
@@ -107,10 +107,15 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
+const wsServer = new WebSocketServer({
+  server: httpServer,
+  path: opt.wsEndpointPath,
+});
+
+const syncServer = new SyncServer<WorldState, SyncServerConnectionMetaData>({
+  wss: wsServer,
   initialState: { characters: {} },
   filterState: deriveWorldStateForClient,
-  httpServer,
   patchCallback: opt.logSyncPatches
     ? (patches) => logger.info("[sync]", patches)
     : undefined,
@@ -118,7 +123,7 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   onDisconnect(clientId) {
     logger.info("Client disconnected", clientId);
     const userId = clients.getUserId(clientId);
-    worldState.access("disconnect", (state) => {
+    syncServer.access("disconnect", (state) => {
       for (const char of Object.values(state.characters)) {
         if (char.userId === userId) {
           logger.info("Removing character", char.id);
@@ -130,14 +135,14 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   },
 });
 
-collectUserMetrics(metrics, clients, worldState);
+collectUserMetrics(metrics, clients, syncServer);
 
 const persistTicker = new Ticker({
   interval: opt.persistInterval,
   async middleware() {
     try {
       await worldService.persistWorldState(
-        worldState.access("persist", (state) => state),
+        syncServer.access("persist", (state) => state),
       );
     } catch (error) {
       logger.error("Error persisting world state", error);
@@ -161,10 +166,10 @@ const apiTicker = new Ticker({
 
 const worldService = new WorldService(db, areas.value, defaultAreaId);
 
-const apiRouter = createRootRouter({
+const trpcRouter = createRootRouter({
   areas: areas.value,
   service: worldService,
-  state: worldState.access,
+  state: syncServer.access,
   createUrl: urlToPublicFile,
   buildVersion: opt.buildVersion,
   ticker: apiTicker,
@@ -175,7 +180,7 @@ webServer.use(
   trpcExpress.createExpressMiddleware({
     onError: ({ path, error }) =>
       logger.error(`[trpc error][${path}]: ${error.message}`),
-    router: apiRouter,
+    router: trpcRouter,
     createContext: ({ req }) =>
       createServerContext(
         `${req.ip}-${req.headers["user-agent"]}` as HttpSessionId,
@@ -197,7 +202,7 @@ function createServerContext(
 ): ServerContext {
   return {
     sessionId,
-    accessWorldState: worldState.access,
+    accessWorldState: syncServer.access,
     authToken,
     auth,
     logger,
@@ -212,6 +217,12 @@ async function handleSyncServerConnection(
 ) {
   logger.info("Client connected", clientId);
 
+  if (token === undefined) {
+    logger.info("Client did not provide a token", clientId);
+    syncServer.disconnectClient(clientId);
+    return;
+  }
+
   const verifyResult = await auth.verifyToken(token);
   if (!verifyResult.ok) {
     logger.info(
@@ -219,7 +230,7 @@ async function handleSyncServerConnection(
       clientId,
       verifyResult.error,
     );
-    worldState.disconnectClient(clientId);
+    syncServer.disconnectClient(clientId);
     return;
   }
 
@@ -231,7 +242,7 @@ async function handleSyncServerConnection(
 
   const char = await worldService.getCharacterForUser(verifyResult.user.id);
   if (char) {
-    worldState.access("handleSyncServerConnection", (state) => {
+    syncServer.access("handleSyncServerConnection", (state) => {
       logger.info("Adding character to world state", char.id);
       state.characters[char.id] = char;
     });
