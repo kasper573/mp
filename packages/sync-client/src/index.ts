@@ -96,7 +96,6 @@ export class SyncClient<State, ConnectionMetaData> {
 
   private pollReadyState = () => {
     const readyState = this.getReadyState();
-    console.log("pollReadyState", readyState);
     if (readyState !== this.lastEmittedReadyState) {
       this.lastEmittedReadyState = readyState;
       for (const handler of this.readyStateHandlers) {
