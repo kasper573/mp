@@ -64,6 +64,20 @@
       "when": 1732511569801,
       "tag": "0008_nosy_scrambler",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1736131309432,
+      "tag": "0009_fearless_marauders",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1736138819998,
+      "tag": "0010_sudden_energizer",
+      "breakpoints": true
     }
   ]
 }
