@@ -10,6 +10,7 @@ import {
 } from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
+import { LoadingSpinner } from "../../ui/LoadingSpinner";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
@@ -37,14 +38,9 @@ export default function GamePage() {
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
         </Match>
-        <Match when={game.readyState() !== "open"}>
-          <Dock position="center">Game client {game.readyState()}</Dock>
-        </Match>
-        <Match when={area.isLoading}>
-          <Dock position="center">Loading area...</Dock>
-        </Match>
-        <Match when={!game.areaId()}>
-          <Dock position="center">Could not determine area id</Dock>
+        <Match when={game.readyState() !== "open" || area.isPending}>
+          {/** TODO replace with specialized loading screen for loading areas */}
+          <LoadingSpinner />
         </Match>
         <Match when={area.data} keyed>
           {(data) => (
