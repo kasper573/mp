@@ -34,8 +34,11 @@ export class SyncServer<State, ConnectionMetaData> {
   access: StateAccess<State> = (message, mutateFn) => {
     let result!: ReturnType<typeof mutateFn>;
     this.handle.change(
-      (state) => {
-        result = mutateFn(state);
+      (draft) => {
+        result = mutateFn(draft);
+        if (result instanceof Promise) {
+          throw new TypeError("State access mutations may not be asynchronous");
+        }
       },
       { patchCallback: this.options.patchCallback, message },
     );
