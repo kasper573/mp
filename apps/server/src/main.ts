@@ -26,13 +26,13 @@ import { loadAreas } from "./modules/area/loadAreas";
 import type { ServerOptions } from "./schemas/serverOptions";
 import { serverOptionsSchema } from "./schemas/serverOptions";
 import { createDBClient } from "./db/client";
-import { loadWorldState, persistWorldState } from "./modules/world/persistence";
 import { ClientRegistry } from "./modules/world/ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
+import { WorldService } from "./modules/world/service";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -91,11 +91,6 @@ const tickDurationMetric = new MetricsHistogram({
 const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl);
 const defaultAreaId = [...areas.value.keys()][0];
-const initialWorldState = await loadWorldState(db);
-if (initialWorldState.isErr()) {
-  logger.error("Failed to load world state", initialWorldState.error);
-  process.exit(1);
-}
 
 const expressLogger = createExpressLogger(logger);
 
@@ -105,15 +100,15 @@ const expressStaticConfig = {
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
+  .use(metricsMiddleware(metrics)) // Intentionally placed before logger since it's so verbose and unnecessary to log
   .use(expressLogger)
-  .use(metricsMiddleware(metrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
 
 const httpServer = http.createServer(webServer);
 
 const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
-  initialState: initialWorldState.value,
+  initialState: { characters: {} },
   filterState: deriveWorldStateForClient,
   httpServer,
   patchCallback: opt.logSyncPatches
@@ -122,6 +117,14 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
     logger.info("Client disconnected", clientId);
+    const userId = clients.getUserId(clientId);
+    worldState.access("disconnect", (state) => {
+      for (const char of Object.values(state.characters)) {
+        if (char.userId === userId) {
+          delete state.characters[char.id];
+        }
+      }
+    });
     clients.deleteClient(clientId);
   },
 });
@@ -129,11 +132,19 @@ const worldState = new SyncServer<WorldState, SyncServerConnectionMetaData>({
 collectUserMetrics(metrics, clients, worldState);
 
 const persistTicker = new Ticker({
-  middleware: persist,
   interval: opt.persistInterval,
+  async middleware() {
+    try {
+      await worldService.persistWorldState(
+        worldState.access("persist", (state) => state),
+      );
+    } catch (error) {
+      logger.error("Error persisting world state", error);
+    }
+  },
 });
 
-const ticker = new Ticker({
+const apiTicker = new Ticker({
   interval: opt.tickInterval,
   middleware({ delta: tickInterval, next }) {
     try {
@@ -142,18 +153,20 @@ const ticker = new Ticker({
       next(tickInterval);
       tickDurationMetric.observe(getMeasurement().totalMilliseconds);
     } catch (error) {
-      logger.error("Error in server tick", error);
+      logger.error("Error in api ticker", error);
     }
   },
 });
 
+const worldService = new WorldService(db, areas.value, defaultAreaId);
+
 const apiRouter = createRootRouter({
   areas: areas.value,
-  defaultAreaId,
+  service: worldService,
   state: worldState.access,
   createUrl: urlToPublicFile,
   buildVersion: opt.buildVersion,
-  ticker,
+  ticker: apiTicker,
 });
 
 webServer.use(
@@ -175,15 +188,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
 });
 
 persistTicker.start();
-ticker.start();
-
-async function persist() {
-  const state = worldState.access("persist", (state) => state);
-  const result = await persistWorldState(db, state);
-  if (result.isErr()) {
-    logger.error("Failed to persist world state", result.error);
-  }
-}
+apiTicker.start();
 
 function createServerContext(
   sessionId: HttpSessionId,
@@ -222,6 +227,13 @@ async function handleSyncServerConnection(
     clientId,
     userId: verifyResult.user.id,
   });
+
+  const char = await worldService.getCharacterForUser(verifyResult.user.id);
+  if (char) {
+    worldState.access("handleSyncServerConnection", (state) => {
+      state.characters[char.id] = char;
+    });
+  }
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
