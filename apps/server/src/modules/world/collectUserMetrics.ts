@@ -34,7 +34,7 @@ export function collectUserMetrics<T>(
     help: "Number of active websocket connections",
     registers: [registry],
     collect() {
-      this.set(worldState.clientIds.length);
+      this.set([...worldState.clientIds].length);
     },
   });
 }
