@@ -1,3 +1,4 @@
+import type http from "node:http";
 import type { Branded } from "@mp/std";
 import { decode, encode } from "cbor2";
 import type { Operation } from "rfc6902";
@@ -45,7 +46,10 @@ export type EventHandler<State> = (state: State) => void;
 
 export type Unsubscribe = () => void;
 
-export function handshakeDataFromUrl(url: URL): HandshakeData {
+export function handshakeDataFromRequest(
+  req: http.IncomingMessage,
+): HandshakeData {
+  const url = new URL(req.url!, "http://localhost"); // .url is in fact a path, so baseUrl does not matter
   return { token: url.searchParams.get("token") ?? undefined };
 }
 

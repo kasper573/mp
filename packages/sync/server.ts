@@ -1,13 +1,13 @@
 import type http from "node:http";
 import { produce, original } from "immer";
-import type { WebSocket } from "ws";
+import type { VerifyClientCallbackAsync, WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { v4 } from "uuid";
 import { createPatch } from "rfc6902";
 import type { PatchStateMessage, ServerToClientMessage } from "./shared";
 import {
   encodeServerToClientMessage,
-  handshakeDataFromUrl,
+  handshakeDataFromRequest,
   type ClientId,
   type HandshakeData,
 } from "./shared";
@@ -26,15 +26,7 @@ export class SyncServer<ServerState, ClientState> {
     this.wss = new WebSocketServer({
       server: this.options.httpServer,
       path: this.options.path,
-      verifyClient: (info, callback) => {
-        const clientId = newClientId();
-        memorizeClientId(info.req, clientId);
-        const url = new URL(info.req.url!, "http://localhost");
-        const handshakeData = handshakeDataFromUrl(url);
-        void this.options.handshake(clientId, handshakeData).then((valid) => {
-          callback(valid, 200, "OK");
-        });
-      },
+      verifyClient: this.verifyClient,
     });
   }
 
@@ -67,8 +59,8 @@ export class SyncServer<ServerState, ClientState> {
           }
 
           message = { type: "patch", patch };
-          if (this.options.patchCallback) {
-            this.options.patchCallback({ clientId, reference, patch });
+          if (this.options.onPatch) {
+            this.options.onPatch({ clientId, reference, patch });
           }
         } else {
           message = { type: "full", state: nextClientState };
@@ -92,9 +84,21 @@ export class SyncServer<ServerState, ClientState> {
     this.wss.removeListener("close", this.handleClose);
   }
 
+  private verifyClient: VerifyClientCallbackAsync<http.IncomingMessage> = (
+    { req },
+    callback,
+  ) => {
+    const clientId = newClientId();
+    memorizeClientId(req, clientId);
+    void this.options
+      .handshake(clientId, handshakeDataFromRequest(req))
+      .then(callback);
+  };
+
   private onConnection = (socket: WebSocket, req: http.IncomingMessage) => {
     const clientId = recallClientId(req);
     this.clients.set(clientId, { socket });
+    this.options.onConnection?.(clientId);
 
     socket.addEventListener("close", () => {
       this.clients.delete(clientId);
@@ -114,20 +118,13 @@ export interface SyncServerOptions<ServerState, ClientState> {
   httpServer: http.Server;
   initialState: ServerState;
   handshake: (clientId: ClientId, data: HandshakeData) => Promise<boolean>;
-  patchCallback?: (props: {
-    clientId: ClientId;
-    reference: string;
-    patch: PatchStateMessage["patch"];
-  }) => void;
   createClientState: (
     serverState: ServerState,
     clientId: ClientId,
   ) => ClientState;
-  onConnection?: (
-    clientId: ClientId,
-    data: HandshakeData,
-  ) => void | undefined | Promise<unknown>;
-  onDisconnect?: (clientId: ClientId) => void | undefined | Promise<unknown>;
+  onPatch?: PatchHandler;
+  onConnection?: (clientId: ClientId) => unknown;
+  onDisconnect?: (clientId: ClientId) => unknown;
 }
 
 export type StateAccess<State> = <Result>(
@@ -140,6 +137,12 @@ export type StateAccess<State> = <Result>(
    */
   stateHandler: (draft: State) => Result,
 ) => Result;
+
+export type PatchHandler = (props: {
+  clientId: ClientId;
+  reference: string;
+  patch: PatchStateMessage["patch"];
+}) => void;
 
 interface ClientInfo<ClientState> {
   socket: WebSocket;

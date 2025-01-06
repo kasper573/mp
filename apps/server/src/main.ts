@@ -114,7 +114,7 @@ const syncServer = new SyncServer<WorldState, WorldState>({
   initialState: { characters: {} },
   handshake: syncServerHandshake,
   createClientState: deriveWorldStateForClient(clients),
-  patchCallback: opt.logSyncPatches
+  onPatch: opt.logSyncPatches
     ? (props) => logger.info("[sync]", props)
     : undefined,
   onConnection: (clientId) => logger.info("Client connected", clientId),
