@@ -113,7 +113,7 @@ const webSocketToSyncClientReadyState = {
 } as const;
 
 function coerceReadyState(
-  state: keyof typeof webSocketToSyncClientReadyState = WebSocket.CLOSED,
+  state: keyof typeof webSocketToSyncClientReadyState = WebSocket.CONNECTING,
 ): SyncClientReadyState {
   return webSocketToSyncClientReadyState[state];
 }
