@@ -50,8 +50,8 @@ export function createGameClient(sync: WorldStateSyncClient): GameClient {
   };
 }
 
-export function createSyncClient(authClient: AuthClient) {
-  const token = createMemo(() => authClient.identity()?.token);
+export function createSyncClient(auth: AuthClient) {
+  const token = createMemo(() => auth.identity()?.token);
   const connectionMetaData = () => ({ token: token() });
 
   const sync: WorldStateSyncClient = new SyncClient(
@@ -65,6 +65,10 @@ export function createSyncClient(authClient: AuthClient) {
       onCleanup(sync.stop);
     }
   });
+
+  // TODO replace with more robust solution that knows exactly that an auth error occurred when trying to establish a websocket connection
+  // or remove this entirely once this is fixed https://github.com/kasper573/mp/issues/122
+  onCleanup(sync.subscribeToErrors(auth.signOut));
 
   return sync;
 }

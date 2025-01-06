@@ -11,6 +11,7 @@ export class SyncClient<State> {
   private state?: State;
   private stateHandlers = new Set<EventHandler<State | undefined>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
+  private errorHandlers = new Set<EventHandler<Event>>();
   private isEnabled = false;
   private connectAttempt = 0;
 
@@ -50,6 +51,11 @@ export class SyncClient<State> {
     return () => this.readyStateHandlers.delete(handler);
   };
 
+  subscribeToErrors = (handler: EventHandler<Event>): Unsubscribe => {
+    this.errorHandlers.add(handler);
+    return () => this.errorHandlers.delete(handler);
+  };
+
   private connect() {
     if (this.socket) {
       throw new Error("Socket already created");
@@ -64,7 +70,7 @@ export class SyncClient<State> {
 
     this.socket.addEventListener("open", this.handleOpen);
     this.socket.addEventListener("close", this.handleClose);
-    this.socket.addEventListener("error", this.emitReadyState);
+    this.socket.addEventListener("error", this.handleError);
     this.socket.addEventListener(
       "message",
       this.handleMessage as EventHandler<MessageEvent>,
@@ -79,7 +85,7 @@ export class SyncClient<State> {
     this.socket.close();
     this.socket.removeEventListener("open", this.handleOpen);
     this.socket.removeEventListener("close", this.handleClose);
-    this.socket.removeEventListener("error", this.emitReadyState);
+    this.socket.removeEventListener("error", this.handleError);
     this.socket.removeEventListener(
       "message",
       this.handleMessage as EventHandler<MessageEvent>,
@@ -105,6 +111,13 @@ export class SyncClient<State> {
     this.emitReadyState();
     this.disconnect();
     this.enqueueReconnect();
+  };
+
+  private handleError = (event: Event) => {
+    this.emitReadyState();
+    for (const handler of this.errorHandlers) {
+      handler(event);
+    }
   };
 
   private handleMessage = async (event: MessageEvent) => {

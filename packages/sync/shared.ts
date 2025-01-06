@@ -42,7 +42,7 @@ export const encodeServerToClientMessage = encode as <ClientState>(
   message: ServerToClientMessage<ClientState>,
 ) => Uint8Array;
 
-export type EventHandler<State> = (state: State) => void;
+export type EventHandler<State> = (state: State) => unknown;
 
 export type Unsubscribe = () => void;
 
