@@ -1,53 +1,64 @@
-import { Match, Switch, Show, useContext } from "solid-js";
-import { atoms } from "@mp/style";
+import { createEffect, Match, Switch, useContext } from "solid-js";
 import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
-import { createGameClient, GameClientContext } from "../../clients/game";
+import {
+  createGameClient,
+  createSyncClient,
+  GameClientContext,
+} from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
+import { Dock } from "../../ui/Dock";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
-
-  return (
-    <Switch>
-      <Match when={auth.isSignedIn()}>
-        <Game />
-      </Match>
-      <Match when={!auth.isSignedIn()}>
-        <div class={atoms({ padding: "2xl" })}>Sign in to play</div>
-      </Match>
-    </Switch>
-  );
-}
-
-function Game() {
-  const auth = useContext(AuthContext);
-  const gameClient = createGameClient(auth);
+  const sync = createSyncClient(auth);
+  const game = createGameClient(sync);
 
   const area = createQuery(() => {
-    const id = gameClient.areaId();
+    const id = game.areaId();
     return {
       queryKey: ["area", id],
       queryFn: id ? () => loadAreaResource(id) : skipToken,
     };
   });
 
-  void gameClient.join();
+  createEffect(() => {
+    if (game.readyState() === "open") {
+      void game.join();
+    }
+  });
+
   return (
-    <GameClientContext.Provider value={gameClient}>
-      <Application class={styles.container}>
-        {({ viewport }) => (
-          <EngineProvider viewport={viewport}>
-            <Show when={area.data} keyed>
-              {(data) => <AreaScene area={data} />}
-            </Show>
-          </EngineProvider>
-        )}
-      </Application>
+    <GameClientContext.Provider value={game}>
+      <Switch>
+        <Match when={!auth.isSignedIn()}>
+          <Dock position="center">Sign in to play</Dock>
+        </Match>
+        <Match when={game.readyState() !== "open"}>
+          <Dock position="center">Game client {game.readyState()}</Dock>
+        </Match>
+        <Match when={area.isPending}>
+          <Dock position="center">Loading area...</Dock>
+        </Match>
+        <Match when={area.error}>
+          <Dock position="center">Error loading area</Dock>
+        </Match>
+        <Match when={area.data} keyed>
+          {(data) => (
+            <Application class={styles.container}>
+              {({ viewport }) => (
+                <EngineProvider viewport={viewport}>
+                  <AreaScene area={data} />
+                </EngineProvider>
+              )}
+            </Application>
+          )}
+        </Match>
+      </Switch>
     </GameClientContext.Provider>
   );
 }
