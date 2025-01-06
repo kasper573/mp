@@ -1,13 +1,13 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { SyncServer } from "@mp/sync-server";
+import type { SyncServer } from "@mp/sync/server";
 import type { ClientRegistry } from "./ClientRegistry";
 import type { WorldState } from "./schema";
 
-export function collectUserMetrics<T>(
+export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  worldState: SyncServer<WorldState, T>,
+  worldState: SyncServer<WorldState, WorldState>,
 ) {
   new MetricsGague({
     name: "active_user_count",
@@ -34,7 +34,7 @@ export function collectUserMetrics<T>(
     help: "Number of active websocket connections",
     registers: [registry],
     collect() {
-      this.set(worldState.clientIds.length);
+      this.set([...worldState.clientIds].length);
     },
   });
 }

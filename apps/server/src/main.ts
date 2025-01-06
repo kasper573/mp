@@ -7,10 +7,11 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
+import type { AuthToken } from "@mp/auth-server";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import type { ClientId } from "@mp/sync-server";
-import { SyncServer, WebSocketServer } from "@mp/sync-server";
+import type { ClientId, HandshakeData } from "@mp/sync/server";
+import { SyncServer } from "@mp/sync/server";
 import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
@@ -20,7 +21,7 @@ import {
 } from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
 import type { WorldState } from "./modules/world/schema";
-import type { HttpSessionId, SyncServerConnectionMetaData } from "./context";
+import type { HttpSessionId } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
 import type { ServerOptions } from "./schemas/serverOptions";
@@ -56,7 +57,7 @@ if (areas.isErr() || areas.value.size === 0) {
   process.exit(1);
 }
 
-export const clients = new ClientRegistry();
+const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 collectDefaultMetrics({ register: metrics });
 
@@ -107,19 +108,16 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const wsServer = new WebSocketServer({
-  server: httpServer,
+const syncServer = new SyncServer<WorldState, WorldState>({
+  httpServer,
   path: opt.wsEndpointPath,
-});
-
-const syncServer = new SyncServer<WorldState, SyncServerConnectionMetaData>({
-  wss: wsServer,
   initialState: { characters: {} },
-  filterState: deriveWorldStateForClient,
-  patchCallback: opt.logSyncPatches
-    ? (patches) => logger.info("[sync]", patches)
+  handshake: syncServerHandshake,
+  createClientState: deriveWorldStateForClient(clients),
+  onPatch: opt.logSyncPatches
+    ? (props) => logger.info("[sync]", props)
     : undefined,
-  onConnection: handleSyncServerConnection,
+  onConnection: (clientId) => logger.info("Client connected", clientId),
   onDisconnect(clientId) {
     logger.info("Client disconnected", clientId);
     const userId = clients.getUserId(clientId);
@@ -195,6 +193,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
 
 persistTicker.start();
 apiTicker.start();
+syncServer.start();
 
 function createServerContext(
   sessionId: HttpSessionId,
@@ -211,27 +210,26 @@ function createServerContext(
   };
 }
 
-async function handleSyncServerConnection(
+async function syncServerHandshake(
   clientId: ClientId,
-  { token }: SyncServerConnectionMetaData,
+  { token }: HandshakeData,
 ) {
-  logger.info("Client connected", clientId);
-
   if (token === undefined) {
-    logger.info("Client did not provide a token", clientId);
-    syncServer.disconnectClient(clientId);
-    return;
+    logger.info(
+      "Client not verified. Client did not provide a token",
+      clientId,
+    );
+    return false;
   }
 
-  const verifyResult = await auth.verifyToken(token);
+  const verifyResult = await auth.verifyToken(token as AuthToken);
   if (!verifyResult.ok) {
     logger.info(
-      "Could not verify client authentication token",
+      "Client not verified. Invalid auth token",
       clientId,
       verifyResult.error,
     );
-    syncServer.disconnectClient(clientId);
-    return;
+    return false;
   }
 
   clients.associateClientWithUser(clientId, verifyResult.user.id);
@@ -240,13 +238,7 @@ async function handleSyncServerConnection(
     userId: verifyResult.user.id,
   });
 
-  const char = await worldService.getCharacterForUser(verifyResult.user.id);
-  if (char) {
-    syncServer.access("handleSyncServerConnection", (state) => {
-      logger.info("Adding character to world state", char.id);
-      state.characters[char.id] = char;
-    });
-  }
+  return true;
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {

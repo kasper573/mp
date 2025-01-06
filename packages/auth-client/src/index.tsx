@@ -21,10 +21,10 @@ export const AuthContext = createContext<AuthClient>(
 export interface AuthClient {
   identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
-  refresh(): Promise<void>;
-  signOut(): Promise<void>;
-  redirectToSignIn(): Promise<void>;
-  signInCallback(): Promise<UserIdentity | undefined>;
+  refresh: () => Promise<void>;
+  signOut: () => Promise<void>;
+  redirectToSignIn: () => Promise<void>;
+  signInCallback: () => Promise<UserIdentity | undefined>;
 }
 
 export interface AuthClientOptions {

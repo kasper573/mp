@@ -1,11 +1,7 @@
-import type {
-  Character,
-  SyncServerConnectionMetaData,
-  WorldState,
-} from "@mp/server";
+import type { Character, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import type { SyncClientReadyState } from "@mp/sync-client";
-import { SyncClient } from "@mp/sync-client";
+import type { SyncClientReadyState } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync/client";
 import type { Accessor } from "solid-js";
 import {
   createContext,
@@ -54,8 +50,8 @@ export function createGameClient(sync: WorldStateSyncClient): GameClient {
   };
 }
 
-export function createSyncClient(authClient: AuthClient) {
-  const token = createMemo(() => authClient.identity()?.token);
+export function createSyncClient(auth: AuthClient) {
+  const token = createMemo(() => auth.identity()?.token);
   const connectionMetaData = () => ({ token: token() });
 
   const sync: WorldStateSyncClient = new SyncClient(
@@ -66,17 +62,18 @@ export function createSyncClient(authClient: AuthClient) {
   createEffect(() => {
     if (token()) {
       sync.start();
-      onCleanup(() => sync.stop());
+      onCleanup(sync.stop);
     }
   });
+
+  // TODO replace with more robust solution that knows exactly that an auth error occurred when trying to establish a websocket connection
+  // or remove this entirely once this is fixed https://github.com/kasper573/mp/issues/122
+  onCleanup(sync.subscribeToErrors(auth.signOut));
 
   return sync;
 }
 
-export type WorldStateSyncClient = SyncClient<
-  WorldState,
-  SyncServerConnectionMetaData
->;
+export type WorldStateSyncClient = SyncClient<WorldState>;
 
 export const GameClientContext = createContext<GameClient>(
   new Proxy({} as GameClient, {

@@ -1,5 +1,5 @@
 {
-  "name": "@mp/data",
+  "name": "@mp/std",
   "version": "0.0.0",
   "sideEffects": false,
   "type": "module",
@@ -10,13 +10,6 @@
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     }
-  },
-  "dependencies": {
-    "@mp/tiled-loader": "workspace:*",
-    "@mp/math": "workspace:*",
-    "@mp/time": "workspace:*",
-    "@mp/std": "workspace:*",
-    "dijkstrajs": "1.0.3"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

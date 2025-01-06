@@ -10,6 +10,7 @@ import {
 } from "../../clients/game";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
+import { LoadingSpinner } from "../../ui/LoadingSpinner";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
 
@@ -17,7 +18,6 @@ export default function GamePage() {
   const auth = useContext(AuthContext);
   const sync = createSyncClient(auth);
   const game = createGameClient(sync);
-
   const area = createQuery(() => {
     const id = game.areaId();
     return {
@@ -38,14 +38,9 @@ export default function GamePage() {
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
         </Match>
-        <Match when={game.readyState() !== "open"}>
-          <Dock position="center">Game client {game.readyState()}</Dock>
-        </Match>
-        <Match when={area.isPending}>
-          <Dock position="center">Loading area...</Dock>
-        </Match>
-        <Match when={area.error}>
-          <Dock position="center">Error loading area</Dock>
+        <Match when={game.readyState() !== "open" || area.isPending}>
+          {/** TODO replace with specialized loading screen for loading areas */}
+          <LoadingSpinner />
         </Match>
         <Match when={area.data} keyed>
           {(data) => (

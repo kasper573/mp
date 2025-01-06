@@ -1,4 +1,4 @@
-import type { Branded } from "./Branded";
+import type { Branded } from "@mp/std";
 
 export interface FileReference {
   filepath: PathToLocalFile;

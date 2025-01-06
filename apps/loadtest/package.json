@@ -8,7 +8,7 @@
     "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts"
   },
   "dependencies": {
-    "@mp/sync-client": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/data": "workspace:*",
