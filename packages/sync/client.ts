@@ -1,14 +1,9 @@
 import { applyPatch } from "rfc6902";
 import { produce } from "immer";
-import type {
-  ClientToServerMessage,
-  EventHandler,
-  HandshakeData,
-  Unsubscribe,
-} from "./shared";
+import type { EventHandler, HandshakeData, Unsubscribe } from "./shared";
 import {
+  createUrlWithHandshakeData,
   decodeServerToClientMessage,
-  encodeClientToServerMessage,
 } from "./shared";
 
 export class SyncClient<State> {
@@ -61,7 +56,9 @@ export class SyncClient<State> {
     }
 
     this.connectAttempt++;
-    this.socket = new WebSocket(this.url);
+    this.socket = new WebSocket(
+      createUrlWithHandshakeData(this.url, this.getHandshakeData()),
+    );
 
     this.emitReadyState();
 
@@ -99,17 +96,9 @@ export class SyncClient<State> {
     }, this.reconnectDelay(this.connectAttempt));
   }
 
-  private send(message: ClientToServerMessage) {
-    if (!this.socket) {
-      throw new Error("No socket available");
-    }
-    this.socket?.send(encodeClientToServerMessage(message));
-  }
-
   private handleOpen = () => {
     this.connectAttempt = 0;
     this.emitReadyState();
-    void this.send({ type: "handshake", ...this.getHandshakeData() });
   };
 
   private handleClose = () => {

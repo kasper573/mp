@@ -11,7 +11,7 @@ import type { AuthToken } from "@mp/auth-server";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import type { ClientId, HandshakeData } from "@mp/sync/server";
-import { SyncServer, WebSocketServer } from "@mp/sync/server";
+import { SyncServer } from "@mp/sync/server";
 import { measureTimeSpan, Ticker } from "@mp/time";
 import {
   collectDefaultMetrics,
@@ -108,20 +108,16 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const wsServer = new WebSocketServer({
-  server: httpServer,
-  path: opt.wsEndpointPath,
-});
-
 const syncServer = new SyncServer<WorldState, WorldState>({
-  wss: wsServer,
-  handshakeTimeout: 5000,
+  httpServer,
+  path: opt.wsEndpointPath,
   initialState: { characters: {} },
+  handshake: syncServerHandshake,
   createClientState: deriveWorldStateForClient(clients),
   patchCallback: opt.logSyncPatches
     ? (props) => logger.info("[sync]", props)
     : undefined,
-  onConnection: handleSyncServerConnection,
+  onConnection: (clientId) => logger.info("Client connected", clientId),
   onDisconnect(clientId) {
     logger.info("Client disconnected", clientId);
     const userId = clients.getUserId(clientId);
@@ -214,27 +210,26 @@ function createServerContext(
   };
 }
 
-async function handleSyncServerConnection(
+async function syncServerHandshake(
   clientId: ClientId,
   { token }: HandshakeData,
 ) {
-  logger.info("Client connected", clientId);
-
   if (token === undefined) {
-    logger.info("Client did not provide a token", clientId);
-    syncServer.disconnectClient(clientId);
-    return;
+    logger.info(
+      "Client not verified. Client did not provide a token",
+      clientId,
+    );
+    return false;
   }
 
   const verifyResult = await auth.verifyToken(token as AuthToken);
   if (!verifyResult.ok) {
     logger.info(
-      "Could not verify client authentication token",
+      "Client not verified. Invalid auth token",
       clientId,
       verifyResult.error,
     );
-    syncServer.disconnectClient(clientId);
-    return;
+    return false;
   }
 
   clients.associateClientWithUser(clientId, verifyResult.user.id);
@@ -243,13 +238,7 @@ async function handleSyncServerConnection(
     userId: verifyResult.user.id,
   });
 
-  const char = await worldService.getCharacterForUser(verifyResult.user.id);
-  if (char) {
-    syncServer.access("handleSyncServerConnection", (state) => {
-      logger.info("Adding character to world state", char.id);
-      state.characters[char.id] = char;
-    });
-  }
+  return true;
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {

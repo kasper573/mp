@@ -41,14 +41,21 @@ export const encodeServerToClientMessage = encode as <ClientState>(
   message: ServerToClientMessage<ClientState>,
 ) => Uint8Array;
 
-export const decodeClientToServerMessage = fixedDecode as (
-  data: ArrayBufferLike,
-) => ClientToServerMessage;
-
-export const encodeClientToServerMessage = encode as (
-  message: ClientToServerMessage,
-) => Uint8Array;
-
 export type EventHandler<State> = (state: State) => void;
 
 export type Unsubscribe = () => void;
+
+export function handshakeDataFromUrl(url: URL): HandshakeData {
+  return { token: url.searchParams.get("token") ?? undefined };
+}
+
+export function createUrlWithHandshakeData(
+  syncServerUrl: string,
+  handshake: HandshakeData,
+): string {
+  const url = new URL(syncServerUrl);
+  if (handshake.token) {
+    url.searchParams.set("token", handshake.token);
+  }
+  return url.toString();
+}

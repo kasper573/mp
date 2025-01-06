@@ -1,11 +1,13 @@
+import type http from "node:http";
 import { produce, original } from "immer";
-import type { WebSocket, WebSocketServer } from "ws";
+import type { WebSocket } from "ws";
+import { WebSocketServer } from "ws";
 import { v4 } from "uuid";
 import { createPatch } from "rfc6902";
 import type { PatchStateMessage, ServerToClientMessage } from "./shared";
 import {
-  decodeClientToServerMessage,
   encodeServerToClientMessage,
+  handshakeDataFromUrl,
   type ClientId,
   type HandshakeData,
 } from "./shared";
@@ -21,7 +23,19 @@ export class SyncServer<ServerState, ClientState> {
 
   constructor(private options: SyncServerOptions<ServerState, ClientState>) {
     this.state = this.options.initialState;
-    this.wss = this.options.wss;
+    this.wss = new WebSocketServer({
+      server: this.options.httpServer,
+      path: this.options.path,
+      verifyClient: (info, callback) => {
+        const clientId = newClientId();
+        memorizeClientId(info.req, clientId);
+        const url = new URL(info.req.url!, "http://localhost");
+        const handshakeData = handshakeDataFromUrl(url);
+        void this.options.handshake(clientId, handshakeData).then((valid) => {
+          callback(valid, 200, "OK");
+        });
+      },
+    });
   }
 
   access: StateAccess<ServerState> = (reference, accessFn) => {
@@ -75,32 +89,12 @@ export class SyncServer<ServerState, ClientState> {
 
   stop() {
     this.wss.removeListener("connection", this.onConnection);
+    this.wss.removeListener("close", this.handleClose);
   }
 
-  disconnectClient(clientId: ClientId) {
-    this.clients.get(clientId)?.socket.close();
-  }
-
-  private onConnection = (socket: WebSocket) => {
-    const clientId = newClientId();
-    const info: ClientInfo<ClientState> = { socket };
-    const handshakeTimeoutId = setTimeout(
-      () => socket.close(),
-      this.options.handshakeTimeout,
-    );
-
-    socket.addEventListener("message", (event) => {
-      const message = decodeClientToServerMessage(
-        event.data as ArrayBufferLike,
-      );
-      switch (message.type) {
-        case "handshake":
-          clearTimeout(handshakeTimeoutId);
-          this.clients.set(clientId, info);
-          void this.options.onConnection?.(clientId, message);
-          break;
-      }
-    });
+  private onConnection = (socket: WebSocket, req: http.IncomingMessage) => {
+    const clientId = recallClientId(req);
+    this.clients.set(clientId, { socket });
 
     socket.addEventListener("close", () => {
       this.clients.delete(clientId);
@@ -116,9 +110,10 @@ export class SyncServer<ServerState, ClientState> {
 }
 
 export interface SyncServerOptions<ServerState, ClientState> {
-  wss: WebSocketServer;
+  path: string;
+  httpServer: http.Server;
   initialState: ServerState;
-  handshakeTimeout: number;
+  handshake: (clientId: ClientId, data: HandshakeData) => Promise<boolean>;
   patchCallback?: (props: {
     clientId: ClientId;
     reference: string;
@@ -146,8 +141,6 @@ export type StateAccess<State> = <Result>(
   stateHandler: (draft: State) => Result,
 ) => Result;
 
-export { WebSocketServer } from "ws";
-
 interface ClientInfo<ClientState> {
   socket: WebSocket;
   state?: ClientState;
@@ -159,3 +152,17 @@ type ClientInfoMap<ClientState> = Map<ClientId, ClientInfo<ClientState>>;
 const newClientId = v4 as unknown as () => ClientId;
 
 export type { ClientId, HandshakeData } from "./shared";
+
+const clientIdSymbol = Symbol("clientId");
+
+function memorizeClientId(request: http.IncomingMessage, id: ClientId): void {
+  Reflect.set(request, clientIdSymbol, id);
+}
+
+function recallClientId(request: http.IncomingMessage): ClientId {
+  const id = Reflect.get(request, clientIdSymbol) as ClientId | undefined;
+  if (id === undefined) {
+    throw new Error("Client ID not found on request");
+  }
+  return id;
+}
