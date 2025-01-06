@@ -36,7 +36,7 @@ export class WorldService {
   }
 
   async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
-    let char = await this.getCharacterForUser(userId);
+    const char = await this.getCharacterForUser(userId);
 
     if (char) {
       return char;
@@ -50,15 +50,22 @@ export class WorldService {
       );
     }
 
-    const dbChar = {
+    const input = {
       areaId: area.id,
       coords: vec(0, 0),
       speed: 3,
       userId,
     };
 
-    const { oid } = await this.db.insert(characterTable).values(dbChar);
-    char = { ...dbChar, id: oid };
-    return char;
+    const [returned] = await this.db
+      .insert(characterTable)
+      .values(input)
+      .returning({ id: characterTable.id });
+
+    if (!returned) {
+      throw new Error("Failed to insert character");
+    }
+
+    return { ...input, ...returned };
   }
 }
