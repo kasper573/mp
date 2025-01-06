@@ -119,7 +119,7 @@ const syncServer = new SyncServer<WorldState, WorldState>({
   initialState: { characters: {} },
   createClientState: deriveWorldStateForClient(clients),
   patchCallback: opt.logSyncPatches
-    ? (patches) => logger.info("[sync]", patches)
+    ? (props) => logger.info("[sync]", props)
     : undefined,
   onConnection: handleSyncServerConnection,
   onDisconnect(clientId) {
@@ -136,8 +136,6 @@ const syncServer = new SyncServer<WorldState, WorldState>({
     clients.deleteClient(clientId);
   },
 });
-
-// restart
 
 collectUserMetrics(metrics, clients, syncServer);
 

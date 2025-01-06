@@ -62,7 +62,7 @@ export function createSyncClient(authClient: AuthClient) {
   createEffect(() => {
     if (token()) {
       sync.start();
-      onCleanup(() => sync.stop());
+      onCleanup(sync.stop);
     }
   });
 

@@ -1,5 +1,6 @@
+import { applyPatch } from "rfc6902";
+import { produce } from "immer";
 import type {
-  ClientId,
   ClientToServerMessage,
   EventHandler,
   HandshakeData,
@@ -18,11 +19,6 @@ export class SyncClient<State> {
   private isEnabled = false;
   private connectAttempt = 0;
 
-  #clientId?: ClientId;
-  get clientId() {
-    return this.#clientId;
-  }
-
   constructor(
     private url: string,
     private getHandshakeData: () => HandshakeData,
@@ -30,24 +26,20 @@ export class SyncClient<State> {
       1000 * Math.min(Math.pow(2, attemptNumber - 1), 10),
   ) {}
 
-  getReadyState(): SyncClientReadyState {
-    return coerceReadyState(this.socket?.readyState as WebSocketReadyState);
-  }
+  getReadyState = (): SyncClientReadyState =>
+    coerceReadyState(this.socket?.readyState as WebSocketReadyState);
 
-  getState(): State | undefined {
-    return this.state;
-  }
+  getState = (): State | undefined => this.state;
 
-  start() {
+  start = () => {
     this.isEnabled = true;
     this.connect();
-  }
+  };
 
-  stop() {
+  stop = () => {
     this.isEnabled = false;
     this.disconnect();
-    this.setState(undefined);
-  }
+  };
 
   subscribeToState = (
     handler: EventHandler<State | undefined>,
@@ -72,6 +64,7 @@ export class SyncClient<State> {
     this.socket = new WebSocket(this.url);
 
     this.emitReadyState();
+
     this.socket.addEventListener("open", this.handleOpen);
     this.socket.addEventListener("close", this.handleClose);
     this.socket.addEventListener("error", this.emitReadyState);
@@ -83,7 +76,7 @@ export class SyncClient<State> {
 
   private disconnect() {
     if (!this.socket) {
-      throw new Error("No socket available");
+      return;
     }
 
     this.socket.close();
@@ -95,6 +88,7 @@ export class SyncClient<State> {
       this.handleMessage as EventHandler<MessageEvent>,
     );
     this.socket = undefined;
+    this.setState(undefined);
   }
 
   private enqueueReconnect() {
@@ -125,19 +119,22 @@ export class SyncClient<State> {
   };
 
   private handleMessage = async (event: MessageEvent) => {
-    const data = decodeServerToClientMessage<State>(
+    const message = decodeServerToClientMessage<State>(
       await (event.data as Blob).arrayBuffer(),
     );
 
-    switch (data.type) {
-      case "identity":
-        this.#clientId = data.clientId;
-        return;
+    switch (message.type) {
       case "full":
-        this.setState(data.state);
-        return data.state;
+        return this.setState(message.state);
       case "patch":
-        throw new Error("Patch state not implemented");
+        if (!this.state) {
+          throw new Error("Received patch before full state");
+        }
+        return this.setState(
+          produce(this.state, (draft) => {
+            applyPatch(draft, message.patch);
+          }),
+        );
     }
   };
 

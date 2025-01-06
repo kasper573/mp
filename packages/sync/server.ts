@@ -1,12 +1,13 @@
 import { produce, original } from "immer";
 import type { WebSocket, WebSocketServer } from "ws";
 import { v4 } from "uuid";
+import { createPatch } from "rfc6902";
+import type { PatchStateMessage, ServerToClientMessage } from "./shared";
 import {
   decodeClientToServerMessage,
   encodeServerToClientMessage,
   type ClientId,
   type HandshakeData,
-  type ServerToClientMessage,
 } from "./shared";
 
 export class SyncServer<ServerState, ClientState> {
@@ -23,7 +24,7 @@ export class SyncServer<ServerState, ClientState> {
     this.wss = this.options.wss;
   }
 
-  access: StateAccess<ServerState> = (message, accessFn) => {
+  access: StateAccess<ServerState> = (reference, accessFn) => {
     let returnValue!: ReturnType<typeof accessFn>;
 
     const nextState = produce(this.state, (draft) => {
@@ -38,11 +39,28 @@ export class SyncServer<ServerState, ClientState> {
 
     if (nextState !== this.state) {
       this.state = nextState;
-      const { patchCallback, createClientState } = this.options;
       for (const [clientId, client] of this.clients.entries()) {
-        const clientState = createClientState(nextState, clientId);
-        const message = { type: "full", state: clientState } as const;
-        patchCallback?.(message);
+        const nextClientState = this.options.createClientState(
+          nextState,
+          clientId,
+        );
+
+        let message: ServerToClientMessage<ClientState>;
+        if (client.state) {
+          const patch = createPatch(client.state, nextClientState);
+          if (patch.length === 0) {
+            continue;
+          }
+
+          message = { type: "patch", patch };
+          if (this.options.patchCallback) {
+            this.options.patchCallback({ clientId, reference, patch });
+          }
+        } else {
+          message = { type: "full", state: nextClientState };
+        }
+
+        client.state = nextClientState;
         client.socket.send(encodeServerToClientMessage(message));
       }
     }
@@ -65,8 +83,7 @@ export class SyncServer<ServerState, ClientState> {
 
   private onConnection = (socket: WebSocket) => {
     const clientId = newClientId();
-    const state = this.options.createClientState(this.state, clientId);
-    const info: ClientInfo<ClientState> = { socket, state };
+    const info: ClientInfo<ClientState> = { socket };
     const handshakeTimeoutId = setTimeout(
       () => socket.close(),
       this.options.handshakeTimeout,
@@ -98,11 +115,19 @@ export class SyncServer<ServerState, ClientState> {
   };
 }
 
-export interface SyncServerOptions<ServerState, ClientState>
-  extends ApplyServerStateOptions<ServerState, ClientState> {
+export interface SyncServerOptions<ServerState, ClientState> {
   wss: WebSocketServer;
   initialState: ServerState;
   handshakeTimeout: number;
+  patchCallback?: (props: {
+    clientId: ClientId;
+    reference: string;
+    patch: PatchStateMessage["patch"];
+  }) => void;
+  createClientState: (
+    serverState: ServerState,
+    clientId: ClientId,
+  ) => ClientState;
   onConnection?: (
     clientId: ClientId,
     data: HandshakeData,
@@ -123,17 +148,9 @@ export type StateAccess<State> = <Result>(
 
 export { WebSocketServer } from "ws";
 
-interface ApplyServerStateOptions<ServerState, ClientState> {
-  createClientState: (
-    serverState: ServerState,
-    clientId: ClientId,
-  ) => ClientState;
-  patchCallback?: (message: ServerToClientMessage<ClientState>) => unknown;
-}
-
 interface ClientInfo<ClientState> {
   socket: WebSocket;
-  state: ClientState;
+  state?: ClientState;
   handshakeData?: HandshakeData;
 }
 

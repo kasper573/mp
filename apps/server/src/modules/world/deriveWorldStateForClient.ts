@@ -1,7 +1,8 @@
 import type { ClientId } from "@mp/sync/server";
 import { vec_distance } from "@mp/math";
-import type { Character, WorldState } from "../../package";
+import { clientViewDistance } from "../../shared";
 import type { ClientRegistry } from "./ClientRegistry";
+import type { WorldState, Character } from "./schema";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -37,5 +38,5 @@ function canSeeCharacter(a: Character, b: Character) {
     return false;
   }
   const distance = vec_distance(a.coords, b.coords);
-  return distance <= 10;
+  return distance <= clientViewDistance;
 }

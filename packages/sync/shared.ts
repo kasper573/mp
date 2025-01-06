@@ -1,5 +1,6 @@
 import type { Branded } from "@mp/std";
 import { decode, encode } from "cbor2";
+import type { Operation } from "rfc6902";
 
 export type ClientId = Branded<string, "ClientId">;
 
@@ -12,17 +13,12 @@ export interface FullStateMessage<State> extends BaseSyncMessage<"full"> {
 }
 
 export interface PatchStateMessage extends BaseSyncMessage<"patch"> {
-  path: string;
-  data: unknown;
+  patch: Operation[];
 }
 
 export interface HandshakeMessage
   extends BaseSyncMessage<"handshake">,
     HandshakeData {}
-
-export interface IdentityMessage extends BaseSyncMessage<"identity"> {
-  clientId: ClientId;
-}
 
 export interface HandshakeData {
   token?: string;
@@ -30,8 +26,7 @@ export interface HandshakeData {
 
 export type ServerToClientMessage<ClientState> =
   | FullStateMessage<ClientState>
-  | PatchStateMessage
-  | IdentityMessage;
+  | PatchStateMessage;
 
 export type ClientToServerMessage = HandshakeMessage;
 
