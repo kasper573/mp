@@ -20,7 +20,7 @@ export class Engine {
   readonly camera: Camera;
 
   constructor(private readonly viewport: HTMLElement) {
-    this.camera = new Camera(elementSize(viewport), 2, 3);
+    this.camera = new Camera(elementSize(viewport));
     this.pointer = new PointerForCamera(viewport, this.camera);
     this.keyboard = new Keyboard(window);
   }

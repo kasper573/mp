@@ -20,21 +20,12 @@ export class Camera {
     this.#cameraSize.set(size);
   }
 
-  constructor(
-    initialCameraSize: Size,
-    private desiredZoom = 2,
-    private maxZoom = 3,
-  ) {
+  constructor(initialCameraSize: Size) {
     this.#cameraSize.set(initialCameraSize);
   }
 
-  update(worldSize: Size, position: Vector = this.position): void {
-    const scaleX = this.cameraSize.width / worldSize.width;
-    const scaleY = this.cameraSize.height / worldSize.height;
-
-    const minZoom = Math.max(scaleX, scaleY);
-
-    this.zoom = Math.max(minZoom, Math.min(this.maxZoom, this.desiredZoom));
+  update(worldSize: Size, zoom: number, position: Vector): void {
+    this.zoom = zoom;
 
     const halfCameraWidth = this.cameraSize.width / 2 / this.zoom;
     const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;

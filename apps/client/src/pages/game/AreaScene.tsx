@@ -6,6 +6,7 @@ import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import { vec_zero } from "@mp/math";
+import { clientViewDistance } from "@mp/server";
 import { GameClientContext } from "../../clients/game";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
@@ -26,10 +27,12 @@ export function AreaScene(props: { area: AreaResource }) {
   }));
 
   const myCoords = useAnimatedCoords(gameClient.character);
+
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
     return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
   });
+
   const cameraPos = useSpring(
     new VectorSpring(myWorldPos, () => ({
       stiffness: 80,
@@ -39,6 +42,12 @@ export function AreaScene(props: { area: AreaResource }) {
     })),
   );
 
+  const zoom = createMemo(() => {
+    const tilesFittingInViewport =
+      engine.camera.cameraSize.width / props.area.tiled.tileSize.x;
+    return tilesFittingInViewport / clientViewDistance.renderedTileCount;
+  });
+
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
@@ -47,7 +56,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    engine.camera.update(props.area.tiled.mapSize, cameraPos());
+    engine.camera.update(props.area.tiled.mapSize, zoom(), cameraPos());
   });
 
   return (

@@ -1,5 +1,5 @@
 import type { ClientId } from "@mp/sync/server";
-import { vec_distance } from "@mp/math";
+import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
 import { clientViewDistance } from "../../shared";
 import type { ClientRegistry } from "./ClientRegistry";
 import type { WorldState, Character } from "./schema";
@@ -37,6 +37,9 @@ function canSeeCharacter(a: Character, b: Character) {
   if (a.areaId !== b.areaId) {
     return false;
   }
-  const distance = vec_distance(a.coords, b.coords);
-  return distance <= clientViewDistance;
+  const viewbox = rect_fromDiameter(
+    a.coords,
+    clientViewDistance.networkFogOfWarTileCount,
+  );
+  return rect_intersectsPoint(viewbox, b.coords);
 }
