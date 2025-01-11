@@ -1,5 +1,5 @@
-import type { Size } from "@mp/math";
 import { TimeSpan } from "@mp/time";
+import type { Vector } from "@mp/math";
 import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
@@ -74,12 +74,12 @@ export class Engine {
   };
 }
 
-function elementSize(element: HTMLElement): Size {
+function elementSize(element: HTMLElement): Vector {
   return {
-    get width() {
+    get x() {
       return element.clientWidth;
     },
-    get height() {
+    get y() {
       return element.clientHeight;
     },
   };

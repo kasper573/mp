@@ -5,7 +5,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import type { Size, Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import { GameClientContext } from "../../clients/game";
@@ -115,11 +115,11 @@ export function AreaScene(props: { area: AreaResource }) {
 
 function createZoomLevelForViewDistance(
   tileSize: Vector,
-  cameraSize: Size,
+  cameraSize: Vector,
   tileViewDistance: number,
 ) {
   return Math.max(
-    cameraSize.width / tileSize.x / tileViewDistance,
-    cameraSize.height / tileSize.y / tileViewDistance,
+    cameraSize.x / tileSize.x / tileViewDistance,
+    cameraSize.y / tileSize.y / tileViewDistance,
   );
 }

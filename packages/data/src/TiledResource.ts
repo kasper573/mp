@@ -1,4 +1,4 @@
-import type { Size, Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import type {
   TiledMap,
@@ -16,10 +16,10 @@ export class TiledResource {
     return vec(this.map.tilewidth, this.map.tileheight);
   }
 
-  get mapSize(): Size {
+  get mapSize(): Vector {
     return {
-      width: this.map.width * this.map.tilewidth,
-      height: this.map.height * this.map.tileheight,
+      x: this.map.width * this.map.tilewidth,
+      y: this.map.height * this.map.tileheight,
     };
   }
 
