@@ -66,10 +66,6 @@ export function createSyncClient(auth: AuthClient) {
     }
   });
 
-  // TODO replace with more robust solution that knows exactly that an auth error occurred when trying to establish a websocket connection
-  // or remove this entirely once this is fixed https://github.com/kasper573/mp/issues/122
-  onCleanup(sync.subscribeToErrors(auth.signOut));
-
   return sync;
 }
 
