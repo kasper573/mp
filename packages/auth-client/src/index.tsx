@@ -50,9 +50,12 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
   }
 
   createEffect(() => {
+    const signOut = () => userManager.signoutRedirect();
     const subscriptions = [
       userManager.events.addUserLoaded(handleUpdatedUser),
       userManager.events.addUserUnloaded(handleUpdatedUser),
+      userManager.events.addAccessTokenExpired(signOut),
+      userManager.events.addSilentRenewError(signOut),
     ];
 
     onCleanup(() => {
