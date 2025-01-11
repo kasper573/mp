@@ -18,15 +18,6 @@ export const trpc = createTRPCClient<RootRouter>({
           [tokenHeaderName]: integrations?.auth?.identity()?.token ?? "",
         };
       },
-      fetch: async (...args) => {
-        const result = await fetch(...args);
-
-        // TODO remove this once this is fixed https://github.com/kasper573/mp/issues/122
-        if (integrations?.auth?.isSignedIn() && result.status === 401) {
-          void integrations?.auth?.signOut();
-        }
-        return result;
-      },
     }),
   ],
 });
