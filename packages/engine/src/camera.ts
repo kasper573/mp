@@ -1,51 +1,42 @@
 import { Matrix, vec } from "@mp/math";
-import type { Size, Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import { atom } from "@mp/state";
 
 export class Camera {
   private position = vec(0, 0);
   private zoom = 1;
   readonly #transform = atom(new Matrix());
-  readonly #cameraSize = atom<Size>({ width: 0, height: 0 });
+  readonly #cameraSize = atom<Vector>({ x: 0, y: 0 });
 
   get transform(): Matrix {
     return this.#transform.get();
   }
 
-  get cameraSize(): Size {
+  get cameraSize(): Vector {
     return this.#cameraSize.get();
   }
 
-  set cameraSize(size: Size) {
+  set cameraSize(size: Vector) {
     this.#cameraSize.set(size);
   }
 
-  constructor(
-    initialCameraSize: Size,
-    private desiredZoom = 2,
-    private maxZoom = 3,
-  ) {
+  constructor(initialCameraSize: Vector) {
     this.#cameraSize.set(initialCameraSize);
   }
 
-  update(worldSize: Size, position: Vector = this.position): void {
-    const scaleX = this.cameraSize.width / worldSize.width;
-    const scaleY = this.cameraSize.height / worldSize.height;
+  update(worldSize: Vector, zoom: number, position: Vector): void {
+    this.zoom = zoom;
 
-    const minZoom = Math.max(scaleX, scaleY);
-
-    this.zoom = Math.max(minZoom, Math.min(this.maxZoom, this.desiredZoom));
-
-    const halfCameraWidth = this.cameraSize.width / 2 / this.zoom;
-    const halfCameraHeight = this.cameraSize.height / 2 / this.zoom;
+    const halfCameraWidth = this.cameraSize.x / 2 / this.zoom;
+    const halfCameraHeight = this.cameraSize.y / 2 / this.zoom;
 
     const clampedX = Math.max(
       halfCameraWidth,
-      Math.min(worldSize.width - halfCameraWidth, position.x),
+      Math.min(worldSize.x - halfCameraWidth, position.x),
     );
     const clampedY = Math.max(
       halfCameraHeight,
-      Math.min(worldSize.height - halfCameraHeight, position.y),
+      Math.min(worldSize.y - halfCameraHeight, position.y),
     );
 
     this.position = vec(clampedX, clampedY);
@@ -67,15 +58,15 @@ export class Camera {
 
   viewportToWorld(screenPos: Vector): Vector {
     return vec(
-      (screenPos.x - this.cameraSize.width / 2) / this.zoom + this.position.x,
-      (screenPos.y - this.cameraSize.height / 2) / this.zoom + this.position.y,
+      (screenPos.x - this.cameraSize.x / 2) / this.zoom + this.position.x,
+      (screenPos.y - this.cameraSize.y / 2) / this.zoom + this.position.y,
     );
   }
 
   worldToViewport(worldPos: Vector): Vector {
     return vec(
-      (worldPos.x - this.position.x) * this.zoom + this.cameraSize.width / 2,
-      (worldPos.y - this.position.y) * this.zoom + this.cameraSize.height / 2,
+      (worldPos.x - this.position.x) * this.zoom + this.cameraSize.x / 2,
+      (worldPos.y - this.position.y) * this.zoom + this.cameraSize.y / 2,
     );
   }
 }

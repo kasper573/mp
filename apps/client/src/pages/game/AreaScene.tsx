@@ -5,7 +5,9 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
+import type { Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
+import { clientViewDistance } from "@mp/server";
 import { GameClientContext } from "../../clients/game";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
@@ -26,10 +28,12 @@ export function AreaScene(props: { area: AreaResource }) {
   }));
 
   const myCoords = useAnimatedCoords(gameClient.character);
+
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
     return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
   });
+
   const cameraPos = useSpring(
     new VectorSpring(myWorldPos, () => ({
       stiffness: 80,
@@ -37,6 +41,14 @@ export function AreaScene(props: { area: AreaResource }) {
       mass: 1,
       precision: 0.1,
     })),
+  );
+
+  const zoom = createMemo(() =>
+    createZoomLevelForViewDistance(
+      props.area.tiled.tileSize,
+      engine.camera.cameraSize,
+      clientViewDistance.renderedTileCount,
+    ),
   );
 
   createEffect(() => {
@@ -47,7 +59,7 @@ export function AreaScene(props: { area: AreaResource }) {
   });
 
   createEffect(() => {
-    engine.camera.update(props.area.tiled.mapSize, cameraPos());
+    engine.camera.update(props.area.tiled.mapSize, zoom(), cameraPos());
   });
 
   return (
@@ -98,5 +110,16 @@ export function AreaScene(props: { area: AreaResource }) {
         pathToDraw={gameClient.character()?.path}
       />
     </Pixi>
+  );
+}
+
+function createZoomLevelForViewDistance(
+  tileSize: Vector,
+  cameraSize: Vector,
+  tileViewDistance: number,
+) {
+  return Math.max(
+    cameraSize.x / tileSize.x / tileViewDistance,
+    cameraSize.y / tileSize.y / tileViewDistance,
   );
 }
