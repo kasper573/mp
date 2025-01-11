@@ -9,6 +9,7 @@ import {
   createMemo,
   createSignal,
   onCleanup,
+  untrack,
 } from "solid-js";
 import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
@@ -51,17 +52,14 @@ export function createGameClient(sync: WorldStateSyncClient): GameClient {
 }
 
 export function createSyncClient(auth: AuthClient) {
-  const token = createMemo(() => auth.identity()?.token);
-  const connectionMetaData = () => ({ token: token() });
-
-  const sync: WorldStateSyncClient = new SyncClient(
-    env.wsUrl,
-    connectionMetaData,
-  );
+  const id = createMemo(() => auth.identity()?.id);
+  const sync: WorldStateSyncClient = new SyncClient(env.wsUrl, () => ({
+    token: auth.identity()?.token,
+  }));
 
   createEffect(() => {
-    if (token()) {
-      sync.start();
+    if (id() !== undefined) {
+      untrack(() => sync.start());
       onCleanup(sync.stop);
     }
   });
