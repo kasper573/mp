@@ -5,6 +5,7 @@ import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
+import type { Size, Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import { GameClientContext } from "../../clients/game";
@@ -42,11 +43,13 @@ export function AreaScene(props: { area: AreaResource }) {
     })),
   );
 
-  const zoom = createMemo(() => {
-    const tilesFittingInViewport =
-      engine.camera.cameraSize.width / props.area.tiled.tileSize.x;
-    return tilesFittingInViewport / clientViewDistance.renderedTileCount;
-  });
+  const zoom = createMemo(() =>
+    createZoomLevelForViewDistance(
+      props.area.tiled.tileSize,
+      engine.camera.cameraSize,
+      clientViewDistance.renderedTileCount,
+    ),
+  );
 
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
@@ -107,5 +110,16 @@ export function AreaScene(props: { area: AreaResource }) {
         pathToDraw={gameClient.character()?.path}
       />
     </Pixi>
+  );
+}
+
+function createZoomLevelForViewDistance(
+  tileSize: Vector,
+  cameraSize: Size,
+  tileViewDistance: number,
+) {
+  return Math.max(
+    cameraSize.width / tileSize.x / tileViewDistance,
+    cameraSize.height / tileSize.y / tileViewDistance,
   );
 }
