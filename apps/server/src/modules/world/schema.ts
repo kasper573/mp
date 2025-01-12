@@ -1,7 +1,8 @@
 import type { AreaId } from "@mp/data";
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
 import type { Path } from "@mp/math";
-import type { UserId } from "@mp/auth-server";
+import type { UserId, UserIdentity } from "@mp/auth-server";
+import type { SyncServer } from "@mp/sync/server";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
 
@@ -24,3 +25,5 @@ export type WorldState = {
 };
 
 export type CharacterId = Character["id"];
+
+export type WorldSyncServer = SyncServer<WorldState, WorldState, UserIdentity>;
