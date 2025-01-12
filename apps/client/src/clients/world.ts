@@ -18,7 +18,11 @@ import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { trpc } from "./trpc";
 
-export function createGameClient(sync: WorldStateSyncClient): GameClient {
+export function createWorldClient(auth: AuthClient): WorldClient {
+  const id = createMemo(() => auth.identity()?.id);
+  const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
+    token: auth.identity()?.token,
+  }));
   const [worldState, setWorldState] = createSignal<WorldState>();
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(() => worldState()?.characters[characterId()!]);
@@ -40,6 +44,13 @@ export function createGameClient(sync: WorldStateSyncClient): GameClient {
   onCleanup(sync.subscribeToState(setWorldState));
   onCleanup(sync.subscribeToReadyState(setReadyState));
 
+  createEffect(() => {
+    if (id() !== undefined) {
+      untrack(() => sync.start());
+      onCleanup(sync.stop);
+    }
+  });
+
   return {
     readyState,
     worldState,
@@ -51,33 +62,15 @@ export function createGameClient(sync: WorldStateSyncClient): GameClient {
   };
 }
 
-export function createSyncClient(auth: AuthClient) {
-  const id = createMemo(() => auth.identity()?.id);
-  const sync: WorldStateSyncClient = new SyncClient(env.wsUrl, () => ({
-    token: auth.identity()?.token,
-  }));
-
-  createEffect(() => {
-    if (id() !== undefined) {
-      untrack(() => sync.start());
-      onCleanup(sync.stop);
-    }
-  });
-
-  return sync;
-}
-
-export type WorldStateSyncClient = SyncClient<WorldState>;
-
-export const GameClientContext = createContext<GameClient>(
-  new Proxy({} as GameClient, {
+export const WorldClientContext = createContext<WorldClient>(
+  new Proxy({} as WorldClient, {
     get() {
-      throw new Error("GameClientContext not provided");
+      throw new Error("WorldClientContext not provided");
     },
   }),
 );
 
-export interface GameClient {
+export interface WorldClient {
   readyState: Accessor<SyncClientReadyState>;
   worldState: Accessor<WorldState | undefined>;
   areaId: Accessor<AreaId | undefined>;

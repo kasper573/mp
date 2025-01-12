@@ -26,7 +26,7 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
-import { GameClientContext } from "../../clients/game";
+import { WorldClientContext } from "../../clients/world";
 import { toggleSignal } from "../../state/toggleSignal";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
@@ -124,7 +124,7 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
 }
 
 function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
-  const gameClient = useContext(GameClientContext);
+  const world = useContext(WorldClientContext);
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
@@ -151,7 +151,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `tile: ${vecToString(tilePos)}`,
       `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)}`,
+      `character: ${JSON.stringify(trimCharacterInfo(world.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,

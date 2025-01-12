@@ -3,11 +3,7 @@ import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
-import {
-  createGameClient,
-  createSyncClient,
-  GameClientContext,
-} from "../../clients/game";
+import { createWorldClient, WorldClientContext } from "../../clients/world";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
@@ -16,10 +12,9 @@ import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
-  const sync = createSyncClient(auth);
-  const game = createGameClient(sync);
+  const world = createWorldClient(auth);
   const area = createQuery(() => {
-    const id = game.areaId();
+    const id = world.areaId();
     return {
       queryKey: ["area", id],
       queryFn: id ? () => loadAreaResource(id) : skipToken,
@@ -28,18 +23,18 @@ export default function GamePage() {
   });
 
   createEffect(() => {
-    if (game.readyState() === "open") {
-      void game.join();
+    if (world.readyState() === "open") {
+      void world.join();
     }
   });
 
   return (
-    <GameClientContext.Provider value={game}>
+    <WorldClientContext.Provider value={world}>
       <Switch>
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
         </Match>
-        <Match when={game.readyState() !== "open" || area.isPending}>
+        <Match when={world.readyState() !== "open" || area.isPending}>
           {/** TODO replace with specialized loading screen for loading areas */}
           <LoadingSpinner />
         </Match>
@@ -55,6 +50,6 @@ export default function GamePage() {
           )}
         </Match>
       </Switch>
-    </GameClientContext.Provider>
+    </WorldClientContext.Provider>
   );
 }

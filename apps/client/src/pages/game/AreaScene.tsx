@@ -8,7 +8,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
-import { GameClientContext } from "../../clients/game";
+import { WorldClientContext } from "../../clients/world";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
 import {
@@ -20,17 +20,17 @@ import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
-  const gameClient = useContext(GameClientContext);
+  const world = useContext(WorldClientContext);
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],
     queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
-  const myCoords = useAnimatedCoords(gameClient.character);
+  const myCoords = useAnimatedCoords(world.character);
 
   const charactersInArea = createMemo(() =>
-    Object.values(gameClient.worldState()?.characters ?? []).filter(
+    Object.values(world.worldState()?.characters ?? []).filter(
       (char) => char.areaId === props.area.id,
     ),
   );
@@ -60,7 +60,7 @@ export function AreaScene(props: { area: AreaResource }) {
   createEffect(() => {
     const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
     if (engine.pointer.isDown && isValidTarget) {
-      gameClient.move(tilePosition);
+      world.move(tilePosition);
     }
   });
 
@@ -85,7 +85,7 @@ export function AreaScene(props: { area: AreaResource }) {
             [props.area.characterLayer.name]: () => (
               <Index each={charactersInArea()}>
                 {(char) => {
-                  const isMe = () => char().id === gameClient.characterId();
+                  const isMe = () => char().id === world.characterId();
                   return (
                     <>
                       <Show when={isMe()}>
@@ -109,10 +109,7 @@ export function AreaScene(props: { area: AreaResource }) {
         </TiledRenderer>
       )}
       <TileHighlight area={props.area} />
-      <AreaDebugUI
-        area={props.area}
-        pathToDraw={gameClient.character()?.path}
-      />
+      <AreaDebugUI area={props.area} pathToDraw={world.character()?.path} />
     </Pixi>
   );
 }
