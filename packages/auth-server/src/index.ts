@@ -1,4 +1,5 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
+import { err, ok, type Result } from "@mp/std";
 import type { AuthToken, UserId, UserIdentity } from "./types";
 
 export interface AuthServerOptions {
@@ -9,7 +10,7 @@ export interface AuthServerOptions {
 }
 
 export interface AuthServer {
-  verifyToken(token: AuthToken): Promise<VerifyTokenResult>;
+  verifyToken(token?: AuthToken): Promise<VerifyTokenResult>;
 }
 
 export function createAuthServer({
@@ -22,6 +23,9 @@ export function createAuthServer({
 
   return {
     async verifyToken(token) {
+      if (token === undefined) {
+        return err("A token must be provided");
+      }
       let jwtPayload;
       try {
         const { payload } = await jwtVerify(token, jwks, {
@@ -30,18 +34,15 @@ export function createAuthServer({
         });
         jwtPayload = payload;
       } catch (error) {
-        return { ok: false, error: String(error) };
+        return err(String(error));
       }
 
       if (jwtPayload.azp !== audience) {
-        return {
-          ok: false,
-          error: `Token azp "${String(jwtPayload.azp)}" is invalid`,
-        };
+        return err(`Token azp "${String(jwtPayload.azp)}" is invalid`);
       }
 
       if (!jwtPayload.sub) {
-        return { ok: false, error: `Token payload is missing 'sub' claim` };
+        return err(`Token payload is missing 'sub' claim`);
       }
 
       const user: UserIdentity = {
@@ -49,14 +50,12 @@ export function createAuthServer({
         token,
       };
 
-      return { ok: true, user };
+      return ok(user);
     },
   };
 }
 
-type VerifyTokenResult =
-  | { ok: true; user: UserIdentity }
-  | { ok: false; error: string };
+export type VerifyTokenResult = Result<UserIdentity, string>;
 
 export * from "./types";
 
