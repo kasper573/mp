@@ -1,6 +1,6 @@
 import type http from "node:http";
 import { produce, original } from "immer";
-import type { VerifyClientCallbackAsync, WebSocket } from "ws";
+import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { v4 } from "uuid";
 import { createPatch } from "rfc6902";
@@ -33,7 +33,15 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     this.wss = new WebSocketServer({
       server: this.options.httpServer,
       path: this.options.path,
-      verifyClient: this.verifyClient,
+      verifyClient: ({ req }, callback) => {
+        void this.verifyClient(req).then((success) => {
+          if (success) {
+            callback(true);
+          } else {
+            callback(false, 401, "Unauthorized");
+          }
+        });
+      },
     });
   }
 
@@ -86,8 +94,12 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
       }
 
       message = { type: "patch", patch };
-      if (this.options.onPatch) {
-        this.options.onPatch({ clientId, reference, patch });
+      if (this.options.logSyncPatches) {
+        this.options.logger?.info("SyncServer patch", {
+          clientId,
+          reference,
+          patch,
+        });
       }
     } else {
       message = { type: "full", state: nextClientState };
@@ -97,25 +109,31 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     client.socket.send(encodeServerToClientMessage(message));
   }
 
-  private verifyClient: VerifyClientCallbackAsync<http.IncomingMessage> = (
-    { req },
-    callback,
-  ) => {
+  private async verifyClient(req: http.IncomingMessage) {
     const clientId = newClientId();
-    void this.options
-      .handshake(clientId, handshakeDataFromRequest(req))
-      .then((handshakeResult) => {
-        if (handshakeResult.isOk()) {
-          memorizeClientMetaData(req, {
-            clientId,
-            handshakeReturn: handshakeResult.value,
-          });
-          callback(true);
-        } else {
-          callback(false, 401, "Unauthorized");
-        }
-      });
-  };
+
+    try {
+      const result = await this.options.handshake(
+        clientId,
+        handshakeDataFromRequest(req),
+      );
+
+      if (result.isOk()) {
+        memorizeClientMetaData(req, {
+          clientId,
+          handshakeReturn: result.value,
+        });
+        return true;
+      } else {
+        this.options.logger?.error("Handshake failed", result.error);
+      }
+    } catch (error) {
+      this.options.logger?.error("Error during handshake", error);
+      // noop
+    }
+
+    return false;
+  }
 
   private onConnection = (socket: WebSocket, req: http.IncomingMessage) => {
     const { clientId, handshakeReturn } =
@@ -158,6 +176,8 @@ export interface SyncServerOptions<ServerState, ClientState, HandshakeReturn> {
     clientId: ClientId,
   ) => ClientState;
   onPatch?: PatchHandler;
+  logSyncPatches?: boolean;
+  logger?: Pick<typeof console, "info" | "error">;
   onConnection?: (clientId: ClientId, handshake: HandshakeReturn) => unknown;
   onDisconnect?: (clientId: ClientId) => unknown;
 }

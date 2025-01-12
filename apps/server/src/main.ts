@@ -19,6 +19,8 @@ import {
   MetricsRegistry,
 } from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+import { err } from "@mp/std";
 import type { HttpSessionId } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
@@ -109,15 +111,29 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
+const syncHandshakeLimiter = new RateLimiterMemory({
+  points: 10,
+  duration: 30,
+});
+
 const syncServer = new SyncServer({
   httpServer,
   path: opt.wsEndpointPath,
   initialState: { characters: {} } as WorldState,
-  handshake: (_, { token }) => auth.verifyToken(token as AuthToken),
+  logSyncPatches: opt.logSyncPatches,
+  logger,
+  handshake: async (_, { token }) => {
+    const result = await auth.verifyToken(token as AuthToken);
+    if (result.isOk()) {
+      try {
+        await syncHandshakeLimiter.consume(result.value.id);
+      } catch {
+        return err("Rate limit exceeded");
+      }
+    }
+    return result;
+  },
   createClientState: deriveWorldStateForClient(clients),
-  onPatch: opt.logSyncPatches
-    ? (props) => logger.info("[sync]", props)
-    : undefined,
   onConnection: (clientId, user) => clients.add(clientId, user.id),
   onDisconnect: (clientId) => clients.remove(clientId),
 });
