@@ -23,6 +23,7 @@ export default function GamePage() {
     return {
       queryKey: ["area", id],
       queryFn: id ? () => loadAreaResource(id) : skipToken,
+      refetchOnWindowFocus: false,
     };
   });
 
