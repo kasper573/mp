@@ -29,6 +29,12 @@ export function AreaScene(props: { area: AreaResource }) {
 
   const myCoords = useAnimatedCoords(gameClient.character);
 
+  const charactersInArea = createMemo(() =>
+    Object.values(gameClient.worldState()?.characters ?? []).filter(
+      (char) => char.areaId === props.area.id,
+    ),
+  );
+
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
     return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
@@ -77,9 +83,7 @@ export function AreaScene(props: { area: AreaResource }) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index
-                each={Object.values(gameClient.worldState()?.characters ?? [])}
-              >
+              <Index each={charactersInArea()}>
                 {(char) => {
                   const isMe = () => char().id === gameClient.characterId();
                   return (
