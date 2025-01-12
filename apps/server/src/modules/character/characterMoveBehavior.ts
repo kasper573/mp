@@ -3,7 +3,7 @@ import { moveAlongPath } from "@mp/data";
 import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
-import type { WorldState } from "./schema";
+import type { WorldState } from "../../WorldState";
 
 export function characterMoveBehavior(
   accessState: StateAccess<WorldState>,

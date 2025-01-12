@@ -1,8 +1,8 @@
 import type { UserId } from "@mp/auth-server";
 import type { StateAccess } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
-import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldState } from "./schema";
+import type { ClientRegistry } from "../../ClientRegistry";
+import type { WorldState } from "../../WorldState";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,

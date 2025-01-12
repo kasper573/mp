@@ -3,10 +3,11 @@ import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { DBClient } from "../../db/client";
+import type { WorldState } from "../../WorldState";
 import { characterTable } from "./schema";
-import type { Character, WorldState } from "./schema";
+import type { Character } from "./schema";
 
-export class WorldService {
+export class CharacterService {
   constructor(
     private db: DBClient,
     private areas: Map<AreaId, AreaResource>,

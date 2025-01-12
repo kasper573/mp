@@ -1,8 +1,9 @@
 import type { ClientId } from "@mp/sync/server";
 import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
-import { clientViewDistance } from "../../shared";
+import { clientViewDistance } from "./shared";
 import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldState, Character } from "./schema";
+import type { WorldState } from "./WorldState";
+import type { Character } from "./modules/character/schema";
 
 /**
  * Removes any information that the given client should not have access to.

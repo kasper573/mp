@@ -5,21 +5,22 @@ import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import { type CharacterId, type WorldState } from "./schema";
-import type { WorldService } from "./service";
+import { type WorldState } from "../../WorldState";
+import { type CharacterId } from "./schema";
+import type { CharacterService } from "./service";
 
-export interface WorldRouterDependencies {
+export interface CharacterRouterDependencies {
   state: StateAccess<WorldState>;
-  service: WorldService;
+  service: CharacterService;
   areas: Map<AreaId, AreaResource>;
 }
 
-export type WorldRouter = ReturnType<typeof createWorldRouter>;
-export function createWorldRouter({
+export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
+export function createCharacterRouter({
   state: accessState,
   areas,
   service,
-}: WorldRouterDependencies) {
+}: CharacterRouterDependencies) {
   return t.router({
     move: t.procedure
       .input(schemaFor<{ characterId: CharacterId } & Vector>())

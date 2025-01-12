@@ -24,19 +24,19 @@ import { err } from "@mp/std";
 import type { HttpSessionId } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { ServerOptions } from "./schemas/serverOptions";
-import { serverOptionsSchema } from "./schemas/serverOptions";
+import type { ServerOptions } from "./serverOptions";
+import { serverOptionsSchema } from "./serverOptions";
 import { createDBClient } from "./db/client";
-import { ClientRegistry } from "./modules/world/ClientRegistry";
+import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
-import { collectUserMetrics } from "./modules/world/collectUserMetrics";
+import { collectUserMetrics } from "./collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
-import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
-import { WorldService } from "./modules/world/service";
-import type { WorldState, WorldSyncServer } from "./package";
-import { characterMoveBehavior } from "./modules/world/characterMoveBehavior";
-import { characterRemoveBehavior } from "./modules/world/characterRemoveBehavior";
+import { deriveWorldStateForClient } from "./deriveWorldStateForClient";
+import { CharacterService } from "./modules/character/service";
+import type { WorldState, WorldSyncServer } from "./WorldState";
+import { characterMoveBehavior } from "./modules/character/characterMoveBehavior";
+import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -171,7 +171,7 @@ const physicsTicker = new Ticker({
   },
 });
 
-const worldService = new WorldService(db, areas.value, defaultAreaId);
+const worldService = new CharacterService(db, areas.value, defaultAreaId);
 
 const trpcRouter = createRootRouter({
   areas: areas.value,

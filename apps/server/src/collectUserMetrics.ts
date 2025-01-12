@@ -1,7 +1,7 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
+import type { WorldSyncServer } from "./WorldState";
 import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldSyncServer } from "./schema";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
