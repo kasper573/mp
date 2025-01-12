@@ -93,7 +93,7 @@ const tickDurationMetric = new MetricsHistogram({
 });
 
 const auth = createAuthServer(opt.auth);
-const db = createDBClient(opt.databaseUrl);
+const db = createDBClient(opt.databaseUrl, logger);
 const defaultAreaId = [...areas.value.keys()][0];
 
 const expressLogger = createExpressLogger(logger);
