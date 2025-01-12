@@ -12,11 +12,11 @@ export function auth() {
     }
 
     const result = await auth.verifyToken(authToken);
-    if (!result.ok) {
+    if (result.isErr()) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: result.error });
     }
 
-    return next({ ctx: { ...ctx, user: result.user } });
+    return next({ ctx: { ...ctx, user: result.value } });
   });
 }
 
@@ -25,7 +25,7 @@ export function optionalAuth() {
     const { authToken, auth } = ctx;
     const result = authToken ? await auth.verifyToken(authToken) : undefined;
     return next({
-      ctx: { ...ctx, user: result?.ok ? result.user : undefined },
+      ctx: { ...ctx, user: result?.isOk() ? result.value : undefined },
     });
   });
 }
