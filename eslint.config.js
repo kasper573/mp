@@ -98,6 +98,9 @@ export default tseslint.config(
 
       // Collides with prettier
       "unicorn/number-literal-case": "off",
+
+      // Has false positives
+      "unicorn/no-useless-undefined": "off",
     },
   },
 );
