@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { DBClient } from "../../db/client";
-import type { WorldState } from "../../WorldState";
+import type { WorldState } from "../world/WorldState";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 

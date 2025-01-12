@@ -5,7 +5,7 @@ import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import { type WorldState } from "../../WorldState";
+import { type WorldState } from "../world/WorldState";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 

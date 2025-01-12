@@ -32,9 +32,9 @@ import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
 import { collectUserMetrics } from "./collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
-import { deriveWorldStateForClient } from "./deriveWorldStateForClient";
+import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
-import type { WorldState, WorldSyncServer } from "./WorldState";
+import type { WorldState, WorldServer } from "./modules/world/WorldState";
 import { characterMoveBehavior } from "./modules/character/characterMoveBehavior";
 import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
 
@@ -116,7 +116,7 @@ const syncHandshakeLimiter = new RateLimiterMemory({
   duration: 30,
 });
 
-const syncServer: WorldSyncServer = new SyncServer({
+const syncServer: WorldServer = new SyncServer({
   httpServer,
   path: opt.wsEndpointPath,
   initialState: { characters: {} } as WorldState,
