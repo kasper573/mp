@@ -1,4 +1,4 @@
-import { err, ok, type Result } from "@mp/state";
+import { err, ok, type Result } from "@mp/std";
 import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
 import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";

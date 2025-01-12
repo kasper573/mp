@@ -1,9 +1,10 @@
 import type http from "node:http";
 import { produce, original } from "immer";
-import type { VerifyClientCallbackAsync, WebSocket } from "ws";
+import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { v4 } from "uuid";
 import { createPatch } from "rfc6902";
+import type { Result } from "@mp/std";
 import type { PatchStateMessage, ServerToClientMessage } from "./shared";
 import {
   encodeServerToClientMessage,
@@ -12,7 +13,7 @@ import {
   type HandshakeData,
 } from "./shared";
 
-export class SyncServer<ServerState, ClientState> {
+export class SyncServer<ServerState, ClientState, HandshakeReturn> {
   private state: ServerState;
   private clients: ClientInfoMap<ClientState> = new Map();
   private wss: WebSocketServer;
@@ -21,12 +22,26 @@ export class SyncServer<ServerState, ClientState> {
     return this.clients.keys();
   }
 
-  constructor(private options: SyncServerOptions<ServerState, ClientState>) {
+  constructor(
+    private options: SyncServerOptions<
+      ServerState,
+      ClientState,
+      HandshakeReturn
+    >,
+  ) {
     this.state = this.options.initialState;
     this.wss = new WebSocketServer({
       server: this.options.httpServer,
       path: this.options.path,
-      verifyClient: this.verifyClient,
+      verifyClient: ({ req }, callback) => {
+        void this.verifyClient(req).then((success) => {
+          if (success) {
+            callback(true);
+          } else {
+            callback(false, 401, "Unauthorized");
+          }
+        });
+      },
     });
   }
 
@@ -46,28 +61,7 @@ export class SyncServer<ServerState, ClientState> {
     if (nextState !== this.state) {
       this.state = nextState;
       for (const [clientId, client] of this.clients.entries()) {
-        const nextClientState = this.options.createClientState(
-          nextState,
-          clientId,
-        );
-
-        let message: ServerToClientMessage<ClientState>;
-        if (client.state) {
-          const patch = createPatch(client.state, nextClientState);
-          if (patch.length === 0) {
-            continue;
-          }
-
-          message = { type: "patch", patch };
-          if (this.options.onPatch) {
-            this.options.onPatch({ clientId, reference, patch });
-          }
-        } else {
-          message = { type: "full", state: nextClientState };
-        }
-
-        client.state = nextClientState;
-        client.socket.send(encodeServerToClientMessage(message));
+        this.updateClientState(reference, clientId, client, nextState);
       }
     }
 
@@ -84,21 +78,77 @@ export class SyncServer<ServerState, ClientState> {
     this.wss.removeListener("close", this.handleClose);
   }
 
-  private verifyClient: VerifyClientCallbackAsync<http.IncomingMessage> = (
-    { req },
-    callback,
-  ) => {
+  private updateClientState(
+    reference: string,
+    clientId: ClientId,
+    client: ClientInfo<ClientState>,
+    nextState: ServerState,
+  ) {
+    const nextClientState = this.options.createClientState(nextState, clientId);
+
+    let message: ServerToClientMessage<ClientState>;
+    if (client.state) {
+      const patch = createPatch(client.state, nextClientState);
+      if (patch.length === 0) {
+        return;
+      }
+
+      message = { type: "patch", patch };
+      if (this.options.logSyncPatches) {
+        this.options.logger?.info("SyncServer patch", {
+          clientId,
+          reference,
+          patch,
+        });
+      }
+    } else {
+      message = { type: "full", state: nextClientState };
+    }
+
+    client.state = nextClientState;
+    client.socket.send(encodeServerToClientMessage(message));
+  }
+
+  private async verifyClient(req: http.IncomingMessage) {
     const clientId = newClientId();
-    memorizeClientId(req, clientId);
-    void this.options
-      .handshake(clientId, handshakeDataFromRequest(req))
-      .then(callback);
-  };
+
+    try {
+      const result = await this.options.handshake(
+        clientId,
+        handshakeDataFromRequest(req),
+      );
+
+      if (result.isOk()) {
+        memorizeClientMetaData(req, {
+          clientId,
+          handshakeReturn: result.value,
+        });
+        return true;
+      } else {
+        this.options.logger?.error("Handshake failed", result.error);
+      }
+    } catch (error) {
+      this.options.logger?.error("Error during handshake", error);
+      // noop
+    }
+
+    return false;
+  }
 
   private onConnection = (socket: WebSocket, req: http.IncomingMessage) => {
-    const clientId = recallClientId(req);
-    this.clients.set(clientId, { socket });
-    this.options.onConnection?.(clientId);
+    const { clientId, handshakeReturn } =
+      recallClientMetaData<HandshakeReturn>(req);
+
+    const clientInfo: ClientInfo<ClientState> = { socket };
+    this.clients.set(clientId, clientInfo);
+    this.options.onConnection?.(clientId, handshakeReturn);
+
+    this.updateClientState(
+      "initial state on new connection",
+      clientId,
+      clientInfo,
+      this.state,
+    );
 
     socket.addEventListener("close", () => {
       this.clients.delete(clientId);
@@ -113,17 +163,22 @@ export class SyncServer<ServerState, ClientState> {
   };
 }
 
-export interface SyncServerOptions<ServerState, ClientState> {
+export interface SyncServerOptions<ServerState, ClientState, HandshakeReturn> {
   path: string;
   httpServer: http.Server;
   initialState: ServerState;
-  handshake: (clientId: ClientId, data: HandshakeData) => Promise<boolean>;
+  handshake: (
+    clientId: ClientId,
+    data: HandshakeData,
+  ) => Promise<Result<HandshakeReturn, string>>;
   createClientState: (
     serverState: ServerState,
     clientId: ClientId,
   ) => ClientState;
   onPatch?: PatchHandler;
-  onConnection?: (clientId: ClientId) => unknown;
+  logSyncPatches?: boolean;
+  logger?: Pick<typeof console, "info" | "error">;
+  onConnection?: (clientId: ClientId, handshake: HandshakeReturn) => unknown;
   onDisconnect?: (clientId: ClientId) => unknown;
 }
 
@@ -156,16 +211,28 @@ const newClientId = v4 as unknown as () => ClientId;
 
 export type { ClientId, HandshakeData } from "./shared";
 
-const clientIdSymbol = Symbol("clientId");
+const clientMetaDataSymbol = Symbol("clientMetaData");
 
-function memorizeClientId(request: http.IncomingMessage, id: ClientId): void {
-  Reflect.set(request, clientIdSymbol, id);
+interface ClientMetaData<HandshakeReturn> {
+  clientId: ClientId;
+  handshakeReturn: HandshakeReturn;
 }
 
-function recallClientId(request: http.IncomingMessage): ClientId {
-  const id = Reflect.get(request, clientIdSymbol) as ClientId | undefined;
-  if (id === undefined) {
-    throw new Error("Client ID not found on request");
+function memorizeClientMetaData<HandshakeReturn>(
+  request: http.IncomingMessage,
+  data: ClientMetaData<HandshakeReturn>,
+): void {
+  Reflect.set(request, clientMetaDataSymbol, data);
+}
+
+function recallClientMetaData<HandshakeReturn>(
+  request: http.IncomingMessage,
+): ClientMetaData<HandshakeReturn> {
+  const data = Reflect.get(request, clientMetaDataSymbol) as
+    | ClientMetaData<HandshakeReturn>
+    | undefined;
+  if (data === undefined) {
+    throw new Error("Client meta data not found on request");
   }
-  return id;
+  return data;
 }

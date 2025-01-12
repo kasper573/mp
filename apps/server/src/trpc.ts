@@ -2,7 +2,7 @@ import { initTRPC } from "@trpc/server";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { transformer } from "./shared";
 import type { ServerContext } from "./context";
-import { consumeLimiterWithContext } from "./middlewares/rateLimit";
+import { consumeLimiterForTRPC } from "./middlewares/rateLimit";
 
 const trpc = initTRPC.context<ServerContext>().create({
   transformer,
@@ -28,7 +28,7 @@ const globalRequestLimit = new RateLimiterMemory({
 });
 
 const globalMiddleware = trpc.middleware(async ({ ctx, next }) => {
-  await consumeLimiterWithContext(globalRequestLimit, ctx);
+  await consumeLimiterForTRPC(globalRequestLimit, ctx);
   return next({ ctx });
 });
 

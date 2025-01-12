@@ -336,9 +336,9 @@ importers:
 
   packages/env:
     dependencies:
-      '@mp/state':
+      '@mp/std':
         specifier: workspace:*
-        version: link:../state
+        version: link:../std
       dot-prop:
         specifier: 9.0.0
         version: 9.0.0
@@ -394,9 +394,6 @@ importers:
 
   packages/state:
     dependencies:
-      neverthrow:
-        specifier: 7.0.0
-        version: 7.0.0
       solid-js:
         specifier: 1.9.3
         version: 1.9.3
@@ -406,6 +403,10 @@ importers:
         version: link:../tsconfig
 
   packages/std:
+    dependencies:
+      neverthrow:
+        specifier: 8.1.1
+        version: 8.1.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -521,9 +522,9 @@ importers:
 
   packages/tiled-loader:
     dependencies:
-      '@mp/state':
+      '@mp/std':
         specifier: workspace:*
-        version: link:../state
+        version: link:../std
       pako:
         specifier: 2.1.0
         version: 2.1.0
@@ -4039,8 +4040,8 @@ packages:
     resolution: {integrity: sha512-+EUsqGPLsM+j/zdChZjsnX51g4XrHFOIXwfnCVPGlQk/k5giakcKsuxCObBRu6DSm9opw/O6slWbJdghQM4bBg==}
     engines: {node: '>= 0.6'}
 
-  neverthrow@7.0.0:
-    resolution: {integrity: sha512-GDDz+SQGGZWIGYk3cL2Jf+RX7QYRJOsQltrbpBiSQiNVN4QJi3/YJhaZY4pRlDou+W3YSHk8DYBKMt4CDPBglg==}
+  neverthrow@8.1.1:
+    resolution: {integrity: sha512-DpbZ/UDI0B+TxJB1JysXSfi1++3YK2xLBqQLTlRN0b4zxlZ2MoiB+dKKV8dMRzt1fAFjRKDknXOVJgpl+a4Amw==}
     engines: {node: '>=18'}
 
   node-fetch@2.7.0:
@@ -8828,7 +8829,9 @@ snapshots:
 
   negotiator@0.6.3: {}
 
-  neverthrow@7.0.0: {}
+  neverthrow@8.1.1:
+    optionalDependencies:
+      '@rollup/rollup-linux-x64-gnu': 4.24.3
 
   node-fetch@2.7.0:
     dependencies:

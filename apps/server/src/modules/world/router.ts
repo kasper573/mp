@@ -1,12 +1,6 @@
-import type { Ticker } from "@mp/time";
-import {
-  findPath,
-  moveAlongPath,
-  type AreaId,
-  type AreaResource,
-} from "@mp/data";
+import { findPath, type AreaId, type AreaResource } from "@mp/data";
 import type { Vector } from "@mp/math";
-import { vec, vec_copy } from "@mp/math";
+import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
@@ -17,7 +11,6 @@ import type { WorldService } from "./service";
 export interface WorldRouterDependencies {
   state: StateAccess<WorldState>;
   service: WorldService;
-  ticker: Ticker;
   areas: Map<AreaId, AreaResource>;
 }
 
@@ -25,36 +18,8 @@ export type WorldRouter = ReturnType<typeof createWorldRouter>;
 export function createWorldRouter({
   state: accessState,
   areas,
-  ticker,
   service,
 }: WorldRouterDependencies) {
-  ticker.subscribe((delta) => {
-    accessState("world.ticker", (state) => {
-      for (const char of Object.values(state.characters)) {
-        if (char.path) {
-          moveAlongPath(char.coords, char.path, char.speed, delta);
-          if (!char.path?.length) {
-            delete char.path;
-          }
-        }
-
-        const area = areas.get(char.areaId);
-        if (area) {
-          for (const hit of area.hitTestObjects([char], (c) => c.coords)) {
-            const targetArea = areas.get(
-              hit.object.properties.get("goto")?.value as AreaId,
-            );
-            if (targetArea) {
-              char.areaId = targetArea.id;
-              char.coords = vec_copy(targetArea.start);
-              delete char.path;
-            }
-          }
-        }
-      }
-    });
-  });
-
   return t.router({
     move: t.procedure
       .input(schemaFor<{ characterId: CharacterId } & Vector>())
@@ -101,8 +66,18 @@ export function createWorldRouter({
       .output(schemaFor<CharacterId>())
       .use(auth())
       .mutation(async ({ ctx: { user } }) => {
+        const existingCharacter = accessState(
+          "world.join (check existing character)",
+          (state) =>
+            Object.values(state.characters).find((c) => c.userId === user.id),
+        );
+
+        if (existingCharacter) {
+          return existingCharacter.id;
+        }
+
         const char = await service.getOrCreateCharacterForUser(user.id);
-        accessState("world.join", (state) => {
+        accessState("world.join (initialize character)", (state) => {
           state.characters[char.id] = char;
         });
         return char.id;

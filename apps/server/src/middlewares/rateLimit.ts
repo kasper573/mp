@@ -8,12 +8,12 @@ export function rateLimit(options: IRateLimiterOptions) {
   const limiter = new RateLimiterMemory(options);
 
   return t.middleware(async ({ ctx, next }) => {
-    await consumeLimiterWithContext(limiter, ctx);
+    await consumeLimiterForTRPC(limiter, ctx);
     return next({ ctx });
   });
 }
 
-export async function consumeLimiterWithContext(
+export async function consumeLimiterForTRPC(
   limiter: RateLimiterMemory,
   { sessionId }: ServerContext,
 ) {

@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
-import { type Result, ok, err } from "@mp/state";
+import { type Result, ok, err } from "@mp/std";
 import { AreaResource } from "@mp/data";
 import { loadTiled } from "./loadTiled";
 

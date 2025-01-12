@@ -10,7 +10,6 @@ import createCors from "cors";
 import type { AuthToken } from "@mp/auth-server";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import type { ClientId, HandshakeData } from "@mp/sync/server";
 import { SyncServer } from "@mp/sync/server";
 import { measureTimeSpan, Ticker } from "@mp/time";
 import {
@@ -20,7 +19,8 @@ import {
   MetricsRegistry,
 } from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
-import type { WorldState } from "./modules/world/schema";
+import { RateLimiterMemory } from "rate-limiter-flexible";
+import { err } from "@mp/std";
 import type { HttpSessionId } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
@@ -34,6 +34,9 @@ import { collectUserMetrics } from "./modules/world/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { WorldService } from "./modules/world/service";
+import type { WorldState, WorldSyncServer } from "./package";
+import { characterMoveBehavior } from "./modules/world/characterMoveBehavior";
+import { characterRemoveBehavior } from "./modules/world/characterRemoveBehavior";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -108,30 +111,36 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const syncServer = new SyncServer<WorldState, WorldState>({
+const syncHandshakeLimiter = new RateLimiterMemory({
+  points: 10,
+  duration: 30,
+});
+
+const syncServer: WorldSyncServer = new SyncServer({
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { characters: {} },
-  handshake: syncServerHandshake,
-  createClientState: deriveWorldStateForClient(clients),
-  onPatch: opt.logSyncPatches
-    ? (props) => logger.info("[sync]", props)
-    : undefined,
-  onConnection: (clientId) => logger.info("Client connected", clientId),
-  onDisconnect(clientId) {
-    logger.info("Client disconnected", clientId);
-    const userId = clients.getUserId(clientId);
-    syncServer.access("disconnect", (state) => {
-      for (const char of Object.values(state.characters)) {
-        if (char.userId === userId) {
-          logger.info("Removing character", char.id);
-          delete state.characters[char.id];
-        }
+  initialState: { characters: {} } as WorldState,
+  logSyncPatches: opt.logSyncPatches,
+  logger,
+  handshake: async (_, { token }) => {
+    const result = await auth.verifyToken(token as AuthToken);
+    if (result.isOk()) {
+      try {
+        await syncHandshakeLimiter.consume(result.value.id);
+      } catch {
+        return err("Rate limit exceeded");
       }
-    });
-    clients.deleteClient(clientId);
+    }
+    return result;
   },
+  createClientState: deriveWorldStateForClient(clients),
+  onConnection: (clientId, user) => clients.add(clientId, user.id),
+  onDisconnect: (clientId) => clients.remove(clientId),
 });
+
+clients.on(({ type, clientId, userId }) =>
+  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
+);
 
 collectUserMetrics(metrics, clients, syncServer);
 
@@ -148,7 +157,7 @@ const persistTicker = new Ticker({
   },
 });
 
-const apiTicker = new Ticker({
+const physicsTicker = new Ticker({
   interval: opt.tickInterval,
   middleware({ delta: tickInterval, next }) {
     try {
@@ -170,7 +179,6 @@ const trpcRouter = createRootRouter({
   state: syncServer.access,
   createUrl: urlToPublicFile,
   buildVersion: opt.buildVersion,
-  ticker: apiTicker,
 });
 
 webServer.use(
@@ -187,12 +195,15 @@ webServer.use(
   }),
 );
 
+physicsTicker.subscribe(characterMoveBehavior(syncServer.access, areas.value));
+characterRemoveBehavior(clients, syncServer.access, logger, 5000);
+
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });
 
 persistTicker.start();
-apiTicker.start();
+physicsTicker.start();
 syncServer.start();
 
 function createServerContext(
@@ -208,37 +219,6 @@ function createServerContext(
     clients,
     exposeErrorDetails: opt.exposeErrorDetails,
   };
-}
-
-async function syncServerHandshake(
-  clientId: ClientId,
-  { token }: HandshakeData,
-) {
-  if (token === undefined) {
-    logger.info(
-      "Client not verified. Client did not provide a token",
-      clientId,
-    );
-    return false;
-  }
-
-  const verifyResult = await auth.verifyToken(token as AuthToken);
-  if (!verifyResult.ok) {
-    logger.info(
-      "Client not verified. Invalid auth token",
-      clientId,
-      verifyResult.error,
-    );
-    return false;
-  }
-
-  clients.associateClientWithUser(clientId, verifyResult.user.id);
-  logger.info("Client verified and associated with user", {
-    clientId,
-    userId: verifyResult.user.id,
-  });
-
-  return true;
 }
 
 function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
