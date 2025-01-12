@@ -15,7 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
     "valibot": "1.0.0-beta.9",
     "dot-prop": "9.0.0"
   },
