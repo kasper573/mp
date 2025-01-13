@@ -12,7 +12,7 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import { parseEnv } from "@mp/env";
+import { assertEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { err } from "@mp/std";
 import { createServerContextFactory } from "./context";
@@ -33,44 +33,25 @@ import { createExpressLogger } from "./express/createExpressLogger";
 import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
 
+const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
-
-const optResult = parseEnv(serverOptionsSchema, process.env, "MP_SERVER_");
-if (optResult.isErr()) {
-  logger.error("Server options invalid or missing:\n", optResult.error);
-  process.exit(1);
-}
-
-const opt = optResult.value;
-logger.info(`
-===============================
-#                             #
-#     ███╗   ███╗ ██████╗     #
-#     ████╗ ████║ ██╔══██╗    #
-#     ██╔████╔██║ ██████╔╝    #
-#     ██║╚██╔╝██║ ██╔═══╝     #
-#     ██║ ╚═╝ ██║ ██║         #
-#     ╚═╝     ╚═╝ ╚═╝         #
-===============================
-${JSON.stringify(optResult.value, null, 2)}
-===============================`);
+logger.info(`Server started with options`, opt);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl, logger);
 
-const expressStaticConfig = {
-  maxAge: opt.publicMaxAge * 1000,
-};
-
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use(metricsMiddleware(metrics)) // Intentionally placed before logger since it's so verbose and unnecessary to log
   .use(createExpressLogger(logger))
   .use(createCors({ origin: opt.corsOrigin }))
-  .use(opt.publicPath, express.static(opt.publicDir, expressStaticConfig));
+  .use(
+    opt.publicPath,
+    express.static(opt.publicDir, { maxAge: opt.publicMaxAge * 1000 }),
+  );
 
 const httpServer = http.createServer(webServer);
 
@@ -101,15 +82,6 @@ const syncServer: WorldServer = new SyncServer({
   onDisconnect: (clientId) => clients.remove(clientId),
 });
 
-clients.on(({ type, clientId, userId }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
-);
-
-collectDefaultMetrics({ register: metrics });
-collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, syncServer);
-const observeTickMetrics = createTickMetricsObserver(metrics);
-
 const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
@@ -122,7 +94,7 @@ const persistTicker = new Ticker({
 const updateTicker = new Ticker({
   onError: logger.error,
   interval: opt.tickInterval,
-  middleware: observeTickMetrics,
+  middleware: createTickMetricsObserver(metrics),
 });
 
 const worldService = new CharacterService(
@@ -153,10 +125,18 @@ webServer.use(
   }),
 );
 
+collectDefaultMetrics({ register: metrics });
+collectProcessMetrics(metrics);
+collectUserMetrics(metrics, clients, syncServer);
+
 updateTicker.subscribe(
   characterMoveBehavior(syncServer.access, worldService.areas),
 );
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
+
+clients.on(({ type, clientId, userId }) =>
+  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
+);
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
