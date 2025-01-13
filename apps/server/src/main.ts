@@ -11,32 +11,29 @@ import type { AuthToken } from "@mp/auth-server";
 import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
-import { measureTimeSpan, Ticker } from "@mp/time";
-import {
-  collectDefaultMetrics,
-  MetricsGague,
-  MetricsHistogram,
-  MetricsRegistry,
-} from "@mp/telemetry/prom";
+import { Ticker } from "@mp/time";
+import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { parseEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { err } from "@mp/std";
 import type { HttpSessionId } from "./context";
 import { type ServerContext } from "./context";
 import { loadAreas } from "./modules/area/loadAreas";
-import type { ServerOptions } from "./serverOptions";
-import { serverOptionsSchema } from "./serverOptions";
+import type { ServerOptions } from "./options";
+import { serverOptionsSchema } from "./options";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { tokenHeaderName } from "./shared";
-import { collectUserMetrics } from "./collectUserMetrics";
+import { collectProcessMetrics } from "./metrics/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
 import type { WorldState, WorldServer } from "./modules/world/WorldState";
 import { characterMoveBehavior } from "./modules/character/characterMoveBehavior";
 import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
+import { collectUserMetrics } from "./metrics/collectProcessMetrics";
+import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -62,35 +59,6 @@ if (areas.isErr() || areas.value.size === 0) {
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-collectDefaultMetrics({ register: metrics });
-
-new MetricsGague({
-  name: "process_uptime_seconds",
-  help: "Time since the process started in seconds",
-  registers: [metrics],
-  collect() {
-    this.set(process.uptime());
-  },
-});
-
-const tickBuckets = [
-  0.01, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 7, 10, 12, 16, 24, 36, 48, 65, 100, 200,
-  400, 600, 800, 1000,
-];
-
-const tickIntervalMetric = new MetricsHistogram({
-  name: "server_tick_interval",
-  help: "Time between each server tick in milliseconds",
-  registers: [metrics],
-  buckets: tickBuckets,
-});
-
-const tickDurationMetric = new MetricsHistogram({
-  name: "server_tick_duration",
-  help: "Time taken to process each server tick in milliseconds",
-  registers: [metrics],
-  buckets: tickBuckets,
-});
 
 const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl, logger);
@@ -117,12 +85,12 @@ const syncHandshakeLimiter = new RateLimiterMemory({
 });
 
 const syncServer: WorldServer = new SyncServer({
+  logger,
   httpServer,
   path: opt.wsEndpointPath,
   initialState: { characters: {} } as WorldState,
   logSyncPatches: opt.logSyncPatches,
-  logger,
-  handshake: async (_, { token }) => {
+  async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     if (result.isOk()) {
       try {
@@ -142,33 +110,24 @@ clients.on(({ type, clientId, userId }) =>
   logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
 );
 
+collectDefaultMetrics({ register: metrics });
+collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, syncServer);
+const observeTickMetrics = createTickMetricsObserver(metrics);
 
 const persistTicker = new Ticker({
+  onError: logger.error,
   interval: opt.persistInterval,
-  async middleware() {
-    try {
-      await worldService.persistWorldState(
-        syncServer.access("persist", (state) => state),
-      );
-    } catch (error) {
-      logger.error("Error persisting world state", error);
-    }
-  },
+  middleware: () =>
+    worldService.persistWorldState(
+      syncServer.access("persist", (state) => state),
+    ),
 });
 
 const physicsTicker = new Ticker({
+  onError: logger.error,
   interval: opt.tickInterval,
-  middleware({ delta: tickInterval, next }) {
-    try {
-      tickIntervalMetric.observe(tickInterval.totalMilliseconds);
-      const getMeasurement = measureTimeSpan();
-      next(tickInterval);
-      tickDurationMetric.observe(getMeasurement().totalMilliseconds);
-    } catch (error) {
-      logger.error("Error in api ticker", error);
-    }
-  },
+  middleware: observeTickMetrics,
 });
 
 const worldService = new CharacterService(db, areas.value, defaultAreaId);

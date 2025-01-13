@@ -33,7 +33,15 @@ export class Ticker {
   }
 
   private tick = () => {
-    this.middleware({ delta: this.delta(), next: this.emit });
+    try {
+      this.middleware({ delta: this.delta(), next: this.emit });
+    } catch (error) {
+      if (this.options.onError) {
+        this.options.onError(error);
+      } else {
+        throw error;
+      }
+    }
   };
 
   private emit = (delta: TimeSpan) => {
@@ -51,6 +59,7 @@ export interface TickMiddlewareOpts {
 export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
 
 export interface TickerOptions {
+  onError?: (error: unknown) => void;
   middleware?: TickMiddleware;
   interval: TimeSpan;
 }
