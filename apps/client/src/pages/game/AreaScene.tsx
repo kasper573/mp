@@ -8,7 +8,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
-import { WorldClientContext } from "../../clients/world";
+import { SyncClientContext } from "../../clients/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
 import {
@@ -20,7 +20,7 @@ import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
-  const world = useContext(WorldClientContext);
+  const world = useContext(SyncClientContext);
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],

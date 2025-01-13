@@ -1,12 +1,12 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { WorldServer } from "../modules/world/WorldState";
+import type { WorldSyncServer } from "../modules/world/WorldState";
 import type { ClientRegistry } from "../ClientRegistry";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  worldState: WorldServer,
+  worldState: WorldSyncServer,
 ) {
   new MetricsGague({
     name: "active_user_count",

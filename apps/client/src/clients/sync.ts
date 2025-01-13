@@ -18,7 +18,7 @@ import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { trpc } from "./trpc";
 
-export function createWorldClient(auth: AuthClient): WorldClient {
+export function createSyncClient(auth: AuthClient): WorldSyncClient {
   const id = createMemo(() => auth.identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
     token: auth.identity()?.token,
@@ -62,15 +62,15 @@ export function createWorldClient(auth: AuthClient): WorldClient {
   };
 }
 
-export const WorldClientContext = createContext<WorldClient>(
-  new Proxy({} as WorldClient, {
+export const SyncClientContext = createContext<WorldSyncClient>(
+  new Proxy({} as WorldSyncClient, {
     get() {
       throw new Error("WorldClientContext not provided");
     },
   }),
 );
 
-export interface WorldClient {
+export interface WorldSyncClient {
   readyState: Accessor<SyncClientReadyState>;
   worldState: Accessor<WorldState | undefined>;
   areaId: Accessor<AreaId | undefined>;

@@ -3,7 +3,7 @@ import type { Branded } from "@mp/std";
 import type { AuthToken, AuthServer } from "@mp/auth-server";
 import type { Logger } from "@mp/logger";
 import type { StateAccess } from "@mp/sync/server";
-import type { WorldServer, WorldState } from "./modules/world/WorldState";
+import type { WorldSyncServer, WorldState } from "./modules/world/WorldState";
 import type { ClientRegistry } from "./ClientRegistry";
 import { tokenHeaderName } from "./shared";
 
@@ -21,7 +21,7 @@ export type HttpSessionId = Branded<string, "HttpSessionId">;
 
 export function createServerContextFactory(
   auth: AuthServer,
-  worldState: WorldServer,
+  worldState: WorldSyncServer,
   clients: ClientRegistry,
   logger: Logger,
   exposeErrorDetails: boolean,

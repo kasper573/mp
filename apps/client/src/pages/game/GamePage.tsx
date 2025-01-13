@@ -3,7 +3,7 @@ import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
-import { createWorldClient, WorldClientContext } from "../../clients/world";
+import { createSyncClient, SyncClientContext } from "../../clients/sync";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
@@ -12,7 +12,7 @@ import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
-  const world = createWorldClient(auth);
+  const world = createSyncClient(auth);
   const area = createQuery(() => {
     const id = world.areaId();
     return {
@@ -29,7 +29,7 @@ export default function GamePage() {
   });
 
   return (
-    <WorldClientContext.Provider value={world}>
+    <SyncClientContext.Provider value={world}>
       <Switch>
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
@@ -50,6 +50,6 @@ export default function GamePage() {
           )}
         </Match>
       </Switch>
-    </WorldClientContext.Provider>
+    </SyncClientContext.Provider>
   );
 }

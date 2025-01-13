@@ -24,7 +24,7 @@ import { collectProcessMetrics } from "./metrics/collectUserMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
-import type { WorldState, WorldServer } from "./modules/world/WorldState";
+import type { WorldState, WorldSyncServer } from "./modules/world/WorldState";
 import { characterMoveBehavior } from "./modules/character/characterMoveBehavior";
 import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
 import { collectUserMetrics } from "./metrics/collectProcessMetrics";
@@ -60,7 +60,7 @@ const syncHandshakeLimiter = new RateLimiterMemory({
   duration: 30,
 });
 
-const syncServer: WorldServer = new SyncServer({
+const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,

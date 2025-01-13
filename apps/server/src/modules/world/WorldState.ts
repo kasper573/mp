@@ -6,4 +6,4 @@ export type WorldState = {
   characters: Record<CharacterId, Character>;
 };
 
-export type WorldServer = SyncServer<WorldState, WorldState, UserIdentity>;
+export type WorldSyncServer = SyncServer<WorldState, WorldState, UserIdentity>;

@@ -26,7 +26,7 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
-import { WorldClientContext } from "../../clients/world";
+import { SyncClientContext } from "../../clients/sync";
 import { toggleSignal } from "../../state/toggleSignal";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
@@ -124,7 +124,7 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
 }
 
 function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
-  const world = useContext(WorldClientContext);
+  const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
