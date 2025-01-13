@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 
 import "dotenv/config";
-import path from "node:path";
 import http from "node:http";
+import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
-import { type PathToLocalFile, type UrlToPublicFile } from "@mp/data";
 import createCors from "cors";
 import type { AuthToken } from "@mp/auth-server";
 import { createAuthServer } from "@mp/auth-server";
@@ -17,8 +16,6 @@ import { parseEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { err } from "@mp/std";
 import { createServerContextFactory } from "./context";
-import { loadAreas } from "./modules/area/loadAreas";
-import type { ServerOptions } from "./options";
 import { serverOptionsSchema } from "./options";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
@@ -33,6 +30,8 @@ import { characterRemoveBehavior } from "./modules/character/characterRemoveBeha
 import { collectUserMetrics } from "./metrics/collectProcessMetrics";
 import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
+import { createUrlResolver } from "./createUrlResolver";
+import { loadAreas } from "./modules/area/loadAreas";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -44,24 +43,23 @@ if (optResult.isErr()) {
 }
 
 const opt = optResult.value;
-logger.info(serverTextHeader(opt));
-
-const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
-
-if (areas.isErr() || areas.value.size === 0) {
-  logger.error(
-    "Cannot start server without areas",
-    areas.isErr() ? areas.error : "No areas found",
-  );
-  process.exit(1);
-}
+logger.info(`
+===============================
+#                             #
+#     ███╗   ███╗ ██████╗     #
+#     ████╗ ████║ ██╔══██╗    #
+#     ██╔████╔██║ ██████╔╝    #
+#     ██║╚██╔╝██║ ██╔═══╝     #
+#     ██║ ╚═╝ ██║ ██║         #
+#     ╚═╝     ╚═╝ ╚═╝         #
+===============================
+${JSON.stringify(optResult.value, null, 2)}
+===============================`);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-
 const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl, logger);
-const defaultAreaId = [...areas.value.keys()][0];
 
 const expressStaticConfig = {
   maxAge: opt.publicMaxAge * 1000,
@@ -127,13 +125,15 @@ const updateTicker = new Ticker({
   middleware: observeTickMetrics,
 });
 
-const worldService = new CharacterService(db, areas.value, defaultAreaId);
+const worldService = new CharacterService(
+  db,
+  await loadAreas(path.resolve(opt.publicDir, "areas")),
+);
 
 const trpcRouter = createRootRouter({
-  areas: areas.value,
   service: worldService,
   state: syncServer.access,
-  createUrl: urlToPublicFile,
+  createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,
 });
 
@@ -153,7 +153,9 @@ webServer.use(
   }),
 );
 
-updateTicker.subscribe(characterMoveBehavior(syncServer.access, areas.value));
+updateTicker.subscribe(
+  characterMoveBehavior(syncServer.access, worldService.areas),
+);
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 httpServer.listen(opt.port, opt.hostname, () => {
@@ -163,25 +165,3 @@ httpServer.listen(opt.port, opt.hostname, () => {
 persistTicker.start();
 updateTicker.start();
 syncServer.start();
-
-function urlToPublicFile(fileInPublicDir: PathToLocalFile): UrlToPublicFile {
-  const relativePath = path.isAbsolute(fileInPublicDir)
-    ? path.relative(opt.publicDir, fileInPublicDir)
-    : fileInPublicDir;
-  return `${opt.httpBaseUrl}${opt.publicPath}${relativePath}` as UrlToPublicFile;
-}
-
-function serverTextHeader(options: ServerOptions) {
-  return `
-===============================
-#                             #
-#     ███╗   ███╗ ██████╗     #
-#     ████╗ ████║ ██╔══██╗    #
-#     ██╔████╔██║ ██████╔╝    #
-#     ██║╚██╔╝██║ ██╔═══╝     #
-#     ██║ ╚═╝ ██║ ██║         #
-#     ╚═╝     ╚═╝ ╚═╝         #
-===============================
-${JSON.stringify(options, null, 2)}
-=====================================================`;
-}

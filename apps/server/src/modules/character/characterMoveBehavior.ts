@@ -1,13 +1,14 @@
-import type { AreaId, AreaResource } from "@mp/data";
+import type { AreaId } from "@mp/data";
 import { moveAlongPath } from "@mp/data";
 import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { WorldState } from "../world/WorldState";
+import type { AreaLookup } from "../area/loadAreas";
 
 export function characterMoveBehavior(
   accessState: StateAccess<WorldState>,
-  areas: Map<AreaId, AreaResource>,
+  areas: AreaLookup,
 ): TickEventHandler {
   return (delta) => {
     accessState("characterMoveBehavior", (state) => {

@@ -1,4 +1,4 @@
-import { findPath, type AreaId, type AreaResource } from "@mp/data";
+import { findPath } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
@@ -12,13 +12,11 @@ import type { CharacterService } from "./service";
 export interface CharacterRouterDependencies {
   state: StateAccess<WorldState>;
   service: CharacterService;
-  areas: Map<AreaId, AreaResource>;
 }
 
 export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
 export function createCharacterRouter({
   state: accessState,
-  areas,
   service,
 }: CharacterRouterDependencies) {
   return t.router({
@@ -43,7 +41,7 @@ export function createCharacterRouter({
             });
           }
 
-          const area = areas.get(char.areaId);
+          const area = service.areas.get(char.areaId);
           if (!area) {
             throw new TRPCError({
               code: "INTERNAL_SERVER_ERROR",

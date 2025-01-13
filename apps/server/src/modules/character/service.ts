@@ -1,18 +1,26 @@
 import { vec } from "@mp/math";
 import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
-import type { AreaId, AreaResource } from "@mp/data";
+import type { AreaId } from "@mp/data";
 import type { DBClient } from "../../db/client";
 import type { WorldState } from "../world/WorldState";
+import type { AreaLookup } from "../area/loadAreas";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 
 export class CharacterService {
+  private defaultAreaId: AreaId;
+
   constructor(
     private db: DBClient,
-    private areas: Map<AreaId, AreaResource>,
-    private defaultAreaId: AreaId,
-  ) {}
+    public readonly areas: AreaLookup,
+  ) {
+    if (areas.size === 0) {
+      throw new Error("CharacterService cannot be created without areas");
+    }
+
+    this.defaultAreaId = [...areas.keys()][0];
+  }
 
   persistWorldState(state: WorldState) {
     return this.db.transaction((tx) =>
