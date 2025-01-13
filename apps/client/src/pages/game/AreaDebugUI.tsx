@@ -26,7 +26,7 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
-import { SyncClientContext } from "../../clients/sync";
+import { SyncClientContext } from "../../integrations/sync";
 import { toggleSignal } from "../../state/toggleSignal";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";

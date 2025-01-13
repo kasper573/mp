@@ -8,7 +8,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
-import { SyncClientContext } from "../../clients/sync";
+import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
 import {

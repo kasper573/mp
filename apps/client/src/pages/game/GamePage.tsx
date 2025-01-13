@@ -3,7 +3,7 @@ import { EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
-import { createSyncClient, SyncClientContext } from "../../clients/sync";
+import { createSyncClient, SyncClientContext } from "../../integrations/sync";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
