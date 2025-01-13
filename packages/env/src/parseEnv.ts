@@ -1,7 +1,17 @@
 import { ok, err } from "@mp/std";
 import { setProperty } from "dot-prop";
-import type { BaseSchema, BaseIssue } from "valibot";
+import type { BaseSchema, BaseIssue, InferOutput } from "valibot";
 import { safeParse } from "valibot";
+
+export function assertEnv<
+  const Schema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,
+>(schema: Schema, env: FlatObject, prefix = ""): InferOutput<Schema> {
+  const result = parseEnv(schema, env, prefix);
+  if (result.isErr()) {
+    throw new Error(result.error);
+  }
+  return result.value;
+}
 
 export function parseEnv<
   const Schema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,
