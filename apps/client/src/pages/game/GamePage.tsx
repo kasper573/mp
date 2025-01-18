@@ -56,14 +56,15 @@ export default function GamePage() {
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
                   <EngineBindings toggleDebug={toggleDebug} />
-                  <AreaScene area={data} />
-                  <Show when={debug()}>
-                    <AreaDebugUI
-                      area={data}
-                      pathToDraw={world.character()?.path}
-                    />
-                    <WorldStateInspector worldState={world.worldState()} />
-                  </Show>
+                  <AreaScene area={data}>
+                    <Show when={debug()}>
+                      <AreaDebugUI
+                        area={data}
+                        pathToDraw={world.character()?.path}
+                      />
+                      <WorldStateInspector worldState={world.worldState()} />
+                    </Show>
+                  </AreaScene>
                 </EngineProvider>
               )}
             </Application>
