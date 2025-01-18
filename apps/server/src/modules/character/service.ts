@@ -41,7 +41,8 @@ export class CharacterService {
       .from(characterTable)
       .where(eq(characterTable.userId, userId))
       .limit(1);
-    return char;
+
+    return { ...char, color: playerColor };
   }
 
   async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
@@ -64,6 +65,7 @@ export class CharacterService {
       coords: vec(0, 0),
       speed: 3,
       userId,
+      color: playerColor,
     };
 
     const [returned] = await this.db
@@ -78,3 +80,5 @@ export class CharacterService {
     return { ...input, ...returned };
   }
 }
+
+const playerColor = 0x00_ff_00;

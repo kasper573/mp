@@ -17,7 +17,6 @@ import {
   createSignal,
   onCleanup,
   onMount,
-  Show,
   useContext,
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
@@ -27,7 +26,6 @@ import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
-import { toggleSignal } from "../../state/toggleSignal";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
 
@@ -38,31 +36,25 @@ export function AreaDebugUI(props: {
   area: AreaResource;
   pathToDraw: Path | undefined;
 }) {
-  const engine = useContext(EngineContext);
-  const [isVisible, toggleDebug] = toggleSignal();
   const [visibleDGraphType, setVisibleDGraphType] =
     createSignal<VisibleDGraphType>("none");
 
-  onCleanup(engine.keyboard.on("keydown", "F2", toggleDebug));
-
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
-      <Show when={isVisible()}>
-        <DebugDGraph area={props.area} visible={visibleDGraphType} />
-        <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
-        <div class={styles.debugMenu}>
-          <div>
-            Visible DGraph lines:{" "}
-            <Select
-              options={visibleDGraphTypes}
-              value={visibleDGraphType()}
-              onChange={setVisibleDGraphType}
-              on:pointerdown={(e) => e.stopPropagation()}
-            />
-          </div>
-          <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+      <DebugDGraph area={props.area} visible={visibleDGraphType} />
+      <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
+      <div class={styles.debugMenu}>
+        <div>
+          Visible DGraph lines:{" "}
+          <Select
+            options={visibleDGraphTypes}
+            value={visibleDGraphType()}
+            onChange={setVisibleDGraphType}
+            on:pointerdown={(e) => e.stopPropagation()}
+          />
         </div>
-      </Show>
+        <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+      </div>
     </Pixi>
   );
 }

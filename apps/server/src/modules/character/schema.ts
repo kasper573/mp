@@ -4,6 +4,7 @@ import type { UserId } from "@mp/auth-server";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
 import type { MovementTrait } from "../../traits/movement";
+import type { AppearanceTrait } from "../../traits/appearance";
 
 export const characterTable = pgTable("characters", {
   id: serial().primaryKey(),
@@ -15,6 +16,9 @@ export const characterTable = pgTable("characters", {
 
 type DBCharacter = typeof characterTable.$inferSelect;
 
-export interface Character extends DBCharacter, MovementTrait {}
+export interface Character
+  extends DBCharacter,
+    MovementTrait,
+    AppearanceTrait {}
 
 export type CharacterId = Character["id"];

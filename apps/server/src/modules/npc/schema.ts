@@ -3,6 +3,7 @@ import { integer, pgTable, serial } from "drizzle-orm/pg-core";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
 import type { MovementTrait } from "../../traits/movement";
+import type { AppearanceTrait } from "../../traits/appearance";
 
 export const npcTable = pgTable("npcs", {
   id: serial().primaryKey(),
@@ -13,6 +14,6 @@ export const npcTable = pgTable("npcs", {
 
 type DBNPC = typeof npcTable.$inferSelect;
 
-export interface NPC extends DBNPC, MovementTrait {}
+export interface NPC extends DBNPC, MovementTrait, AppearanceTrait {}
 
 export type NPCId = NPC["id"];

@@ -1,5 +1,12 @@
-import { createEffect, Match, Switch, useContext } from "solid-js";
-import { EngineProvider } from "@mp/engine";
+import {
+  createEffect,
+  Match,
+  onCleanup,
+  Show,
+  Switch,
+  useContext,
+} from "solid-js";
+import { EngineContext, EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
@@ -7,8 +14,11 @@ import { createSyncClient, SyncClientContext } from "../../integrations/sync";
 import { loadAreaResource } from "../../state/loadAreaResource";
 import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
+import { toggleSignal } from "../../state/toggleSignal";
 import * as styles from "./GamePage.css";
 import { AreaScene } from "./AreaScene";
+import { WorldStateInspector } from "./WorldStateInspector";
+import { AreaDebugUI } from "./AreaDebugUI";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
@@ -21,6 +31,8 @@ export default function GamePage() {
       refetchOnWindowFocus: false,
     };
   });
+
+  const [debug, toggleDebug] = toggleSignal();
 
   createEffect(() => {
     if (world.readyState() === "open") {
@@ -43,7 +55,15 @@ export default function GamePage() {
             <Application class={styles.container}>
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
+                  <EngineBindings toggleDebug={toggleDebug} />
                   <AreaScene area={data} />
+                  <Show when={debug()}>
+                    <AreaDebugUI
+                      area={data}
+                      pathToDraw={world.character()?.path}
+                    />
+                    <WorldStateInspector worldState={world.worldState()} />
+                  </Show>
                 </EngineProvider>
               )}
             </Application>
@@ -52,4 +72,13 @@ export default function GamePage() {
       </Switch>
     </SyncClientContext.Provider>
   );
+}
+
+// TODO remove this component, this is an anti pattern. Better to initialize an engine instance higher up the tree instead.
+function EngineBindings(props: { toggleDebug: () => void }) {
+  const engine = useContext(EngineContext);
+  createEffect(() => {
+    onCleanup(engine.keyboard.on("keydown", "F2", props.toggleDebug));
+  });
+  return null;
 }

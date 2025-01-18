@@ -1,20 +1,22 @@
 import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import type { Character } from "@mp/server";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
+import type { MovementTrait, AppearanceTrait } from "@mp/server";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
-export function AutoPositionedCharacterActor(props: {
+export type Actor = MovementTrait & AppearanceTrait;
+
+export function AutoPositionedActor(props: {
   tiled: TiledResource;
-  char: Character;
+  subject: Actor;
 }) {
-  const coords = useAnimatedCoords(() => props.char);
+  const coords = useAnimatedCoords(() => props.subject);
   return (
     <Show when={coords()}>
       {(coords) => (
-        <ManuallyPositionedCharacterActor
+        <ManuallyPositionedActor
           tileSize={props.tiled.tileSize}
           position={props.tiled.tileCoordToWorld(coords())}
         />
@@ -23,7 +25,7 @@ export function AutoPositionedCharacterActor(props: {
   );
 }
 
-export function ManuallyPositionedCharacterActor(props: {
+export function ManuallyPositionedActor(props: {
   tileSize: Vector;
   position?: Vector;
 }) {

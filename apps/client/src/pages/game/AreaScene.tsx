@@ -11,12 +11,8 @@ import { clientViewDistance } from "@mp/server";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
-import {
-  AutoPositionedCharacterActor,
-  ManuallyPositionedCharacterActor,
-} from "./CharacterActor";
+import { AutoPositionedActor, ManuallyPositionedActor } from "./Actor";
 import { TileHighlight } from "./TileHighlight";
-import { AreaDebugUI } from "./AreaDebugUI";
 
 export function AreaScene(props: { area: AreaResource }) {
   const engine = useContext(EngineContext);
@@ -29,10 +25,11 @@ export function AreaScene(props: { area: AreaResource }) {
 
   const myCoords = useAnimatedCoords(world.character);
 
-  const charactersInArea = createMemo(() =>
-    Object.values(world.worldState()?.characters ?? []).filter(
-      (char) => char.areaId === props.area.id,
-    ),
+  const actorsInArea = createMemo(() =>
+    [
+      ...Object.values(world.worldState()?.characters ?? []),
+      ...Object.values(world.worldState()?.npcs ?? []),
+    ].filter((char) => char.areaId === props.area.id),
   );
 
   const myWorldPos = createMemo(() => {
@@ -76,28 +73,29 @@ export function AreaScene(props: { area: AreaResource }) {
     >
       {spritesheets.data && (
         <TiledRenderer
-          layers={props.area.tiled.map.layers}
+          layers={props.area.tiled.map.layers.filter(
+            (l) => l.type !== "objectgroup",
+          )}
           spritesheets={spritesheets.data}
-          debug={engine.keyboard.keysHeld.has("Shift")}
           label={props.area.id}
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={charactersInArea()}>
-                {(char) => {
-                  const isMe = () => char().id === world.characterId();
+              <Index each={actorsInArea()}>
+                {(actor) => {
+                  const isMe = () => actor().id === world.characterId();
                   return (
                     <>
                       <Show when={isMe()}>
-                        <ManuallyPositionedCharacterActor
+                        <ManuallyPositionedActor
                           tileSize={props.area.tiled.tileSize}
                           position={myWorldPos()}
                         />
                       </Show>
                       <Show when={!isMe()}>
-                        <AutoPositionedCharacterActor
+                        <AutoPositionedActor
                           tiled={props.area.tiled}
-                          char={char()}
+                          subject={actor()}
                         />
                       </Show>
                     </>
@@ -109,7 +107,6 @@ export function AreaScene(props: { area: AreaResource }) {
         </TiledRenderer>
       )}
       <TileHighlight area={props.area} />
-      <AreaDebugUI area={props.area} pathToDraw={world.character()?.path} />
     </Pixi>
   );
 }

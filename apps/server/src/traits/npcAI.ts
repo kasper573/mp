@@ -26,6 +26,7 @@ export function npcAIBehavior(
       coords: someArea.start,
       id: 0,
       speed: 3,
+      color: 0xff_00_00,
     };
   });
 
