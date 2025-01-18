@@ -1,9 +1,9 @@
 import type { AreaId } from "@mp/data";
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
-import type { Path } from "@mp/math";
 import type { UserId } from "@mp/auth-server";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
+import type { MovementTrait } from "../../traits/movement";
 
 export const characterTable = pgTable("characters", {
   id: serial().primaryKey(),
@@ -15,8 +15,6 @@ export const characterTable = pgTable("characters", {
 
 type DBCharacter = typeof characterTable.$inferSelect;
 
-export interface Character extends DBCharacter {
-  path?: Path;
-}
+export interface Character extends DBCharacter, MovementTrait {}
 
 export type CharacterId = Character["id"];

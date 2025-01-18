@@ -25,7 +25,7 @@ import { metricsMiddleware } from "./express/metricsMiddleware";
 import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
 import type { WorldState, WorldSyncServer } from "./modules/world/WorldState";
-import { characterMoveBehavior } from "./modules/character/characterMoveBehavior";
+import { movementBehavior } from "./traits/movement";
 import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
 import { collectUserMetrics } from "./metrics/collectProcessMetrics";
 import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
@@ -129,9 +129,7 @@ collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, syncServer);
 
-updateTicker.subscribe(
-  characterMoveBehavior(syncServer.access, worldService.areas),
-);
+updateTicker.subscribe(movementBehavior(syncServer.access, worldService.areas));
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>

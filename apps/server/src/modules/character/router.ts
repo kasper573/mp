@@ -1,4 +1,3 @@
-import { findPath } from "@mp/data";
 import type { Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
@@ -6,6 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
+import { updatePathForSubject } from "../../traits/movement";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 
@@ -41,23 +41,7 @@ export function createCharacterRouter({
             });
           }
 
-          const area = service.areas.get(char.areaId);
-          if (!area) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Characters current area not found: ${char.areaId}`,
-            });
-          }
-
-          const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
-          if (idx !== undefined && idx !== -1) {
-            char.path?.splice(idx + 1);
-          } else {
-            const newPath = findPath(char.coords, vec(x, y), area.dGraph);
-            if (newPath) {
-              char.path = newPath;
-            }
-          }
+          updatePathForSubject(char, service.areas, vec(x, y));
         }),
       ),
 
