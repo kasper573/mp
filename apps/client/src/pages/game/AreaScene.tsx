@@ -1,6 +1,7 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import { useContext, createEffect, Index, Show, createMemo } from "solid-js";
+import type { ParentProps } from "solid-js";
+import { useContext, createEffect, Index, createMemo } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -11,10 +12,10 @@ import { clientViewDistance } from "@mp/server";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { getTilePosition } from "../../state/getTilePosition";
-import { AutoPositionedActor, ManuallyPositionedActor } from "./Actor";
+import { Actor } from "./Actor";
 import { TileHighlight } from "./TileHighlight";
 
-export function AreaScene(props: { area: AreaResource }) {
+export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
   const world = useContext(SyncClientContext);
 
@@ -82,30 +83,13 @@ export function AreaScene(props: { area: AreaResource }) {
           {{
             [props.area.characterLayer.name]: () => (
               <Index each={actorsInArea()}>
-                {(actor) => {
-                  const isMe = () => actor().id === world.characterId();
-                  return (
-                    <>
-                      <Show when={isMe()}>
-                        <ManuallyPositionedActor
-                          tileSize={props.area.tiled.tileSize}
-                          position={myWorldPos()}
-                        />
-                      </Show>
-                      <Show when={!isMe()}>
-                        <AutoPositionedActor
-                          tiled={props.area.tiled}
-                          subject={actor()}
-                        />
-                      </Show>
-                    </>
-                  );
-                }}
+                {(actor) => <Actor tiled={props.area.tiled} actor={actor()} />}
               </Index>
             ),
           }}
         </TiledRenderer>
       )}
+      {props.children}
       <TileHighlight area={props.area} />
     </Pixi>
   );
