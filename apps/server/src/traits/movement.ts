@@ -1,6 +1,6 @@
-import { findPath, moveAlongPath, type AreaId } from "@mp/data";
+import { findPath, moveAlongPath, snapTileVector, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
-import { vec, vec_copy } from "@mp/math";
+import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { AreaLookup } from "../modules/area/loadAreas";
@@ -15,15 +15,19 @@ export interface MovementTrait {
 
 export function movementBehavior(
   accessState: StateAccess<WorldState>,
+  getSubjects: (state: WorldState) => MovementTrait[],
   areas: AreaLookup,
 ): TickEventHandler {
-  return (delta) => {
+  return ({ timeSinceLastTick }) => {
     accessState("movementBehavior", (state) => {
-      const subjects: MovementTrait[] = Object.values(state.characters);
-
-      for (const subject of subjects) {
+      for (const subject of getSubjects(state)) {
         if (subject.path) {
-          moveAlongPath(subject.coords, subject.path, subject.speed, delta);
+          moveAlongPath(
+            subject.coords,
+            subject.path,
+            subject.speed,
+            timeSinceLastTick,
+          );
           if (!subject.path?.length) {
             delete subject.path;
           }
@@ -50,18 +54,21 @@ export function movementBehavior(
 export function updatePathForSubject(
   subject: MovementTrait,
   areas: AreaLookup,
-  { x, y }: Vector,
+  dest: Vector,
 ) {
   const area = areas.get(subject.areaId);
   if (!area) {
     throw new Error(`Area not found: ${subject.areaId}`);
   }
 
-  const idx = subject.path?.findIndex((c) => c.x === x && c.y === y);
+  // Snap just in case the input is fractions
+  dest = snapTileVector(dest);
+
+  const idx = subject.path?.findIndex((c) => c.x === dest.x && c.y === dest.y);
   if (idx !== undefined && idx !== -1) {
     subject.path?.splice(idx + 1);
   } else {
-    const newPath = findPath(subject.coords, vec(x, y), area.dGraph);
+    const newPath = findPath(subject.coords, dest, area.dGraph);
     if (newPath) {
       subject.path = newPath;
     }

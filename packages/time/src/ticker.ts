@@ -1,15 +1,17 @@
-import type { TimeSpan } from "timespan-ts";
-import { measureTimeSpan } from "./measure";
+import { TimeSpan } from "timespan-ts";
+import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
   private intervalId?: NodeJS.Timeout;
   private middleware: TickMiddleware;
-  private delta: () => TimeSpan;
+  private getTimeSinceLastTick: () => TimeSpan;
+  private getTotalTimeElapsed: () => TimeSpan;
 
   constructor(private options: TickerOptions) {
     this.middleware = options.middleware ?? noopMiddleware;
-    this.delta = createDeltaFn();
+    this.getTimeSinceLastTick = createDeltaFn();
+    this.getTotalTimeElapsed = () => TimeSpan.Zero;
   }
 
   subscribe(fn: TickEventHandler): Unsubscribe {
@@ -19,6 +21,7 @@ export class Ticker {
 
   start() {
     this.stop();
+    this.getTotalTimeElapsed = beginMeasuringTimeSpan();
     this.intervalId = setInterval(
       this.tick,
       this.options.interval.totalMilliseconds,
@@ -26,6 +29,7 @@ export class Ticker {
   }
 
   stop() {
+    this.getTotalTimeElapsed = () => TimeSpan.Zero;
     if (this.intervalId !== undefined) {
       clearInterval(this.intervalId);
       this.intervalId = undefined;
@@ -34,7 +38,11 @@ export class Ticker {
 
   private tick = () => {
     try {
-      this.middleware({ delta: this.delta(), next: this.emit });
+      this.middleware({
+        timeSinceLastTick: this.getTimeSinceLastTick(),
+        totalTimeElapsed: this.getTotalTimeElapsed(),
+        next: this.emit,
+      });
     } catch (error) {
       if (this.options.onError) {
         this.options.onError(error);
@@ -44,16 +52,20 @@ export class Ticker {
     }
   };
 
-  private emit = (delta: TimeSpan) => {
+  private emit: TickEventHandler = (...args) => {
     for (const fn of this.subscriptions) {
-      fn(delta);
+      fn(...args);
     }
   };
 }
 
-export interface TickMiddlewareOpts {
-  delta: TimeSpan;
-  next: (delta: TimeSpan) => void;
+export interface TickEvent {
+  timeSinceLastTick: TimeSpan;
+  totalTimeElapsed: TimeSpan;
+}
+
+export interface TickMiddlewareOpts extends TickEvent {
+  next: TickEventHandler;
 }
 
 export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
@@ -66,15 +78,15 @@ export interface TickerOptions {
 
 export type Unsubscribe = () => void;
 
-export type TickEventHandler = (delta: TimeSpan) => void;
+export type TickEventHandler = (event: TickEvent) => void;
 
-const noopMiddleware: TickMiddleware = ({ delta, next }) => next(delta);
+const noopMiddleware: TickMiddleware = ({ next, ...event }) => next(event);
 
 function createDeltaFn(): () => TimeSpan {
-  let stopMeasuring = measureTimeSpan();
+  let getMeasurement = beginMeasuringTimeSpan();
   return () => {
-    const delta = stopMeasuring();
-    stopMeasuring = measureTimeSpan();
+    const delta = getMeasurement();
+    getMeasurement = beginMeasuringTimeSpan();
     return delta;
   };
 }

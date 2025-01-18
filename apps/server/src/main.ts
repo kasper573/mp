@@ -32,6 +32,7 @@ import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
 import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
+import { npcAIBehavior } from "./traits/npcAI";
 
 const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();
@@ -64,7 +65,7 @@ const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { characters: {} } as WorldState,
+  initialState: { characters: {}, npcs: {} } satisfies WorldState,
   logSyncPatches: opt.logSyncPatches,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
@@ -129,7 +130,14 @@ collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, syncServer);
 
-updateTicker.subscribe(movementBehavior(syncServer.access, worldService.areas));
+updateTicker.subscribe(npcAIBehavior(syncServer.access, worldService.areas));
+updateTicker.subscribe(
+  movementBehavior(
+    syncServer.access,
+    (state) => Object.values(state.characters),
+    worldService.areas,
+  ),
+);
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
