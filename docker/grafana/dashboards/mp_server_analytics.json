@@ -28,7 +28,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 13,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -158,6 +158,23 @@
           "legendFormat": "clients",
           "range": true,
           "refId": "C",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "active_npc_count",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "npcs",
+          "range": true,
+          "refId": "D",
           "useBackend": false
         }
       ],
@@ -292,13 +309,13 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "mp-server (custom analytics)",
   "uid": "ae3kps81booaoe",
-  "version": 3,
+  "version": 7,
   "weekStart": ""
 }
