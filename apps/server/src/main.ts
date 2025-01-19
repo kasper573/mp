@@ -134,7 +134,10 @@ updateTicker.subscribe(npcAIBehavior(syncServer.access, worldService.areas));
 updateTicker.subscribe(
   movementBehavior(
     syncServer.access,
-    (state) => Object.values(state.characters),
+    (state) => [
+      ...Object.values(state.characters),
+      ...Object.values(state.npcs),
+    ],
     worldService.areas,
   ),
 );
