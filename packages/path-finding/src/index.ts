@@ -1,4 +1,3 @@
-export * from "./addTemporaryNode";
+export * from "./addFractionalNode";
 export * from "./types";
-export * from "./implementations/dijkstra";
-export * from "./implementations/ngraph";
+export * from "./ngraph";

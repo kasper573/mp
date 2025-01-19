@@ -1,9 +1,9 @@
 import { vec_distance, vec_has_fractions, type Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import { aStar } from "ngraph.path";
-import type { Graph } from "../types";
-import { nodeIdFromVector } from "../nodeId";
-import { addTemporaryNode } from "../addTemporaryNode";
+import type { Graph } from "./types";
+import { nodeIdFromVector } from "./nodeId";
+import { addFractionalNode } from "./addFractionalNode";
 
 export function createNGraph(): Graph {
   const n = createGraph<Vector, number>();
@@ -12,11 +12,11 @@ export function createNGraph(): Graph {
     addNode(vector) {
       n.addNode(nodeIdFromVector(vector), vector);
     },
-    addLink(fromVector, toVector, weight) {
+    addLink(fromVector, toVector) {
       n.addLink(
         nodeIdFromVector(fromVector),
         nodeIdFromVector(toVector),
-        weight,
+        vec_distance(fromVector, toVector),
       );
     },
     getLinks(vector) {
@@ -46,15 +46,14 @@ export function createNGraph(): Graph {
         heuristic: (from, to) => vec_distance(from.data, to.data),
       });
       return (start, end) => {
-        const cleanupFns: Array<() => void> = [];
         const addTempStart = vec_has_fractions(start) && !this.hasNode(start);
-        const addTempEnd = vec_has_fractions(end) && !this.hasNode(end);
-
         if (addTempStart) {
-          cleanupFns.push(addTemporaryNode(this, start));
+          addFractionalNode(this, start);
         }
+
+        const addTempEnd = vec_has_fractions(end) && !this.hasNode(end);
         if (addTempEnd) {
-          cleanupFns.push(addTemporaryNode(this, end));
+          addFractionalNode(this, end);
         }
 
         const path = pathFinder
@@ -64,14 +63,12 @@ export function createNGraph(): Graph {
 
         if (addTempStart) {
           path.shift();
+          this.removeNode(start);
         }
 
         if (addTempEnd) {
           path.unshift();
-        }
-
-        for (const fn of cleanupFns) {
-          fn();
+          this.removeNode(end);
         }
 
         return path;

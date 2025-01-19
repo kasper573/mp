@@ -30,7 +30,7 @@ export function graphFromTiled(tiled: TiledResource): Graph {
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
       const distance = vec_distance(tile, neighbor);
       if (distance === 1 || distance === Math.SQRT2) {
-        graph.addLink(tile, neighbor, distance);
+        graph.addLink(tile, neighbor);
       }
     }
   }

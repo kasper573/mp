@@ -1,6 +1,6 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { vec, vec_round, type Path, type Vector } from "@mp/math";
-import { type Graph, addTemporaryNode } from "@mp/path-finding";
+import { type Graph, addFractionalNode } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
@@ -82,9 +82,9 @@ function DebugGraph(props: {
       );
     } else if (props.visible() === "coord") {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
-      const cleanupGraph = addTemporaryNode(graph, tilePos);
+      addFractionalNode(graph, tilePos);
       drawNode(gfx, tiled, graph, tilePos, tiled.tileCoordToWorld(tilePos));
-      cleanupGraph();
+      graph.removeNode(tilePos);
     }
   });
 
