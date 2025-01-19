@@ -1,10 +1,9 @@
-import { vec_distance } from "@mp/math";
+import { vec, vec_distance } from "@mp/math";
 import { type TiledResource } from "./TiledResource";
-import type { DNode } from "./findPath";
-import { dNodeFromVector, type DGraph } from "./findPath";
+import { createGraph, nodeIdFromVector, type Graph } from "./findPath";
 
-export function dGraphFromTiled(tiled: TiledResource): DGraph {
-  const graph: DGraph = {};
+export function dGraphFromTiled(tiled: TiledResource): Graph {
+  const graph = createGraph();
 
   const walkableTileCoords = tiled.getMatchingTileCoords(
     ({ tile }) => tile.properties.get("Walkable")?.value,
@@ -23,16 +22,20 @@ export function dGraphFromTiled(tiled: TiledResource): DGraph {
   );
 
   for (const tile of walkableTileCoords) {
-    const neighbors: DGraph[DNode] = {};
+    const vector = vec(tile.x, tile.y);
+    const tileNodeId = nodeIdFromVector(vector);
+    graph.addNode(tileNodeId, { vector });
+
     for (const neighbor of walkableTileCoords) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
       const distance = vec_distance(tile, neighbor);
       if (distance === 1 || distance === Math.SQRT2) {
-        neighbors[dNodeFromVector(neighbor)] = vec_distance(tile, neighbor);
+        graph.addLink(tileNodeId, nodeIdFromVector(neighbor), {
+          weight: distance,
+        });
       }
     }
-    graph[dNodeFromVector(tile)] = neighbors;
   }
 
   return graph;

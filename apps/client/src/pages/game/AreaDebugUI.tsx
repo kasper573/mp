@@ -2,10 +2,9 @@ import type { AreaResource, TiledResource } from "@mp/data";
 import { snapTileVector } from "@mp/data";
 import { vec, type Path, type Vector } from "@mp/math";
 import {
-  type DNode,
-  type DGraph,
-  vectorFromDNode,
-  dNodeFromVector,
+  type Graph,
+  vectorFromNodeId,
+  nodeIdFromVector,
   addVectorToAdjacentInGraph,
 } from "@mp/data";
 import { Graphics } from "@mp/pixi";
@@ -89,13 +88,9 @@ function DebugDGraph(props: {
       );
     } else if (props.visible() === "coord") {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
-      drawDNode(
-        gfx,
-        tiled,
-        addVectorToAdjacentInGraph(dGraph, tilePos),
-        tilePos,
-        tiled.tileCoordToWorld(tilePos),
-      );
+      const cleanupGraph = addVectorToAdjacentInGraph(dGraph, tilePos);
+      drawDNode(gfx, tiled, dGraph, tilePos, tiled.tileCoordToWorld(tilePos));
+      cleanupGraph();
     }
   });
 
@@ -168,14 +163,12 @@ function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
 function drawDNode(
   ctx: Graphics,
   tiled: TiledResource,
-  graph: DGraph,
+  graph: Graph,
   tilePos: Vector,
   start = tiled.tileCoordToWorld(tilePos),
 ) {
-  for (const [neighbor] of Object.entries(
-    graph[dNodeFromVector(tilePos)] ?? {},
-  )) {
-    const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
+  for (const linkedNodeId of graph.getLinks(nodeIdFromVector(tilePos))) {
+    const end = tiled.tileCoordToWorld(vectorFromNodeId(linkedNodeId));
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);

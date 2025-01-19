@@ -3,8 +3,8 @@ import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
 import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { DNode, PathFinder } from "./findPath";
-import { createPathFinder, vectorFromDNode, type DGraph } from "./findPath";
+import type { PathFinder } from "./findPath";
+import { createPathFinder, type Graph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
@@ -14,7 +14,7 @@ export type AreaId = Branded<string, "AreaId">;
 export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
-  readonly dGraph: DGraph;
+  readonly dGraph: Graph;
   readonly characterLayer: Layer;
   readonly #findPath: PathFinder;
 
@@ -33,10 +33,11 @@ export class AreaResource {
     this.#findPath = createPathFinder(this.dGraph);
 
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
+    if (!startObj) {
+      throw new Error("Invalid area data: must have a start location");
+    }
 
-    this.start = startObj
-      ? snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)))
-      : vectorFromDNode(Object.keys(this.dGraph)[0] as DNode);
+    this.start = snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)));
   }
 
   findPath: PathFinder = (...args) =>

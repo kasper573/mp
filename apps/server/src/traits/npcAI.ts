@@ -65,7 +65,7 @@ export function npcAIBehavior(
   function getDestination(subject: NPC): Vector {
     return vec_add(
       subject.coords,
-      getDirection(subject) ? vec(-1, 0) : vec(1, 0),
+      getDirection(subject) ? vec(-10, 0) : vec(10, 0),
     );
   }
 
@@ -82,6 +82,8 @@ export function npcAIBehavior(
   return ({ totalTimeElapsed }) => {
     accessState("npcAIBehavior", (state) => {
       for (const subject of Object.values(state.npcs)) {
+        someArea.findPath(subject.coords, getDestination(subject));
+
         if (isItTimeToMove(subject, totalTimeElapsed)) {
           subject.path = getDirection(subject)
             ? [...polyline]
