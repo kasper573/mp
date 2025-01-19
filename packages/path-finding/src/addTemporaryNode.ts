@@ -1,10 +1,7 @@
 import { type Vector, vec, vec_add, vec_distance, vec_round } from "@mp/math";
 import type { Graph } from "./types";
 
-export function addVectorToAdjacentInGraph(
-  graph: Graph,
-  vector: Vector,
-): UndoFn {
+export function addTemporaryNode(graph: Graph, vector: Vector): UndoFn {
   graph.addNode(vector);
 
   for (const adjacent of adjacentVectors(vector)) {

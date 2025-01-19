@@ -4,7 +4,7 @@ import type { Vector } from "@mp/math";
 import type { Graph, PathFinder } from "../types";
 import type { NodeId } from "../nodeId";
 import { nodeIdFromVector, vectorFromNodeId } from "../nodeId";
-import { addVectorToAdjacentInGraph } from "../addVectorToAdjacentInGraph";
+import { addTemporaryNode } from "../addTemporaryNode";
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
 export const find_path = dijkstrajs.find_path;
@@ -42,7 +42,7 @@ export function createDijkstraPathFinder(graph: DijkstraGraph): PathFinder {
   return (start, target) => {
     let cleanup;
     if (isFractionalVector(start)) {
-      cleanup = addVectorToAdjacentInGraph(graph, start);
+      cleanup = addTemporaryNode(graph, start);
     }
 
     try {
