@@ -11,4 +11,5 @@ export interface Graph {
   hasNode(v: Vector): boolean;
   removeNode(v: Vector): void;
   getLinks(v: Vector): Vector[];
+  createPathFinder: () => PathFinder;
 }

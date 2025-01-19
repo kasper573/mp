@@ -6,8 +6,7 @@ export function addTemporaryNode(graph: Graph, vector: Vector): UndoFn {
 
   for (const adjacent of adjacentVectors(vector)) {
     if (graph.hasNode(adjacent)) {
-      const weight = vec_distance(vector, adjacent);
-      graph.addLink(vector, adjacent, weight);
+      graph.addLink(vector, adjacent, vec_distance(vector, adjacent));
     }
   }
 

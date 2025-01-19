@@ -32,8 +32,8 @@ import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
 import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
-import { npcAIBehavior } from "./traits/npcAI";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
+import { npcAIBehavior } from "./traits/npcAI";
 
 const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();

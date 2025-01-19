@@ -1,10 +1,10 @@
 import { vec_distance } from "@mp/math";
-import type { DijkstraGraph } from "@mp/path-finding";
-import { createDijkstraGraph } from "@mp/path-finding";
+import type { Graph } from "@mp/path-finding";
+import { createNGraph } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 
-export function graphFromTiled(tiled: TiledResource): DijkstraGraph {
-  const graph = createDijkstraGraph();
+export function graphFromTiled(tiled: TiledResource): Graph {
+  const graph = createNGraph();
 
   const walkableTileCoords = tiled.getMatchingTileCoords(
     ({ tile }) => tile.properties.get("Walkable")?.value,

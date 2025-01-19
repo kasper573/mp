@@ -18,6 +18,10 @@ export function vec_round({ x, y }: Vector): Vector {
   return vec(Math.round(x), Math.round(y));
 }
 
+export function vec_has_fractions(v: Vector): boolean {
+  return v.x % 1 !== 0 || v.y % 1 !== 0;
+}
+
 export const vec_zero: Vector = Object.freeze(vec(0, 0));
 
 export interface Vector {
