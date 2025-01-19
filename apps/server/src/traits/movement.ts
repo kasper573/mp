@@ -1,12 +1,10 @@
-import { findPath, moveAlongPath, snapTileVector, type AreaId } from "@mp/data";
+import { moveAlongPath, snapTileVector, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
 import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
-import { MetricsHistogram } from "@mp/telemetry/prom";
 import type { AreaLookup } from "../modules/area/loadAreas";
 import type { WorldState } from "../package";
-import { metricsRegistry, observe, tickBuckets } from "../metrics/shared";
 
 export interface MovementTrait {
   coords: Vector;
@@ -53,16 +51,6 @@ export function movementBehavior(
   };
 }
 
-const measuredFindPath = observe(
-  findPath,
-  new MetricsHistogram({
-    name: "findPath",
-    help: "Path finding algorithm",
-    registers: [metricsRegistry],
-    buckets: tickBuckets,
-  }),
-);
-
 export function updatePathForSubject(
   subject: MovementTrait,
   areas: AreaLookup,
@@ -80,7 +68,8 @@ export function updatePathForSubject(
   if (idx !== undefined && idx !== -1) {
     subject.path?.splice(idx + 1);
   } else {
-    const newPath = measuredFindPath(subject.coords, dest, area.dGraph);
+    const newPath = area.findPath(subject.coords, dest);
+
     if (newPath) {
       subject.path = newPath;
     }

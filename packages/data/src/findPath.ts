@@ -3,7 +3,16 @@ import { vec, vec_add, vec_distance } from "@mp/math";
 import { snapTileVector } from "./TiledResource";
 import { find_path } from "./dijkstra";
 
-export function findPath(
+export function createPathFinder(graph: DGraph): PathFinder {
+  return (start, target) => findPath(start, target, graph);
+}
+
+export type PathFinder = (
+  start: Vector,
+  target: Vector,
+) => Vector[] | undefined;
+
+function findPath(
   start: Vector,
   target: Vector,
   graph: DGraph,

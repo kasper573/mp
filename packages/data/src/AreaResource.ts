@@ -3,8 +3,8 @@ import { vec_copy } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
 import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { DNode } from "./findPath";
-import { vectorFromDNode, type DGraph } from "./findPath";
+import type { DNode, PathFinder } from "./findPath";
+import { createPathFinder, vectorFromDNode, type DGraph } from "./findPath";
 import { dGraphFromTiled } from "./dGraphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
@@ -16,6 +16,7 @@ export class AreaResource {
   private objects: Iterable<TiledObject>;
   readonly dGraph: DGraph;
   readonly characterLayer: Layer;
+  readonly #findPath: PathFinder;
 
   constructor(
     readonly id: AreaId,
@@ -29,6 +30,7 @@ export class AreaResource {
 
     this.objects = this.tiled.getObjects();
     this.dGraph = dGraphFromTiled(tiled);
+    this.#findPath = createPathFinder(this.dGraph);
 
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
 
@@ -36,6 +38,9 @@ export class AreaResource {
       ? snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)))
       : vectorFromDNode(Object.keys(this.dGraph)[0] as DNode);
   }
+
+  findPath: PathFinder = (...args) =>
+    AreaResource.findPathMiddleware(args, this.#findPath);
 
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
@@ -45,6 +50,11 @@ export class AreaResource {
       this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
     );
   }
+
+  static findPathMiddleware = (
+    args: Parameters<PathFinder>,
+    next: PathFinder,
+  ): ReturnType<PathFinder> => next(...args);
 }
 
 const characterLayerName = "Characters";

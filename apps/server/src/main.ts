@@ -11,7 +11,7 @@ import { createAuthServer } from "@mp/auth-server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
-import { collectDefaultMetrics } from "@mp/telemetry/prom";
+import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { assertEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
 import { err } from "@mp/std";
@@ -33,7 +33,7 @@ import { createExpressLogger } from "./express/createExpressLogger";
 import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
 import { npcAIBehavior } from "./traits/npcAI";
-import { metricsRegistry } from "./metrics/shared";
+import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
 
 const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();
@@ -41,12 +41,13 @@ logger.subscribe(consoleLoggerHandler(console));
 logger.info(`Server started with options`, opt);
 
 const clients = new ClientRegistry();
+const metrics = new MetricsRegistry();
 const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl, logger);
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
-  .use(metricsMiddleware(metricsRegistry)) // Intentionally placed before logger since it's so verbose and unnecessary to log
+  .use(metricsMiddleware(metrics)) // Intentionally placed before logger since it's so verbose and unnecessary to log
   .use(createExpressLogger(logger))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(
@@ -95,7 +96,7 @@ const persistTicker = new Ticker({
 const updateTicker = new Ticker({
   onError: logger.error,
   interval: opt.tickInterval,
-  middleware: createTickMetricsObserver(metricsRegistry),
+  middleware: createTickMetricsObserver(metrics),
 });
 
 const worldService = new CharacterService(
@@ -126,9 +127,10 @@ webServer.use(
   }),
 );
 
-collectDefaultMetrics({ register: metricsRegistry });
-collectProcessMetrics(metricsRegistry);
-collectUserMetrics(metricsRegistry, clients, syncServer);
+collectDefaultMetrics({ register: metrics });
+collectProcessMetrics(metrics);
+collectUserMetrics(metrics, clients, syncServer);
+collectPathFindingMetrics(metrics);
 
 updateTicker.subscribe(npcAIBehavior(syncServer.access, worldService.areas));
 updateTicker.subscribe(
