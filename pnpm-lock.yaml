@@ -74,6 +74,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../packages/math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../packages/path-finding
       '@mp/pixi':
         specifier: workspace:*
         version: link:../../packages/pixi
@@ -196,6 +199,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../packages/math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../packages/path-finding
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state

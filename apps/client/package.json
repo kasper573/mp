@@ -12,6 +12,7 @@
     "@mp/env": "workspace:*",
     "@mp/auth-client": "workspace:*",
     "@mp/data": "workspace:*",
+    "@mp/path-finding": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/logger": "workspace:*",

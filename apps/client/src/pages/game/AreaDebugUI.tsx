@@ -1,11 +1,6 @@
 import type { AreaResource, TiledResource } from "@mp/data";
 import { vec, vec_round, type Path, type Vector } from "@mp/math";
-import {
-  type Graph,
-  vectorFromNodeId,
-  nodeIdFromVector,
-  addVectorToAdjacentInGraph,
-} from "@mp/data";
+import { type Graph, addVectorToAdjacentInGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
@@ -166,8 +161,8 @@ function drawNode(
   tilePos: Vector,
   start = tiled.tileCoordToWorld(tilePos),
 ) {
-  for (const linkedNodeId of graph.getLinks(nodeIdFromVector(tilePos))) {
-    const end = tiled.tileCoordToWorld(vectorFromNodeId(linkedNodeId));
+  for (const linkedVector of graph.getLinks(tilePos)) {
+    const end = tiled.tileCoordToWorld(linkedVector);
     ctx.beginPath();
     ctx.moveTo(start.x, start.y);
     ctx.lineTo(end.x, end.y);

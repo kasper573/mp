@@ -2,8 +2,8 @@ import type { Vector } from "@mp/math";
 import { vec_copy, vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
-import type { PathFinder } from "@mp/path-finding";
-import { createPathFinder, type Graph } from "@mp/path-finding";
+import type { DijkstraGraph, PathFinder } from "@mp/path-finding";
+import { createDijkstraPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
@@ -14,7 +14,7 @@ export type AreaId = Branded<string, "AreaId">;
 export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
-  readonly graph: Graph;
+  readonly graph: DijkstraGraph;
   readonly characterLayer: Layer;
   readonly #findPath: PathFinder;
 
@@ -30,7 +30,7 @@ export class AreaResource {
 
     this.objects = this.tiled.getObjects();
     this.graph = graphFromTiled(tiled);
-    this.#findPath = createPathFinder(this.graph);
+    this.#findPath = createDijkstraPathFinder(this.graph);
 
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
     if (!startObj) {
