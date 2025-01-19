@@ -1,6 +1,6 @@
 import type http from "node:http";
 import type { Branded } from "@mp/std";
-import { decode, encode } from "cbor2";
+import { decode, encode } from "cbor-x";
 import type { Operation } from "rfc6902";
 
 export type ClientId = Branded<string, "ClientId">;
@@ -32,7 +32,7 @@ export type ServerToClientMessage<ClientState> =
 export type ClientToServerMessage = HandshakeMessage;
 
 const fixedDecode = <T>(buffer: ArrayBufferLike) =>
-  decode<T>(new Uint8Array(buffer));
+  decode(new Uint8Array(buffer)) as T;
 
 export const decodeServerToClientMessage = fixedDecode as <ClientState>(
   data: ArrayBufferLike,
