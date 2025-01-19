@@ -1,10 +1,11 @@
+import type { Path } from "@mp/math";
 import { vec, vec_add, type Vector } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
+import type { TiledClass } from "@mp/tiled-loader";
 import type { AreaLookup } from "../modules/area/loadAreas";
 import type { WorldState } from "../modules/world/WorldState";
 import type { NPC, NPCId } from "../modules/npc/schema";
-import { updatePathForSubject } from "./movement";
 
 export function npcAIBehavior(
   accessState: StateAccess<WorldState>,
@@ -20,17 +21,33 @@ export function npcAIBehavior(
 
   const someArea = [...areas.values()][0];
 
+  const npcObjects = someArea.tiled.getObjectsByClassName("NPC" as TiledClass);
+  const polylineObject = npcObjects.find((o) => o.objectType === "polyline");
+
+  const polyline = polylineObject?.polyline.map((coord) =>
+    someArea.tiled.worldCoordToTile(vec_add(polylineObject, coord)),
+  );
+
+  if (!polyline) {
+    throw new Error("No NPC polyline");
+  }
+
   accessState("initialize npcs", (state) => {
-    state.npcs[0] = {
-      areaId: someArea.id,
-      coords: someArea.start,
-      id: 0,
-      speed: 3,
-      color: 0xff_00_00,
-    };
+    for (let id = 0; id < 100; id++) {
+      state.npcs[id] = {
+        areaId: someArea.id,
+        coords: polyline[id % polyline.length],
+        id: id,
+        speed: 1 + (id % 4),
+        color: 0xff_00_00,
+      };
+    }
   });
 
   function isItTimeToMove(subject: NPC, totalTimeElapsed: TimeSpan): boolean {
+    if (subject.path) {
+      return false;
+    }
     const subjectMemory = memory.get(subject.id);
     if (!subjectMemory) {
       return true;
@@ -41,11 +58,15 @@ export function npcAIBehavior(
     return delta >= 2;
   }
 
-  function getDestination(subject: NPC): Vector {
-    const direction =
-      (memory.get(subject.id)?.numberOfMoves ?? 0) % 2 ? vec(-1, 0) : vec(1, 0);
+  function getDirection(subject: NPC) {
+    return (memory.get(subject.id)?.numberOfMoves ?? 0) % 2;
+  }
 
-    return vec_add(subject.coords, direction);
+  function getDestination(subject: NPC): Vector {
+    return vec_add(
+      subject.coords,
+      getDirection(subject) ? vec(-1, 0) : vec(1, 0),
+    );
   }
 
   function memorizeMove(subject: NPC, currentDelta: TimeSpan) {
@@ -62,10 +83,16 @@ export function npcAIBehavior(
     accessState("npcAIBehavior", (state) => {
       for (const subject of Object.values(state.npcs)) {
         if (isItTimeToMove(subject, totalTimeElapsed)) {
-          updatePathForSubject(subject, areas, getDestination(subject));
+          subject.path = getDirection(subject)
+            ? [...polyline]
+            : [...polyline].reverse();
           memorizeMove(subject, totalTimeElapsed);
         }
       }
     });
   };
+}
+
+function reversePath(path: Path): Path {
+  return [...path].reverse();
 }
