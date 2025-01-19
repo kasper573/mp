@@ -28,27 +28,27 @@ import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
 
-const visibleDGraphTypes = ["none", "all", "tile", "coord"] as const;
-type VisibleDGraphType = (typeof visibleDGraphTypes)[number];
+const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
+type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
   pathToDraw: Path | undefined;
 }) {
-  const [visibleDGraphType, setVisibleDGraphType] =
-    createSignal<VisibleDGraphType>("none");
+  const [visibleGraphType, setVisibleGraphType] =
+    createSignal<VisibleGraphType>("none");
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
-      <DebugDGraph area={props.area} visible={visibleDGraphType} />
+      <DebugGraph area={props.area} visible={visibleGraphType} />
       <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
       <div class={styles.debugMenu}>
         <div>
-          Visible DGraph lines:{" "}
+          Visible Graph lines:{" "}
           <Select
-            options={visibleDGraphTypes}
-            value={visibleDGraphType()}
-            onChange={setVisibleDGraphType}
+            options={visibleGraphTypes}
+            value={visibleGraphType()}
+            onChange={setVisibleGraphType}
             on:pointerdown={(e) => e.stopPropagation()}
           />
         </div>
@@ -58,9 +58,9 @@ export function AreaDebugUI(props: {
   );
 }
 
-function DebugDGraph(props: {
+function DebugGraph(props: {
   area: AreaResource;
-  visible: Accessor<VisibleDGraphType>;
+  visible: Accessor<VisibleGraphType>;
 }) {
   const gfx = new Graphics();
   const engine = useContext(EngineContext);
@@ -73,28 +73,28 @@ function DebugDGraph(props: {
 
   createEffect(() => {
     gfx.clear();
-    const { tiled, dGraph } = props.area;
+    const { tiled, graph } = props.area;
 
     if (props.visible() === "all") {
       for (const pos of allTileCoords()) {
-        drawDNode(gfx, tiled, dGraph, pos);
+        drawNode(gfx, tiled, graph, pos);
       }
     } else if (props.visible() === "tile") {
-      drawDNode(
+      drawNode(
         gfx,
         tiled,
-        dGraph,
+        graph,
         snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
       );
     } else if (props.visible() === "coord") {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
-      const cleanupGraph = addVectorToAdjacentInGraph(dGraph, tilePos);
-      drawDNode(gfx, tiled, dGraph, tilePos, tiled.tileCoordToWorld(tilePos));
+      const cleanupGraph = addVectorToAdjacentInGraph(graph, tilePos);
+      drawNode(gfx, tiled, graph, tilePos, tiled.tileCoordToWorld(tilePos));
       cleanupGraph();
     }
   });
 
-  return <Pixi label="DGraphDebugUI" as={gfx} />;
+  return <Pixi label="GraphDebugUI" as={gfx} />;
 }
 
 function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
@@ -160,7 +160,7 @@ function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
   ctx.stroke();
 }
 
-function drawDNode(
+function drawNode(
   ctx: Graphics,
   tiled: TiledResource,
   graph: Graph,

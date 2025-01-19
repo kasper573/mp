@@ -1,4 +1,4 @@
-export * from "./dGraphFromTiled";
+export * from "./graphFromTiled";
 export * from "./findPath";
 export * from "./moveAlongPath";
 export * from "./AreaResource";

@@ -5,7 +5,7 @@ import type { Branded } from "@mp/std";
 import { snapTileVector, type TiledResource } from "./TiledResource";
 import type { PathFinder } from "./findPath";
 import { createPathFinder, type Graph } from "./findPath";
-import { dGraphFromTiled } from "./dGraphFromTiled";
+import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
 
@@ -14,7 +14,7 @@ export type AreaId = Branded<string, "AreaId">;
 export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
-  readonly dGraph: Graph;
+  readonly graph: Graph;
   readonly characterLayer: Layer;
   readonly #findPath: PathFinder;
 
@@ -29,8 +29,8 @@ export class AreaResource {
     }
 
     this.objects = this.tiled.getObjects();
-    this.dGraph = dGraphFromTiled(tiled);
-    this.#findPath = createPathFinder(this.dGraph);
+    this.graph = graphFromTiled(tiled);
+    this.#findPath = createPathFinder(this.graph);
 
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
     if (!startObj) {

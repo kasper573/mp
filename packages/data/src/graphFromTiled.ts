@@ -2,7 +2,7 @@ import { vec, vec_distance } from "@mp/math";
 import { type TiledResource } from "./TiledResource";
 import { createGraph, nodeIdFromVector, type Graph } from "./findPath";
 
-export function dGraphFromTiled(tiled: TiledResource): Graph {
+export function graphFromTiled(tiled: TiledResource): Graph {
   const graph = createGraph();
 
   const walkableTileCoords = tiled.getMatchingTileCoords(

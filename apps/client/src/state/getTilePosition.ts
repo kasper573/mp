@@ -6,6 +6,6 @@ export function getTilePosition(area: AreaResource, engine: Engine) {
   const tilePosition = snapTileVector(
     area.tiled.worldCoordToTile(engine.pointer.worldPosition),
   );
-  const isValidTarget = area.dGraph.hasNode(nodeIdFromVector(tilePosition));
+  const isValidTarget = area.graph.hasNode(nodeIdFromVector(tilePosition));
   return { tilePosition, isValidTarget };
 }
