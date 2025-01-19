@@ -13,7 +13,6 @@
   },
   "dependencies": {
     "@mp/math": "workspace:*",
-    "dijkstrajs": "1.0.3",
     "ngraph.path": "1.5.0",
     "ngraph.graph": "20.0.1"
   },

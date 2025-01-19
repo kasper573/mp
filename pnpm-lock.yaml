@@ -380,9 +380,6 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
-      dijkstrajs:
-        specifier: 1.0.3
-        version: 1.0.3
       ngraph.graph:
         specifier: 20.0.1
         version: 20.0.1
@@ -3068,9 +3065,6 @@ packages:
   detect-libc@2.0.3:
     resolution: {integrity: sha512-bwy0MGW55bG41VqxxypOsdSdGqLwXPI/focwgTYCFMbdUiBAxLg9CFzG08sz2aqzknwiX7Hkl0bQENjg8iLByw==}
     engines: {node: '>=8'}
-
-  dijkstrajs@1.0.3:
-    resolution: {integrity: sha512-qiSlmBq9+BCdCA/L46dw8Uy93mloxsPSbwnm5yrKn2vMPiy8KyAskTF6zuV/j5BMsmOGZDPs7KjU+mjb670kfA==}
 
   doctrine@2.1.0:
     resolution: {integrity: sha512-35mSku4ZXK0vfCuHEDAwt55dg2jNajHZ1odvF+8SSr82EsZY4QmXfuWso8oEd8zRhVObSN18aM0CjSdoBX7zIw==}
@@ -7817,8 +7811,6 @@ snapshots:
 
   detect-libc@2.0.3:
     optional: true
-
-  dijkstrajs@1.0.3: {}
 
   doctrine@2.1.0:
     dependencies:
