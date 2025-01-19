@@ -79,6 +79,7 @@ export default tseslint.config(
       "unicorn/prefer-global-this": "off",
       "unicorn/filename-case": "off",
       "unicorn/no-array-reduce": "off",
+      "unicorn/prefer-spread": "off",
 
       // Typescript already catches these type of errors
       "unicorn/switch-case-braces": "off",
@@ -89,6 +90,7 @@ export default tseslint.config(
       // Gives false negatives, warns about non DOM functions
       "unicorn/prefer-dom-node-remove": "off",
       "unicorn/require-array-join-separator": "off",
+      "unicorn/no-array-method-this-argument": "off",
 
       // It's not worth the effort, some tooling does require it
       "unicorn/prefer-module": "off",
