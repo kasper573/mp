@@ -1,10 +1,10 @@
 import type { Vector } from "@mp/math";
-import { vec_copy } from "@mp/math";
+import { vec_copy, vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
-import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { PathFinder } from "./findPath";
-import { createPathFinder, type Graph } from "./findPath";
+import type { PathFinder } from "@mp/path-finding";
+import { createPathFinder, type Graph } from "@mp/path-finding";
+import { type TiledResource } from "./TiledResource";
 import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
@@ -37,7 +37,7 @@ export class AreaResource {
       throw new Error("Invalid area data: must have a start location");
     }
 
-    this.start = snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)));
+    this.start = vec_round(tiled.worldCoordToTile(vec_copy(startObj)));
   }
 
   findPath: PathFinder = (...args) =>

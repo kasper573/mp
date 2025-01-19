@@ -84,10 +84,6 @@ export class TiledResource {
     this.map.layers.flatMap((layer) => filterTiledObjects(layer, all));
 }
 
-export function snapTileVector({ x, y }: Vector): Vector {
-  return vec(Math.floor(x + 0.5), Math.floor(y + 0.5));
-}
-
 function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
   const map = new Map<K, T[]>();
   for (const item of array) {

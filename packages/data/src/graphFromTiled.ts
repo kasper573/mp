@@ -1,6 +1,6 @@
 import { vec, vec_distance } from "@mp/math";
+import { createGraph, nodeIdFromVector, type Graph } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
-import { createGraph, nodeIdFromVector, type Graph } from "./findPath";
 
 export function graphFromTiled(tiled: TiledResource): Graph {
   const graph = createGraph();

@@ -1,6 +1,5 @@
 import type { AreaResource, TiledResource } from "@mp/data";
-import { snapTileVector } from "@mp/data";
-import { vec, type Path, type Vector } from "@mp/math";
+import { vec, vec_round, type Path, type Vector } from "@mp/math";
 import {
   type Graph,
   vectorFromNodeId,
@@ -84,7 +83,7 @@ function DebugGraph(props: {
         gfx,
         tiled,
         graph,
-        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
+        vec_round(tiled.worldCoordToTile(engine.pointer.worldPosition)),
       );
     } else if (props.visible() === "coord") {
       const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
@@ -136,7 +135,7 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `viewport: ${vecToString(viewportPosition)}`,
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
-      `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
+      `tile (snapped): ${vecToString(vec_round(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       `character: ${JSON.stringify(trimCharacterInfo(world.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,

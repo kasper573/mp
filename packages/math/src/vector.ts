@@ -14,6 +14,10 @@ export const vec_equals = (a: Vector, b: Vector): boolean =>
 
 export const vec = (x: number, y: number): Vector => ({ x, y });
 
+export function vec_round({ x, y }: Vector): Vector {
+  return vec(Math.round(x), Math.round(y));
+}
+
 export const vec_zero: Vector = Object.freeze(vec(0, 0));
 
 export interface Vector {

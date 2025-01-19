@@ -1,6 +1,5 @@
 import type { Vector } from "@mp/math";
-import { vec, vec_add, vec_distance } from "@mp/math";
-import { snapTileVector } from "./TiledResource";
+import { vec, vec_add, vec_distance, vec_round } from "@mp/math";
 import { find_path } from "./dijkstra";
 
 export function createPathFinder(graph: Graph): PathFinder {
@@ -100,7 +99,7 @@ export function addVectorToAdjacentInGraph(
 }
 
 function adjacentVectors(fractional: Vector): Vector[] {
-  const from = snapTileVector(fractional);
+  const from = vec_round(fractional);
   const xOffset = (fractional.x - 0.5) % 1 < 0.5 ? -1 : 1;
   const yOffset = (fractional.y - 0.5) % 1 < 0.5 ? -1 : 1;
 

@@ -1,6 +1,6 @@
-import { moveAlongPath, snapTileVector, type AreaId } from "@mp/data";
+import { moveAlongPath, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
-import { vec_copy } from "@mp/math";
+import { vec_copy, vec_round } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { AreaLookup } from "../modules/area/loadAreas";
@@ -62,7 +62,7 @@ export function updatePathForSubject(
   }
 
   // Snap just in case the input is fractions
-  dest = snapTileVector(dest);
+  dest = vec_round(dest);
 
   const idx = subject.path?.findIndex((c) => c.x === dest.x && c.y === dest.y);
   if (idx !== undefined && idx !== -1) {

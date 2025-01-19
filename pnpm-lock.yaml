@@ -298,6 +298,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../path-finding
       '@mp/std':
         specifier: workspace:*
         version: link:../std
@@ -307,9 +310,6 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../time
-      dijkstrajs:
-        specifier: 1.0.3
-        version: 1.0.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -364,6 +364,25 @@ importers:
         version: link:../tsconfig
 
   packages/math:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/path-finding:
+    dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      dijkstrajs:
+        specifier: 1.0.3
+        version: 1.0.3
+      ngraph.graph:
+        specifier: 20.0.1
+        version: 20.0.1
+      ngraph.path:
+        specifier: 1.5.0
+        version: 1.5.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -4080,6 +4099,15 @@ packages:
   neverthrow@8.1.1:
     resolution: {integrity: sha512-DpbZ/UDI0B+TxJB1JysXSfi1++3YK2xLBqQLTlRN0b4zxlZ2MoiB+dKKV8dMRzt1fAFjRKDknXOVJgpl+a4Amw==}
     engines: {node: '>=18'}
+
+  ngraph.events@1.2.2:
+    resolution: {integrity: sha512-JsUbEOzANskax+WSYiAPETemLWYXmixuPAlmZmhIbIj6FH/WDgEGCGnRwUQBK0GjOnVm8Ui+e5IJ+5VZ4e32eQ==}
+
+  ngraph.graph@20.0.1:
+    resolution: {integrity: sha512-VFsQ+EMkT+7lcJO1QP8Ik3w64WbHJl27Q53EO9hiFU9CRyxJ8HfcXtfWz/U8okuoYKDctbciL6pX3vG5dt1rYA==}
+
+  ngraph.path@1.5.0:
+    resolution: {integrity: sha512-2IdmqfBYq2zbGHtpmskdWF6x/nIWZkhfs1taMgg2waBJRn4xNqe7gBiRtD1YS5ZcKhp0trK+Gw94Rli2emMs1Q==}
 
   node-fetch@2.7.0:
     resolution: {integrity: sha512-c4FRfUm/dbcWZ7U+1Wq0AwCyFL+3nt2bEw05wfxSz+DWpWsitgmSgYmy2dQdWyKC1694ELPqMs/YzUSNozLt8A==}
@@ -8908,6 +8936,14 @@ snapshots:
   neverthrow@8.1.1:
     optionalDependencies:
       '@rollup/rollup-linux-x64-gnu': 4.24.3
+
+  ngraph.events@1.2.2: {}
+
+  ngraph.graph@20.0.1:
+    dependencies:
+      ngraph.events: 1.2.2
+
+  ngraph.path@1.5.0: {}
 
   node-fetch@2.7.0:
     dependencies:
