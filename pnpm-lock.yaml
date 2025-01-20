@@ -380,6 +380,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       ngraph.graph:
         specifier: 20.0.1
         version: 20.0.1

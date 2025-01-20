@@ -1,6 +1,7 @@
 import type { AreaResource, TiledResource } from "@mp/data";
-import { vec, vec_round, type Path, type Vector } from "@mp/math";
-import { type Graph, addFractionalNode } from "@mp/path-finding";
+import { vec_round, type Path, type Vector } from "@mp/math";
+import type { VectorGraphNode } from "@mp/path-finding";
+import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
@@ -58,33 +59,32 @@ function DebugGraph(props: {
 }) {
   const gfx = new Graphics();
   const engine = useContext(EngineContext);
-  const allTileCoords = createMemo(() =>
-    generateAllTileCoords(
-      props.area.tiled.map.width,
-      props.area.tiled.map.height,
-    ),
-  );
 
   createEffect(() => {
     gfx.clear();
     const { tiled, graph } = props.area;
 
     if (props.visible() === "all") {
-      for (const pos of allTileCoords()) {
-        drawNode(gfx, tiled, graph, pos);
+      for (const node of graph.getNodes()) {
+        drawGraphNode(gfx, tiled, graph, node);
       }
     } else if (props.visible() === "tile") {
-      drawNode(
-        gfx,
-        tiled,
-        graph,
-        vec_round(tiled.worldCoordToTile(engine.pointer.worldPosition)),
+      const tileNode = graph.getNearestNode(
+        tiled.worldCoordToTile(engine.pointer.worldPosition),
       );
+      if (tileNode) {
+        drawGraphNode(gfx, tiled, graph, tileNode);
+      }
     } else if (props.visible() === "coord") {
-      const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
-      addFractionalNode(graph, tilePos);
-      drawNode(gfx, tiled, graph, tilePos, tiled.tileCoordToWorld(tilePos));
-      graph.removeNode(tilePos);
+      drawStar(
+        gfx,
+        engine.pointer.worldPosition,
+        props.area.graph
+          .getAdjacentNodes(
+            tiled.worldCoordToTile(engine.pointer.worldPosition),
+          )
+          .map((node) => tiled.tileCoordToWorld(node.data.vector)),
+      );
     }
   });
 
@@ -97,7 +97,7 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
   createEffect(() => {
     gfx.clear();
     if (props.path?.length) {
-      drawPath(gfx, props.tiled, props.path);
+      drawPath(gfx, props.path.map(props.tiled.tileCoordToWorld));
     }
   });
 
@@ -142,8 +142,24 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   return <p>{text()}</p>;
 }
 
-function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
-  const [start, ...rest] = path.map(tiled.tileCoordToWorld);
+function drawGraphNode(
+  ctx: Graphics,
+  tiled: TiledResource,
+  graph: VectorGraph,
+  node: VectorGraphNode,
+) {
+  drawStar(
+    ctx,
+    tiled.tileCoordToWorld(node.data.vector),
+    node.links
+      .values()
+      .map((link) => graph.getNode(link.toId).data.vector)
+      .map(tiled.tileCoordToWorld),
+  );
+}
+
+function drawPath(ctx: Graphics, path: Iterable<Vector>) {
+  const [start, ...rest] = Array.from(path);
 
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
@@ -154,32 +170,15 @@ function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
   ctx.stroke();
 }
 
-function drawNode(
-  ctx: Graphics,
-  tiled: TiledResource,
-  graph: Graph,
-  tilePos: Vector,
-  start = tiled.tileCoordToWorld(tilePos),
-) {
-  for (const linkedVector of graph.getLinks(tilePos)) {
-    const end = tiled.tileCoordToWorld(linkedVector);
+function drawStar(ctx: Graphics, from: Vector, destinations: Iterable<Vector>) {
+  for (const end of destinations) {
     ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
+    ctx.moveTo(from.x, from.y);
     ctx.lineTo(end.x, end.y);
     ctx.strokeStyle = { width: 2, color: "red" };
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
-}
-
-function generateAllTileCoords(width: number, height: number): Vector[] {
-  const result: Vector[] = [];
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
-      result.push(vec(x, y));
-    }
-  }
-  return result;
 }
 
 function trimCharacterInfo(char?: Character) {

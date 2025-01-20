@@ -34,8 +34,8 @@ export function createSyncClient(auth: AuthClient): WorldSyncClient {
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
-      ({ x, y }: Vector) =>
-        trpc.world.move.mutate({ characterId: characterId()!, x, y }),
+      (to: Vector) =>
+        trpc.world.move.mutate({ characterId: characterId()!, to }),
       100,
     ),
     vec_equals,

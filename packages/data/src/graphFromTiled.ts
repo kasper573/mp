@@ -1,10 +1,9 @@
 import { vec_distance } from "@mp/math";
-import type { Graph } from "@mp/path-finding";
-import { createNGraph } from "@mp/path-finding";
+import { VectorGraph } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 
-export function graphFromTiled(tiled: TiledResource): Graph {
-  const graph = createNGraph();
+export function graphFromTiled(tiled: TiledResource): VectorGraph {
+  const graph = new VectorGraph();
 
   const walkableTileCoords = tiled.getMatchingTileCoords(
     ({ tile }) => tile.properties.get("Walkable")?.value,
@@ -22,15 +21,15 @@ export function graphFromTiled(tiled: TiledResource): Graph {
     },
   );
 
-  for (const tile of walkableTileCoords) {
-    graph.addNode(tile);
+  for (const from of walkableTileCoords) {
+    graph.addNode(from);
 
-    for (const neighbor of walkableTileCoords) {
+    for (const to of walkableTileCoords) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
-      const distance = vec_distance(tile, neighbor);
+      const distance = vec_distance(from, to);
       if (distance === 1 || distance === Math.SQRT2) {
-        graph.addLink(tile, neighbor);
+        graph.addLink(from, to);
       }
     }
   }

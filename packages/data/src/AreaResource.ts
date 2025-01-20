@@ -2,7 +2,7 @@ import type { Vector } from "@mp/math";
 import { vec_copy, vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
-import type { Graph, PathFinder } from "@mp/path-finding";
+import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
@@ -13,9 +13,9 @@ export type AreaId = Branded<string, "AreaId">;
 export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
-  readonly graph: Graph;
+  readonly graph: VectorGraph;
   readonly characterLayer: Layer;
-  readonly #findPath: PathFinder;
+  #findPath: VectorPathFinder;
 
   constructor(
     readonly id: AreaId,
@@ -39,7 +39,7 @@ export class AreaResource {
     this.start = vec_round(tiled.worldCoordToTile(vec_copy(startObj)));
   }
 
-  findPath: PathFinder = (...args) =>
+  findPath: VectorPathFinder = (...args) =>
     AreaResource.findPathMiddleware(args, this.#findPath);
 
   hitTestObjects<Subject>(
@@ -51,10 +51,11 @@ export class AreaResource {
     );
   }
 
+  // TODO replace this with an idiomatic monkeypatch based otel instrumentation. That will also allow tracing
   static findPathMiddleware = (
-    args: Parameters<PathFinder>,
-    next: PathFinder,
-  ): ReturnType<PathFinder> => next(...args);
+    args: Parameters<VectorPathFinder>,
+    next: VectorPathFinder,
+  ): ReturnType<VectorPathFinder> => next(...args);
 }
 
 const characterLayerName = "Characters";

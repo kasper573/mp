@@ -11,7 +11,6 @@ import { vec_zero } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
-import { getTilePosition } from "../../state/getTilePosition";
 import { Actor } from "./Actor";
 import { TileHighlight } from "./TileHighlight";
 
@@ -56,9 +55,11 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   );
 
   createEffect(() => {
-    const { tilePosition, isValidTarget } = getTilePosition(props.area, engine);
-    if (engine.pointer.isDown && isValidTarget) {
-      world.move(tilePosition);
+    const tileNode = props.area.graph.getNearestNode(
+      props.area.tiled.worldCoordToTile(engine.pointer.worldPosition),
+    );
+    if (engine.pointer.isDown && tileNode) {
+      world.move(tileNode.data.vector);
     }
   });
 

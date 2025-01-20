@@ -51,7 +51,10 @@ export function movementBehavior(
   };
 }
 
-export function updatePathForSubject(
+/**
+ * Update the path of the subject to the path required to reach the given destination.
+ */
+export function moveTo(
   subject: MovementTrait,
   areas: AreaLookup,
   dest: Vector,
@@ -61,14 +64,29 @@ export function updatePathForSubject(
     throw new Error(`Area not found: ${subject.areaId}`);
   }
 
-  const idx = subject.path?.findIndex((c) => c.x === dest.x && c.y === dest.y);
-  if (idx !== undefined && idx !== -1) {
-    subject.path?.splice(idx + 1);
-  } else {
-    const newPath = area.findPath(subject.coords, dest);
+  const destNode = area.graph.getNearestNode(dest);
+  if (!destNode) {
+    throw new Error(`Destination not reachable: ${dest.x},${dest.y}`);
+  }
 
-    if (newPath) {
-      subject.path = newPath;
+  // If the subject is already on a path that contains the the destination, truncate the path to that point
+  if (subject.path) {
+    const idx = subject.path.findIndex(
+      (c) => c.x === destNode.data.vector.x && c.y === destNode.data.vector.y,
+    );
+    if (idx !== -1) {
+      subject.path.splice(idx + 1);
+      return;
     }
   }
+
+  const fromNode = area.graph.getNearestNode(subject.coords);
+  if (!fromNode) {
+    throw new Error(
+      `Invalid start position: ${subject.coords.x},${subject.coords.y}`,
+    );
+  }
+
+  // Otherwise, find a new path to the destination
+  subject.path = area.findPath(fromNode.id, destNode.id);
 }

@@ -5,7 +5,6 @@ import { createEffect, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { vec_scale, type Vector } from "@mp/math";
 import { EngineContext } from "@mp/engine";
-import { getTilePosition } from "../../state/getTilePosition";
 
 export interface TileHighlightProps {
   area: AreaResource;
@@ -17,10 +16,14 @@ export function TileHighlight(props: TileHighlightProps) {
 
   createEffect(() => {
     const { tileSize } = props.area.tiled;
-    const { isValidTarget, tilePosition } = getTilePosition(props.area, engine);
-    const { x, y } = vec_scale(tilePosition, tileSize);
-    gfx.position.set(x, y);
-    gfx.update(tileSize, isValidTarget);
+    const tileNode = props.area.graph.getNearestNode(
+      props.area.tiled.worldCoordToTile(engine.pointer.worldPosition),
+    );
+    if (tileNode) {
+      const { x, y } = vec_scale(tileNode.data.vector, tileSize);
+      gfx.position.set(x, y);
+    }
+    gfx.update(tileSize, !!tileNode);
   });
 
   return <Pixi as={gfx} />;

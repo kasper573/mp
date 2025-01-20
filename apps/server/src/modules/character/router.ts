@@ -1,11 +1,10 @@
 import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
-import { updatePathForSubject } from "../../traits/movement";
+import { moveTo } from "../../traits/movement";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 
@@ -21,9 +20,9 @@ export function createCharacterRouter({
 }: CharacterRouterDependencies) {
   return t.router({
     move: t.procedure
-      .input(schemaFor<{ characterId: CharacterId } & Vector>())
+      .input(schemaFor<{ characterId: CharacterId; to: Vector }>())
       .use(auth())
-      .mutation(({ input: { characterId, x, y }, ctx: { user } }) =>
+      .mutation(({ input: { characterId, to }, ctx: { user } }) =>
         accessState(`world.move`, (state) => {
           const char = state.characters[characterId];
 
@@ -41,7 +40,7 @@ export function createCharacterRouter({
             });
           }
 
-          updatePathForSubject(char, service.areas, vec(x, y));
+          moveTo(char, service.areas, to);
         }),
       ),
 
