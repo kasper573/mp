@@ -82,8 +82,6 @@ export function npcAIBehavior(
   return ({ totalTimeElapsed }) => {
     accessState("npcAIBehavior", (state) => {
       for (const subject of Object.values(state.npcs)) {
-        someArea.findPath(subject.coords, getDestination(subject));
-
         if (isItTimeToMove(subject, totalTimeElapsed)) {
           subject.path = getDirection(subject)
             ? [...polyline]
