@@ -40,7 +40,10 @@ export function createCharacterRouter({
             });
           }
 
-          moveTo(char, service.areas, to);
+          const result = moveTo(char, service.areas, to);
+          if (result.isErr()) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+          }
         }),
       ),
 
