@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
 import type { AreaId } from "@mp/data";
 import type { DBClient } from "../../db/client";
-import type { WorldState } from "../world/WorldState";
 import type { AreaLookup } from "../area/loadAreas";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
@@ -13,26 +12,13 @@ export class CharacterService {
 
   constructor(
     private db: DBClient,
-    public readonly areas: AreaLookup,
+    private readonly areas: AreaLookup,
   ) {
     if (areas.size === 0) {
       throw new Error("CharacterService cannot be created without areas");
     }
 
     this.defaultAreaId = [...areas.keys()][0];
-  }
-
-  persistWorldState(state: WorldState) {
-    return this.db.transaction((tx) =>
-      Promise.all(
-        Object.values(state.characters).map((char) => {
-          return tx.insert(characterTable).values(char).onConflictDoUpdate({
-            target: characterTable.id,
-            set: char,
-          });
-        }),
-      ),
-    );
   }
 
   async getCharacterForUser(userId: UserId): Promise<Character | undefined> {

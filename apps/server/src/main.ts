@@ -34,6 +34,9 @@ import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
 import { npcAIBehavior } from "./traits/npcAI";
+import { WorldService } from "./modules/world/service";
+import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
+import { NPCService } from "./modules/npc/service";
 
 const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();
@@ -84,13 +87,16 @@ const syncServer: WorldSyncServer = new SyncServer({
   onDisconnect: (clientId) => clients.remove(clientId),
 });
 
+const npcService = new NPCService(db);
+const worldService = new WorldService(db);
+
 const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
-  middleware: () =>
-    worldService.persistWorldState(
-      syncServer.access("persist", (state) => state),
-    ),
+  middleware: () => {
+    const state = syncServer.access("persist", (state) => state);
+    return worldService.persist(state);
+  },
 });
 
 const updateTicker = new Ticker({
@@ -99,13 +105,12 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
-const worldService = new CharacterService(
-  db,
-  await loadAreas(path.resolve(opt.publicDir, "areas")),
-);
+const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
+const characterService = new CharacterService(db, areas);
 
 const trpcRouter = createRootRouter({
-  service: worldService,
+  areas,
+  service: characterService,
   state: syncServer.access,
   createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,
@@ -132,7 +137,7 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, syncServer);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAIBehavior(syncServer.access, worldService.areas));
+updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
 updateTicker.subscribe(
   movementBehavior(
     syncServer.access,
@@ -140,9 +145,10 @@ updateTicker.subscribe(
       ...Object.values(state.characters),
       ...Object.values(state.npcs),
     ],
-    worldService.areas,
+    areas,
   ),
 );
+updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>

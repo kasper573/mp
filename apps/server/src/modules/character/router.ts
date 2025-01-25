@@ -5,17 +5,20 @@ import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
 import { moveTo } from "../../traits/movement";
+import type { AreaLookup } from "../area/loadAreas";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 
 export interface CharacterRouterDependencies {
   state: StateAccess<WorldState>;
+  areas: AreaLookup;
   service: CharacterService;
 }
 
 export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
 export function createCharacterRouter({
   state: accessState,
+  areas,
   service,
 }: CharacterRouterDependencies) {
   return t.router({
@@ -40,7 +43,7 @@ export function createCharacterRouter({
             });
           }
 
-          const result = moveTo(char, service.areas, to);
+          const result = moveTo(char, areas, to);
           if (result.isErr()) {
             throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
           }

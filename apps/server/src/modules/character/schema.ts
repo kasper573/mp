@@ -6,7 +6,7 @@ import { vector } from "../../db/types/vector";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 
-export const characterTable = pgTable("characters", {
+export const characterTable = pgTable("character", {
   id: serial().primaryKey(),
   coords: vector("coords").notNull(),
   areaId: branded<AreaId>("area_id").notNull(),
