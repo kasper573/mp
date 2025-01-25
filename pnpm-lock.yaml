@@ -432,6 +432,9 @@ importers:
       neverthrow:
         specifier: 8.1.1
         version: 8.1.1
+      uuid:
+        specifier: 11.0.4
+        version: 11.0.4
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -479,9 +482,6 @@ importers:
       rfc6902:
         specifier: 5.1.2
         version: 5.1.2
-      uuid:
-        specifier: 11.0.4
-        version: 11.0.4
       ws:
         specifier: 8.18.0
         version: 8.18.0
