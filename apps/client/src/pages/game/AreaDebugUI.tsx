@@ -9,6 +9,7 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  For,
   onCleanup,
   onMount,
   useContext,
@@ -28,7 +29,7 @@ type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathToDraw: Path | undefined;
+  pathsToDraw: Path[];
 }) {
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
@@ -36,7 +37,9 @@ export function AreaDebugUI(props: {
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
       <DebugGraph area={props.area} visible={visibleGraphType} />
-      <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
+      <For each={props.pathsToDraw}>
+        {(path) => <DebugPath tiled={props.area.tiled} path={path} />}
+      </For>
       <div class={styles.debugMenu}>
         <div>
           Visible Graph lines:{" "}
@@ -47,7 +50,7 @@ export function AreaDebugUI(props: {
             on:pointerdown={(e) => e.stopPropagation()}
           />
         </div>
-        <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+        <DebugText tiled={props.area.tiled} />
       </div>
     </Pixi>
   );
@@ -104,7 +107,7 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
   return <Pixi label="PathDebugUI" as={gfx} />;
 }
 
-function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
+function DebugText(props: { tiled: TiledResource }) {
   const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();

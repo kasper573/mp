@@ -1,8 +1,6 @@
-import type { Character, WorldState } from "@mp/server";
+import type { WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import type { SyncClientReadyState } from "@mp/sync/client";
 import { SyncClient } from "@mp/sync/client";
-import type { Accessor } from "solid-js";
 import {
   createContext,
   createEffect,
@@ -11,14 +9,13 @@ import {
   onCleanup,
   untrack,
 } from "solid-js";
-import type { AreaId } from "@mp/data";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth-client";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { trpc } from "./trpc";
 
-export function createSyncClient(auth: AuthClient): WorldSyncClient {
+export function createSyncClient(auth: AuthClient) {
   const id = createMemo(() => auth.identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
     token: auth.identity()?.token,
@@ -28,6 +25,12 @@ export function createSyncClient(auth: AuthClient): WorldSyncClient {
   const character = createMemo(() => worldState()?.characters[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
+  const actorsInArea = createMemo(() =>
+    [
+      ...Object.values(worldState()?.characters ?? []),
+      ...Object.values(worldState()?.npcs ?? []),
+    ].filter((char) => char.areaId === areaId()),
+  );
 
   const join = async () => trpc.world.join.mutate().then(setCharacterId);
 
@@ -52,6 +55,7 @@ export function createSyncClient(auth: AuthClient): WorldSyncClient {
   });
 
   return {
+    actorsInArea,
     readyState,
     worldState,
     areaId,
@@ -70,12 +74,4 @@ export const SyncClientContext = createContext<WorldSyncClient>(
   }),
 );
 
-export interface WorldSyncClient {
-  readyState: Accessor<SyncClientReadyState>;
-  worldState: Accessor<WorldState | undefined>;
-  areaId: Accessor<AreaId | undefined>;
-  characterId: Accessor<CharacterId | undefined>;
-  character: Accessor<Character | undefined>;
-  join(): Promise<unknown>;
-  move(pos: Vector): void;
-}
+export type WorldSyncClient = ReturnType<typeof createSyncClient>;
