@@ -3,10 +3,10 @@ import { QueryClientProvider } from "@tanstack/solid-query";
 import { Router } from "@solidjs/router";
 import Layout from "./ui/Layout";
 import { routes } from "./routes";
-import { createQueryClient } from "./clients/query";
-import { attachTrpcIntegrations } from "./clients/trpc";
+import { createQueryClient } from "./integrations/query";
+import { attachTrpcIntegrations } from "./integrations/trpc";
 import { env } from "./env";
-import { createFaroClient, useFaroIntegration } from "./clients/faro";
+import { createFaroClient, useFaroIntegration } from "./integrations/faro";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.

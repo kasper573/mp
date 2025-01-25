@@ -12,7 +12,8 @@
     }
   },
   "dependencies": {
-    "neverthrow": "8.1.1"
+    "neverthrow": "8.1.1",
+    "uuid": "11.0.4"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

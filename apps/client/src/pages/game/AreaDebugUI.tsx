@@ -1,13 +1,7 @@
 import type { AreaResource, TiledResource } from "@mp/data";
-import { snapTileVector } from "@mp/data";
-import { vec, type Path, type Vector } from "@mp/math";
-import {
-  type DNode,
-  type DGraph,
-  vectorFromDNode,
-  dNodeFromVector,
-  addVectorToAdjacentInGraph,
-} from "@mp/data";
+import { vec_round, type Path, type Vector } from "@mp/math";
+import type { VectorGraphNode } from "@mp/path-finding";
+import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
@@ -15,9 +9,9 @@ import {
   createEffect,
   createMemo,
   createSignal,
+  For,
   onCleanup,
   onMount,
-  Show,
   useContext,
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
@@ -26,88 +20,78 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
-import { GameClientContext } from "../../clients/game";
-import { toggleSignal } from "../../state/toggleSignal";
+import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
 import * as styles from "./AreaDebugUI.css";
 
-const visibleDGraphTypes = ["none", "all", "tile", "coord"] as const;
-type VisibleDGraphType = (typeof visibleDGraphTypes)[number];
+const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
+type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathToDraw: Path | undefined;
+  pathsToDraw: Path[];
 }) {
-  const engine = useContext(EngineContext);
-  const [isVisible, toggleDebug] = toggleSignal();
-  const [visibleDGraphType, setVisibleDGraphType] =
-    createSignal<VisibleDGraphType>("none");
-
-  onCleanup(engine.keyboard.on("keydown", "F2", toggleDebug));
+  const [visibleGraphType, setVisibleGraphType] =
+    createSignal<VisibleGraphType>("none");
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
-      <Show when={isVisible()}>
-        <DebugDGraph area={props.area} visible={visibleDGraphType} />
-        <DebugPath tiled={props.area.tiled} path={props.pathToDraw} />
-        <div class={styles.debugMenu}>
-          <div>
-            Visible DGraph lines:{" "}
-            <Select
-              options={visibleDGraphTypes}
-              value={visibleDGraphType()}
-              onChange={setVisibleDGraphType}
-              on:pointerdown={(e) => e.stopPropagation()}
-            />
-          </div>
-          <DebugText tiled={props.area.tiled} path={props.pathToDraw} />
+      <DebugGraph area={props.area} visible={visibleGraphType} />
+      <For each={props.pathsToDraw}>
+        {(path) => <DebugPath tiled={props.area.tiled} path={path} />}
+      </For>
+      <div class={styles.debugMenu}>
+        <div>
+          Visible Graph lines:{" "}
+          <Select
+            options={visibleGraphTypes}
+            value={visibleGraphType()}
+            onChange={setVisibleGraphType}
+            on:pointerdown={(e) => e.stopPropagation()}
+          />
         </div>
-      </Show>
+        <DebugText tiled={props.area.tiled} />
+      </div>
     </Pixi>
   );
 }
 
-function DebugDGraph(props: {
+function DebugGraph(props: {
   area: AreaResource;
-  visible: Accessor<VisibleDGraphType>;
+  visible: Accessor<VisibleGraphType>;
 }) {
   const gfx = new Graphics();
   const engine = useContext(EngineContext);
-  const allTileCoords = createMemo(() =>
-    generateAllTileCoords(
-      props.area.tiled.map.width,
-      props.area.tiled.map.height,
-    ),
-  );
 
   createEffect(() => {
     gfx.clear();
-    const { tiled, dGraph } = props.area;
+    const { tiled, graph } = props.area;
 
     if (props.visible() === "all") {
-      for (const pos of allTileCoords()) {
-        drawDNode(gfx, tiled, dGraph, pos);
+      for (const node of graph.getNodes()) {
+        drawGraphNode(gfx, tiled, graph, node);
       }
     } else if (props.visible() === "tile") {
-      drawDNode(
-        gfx,
-        tiled,
-        dGraph,
-        snapTileVector(tiled.worldCoordToTile(engine.pointer.worldPosition)),
+      const tileNode = graph.getNearestNode(
+        tiled.worldCoordToTile(engine.pointer.worldPosition),
       );
+      if (tileNode) {
+        drawGraphNode(gfx, tiled, graph, tileNode);
+      }
     } else if (props.visible() === "coord") {
-      const tilePos = tiled.worldCoordToTile(engine.pointer.worldPosition);
-      drawDNode(
+      drawStar(
         gfx,
-        tiled,
-        addVectorToAdjacentInGraph(dGraph, tilePos),
-        tilePos,
-        tiled.tileCoordToWorld(tilePos),
+        engine.pointer.worldPosition,
+        props.area.graph
+          .getAdjacentNodes(
+            tiled.worldCoordToTile(engine.pointer.worldPosition),
+          )
+          .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }
   });
 
-  return <Pixi label="DGraphDebugUI" as={gfx} />;
+  return <Pixi label="GraphDebugUI" as={gfx} />;
 }
 
 function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
@@ -116,15 +100,15 @@ function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
   createEffect(() => {
     gfx.clear();
     if (props.path?.length) {
-      drawPath(gfx, props.tiled, props.path);
+      drawPath(gfx, props.path.map(props.tiled.tileCoordToWorld));
     }
   });
 
   return <Pixi label="PathDebugUI" as={gfx} />;
 }
 
-function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
-  const gameClient = useContext(GameClientContext);
+function DebugText(props: { tiled: TiledResource }) {
+  const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
   const serverVersion = useServerVersion();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
@@ -149,9 +133,9 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
       `viewport: ${vecToString(viewportPosition)}`,
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
-      `tile (snapped): ${vecToString(snapTileVector(tilePos))}`,
+      `tile (snapped): ${vecToString(vec_round(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(gameClient.character()), null, 2)}`,
+      `character: ${JSON.stringify(trimCharacterInfo(world.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,
@@ -161,8 +145,24 @@ function DebugText(props: { tiled: TiledResource; path: Path | undefined }) {
   return <p>{text()}</p>;
 }
 
-function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
-  const [start, ...rest] = path.map(tiled.tileCoordToWorld);
+function drawGraphNode(
+  ctx: Graphics,
+  tiled: TiledResource,
+  graph: VectorGraph,
+  node: VectorGraphNode,
+) {
+  drawStar(
+    ctx,
+    tiled.tileCoordToWorld(node.data.vector),
+    node.links
+      .values()
+      .map((link) => graph.getNode(link.toId).data.vector)
+      .map(tiled.tileCoordToWorld),
+  );
+}
+
+function drawPath(ctx: Graphics, path: Iterable<Vector>) {
+  const [start, ...rest] = Array.from(path);
 
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
@@ -173,34 +173,15 @@ function drawPath(ctx: Graphics, tiled: TiledResource, path: Vector[]) {
   ctx.stroke();
 }
 
-function drawDNode(
-  ctx: Graphics,
-  tiled: TiledResource,
-  graph: DGraph,
-  tilePos: Vector,
-  start = tiled.tileCoordToWorld(tilePos),
-) {
-  for (const [neighbor] of Object.entries(
-    graph[dNodeFromVector(tilePos)] ?? {},
-  )) {
-    const end = tiled.tileCoordToWorld(vectorFromDNode(neighbor as DNode));
+function drawStar(ctx: Graphics, from: Vector, destinations: Iterable<Vector>) {
+  for (const end of destinations) {
     ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
+    ctx.moveTo(from.x, from.y);
     ctx.lineTo(end.x, end.y);
     ctx.strokeStyle = { width: 2, color: "red" };
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
-}
-
-function generateAllTileCoords(width: number, height: number): Vector[] {
-  const result: Vector[] = [];
-  for (let x = 0; x < width; x++) {
-    for (let y = 0; y < height; y++) {
-      result.push(vec(x, y));
-    }
-  }
-  return result;
 }
 
 function trimCharacterInfo(char?: Character) {

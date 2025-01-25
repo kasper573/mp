@@ -1,4 +1,4 @@
-type Branded<T, Brand> = T & { __brand: Brand };
+import type { Branded } from "@mp/std";
 
 // Primitives
 export type RGB = Branded<string, "RGB">;

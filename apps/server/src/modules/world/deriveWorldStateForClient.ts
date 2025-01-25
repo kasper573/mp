@@ -1,8 +1,9 @@
 import type { ClientId } from "@mp/sync/server";
 import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
 import { clientViewDistance } from "../../shared";
-import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldState, Character } from "./schema";
+import type { ClientRegistry } from "../../ClientRegistry";
+import type { MovementTrait } from "../../traits/movement";
+import type { WorldState } from "./WorldState";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -17,23 +18,25 @@ export function deriveWorldStateForClient(clients: ClientRegistry) {
     );
 
     if (!clientCharacter) {
-      return { characters: {} };
+      return { characters: {}, npcs: {} };
     }
 
     const visibleCharacters = Object.entries(state.characters).filter(
-      ([_, other]) => canSeeCharacter(clientCharacter, other),
+      ([_, other]) => canSeeSubject(clientCharacter, other),
+    );
+
+    const visibleNpcs = Object.entries(state.npcs).filter(([_, other]) =>
+      canSeeSubject(clientCharacter, other),
     );
 
     return {
       characters: Object.fromEntries(visibleCharacters),
+      npcs: Object.fromEntries(visibleNpcs),
     };
   };
 }
 
-function canSeeCharacter(a: Character, b: Character) {
-  if (a.id === b.id) {
-    return true;
-  }
+function canSeeSubject(a: MovementTrait, b: MovementTrait) {
   if (a.areaId !== b.areaId) {
     return false;
   }

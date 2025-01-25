@@ -1,21 +1,21 @@
 import { Graphics } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import type { Character } from "@mp/server";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
+import type { MovementTrait, AppearanceTrait } from "@mp/server";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
-export function AutoPositionedCharacterActor(props: {
-  tiled: TiledResource;
-  char: Character;
-}) {
-  const coords = useAnimatedCoords(() => props.char);
+export type ActorTrait = MovementTrait & AppearanceTrait;
+
+export function Actor(props: { tiled: TiledResource; actor: ActorTrait }) {
+  const coords = useAnimatedCoords(() => props.actor);
   return (
     <Show when={coords()}>
       {(coords) => (
-        <ManuallyPositionedCharacterActor
+        <ActorGraphics
           tileSize={props.tiled.tileSize}
+          color={props.actor.color}
           position={props.tiled.tileCoordToWorld(coords())}
         />
       )}
@@ -23,23 +23,24 @@ export function AutoPositionedCharacterActor(props: {
   );
 }
 
-export function ManuallyPositionedCharacterActor(props: {
+function ActorGraphics(props: {
   tileSize: Vector;
   position?: Vector;
+  color: number;
 }) {
   const gfx = new Graphics();
 
   createEffect(() => {
     const { x: width, y: height } = props.tileSize;
     gfx.clear();
-    gfx.fillStyle.color = 0x00_ff_00;
+    gfx.fillStyle.color = props.color;
     gfx.rect(-width / 2, -height / 2, width, height);
     gfx.fill();
   });
 
   return (
     <Show when={props.position}>
-      {(pos) => <Pixi label="CharacterActor" as={gfx} position={pos()} />}
+      {(pos) => <Pixi label="Actor" as={gfx} position={pos()} />}
     </Show>
   );
 }

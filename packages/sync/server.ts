@@ -2,7 +2,7 @@ import type http from "node:http";
 import { produce, original } from "immer";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
-import { v4 } from "uuid";
+import { uuid } from "@mp/std";
 import { createPatch } from "rfc6902";
 import type { Result } from "@mp/std";
 import type { PatchStateMessage, ServerToClientMessage } from "./shared";
@@ -207,7 +207,7 @@ interface ClientInfo<ClientState> {
 
 type ClientInfoMap<ClientState> = Map<ClientId, ClientInfo<ClientState>>;
 
-const newClientId = v4 as unknown as () => ClientId;
+const newClientId = uuid as unknown as () => ClientId;
 
 export type { ClientId, HandshakeData } from "./shared";
 

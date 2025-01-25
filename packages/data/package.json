@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@mp/tiled-loader": "workspace:*",
+    "@mp/path-finding": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
-    "@mp/std": "workspace:*",
-    "dijkstrajs": "1.0.3"
+    "@mp/std": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

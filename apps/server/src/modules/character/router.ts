@@ -1,30 +1,31 @@
-import { findPath, type AreaId, type AreaResource } from "@mp/data";
 import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
-import { type CharacterId, type WorldState } from "./schema";
-import type { WorldService } from "./service";
+import { type WorldState } from "../world/WorldState";
+import { moveTo } from "../../traits/movement";
+import type { AreaLookup } from "../area/loadAreas";
+import { type CharacterId } from "./schema";
+import type { CharacterService } from "./service";
 
-export interface WorldRouterDependencies {
+export interface CharacterRouterDependencies {
   state: StateAccess<WorldState>;
-  service: WorldService;
-  areas: Map<AreaId, AreaResource>;
+  areas: AreaLookup;
+  service: CharacterService;
 }
 
-export type WorldRouter = ReturnType<typeof createWorldRouter>;
-export function createWorldRouter({
+export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
+export function createCharacterRouter({
   state: accessState,
   areas,
   service,
-}: WorldRouterDependencies) {
+}: CharacterRouterDependencies) {
   return t.router({
     move: t.procedure
-      .input(schemaFor<{ characterId: CharacterId } & Vector>())
+      .input(schemaFor<{ characterId: CharacterId; to: Vector }>())
       .use(auth())
-      .mutation(({ input: { characterId, x, y }, ctx: { user } }) =>
+      .mutation(({ input: { characterId, to }, ctx: { user } }) =>
         accessState(`world.move`, (state) => {
           const char = state.characters[characterId];
 
@@ -42,22 +43,9 @@ export function createWorldRouter({
             });
           }
 
-          const area = areas.get(char.areaId);
-          if (!area) {
-            throw new TRPCError({
-              code: "INTERNAL_SERVER_ERROR",
-              message: `Characters current area not found: ${char.areaId}`,
-            });
-          }
-
-          const idx = char.path?.findIndex((c) => c.x === x && c.y === y);
-          if (idx !== undefined && idx !== -1) {
-            char.path?.splice(idx + 1);
-          } else {
-            const newPath = findPath(char.coords, vec(x, y), area.dGraph);
-            if (newPath) {
-              char.path = newPath;
-            }
+          const result = moveTo(char, areas, to);
+          if (result.isErr()) {
+            throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
           }
         }),
       ),

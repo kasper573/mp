@@ -1,7 +1,7 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { ClientRegistry } from "./ClientRegistry";
-import type { WorldSyncServer } from "./schema";
+import type { WorldSyncServer } from "../modules/world/WorldState";
+import type { ClientRegistry } from "../ClientRegistry";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
@@ -22,8 +22,22 @@ export function collectUserMetrics(
     help: "Number of player characters currently active",
     registers: [registry],
     collect() {
-      worldState.access("collectUserMetrics", (state) => {
-        this.set(Object.values(state.characters).length);
+      worldState.access(
+        "collectUserMetrics.active_character_count",
+        (state) => {
+          this.set(Object.values(state.characters).length);
+        },
+      );
+    },
+  });
+
+  new MetricsGague({
+    name: "active_npc_count",
+    help: "Number of non-player characters currently active",
+    registers: [registry],
+    collect() {
+      worldState.access("collectUserMetrics.active_npc_count", (state) => {
+        this.set(Object.values(state.npcs).length);
       });
     },
   });

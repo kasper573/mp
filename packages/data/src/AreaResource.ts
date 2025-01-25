@@ -1,11 +1,10 @@
 import type { Vector } from "@mp/math";
-import { vec_copy } from "@mp/math";
+import { vec_copy, vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded } from "@mp/std";
-import { snapTileVector, type TiledResource } from "./TiledResource";
-import type { DNode } from "./findPath";
-import { vectorFromDNode, type DGraph } from "./findPath";
-import { dGraphFromTiled } from "./dGraphFromTiled";
+import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
+import { type TiledResource } from "./TiledResource";
+import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
 
@@ -14,8 +13,9 @@ export type AreaId = Branded<string, "AreaId">;
 export class AreaResource {
   readonly start: Vector;
   private objects: Iterable<TiledObject>;
-  readonly dGraph: DGraph;
+  readonly graph: VectorGraph;
   readonly characterLayer: Layer;
+  #findPath: VectorPathFinder;
 
   constructor(
     readonly id: AreaId,
@@ -28,14 +28,19 @@ export class AreaResource {
     }
 
     this.objects = this.tiled.getObjects();
-    this.dGraph = dGraphFromTiled(tiled);
+    this.graph = graphFromTiled(tiled);
+    this.#findPath = this.graph.createPathFinder();
 
     const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
+    if (!startObj) {
+      throw new Error("Invalid area data: must have a start location");
+    }
 
-    this.start = startObj
-      ? snapTileVector(tiled.worldCoordToTile(vec_copy(startObj)))
-      : vectorFromDNode(Object.keys(this.dGraph)[0] as DNode);
+    this.start = vec_round(tiled.worldCoordToTile(vec_copy(startObj)));
   }
+
+  findPath: VectorPathFinder = (...args) =>
+    AreaResource.findPathMiddleware(args, this.#findPath);
 
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
@@ -45,6 +50,12 @@ export class AreaResource {
       this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
     );
   }
+
+  // TODO replace this with an idiomatic monkeypatch based otel instrumentation. That will also allow tracing
+  static findPathMiddleware = (
+    args: Parameters<VectorPathFinder>,
+    next: VectorPathFinder,
+  ): ReturnType<VectorPathFinder> => next(...args);
 }
 
 const characterLayerName = "Characters";

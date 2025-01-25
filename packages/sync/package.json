@@ -19,9 +19,8 @@
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "rfc6902": "5.1.2",
-    "cbor2": "1.8.0",
+    "cbor-x": "1.6.0",
     "immer": "10.1.1",
-    "uuid": "11.0.4",
     "ws": "8.18.0"
   },
   "devDependencies": {

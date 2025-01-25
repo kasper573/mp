@@ -16,10 +16,13 @@
     "watch": "tsx watch src/main.ts",
     "db": "drizzle-kit",
     "dev": "pnpm devenv watch",
+    "inspect": "pnpm devenv tsx --inspect src/main.ts",
+    "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
     "@mp/auth-server": "workspace:*",
+    "@mp/path-finding": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/std": "workspace:*",

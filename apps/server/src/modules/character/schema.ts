@@ -1,12 +1,12 @@
 import type { AreaId } from "@mp/data";
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
-import type { Path } from "@mp/math";
-import type { UserId, UserIdentity } from "@mp/auth-server";
-import type { SyncServer } from "@mp/sync/server";
+import type { UserId } from "@mp/auth-server";
 import { branded } from "../../db/types/branded";
 import { vector } from "../../db/types/vector";
+import type { MovementTrait } from "../../traits/movement";
+import type { AppearanceTrait } from "../../traits/appearance";
 
-export const characterTable = pgTable("characters", {
+export const characterTable = pgTable("character", {
   id: serial().primaryKey(),
   coords: vector("coords").notNull(),
   areaId: branded<AreaId>("area_id").notNull(),
@@ -16,14 +16,9 @@ export const characterTable = pgTable("characters", {
 
 type DBCharacter = typeof characterTable.$inferSelect;
 
-export interface Character extends DBCharacter {
-  path?: Path;
-}
-
-export type WorldState = {
-  characters: Record<CharacterId, Character>;
-};
+export interface Character
+  extends DBCharacter,
+    MovementTrait,
+    AppearanceTrait {}
 
 export type CharacterId = Character["id"];
-
-export type WorldSyncServer = SyncServer<WorldState, WorldState, UserIdentity>;

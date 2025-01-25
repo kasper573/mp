@@ -22,7 +22,7 @@ export interface Tileset {
   backgroundcolor?: string;
   class?: TiledClass;
   columns: TileNumber;
-  fillmode: FillMode;
+  fillmode: string;
   firstgid: GlobalTileId;
   grid?: Grid;
 

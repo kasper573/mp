@@ -8,7 +8,7 @@ import type { MetricsRegistry } from "@mp/telemetry/prom";
 export function metricsMiddleware(
   registry: MetricsRegistry,
 ): express.RequestHandler {
-  return (req, res, next) => {
+  return function metricsMiddleware(req, res, next) {
     if (isAllowedToAccessMetrics(req) && req.path === "/metrics") {
       res.set("Content-Type", "text/plain");
       registry
