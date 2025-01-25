@@ -1,7 +1,7 @@
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
-import type { AreaLookup } from "../modules/area/loadAreas";
-import type { WorldState } from "../modules/world/WorldState";
+import type { AreaLookup } from "../area/loadAreas";
+import type { WorldState } from "../world/WorldState";
 
 export function npcAIBehavior(
   accessState: StateAccess<WorldState>,

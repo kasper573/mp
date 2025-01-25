@@ -33,7 +33,7 @@ import { createExpressLogger } from "./express/createExpressLogger";
 import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
-import { npcAIBehavior } from "./traits/npcAI";
+import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
 import { WorldService } from "./modules/world/service";
 import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
