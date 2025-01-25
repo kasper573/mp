@@ -20,11 +20,13 @@ export function npcSpawnBehavior(
           throw new Error(`Area not found: ${spawn.areaId}`);
         }
 
-        const instance = spawnNpcInstance(npc, spawn, {
-          x: area.tiled.map.tilewidth,
-          y: area.tiled.map.tileheight,
-        });
-        state.npcs[instance.id] = instance;
+        for (let i = 0; i < spawn.count; i++) {
+          const instance = spawnNpcInstance(npc, spawn, {
+            x: area.tiled.map.tilewidth,
+            y: area.tiled.map.tileheight,
+          });
+          state.npcs[instance.id] = instance;
+        }
       }
     });
   });
