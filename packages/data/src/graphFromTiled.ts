@@ -1,9 +1,10 @@
 import { vec_distance } from "@mp/math";
 import { VectorGraph } from "@mp/path-finding";
+import type { TileNumber } from "@mp/std";
 import { type TiledResource } from "./TiledResource";
 
-export function graphFromTiled(tiled: TiledResource): VectorGraph {
-  const graph = new VectorGraph();
+export function graphFromTiled(tiled: TiledResource): VectorGraph<TileNumber> {
+  const graph = new VectorGraph<TileNumber>();
 
   const walkableTileCoords = tiled.getMatchingTileCoords(
     ({ tile }) => tile.properties.get("Walkable")?.value,

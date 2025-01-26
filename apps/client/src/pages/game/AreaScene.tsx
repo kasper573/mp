@@ -7,8 +7,9 @@ import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
-import { vec_zero } from "@mp/math";
+import { vec } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
+import type { Pixel, TileNumber } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { Actor } from "./Actor";
@@ -34,7 +35,9 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
 
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
-    return coords ? props.area.tiled.tileCoordToWorld(coords) : vec_zero;
+    return coords
+      ? props.area.tiled.tileCoordToWorld(coords)
+      : vec(0 as Pixel, 0 as Pixel);
   });
 
   const cameraPos = useSpring(
@@ -97,10 +100,10 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
 }
 
 function createZoomLevelForViewDistance(
-  tileSize: Vector,
-  cameraSize: Vector,
-  tileViewDistance: number,
-) {
+  tileSize: Vector<Pixel>,
+  cameraSize: Vector<Pixel>,
+  tileViewDistance: TileNumber,
+): number {
   return Math.max(
     cameraSize.x / tileSize.x / tileViewDistance,
     cameraSize.y / tileSize.y / tileViewDistance,

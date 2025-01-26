@@ -1,5 +1,6 @@
 import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
+import { vec, vec_scale } from "@mp/math";
+import type { Pixel, TileNumber } from "@mp/std";
 import type {
   TiledMap,
   TileLayerTile,
@@ -16,27 +17,34 @@ export class TiledResource {
     return vec(this.map.tilewidth, this.map.tileheight);
   }
 
-  get mapSize(): Vector {
-    return {
-      x: this.map.width * this.map.tilewidth,
-      y: this.map.height * this.map.tileheight,
-    };
+  get mapSize(): Vector<Pixel> {
+    return vec_scale(this.tileCount, this.tileSize);
   }
 
-  worldCoordToTile = ({ x, y }: Vector): Vector => {
-    return vec(x / this.map.tilewidth - 0.5, y / this.map.tileheight - 0.5);
+  get tileCount(): Vector<TileNumber> {
+    return vec(this.map.width, this.map.height);
+  }
+
+  worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<TileNumber> => {
+    return vec(
+      (x / this.map.tilewidth - 0.5) as TileNumber,
+      (y / this.map.tileheight - 0.5) as TileNumber,
+    );
   };
 
-  tileCoordToWorld = ({ x, y }: Vector): Vector => {
-    return vec((x + 0.5) * this.map.tilewidth, (y + 0.5) * this.map.tileheight);
+  tileCoordToWorld = ({ x, y }: Vector<TileNumber>): Vector<Pixel> => {
+    return vec(
+      ((x + 0.5) * this.map.tilewidth) as Pixel,
+      ((y + 0.5) * this.map.tileheight) as Pixel,
+    );
   };
 
-  tileUnitToWorld = (n: number): number => n * this.map.tilewidth;
+  tileUnitToWorld = (n: TileNumber): Pixel => (n * this.map.tilewidth) as Pixel;
 
   getMatchingTileCoords = <T>(
     getValue: (tile: TileLayerTile) => T,
     coordinateTest: (values: NoInfer<T>[]) => boolean,
-  ): Vector[] => {
+  ): Vector<TileNumber>[] => {
     const tilesPerCoordinate = groupBy(
       this.map.layers
         .flatMap((layer) => filterTileLayerTiles(layer, all))
@@ -47,7 +55,7 @@ export class TiledResource {
       ({ pos: { x, y } }) => `${x}|${y}`,
     );
 
-    const coordinates: Vector[] = [];
+    const coordinates: Vector<TileNumber>[] = [];
     for (const tiles of tilesPerCoordinate.values()) {
       const values = tiles.map((t) => t.propertyValue);
       if (coordinateTest(values)) {

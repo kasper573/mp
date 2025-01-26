@@ -2,19 +2,19 @@ import type { Computed } from "@mp/state";
 import { atom, computed, batch } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
-export class Spring implements SpringLike<number> {
-  readonly velocity = atom(0);
-  readonly #value = atom(0);
+export class Spring<T extends number> implements SpringLike<T> {
+  readonly velocity = atom<T>(0 as T);
+  readonly #value = atom<T>(0 as T);
   readonly state: Computed<SpringState>;
 
   value = () => this.#value.get();
 
   constructor(
-    public readonly target: () => number,
+    public readonly target: () => T,
     private options: () => SpringOptions,
-    init?: number,
+    init?: T,
   ) {
-    this.#value.set(init ?? target());
+    this.#value.set(() => init ?? target());
     this.state = computed(() => {
       const { precision } = this.options();
       const isSettled =
@@ -34,12 +34,14 @@ export class Spring implements SpringLike<number> {
     const acceleration = (force + dampingForce) / mass;
 
     batch(() => {
-      this.velocity.set((prev) => prev + acceleration * dt.totalSeconds);
-      this.#value.set((prev) => prev + this.velocity.get() * dt.totalSeconds);
+      this.velocity.set((prev) => (prev + acceleration * dt.totalSeconds) as T);
+      this.#value.set(
+        (prev) => (prev + this.velocity.get() * dt.totalSeconds) as T,
+      );
 
       if (this.state() === "settled") {
-        this.#value.set(currentTarget);
-        this.velocity.set(0);
+        this.#value.set(() => currentTarget);
+        this.velocity.set(() => 0 as T);
       }
     });
   };

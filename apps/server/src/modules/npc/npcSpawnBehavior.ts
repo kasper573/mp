@@ -1,7 +1,8 @@
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
+import type { TileNumber } from "@mp/std";
 import { uuid } from "@mp/std";
-import { clamp, type Vector } from "@mp/math";
+import { clamp, vec, type Vector } from "@mp/math";
 import type { WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
 import type { NPCService } from "./service";
@@ -22,8 +23,8 @@ export function npcSpawnBehavior(
 
         for (let i = 0; i < spawn.count; i++) {
           const instance = spawnNpcInstance(npc, spawn, {
-            x: area.tiled.map.tilewidth,
-            y: area.tiled.map.tileheight,
+            x: area.tiled.map.width,
+            y: area.tiled.map.height,
           });
           state.npcs[instance.id] = instance;
         }
@@ -37,7 +38,7 @@ export function npcSpawnBehavior(
 function spawnNpcInstance(
   npc: NPC,
   spawn: NPCSpawn,
-  tiledMapSize: Vector,
+  tiledMapSize: Vector<TileNumber>,
 ): NPCInstance {
   const id = uuid();
   return {
@@ -49,7 +50,10 @@ function spawnNpcInstance(
   };
 }
 
-function determineSpawnCoords(spawn: NPCSpawn, tiledMapSize: Vector): Vector {
+function determineSpawnCoords(
+  spawn: NPCSpawn,
+  tiledMapSize: Vector<TileNumber>,
+): Vector<TileNumber> {
   if (spawn.coords) {
     return spawn.coords;
   }
@@ -57,14 +61,14 @@ function determineSpawnCoords(spawn: NPCSpawn, tiledMapSize: Vector): Vector {
   if (spawn.randomRadius) {
     const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * spawn.randomRadius;
-    return {
-      x: clamp(0, Math.cos(angle) * radius, tiledMapSize.x),
-      y: clamp(0, Math.sin(angle) * radius, tiledMapSize.y),
-    };
+    return vec(
+      clamp(0, Math.cos(angle) * radius, tiledMapSize.x) as TileNumber,
+      clamp(0, Math.sin(angle) * radius, tiledMapSize.y) as TileNumber,
+    );
   }
 
-  return {
-    x: Math.floor(Math.random() * tiledMapSize.x),
-    y: Math.floor(Math.random() * tiledMapSize.y),
-  };
+  return vec(
+    Math.floor(Math.random() * tiledMapSize.x) as TileNumber,
+    Math.floor(Math.random() * tiledMapSize.y) as TileNumber,
+  );
 }

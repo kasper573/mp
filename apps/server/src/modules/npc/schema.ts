@@ -1,16 +1,17 @@
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import { vector } from "../../db/types/vector";
+import type { TileNumber } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
+import { vector } from "../../db/types/vector";
 
 /**
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
   id: serial().primaryKey(),
-  speed: integer("speed").notNull(),
+  speed: integer().$type<TileNumber>().notNull(),
 });
 
 export type NPC = typeof npcTable.$inferSelect;
@@ -24,13 +25,13 @@ export const npcRelations = relations(npcTable, ({ many }) => ({
  */
 export const npcSpawnTable = pgTable("npc_spawn", {
   id: serial().primaryKey(),
-  count: integer("count").notNull(),
+  count: integer().notNull(),
   areaId: areaId.notNull(),
-  npcId: integer("npc_id")
+  npcId: integer()
     .notNull()
     .references(() => npcTable.id, { onDelete: "cascade" }),
-  coords: vector("coords"),
-  randomRadius: integer("random_radius"),
+  coords: vector<TileNumber>(),
+  randomRadius: integer(),
 });
 
 export type NPCSpawn = typeof npcSpawnTable.$inferSelect;

@@ -1,7 +1,7 @@
+import type { Pixel } from "@mp/std";
 import type {
   GlobalTileId,
   ObjectId,
-  Pixel,
   Coord,
   Degrees,
   TiledClass,

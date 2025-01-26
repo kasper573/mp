@@ -1,20 +1,26 @@
 import type { Vector } from "./vector";
 
-export interface Rect {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
+export interface Rect<T extends number> {
+  x: T;
+  y: T;
+  width: T;
+  height: T;
 }
 
-export const rect_fromDiameter = (center: Vector, diameter: number): Rect => ({
-  x: center.x - diameter / 2,
-  y: center.y - diameter / 2,
+export const rect_fromDiameter = <T extends number>(
+  center: Vector<T>,
+  diameter: T,
+): Rect<T> => ({
+  x: (center.x - diameter / 2) as T,
+  y: (center.y - diameter / 2) as T,
   width: diameter,
   height: diameter,
 });
 
-export const rect_intersectsPoint = (rect: Rect, p: Vector): boolean =>
+export const rect_intersectsPoint = <T extends number>(
+  rect: Rect<T>,
+  p: Vector<T>,
+): boolean =>
   p.x >= rect.x &&
   p.x <= rect.x + rect.width &&
   p.y >= rect.y &&

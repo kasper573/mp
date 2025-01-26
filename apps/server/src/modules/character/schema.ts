@@ -1,17 +1,19 @@
-import type { AreaId } from "@mp/data";
-import { integer, pgTable, serial } from "drizzle-orm/pg-core";
+import { integer, pgTable, serial, uuid } from "drizzle-orm/pg-core";
 import type { UserId } from "@mp/auth-server";
-import { branded } from "../../db/types/branded";
-import { vector } from "../../db/types/vector";
+import type { TileNumber } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
+import { areaId } from "../area/schema";
+import { vector } from "../../db/types/vector";
+
+export const userId = uuid().$type<UserId>();
 
 export const characterTable = pgTable("character", {
   id: serial().primaryKey(),
-  coords: vector("coords").notNull(),
-  areaId: branded<AreaId>("area_id").notNull(),
-  speed: integer("speed").notNull(),
-  userId: branded<UserId>("user_id").notNull(),
+  coords: vector<TileNumber>().notNull(),
+  areaId: areaId.notNull(),
+  speed: integer().$type<TileNumber>().notNull(),
+  userId: userId.notNull(),
 });
 
 type DBCharacter = typeof characterTable.$inferSelect;

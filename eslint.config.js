@@ -58,6 +58,9 @@ export default tseslint.config(
       // {} is useful as empty set
       "@typescript-eslint/ban-types": "off",
       "@typescript-eslint/no-empty-object-type": "off",
+
+      // Gives false positives for branded number types
+      "@typescript-eslint/no-unsafe-unary-minus": "off",
     },
   },
   {

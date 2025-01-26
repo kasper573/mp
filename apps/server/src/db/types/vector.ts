@@ -1,12 +1,9 @@
 import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
-import { customType } from "drizzle-orm/pg-core";
+import { point } from "drizzle-orm/pg-core";
 
-export const vector = customType<{ data: Vector; driverData: string }>({
-  dataType: () => "jsonb",
-  toDriver: (value) => JSON.stringify(value),
-  fromDriver: (json: unknown) => {
-    const { x, y } = json as Vector;
-    return vec(x, y);
-  },
-});
+/**
+ * A drizzle/postgres representation of the Vector type from @mp/std
+ */
+export function vector<T extends number>() {
+  return point({ mode: "xy" }).$type<Vector<T>>();
+}

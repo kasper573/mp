@@ -1,7 +1,7 @@
 import type { Vector } from "@mp/math";
 import { vec_copy, vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import type { Branded } from "@mp/std";
+import type { Branded, Pixel, TileNumber } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 import { graphFromTiled } from "./graphFromTiled";
@@ -11,11 +11,11 @@ import { hitTestTiledObject } from "./hitTestTiledObject";
 export type AreaId = Branded<string, "AreaId">;
 
 export class AreaResource {
-  readonly start: Vector;
+  readonly start: Vector<TileNumber>;
   private objects: Iterable<TiledObject>;
-  readonly graph: VectorGraph;
+  readonly graph: VectorGraph<TileNumber>;
   readonly characterLayer: Layer;
-  #findPath: VectorPathFinder;
+  #findPath: VectorPathFinder<TileNumber>;
 
   constructor(
     readonly id: AreaId,
@@ -39,23 +39,23 @@ export class AreaResource {
     this.start = vec_round(tiled.worldCoordToTile(vec_copy(startObj)));
   }
 
-  findPath: VectorPathFinder = (...args) =>
+  findPath: VectorPathFinder<TileNumber> = (...args) =>
     AreaResource.findPathMiddleware(args, this.#findPath);
 
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
-    getTileCoordOfSubject: (s: Subject) => Vector,
+    getCoordOfSubject: (s: Subject) => Vector<TileNumber>,
   ) {
     return hitTestObjects(this.objects, subjects, (subject) =>
-      this.tiled.tileCoordToWorld(getTileCoordOfSubject(subject)),
+      this.tiled.tileCoordToWorld(getCoordOfSubject(subject)),
     );
   }
 
   // TODO replace this with an idiomatic monkeypatch based otel instrumentation. That will also allow tracing
   static findPathMiddleware = (
-    args: Parameters<VectorPathFinder>,
-    next: VectorPathFinder,
-  ): ReturnType<VectorPathFinder> => next(...args);
+    args: Parameters<VectorPathFinder<TileNumber>>,
+    next: VectorPathFinder<TileNumber>,
+  ): ReturnType<VectorPathFinder<TileNumber>> => next(...args);
 }
 
 const characterLayerName = "Characters";
@@ -63,10 +63,10 @@ const characterLayerName = "Characters";
 function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,
   subjects: Iterable<Subject>,
-  getWorldCoordOfSubject: (s: Subject) => Vector,
+  getCoordOfSubject: (s: Subject) => Vector<Pixel>,
 ): Generator<{ subject: Subject; object: TiledObject }> {
   for (const subject of subjects) {
-    const worldPos = getWorldCoordOfSubject(subject);
+    const worldPos = getCoordOfSubject(subject);
     for (const object of objects) {
       if (hitTestTiledObject(object, worldPos)) {
         yield { subject, object };

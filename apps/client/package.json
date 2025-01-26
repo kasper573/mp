@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@mp/env": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/auth-client": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/path-finding": "workspace:*",

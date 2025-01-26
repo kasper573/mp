@@ -1,10 +1,10 @@
 import { vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
-export function moveAlongPath(
-  coords: Vector,
-  path: ShiftableArray<Vector>,
-  speed: number,
+export function moveAlongPath<T extends number>(
+  coords: Vector<T>,
+  path: ShiftableArray<Vector<T>>,
+  speed: NoInfer<T>,
   delta: TimeSpan,
 ): void {
   let distanceToMove = speed * delta.totalSeconds;
@@ -19,8 +19,8 @@ export function moveAlongPath(
       coords.y = y;
     } else {
       const percentage = distanceToMove / distanceToDestination;
-      coords.x += (destination.x - coords.x) * percentage;
-      coords.y += (destination.y - coords.y) * percentage;
+      coords.x = (coords.x + (destination.x - coords.x) * percentage) as T;
+      coords.y = (coords.y + (destination.y - coords.y) * percentage) as T;
       break;
     }
   }
