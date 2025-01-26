@@ -1,4 +1,4 @@
 import type { AreaId } from "@mp/data";
-import { branded } from "../../db/types/branded";
+import { varchar } from "drizzle-orm/pg-core";
 
-export const areaId = branded<AreaId>("area_id");
+export const areaId = varchar({ length: 60 }).$type<AreaId>();

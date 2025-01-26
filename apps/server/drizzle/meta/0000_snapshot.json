@@ -1,5 +1,5 @@
 {
-  "id": "bc1738fc-63a5-4a61-874b-fccaac72f124",
+  "id": "f651f297-c14d-4ea5-814b-2be3e15642db",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -20,9 +20,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "area_id": {
-          "name": "area_id",
-          "type": "text",
+        "areaId": {
+          "name": "areaId",
+          "type": "varchar(60)",
           "primaryKey": false,
           "notNull": true
         },
@@ -32,9 +32,9 @@
           "primaryKey": false,
           "notNull": true
         },
-        "user_id": {
-          "name": "user_id",
-          "type": "text",
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
           "primaryKey": false,
           "notNull": true
         }
@@ -63,14 +63,14 @@
           "primaryKey": false,
           "notNull": true
         },
-        "area_id": {
-          "name": "area_id",
-          "type": "text",
+        "areaId": {
+          "name": "areaId",
+          "type": "varchar(60)",
           "primaryKey": false,
           "notNull": true
         },
-        "npc_id": {
-          "name": "npc_id",
+        "npcId": {
+          "name": "npcId",
           "type": "integer",
           "primaryKey": false,
           "notNull": true
@@ -81,8 +81,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "random_radius": {
-          "name": "random_radius",
+        "randomRadius": {
+          "name": "randomRadius",
           "type": "integer",
           "primaryKey": false,
           "notNull": false
@@ -90,12 +90,12 @@
       },
       "indexes": {},
       "foreignKeys": {
-        "npc_spawn_npc_id_npc_id_fk": {
-          "name": "npc_spawn_npc_id_npc_id_fk",
+        "npc_spawn_npcId_npc_id_fk": {
+          "name": "npc_spawn_npcId_npc_id_fk",
           "tableFrom": "npc_spawn",
           "tableTo": "npc",
           "columnsFrom": [
-            "npc_id"
+            "npcId"
           ],
           "columnsTo": [
             "id"
