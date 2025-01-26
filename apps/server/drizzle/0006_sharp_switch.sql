@@ -1,1 +1,0 @@
-ALTER TABLE "npc_spawn" ADD CONSTRAINT "npc_spawn_npc_id_npc_id_fk" FOREIGN KEY ("npc_id") REFERENCES "public"."npc"("id") ON DELETE no action ON UPDATE no action;

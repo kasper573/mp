@@ -1,11 +1,11 @@
 {
-  "id": "ad059a1a-509a-4395-b82a-b1062a97e2b3",
+  "id": "bc1738fc-63a5-4a61-874b-fccaac72f124",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
-    "public.characters": {
-      "name": "characters",
+    "public.character": {
+      "name": "character",
       "schema": "",
       "columns": {
         "id": {
@@ -16,7 +16,7 @@
         },
         "coords": {
           "name": "coords",
-          "type": "jsonb",
+          "type": "point",
           "primaryKey": false,
           "notNull": true
         },
@@ -35,6 +35,94 @@
         "user_id": {
           "name": "user_id",
           "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc_spawn": {
+      "name": "npc_spawn",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "area_id": {
+          "name": "area_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "npc_id": {
+          "name": "npc_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coords": {
+          "name": "coords",
+          "type": "point",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "random_radius": {
+          "name": "random_radius",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "npc_spawn_npc_id_npc_id_fk": {
+          "name": "npc_spawn_npc_id_npc_id_fk",
+          "tableFrom": "npc_spawn",
+          "tableTo": "npc",
+          "columnsFrom": [
+            "npc_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc": {
+      "name": "npc",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "speed": {
+          "name": "speed",
+          "type": "integer",
           "primaryKey": false,
           "notNull": true
         }

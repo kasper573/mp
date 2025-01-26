@@ -1,1 +1,0 @@
-ALTER TABLE "npc_spawn" ADD COLUMN "npc_id" integer NOT NULL;
