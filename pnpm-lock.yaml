@@ -89,6 +89,9 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../packages/std
       '@mp/style':
         specifier: workspace:*
         version: link:../../packages/style
@@ -329,6 +332,9 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/time':
         specifier: workspace:*
         version: link:../time

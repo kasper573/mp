@@ -3,11 +3,11 @@ import createGraph from "ngraph.graph";
 import { aStar } from "ngraph.path";
 import type { Branded } from "@mp/std";
 
-export class VectorGraph {
+export class VectorGraph<T extends number> {
   private nodeIds = new Set<VectorGraphNodeId>();
-  private ng = createGraph<NodeData, LinkData>();
+  private ng = createGraph<NodeData<T>, LinkData>();
 
-  getNode = (id: VectorGraphNodeId): VectorGraphNode => {
+  getNode = (id: VectorGraphNodeId): VectorGraphNode<T> => {
     const node = this.ng.getNode(id);
 
     if (!node) {
@@ -17,41 +17,41 @@ export class VectorGraph {
     // Forceful assert instead of constructing a new object since this function is called a lot
     // and we want to avoid allocating new objects. The VectorGraphNode type should have a matching
     // shape to the ngraph node, except with stricter id types, so this should be a safe assert, albeit fragile.
-    return node as unknown as VectorGraphNode;
+    return node as unknown as VectorGraphNode<T>;
   };
 
-  getNodes = (): Iterable<VectorGraphNode> => {
+  getNodes = (): Iterable<VectorGraphNode<T>> => {
     return this.nodeIds.values().map(this.getNode);
   };
 
-  getNearestNode(vector: Vector): VectorGraphNode | undefined {
+  getNearestNode(vector: Vector<T>): VectorGraphNode<T> | undefined {
     const id = nodeIdFromVector(vec_round(vector));
     return this.hasNode(id) ? this.getNode(id) : undefined;
   }
 
-  getAdjacentNodes(v: Vector): VectorGraphNode[] {
+  getAdjacentNodes(v: Vector<T>): VectorGraphNode<T>[] {
     const from = vec_round(v);
     const xOffset = (v.x - 0.5) % 1 < 0.5 ? -1 : 1;
     const yOffset = (v.y - 0.5) % 1 < 0.5 ? -1 : 1;
 
     return [
       from,
-      vec_add(from, vec(xOffset, 0)),
-      vec_add(from, vec(0, yOffset)),
-      vec_add(from, vec(xOffset, yOffset)),
+      vec_add(from, vec<T>(xOffset as T, 0 as T)),
+      vec_add(from, vec<T>(0 as T, yOffset as T)),
+      vec_add(from, vec<T>(xOffset as T, yOffset as T)),
     ]
       .map(nodeIdFromVector)
       .filter(this.hasNode)
       .map(this.getNode);
   }
 
-  addNode = (vector: Vector) => {
+  addNode = (vector: Vector<T>) => {
     const id = nodeIdFromVector(vector);
     this.nodeIds.add(id);
     this.ng.addNode(id, { vector });
   };
 
-  addLink = (fromVector: Vector, toVector: Vector) => {
+  addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
     this.ng.addLink(nodeIdFromVector(fromVector), nodeIdFromVector(toVector), {
       distance: vec_distance(fromVector, toVector),
     });
@@ -66,7 +66,7 @@ export class VectorGraph {
     this.ng.removeNode(id);
   };
 
-  createPathFinder = (): VectorPathFinder => {
+  createPathFinder = (): VectorPathFinder<T> => {
     const pathFinder = aStar(this.ng, {
       distance: (n1, n2, link) => link.data.distance,
       heuristic: (from, to) => vec_distance(from.data.vector, to.data.vector),
@@ -81,16 +81,16 @@ export class VectorGraph {
   };
 }
 
-export type VectorPathFinder = (
+export type VectorPathFinder<T extends number> = (
   start: VectorGraphNodeId,
   target: VectorGraphNodeId,
-) => Vector[] | undefined;
+) => Vector<T>[] | undefined;
 
 /**
  * Identical to ngraph's node type, but with stricter types.
  */
-export interface VectorGraphNode {
-  readonly data: Readonly<NodeData>;
+export interface VectorGraphNode<T extends number> {
+  readonly data: Readonly<NodeData<T>>;
   readonly id: VectorGraphNodeId;
   readonly links: ReadonlySet<{
     readonly id: string;
@@ -104,12 +104,15 @@ interface LinkData {
   distance: number;
 }
 
-interface NodeData {
-  vector: Vector;
+interface NodeData<T extends number> {
+  vector: Vector<T>;
 }
 
 export type VectorGraphNodeId = Branded<string, "NodeId">;
 
-function nodeIdFromVector({ x, y }: Vector): VectorGraphNodeId {
+function nodeIdFromVector<T extends number>({
+  x,
+  y,
+}: Vector<T>): VectorGraphNodeId {
   return `${x}:${y}` as VectorGraphNodeId;
 }

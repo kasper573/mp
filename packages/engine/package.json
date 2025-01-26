@@ -11,6 +11,7 @@
     }
   },
   "dependencies": {
+    "@mp/std": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/state": "workspace:*",

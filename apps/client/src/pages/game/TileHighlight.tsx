@@ -5,6 +5,7 @@ import { createEffect, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { vec_scale, type Vector } from "@mp/math";
 import { EngineContext } from "@mp/engine";
+import type { Pixel } from "@mp/std";
 
 export interface TileHighlightProps {
   area: AreaResource;
@@ -30,7 +31,7 @@ export function TileHighlight(props: TileHighlightProps) {
 }
 
 class TileHighlightGraphics extends Graphics {
-  update(size: Vector, isVisible: boolean) {
+  update(size: Vector<Pixel>, isVisible: boolean) {
     this.clear();
     this.fillStyle = isVisible ? visibleStyle : hiddenStyle;
     this.rect(0, 0, size.x, size.y);

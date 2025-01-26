@@ -4,6 +4,7 @@ import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
 import type { MovementTrait, AppearanceTrait } from "@mp/server";
+import type { Pixel } from "@mp/std";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
 export type ActorTrait = MovementTrait & AppearanceTrait;
@@ -24,8 +25,8 @@ export function Actor(props: { tiled: TiledResource; actor: ActorTrait }) {
 }
 
 function ActorGraphics(props: {
-  tileSize: Vector;
-  position?: Vector;
+  tileSize: Vector<Pixel>;
+  position?: Vector<Pixel>;
   color: number;
 }) {
   const gfx = new Graphics();

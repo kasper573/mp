@@ -1,13 +1,12 @@
+import type { TileNumber, Pixel } from "@mp/std";
 import type {
   GlobalTileId,
   LocalTileId,
   ObjectAlignment,
-  Pixel,
   Coord,
   RGB,
   TiledClass,
   TileRenderSize,
-  TileNumber,
   FilePath,
 } from "./common";
 import type { WangSet } from "./wang";

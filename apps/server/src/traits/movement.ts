@@ -3,16 +3,16 @@ import type { Path, Vector } from "@mp/math";
 import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
-import type { Result } from "@mp/std";
+import type { Result, TileNumber } from "@mp/std";
 import { err, ok } from "@mp/std";
 import type { AreaLookup } from "../modules/area/loadAreas";
 import type { WorldState } from "../package";
 
 export interface MovementTrait {
-  coords: Vector;
-  speed: number;
+  coords: Vector<TileNumber>;
+  speed: TileNumber;
   areaId: AreaId;
-  path?: Path;
+  path?: Path<TileNumber>;
 }
 
 export function movementBehavior(
@@ -59,7 +59,7 @@ export function movementBehavior(
 export function moveTo(
   subject: MovementTrait,
   areas: AreaLookup,
-  dest: Vector,
+  dest: Vector<TileNumber>,
 ): Result<"new" | "truncated" | "extended", string> {
   const area = areas.get(subject.areaId);
   if (!area) {

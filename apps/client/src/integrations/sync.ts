@@ -11,6 +11,7 @@ import {
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth-client";
+import type { TileNumber } from "@mp/std";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { trpc } from "./trpc";
@@ -37,7 +38,7 @@ export function createSyncClient(auth: AuthClient) {
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
-      (to: Vector) =>
+      (to: Vector<TileNumber>) =>
         trpc.world.move.mutate({ characterId: characterId()!, to }),
       100,
     ),

@@ -18,6 +18,7 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
+import type { Pixel, TileNumber } from "@mp/std";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
@@ -29,7 +30,7 @@ type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathsToDraw: Path[];
+  pathsToDraw: Path<TileNumber>[];
 }) {
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
@@ -94,7 +95,10 @@ function DebugGraph(props: {
   return <Pixi label="GraphDebugUI" as={gfx} />;
 }
 
-function DebugPath(props: { tiled: TiledResource; path: Path | undefined }) {
+function DebugPath(props: {
+  tiled: TiledResource;
+  path: Path<TileNumber> | undefined;
+}) {
   const gfx = new Graphics();
 
   createEffect(() => {
@@ -148,8 +152,8 @@ function DebugText(props: { tiled: TiledResource }) {
 function drawGraphNode(
   ctx: Graphics,
   tiled: TiledResource,
-  graph: VectorGraph,
-  node: VectorGraphNode,
+  graph: VectorGraph<TileNumber>,
+  node: VectorGraphNode<TileNumber>,
 ) {
   drawStar(
     ctx,
@@ -161,7 +165,7 @@ function drawGraphNode(
   );
 }
 
-function drawPath(ctx: Graphics, path: Iterable<Vector>) {
+function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>) {
   const [start, ...rest] = Array.from(path);
 
   ctx.beginPath();
@@ -173,7 +177,11 @@ function drawPath(ctx: Graphics, path: Iterable<Vector>) {
   ctx.stroke();
 }
 
-function drawStar(ctx: Graphics, from: Vector, destinations: Iterable<Vector>) {
+function drawStar(
+  ctx: Graphics,
+  from: Vector<Pixel>,
+  destinations: Iterable<Vector<Pixel>>,
+) {
   for (const end of destinations) {
     ctx.beginPath();
     ctx.moveTo(from.x, from.y);
@@ -194,6 +202,6 @@ function trimCharacterInfo(char?: Character) {
   );
 }
 
-function vecToString(v: Vector): string {
+function vecToString(v: Vector<number>): string {
   return `${v.x.toFixed(1)}, ${v.y.toFixed(1)}`;
 }

@@ -8,8 +8,12 @@ import type {
   TiledObject,
 } from "@mp/tiled-loader";
 import type { Vector } from "@mp/math";
+import type { Pixel } from "@mp/std";
 
-export function hitTestTiledObject(obj: TiledObject, pos: Vector): boolean {
+export function hitTestTiledObject(
+  obj: TiledObject,
+  pos: Vector<Pixel>,
+): boolean {
   switch (obj.objectType) {
     case "point":
       return point(obj, pos);
@@ -26,11 +30,11 @@ export function hitTestTiledObject(obj: TiledObject, pos: Vector): boolean {
   }
 }
 
-function point(obj: PointObject, pos: Vector): boolean {
+function point(obj: PointObject, pos: Vector<Pixel>): boolean {
   return obj.x === pos.x && obj.y === pos.y;
 }
 
-function ellipse(obj: EllipseObject, pos: Vector): boolean {
+function ellipse(obj: EllipseObject, pos: Vector<Pixel>): boolean {
   const { x, y, width, height } = obj;
   const dx = x - pos.x;
   const dy = y - pos.y;
@@ -39,19 +43,19 @@ function ellipse(obj: EllipseObject, pos: Vector): boolean {
   return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
 }
 
-function rectangle(obj: RectangleObject, pos: Vector): boolean {
+function rectangle(obj: RectangleObject, pos: Vector<Pixel>): boolean {
   const { x, y, width, height } = obj;
   return pos.x >= x && pos.x <= x + width && pos.y >= y && pos.y <= y + height;
 }
 
-function polygon(obj: PolygonObject, pos: Vector): boolean {
+function polygon(obj: PolygonObject, pos: Vector<Pixel>): boolean {
   return false;
 }
 
-function polyline(obj: PolylineObject, pos: Vector): boolean {
+function polyline(obj: PolylineObject, pos: Vector<Pixel>): boolean {
   return false;
 }
 
-function text(obj: TextObject, pos: Vector): boolean {
+function text(obj: TextObject, pos: Vector<Pixel>): boolean {
   return false;
 }

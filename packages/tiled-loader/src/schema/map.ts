@@ -1,14 +1,13 @@
+import type { TileNumber, Pixel } from "@mp/std";
 import type {
   Color,
   CompressionLevel,
   LayerId,
   MapRenderOrder,
   ObjectId,
-  Pixel,
   StaggerAxis,
   StaggerIndex,
   TiledClass,
-  TileNumber,
 } from "./common";
 import type { Layer } from "./layer";
 import type { PropertyMap } from "./property";

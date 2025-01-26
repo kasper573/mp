@@ -1,11 +1,7 @@
+import type { TileNumber } from "@mp/std";
 import { localToGlobalId, readGlobalIdBuffer } from "../gid";
 import type { Chunk } from "../schema/chunk";
-import type {
-  TileNumber,
-  Compression,
-  TiledData,
-  Encoding,
-} from "../schema/common";
+import type { Compression, TiledData, Encoding } from "../schema/common";
 import type {
   TileLayerTile,
   SharedLayerProperties,

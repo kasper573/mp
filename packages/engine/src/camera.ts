@@ -1,30 +1,35 @@
 import { Matrix, vec } from "@mp/math";
 import type { Vector } from "@mp/math";
 import { atom } from "@mp/state";
+import type { Pixel } from "@mp/std";
 
 export class Camera {
-  private position = vec(0, 0);
+  private position = vec(0 as Pixel, 0 as Pixel);
   private zoom = 1;
   readonly #transform = atom(new Matrix());
-  readonly #cameraSize = atom<Vector>({ x: 0, y: 0 });
+  readonly #cameraSize = atom(vec(0 as Pixel, 0 as Pixel));
 
   get transform(): Matrix {
     return this.#transform.get();
   }
 
-  get cameraSize(): Vector {
+  get cameraSize(): Vector<Pixel> {
     return this.#cameraSize.get();
   }
 
-  set cameraSize(size: Vector) {
+  set cameraSize(size: Vector<Pixel>) {
     this.#cameraSize.set(size);
   }
 
-  constructor(initialCameraSize: Vector) {
+  constructor(initialCameraSize: Vector<Pixel>) {
     this.#cameraSize.set(initialCameraSize);
   }
 
-  update(worldSize: Vector, zoom: number, position: Vector): void {
+  update(
+    worldSize: Vector<Pixel>,
+    zoom: number,
+    position: Vector<Pixel>,
+  ): void {
     this.zoom = zoom;
 
     const halfCameraWidth = this.cameraSize.x / 2 / this.zoom;
@@ -39,7 +44,7 @@ export class Camera {
       Math.min(worldSize.y - halfCameraHeight, position.y),
     );
 
-    this.position = vec(clampedX, clampedY);
+    this.position = vec(clampedX as Pixel, clampedY as Pixel);
 
     const offsetX = this.position.x - halfCameraWidth;
     const offsetY = this.position.y - halfCameraHeight;
@@ -56,17 +61,21 @@ export class Camera {
     );
   }
 
-  viewportToWorld(screenPos: Vector): Vector {
+  viewportToWorld(screenPos: Vector<Pixel>): Vector<Pixel> {
     return vec(
-      (screenPos.x - this.cameraSize.x / 2) / this.zoom + this.position.x,
-      (screenPos.y - this.cameraSize.y / 2) / this.zoom + this.position.y,
+      ((screenPos.x - this.cameraSize.x / 2) / this.zoom +
+        this.position.x) as Pixel,
+      ((screenPos.y - this.cameraSize.y / 2) / this.zoom +
+        this.position.y) as Pixel,
     );
   }
 
-  worldToViewport(worldPos: Vector): Vector {
+  worldToViewport(worldPos: Vector<Pixel>): Vector<Pixel> {
     return vec(
-      (worldPos.x - this.position.x) * this.zoom + this.cameraSize.x / 2,
-      (worldPos.y - this.position.y) * this.zoom + this.cameraSize.y / 2,
+      ((worldPos.x - this.position.x) * this.zoom +
+        this.cameraSize.x / 2) as Pixel,
+      ((worldPos.y - this.position.y) * this.zoom +
+        this.cameraSize.y / 2) as Pixel,
     );
   }
 }

@@ -1,12 +1,11 @@
+import type { Pixel, TileNumber } from "@mp/std";
 import type { GlobalIdFlags } from "../gid";
 import type {
   Color,
   LayerId,
-  Pixel,
   Ratio,
   RGB,
   TiledClass,
-  TileNumber,
   LayerDrawOrder,
   FilePath,
   GlobalTileId,

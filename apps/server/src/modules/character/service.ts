@@ -1,6 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
 import type { AreaId } from "@mp/data";
+import type { TileNumber } from "@mp/std";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
 import { characterTable } from "./schema";
@@ -48,7 +49,7 @@ export class CharacterService {
     const input = {
       areaId: area.id,
       coords: area.start,
-      speed: 3,
+      speed: 3 as TileNumber,
       userId,
       color: playerColor,
     };

@@ -7,14 +7,14 @@ import { computed } from "@mp/state";
 import type { SpringLike, SpringOptions } from "./spring";
 import { Spring } from "./spring";
 
-export class VectorSpring implements SpringLike<Vector> {
-  private xSpring: Spring;
-  private ySpring: Spring;
+export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
+  private xSpring: Spring<T>;
+  private ySpring: Spring<T>;
 
   constructor(
-    getTargetValue: () => Vector,
+    getTargetValue: () => Vector<T>,
     options: () => SpringOptions,
-    init?: Vector,
+    init?: Vector<T>,
   ) {
     this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
     this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);
@@ -23,7 +23,7 @@ export class VectorSpring implements SpringLike<Vector> {
     );
   }
 
-  readonly value: Computed<Vector>;
+  readonly value: Computed<Vector<T>>;
 
   state = () =>
     this.xSpring.state() === "settled" && this.ySpring.state() === "settled"

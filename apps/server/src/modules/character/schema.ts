@@ -1,16 +1,17 @@
 import type { AreaId } from "@mp/data";
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
 import type { UserId } from "@mp/auth-server";
+import type { TileNumber } from "@mp/std";
 import { branded } from "../../db/types/branded";
-import { vector } from "../../db/types/vector";
+import { tileVector } from "../../db/types/vector";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 
 export const characterTable = pgTable("character", {
   id: serial().primaryKey(),
-  coords: vector("coords").notNull(),
+  coords: tileVector("coords").notNull(),
   areaId: branded<AreaId>("area_id").notNull(),
-  speed: integer("speed").notNull(),
+  speed: integer("speed").$type<TileNumber>().notNull(),
   userId: branded<UserId>("user_id").notNull(),
 });
 
