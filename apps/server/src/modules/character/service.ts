@@ -1,4 +1,3 @@
-import { vec } from "@mp/math";
 import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth-server";
 import type { AreaId } from "@mp/data";
@@ -28,7 +27,7 @@ export class CharacterService {
       .where(eq(characterTable.userId, userId))
       .limit(1);
 
-    return { ...char, color: playerColor };
+    return char ? { ...char, color: playerColor } : undefined;
   }
 
   async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
@@ -48,7 +47,7 @@ export class CharacterService {
 
     const input = {
       areaId: area.id,
-      coords: vec(0, 0),
+      coords: area.start,
       speed: 3,
       userId,
       color: playerColor,
