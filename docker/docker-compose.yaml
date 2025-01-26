@@ -35,6 +35,9 @@ services:
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
+    deploy:
+      update_config:
+        order: start-first
 
   keycloak:
     env_file: *env_files
