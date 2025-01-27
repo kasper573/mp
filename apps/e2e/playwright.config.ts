@@ -1,8 +1,6 @@
 import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 
-const dockerDir = path.resolve(__dirname, "../../docker");
-
 const baseURL = `https://${process.env.MP_CLIENT_DOMAIN}`;
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
 const artifactsDir = path.join(outputDir, "artifacts");
@@ -38,13 +36,4 @@ export default defineConfig({
       use: { ...devices["Desktop Chrome"] },
     },
   ],
-
-  webServer: {
-    command: `cd ${dockerDir} && ./dockerctl.sh test up --no-build`,
-    stdout: "ignore",
-    stderr: "ignore",
-    url: baseURL,
-    ignoreHTTPSErrors,
-    reuseExistingServer: !process.env.CI,
-  },
 });
