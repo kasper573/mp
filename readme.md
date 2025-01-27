@@ -58,6 +58,10 @@ Local development is done using node and docker compose.
 
 You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script.
 
+### If you make database related changes
+
+You can perform [drizzle-kit](https://orm.drizzle.team/docs/kit-overview) commands against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
+
 ### Quirks
 
 While most of the repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
