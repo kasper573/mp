@@ -112,5 +112,4 @@ jobs:
             ./dockerctl.sh prod pull
             ./dockerctl.sh prod down
             ./dockerctl.sh prod up -d --remove-orphans --no-build
-            docker system prune -f
-            docker image prune -af
+            docker system prune
