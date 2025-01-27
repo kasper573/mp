@@ -32,12 +32,24 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
-    deploy:
-      update_config:
-        order: start-first
+
+  # This service only exists to aid the CI deployment script with a non zero exit code
+  # if mp-server fails to start properly (usually related to migrations failing).
+  mp-server-healthcheck:
+    image: alpine
+    restart: no
+    profiles: ["prod", "test"]
+    depends_on:
+      mp-server:
+        condition: service_healthy
 
   keycloak:
     env_file: *env_files
