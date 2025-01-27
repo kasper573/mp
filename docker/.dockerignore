@@ -3,5 +3,8 @@ dist
 node_modules
 docker
 .env*
+.git
+.vscode
 .docker-compose.yaml
 Dockerfile*
+*.md
