@@ -105,7 +105,7 @@ services:
     image: grafana/mimir:2.12.0
     volumes:
       - ./grafana/mimir.yaml:/etc/mimir/config.yaml
-      - /opt/mimir-data:/data
+      - mimir-data:/data
     entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
 
   tempo:
@@ -144,7 +144,7 @@ services:
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ./grafana/loki.yaml:/etc/loki/local-config.yaml
-      - /opt/loki-data:/loki
+      - loki-data:/loki
 
   node_exporter:
     env_file: *env_files
@@ -156,7 +156,7 @@ services:
     logging: *logging
     image: grafana/grafana:10.4.12
     volumes:
-      - /opt/grafana-data:/var/lib/grafana
+      - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
       - ./grafana/dashboards:/etc/grafana/dashboards
 
@@ -181,5 +181,8 @@ services:
       - caddy-config:/config
 
 volumes:
+  grafana-data:
+  loki-data:
+  mimir-data:
   caddy-data:
   caddy-config:

@@ -7,13 +7,13 @@ alertmanager_storage:
 blocks_storage:
   backend: filesystem
   bucket_store:
-    sync_dir: /data/mimir/tsdb-sync
+    sync_dir: /data/tsdb-sync
   filesystem:
-    dir: /data/mimir/blocks
+    dir: /data/blocks
   tsdb:
-    dir: /data/mimir/tsdb
+    dir: /data/tsdb
 compactor:
-  data_dir: /data/mimir/compactor
+  data_dir: /data/compactor
   sharding_ring:
     kvstore:
       store: inmemory
@@ -45,7 +45,7 @@ ruler_storage:
   filesystem:
     dir: ""
   local:
-    directory: /data/mimir/rules
+    directory: /data/rules
 server:
   grpc_server_max_concurrent_streams: 1000
   grpc_server_max_recv_msg_size: 104857600
