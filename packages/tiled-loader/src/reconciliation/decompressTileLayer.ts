@@ -1,4 +1,4 @@
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { localToGlobalId, readGlobalIdBuffer } from "../gid";
 import type { Chunk } from "../schema/chunk";
 import type { Compression, TiledData, Encoding } from "../schema/common";
@@ -46,8 +46,8 @@ export function decompressTileLayer(
   );
 
   const tiles: TileLayerTile[] = [];
-  for (let y = 0 as TileNumber; y < map.height; y++) {
-    for (let x = 0 as TileNumber; x < map.width; x++) {
+  for (let y = 0 as Tile; y < map.height; y++) {
+    for (let x = 0 as Tile; x < map.width; x++) {
       const { gid, newOffset, flags } = readGlobalIdBuffer(data, dataOffset);
       dataOffset = newOffset;
 

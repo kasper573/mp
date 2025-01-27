@@ -1,4 +1,4 @@
-import type { Pixel, TileNumber } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type { GlobalIdFlags } from "../gid";
 import type {
   Color,
@@ -40,12 +40,12 @@ export interface SharedLayerProperties {
   /**
    * Horizontal layer offset in tiles. Always 0.
    */
-  x: TileNumber;
+  x: Tile;
 
   /**
    * Vertical layer offset in tiles. Always 0.
    */
-  y: TileNumber;
+  y: Tile;
 }
 
 export interface CommonTileLayerProperties {
@@ -53,12 +53,12 @@ export interface CommonTileLayerProperties {
   /**
    * Row count. Same as map height for fixed-size maps.
    */
-  height: TileNumber;
+  height: Tile;
 
   /**
    * Column count. Same as map width for fixed-size maps.
    */
-  width: TileNumber;
+  width: Tile;
 }
 
 export interface TileLayer
@@ -69,8 +69,8 @@ export interface TileLayer
 
 export interface TileLayerTile {
   id: GlobalTileId;
-  x: TileNumber;
-  y: TileNumber;
+  x: Tile;
+  y: Tile;
   width: Pixel;
   height: Pixel;
   tileset: Tileset;

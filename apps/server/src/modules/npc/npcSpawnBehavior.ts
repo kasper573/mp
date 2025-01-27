@@ -1,6 +1,6 @@
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";
 import { clamp, vec, type Vector } from "@mp/math";
 import type { AreaResource } from "@mp/data";
@@ -52,19 +52,19 @@ function spawnNpcInstance(
 function determineSpawnCoords(
   spawn: NPCSpawn,
   area: AreaResource,
-): Vector<TileNumber> {
+): Vector<Tile> {
   if (spawn.coords) {
     return spawn.coords;
   }
 
-  let randomNode: VectorGraphNode<TileNumber> | undefined;
+  let randomNode: VectorGraphNode<Tile> | undefined;
   if (spawn.randomRadius) {
     const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * spawn.randomRadius;
 
     const randomTile = vec(
-      clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as TileNumber,
-      clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as TileNumber,
+      clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,
+      clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as Tile,
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {

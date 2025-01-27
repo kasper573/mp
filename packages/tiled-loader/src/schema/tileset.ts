@@ -1,4 +1,4 @@
-import type { TileNumber, Pixel } from "@mp/std";
+import type { Tile, Pixel } from "@mp/std";
 import type {
   GlobalTileId,
   LocalTileId,
@@ -20,7 +20,7 @@ import type { ObjectGroupLayer } from "./layer";
 export interface Tileset {
   backgroundcolor?: string;
   class?: TiledClass;
-  columns: TileNumber;
+  columns: Tile;
   fillmode: string;
   firstgid: GlobalTileId;
   grid?: Grid;
@@ -47,7 +47,7 @@ export interface Tileset {
   /**
    * The number of tiles in this tileset
    */
-  tilecount: TileNumber;
+  tilecount: Tile;
 
   /**
    * The Tiled version used to save the file
@@ -57,12 +57,12 @@ export interface Tileset {
   /**
    * Maximum height of tiles in this set
    */
-  tileheight?: TileNumber;
+  tileheight?: Tile;
 
   /**
    * Maximum width of tiles in this set
    */
-  tilewidth?: TileNumber;
+  tilewidth?: Tile;
 
   tileoffset?: Coord;
   tilerendersize: TileRenderSize;

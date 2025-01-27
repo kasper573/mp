@@ -1,6 +1,6 @@
 import { integer, pgTable, serial, uuid } from "drizzle-orm/pg-core";
 import type { UserId } from "@mp/auth-server";
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
@@ -10,9 +10,9 @@ export const userId = uuid().$type<UserId>();
 
 export const characterTable = pgTable("character", {
   id: serial().primaryKey(),
-  coords: vector<TileNumber>().notNull(),
+  coords: vector<Tile>().notNull(),
   areaId: areaId.notNull(),
-  speed: integer().$type<TileNumber>().notNull(),
+  speed: integer().$type<Tile>().notNull(),
   userId: userId.notNull(),
 });
 

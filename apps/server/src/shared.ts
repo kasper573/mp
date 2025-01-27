@@ -1,4 +1,4 @@
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 
 // This file should only expose runtime code that is shared between client/server.
 
@@ -11,8 +11,8 @@ export const tokenHeaderName = "token";
  * in the renderer so that objects don't pop in and out of view.
  */
 export const clientViewDistance = {
-  renderedTileCount: 24 as TileNumber,
-  networkFogOfWarTileCount: 32 as TileNumber,
+  renderedTileCount: 24 as Tile,
+  networkFogOfWarTileCount: 32 as Tile,
 };
 
 export { default as transformer } from "superjson";

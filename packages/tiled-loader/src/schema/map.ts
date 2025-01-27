@@ -1,4 +1,4 @@
-import type { TileNumber, Pixel } from "@mp/std";
+import type { Tile, Pixel } from "@mp/std";
 import type {
   Color,
   CompressionLevel,
@@ -25,8 +25,8 @@ export interface SharedMapProperties {
   backgroundcolor?: Color;
   class?: TiledClass;
 
-  height: TileNumber;
-  width: TileNumber;
+  height: Tile;
+  width: Tile;
   tileheight: Pixel;
   tilewidth: Pixel;
 

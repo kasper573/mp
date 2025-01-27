@@ -1,6 +1,6 @@
 import { integer, pgTable, serial } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
@@ -11,7 +11,7 @@ import { vector } from "../../db/types/vector";
  */
 export const npcTable = pgTable("npc", {
   id: serial().primaryKey(),
-  speed: integer().$type<TileNumber>().notNull(),
+  speed: integer().$type<Tile>().notNull(),
 });
 
 export type NPC = typeof npcTable.$inferSelect;
@@ -30,7 +30,7 @@ export const npcSpawnTable = pgTable("npc_spawn", {
   npcId: integer()
     .notNull()
     .references(() => npcTable.id, { onDelete: "cascade" }),
-  coords: vector<TileNumber>(),
+  coords: vector<Tile>(),
   randomRadius: integer(),
 });
 

@@ -9,7 +9,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
-import type { Pixel, TileNumber } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { Actor } from "./Actor";
@@ -102,7 +102,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
 function createZoomLevelForViewDistance(
   tileSize: Vector<Pixel>,
   cameraSize: Vector<Pixel>,
-  tileViewDistance: TileNumber,
+  tileViewDistance: Tile,
 ): number {
   return Math.max(
     cameraSize.x / tileSize.x / tileViewDistance,

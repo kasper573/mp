@@ -1,5 +1,11 @@
 export type Branded<T, Name extends string> = T & { __brand__: Name };
 
+/**
+ * Unit of measurement in 2D screen space.
+ */
 export type Pixel = Branded<number, "Pixel">;
 
-export type TileNumber = Branded<number, "TileNumber">;
+/**
+ * Unit of measurement in 2D tile space.
+ */
+export type Tile = Branded<number, "Tile">;

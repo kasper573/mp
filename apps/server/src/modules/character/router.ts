@@ -1,7 +1,7 @@
 import type { Vector } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
@@ -24,7 +24,7 @@ export function createCharacterRouter({
 }: CharacterRouterDependencies) {
   return t.router({
     move: t.procedure
-      .input(schemaFor<{ characterId: CharacterId; to: Vector<TileNumber> }>())
+      .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
       .use(auth())
       .mutation(({ input: { characterId, to }, ctx: { user } }) =>
         accessState(`world.move`, (state) => {

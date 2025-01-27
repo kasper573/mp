@@ -1,6 +1,6 @@
 import type { Vector } from "@mp/math";
 import { vec, vec_scale } from "@mp/math";
-import type { Pixel, TileNumber } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type {
   TiledMap,
   TileLayerTile,
@@ -21,30 +21,30 @@ export class TiledResource {
     return vec_scale(this.tileCount, this.tileSize);
   }
 
-  get tileCount(): Vector<TileNumber> {
+  get tileCount(): Vector<Tile> {
     return vec(this.map.width, this.map.height);
   }
 
-  worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<TileNumber> => {
+  worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<Tile> => {
     return vec(
-      (x / this.map.tilewidth - 0.5) as TileNumber,
-      (y / this.map.tileheight - 0.5) as TileNumber,
+      (x / this.map.tilewidth - 0.5) as Tile,
+      (y / this.map.tileheight - 0.5) as Tile,
     );
   };
 
-  tileCoordToWorld = ({ x, y }: Vector<TileNumber>): Vector<Pixel> => {
+  tileCoordToWorld = ({ x, y }: Vector<Tile>): Vector<Pixel> => {
     return vec(
       ((x + 0.5) * this.map.tilewidth) as Pixel,
       ((y + 0.5) * this.map.tileheight) as Pixel,
     );
   };
 
-  tileUnitToWorld = (n: TileNumber): Pixel => (n * this.map.tilewidth) as Pixel;
+  tileUnitToWorld = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
 
   getMatchingTileCoords = <T>(
     getValue: (tile: TileLayerTile) => T,
     coordinateTest: (values: NoInfer<T>[]) => boolean,
-  ): Vector<TileNumber>[] => {
+  ): Vector<Tile>[] => {
     const tilesPerCoordinate = groupBy(
       this.map.layers
         .flatMap((layer) => filterTileLayerTiles(layer, all))
@@ -55,7 +55,7 @@ export class TiledResource {
       ({ pos: { x, y } }) => `${x}|${y}`,
     );
 
-    const coordinates: Vector<TileNumber>[] = [];
+    const coordinates: Vector<Tile>[] = [];
     for (const tiles of tilesPerCoordinate.values()) {
       const values = tiles.map((t) => t.propertyValue);
       if (coordinateTest(values)) {

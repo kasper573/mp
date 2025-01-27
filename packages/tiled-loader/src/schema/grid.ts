@@ -1,8 +1,8 @@
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import type { Orientation } from "./common";
 
 export interface Grid {
-  height: TileNumber;
-  width: TileNumber;
+  height: Tile;
+  width: Tile;
   orientation: Orientation;
 }

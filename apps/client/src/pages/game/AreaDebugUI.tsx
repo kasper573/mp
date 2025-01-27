@@ -18,7 +18,7 @@ import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
-import type { Pixel, TileNumber } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
@@ -30,7 +30,7 @@ type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathsToDraw: Path<TileNumber>[];
+  pathsToDraw: Path<Tile>[];
 }) {
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
@@ -97,7 +97,7 @@ function DebugGraph(props: {
 
 function DebugPath(props: {
   tiled: TiledResource;
-  path: Path<TileNumber> | undefined;
+  path: Path<Tile> | undefined;
 }) {
   const gfx = new Graphics();
 
@@ -152,8 +152,8 @@ function DebugText(props: { tiled: TiledResource }) {
 function drawGraphNode(
   ctx: Graphics,
   tiled: TiledResource,
-  graph: VectorGraph<TileNumber>,
-  node: VectorGraphNode<TileNumber>,
+  graph: VectorGraph<Tile>,
+  node: VectorGraphNode<Tile>,
 ) {
   drawStar(
     ctx,

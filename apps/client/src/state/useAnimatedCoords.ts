@@ -2,7 +2,7 @@ import { moveAlongPath } from "@mp/data";
 import { EngineContext } from "@mp/engine";
 import type { Path, Vector } from "@mp/math";
 import { vec } from "@mp/math";
-import type { TileNumber } from "@mp/std";
+import type { Tile } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
@@ -19,7 +19,7 @@ import {
  */
 export function useAnimatedCoords(
   getExternal: Accessor<External | undefined>,
-): Accessor<Vector<TileNumber> | undefined> {
+): Accessor<Vector<Tile> | undefined> {
   const engine = useContext(EngineContext);
   const isMoving = createMemo(() => !!getExternal()?.path);
   const externalCoords = createMemo(() => getExternal()?.coords);
@@ -67,7 +67,7 @@ export function useAnimatedCoords(
 }
 
 interface External {
-  coords: Vector<TileNumber>;
-  path?: Path<TileNumber>;
-  speed: TileNumber;
+  coords: Vector<Tile>;
+  path?: Path<Tile>;
+  speed: Tile;
 }
