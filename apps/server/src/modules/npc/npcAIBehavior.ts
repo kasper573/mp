@@ -1,5 +1,6 @@
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
+import { randomItem } from "@mp/std";
 import type { AreaLookup } from "../area/loadAreas";
 import type { WorldState } from "../world/WorldState";
 
@@ -25,8 +26,4 @@ export function npcAIBehavior(
       }
     });
   };
-}
-
-function randomItem<T>(arr: T[]): T | undefined {
-  return arr[Math.floor(Math.random() * arr.length)];
 }

@@ -1,8 +1,10 @@
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { TileNumber } from "@mp/std";
-import { uuid } from "@mp/std";
+import { randomItem, uuid } from "@mp/std";
 import { clamp, vec, type Vector } from "@mp/math";
+import type { AreaResource } from "@mp/data";
+import type { VectorGraphNode } from "@mp/path-finding";
 import type { WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
 import type { NPCService } from "./service";
@@ -22,10 +24,7 @@ export function npcSpawnBehavior(
         }
 
         for (let i = 0; i < spawn.count; i++) {
-          const instance = spawnNpcInstance(npc, spawn, {
-            x: area.tiled.map.width,
-            y: area.tiled.map.height,
-          });
+          const instance = spawnNpcInstance(npc, spawn, area);
           state.npcs[instance.id] = instance;
         }
       }
@@ -38,13 +37,13 @@ export function npcSpawnBehavior(
 function spawnNpcInstance(
   npc: NPC,
   spawn: NPCSpawn,
-  tiledMapSize: Vector<TileNumber>,
+  area: AreaResource,
 ): NPCInstance {
   const id = uuid();
   return {
     id,
     areaId: spawn.areaId,
-    coords: determineSpawnCoords(spawn, tiledMapSize),
+    coords: determineSpawnCoords(spawn, area),
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
   };
@@ -52,23 +51,29 @@ function spawnNpcInstance(
 
 function determineSpawnCoords(
   spawn: NPCSpawn,
-  tiledMapSize: Vector<TileNumber>,
+  area: AreaResource,
 ): Vector<TileNumber> {
   if (spawn.coords) {
     return spawn.coords;
   }
 
+  let randomNode: VectorGraphNode<TileNumber> | undefined;
   if (spawn.randomRadius) {
     const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * spawn.randomRadius;
-    return vec(
-      clamp(0, Math.cos(angle) * radius, tiledMapSize.x) as TileNumber,
-      clamp(0, Math.sin(angle) * radius, tiledMapSize.y) as TileNumber,
+
+    const randomTile = vec(
+      clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as TileNumber,
+      clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as TileNumber,
     );
+    randomNode = area.graph.getNearestNode(randomTile);
+  } else {
+    randomNode = randomItem(Array.from(area.graph.getNodes()));
   }
 
-  return vec(
-    Math.floor(Math.random() * tiledMapSize.x) as TileNumber,
-    Math.floor(Math.random() * tiledMapSize.y) as TileNumber,
-  );
+  if (!randomNode) {
+    throw new Error("No tiles available for NPC spawn");
+  }
+
+  return randomNode.data.vector;
 }
