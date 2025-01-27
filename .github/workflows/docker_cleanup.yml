@@ -1,5 +1,4 @@
 name: Daily Image Cleanup
-on: [push]
 on:
   schedule:
     - cron: "30 1 * * *"
