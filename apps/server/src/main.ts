@@ -50,9 +50,10 @@ const db = createDBClient(opt.databaseUrl, logger);
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
-  .use(metricsMiddleware(metrics)) // Intentionally placed before logger since it's so verbose and unnecessary to log
-  .use(createExpressLogger(logger))
+  .use(metricsMiddleware(metrics))
   .use("/health", (_, res) => res.send("OK"))
+  // the above is intentionally placed before logger since it's so verbose and unnecessary to log
+  .use(createExpressLogger(logger))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(
     opt.publicPath,
