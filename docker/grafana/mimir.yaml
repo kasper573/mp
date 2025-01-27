@@ -1,19 +1,19 @@
 activity_tracker:
   filepath: ./active-query-tracker
 alertmanager:
-  data_dir: data/
+  data_dir: /data/alertmanager
 alertmanager_storage:
   backend: s3
 blocks_storage:
   backend: filesystem
   bucket_store:
-    sync_dir: /tmp/mimir/tsdb-sync
+    sync_dir: /data/mimir/tsdb-sync
   filesystem:
-    dir: /tmp/mimir/blocks
+    dir: /data/mimir/blocks
   tsdb:
-    dir: /tmp/mimir/tsdb
+    dir: /data/mimir/tsdb
 compactor:
-  data_dir: /tmp/mimir/compactor
+  data_dir: /data/mimir/compactor
   sharding_ring:
     kvstore:
       store: inmemory
@@ -45,7 +45,7 @@ ruler_storage:
   filesystem:
     dir: ""
   local:
-    directory: /tmp/mimir/rules
+    directory: /data/mimir/rules
 server:
   grpc_server_max_concurrent_streams: 1000
   grpc_server_max_recv_msg_size: 104857600
