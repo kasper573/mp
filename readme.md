@@ -60,7 +60,9 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 ### If you make database related changes
 
-You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview). Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
+You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
+
+Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
 
 ### Quirks
 
