@@ -111,5 +111,5 @@ jobs:
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             ./dockerctl.sh prod pull
             ./dockerctl.sh prod down
-            ./dockerctl.sh prod up -d --remove-orphans --no-build -y
+            ./dockerctl.sh prod up -d --remove-orphans --no-build
             docker image prune
