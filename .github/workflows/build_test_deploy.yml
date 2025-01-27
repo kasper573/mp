@@ -1,5 +1,8 @@
 name: Test, Build, Deploy
-on: [push]
+on:
+  push:
+    paths-ignore:
+      - "*.md"
 
 env:
   DOCKER_REGISTRY: ghcr.io
