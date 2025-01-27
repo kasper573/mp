@@ -13,7 +13,7 @@ jobs:
     steps:
       - uses: dataaxiom/ghcr-cleanup-action@v1
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.DOCKER_PACKAGE_CLEANUP_PAT }}
           package: "*"
           expand-packages: true
           keep-n-tagged: 10
