@@ -56,7 +56,7 @@ Local development is done using node and docker compose.
 
 ### If you make docker related changes
 
-You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script.
+You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script. See [quirks](#quirks) below.
 
 ### If you make database related changes
 
