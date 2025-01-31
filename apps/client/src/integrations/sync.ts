@@ -55,10 +55,6 @@ export function createSyncClient(auth: AuthClient) {
     }
   });
 
-  createEffect(() => {
-    console.log("roles", auth.identity()?.roles);
-  });
-
   return {
     actorsInArea,
     readyState,
