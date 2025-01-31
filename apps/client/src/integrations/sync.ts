@@ -10,7 +10,7 @@ import {
   untrack,
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth-client";
+import type { AuthClient } from "@mp/auth/client";
 import type { Tile } from "@mp/std";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
@@ -53,6 +53,10 @@ export function createSyncClient(auth: AuthClient) {
       untrack(() => sync.start());
       onCleanup(sync.stop);
     }
+  });
+
+  createEffect(() => {
+    console.log("roles", auth.identity()?.roles);
   });
 
   return {

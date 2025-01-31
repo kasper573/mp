@@ -1,8 +1,9 @@
 import type express from "express";
 import type { Branded } from "@mp/std";
-import type { AuthToken, AuthServer } from "@mp/auth-server";
+import type { AuthServer } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
 import type { StateAccess } from "@mp/sync/server";
+import type { AuthToken } from "@mp/auth";
 import type { WorldSyncServer, WorldState } from "./modules/world/WorldState";
 import type { ClientRegistry } from "./ClientRegistry";
 import { tokenHeaderName } from "./shared";

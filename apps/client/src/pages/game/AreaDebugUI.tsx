@@ -54,11 +54,14 @@ export function AreaDebugUI(props: {
           />
         </div>
         <div>
-          Server tick:{" "}
+          Server tick:
           <input
             type="checkbox"
             checked={isServerTickEnabled()}
-            onChange={(e) => setServerTickEnabled(e.currentTarget.checked)}
+            on:click={(e) => {
+              e.preventDefault();
+              setServerTickEnabled(!e.currentTarget.checked);
+            }}
             on:pointerdown={(e) => e.stopPropagation()}
           />
         </div>

@@ -20,6 +20,19 @@ export function auth() {
   });
 }
 
+export function roles(requiredRoles: string[]) {
+  return auth().unstable_pipe(async ({ ctx, next }) => {
+    if (!new Set(requiredRoles).isSubsetOf(ctx.user.roles)) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Insufficient permissions",
+      });
+    }
+
+    return next({ ctx });
+  });
+}
+
 export function optionalAuth() {
   return t.middleware(async ({ ctx, next }) => {
     const { authToken, auth } = ctx;

@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/auth-server";
+import type { UserIdentity } from "@mp/auth";
 import type { SyncServer } from "@mp/sync/server";
 import type { CharacterId, Character } from "../character/schema";
 import type { NPCInstanceId, NPCInstance } from "../npc/schema";

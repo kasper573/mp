@@ -1,6 +1,6 @@
 import path from "node:path";
 import { TimeSpan } from "@mp/time";
-import { authAlgorithms } from "@mp/auth-server";
+import { authAlgorithms } from "@mp/auth/server";
 import type { InferOutput } from "@mp/env";
 import {
   boolish,

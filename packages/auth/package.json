@@ -1,0 +1,32 @@
+{
+  "name": "@mp/auth",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./shared.ts",
+      "import": "./shared.ts",
+      "require": "./shared.ts"
+    },
+    "./client": {
+      "types": "./client.tsx",
+      "import": "./client.tsx",
+      "require": "./client.tsx"
+    },
+    "./server": {
+      "types": "./server.ts",
+      "import": "./server.ts",
+      "require": "./server.ts"
+    }
+  },
+  "dependencies": {
+    "@mp/std": "workspace:*",
+    "oidc-client-ts": "3.1.0",
+    "solid-js": "1.9.3",
+    "jose": "5.9.6"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { UserId } from "@mp/auth-server";
+import type { UserId } from "@mp/auth";
 import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
 import type { DBClient } from "../../db/client";

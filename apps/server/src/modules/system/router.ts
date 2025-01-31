@@ -1,6 +1,6 @@
 import type { Ticker } from "@mp/time";
 import { schemaFor, t } from "../../trpc";
-import { auth } from "../../middlewares/auth";
+import { roles } from "../../middlewares/auth";
 
 export interface SystemRouterDependencies {
   buildVersion: string;
@@ -16,7 +16,7 @@ export function createSystemRouter({
     buildVersion: t.procedure.query(() => buildVersion),
     isTickEnabled: t.procedure.query(() => updateTicker.isEnabled),
     setTickEnabled: t.procedure
-      .use(auth())
+      .use(roles(["toggle_server_tick"]))
       .input(schemaFor<boolean>())
       .mutation(({ input: enabled }) => {
         if (enabled !== updateTicker.isEnabled) {

@@ -7,7 +7,7 @@ import {
   useContext,
 } from "solid-js";
 import { EngineContext, EngineProvider } from "@mp/engine";
-import { AuthContext } from "@mp/auth-client";
+import { AuthContext } from "@mp/auth/client";
 import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
