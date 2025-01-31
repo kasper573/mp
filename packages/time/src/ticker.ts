@@ -8,6 +8,11 @@ export class Ticker {
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
 
+  #isEnabled = false;
+  get isEnabled() {
+    return this.#isEnabled;
+  }
+
   constructor(private options: TickerOptions) {
     this.middleware = options.middleware ?? noopMiddleware;
     this.getTimeSinceLastTick = createDeltaFn();
@@ -21,6 +26,7 @@ export class Ticker {
 
   start() {
     this.stop();
+    this.#isEnabled = true;
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
     this.intervalId = setInterval(
       this.tick,
@@ -29,6 +35,7 @@ export class Ticker {
   }
 
   stop() {
+    this.#isEnabled = false;
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
     if (this.intervalId !== undefined) {
       clearInterval(this.intervalId);
