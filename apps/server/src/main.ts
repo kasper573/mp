@@ -114,6 +114,7 @@ const trpcRouter = createRootRouter({
   state: syncServer.access,
   createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,
+  updateTicker,
 });
 
 webServer.use(

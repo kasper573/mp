@@ -11,8 +11,8 @@ export const tokenHeaderName = "token";
  * in the renderer so that objects don't pop in and out of view.
  */
 export const clientViewDistance = {
-  renderedTileCount: 24 as Tile,
-  networkFogOfWarTileCount: 32 as Tile,
+  renderedTileCount: 66 as Tile,
+  networkFogOfWarTileCount: 99 as Tile,
 };
 
 export { default as transformer } from "superjson";

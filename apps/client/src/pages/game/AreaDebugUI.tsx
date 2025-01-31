@@ -23,6 +23,7 @@ import { env } from "../../env";
 import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
+import { useToggleServerTick } from "../../state/useToggleServerTick";
 import * as styles from "./AreaDebugUI.css";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
@@ -32,6 +33,7 @@ export function AreaDebugUI(props: {
   area: AreaResource;
   pathsToDraw: Path<Tile>[];
 }) {
+  const [isServerTickEnabled, setServerTickEnabled] = useToggleServerTick();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -48,6 +50,15 @@ export function AreaDebugUI(props: {
             options={visibleGraphTypes}
             value={visibleGraphType()}
             onChange={setVisibleGraphType}
+            on:pointerdown={(e) => e.stopPropagation()}
+          />
+        </div>
+        <div>
+          Server tick:{" "}
+          <input
+            type="checkbox"
+            checked={isServerTickEnabled()}
+            onChange={(e) => setServerTickEnabled(e.currentTarget.checked)}
             on:pointerdown={(e) => e.stopPropagation()}
           />
         </div>
