@@ -35,7 +35,7 @@ export default function GamePage() {
       <Switch>
         <Match when={world.readyState() !== "open" || area.isLoading}>
           {/** TODO replace with specialized loading screen for loading areas */}
-          <LoadingSpinner debugId="GamePage" />
+          <LoadingSpinner />
         </Match>
         <Match when={area.data} keyed>
           {(data) => (

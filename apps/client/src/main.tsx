@@ -25,7 +25,7 @@ render(
   () => (
     <LoggerContext.Provider value={logger}>
       <ErrorBoundary fallback={ErrorFallback}>
-        <Suspense fallback={<LoadingSpinner debugId="main" />}>
+        <Suspense fallback={<LoadingSpinner />}>
           <App />
         </Suspense>
       </ErrorBoundary>
