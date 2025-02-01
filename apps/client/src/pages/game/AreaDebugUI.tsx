@@ -37,7 +37,9 @@ export function AreaDebugUI(props: {
 
   const isTickEnabled = trpc.system.isTickEnabled.createQuery();
   const setTickEnabled = trpc.system.setTickEnabled.createMutation();
-  const spawnNPC = trpc.npc.spawnProblematicNPC.createMutation();
+  const spawnNPC = trpc.npc.spawnProblematicNPC.createMutation(() => ({
+    meta: { cancelInvalidate: true },
+  }));
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
