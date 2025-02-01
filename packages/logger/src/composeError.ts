@@ -28,7 +28,12 @@ function mergeErrors(errors: Error[]): Error {
 }
 
 function enhanceErrorMessage(error: Error, args: unknown[]): Error {
-  error.message = createErrorMessage([error.message, ...args]);
+  try {
+    error.message = createErrorMessage([error.message, ...args]);
+  } catch {
+    // Some native DOM errors can not be modified, in which case we use an error + cause instead.
+    return new Error(createErrorMessage(args), { cause: error });
+  }
   return error;
 }
 
