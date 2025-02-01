@@ -6,12 +6,14 @@ import {
   createTRPCHook,
 } from "@mp/solid-trpc";
 import { type AuthClient } from "@mp/auth/client";
-import type { QueryClient } from "@tanstack/solid-query";
+import { QueryClientContext } from "@tanstack/solid-query";
+import { useContext } from "solid-js";
 import { env } from "../env";
+import { LoggerContext } from "../logger";
 
 export const CANCEL_INVALIDATE = Symbol("CANCEL_INVALIDATE");
 
-export function createTRPCClient(auth: AuthClient, query: QueryClient) {
+export function createTRPCClient(auth: AuthClient) {
   return createTRPCSolidClient<RootRouter>({
     links: [
       httpBatchLink({
@@ -25,12 +27,17 @@ export function createTRPCClient(auth: AuthClient, query: QueryClient) {
         },
       }),
     ],
-    async onMutation({ meta }) {
-      if (!meta?.cancelInvalidate) {
-        // Invalidate all queries on successful mutations
-        // This is a bit inefficient, but it promotes correctness over performance.
-        await query.invalidateQueries();
-      }
+    createMutationHandler() {
+      const query = useContext(QueryClientContext);
+      const logger = useContext(LoggerContext);
+      return async function onMutation({ meta }) {
+        if (!meta?.cancelInvalidate) {
+          // Invalidate all queries on successful mutations
+          // This is a bit inefficient, but it promotes correctness over performance.
+          logger.info("Invalidating all queries due to successful mutation");
+          await query?.().invalidateQueries();
+        }
+      };
     },
   });
 }

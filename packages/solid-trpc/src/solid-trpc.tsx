@@ -23,7 +23,7 @@ import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy";
 
 export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
-  onMutation,
+  createMutationHandler: onMutation,
   ...clientOptions
 }: TRPCSolidClientOptions<TRouter>): TRPCSolidClient<TRouter> {
   const client = createTRPCClient(clientOptions);
@@ -74,10 +74,11 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
 function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
   trpc: CreateTRPCClient<TRouter>,
   path: string[],
-  onMutation?: MutationResultHandler,
+  createMutationHandler?: CreateMutationHandler,
 ): CreateMutationFn<AnyProcedure> {
-  return (createOptions) =>
-    createMutation(() => {
+  return (createOptions) => {
+    const onMutation = createMutationHandler?.();
+    return createMutation(() => {
       const options = createOptions?.();
       async function mutationFn(input: unknown) {
         const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
@@ -96,6 +97,7 @@ function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
         mutationFn,
       } as never;
     });
+  };
 }
 
 export function createTRPCHook<
@@ -123,10 +125,10 @@ export interface TRPCSolidClientLike {
 
 export interface TRPCSolidClientOptions<TRouter extends AnyTRPCRouter>
   extends CreateTRPCClientOptions<TRouter> {
-  onMutation?: MutationResultHandler;
+  createMutationHandler?: CreateMutationHandler;
 }
 
-export type MutationResultHandler = (opt: {
+export type CreateMutationHandler = () => (opt: {
   input: unknown;
   output: unknown;
   meta: MutationOptions["meta"];

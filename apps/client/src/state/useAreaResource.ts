@@ -1,11 +1,12 @@
 import { AreaResource, TiledResource, type AreaId } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@tanstack/solid-query";
-import type { Accessor } from "solid-js";
+import { type Accessor } from "solid-js";
 import { useTRPC } from "../integrations/trpc";
 
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const trpc = useTRPC();
+
   return trpc.area.areaFileUrl.createQuery(() => ({
     refetchOnWindowFocus: false,
     input: areaId?.() ?? skipToken,

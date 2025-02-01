@@ -3,6 +3,7 @@ import {
   Match,
   onCleanup,
   Show,
+  Suspense,
   Switch,
   useContext,
 } from "solid-js";
@@ -38,9 +39,9 @@ export default function GamePage() {
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
         </Match>
-        <Match when={world.readyState() !== "open" || area.isPending}>
+        <Match when={world.readyState() !== "open" || area.isLoading}>
           {/** TODO replace with specialized loading screen for loading areas */}
-          <LoadingSpinner />
+          <LoadingSpinner debugId="GamePage" />
         </Match>
         <Match when={area.data} keyed>
           {(data) => (
@@ -48,17 +49,21 @@ export default function GamePage() {
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
                   <EngineBindings toggleDebug={toggleDebug} />
-                  <AreaScene area={data}>
-                    <Show when={debug()}>
-                      <AreaDebugUI
-                        area={data}
-                        pathsToDraw={world
-                          .actorsInArea()
-                          .flatMap((actor) => (actor.path ? [actor.path] : []))}
-                      />
-                      <WorldStateInspector worldState={world.worldState()} />
-                    </Show>
-                  </AreaScene>
+                  <Suspense fallback="AreaScene loading...">
+                    <AreaScene area={data}>
+                      <Show when={debug()}>
+                        <AreaDebugUI
+                          area={data}
+                          pathsToDraw={world
+                            .actorsInArea()
+                            .flatMap((actor) =>
+                              actor.path ? [actor.path] : [],
+                            )}
+                        />
+                        <WorldStateInspector worldState={world.worldState()} />
+                      </Show>
+                    </AreaScene>
+                  </Suspense>
                 </EngineProvider>
               )}
             </Application>

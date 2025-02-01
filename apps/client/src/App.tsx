@@ -18,7 +18,7 @@ import { createTRPCClient } from "./integrations/trpc";
 const auth = createAuthClient(env.auth);
 const query = createQueryClient();
 const faro = createFaroClient();
-const trpc = createTRPCClient(auth, query);
+const trpc = createTRPCClient(auth);
 
 export default function App() {
   useFaroIntegration(faro, auth);
