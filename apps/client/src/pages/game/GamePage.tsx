@@ -35,6 +35,18 @@ export default function GamePage() {
 
   return (
     <SyncClientContext.Provider value={world}>
+      <pre>
+        Data:{" "}
+        {JSON.stringify(
+          {
+            data: area.latest?.id ?? null,
+            loading: area.loading,
+            error: (area.error as unknown) ?? null,
+          },
+          null,
+          2,
+        )}
+      </pre>
       <Switch>
         <Match when={!auth.isSignedIn()}>
           <Dock position="center">Sign in to play</Dock>
