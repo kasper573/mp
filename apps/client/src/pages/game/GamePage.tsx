@@ -8,10 +8,9 @@ import {
 } from "solid-js";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth/client";
-import { createQuery, skipToken } from "@tanstack/solid-query";
 import { Application } from "@mp/solid-pixi";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
-import { loadAreaResource } from "../../state/loadAreaResource";
+import { useAreaResource } from "../../state/useAreaResource";
 import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
 import { toggleSignal } from "../../state/toggleSignal";
@@ -23,14 +22,7 @@ import { AreaDebugUI } from "./AreaDebugUI";
 export default function GamePage() {
   const auth = useContext(AuthContext);
   const world = createSyncClient(auth);
-  const area = createQuery(() => {
-    const id = world.areaId();
-    return {
-      queryKey: ["area", id],
-      queryFn: id ? () => loadAreaResource(id) : skipToken,
-      refetchOnWindowFocus: false,
-    };
-  });
+  const area = useAreaResource(world.areaId);
 
   const [debug, toggleDebug] = toggleSignal();
 

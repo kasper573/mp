@@ -1,31 +1,30 @@
 import type { RootRouter } from "@mp/server";
 import { transformer, tokenHeaderName } from "@mp/server";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import {
+  createTRPCSolidClient,
+  httpBatchLink,
+  createTRPCHook,
+} from "@mp/solid-trpc";
 import { type AuthClient } from "@mp/auth/client";
+import type { QueryClient } from "@tanstack/solid-query";
 import { env } from "../env";
 
-let integrations: TRPCIntegrations | undefined;
-
-// TODO refactor this to be a factory so it can be constructed in the composition root
-export const trpc = createTRPCClient<RootRouter>({
-  links: [
-    httpBatchLink({
-      url: env.apiUrl,
-      transformer,
-      async headers() {
-        await integrations?.auth.refresh(); // Ensure we have the latest user identity
-        return {
-          [tokenHeaderName]: integrations?.auth?.identity()?.token ?? "",
-        };
-      },
-    }),
-  ],
-});
-
-export interface TRPCIntegrations {
-  auth: AuthClient;
+export function createTRPCClient(auth: AuthClient, queryClient: QueryClient) {
+  return createTRPCSolidClient<RootRouter>({
+    queryClient,
+    links: [
+      httpBatchLink({
+        url: env.apiUrl,
+        transformer,
+        async headers() {
+          await auth.refresh(); // Ensure we have the latest user identity
+          return {
+            [tokenHeaderName]: auth.identity()?.token ?? "",
+          };
+        },
+      }),
+    ],
+  });
 }
 
-export function attachTrpcIntegrations(int: TRPCIntegrations) {
-  integrations = int;
-}
+export const useTRPC = createTRPCHook<RootRouter>();

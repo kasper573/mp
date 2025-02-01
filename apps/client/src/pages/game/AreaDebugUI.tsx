@@ -20,10 +20,9 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
 import { env } from "../../env";
-import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
-import { useToggleServerTick } from "../../state/useToggleServerTick";
+import { useTRPC } from "../../integrations/trpc";
 import * as styles from "./AreaDebugUI.css";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
@@ -33,7 +32,9 @@ export function AreaDebugUI(props: {
   area: AreaResource;
   pathsToDraw: Path<Tile>[];
 }) {
-  const [isServerTickEnabled, setServerTickEnabled] = useToggleServerTick();
+  const trpc = useTRPC();
+
+  const isTickEnabled = trpc.system.isTickEnabled.createQuery();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -57,10 +58,10 @@ export function AreaDebugUI(props: {
           Server tick:
           <input
             type="checkbox"
-            checked={isServerTickEnabled()}
+            checked={isTickEnabled.data ?? false}
             on:click={(e) => {
               e.preventDefault();
-              setServerTickEnabled(!e.currentTarget.checked);
+              void trpc.system.setTickEnabled.mutate(!e.currentTarget.checked);
             }}
             on:pointerdown={(e) => e.stopPropagation()}
           />
@@ -126,9 +127,10 @@ function DebugPath(props: {
 }
 
 function DebugText(props: { tiled: TiledResource }) {
+  const trpc = useTRPC();
   const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
-  const serverVersion = useServerVersion();
+  const serverVersion = trpc.system.buildVersion.createQuery();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 

@@ -22,6 +22,7 @@
     "@mp/pixi": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/solid-pixi": "workspace:*",
+    "@mp/solid-trpc": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
@@ -29,7 +30,6 @@
     "@mp/time": "workspace:*",
     "@solidjs/router": "0.14.7",
     "@tanstack/solid-query": "5.56.2",
-    "@trpc/client": "11.0.0-rc.593",
     "solid-js": "1.9.3"
   },
   "devDependencies": {

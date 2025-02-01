@@ -86,6 +86,9 @@ importers:
       '@mp/solid-pixi':
         specifier: workspace:*
         version: link:../../packages/solid-pixi
+      '@mp/solid-trpc':
+        specifier: workspace:*
+        version: link:../../packages/solid-trpc
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -116,9 +119,6 @@ importers:
       '@tanstack/solid-query':
         specifier: 5.56.2
         version: 5.56.2(solid-js@1.9.3)
-      '@trpc/client':
-        specifier: 11.0.0-rc.593
-        version: 11.0.0-rc.593(@trpc/server@11.0.0-rc.593)
       solid-js:
         specifier: 1.9.3
         version: 1.9.3
@@ -405,6 +405,25 @@ importers:
       '@mp/pixi':
         specifier: workspace:*
         version: link:../pixi
+      solid-js:
+        specifier: 1.9.3
+        version: 1.9.3
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/solid-trpc:
+    dependencies:
+      '@tanstack/solid-query':
+        specifier: 5.56.2
+        version: 5.56.2(solid-js@1.9.3)
+      '@trpc/client':
+        specifier: 11.0.0-rc.593
+        version: 11.0.0-rc.593(@trpc/server@11.0.0-rc.593)
+      '@trpc/server':
+        specifier: 11.0.0-rc.593
+        version: 11.0.0-rc.593
       solid-js:
         specifier: 1.9.3
         version: 1.9.3

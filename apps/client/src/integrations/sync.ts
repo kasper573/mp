@@ -14,9 +14,10 @@ import type { AuthClient } from "@mp/auth/client";
 import type { Tile } from "@mp/std";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
-import { trpc } from "./trpc";
+import { useTRPC } from "./trpc";
 
 export function createSyncClient(auth: AuthClient) {
+  const trpc = useTRPC();
   const id = createMemo(() => auth.identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
     token: auth.identity()?.token,
