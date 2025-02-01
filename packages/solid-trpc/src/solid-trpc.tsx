@@ -11,13 +11,12 @@ import {
 } from "@tanstack/solid-query";
 import type { CreateTRPCClient, CreateTRPCClientOptions } from "@trpc/client";
 import { createTRPCClient } from "@trpc/client";
-import type { AnyTRPCRouter } from "@trpc/server";
 import type {
+  AnyTRPCRouter,
   AnyProcedure,
   inferProcedureInput,
   inferProcedureOutput,
-  RouterRecord,
-} from "@trpc/server/unstable-core-do-not-import";
+} from "@trpc/server";
 import { createContext, useContext } from "solid-js";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy";
@@ -79,20 +78,15 @@ function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
   return (createOptions) => {
     const onMutation = createMutationHandler?.();
     return createMutation(() => {
-      const options = createOptions?.();
       async function mutationFn(input: unknown) {
         const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
         const output = await mutate(input);
-        if (onMutation) {
-          await onMutation({ input, output, meta: options?.meta });
-        }
-        if (options?.map) {
-          return options.map(output, input);
-        }
-        return output;
+        const { map, meta } = createOptions?.() ?? {};
+        await onMutation?.({ input, output, meta });
+        return map ? map(output, input) : output;
       }
       return {
-        ...options,
+        ...createOptions?.(),
         mutationKey: path,
         mutationFn,
       } as never;
@@ -132,7 +126,7 @@ export type CreateMutationHandler = () => (opt: {
   input: unknown;
   output: unknown;
   meta: MutationOptions["meta"];
-}) => Promise<unknown>;
+}) => unknown;
 
 export type TRPCSolidClient<TRouter extends AnyTRPCRouter> =
   TRPCSolidClientLike & CreateTRPCSolidClient<TRouter>;
@@ -144,12 +138,10 @@ type CreateTRPCSolidClient<TRouter extends AnyTRPCRouter> = RouterHooks<
   TRouter["_def"]["record"]
 >;
 
-type RouterHooks<Routes extends RouterRecord> = {
-  [K in keyof Routes]: Routes[K] extends RouterRecord
-    ? RouterHooks<Routes[K]>
-    : Routes[K] extends AnyProcedure
-      ? ProcedureHooks<Routes[K]>
-      : never;
+type RouterHooks<Routes> = {
+  [K in keyof Routes]: Routes[K] extends AnyProcedure
+    ? ProcedureHooks<Routes[K]>
+    : RouterHooks<Routes[K]>;
 };
 
 const createQueryProperty = "createQuery";

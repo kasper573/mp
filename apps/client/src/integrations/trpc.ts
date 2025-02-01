@@ -30,12 +30,12 @@ export function createTRPCClient(auth: AuthClient) {
     createMutationHandler() {
       const query = useContext(QueryClientContext);
       const logger = useContext(LoggerContext);
-      return async function onMutation({ meta }) {
+      return function onMutation({ meta }) {
         if (!meta?.cancelInvalidate) {
           // Invalidate all queries on successful mutations
           // This is a bit inefficient, but it promotes correctness over performance.
           logger.info("Invalidating all queries due to successful mutation");
-          await query?.().invalidateQueries();
+          void query?.().invalidateQueries();
         }
       };
     },
