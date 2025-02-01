@@ -9,7 +9,6 @@ import {
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth/client";
 import { Application } from "@mp/solid-pixi";
-import type { AreaResource } from "@mp/data";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
 import { useAreaResource } from "../../state/useAreaResource";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
@@ -23,6 +22,7 @@ export default function GamePage() {
   const auth = useContext(AuthContext);
   const world = createSyncClient(auth);
   const area = useAreaResource(world.areaId);
+  const [debug, toggleDebug] = toggleSignal();
 
   createEffect(() => {
     if (world.readyState() === "open") {
@@ -38,36 +38,29 @@ export default function GamePage() {
           <LoadingSpinner debugId="GamePage" />
         </Match>
         <Match when={area.data} keyed>
-          {(data) => <Game area={data} />}
+          {(data) => (
+            <Application class={styles.container}>
+              {({ viewport }) => (
+                <EngineProvider viewport={viewport}>
+                  <EngineBindings toggleDebug={toggleDebug} />
+                  <AreaScene area={data}>
+                    <Show when={debug()}>
+                      <AreaDebugUI
+                        area={data}
+                        pathsToDraw={world
+                          .actorsInArea()
+                          .flatMap((actor) => (actor.path ? [actor.path] : []))}
+                      />
+                      <WorldStateInspector worldState={world.worldState()} />
+                    </Show>
+                  </AreaScene>
+                </EngineProvider>
+              )}
+            </Application>
+          )}
         </Match>
       </Switch>
     </SyncClientContext.Provider>
-  );
-}
-
-function Game(props: { area: AreaResource }) {
-  const [debug, toggleDebug] = toggleSignal();
-  const world = useContext(SyncClientContext);
-  return (
-    <Application class={styles.container}>
-      {({ viewport }) => (
-        <EngineProvider viewport={viewport}>
-          <EngineBindings toggleDebug={toggleDebug} />
-
-          <AreaScene area={props.area}>
-            <Show when={debug()}>
-              <AreaDebugUI
-                area={props.area}
-                pathsToDraw={world
-                  .actorsInArea()
-                  .flatMap((actor) => (actor.path ? [actor.path] : []))}
-              />
-              <WorldStateInspector worldState={world.worldState()} />
-            </Show>
-          </AreaScene>
-        </EngineProvider>
-      )}
-    </Application>
   );
 }
 
