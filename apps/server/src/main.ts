@@ -110,7 +110,8 @@ const characterService = new CharacterService(db, areas);
 
 const trpcRouter = createRootRouter({
   areas,
-  service: characterService,
+  npcService,
+  characterService,
   state: syncServer.access,
   createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,

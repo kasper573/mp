@@ -3,7 +3,7 @@ import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";
 import { clamp, vec, type Vector } from "@mp/math";
-import type { AreaResource } from "@mp/data";
+import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
@@ -34,16 +34,28 @@ export function npcSpawnBehavior(
   return () => {};
 }
 
-function spawnNpcInstance(
+export function spawnNpcInstance(
   npc: NPC,
   spawn: NPCSpawn,
   area: AreaResource,
 ): NPCInstance {
+  return createNpcInstance(
+    npc,
+    spawn.areaId,
+    determineSpawnCoords(spawn, area),
+  );
+}
+
+export function createNpcInstance(
+  npc: NPC,
+  areaId: AreaId,
+  coords: Vector<Tile>,
+): NPCInstance {
   const id = uuid();
   return {
     id,
-    areaId: spawn.areaId,
-    coords: determineSpawnCoords(spawn, area),
+    areaId,
+    coords,
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
   };
