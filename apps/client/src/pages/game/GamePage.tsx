@@ -42,7 +42,7 @@ export default function GamePage() {
             <Application class={styles.container}>
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
-                  <EngineBindings toggleDebug={toggleDebug} />
+                  <Keybindings toggleDebug={toggleDebug} />
                   <AreaScene area={data}>
                     <Show when={debug()}>
                       <AreaDebugUI
@@ -64,8 +64,7 @@ export default function GamePage() {
   );
 }
 
-// TODO remove this component, this is an anti pattern. Better to initialize an engine instance higher up the tree instead.
-function EngineBindings(props: { toggleDebug: () => void }) {
+function Keybindings(props: { toggleDebug: () => void }) {
   const engine = useContext(EngineContext);
   createEffect(() => {
     onCleanup(engine.keyboard.on("keydown", "F2", props.toggleDebug));
