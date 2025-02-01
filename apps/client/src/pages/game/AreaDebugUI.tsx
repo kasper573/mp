@@ -62,7 +62,7 @@ export function AreaDebugUI(props: {
             checked={isTickEnabled.data ?? false}
             on:click={(e) => {
               e.preventDefault();
-              setTickEnabled.mutate(!e.currentTarget.checked);
+              setTickEnabled.mutate(!isTickEnabled.data);
             }}
             on:pointerdown={(e) => e.stopPropagation()}
           />
