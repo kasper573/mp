@@ -35,9 +35,9 @@ export function AreaDebugUI(props: {
 }) {
   const trpc = useTRPC();
 
-  const isTickEnabled = trpc.system.isTickEnabled.use();
-  const setTickEnabled = trpc.system.setTickEnabled.use();
-  const spawnNPC = trpc.npc.spawnProblematicNPC.use(() => ({
+  const isTickEnabled = trpc.system.isTickEnabled.createQuery();
+  const setTickEnabled = trpc.system.setTickEnabled.createMutation();
+  const spawnNPC = trpc.npc.spawnProblematicNPC.createMutation(() => ({
     meta: { invalidateCache: false },
   }));
   const [visibleGraphType, setVisibleGraphType] =
@@ -140,7 +140,7 @@ function DebugText(props: { tiled: TiledResource }) {
   const trpc = useTRPC();
   const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
-  const serverVersion = trpc.system.buildVersion.use();
+  const serverVersion = trpc.system.buildVersion.createQuery();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 

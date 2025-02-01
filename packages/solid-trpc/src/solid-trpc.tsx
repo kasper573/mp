@@ -144,8 +144,8 @@ type RouterHooks<Routes> = {
     : RouterHooks<Routes[K]>;
 };
 
-const createQueryProperty = "use";
-const createMutationProperty = "use";
+const createQueryProperty = "createQuery";
+const createMutationProperty = "createMutation";
 
 type ProcedureHooks<Proc extends AnyProcedure> =
   Proc["_def"]["type"] extends "query"
