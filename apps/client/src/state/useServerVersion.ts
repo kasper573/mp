@@ -4,7 +4,7 @@ import { env } from "../env";
 
 export const useVersionCompatibility = () => {
   const trpc = useTRPC();
-  const serverVersion = trpc.system.buildVersion.createQuery();
+  const serverVersion = trpc.system.buildVersion.use();
   const compatibility = createMemo(() => {
     if (serverVersion.status === "success") {
       return env.buildVersion === serverVersion.data

@@ -7,7 +7,7 @@ import { useTRPC } from "../integrations/trpc";
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const trpc = useTRPC();
 
-  return trpc.area.areaFileUrl.createQuery(() => ({
+  return trpc.area.areaFileUrl.use(() => ({
     refetchOnWindowFocus: false,
     input: areaId?.() ?? skipToken,
     async map(url, input) {

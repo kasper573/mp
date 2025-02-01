@@ -16,7 +16,7 @@ export function createQueryClient() {
 declare module "@tanstack/solid-query" {
   interface Register {
     mutationMeta: {
-      cancelInvalidate?: boolean;
+      invalidateCache?: boolean;
     };
   }
 }

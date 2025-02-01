@@ -34,10 +34,10 @@ export function createSyncClient(auth: AuthClient) {
     ].filter((char) => char.areaId === areaId()),
   );
 
-  const moveMutation = trpc.character.move.createMutation(() => ({
-    meta: { cancelInvalidate: true },
+  const moveMutation = trpc.character.move.use(() => ({
+    meta: { invalidateCache: false },
   }));
-  const { mutate: join } = trpc.character.join.createMutation(() => ({
+  const { mutate: join } = trpc.character.join.use(() => ({
     onSuccess: setCharacterId,
   }));
 
