@@ -34,13 +34,18 @@ export function createSyncClient(auth: AuthClient) {
     ].filter((char) => char.areaId === areaId()),
   );
 
-  const join = async () => trpc.world.join.mutate().then(setCharacterId);
+  const moveMutation = trpc.world.move.createMutation(() => ({
+    meta: { cancelInvalidate: true },
+  }));
+  const { mutate: join } = trpc.world.join.createMutation(() => ({
+    onSuccess: setCharacterId,
+  }));
 
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
       (to: Vector<Tile>) =>
-        trpc.world.move.mutate({ characterId: characterId()!, to }),
+        moveMutation.mutate({ characterId: characterId()!, to }),
       100,
     ),
     vec_equals,

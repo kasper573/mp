@@ -35,6 +35,7 @@ export function AreaDebugUI(props: {
   const trpc = useTRPC();
 
   const isTickEnabled = trpc.system.isTickEnabled.createQuery();
+  const setTickEnabled = trpc.system.setTickEnabled.createMutation();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -61,7 +62,7 @@ export function AreaDebugUI(props: {
             checked={isTickEnabled.data ?? false}
             on:click={(e) => {
               e.preventDefault();
-              void trpc.system.setTickEnabled.mutate(!e.currentTarget.checked);
+              setTickEnabled.mutate(!e.currentTarget.checked);
             }}
             on:pointerdown={(e) => e.stopPropagation()}
           />

@@ -9,9 +9,10 @@ import { type AuthClient } from "@mp/auth/client";
 import type { QueryClient } from "@tanstack/solid-query";
 import { env } from "../env";
 
-export function createTRPCClient(auth: AuthClient, queryClient: QueryClient) {
+export const CANCEL_INVALIDATE = Symbol("CANCEL_INVALIDATE");
+
+export function createTRPCClient(auth: AuthClient, query: QueryClient) {
   return createTRPCSolidClient<RootRouter>({
-    queryClient,
     links: [
       httpBatchLink({
         url: env.apiUrl,
@@ -24,6 +25,13 @@ export function createTRPCClient(auth: AuthClient, queryClient: QueryClient) {
         },
       }),
     ],
+    async onMutation({ meta }) {
+      if (!meta?.cancelInvalidate) {
+        // Invalidate all queries on successful mutations
+        // This is a bit inefficient, but it promotes correctness over performance.
+        await query.invalidateQueries();
+      }
+    },
   });
 }
 
