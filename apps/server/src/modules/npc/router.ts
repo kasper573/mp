@@ -1,6 +1,5 @@
 import { vec } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
-import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
 import { auth } from "../../middlewares/auth";
 import { t } from "../../trpc";
@@ -28,9 +27,21 @@ export function createNPCRouter({
 
       const [{ npc }] = await npcService.getAllSpawnsAndTheirNpcs();
 
+      const area = areas.values().find((area) => area.id === "forest");
+      if (!area) {
+        throw new Error(`Area not found: forest`);
+      }
+
+      const fromNode = area.graph.getNearestNode(start);
+      const toNode = area.graph.getNearestNode(end);
+      if (!fromNode || !toNode) {
+        throw new Error(`Could not find nodes for start and end`);
+      }
+      const path = area.findPath(fromNode.id, toNode.id);
+
       accessState("world.spawnProblematicNPC", (state) => {
-        const instance = createNpcInstance(npc, "forest" as AreaId, start);
-        instance.path = [start, end];
+        const instance = createNpcInstance(npc, area.id, start);
+        instance.path = path;
         state.npcs[instance.id] = instance;
       });
     }),
