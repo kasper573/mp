@@ -11,8 +11,6 @@ import { useContext } from "solid-js";
 import { env } from "../env";
 import { LoggerContext } from "../logger";
 
-export const CANCEL_INVALIDATE = Symbol("CANCEL_INVALIDATE");
-
 export function createTRPCClient(auth: AuthClient) {
   return createTRPCSolidClient<RootRouter>({
     links: [
