@@ -12,7 +12,6 @@ import { Application } from "@mp/solid-pixi";
 import type { AreaResource } from "@mp/data";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
 import { useAreaResource } from "../../state/useAreaResource";
-import { Dock } from "../../ui/Dock";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
 import { toggleSignal } from "../../state/toggleSignal";
 import * as styles from "./GamePage.css";
@@ -34,9 +33,6 @@ export default function GamePage() {
   return (
     <SyncClientContext.Provider value={world}>
       <Switch>
-        <Match when={!auth.isSignedIn()}>
-          <Dock position="center">Sign in to play</Dock>
-        </Match>
         <Match when={world.readyState() !== "open" || area.isLoading}>
           {/** TODO replace with specialized loading screen for loading areas */}
           <LoadingSpinner debugId="GamePage" />
