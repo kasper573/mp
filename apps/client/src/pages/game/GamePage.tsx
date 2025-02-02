@@ -16,7 +16,6 @@ import { toggleSignal } from "../../state/toggleSignal";
 import * as styles from "./GamePage.css";
 import { AreaDebugUI } from "./AreaDebugUI";
 import { AreaScene } from "./AreaScene";
-import { WorldStateInspector } from "./WorldStateInspector";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
@@ -51,7 +50,6 @@ export default function GamePage() {
                           .actorsInArea()
                           .flatMap((actor) => (actor.path ? [actor.path] : []))}
                       />
-                      <WorldStateInspector worldState={world.worldState} />
                     </Show>
                   </AreaScene>
                 </EngineProvider>
