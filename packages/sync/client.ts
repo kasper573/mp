@@ -1,15 +1,20 @@
 import { applyPatch } from "rfc6902";
-import { produce } from "immer";
-import type { EventHandler, HandshakeData, Unsubscribe } from "./shared";
+import type {
+  StateHandler,
+  HandshakeData,
+  Unsubscribe,
+  EventHandler,
+  StateMutation,
+} from "./shared";
 import {
   createUrlWithHandshakeData,
   decodeServerToClientMessage,
 } from "./shared";
 
-export class SyncClient<State> {
+export class SyncClient<State extends object> {
   private socket?: WebSocket;
-  private state?: State;
-  private stateHandlers = new Set<EventHandler<State | undefined>>();
+
+  private stateHandlers = new Set<StateHandler<State>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
   private errorHandlers = new Set<EventHandler<Event>>();
   private isEnabled = false;
@@ -25,8 +30,6 @@ export class SyncClient<State> {
   getReadyState = (): SyncClientReadyState =>
     coerceReadyState(this.socket?.readyState as WebSocketReadyState);
 
-  getState = (): State | undefined => this.state;
-
   start = () => {
     this.isEnabled = true;
     this.connect();
@@ -37,9 +40,7 @@ export class SyncClient<State> {
     this.disconnect();
   };
 
-  subscribeToState = (
-    handler: EventHandler<State | undefined>,
-  ): Unsubscribe => {
+  subscribeToState = (handler: StateHandler<State>): Unsubscribe => {
     this.stateHandlers.add(handler);
     return () => this.stateHandlers.delete(handler);
   };
@@ -91,7 +92,6 @@ export class SyncClient<State> {
       this.handleMessage as EventHandler<MessageEvent>,
     );
     this.socket = undefined;
-    this.setState(undefined);
   }
 
   private enqueueReconnect() {
@@ -127,23 +127,17 @@ export class SyncClient<State> {
 
     switch (message.type) {
       case "full":
-        return this.setState(message.state);
-      case "patch":
-        if (!this.state) {
-          throw new Error("Received patch before full state");
-        }
-        return this.setState(
-          produce(this.state, (draft) => {
-            applyPatch(draft, message.patch);
-          }),
+        return this.updateState((target) =>
+          Object.assign(target, message.state),
         );
+      case "patch":
+        return this.updateState((target) => applyPatch(target, message.patch));
     }
   };
 
-  private setState = (newState?: State) => {
-    this.state = newState;
+  private updateState = (mutation: StateMutation<State>) => {
     for (const handler of this.stateHandlers) {
-      handler(this.state);
+      handler(mutation);
     }
   };
 

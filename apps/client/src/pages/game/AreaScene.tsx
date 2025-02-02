@@ -1,7 +1,7 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ParentProps } from "solid-js";
-import { useContext, createEffect, createMemo, Index } from "solid-js";
+import { useContext, createEffect, createMemo, For } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -12,7 +12,6 @@ import { clientViewDistance } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
-import type { ActorTrait } from "./Actor";
 import { Actor } from "./Actor";
 import { TileHighlight } from "./TileHighlight";
 
@@ -26,11 +25,6 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   }));
 
   const myCoords = useAnimatedCoords(world.character);
-
-  const actorsInArea = createMemo((): ActorTrait[] => {
-    const { characters, npcs } = world.worldState() ?? {};
-    return Object.values({ ...characters, ...npcs });
-  });
 
   const myWorldPos = createMemo(() => {
     const coords = myCoords();
@@ -85,9 +79,9 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={actorsInArea()}>
-                {(actor) => <Actor tiled={props.area.tiled} actor={actor()} />}
-              </Index>
+              <For each={world.actorsInArea()}>
+                {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
+              </For>
             ),
           }}
         </TiledRenderer>

@@ -51,7 +51,7 @@ export default function GamePage() {
                           .actorsInArea()
                           .flatMap((actor) => (actor.path ? [actor.path] : []))}
                       />
-                      <WorldStateInspector worldState={world.worldState()} />
+                      <WorldStateInspector worldState={world.worldState} />
                     </Show>
                   </AreaScene>
                 </EngineProvider>
