@@ -14,9 +14,9 @@ export function moveAlongPath<T extends number>(
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;
-      const { x, y } = path.shift()!;
-      coords.x = x;
-      coords.y = y;
+      const nextCoord = path.shift()!;
+      coords.x = nextCoord.x;
+      coords.y = nextCoord.y;
     } else {
       const percentage = distanceToMove / distanceToDestination;
       coords.x = (coords.x + (destination.x - coords.x) * percentage) as T;
