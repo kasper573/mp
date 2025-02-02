@@ -4,7 +4,7 @@ import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Result, Tile } from "@mp/std";
-import { err, ok } from "@mp/std";
+import { err, ok, recordValues } from "@mp/std";
 import type { AreaLookup } from "../modules/area/loadAreas";
 import type { WorldState } from "../package";
 
@@ -17,12 +17,11 @@ export interface MovementTrait {
 
 export function movementBehavior(
   accessState: StateAccess<WorldState>,
-  getSubjects: (state: WorldState) => Iterable<MovementTrait>,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
     accessState("movementBehavior", (state) => {
-      for (const subject of getSubjects(state)) {
+      for (const subject of recordValues(state.actors)) {
         if (subject.path) {
           moveAlongPath(
             subject.coords,
@@ -30,7 +29,7 @@ export function movementBehavior(
             subject.speed,
             timeSinceLastTick,
           );
-          if (!subject.path?.length) {
+          if (subject.path?.length === 0) {
             delete subject.path;
           }
         }

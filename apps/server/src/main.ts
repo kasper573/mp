@@ -12,7 +12,7 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { assertEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { err, recordValues } from "@mp/std";
+import { err } from "@mp/std";
 import { createServerContextFactory } from "./context";
 import { serverOptionsSchema } from "./options";
 import { createDBClient } from "./db/client";
@@ -140,13 +140,7 @@ collectUserMetrics(metrics, clients, syncServer);
 collectPathFindingMetrics(metrics);
 
 updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
-updateTicker.subscribe(
-  movementBehavior(
-    syncServer.access,
-    (state) => recordValues(state.actors),
-    areas,
-  ),
-);
+updateTicker.subscribe(movementBehavior(syncServer.access, areas));
 updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
