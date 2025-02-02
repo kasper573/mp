@@ -1,3 +1,4 @@
+import { uniqueNamesGenerator, names } from "unique-names-generator";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
@@ -52,12 +53,17 @@ export function createNpcInstance(
   coords: Vector<Tile>,
 ): NPCInstance {
   const id = uuid();
+  const name = uniqueNamesGenerator({
+    dictionaries: [names],
+    seed: id,
+  });
   return {
     id,
     areaId,
     coords,
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
+    name,
   };
 }
 

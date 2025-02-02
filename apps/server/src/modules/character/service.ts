@@ -2,6 +2,7 @@ import { eq } from "drizzle-orm";
 import type { UserId } from "@mp/auth";
 import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
+import { uniqueNamesGenerator, names } from "unique-names-generator";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
 import { characterTable } from "./schema";
@@ -28,7 +29,16 @@ export class CharacterService {
       .where(eq(characterTable.userId, userId))
       .limit(1);
 
-    return char ? { ...char, color: playerColor } : undefined;
+    return char
+      ? {
+          ...char,
+          color: playerColor,
+          name: uniqueNamesGenerator({
+            dictionaries: [names],
+            seed: char.id,
+          }),
+        }
+      : undefined;
   }
 
   async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
@@ -63,7 +73,14 @@ export class CharacterService {
       throw new Error("Failed to insert character");
     }
 
-    return { ...input, ...returned };
+    return {
+      ...input,
+      ...returned,
+      name: uniqueNamesGenerator({
+        dictionaries: [names],
+        seed: returned.id,
+      }),
+    };
   }
 }
 
