@@ -2,8 +2,6 @@ import type { CSSProperties } from "@vanilla-extract/css";
 import { flattened } from "./flattened";
 import { themeContract } from "./theme.css";
 import { inter } from "./fonts/inter/inter.css";
-import type { FontFaceDefinition } from "./fonts/convention";
-import { interFontFaces } from "./fonts/inter/inter";
 
 const cssDefaults = {
   auto: "auto",
@@ -154,14 +152,9 @@ export const shadows = {
   m: "0px 4px 8px rgba(0, 0, 0, 0.1)",
 };
 
-export type FontFaceName = keyof typeof fontFaceDefinitions;
-export const fontFaceDefinitions = {
-  default: interFontFaces,
-} satisfies Record<string, FontFaceDefinition[]>;
-
 export const fontFaces = {
   default: inter,
-} satisfies Record<FontFaceName, string>;
+};
 
 export const typography = {
   caption: { fontFamily: fontFaces.default, fontSize: 11 },
