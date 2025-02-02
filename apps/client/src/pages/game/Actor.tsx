@@ -18,7 +18,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
     <ActorGraphics
       tileSize={props.tiled.tileSize}
       color={props.actor.color}
-      position={props.tiled.tileCoordToWorld(coords)}
+      position={props.tiled.tileCoordToWorld(coords())}
       name={props.actor.name}
     />
   );

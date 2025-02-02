@@ -31,7 +31,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   );
 
   const myWorldPos = createMemo(() =>
-    props.area.tiled.tileCoordToWorld(myCoords),
+    props.area.tiled.tileCoordToWorld(myCoords()),
   );
 
   const cameraPos = useSpring(

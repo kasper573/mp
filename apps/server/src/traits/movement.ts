@@ -1,6 +1,5 @@
 import { moveAlongPath, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
-import { vec_copy } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Result, Tile } from "@mp/std";
@@ -23,7 +22,7 @@ export function movementBehavior(
     accessState("movementBehavior", (state) => {
       for (const subject of recordValues(state.actors)) {
         if (subject.path) {
-          moveAlongPath(
+          [subject.coords, subject.path] = moveAlongPath(
             subject.coords,
             subject.path,
             subject.speed,
@@ -42,7 +41,7 @@ export function movementBehavior(
             );
             if (targetArea) {
               subject.areaId = targetArea.id;
-              subject.coords = vec_copy(targetArea.start);
+              subject.coords = targetArea.start;
               delete subject.path;
             }
           }
@@ -77,7 +76,7 @@ export function moveTo(
       (c) => c.x === destNode.data.vector.x && c.y === destNode.data.vector.y,
     );
     if (idx !== -1) {
-      subject.path.splice(idx + 1);
+      subject.path = subject.path.slice(0, idx);
       return ok("truncated");
     }
 
@@ -90,7 +89,7 @@ export function moveTo(
     if (nextNode) {
       const newPath = area.findPath(nextNode.id, destNode.id);
       if (newPath) {
-        subject.path.splice(1, subject.path.length - 1, ...newPath);
+        subject.path = subject.path.slice(0, 1).concat(newPath);
         return ok("extended");
       }
     }

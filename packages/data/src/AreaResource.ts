@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import { vec_copy, vec_round } from "@mp/math";
+import { vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded, Pixel, Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
@@ -36,7 +36,7 @@ export class AreaResource {
       throw new Error("Invalid area data: must have a start location");
     }
 
-    this.start = vec_round(tiled.worldCoordToTile(vec_copy(startObj)));
+    this.start = vec_round(tiled.worldCoordToTile(startObj));
   }
 
   findPath: VectorPathFinder<Tile> = (...args) =>
