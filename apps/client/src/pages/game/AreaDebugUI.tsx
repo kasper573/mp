@@ -16,9 +16,10 @@ import {
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import type { Character } from "@mp/server";
+import type { Actor, Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
+import uniqolor from "uniqolor";
 import { env } from "../../env";
 import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
@@ -31,7 +32,7 @@ type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
 export function AreaDebugUI(props: {
   area: AreaResource;
-  pathsToDraw: Path<Tile>[];
+  drawPathsForActors: Actor[];
 }) {
   const trpc = useTRPC();
 
@@ -46,8 +47,16 @@ export function AreaDebugUI(props: {
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
       <DebugGraph area={props.area} visible={visibleGraphType} />
-      <For each={props.pathsToDraw}>
-        {(path) => <DebugPath tiled={props.area.tiled} path={path} />}
+      <For each={props.drawPathsForActors}>
+        {(actor) =>
+          actor.path ? (
+            <DebugPath
+              tiled={props.area.tiled}
+              path={actor.path}
+              color={uniqolor(actor.id).color}
+            />
+          ) : null
+        }
       </For>
       <div class={styles.debugMenu}>
         <div on:pointerdown={(e) => e.stopPropagation()}>
@@ -121,13 +130,14 @@ function DebugGraph(props: {
 function DebugPath(props: {
   tiled: TiledResource;
   path: Path<Tile> | undefined;
+  color: string;
 }) {
   const gfx = new Graphics();
 
   createEffect(() => {
     gfx.clear();
     if (props.path?.length) {
-      drawPath(gfx, props.path.map(props.tiled.tileCoordToWorld));
+      drawPath(gfx, props.path.map(props.tiled.tileCoordToWorld), props.color);
     }
   });
 
@@ -189,12 +199,12 @@ function drawGraphNode(
   );
 }
 
-function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>) {
+function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
   const [start, ...rest] = Array.from(path);
 
   ctx.beginPath();
   ctx.moveTo(start.x, start.y);
-  ctx.strokeStyle = { width: 1, color: "purple" };
+  ctx.strokeStyle = { width: 1, color };
   for (const { x, y } of rest) {
     ctx.lineTo(x, y);
   }

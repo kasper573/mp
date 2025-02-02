@@ -53,9 +53,7 @@ export default function GamePage() {
                     <Show when={debug()}>
                       <AreaDebugUI
                         area={data}
-                        pathsToDraw={world
-                          .actorsInArea()
-                          .flatMap((actor) => (actor.path ? [actor.path] : []))}
+                        drawPathsForActors={world.actorsInArea()}
                       />
                     </Show>
                   </AreaScene>

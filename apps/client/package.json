@@ -30,7 +30,8 @@
     "@mp/time": "workspace:*",
     "@solidjs/router": "0.14.7",
     "@tanstack/solid-query": "5.56.2",
-    "solid-js": "1.9.3"
+    "solid-js": "1.9.3",
+    "uniqolor": "1.1.1"
   },
   "devDependencies": {
     "@mp/server": "workspace:*",
