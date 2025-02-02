@@ -4,7 +4,7 @@ import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
 import type { MovementTrait, AppearanceTrait } from "@mp/server";
-import type { Pixel } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
 export type ActorTrait = MovementTrait & AppearanceTrait;
@@ -12,8 +12,9 @@ export type ActorTrait = MovementTrait & AppearanceTrait;
 export function Actor(props: { tiled: TiledResource; actor: ActorTrait }) {
   const coords = useAnimatedCoords(
     () => props.actor.coords,
-    () => props.actor.path?.[0],
+    () => props.actor.path,
     () => props.actor.speed,
+    () => 2 as Tile, // Magic number, no reason other than it seems to work well
   );
   return (
     <ActorGraphics

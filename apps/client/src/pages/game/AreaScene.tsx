@@ -11,6 +11,7 @@ import { vec } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { Actor } from "./Actor";
 import { TileHighlight } from "./TileHighlight";
 
@@ -23,10 +24,14 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
+  const myCoords = useAnimatedCoords(
+    () => world.character()?.coords ?? vec(0 as Tile, 0 as Tile),
+    () => world.character()?.path,
+    () => world.character()?.speed ?? (0 as Tile),
+  );
+
   const myWorldPos = createMemo(() =>
-    props.area.tiled.tileCoordToWorld(
-      world.character()?.coords ?? vec(0 as Tile, 0 as Tile),
-    ),
+    props.area.tiled.tileCoordToWorld(myCoords),
   );
 
   const cameraPos = useSpring(

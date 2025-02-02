@@ -1,6 +1,7 @@
 import { moveAlongPath } from "@mp/data";
 import { EngineContext } from "@mp/engine";
-import { vec_distance, type Vector } from "@mp/math";
+import type { Path } from "@mp/math";
+import { vec_copy, vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
@@ -12,16 +13,21 @@ import {
 import { createMutable } from "solid-js/store";
 
 /**
- * Creates a vector signal that lerps each frame along the current path
+ * Creates a vector signal that lerps each frame along the current path.
+ * Will synchronize external coords and path if they change.
  */
 export function useAnimatedCoords<T extends number>(
-  realCoords: Accessor<Vector<T>>,
-  destination: Accessor<Vector<T> | undefined>,
+  externalCoords: Accessor<Vector<T>>,
+  externalPath: Accessor<Path<T> | undefined>,
   speed: Accessor<NoInfer<T>>,
+  snapDistance?: Accessor<NoInfer<T>>,
 ): Vector<NoInfer<T>> {
   const engine = useContext(EngineContext);
-  const animatedCoords = createMutable(realCoords());
-  const isMoving = createMemo(() => !!destination());
+  const local = createMutable({
+    coords: vec_copy(externalCoords()),
+    path: externalPath()?.map(vec_copy),
+  });
+  const isMoving = createMemo(() => !!local.path);
 
   createEffect(() => {
     if (isMoving()) {
@@ -29,19 +35,30 @@ export function useAnimatedCoords<T extends number>(
     }
   });
 
+  createEffect(() => {
+    // eslint-disable-next-line solid/reactivity
+    local.path = externalPath();
+  });
+
+  if (snapDistance) {
+    createEffect(() => {
+      const coords = externalCoords();
+      // If the distance between real and animated coords is too large, snap to real coords
+      if (vec_distance(coords, local.coords) >= snapDistance()) {
+        Object.assign(local.coords, coords);
+      }
+    });
+  }
+
   function onFrame(deltaTime: TimeSpan) {
-    const dest = destination();
-
-    // If the distance between real and animated coords is too large, snap to real coords
-    // This may be a bad idea, specially relying on speed as the cutoff, but it may work.
-    if (vec_distance(realCoords(), animatedCoords) >= speed()) {
-      Object.assign(animatedCoords, realCoords());
-    }
-
-    if (dest) {
-      moveAlongPath(animatedCoords, [animatedCoords, dest], speed(), deltaTime);
+    if (local.path) {
+      moveAlongPath(local.coords, local.path, speed(), deltaTime);
+      if (local.path.length === 0) {
+        delete local.path;
+      }
     }
   }
 
-  return animatedCoords;
+  // eslint-disable-next-line solid/reactivity
+  return local.coords;
 }
