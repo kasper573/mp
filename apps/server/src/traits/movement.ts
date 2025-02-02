@@ -17,7 +17,7 @@ export interface MovementTrait {
 
 export function movementBehavior(
   accessState: StateAccess<WorldState>,
-  getSubjects: (state: WorldState) => MovementTrait[],
+  getSubjects: (state: WorldState) => Iterable<MovementTrait>,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {

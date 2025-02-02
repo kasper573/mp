@@ -26,7 +26,7 @@ export function npcSpawnBehavior(
 
         for (let i = 0; i < spawn.count; i++) {
           const instance = spawnNpcInstance(npc, spawn, area);
-          state.npcs[instance.id] = instance;
+          state.actors[instance.id] = { type: "npc", ...instance };
         }
       }
     });

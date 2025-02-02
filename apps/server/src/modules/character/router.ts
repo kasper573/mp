@@ -1,7 +1,7 @@
 import { type Vector } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
-import type { Tile } from "@mp/std";
+import { recordValues, type Tile } from "@mp/std";
 import { auth } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
@@ -28,9 +28,9 @@ export function createCharacterRouter({
       .use(auth())
       .mutation(({ input: { characterId, to }, ctx: { user } }) =>
         accessState(`world.move`, (state) => {
-          const char = state.characters[characterId];
+          const char = state.actors[characterId];
 
-          if (!char) {
+          if (!char || char.type !== "character") {
             throw new TRPCError({
               code: "BAD_REQUEST",
               message: "Character not found",
@@ -58,7 +58,9 @@ export function createCharacterRouter({
         const existingCharacter = accessState(
           "world.join (check existing character)",
           (state) =>
-            Object.values(state.characters).find((c) => c.userId === user.id),
+            recordValues(state.actors)
+              .filter((actor) => actor.type === "character")
+              .find((actor) => actor.userId === user.id),
         );
 
         if (existingCharacter) {
@@ -69,7 +71,7 @@ export function createCharacterRouter({
           user.id,
         );
         accessState("world.join (initialize character)", (state) => {
-          state.characters[char.id] = char;
+          state.actors[char.id] = { type: "character", ...char };
         });
         return char.id;
       }),

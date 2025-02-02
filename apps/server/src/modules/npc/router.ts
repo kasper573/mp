@@ -42,7 +42,7 @@ export function createNPCRouter({
       accessState("world.spawnProblematicNPC", (state) => {
         const instance = createNpcInstance(npc, area.id, start);
         instance.path = path;
-        state.npcs[instance.id] = instance;
+        state.actors[instance.id] = { type: "npc", ...instance };
       });
     }),
   });

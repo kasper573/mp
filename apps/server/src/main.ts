@@ -12,7 +12,7 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { assertEnv } from "@mp/env";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { err } from "@mp/std";
+import { err, recordValues } from "@mp/std";
 import { createServerContextFactory } from "./context";
 import { serverOptionsSchema } from "./options";
 import { createDBClient } from "./db/client";
@@ -69,7 +69,7 @@ const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { characters: {}, npcs: {} } satisfies WorldState,
+  initialState: { actors: {} } satisfies WorldState,
   logSyncPatches: opt.logSyncPatches,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
@@ -143,10 +143,7 @@ updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
 updateTicker.subscribe(
   movementBehavior(
     syncServer.access,
-    (state) => [
-      ...Object.values(state.characters),
-      ...Object.values(state.npcs),
-    ],
+    (state) => recordValues(state.actors),
     areas,
   ),
 );

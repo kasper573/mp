@@ -1,5 +1,6 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
+import { recordValues } from "@mp/std";
 import type { WorldSyncServer } from "../modules/world/WorldState";
 import type { ClientRegistry } from "../ClientRegistry";
 
@@ -25,7 +26,11 @@ export function collectUserMetrics(
       worldState.access(
         "collectUserMetrics.active_character_count",
         (state) => {
-          this.set(Object.values(state.characters).length);
+          this.set(
+            recordValues(state.actors)
+              .filter((actor) => actor.type === "character")
+              .toArray().length,
+          );
         },
       );
     },
@@ -37,7 +42,11 @@ export function collectUserMetrics(
     registers: [registry],
     collect() {
       worldState.access("collectUserMetrics.active_npc_count", (state) => {
-        this.set(Object.values(state.npcs).length);
+        this.set(
+          recordValues(state.actors)
+            .filter((actor) => actor.type === "npc")
+            .toArray().length,
+        );
       });
     },
   });
