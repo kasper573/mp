@@ -37,7 +37,7 @@ export function AreaDebugUI(props: {
 
   const isTickEnabled = trpc.system.isTickEnabled.createQuery();
   const setTickEnabled = trpc.system.setTickEnabled.createMutation();
-  const spawnNPC = trpc.npc.spawnProblematicNPC.createMutation(() => ({
+  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
     meta: { invalidateCache: false },
   }));
   const [visibleGraphType, setVisibleGraphType] =
@@ -71,9 +71,7 @@ export function AreaDebugUI(props: {
             />
           </div>
           <div>
-            <Button on:click={() => spawnNPC.mutate()}>
-              Spawn problematic NPC
-            </Button>
+            <Button on:click={() => spawnNPC.mutate()}>Spawn random NPC</Button>
           </div>
         </div>
         <DebugText tiled={props.area.tiled} />
