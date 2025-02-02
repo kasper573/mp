@@ -3,13 +3,11 @@ import type { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
-import type { MovementTrait, AppearanceTrait } from "@mp/server";
+import type { AppearanceTrait, Actor } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
-export type ActorTrait = MovementTrait & AppearanceTrait;
-
-export function Actor(props: { tiled: TiledResource; actor: ActorTrait }) {
+export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   const coords = useAnimatedCoords(
     () => props.actor.coords,
     () => props.actor.path,
