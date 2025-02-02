@@ -11,26 +11,28 @@ export const vec_scale = <A extends number, B extends number>(
   b: Vector<B>,
 ): Vector<B> => vec<B>((a.x * b.x) as B, (a.y * b.y) as B);
 
-export const vec_copy = <T extends number>(v: Vector<T>): Vector<T> =>
-  vec(v.x, v.y);
-
 export const vec_equals = <T extends number>(
   a: Vector<T>,
   b: Vector<T>,
 ): boolean => a.x === b.x && a.y === b.y;
 
-export const vec = <const T extends number>(x: T, y: T): Vector<T> => ({
-  x,
-  y,
-});
+export const vec = <const T extends number>(x: T, y: T): Vector<T> =>
+  Object.freeze({
+    x,
+    y,
+  });
 
 export function vec_round<T extends number>({ x, y }: Vector<T>): Vector<T> {
   return vec<T>(Math.round(x) as T, Math.round(y) as T);
 }
 
-export interface Vector<T extends number> {
-  x: T;
-  y: T;
+export function path_copy<P extends Path<number> | undefined>(path: P): P {
+  return path ? (Object.freeze([...path]) as P) : (undefined as P);
 }
 
-export type Path<T extends number> = Vector<T>[];
+export interface Vector<T extends number> {
+  readonly x: T;
+  readonly y: T;
+}
+
+export type Path<T extends number> = readonly Vector<T>[];

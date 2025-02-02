@@ -69,7 +69,7 @@ const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { characters: {}, npcs: {} } satisfies WorldState,
+  initialState: { actors: {} } satisfies WorldState,
   logSyncPatches: opt.logSyncPatches,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
@@ -140,17 +140,9 @@ collectUserMetrics(metrics, clients, syncServer);
 collectPathFindingMetrics(metrics);
 
 updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
-updateTicker.subscribe(
-  movementBehavior(
-    syncServer.access,
-    (state) => [
-      ...Object.values(state.characters),
-      ...Object.values(state.npcs),
-    ],
-    areas,
-  ),
-);
+updateTicker.subscribe(movementBehavior(syncServer.access, areas));
 updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
+updateTicker.subscribe(syncServer.flush);
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>

@@ -1,31 +1,33 @@
-import { vec_distance, type Vector } from "@mp/math";
+import type { Path } from "@mp/math";
+import { vec, vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath<T extends number>(
   coords: Vector<T>,
-  path: ShiftableArray<Vector<T>>,
+  path: Path<T>,
   speed: NoInfer<T>,
   delta: TimeSpan,
-): void {
+): [Vector<T>, Path<T>] {
   let distanceToMove = speed * delta.totalSeconds;
-  while (path.length > 0 && distanceToMove > 0) {
-    const destination = path[0];
-    const distanceToDestination = vec_distance(destination, coords);
+  let newCoords = coords;
+  const newPath = [...path];
+
+  while (newPath.length > 0 && distanceToMove > 0) {
+    const destination = newPath[0];
+    const distanceToDestination = vec_distance(destination, newCoords);
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;
-      const nextCoord = path.shift()!;
-      coords.x = nextCoord.x;
-      coords.y = nextCoord.y;
+      newCoords = newPath.shift()!;
     } else {
       const percentage = distanceToMove / distanceToDestination;
-      coords.x = (coords.x + (destination.x - coords.x) * percentage) as T;
-      coords.y = (coords.y + (destination.y - coords.y) * percentage) as T;
+      newCoords = vec(
+        (newCoords.x + (destination.x - newCoords.x) * percentage) as T,
+        (newCoords.y + (destination.y - newCoords.y) * percentage) as T,
+      );
+
       break;
     }
   }
-}
-
-interface ShiftableArray<T> extends ArrayLike<T> {
-  shift(): T | undefined;
+  return [newCoords, newPath];
 }

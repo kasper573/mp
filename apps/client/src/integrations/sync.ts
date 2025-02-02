@@ -1,4 +1,4 @@
-import type { Character, NPCInstance, WorldState } from "@mp/server";
+import type { Character, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
 import { SyncClient } from "@mp/sync/client";
 import {
@@ -23,20 +23,14 @@ export function createSyncClient(auth: AuthClient) {
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
     token: auth.identity()?.token,
   }));
-  const worldState = createMutable<WorldState>({ characters: {}, npcs: {} });
+  const worldState = createMutable<WorldState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
-    () => worldState.characters[characterId()!] as Character | undefined,
+    () => worldState.actors[characterId()!] as Character | undefined,
   );
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
-  const actors = createMemo(
-    (): Array<Character | NPCInstance> =>
-      Object.values({
-        ...worldState.characters,
-        ...worldState.npcs,
-      }),
-  );
+  const actors = createMemo(() => Object.values(worldState.actors));
   const actorsInArea = createMemo(() =>
     actors().filter((actor) => actor.areaId === areaId()),
   );

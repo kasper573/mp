@@ -20,7 +20,6 @@
     "@mp/std": "workspace:*",
     "rfc6902": "5.1.2",
     "cbor-x": "1.6.0",
-    "immer": "10.1.1",
     "ws": "8.18.0"
   },
   "devDependencies": {

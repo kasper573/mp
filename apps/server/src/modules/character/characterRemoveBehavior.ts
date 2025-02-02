@@ -1,6 +1,7 @@
 import type { UserId } from "@mp/auth";
 import type { StateAccess } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
+import { recordValues } from "@mp/std";
 import type { ClientRegistry } from "../../ClientRegistry";
 import type { WorldState } from "../world/WorldState";
 
@@ -35,10 +36,12 @@ export function characterRemoveBehavior(
 
   function removeCharacter(userId: UserId) {
     accessState("removeCharacter", (state) => {
-      for (const char of Object.values(state.characters)) {
+      for (const char of recordValues(state.actors).filter(
+        (actor) => actor.type === "character",
+      )) {
         if (char.userId === userId) {
           logger.info("Removing character", char.id);
-          delete state.characters[char.id];
+          delete state.actors[char.id];
         }
       }
     });

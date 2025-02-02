@@ -1,5 +1,4 @@
 import type http from "node:http";
-import { produce, original } from "immer";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { uuid } from "@mp/std";
@@ -46,45 +45,37 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
   }
 
   access: StateAccess<ServerState> = (reference, accessFn) => {
-    let returnValue!: ReturnType<typeof accessFn>;
-
-    const nextState = produce(this.state, (draft) => {
-      returnValue = accessFn(draft as ServerState);
-      if (returnValue && typeof returnValue === "object") {
-        returnValue = original(returnValue) as ReturnType<typeof accessFn>;
-      }
-      if (returnValue instanceof Promise) {
-        throw new TypeError("State access mutations may not be asynchronous");
-      }
-    });
-
-    if (nextState !== this.state) {
-      this.state = nextState;
-      for (const [clientId, client] of this.clients.entries()) {
-        this.updateClientState(reference, clientId, client, nextState);
-      }
+    const returnValue = accessFn(this.state);
+    if (returnValue instanceof Promise) {
+      throw new TypeError("State access mutations may not be asynchronous");
     }
-
     return returnValue;
   };
 
-  start() {
+  flush = () => {
+    for (const [clientId, client] of this.clients.entries()) {
+      this.updateClientState(clientId, client);
+    }
+  };
+
+  start = () => {
     this.wss.addListener("connection", this.onConnection);
     this.wss.addListener("close", this.handleClose);
-  }
+  };
 
-  stop() {
+  stop = () => {
     this.wss.removeListener("connection", this.onConnection);
     this.wss.removeListener("close", this.handleClose);
-  }
+  };
 
   private updateClientState(
-    reference: string,
     clientId: ClientId,
     client: ClientInfo<ClientState>,
-    nextState: ServerState,
   ) {
-    const nextClientState = this.options.createClientState(nextState, clientId);
+    const nextClientState = this.options.createClientState(
+      this.state,
+      clientId,
+    );
 
     let message: ServerToClientMessage<ClientState>;
     if (client.state) {
@@ -95,17 +86,13 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
 
       message = { type: "patch", patch };
       if (this.options.logSyncPatches) {
-        this.options.logger?.info("SyncServer patch", {
-          clientId,
-          reference,
-          patch,
-        });
+        this.options.logger?.info("SyncServer patch", { clientId, patch });
       }
     } else {
       message = { type: "full", state: nextClientState };
     }
 
-    client.state = nextClientState;
+    client.state = structuredClone(nextClientState);
     client.socket.send(encodeServerToClientMessage(message));
   }
 
@@ -142,13 +129,6 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     const clientInfo: ClientInfo<ClientState> = { socket };
     this.clients.set(clientId, clientInfo);
     this.options.onConnection?.(clientId, handshakeReturn);
-
-    this.updateClientState(
-      "initial state on new connection",
-      clientId,
-      clientInfo,
-      this.state,
-    );
 
     socket.addEventListener("close", () => {
       this.clients.delete(clientId);

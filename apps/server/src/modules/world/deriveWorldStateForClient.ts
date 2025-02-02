@@ -1,9 +1,10 @@
 import type { ClientId } from "@mp/sync/server";
 import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
+import { recordValues } from "@mp/std";
 import { clientViewDistance } from "../../shared";
 import type { ClientRegistry } from "../../ClientRegistry";
 import type { MovementTrait } from "../../traits/movement";
-import type { WorldState } from "./WorldState";
+import type { Actor, ActorId, WorldState } from "./WorldState";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -13,25 +14,20 @@ import type { WorldState } from "./WorldState";
 export function deriveWorldStateForClient(clients: ClientRegistry) {
   return (state: WorldState, clientId: ClientId): WorldState => {
     const userId = clients.getUserId(clientId);
-    const clientCharacter = Object.values(state.characters).find(
-      (char) => char.userId === userId,
+    const clientCharacter = recordValues(state.actors).find(
+      (actor) => actor.type === "character" && actor.userId === userId,
     );
 
-    if (!clientCharacter) {
-      return { characters: {}, npcs: {} };
+    const visibleActors: Record<ActorId, Actor> = {};
+    if (clientCharacter) {
+      for (const other of recordValues(state.actors).filter((other) =>
+        canSeeSubject(clientCharacter, other),
+      )) {
+        visibleActors[other.id] = other;
+      }
     }
-
-    const visibleCharacters = Object.entries(state.characters).filter(
-      ([_, other]) => canSeeSubject(clientCharacter, other),
-    );
-
-    const visibleNpcs = Object.entries(state.npcs).filter(([_, other]) =>
-      canSeeSubject(clientCharacter, other),
-    );
-
     return {
-      characters: Object.fromEntries(visibleCharacters),
-      npcs: Object.fromEntries(visibleNpcs),
+      actors: visibleActors,
     };
   };
 }
