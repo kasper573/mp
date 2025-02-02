@@ -32,7 +32,14 @@ export default function GamePage() {
   return (
     <SyncClientContext.Provider value={world}>
       <Switch>
-        <Match when={world.readyState() !== "open" || area.isLoading}>
+        <Match
+          when={
+            world.readyState() !== "open" ||
+            area.isLoading ||
+            // AreaId would be null if the initial world state hasn't been received yet
+            !world.areaId()
+          }
+        >
           {/** TODO replace with specialized loading screen for loading areas */}
           <LoadingSpinner />
         </Match>
