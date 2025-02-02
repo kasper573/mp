@@ -10,18 +10,18 @@ import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 export type ActorTrait = MovementTrait & AppearanceTrait;
 
 export function Actor(props: { tiled: TiledResource; actor: ActorTrait }) {
-  const coords = useAnimatedCoords(() => props.actor);
+  const coords = useAnimatedCoords(
+    () => props.actor.coords,
+    () => props.actor.path?.[0],
+    () => props.actor.speed,
+  );
   return (
-    <Show when={coords()}>
-      {(coords) => (
-        <ActorGraphics
-          tileSize={props.tiled.tileSize}
-          color={props.actor.color}
-          position={props.tiled.tileCoordToWorld(coords())}
-          name={props.actor.name}
-        />
-      )}
-    </Show>
+    <ActorGraphics
+      tileSize={props.tiled.tileSize}
+      color={props.actor.color}
+      position={props.tiled.tileCoordToWorld(coords)}
+      name={props.actor.name}
+    />
   );
 }
 
@@ -33,11 +33,7 @@ function ActorGraphics(
 ) {
   const container = new Container();
   const gfx = new Graphics();
-  const text = new Text({
-    text: "hi",
-    scale: 0.25,
-    anchor: { x: 0.5, y: 0 },
-  });
+  const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(gfx);
   container.addChild(text);
 
