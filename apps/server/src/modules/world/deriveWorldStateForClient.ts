@@ -20,11 +20,10 @@ export function deriveWorldStateForClient(clients: ClientRegistry) {
 
     const visibleActors: Record<ActorId, Actor> = {};
     if (clientCharacter) {
-      for (const id in state.actors) {
-        const other = state.actors[id];
-        if (canSeeSubject(clientCharacter, other)) {
-          visibleActors[id] = other;
-        }
+      for (const other of recordValues(state.actors).filter((other) =>
+        canSeeSubject(clientCharacter, other),
+      )) {
+        visibleActors[other.id] = other;
       }
     }
     return {
