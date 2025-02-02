@@ -142,6 +142,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
 updateTicker.subscribe(movementBehavior(syncServer.access, areas));
 updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
+updateTicker.subscribe(syncServer.flush);
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
