@@ -1,9 +1,10 @@
+import type { Path } from "@mp/math";
 import { vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath<T extends number>(
   coords: Vector<T>,
-  path: ShiftableArray<Vector<T>>,
+  path: Path<T>,
   speed: NoInfer<T>,
   delta: TimeSpan,
 ): void {
@@ -24,8 +25,4 @@ export function moveAlongPath<T extends number>(
       break;
     }
   }
-}
-
-interface ShiftableArray<T> extends ArrayLike<T> {
-  shift(): T | undefined;
 }
