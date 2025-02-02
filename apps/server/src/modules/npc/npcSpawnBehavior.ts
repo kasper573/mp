@@ -40,6 +40,7 @@ const randomAndCustomNames = [
   "Chomps",
   "Bill",
   "normal Jeff",
+  "Max Power",
   ...names,
 ];
 
