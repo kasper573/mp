@@ -37,7 +37,7 @@ export function useAnimatedCoords<T extends number>(
 
   createEffect(() => {
     // eslint-disable-next-line solid/reactivity
-    local.path = externalPath();
+    local.path = externalPath()?.map(vec_copy);
   });
 
   if (snapDistance) {
