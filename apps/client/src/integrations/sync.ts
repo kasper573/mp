@@ -1,4 +1,4 @@
-import type { WorldState } from "@mp/server";
+import type { Character, NPCInstance, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
 import { SyncClient } from "@mp/sync/client";
 import {
@@ -10,42 +10,57 @@ import {
   untrack,
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth-client";
+import type { AuthClient } from "@mp/auth/client";
 import type { Tile } from "@mp/std";
+import { createMutable } from "solid-js/store";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
-import { trpc } from "./trpc";
+import { useTRPC } from "./trpc";
 
 export function createSyncClient(auth: AuthClient) {
+  const trpc = useTRPC();
   const id = createMemo(() => auth.identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
     token: auth.identity()?.token,
   }));
-  const [worldState, setWorldState] = createSignal<WorldState>();
+  const worldState = createMutable<WorldState>({ characters: {}, npcs: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-  const character = createMemo(() => worldState()?.characters[characterId()!]);
+  const character = createMemo(
+    () => worldState.characters[characterId()!] as Character | undefined,
+  );
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
+  const actors = createMemo(
+    (): Array<Character | NPCInstance> =>
+      Object.values({
+        ...worldState.characters,
+        ...worldState.npcs,
+      }),
+  );
   const actorsInArea = createMemo(() =>
-    [
-      ...Object.values(worldState()?.characters ?? []),
-      ...Object.values(worldState()?.npcs ?? []),
-    ].filter((char) => char.areaId === areaId()),
+    actors().filter((actor) => actor.areaId === areaId()),
   );
 
-  const join = async () => trpc.world.join.mutate().then(setCharacterId);
+  const moveMutation = trpc.character.move.createMutation(() => ({
+    meta: { invalidateCache: false },
+  }));
+  const res = trpc.character.join.createMutation(() => ({
+    onSuccess: setCharacterId,
+  }));
+
+  const join = res.mutate;
 
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
       (to: Vector<Tile>) =>
-        trpc.world.move.mutate({ characterId: characterId()!, to }),
+        moveMutation.mutate({ characterId: characterId()!, to }),
       100,
     ),
     vec_equals,
   );
 
-  onCleanup(sync.subscribeToState(setWorldState));
+  onCleanup(sync.subscribeToState((applyPatch) => applyPatch(worldState)));
   onCleanup(sync.subscribeToReadyState(setReadyState));
 
   createEffect(() => {

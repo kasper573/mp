@@ -23,6 +23,7 @@
   "exclude": ["node_modules", "${configDir}dist", "${configDir}.cache"],
   "include": [
     "${configDir}*.ts",
+    "${configDir}*.tsx",
     "${configDir}src/**/*.ts",
     "${configDir}src/**/*.tsx"
   ]

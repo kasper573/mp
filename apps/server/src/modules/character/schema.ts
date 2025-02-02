@@ -1,5 +1,5 @@
 import { integer, pgTable, serial, uuid } from "drizzle-orm/pg-core";
-import type { UserId } from "@mp/auth-server";
+import type { UserId } from "@mp/auth";
 import type { Tile } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";

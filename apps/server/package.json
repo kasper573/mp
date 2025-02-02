@@ -21,7 +21,7 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/auth-server": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/data": "workspace:*",
@@ -41,6 +41,7 @@
     "express": "4.19.2",
     "pg": "8.13.1",
     "rate-limiter-flexible": "^5.0.3",
+    "unique-names-generator": "4.7.1",
     "superjson": "2.2.1",
     "yargs": "17.7.2"
   },

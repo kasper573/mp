@@ -1,8 +1,8 @@
 {
-  "name": "@mp/auth-server",
+  "name": "@mp/solid-trpc",
   "version": "0.0.0",
-  "type": "module",
   "private": true,
+  "type": "module",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -11,8 +11,10 @@
     }
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "jose": "5.9.6"
+    "solid-js": "1.9.3",
+    "@trpc/server": "11.0.0-rc.593",
+    "@tanstack/solid-query": "5.56.2",
+    "@trpc/client": "11.0.0-rc.593"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

@@ -1,7 +1,7 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ParentProps } from "solid-js";
-import { useContext, createEffect, Index, createMemo } from "solid-js";
+import { useContext, createEffect, createMemo, For } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -24,21 +24,15 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
   }));
 
-  const myCoords = useAnimatedCoords(world.character);
-
-  const actorsInArea = createMemo(() =>
-    [
-      ...Object.values(world.worldState()?.characters ?? []),
-      ...Object.values(world.worldState()?.npcs ?? []),
-    ].filter((char) => char.areaId === props.area.id),
+  const myCoords = useAnimatedCoords(
+    () => world.character()?.coords ?? vec(0 as Tile, 0 as Tile),
+    () => world.character()?.path,
+    () => world.character()?.speed ?? (0 as Tile),
   );
 
-  const myWorldPos = createMemo(() => {
-    const coords = myCoords();
-    return coords
-      ? props.area.tiled.tileCoordToWorld(coords)
-      : vec(0 as Pixel, 0 as Pixel);
-  });
+  const myWorldPos = createMemo(() =>
+    props.area.tiled.tileCoordToWorld(myCoords),
+  );
 
   const cameraPos = useSpring(
     new VectorSpring(myWorldPos, () => ({
@@ -86,9 +80,9 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <Index each={actorsInArea()}>
-                {(actor) => <Actor tiled={props.area.tiled} actor={actor()} />}
-              </Index>
+              <For each={world.actorsInArea()}>
+                {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
+              </For>
             ),
           }}
         </TiledRenderer>

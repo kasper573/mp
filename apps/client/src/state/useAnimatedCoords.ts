@@ -1,43 +1,33 @@
 import { moveAlongPath } from "@mp/data";
 import { EngineContext } from "@mp/engine";
-import type { Path, Vector } from "@mp/math";
-import { vec } from "@mp/math";
-import type { Tile } from "@mp/std";
+import type { Path } from "@mp/math";
+import { vec_copy, vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
-  createSignal,
-  createMemo,
   createEffect,
   onCleanup,
   useContext,
-  batch,
+  createMemo,
 } from "solid-js";
+import { createMutable } from "solid-js/store";
 
 /**
- * Creates a vector signal that lerps each frame along the current path
+ * Creates a vector signal that lerps each frame along the current path.
+ * Will synchronize external coords and path if they change.
  */
-export function useAnimatedCoords(
-  getExternal: Accessor<External | undefined>,
-): Accessor<Vector<Tile> | undefined> {
+export function useAnimatedCoords<T extends number>(
+  externalCoords: Accessor<Vector<T>>,
+  externalPath: Accessor<Path<T> | undefined>,
+  speed: Accessor<NoInfer<T>>,
+  snapDistance?: Accessor<NoInfer<T>>,
+): Vector<NoInfer<T>> {
   const engine = useContext(EngineContext);
-  const isMoving = createMemo(() => !!getExternal()?.path);
-  const externalCoords = createMemo(() => getExternal()?.coords);
-  const [getCoords, setCoords] = createSignal(getExternal()?.coords);
-  const [getPath, setPath] = createSignal(getExternal()?.path);
-
-  createEffect(() => {
-    if (!isMoving()) {
-      setCoords(externalCoords());
-    }
+  const local = createMutable({
+    coords: vec_copy(externalCoords()),
+    path: externalPath()?.map(vec_copy),
   });
-
-  createEffect(() => {
-    const external = getExternal();
-    if (external?.path) {
-      setPath(external.path);
-    }
-  });
+  const isMoving = createMemo(() => !!local.path);
 
   createEffect(() => {
     if (isMoving()) {
@@ -45,29 +35,30 @@ export function useAnimatedCoords(
     }
   });
 
-  function onFrame(deltaTime: TimeSpan) {
-    const path = getPath();
-    const external = getExternal();
-    const coords = getCoords();
-    if (!path || !external || !coords) {
-      return;
-    }
+  createEffect(() => {
+    // eslint-disable-next-line solid/reactivity
+    local.path = externalPath()?.map(vec_copy);
+  });
 
-    const newCoords = vec(coords.x, coords.y);
-    const newPath = [...path];
-    moveAlongPath(newCoords, newPath, external.speed, deltaTime);
-
-    batch(() => {
-      setCoords(newCoords);
-      setPath(newPath.length > 0 ? newPath : undefined);
+  if (snapDistance) {
+    createEffect(() => {
+      const coords = externalCoords();
+      // If the distance between real and animated coords is too large, snap to real coords
+      if (vec_distance(coords, local.coords) >= snapDistance()) {
+        Object.assign(local.coords, coords);
+      }
     });
   }
 
-  return getCoords;
-}
+  function onFrame(deltaTime: TimeSpan) {
+    if (local.path) {
+      moveAlongPath(local.coords, local.path, speed(), deltaTime);
+      if (local.path.length === 0) {
+        delete local.path;
+      }
+    }
+  }
 
-interface External {
-  coords: Vector<Tile>;
-  path?: Path<Tile>;
-  speed: Tile;
+  // eslint-disable-next-line solid/reactivity
+  return local.coords;
 }

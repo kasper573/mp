@@ -1,4 +1,4 @@
-import type { UserId } from "@mp/auth-server";
+import type { UserId } from "@mp/auth";
 import type { ClientId } from "@mp/sync/server";
 
 export class ClientRegistry {

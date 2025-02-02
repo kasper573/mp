@@ -5,11 +5,14 @@ import type { SystemRouterDependencies } from "./system/router";
 import { createSystemRouter } from "./system/router";
 import type { CharacterRouterDependencies } from "./character/router";
 import { createCharacterRouter } from "./character/router";
+import type { NPCRouterDependencies } from "./npc/router";
+import { createNPCRouter } from "./npc/router";
 
 export type RootRouter = ReturnType<typeof createRootRouter>;
 
 export interface RootRouterDependencies
   extends CharacterRouterDependencies,
+    NPCRouterDependencies,
     SystemRouterDependencies {
   createUrl: UrlFactory;
 }
@@ -19,8 +22,9 @@ export function createRootRouter({
   ...dependencies
 }: RootRouterDependencies) {
   return t.router({
-    world: createCharacterRouter(dependencies),
+    character: createCharacterRouter(dependencies),
     system: createSystemRouter(dependencies),
     area: createAreaRouter(createUrl),
+    npc: createNPCRouter(dependencies),
   });
 }

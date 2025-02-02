@@ -1,4 +1,4 @@
-import type { Vector } from "@mp/math";
+import { type Vector } from "@mp/math";
 import type { StateAccess } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import type { Tile } from "@mp/std";
@@ -13,14 +13,14 @@ import type { CharacterService } from "./service";
 export interface CharacterRouterDependencies {
   state: StateAccess<WorldState>;
   areas: AreaLookup;
-  service: CharacterService;
+  characterService: CharacterService;
 }
 
 export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
 export function createCharacterRouter({
   state: accessState,
   areas,
-  service,
+  characterService,
 }: CharacterRouterDependencies) {
   return t.router({
     move: t.procedure
@@ -65,7 +65,9 @@ export function createCharacterRouter({
           return existingCharacter.id;
         }
 
-        const char = await service.getOrCreateCharacterForUser(user.id);
+        const char = await characterService.getOrCreateCharacterForUser(
+          user.id,
+        );
         accessState("world.join (initialize character)", (state) => {
           state.characters[char.id] = char;
         });

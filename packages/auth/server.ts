@@ -1,6 +1,11 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
-import type { AuthToken, UserId, UserIdentity } from "./types";
+import {
+  isOurJWTPayload,
+  type AuthToken,
+  type UserId,
+  type UserIdentity,
+} from "./shared";
 
 export interface AuthServerOptions {
   jwksUri: string;
@@ -37,6 +42,10 @@ export function createAuthServer({
         return err(String(error));
       }
 
+      if (!isOurJWTPayload(jwtPayload)) {
+        return err("Token payload is not valid");
+      }
+
       if (jwtPayload.azp !== audience) {
         return err(`Token azp "${String(jwtPayload.azp)}" is invalid`);
       }
@@ -48,6 +57,7 @@ export function createAuthServer({
       const user: UserIdentity = {
         id: jwtPayload.sub as UserId,
         token,
+        roles: new Set(jwtPayload.realm_access.roles),
       };
 
       return ok(user);
@@ -56,8 +66,6 @@ export function createAuthServer({
 }
 
 export type VerifyTokenResult = Result<UserIdentity, string>;
-
-export * from "./types";
 
 // Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [

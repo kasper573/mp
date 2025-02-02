@@ -1,16 +1,10 @@
-import { createQuery } from "@tanstack/solid-query";
 import { createMemo } from "solid-js";
-import { trpc } from "../integrations/trpc";
+import { useTRPC } from "../integrations/trpc";
 import { env } from "../env";
 
-export const useServerVersion = () =>
-  createQuery(() => ({
-    queryKey: ["server-version"],
-    queryFn: () => trpc.system.buildVersion.query(),
-  }));
-
 export const useVersionCompatibility = () => {
-  const serverVersion = useServerVersion();
+  const trpc = useTRPC();
+  const serverVersion = trpc.system.buildVersion.createQuery();
   const compatibility = createMemo(() => {
     if (serverVersion.status === "success") {
       return env.buildVersion === serverVersion.data

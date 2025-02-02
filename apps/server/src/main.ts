@@ -4,8 +4,8 @@ import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import type { AuthToken } from "@mp/auth-server";
-import { createAuthServer } from "@mp/auth-server";
+import type { AuthToken } from "@mp/auth";
+import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
@@ -110,10 +110,12 @@ const characterService = new CharacterService(db, areas);
 
 const trpcRouter = createRootRouter({
   areas,
-  service: characterService,
+  npcService,
+  characterService,
   state: syncServer.access,
   createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,
+  updateTicker,
 });
 
 webServer.use(

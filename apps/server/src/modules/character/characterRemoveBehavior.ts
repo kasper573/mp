@@ -1,4 +1,4 @@
-import type { UserId } from "@mp/auth-server";
+import type { UserId } from "@mp/auth";
 import type { StateAccess } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
 import type { ClientRegistry } from "../../ClientRegistry";

@@ -1,4 +1,4 @@
-import type { AuthClient, UserIdentity } from "@mp/auth-client";
+import type { UserIdentity } from "@mp/auth";
 import type { Faro, FaroUser } from "@mp/telemetry/faro";
 import {
   faroLoggerHandler,
@@ -7,6 +7,7 @@ import {
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
 import { useContext, onCleanup, createEffect } from "solid-js";
+import type { AuthClient } from "@mp/auth/client";
 import { env } from "../env";
 import { LoggerContext } from "../logger";
 

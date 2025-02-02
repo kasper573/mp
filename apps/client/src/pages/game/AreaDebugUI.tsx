@@ -20,9 +20,10 @@ import type { Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
 import { env } from "../../env";
-import { useServerVersion } from "../../state/useServerVersion";
 import { SyncClientContext } from "../../integrations/sync";
 import { Select } from "../../ui/Select";
+import { useTRPC } from "../../integrations/trpc";
+import { Button } from "../../ui/Button";
 import * as styles from "./AreaDebugUI.css";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
@@ -32,6 +33,13 @@ export function AreaDebugUI(props: {
   area: AreaResource;
   pathsToDraw: Path<Tile>[];
 }) {
+  const trpc = useTRPC();
+
+  const isTickEnabled = trpc.system.isTickEnabled.createQuery();
+  const setTickEnabled = trpc.system.setTickEnabled.createMutation();
+  const spawnNPC = trpc.npc.spawnProblematicNPC.createMutation(() => ({
+    meta: { invalidateCache: false },
+  }));
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -42,14 +50,31 @@ export function AreaDebugUI(props: {
         {(path) => <DebugPath tiled={props.area.tiled} path={path} />}
       </For>
       <div class={styles.debugMenu}>
-        <div>
-          Visible Graph lines:{" "}
-          <Select
-            options={visibleGraphTypes}
-            value={visibleGraphType()}
-            onChange={setVisibleGraphType}
-            on:pointerdown={(e) => e.stopPropagation()}
-          />
+        <div on:pointerdown={(e) => e.stopPropagation()}>
+          <div>
+            Visible Graph lines:{" "}
+            <Select
+              options={visibleGraphTypes}
+              value={visibleGraphType()}
+              onChange={setVisibleGraphType}
+            />
+          </div>
+          <div>
+            Server tick:
+            <input
+              type="checkbox"
+              checked={isTickEnabled.data ?? false}
+              on:click={(e) => {
+                e.preventDefault();
+                setTickEnabled.mutate(!isTickEnabled.data);
+              }}
+            />
+          </div>
+          <div>
+            <Button on:click={() => spawnNPC.mutate()}>
+              Spawn problematic NPC
+            </Button>
+          </div>
         </div>
         <DebugText tiled={props.area.tiled} />
       </div>
@@ -112,9 +137,10 @@ function DebugPath(props: {
 }
 
 function DebugText(props: { tiled: TiledResource }) {
+  const trpc = useTRPC();
   const world = useContext(SyncClientContext);
   const engine = useContext(EngineContext);
-  const serverVersion = useServerVersion();
+  const serverVersion = trpc.system.buildVersion.createQuery();
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 

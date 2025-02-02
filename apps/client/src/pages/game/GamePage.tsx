@@ -2,36 +2,25 @@ import {
   createEffect,
   Match,
   onCleanup,
-  Show,
   Switch,
   useContext,
+  Show,
 } from "solid-js";
 import { EngineContext, EngineProvider } from "@mp/engine";
-import { AuthContext } from "@mp/auth-client";
-import { createQuery, skipToken } from "@tanstack/solid-query";
+import { AuthContext } from "@mp/auth/client";
 import { Application } from "@mp/solid-pixi";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
-import { loadAreaResource } from "../../state/loadAreaResource";
-import { Dock } from "../../ui/Dock";
+import { useAreaResource } from "../../state/useAreaResource";
 import { LoadingSpinner } from "../../ui/LoadingSpinner";
 import { toggleSignal } from "../../state/toggleSignal";
 import * as styles from "./GamePage.css";
-import { AreaScene } from "./AreaScene";
-import { WorldStateInspector } from "./WorldStateInspector";
 import { AreaDebugUI } from "./AreaDebugUI";
+import { AreaScene } from "./AreaScene";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);
   const world = createSyncClient(auth);
-  const area = createQuery(() => {
-    const id = world.areaId();
-    return {
-      queryKey: ["area", id],
-      queryFn: id ? () => loadAreaResource(id) : skipToken,
-      refetchOnWindowFocus: false,
-    };
-  });
-
+  const area = useAreaResource(world.areaId);
   const [debug, toggleDebug] = toggleSignal();
 
   createEffect(() => {
@@ -43,10 +32,7 @@ export default function GamePage() {
   return (
     <SyncClientContext.Provider value={world}>
       <Switch>
-        <Match when={!auth.isSignedIn()}>
-          <Dock position="center">Sign in to play</Dock>
-        </Match>
-        <Match when={world.readyState() !== "open" || area.isPending}>
+        <Match when={world.readyState() !== "open" || area.isLoading}>
           {/** TODO replace with specialized loading screen for loading areas */}
           <LoadingSpinner />
         </Match>
@@ -55,7 +41,7 @@ export default function GamePage() {
             <Application class={styles.container}>
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
-                  <EngineBindings toggleDebug={toggleDebug} />
+                  <Keybindings toggleDebug={toggleDebug} />
                   <AreaScene area={data}>
                     <Show when={debug()}>
                       <AreaDebugUI
@@ -64,7 +50,6 @@ export default function GamePage() {
                           .actorsInArea()
                           .flatMap((actor) => (actor.path ? [actor.path] : []))}
                       />
-                      <WorldStateInspector worldState={world.worldState()} />
                     </Show>
                   </AreaScene>
                 </EngineProvider>
@@ -77,8 +62,7 @@ export default function GamePage() {
   );
 }
 
-// TODO remove this component, this is an anti pattern. Better to initialize an engine instance higher up the tree instead.
-function EngineBindings(props: { toggleDebug: () => void }) {
+function Keybindings(props: { toggleDebug: () => void }) {
   const engine = useContext(EngineContext);
   createEffect(() => {
     onCleanup(engine.keyboard.on("keydown", "F2", props.toggleDebug));
