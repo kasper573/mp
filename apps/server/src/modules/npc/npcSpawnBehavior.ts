@@ -1,4 +1,4 @@
-import { uniqueNamesGenerator, names } from "unique-names-generator";
+import { names, uniqueNamesGenerator } from "unique-names-generator";
 import type { StateAccess } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
@@ -35,6 +35,14 @@ export function npcSpawnBehavior(
   return () => {};
 }
 
+const randomAndCustomNames = [
+  "Chombs",
+  "Chomps",
+  "Bill",
+  "normal Jeff",
+  ...names,
+];
+
 export function spawnNpcInstance(
   npc: NPC,
   spawn: NPCSpawn,
@@ -54,7 +62,7 @@ export function createNpcInstance(
 ): NPCInstance {
   const id = uuid();
   const name = uniqueNamesGenerator({
-    dictionaries: [names],
+    dictionaries: [randomAndCustomNames],
     seed: id,
   });
   return {
