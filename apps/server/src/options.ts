@@ -13,6 +13,7 @@ import {
   string,
   transform,
 } from "@mp/env";
+import type { AuthToken } from "@mp/auth";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
 
@@ -85,6 +86,13 @@ export const serverOptionsSchema = object({
      * OIDC JWT algorithms
      */
     algorithms: csv(picklist(authAlgorithms)),
+    /**
+     * Publically available token that can be used by anyone to sign in as the guest user
+     */
+    guestUserToken: pipe(
+      string(),
+      transform((token) => token as AuthToken),
+    ),
   }),
 
   /**
