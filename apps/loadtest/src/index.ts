@@ -1,7 +1,7 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
-import type { RootRouter, WorldState } from "@mp/server";
-import { transformer } from "@mp/server";
+import type { RootRouter } from "@mp/server";
+import { tokenHeaderName, transformer } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { SyncClient } from "@mp/sync/client";
 import { readCliOptions } from "./cli";
@@ -16,7 +16,7 @@ const {
   httpRequests,
   rpcRequests,
   gameClients,
-  gameClientTestTimeout,
+  timeout,
   verbose,
 } = readCliOptions();
 
@@ -55,9 +55,7 @@ async function loadTestHTTP() {
 
 async function loadTestRPC() {
   logger.info("Testing", rpcRequests, "RPC requests");
-  const trpc = createTRPCClient<RootRouter>({
-    links: [httpBatchLink({ url: apiServerUrl, transformer })],
-  });
+  const trpc = createRPCClient();
 
   const results = await Promise.allSettled(
     range(rpcRequests).map(() =>
@@ -101,24 +99,47 @@ async function loadTestGameClients() {
 }
 
 async function testGameClient() {
-  const sync = new SyncClient<WorldState>(wsUrl, () => ({
-    token: "anonymous",
-  }));
+  const token = process.env.MP_SERVER_AUTH__GUEST_USER_TOKEN;
+  const sync = new SyncClient(wsUrl, () => ({ token }));
+  const rpc = createRPCClient(token);
 
   try {
-    await new Promise<void>((resolve, reject) => {
-      sync.subscribeToErrors((e) => {
-        clearTimeout(timeoutId);
-        reject(new Error(e.message));
-      });
-      sync.start();
-      const timeoutId = setTimeout(resolve, gameClientTestTimeout);
-    });
+    await connect(sync);
+    await rpc.character.join.mutate();
+    await wait(timeout);
   } finally {
     sync.stop();
   }
 }
 
+function createRPCClient(token?: string) {
+  return createTRPCClient<RootRouter>({
+    links: [
+      httpBatchLink({
+        url: apiServerUrl,
+        transformer,
+        headers: () => ({ [tokenHeaderName]: token }),
+      }),
+    ],
+  });
+}
+
+async function connect<State extends object>(sync: SyncClient<State>) {
+  await new Promise<void>((resolve, reject) => {
+    sync.subscribeToErrors((e) => reject(new Error(e.message)));
+    sync.subscribeToReadyState((readyState) => {
+      if (readyState === "open") {
+        resolve();
+      }
+    });
+    sync.start();
+  });
+}
+
 function range(n: number) {
   return Array.from({ length: n }, (_, i) => i + 1);
+}
+
+function wait(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

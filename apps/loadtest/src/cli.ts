@@ -39,7 +39,7 @@ export function readCliOptions(argv = process.argv) {
       default: 1,
     })
     .option("rpcRequests", {
-      alias: "gc",
+      alias: "rpc",
       type: "number",
       demandOption: true,
       default: 1,
@@ -50,8 +50,8 @@ export function readCliOptions(argv = process.argv) {
       demandOption: true,
       default: 0,
     })
-    .option("gameClientTestTimeout", {
-      alias: "gct",
+    .option("timeout", {
+      alias: "t",
       type: "number",
       demandOption: true,
       default: 60_000,
