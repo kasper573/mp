@@ -18,6 +18,11 @@ export function readCliOptions(argv = process.argv) {
       type: "boolean",
       default: false,
     })
+    .option("wsUrl", {
+      type: "string",
+      default: process.env.MP_CLIENT_WS_URL,
+      demandOption: true,
+    })
     .option("httpServerUrl", {
       type: "string",
       default: `https://${process.env.MP_CLIENT_DOMAIN}`,
@@ -29,13 +34,27 @@ export function readCliOptions(argv = process.argv) {
       demandOption: true,
     })
     .option("httpRequests", {
+      alias: "http",
       type: "number",
       default: 1,
     })
     .option("rpcRequests", {
+      alias: "gc",
       type: "number",
       demandOption: true,
       default: 1,
+    })
+    .option("gameClients", {
+      alias: "gc",
+      type: "number",
+      demandOption: true,
+      default: 0,
+    })
+    .option("gameClientTestTimeout", {
+      alias: "gct",
+      type: "number",
+      demandOption: true,
+      default: 60_000,
     })
     .parseSync();
 
