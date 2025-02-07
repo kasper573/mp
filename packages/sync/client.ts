@@ -16,7 +16,7 @@ export class SyncClient<State extends object> {
 
   private stateHandlers = new Set<StateHandler<State>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
-  private errorHandlers = new Set<EventHandler<SocketError>>();
+  private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
   private connectAttempt = 0;
 
@@ -52,7 +52,9 @@ export class SyncClient<State extends object> {
     return () => this.readyStateHandlers.delete(handler);
   };
 
-  subscribeToErrors = (handler: EventHandler<SocketError>): Unsubscribe => {
+  subscribeToErrors = (
+    handler: EventHandler<SocketErrorEvent>,
+  ): Unsubscribe => {
     this.errorHandlers.add(handler);
     return () => this.errorHandlers.delete(handler);
   };
@@ -113,7 +115,7 @@ export class SyncClient<State extends object> {
     this.enqueueReconnect();
   };
 
-  private handleError = (event: SocketError) => {
+  private handleError = (event: SocketErrorEvent) => {
     this.emitReadyState();
     for (const handler of this.errorHandlers) {
       handler(event);
@@ -169,9 +171,8 @@ function coerceReadyState(
 
 export { type ClientId } from "./shared";
 
-export interface SocketError {
-  readonly message: string;
-  readonly lineno: number;
-  readonly colno: number;
-  readonly error: unknown;
+// Note: using a custom interface for the error event type because the types differ between node and browser.
+// This is a hack and should be replaced with some normalizing websocket package, ie. "ws".
+export interface SocketErrorEvent extends Event {
+  readonly message?: string;
 }
