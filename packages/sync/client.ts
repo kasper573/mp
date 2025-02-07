@@ -16,7 +16,7 @@ export class SyncClient<State extends object> {
 
   private stateHandlers = new Set<StateHandler<State>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
-  private errorHandlers = new Set<EventHandler<Event>>();
+  private errorHandlers = new Set<EventHandler<SocketError>>();
   private isEnabled = false;
   private connectAttempt = 0;
 
@@ -52,7 +52,7 @@ export class SyncClient<State extends object> {
     return () => this.readyStateHandlers.delete(handler);
   };
 
-  subscribeToErrors = (handler: EventHandler<Event>): Unsubscribe => {
+  subscribeToErrors = (handler: EventHandler<SocketError>): Unsubscribe => {
     this.errorHandlers.add(handler);
     return () => this.errorHandlers.delete(handler);
   };
@@ -113,7 +113,7 @@ export class SyncClient<State extends object> {
     this.enqueueReconnect();
   };
 
-  private handleError = (event: Event) => {
+  private handleError = (event: SocketError) => {
     this.emitReadyState();
     for (const handler of this.errorHandlers) {
       handler(event);
@@ -168,3 +168,10 @@ function coerceReadyState(
 }
 
 export { type ClientId } from "./shared";
+
+export interface SocketError {
+  readonly message: string;
+  readonly lineno: number;
+  readonly colno: number;
+  readonly error: unknown;
+}
