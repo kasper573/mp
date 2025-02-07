@@ -8,10 +8,13 @@ import { readCliOptions } from "./cli";
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
-const { httpServerUrl, apiServerUrl, connections, requests } = readCliOptions();
+const { httpServerUrl, apiServerUrl, httpRequests, rpcRequests, verbose } =
+  readCliOptions();
 
 const start = performance.now();
-logger.info(`Load testing ${requests} requests x ${connections} connections`);
+logger.info(
+  `Load testing ${httpRequests} http requests and ${rpcRequests} rpc requests`,
+);
 
 await loadTestHTTP();
 await loadTestRPC();
@@ -21,48 +24,52 @@ const end = performance.now();
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
 async function loadTestHTTP() {
-  await Promise.all(
-    range(connections).map(async (clientNr) => {
-      const results = await Promise.allSettled(
-        range(requests).map(async () => {
-          const res = await fetch(httpServerUrl);
-          if (!res.ok) {
-            throw new Error(`Error: ${res.status} ${res.statusText}`);
-          }
-        }),
-      );
-
-      const successes = results.filter((r) => r.status === "fulfilled").length;
-      const failures = results.filter((r) => r.status === "rejected").length;
-
-      logger.info(
-        `HTTP test ${clientNr} done: ${successes} successes, ${failures} failures`,
-      );
+  const results = await Promise.allSettled(
+    range(httpRequests).map(async () => {
+      const res = await fetch(httpServerUrl);
+      if (!res.ok) {
+        throw new Error(`Error: ${res.status} ${res.statusText}`);
+      }
     }),
   );
+
+  const successes = results.filter((r) => r.status === "fulfilled");
+  const failures = results.filter((r) => r.status === "rejected");
+
+  logger.info(
+    `HTTP request test: ${successes.length} successes, ${failures.length} failures`,
+  );
+
+  if (verbose) {
+    for (const result of failures) {
+      logger.error(result.reason);
+    }
+  }
 }
 
 async function loadTestRPC() {
-  await Promise.all(
-    range(connections).map(async (clientNr) => {
-      const trpc = createTRPCClient<RootRouter>({
-        links: [httpBatchLink({ url: apiServerUrl, transformer })],
-      });
+  const trpc = createTRPCClient<RootRouter>({
+    links: [httpBatchLink({ url: apiServerUrl, transformer })],
+  });
 
-      const results = await Promise.allSettled(
-        range(requests).map(() =>
-          trpc.area.areaFileUrl.query("forest" as AreaId),
-        ),
-      );
-
-      const successes = results.filter((r) => r.status === "fulfilled").length;
-      const failures = results.filter((r) => r.status === "rejected").length;
-
-      logger.info(
-        `RPC test ${clientNr} done: ${successes} successes, ${failures} failures`,
-      );
-    }),
+  const results = await Promise.allSettled(
+    range(rpcRequests).map(() =>
+      trpc.area.areaFileUrl.query("forest" as AreaId),
+    ),
   );
+
+  const successes = results.filter((r) => r.status === "fulfilled");
+  const failures = results.filter((r) => r.status === "rejected");
+
+  logger.info(
+    `RPC test: ${successes.length} successes, ${failures.length} failures`,
+  );
+
+  if (verbose) {
+    for (const result of failures) {
+      logger.error(result.reason);
+    }
+  }
 }
 
 function range(n: number) {

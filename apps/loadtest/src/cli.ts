@@ -14,25 +14,25 @@ export function readCliOptions(argv = process.argv) {
       "camel-case-expansion": false, // Ensures only the explicit option names are used
       "unknown-options-as-args": true, // Omits unknown args from the options object
     })
+    .option("verbose", {
+      type: "boolean",
+      default: false,
+    })
     .option("httpServerUrl", {
-      alias: "hs",
       type: "string",
       default: `https://${process.env.MP_CLIENT_DOMAIN}`,
       demandOption: true,
     })
     .option("apiServerUrl", {
-      alias: "as",
       type: "string",
       default: process.env.MP_CLIENT_API_URL,
       demandOption: true,
     })
-    .option("connections", {
-      alias: "c",
+    .option("httpRequests", {
       type: "number",
       default: 1,
     })
-    .option("requests", {
-      alias: "r",
+    .option("rpcRequests", {
       type: "number",
       demandOption: true,
       default: 1,
