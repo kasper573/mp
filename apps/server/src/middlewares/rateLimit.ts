@@ -1,5 +1,5 @@
-import type { IRateLimiterOptions } from "rate-limiter-flexible";
-import { RateLimiterMemory } from "rate-limiter-flexible";
+import type { IRateLimiterOptions } from "@mp/rate-limiter";
+import { RateLimiterMemory } from "@mp/rate-limiter";
 import { TRPCError } from "@trpc/server";
 import { t } from "../trpc";
 import type { ServerContext } from "../context";

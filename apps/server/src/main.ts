@@ -11,7 +11,7 @@ import { SyncServer } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { assertEnv } from "@mp/env";
-import { RateLimiterMemory } from "rate-limiter-flexible";
+import { RateLimiterMemory } from "@mp/rate-limiter";
 import { err } from "@mp/std";
 import { createServerContextFactory } from "./context";
 import { serverOptionsSchema } from "./options";
