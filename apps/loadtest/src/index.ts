@@ -90,23 +90,32 @@ async function loadTestGameClients() {
   logger.info(
     `Game client test finished: ${successes.length} successes, ${failures.length} failures`,
   );
-
-  if (verbose) {
-    for (const result of failures) {
-      logger.error(result.reason);
-    }
-  }
 }
 
-async function testGameClient() {
+async function testGameClient(n: number) {
+  if (verbose) {
+    logger.info(`Starting game client ${n}`);
+  }
+
   const token = process.env.MP_SERVER_AUTH__GUEST_USER_TOKEN;
   const sync = new SyncClient(wsUrl, () => ({ token }));
   const rpc = createRPCClient(token);
 
   try {
     await connect(sync);
-    await rpc.character.join.mutate();
+    if (verbose) {
+      logger.info(`Game client ${n} connected`);
+    }
+    const characterId = await rpc.character.join.mutate();
+    if (verbose) {
+      logger.info(`Game client ${n} joined as character ${characterId}`);
+    }
     await wait(timeout);
+    logger.info(`Game client ${n} test finished`);
+  } catch (error) {
+    if (verbose) {
+      logger.error(`Game client ${n} error:`, error);
+    }
   } finally {
     sync.stop();
   }
