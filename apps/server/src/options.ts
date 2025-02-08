@@ -3,6 +3,7 @@ import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
 import type { InferOutput } from "@mp/env";
 import {
+  assertEnv,
   boolish,
   csv,
   numeric,
@@ -125,4 +126,10 @@ export const serverOptionsSchema = object({
    * Whether to expose detailed error information to clients
    */
   exposeErrorDetails: boolish(),
+  /**
+   * Whether to enable rate limiting
+   */
+  rateLimit: boolish(),
 });
+
+export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

@@ -11,6 +11,7 @@
     }
   },
   "dependencies": {
+    "@mp/std": "workspace:*",
     "rate-limiter-flexible": "5.0.5"
   },
   "devDependencies": {

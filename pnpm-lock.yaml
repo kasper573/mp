@@ -408,6 +408,9 @@ importers:
 
   packages/rate-limiter:
     dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       rate-limiter-flexible:
         specifier: 5.0.5
         version: 5.0.5

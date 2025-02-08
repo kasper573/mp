@@ -1,8 +1,8 @@
 import { initTRPC } from "@trpc/server";
-import { RateLimiterMemory } from "@mp/rate-limiter";
 import { transformer } from "./shared";
 import type { ServerContext } from "./context";
 import { consumeLimiterForTRPC } from "./middlewares/rateLimit";
+import { createRateLimiter } from "./createRateLimiter";
 
 const trpc = initTRPC.context<ServerContext>().create({
   transformer,
@@ -22,7 +22,7 @@ const trpc = initTRPC.context<ServerContext>().create({
 
 export const schemaFor = <T>() => ({ parse: (input: unknown) => input as T });
 
-const globalRequestLimit = new RateLimiterMemory({
+const globalRequestLimit = createRateLimiter({
   points: 20,
   duration: 1,
 });
