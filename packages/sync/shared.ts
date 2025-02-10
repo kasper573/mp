@@ -1,47 +1,62 @@
 import type http from "node:http";
 import type { Branded } from "@mp/std";
-import { decode, encode } from "cbor-x";
-import type { Operation } from "rfc6902";
+import { decode, encodeAsAsyncIterable } from "cbor-x";
+import type { Patch } from "immer";
 
 export type ClientId = Branded<string, "ClientId">;
 
-export interface BaseSyncMessage<Type extends string> {
+export interface BaseMessage<Type extends string> {
   type: Type;
 }
 
-export interface FullStateMessage<State> extends BaseSyncMessage<"full"> {
-  state: State;
-}
-
-export interface PatchStateMessage extends BaseSyncMessage<"patch"> {
-  patch: Operation[];
+export interface StatePatchMessage extends BaseMessage<"patch"> {
+  patches: Patch[];
 }
 
 export interface HandshakeMessage
-  extends BaseSyncMessage<"handshake">,
+  extends BaseMessage<"handshake">,
     HandshakeData {}
 
 export interface HandshakeData {
   token?: string;
 }
 
-export type ServerToClientMessage<ClientState> =
-  | FullStateMessage<ClientState>
-  | PatchStateMessage;
+export type ServerToClientMessage<State> = StatePatchMessage;
 
 export type ClientToServerMessage = HandshakeMessage;
 
 const fixedDecode = <T>(buffer: ArrayBufferLike) =>
   decode(new Uint8Array(buffer)) as T;
 
-export const decodeServerToClientMessage = fixedDecode as <ClientState>(
+export const decodeServerToClientMessage = fixedDecode as <State>(
   data: ArrayBufferLike,
-) => ServerToClientMessage<ClientState>;
+) => ServerToClientMessage<State>;
 
-export const encodeServerToClientMessage = encode as <ClientState>(
-  message: ServerToClientMessage<ClientState>,
-) => Uint8Array;
+export const encodeServerToClientMessage = encodeAsync as <State>(
+  message: ServerToClientMessage<State>,
+) => Promise<Uint8Array>;
 
+async function encodeAsync<T>(data: T): Promise<Uint8Array> {
+  return new Uint8Array(
+    await asyncIterableToArrayBuffer(encodeAsAsyncIterable(data)),
+  );
+}
+
+async function asyncIterableToArrayBuffer(
+  asyncIterable: AsyncIterable<Buffer>,
+): Promise<ArrayBuffer> {
+  const chunks: Buffer[] = [];
+  for await (const chunk of asyncIterable) {
+    chunks.push(chunk);
+  }
+
+  const combinedBuffer = Buffer.concat(chunks);
+
+  return combinedBuffer.buffer.slice(
+    combinedBuffer.byteOffset,
+    combinedBuffer.byteOffset + combinedBuffer.byteLength,
+  );
+}
 export type EventHandler<Payload> = (payload: Payload) => void;
 
 export type StateMutation<State> = (state: State) => void;

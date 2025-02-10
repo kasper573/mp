@@ -7,7 +7,7 @@ export type WorldState = {
   actors: Record<ActorId, Actor>;
 };
 
-export type WorldSyncServer = SyncServer<WorldState, WorldState, UserIdentity>;
+export type WorldSyncServer = SyncServer<WorldState, UserIdentity>;
 
 export type ActorId = Actor["id"];
 

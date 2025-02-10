@@ -111,10 +111,6 @@ export const serverOptionsSchema = object({
     transform((ms) => TimeSpan.fromMilliseconds(ms)),
   ),
   /**
-   * Whether to log server state changes that are sent to clients
-   */
-  logSyncPatches: boolish(),
-  /**
    * The URL to the database
    */
   databaseUrl: string(),

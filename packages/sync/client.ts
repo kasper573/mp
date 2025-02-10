@@ -1,4 +1,6 @@
+import type { Operation } from "rfc6902";
 import { applyPatch } from "rfc6902";
+import type { Patch } from "immer";
 import type {
   StateHandler,
   HandshakeData,
@@ -128,12 +130,10 @@ export class SyncClient<State extends object> {
     );
 
     switch (message.type) {
-      case "full":
-        return this.updateState((target) =>
-          Object.assign(target, message.state),
-        );
       case "patch":
-        return this.updateState((target) => applyPatch(target, message.patch));
+        return this.updateState((target) =>
+          applyPatch(target, message.patches.map(immerToRFCPatch)),
+        );
     }
   };
 
@@ -175,4 +175,8 @@ export { type ClientId } from "./shared";
 // This is a hack and should be replaced with some normalizing websocket package, ie. "ws".
 export interface SocketErrorEvent extends Event {
   readonly message?: string;
+}
+
+function immerToRFCPatch({ path, ...rest }: Patch): Operation {
+  return { path: "/" + path.join("/"), ...rest } as Operation;
 }
