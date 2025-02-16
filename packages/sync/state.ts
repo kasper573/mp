@@ -15,9 +15,11 @@ export class SyncStateMachine<State extends SyncState> {
   ): [Result, ClientPatches] => {
     let result!: Result;
 
-    produceWithPatches(this.state, (draft) => {
+    const [nextState, patches] = produceWithPatches(this.state, (draft) => {
       result = accessFn(draft as State);
     });
+
+    this.state = nextState;
 
     const clientPatches: ClientPatches = {};
 

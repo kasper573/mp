@@ -26,6 +26,18 @@ it("state access can return arbitrary value", () => {
   expect(result).toEqual("return");
 });
 
+it("can mutate state", () => {
+  const state = new SyncStateMachine({
+    state: () => ({ entity: { count: 0 } }),
+    clientReferences: () => ({ entity: [] }),
+    clientIds: () => [],
+  });
+
+  state.access((draft) => (draft.entity.count = 50));
+  const [count] = state.access((draft) => draft.entity.count);
+  expect(count).toEqual(50);
+});
+
 it("can access client state", () => {
   const john = { id: "john" as ClientId };
   const jane = { id: "jane" as ClientId };
