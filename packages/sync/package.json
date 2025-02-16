@@ -17,7 +17,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "test:inspect": "vitest --inspect-brk --no-file-parallelism"
   },
   "dependencies": {
     "@mp/state": "workspace:*",
