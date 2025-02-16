@@ -5,6 +5,8 @@ enablePatches();
 
 export class SyncStateMachine<State extends SyncState> {
   private state: State;
+  private visibilities: Record<ClientId, ClientVisibility<State> | undefined> =
+    {};
 
   constructor(private options: SyncStateMachineOptions<State>) {
     this.state = options.state();
@@ -14,7 +16,8 @@ export class SyncStateMachine<State extends SyncState> {
     accessFn: StateAccessFn<State, Result>,
   ): [Result, ClientPatches] => {
     let result!: Result;
-    const { clientIds, clientReferences } = this.options;
+    const { clientIds, clientVisibility } = this.options;
+
     const [nextState, patches] = produceWithPatches(this.state, (draft) => {
       result = accessFn(draft as State);
     });
@@ -25,20 +28,48 @@ export class SyncStateMachine<State extends SyncState> {
     const clientPatches: ClientPatches = {};
 
     for (const clientId of clientIds()) {
-      const allowedIds = clientReferences(clientId, prevState);
-      clientPatches[clientId] = patches.filter(
-        ({ path: [entityName, entityId] }) =>
-          allowedIds[entityName].includes(entityId),
-      );
-    }
+      const prevVisibility =
+        this.visibilities[clientId] ?? clientVisibility(clientId, prevState);
 
-    // TODO
+      const nextVisibility = clientVisibility(clientId, nextState);
+
+      const patchesForClient: Patch[] = [];
+
+      for (const entityName in this.state) {
+        const prevIds = prevVisibility[entityName];
+        const nextIds = nextVisibility[entityName];
+
+        for (const addedId of nextIds.difference(prevIds)) {
+          patchesForClient.push({
+            op: "add",
+            path: [entityName, String(addedId)],
+            value: nextState[entityName][addedId],
+          });
+        }
+
+        for (const removedId of prevIds.difference(nextIds)) {
+          patchesForClient.push({
+            op: "remove",
+            path: [entityName, String(removedId)],
+          });
+        }
+      }
+
+      patchesForClient.push(
+        ...patches.filter(({ path: [entityName, entityId] }) =>
+          nextVisibility[entityName].has(entityId),
+        ),
+      );
+
+      this.visibilities[clientId] = nextVisibility;
+      clientPatches[clientId] = patchesForClient;
+    }
 
     return [result, clientPatches];
   };
 
   readClientState = (clientId: ClientId): State => {
-    const clientReferences = this.options.clientReferences(
+    const clientReferences = this.options.clientVisibility(
       clientId,
       this.state,
     );
@@ -46,7 +77,7 @@ export class SyncStateMachine<State extends SyncState> {
       Object.entries(clientReferences).map(([entityName, entityIds]) => {
         const allEntities = this.state[entityName];
         const referencedEntities = Object.fromEntries(
-          entityIds.map((id) => [id, allEntities[id]]),
+          entityIds.values().map((id) => [id, allEntities[id]]),
         );
         return [entityName, referencedEntities];
       }),
@@ -56,10 +87,10 @@ export class SyncStateMachine<State extends SyncState> {
 
 export interface SyncStateMachineOptions<State extends SyncState> {
   state: () => State;
-  clientReferences: (
+  clientVisibility: (
     clientId: ClientId,
     state: State,
-  ) => ClientReferences<State>;
+  ) => ClientVisibility<State>;
   clientIds: () => ClientId[];
 }
 
@@ -73,6 +104,6 @@ export type EntityLookup = { [entityId: PropertyKey]: unknown };
 
 export type SyncState = { [entityName: PropertyKey]: EntityLookup };
 
-export type ClientReferences<State extends SyncState> = {
-  [EntityName in keyof State]: Array<keyof State[EntityName]>;
+export type ClientVisibility<State extends SyncState> = {
+  [EntityName in keyof State]: ReadonlySet<keyof State[EntityName]>;
 };

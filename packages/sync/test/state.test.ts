@@ -6,7 +6,7 @@ import type { ClientId } from "../shared";
 it("can access initial state", () => {
   const state = new SyncStateMachine({
     state: () => ({ record: { foo: "bar" } }),
-    clientReferences: () => ({ record: ["foo"] }),
+    clientVisibility: () => ({ record: new Set(["foo"] as const) }),
     clientIds: () => [],
   });
 
@@ -18,7 +18,7 @@ it("can access initial state", () => {
 it("state access can return arbitrary value", () => {
   const state = new SyncStateMachine({
     state: () => ({}),
-    clientReferences: () => ({}),
+    clientVisibility: () => ({}),
     clientIds: () => [],
   });
 
@@ -29,7 +29,7 @@ it("state access can return arbitrary value", () => {
 it("can mutate state", () => {
   const state = new SyncStateMachine({
     state: () => ({ entity: { count: 0 } }),
-    clientReferences: () => ({ entity: [] }),
+    clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
   });
 
@@ -47,7 +47,7 @@ it("can access client state", () => {
   const state = new SyncStateMachine({
     state: () => ({ actors: actorRecord }),
     clientIds: () => actorList.map((a) => a.id),
-    clientReferences: (clientId) => ({ actors: [clientId] }),
+    clientVisibility: (clientId) => ({ actors: new Set([clientId]) }),
   });
 
   expect(state.readClientState(john.id)).toEqual({
@@ -67,7 +67,7 @@ it("can produce client state patches for object changes", () => {
   const state = new SyncStateMachine({
     state: () => ({ actors: actorRecord }),
     clientIds: () => actorList.map((a) => a.id),
-    clientReferences: (clientId) => ({ actors: [clientId] }),
+    clientVisibility: (clientId) => ({ actors: new Set([clientId]) }),
   });
 
   const johnsClientState = state.readClientState(john.id);
@@ -99,10 +99,12 @@ it("can produce client state patches for additions to record", () => {
   const state = new SyncStateMachine({
     state: () => ({ actors: actorRecord }),
     clientIds: () => actorList.map((a) => a.id),
-    clientReferences: (clientId, state) => ({
-      actors: Object.values(state.actors)
-        .filter((a) => a.id === clientId || a.visibleToOthers)
-        .map((a) => a.id),
+    clientVisibility: (clientId, state) => ({
+      actors: new Set(
+        Object.values(state.actors)
+          .filter((a) => a.id === clientId || a.visibleToOthers)
+          .map((a) => a.id),
+      ),
     }),
   });
 
@@ -136,10 +138,12 @@ it("can produce client state patches for removals in record", () => {
   const state = new SyncStateMachine({
     state: () => ({ actors: actorRecord }),
     clientIds: () => actorList.map((a) => a.id),
-    clientReferences: (clientId, state) => ({
-      actors: Object.values(state.actors)
-        .filter((a) => a.id === clientId || a.visibleToOthers)
-        .map((a) => a.id),
+    clientVisibility: (clientId, state) => ({
+      actors: new Set(
+        Object.values(state.actors)
+          .filter((a) => a.id === clientId || a.visibleToOthers)
+          .map((a) => a.id),
+      ),
     }),
   });
 
