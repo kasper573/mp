@@ -14,14 +14,23 @@ export class SyncStateMachine<State extends SyncState> {
     accessFn: StateAccessFn<State, Result>,
   ): [Result, ClientPatches] => {
     let result!: Result;
-
+    const { clientIds, clientReferences } = this.options;
     const [nextState, patches] = produceWithPatches(this.state, (draft) => {
       result = accessFn(draft as State);
     });
 
+    const prevState = this.state;
     this.state = nextState;
 
     const clientPatches: ClientPatches = {};
+
+    for (const clientId of clientIds()) {
+      const allowedIds = clientReferences(clientId, prevState);
+      clientPatches[clientId] = patches.filter(
+        ({ path: [entityName, entityId] }) =>
+          allowedIds[entityName].includes(entityId),
+      );
+    }
 
     // TODO
 
