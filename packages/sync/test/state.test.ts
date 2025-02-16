@@ -62,6 +62,7 @@ it("can produce client state patches for object changes", () => {
   const [, patches] = state.access((draft) => {
     draft.actors[john.id].cash = 50;
     draft.actors[jane.id].cash = 100;
+    return;
   });
 
   expect(patches[john.id]).toEqual([

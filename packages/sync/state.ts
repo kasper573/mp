@@ -20,12 +20,12 @@ export class SyncStateMachine<State extends SyncState> {
       this.state,
     );
     return Object.fromEntries(
-      Object.entries(clientReferences).map(([objectName, objectIds]) => {
-        const allObjects = this.state[objectName];
-        const referencedObjects = Object.fromEntries(
-          objectIds.map((objectId) => [objectId, allObjects[objectId]]),
+      Object.entries(clientReferences).map(([entityName, entityIds]) => {
+        const allEntities = this.state[entityName];
+        const referencedEntities = Object.fromEntries(
+          entityIds.map((id) => [id, allEntities[id]]),
         );
-        return [objectName, referencedObjects];
+        return [entityName, referencedEntities];
       }),
     ) as State;
   };
@@ -46,10 +46,10 @@ export type StateAccessFn<State extends SyncState, Result> = (
   draft: State,
 ) => Result;
 
-export type ObjectLookup = { [objectId: PropertyKey]: object };
+export type EntityLookup = { [entityId: PropertyKey]: unknown };
 
-export type SyncState = { [objectName: PropertyKey]: ObjectLookup };
+export type SyncState = { [entityName: PropertyKey]: EntityLookup };
 
 export type ClientReferences<State extends SyncState> = {
-  [ObjectName in keyof State]: Array<keyof State[ObjectName]>;
+  [EntityName in keyof State]: Array<keyof State[EntityName]>;
 };
