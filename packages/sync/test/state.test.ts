@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import type { Patch } from "immer";
+import { applyPatches } from "immer";
 import { SyncStateMachine } from "../state";
 import type { ClientId } from "../shared";
 
@@ -70,19 +70,24 @@ it("can produce client state patches for object changes", () => {
     clientReferences: (clientId) => ({ actors: [clientId] }),
   });
 
+  const johnsClientState = state.readClientState(john.id);
+  const janesClientState = state.readClientState(jane.id);
+
   const [, patches] = state.access((draft) => {
     draft.actors[john.id].cash = 50;
     draft.actors[jane.id].cash = 100;
     return;
   });
 
-  expect(patches[john.id]).toEqual([
-    { path: ["actors", john.id, "cash"], op: "replace", value: 50 },
-  ] satisfies Patch[]);
+  const johnsNewClientState = applyPatches(johnsClientState, patches[john.id]);
+  expect(johnsNewClientState.actors).toEqual({
+    [john.id]: { id: john.id, cash: 50 },
+  });
 
-  expect(patches[jane.id]).toEqual([
-    { path: ["actors", jane.id, "cash"], op: "replace", value: 100 },
-  ] satisfies Patch[]);
+  const janesNewClientState = applyPatches(janesClientState, patches[jane.id]);
+  expect(janesNewClientState.actors).toEqual({
+    [jane.id]: { id: jane.id, cash: 100 },
+  });
 });
 
 it("can produce client state patches for additions to record", () => {
@@ -101,26 +106,25 @@ it("can produce client state patches for additions to record", () => {
     }),
   });
 
+  const johnsClientState = state.readClientState(john.id);
+  const janesClientState = state.readClientState(jane.id);
+
   const [, patches] = state.access((draft) => {
     draft.actors[john.id].visibleToOthers = true;
     draft.actors[jane.id].visibleToOthers = true;
   });
 
-  expect(patches[john.id]).toEqual([
-    {
-      path: ["actors", jane.id],
-      op: "add",
-      value: { ...jane, visible: true },
-    },
-  ] satisfies Patch[]);
+  const johnsNewClientState = applyPatches(johnsClientState, patches[john.id]);
+  expect(johnsNewClientState.actors).toEqual({
+    [john.id]: { id: john.id, visibleToOthers: true },
+    [jane.id]: { id: jane.id, visibleToOthers: true },
+  });
 
-  expect(patches[jane.id]).toEqual([
-    {
-      path: ["actors", john.id],
-      op: "add",
-      value: { ...john, visible: true },
-    },
-  ] satisfies Patch[]);
+  const janesNewClientState = applyPatches(janesClientState, patches[jane.id]);
+  expect(janesNewClientState.actors).toEqual({
+    [john.id]: { id: john.id, visibleToOthers: true },
+    [jane.id]: { id: jane.id, visibleToOthers: true },
+  });
 });
 
 it("can produce client state patches for removals in record", () => {
@@ -139,16 +143,21 @@ it("can produce client state patches for removals in record", () => {
     }),
   });
 
+  const johnsClientState = state.readClientState(john.id);
+  const janesClientState = state.readClientState(jane.id);
+
   const [, patches] = state.access((draft) => {
     draft.actors[john.id].visibleToOthers = false;
     draft.actors[jane.id].visibleToOthers = false;
   });
 
-  expect(patches[john.id]).toEqual([
-    { path: ["actors", jane.id], op: "remove" },
-  ] satisfies Patch[]);
+  const johnsNewClientState = applyPatches(johnsClientState, patches[john.id]);
+  expect(johnsNewClientState.actors).toEqual({
+    [john.id]: { id: john.id, visibleToOthers: false },
+  });
 
-  expect(patches[jane.id]).toEqual([
-    { path: ["actors", john.id], op: "remove" },
-  ] satisfies Patch[]);
+  const janesNewClientState = applyPatches(janesClientState, patches[jane.id]);
+  expect(janesNewClientState.actors).toEqual({
+    [jane.id]: { id: jane.id, visibleToOthers: false },
+  });
 });
