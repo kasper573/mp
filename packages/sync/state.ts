@@ -2,7 +2,11 @@ import type { Patch } from "immer";
 import type { ClientId } from "./shared";
 
 export class SyncStateMachine<State extends SyncState> {
-  constructor(private options: SyncStateMachineOptions<State>) {}
+  private state: State;
+
+  constructor(private options: SyncStateMachineOptions<State>) {
+    this.state = options.state();
+  }
 
   access = <Result>(
     fn: StateAccessFn<State, Result>,
@@ -11,7 +15,19 @@ export class SyncStateMachine<State extends SyncState> {
   };
 
   readClientState = (clientId: ClientId): State => {
-    throw new Error("Not implemented");
+    const clientReferences = this.options.clientReferences(
+      clientId,
+      this.state,
+    );
+    return Object.fromEntries(
+      Object.entries(clientReferences).map(([objectName, objectIds]) => {
+        const allObjects = this.state[objectName];
+        const referencedObjects = Object.fromEntries(
+          objectIds.map((objectId) => [objectId, allObjects[objectId]]),
+        );
+        return [objectName, referencedObjects];
+      }),
+    ) as State;
   };
 }
 
@@ -30,8 +46,10 @@ export type StateAccessFn<State extends SyncState, Result> = (
   draft: State,
 ) => Result;
 
-export type SyncState = Record<PropertyKey, Record<PropertyKey, unknown>>;
+export type ObjectLookup = { [objectId: PropertyKey]: object };
+
+export type SyncState = { [objectName: PropertyKey]: ObjectLookup };
 
 export type ClientReferences<State extends SyncState> = {
-  [Property in keyof State]: Array<keyof State[Property]>;
+  [ObjectName in keyof State]: Array<keyof State[ObjectName]>;
 };
