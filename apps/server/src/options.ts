@@ -3,6 +3,7 @@ import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
 import type { InferOutput } from "@mp/env";
 import {
+  assertEnv,
   boolish,
   csv,
   numeric,
@@ -13,6 +14,7 @@ import {
   string,
   transform,
 } from "@mp/env";
+import type { AuthToken } from "@mp/auth";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
 
@@ -85,6 +87,13 @@ export const serverOptionsSchema = object({
      * OIDC JWT algorithms
      */
     algorithms: csv(picklist(authAlgorithms)),
+    /**
+     * Publically available token that can be used by anyone to sign in as the guest user
+     */
+    guestUserToken: pipe(
+      string(),
+      transform((token) => token as AuthToken),
+    ),
   }),
 
   /**
@@ -102,10 +111,6 @@ export const serverOptionsSchema = object({
     transform((ms) => TimeSpan.fromMilliseconds(ms)),
   ),
   /**
-   * Whether to log server state changes that are sent to clients
-   */
-  logSyncPatches: boolish(),
-  /**
    * The URL to the database
    */
   databaseUrl: string(),
@@ -117,4 +122,10 @@ export const serverOptionsSchema = object({
    * Whether to expose detailed error information to clients
    */
   exposeErrorDetails: boolish(),
+  /**
+   * Whether to enable rate limiting
+   */
+  rateLimit: boolish(),
 });
+
+export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

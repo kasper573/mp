@@ -7,20 +7,15 @@ import createCors from "cors";
 import type { AuthToken } from "@mp/auth";
 import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import { SyncServer } from "@mp/sync/server";
+import { SyncServer, SyncStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import { assertEnv } from "@mp/env";
-import { RateLimiterMemory } from "rate-limiter-flexible";
-import { err } from "@mp/std";
 import { createServerContextFactory } from "./context";
-import { serverOptionsSchema } from "./options";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
-import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
 import type { WorldState, WorldSyncServer } from "./modules/world/WorldState";
 import { movementBehavior } from "./traits/movement";
@@ -35,8 +30,10 @@ import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
 import { WorldService } from "./modules/world/service";
 import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
+import { createRateLimiter } from "./createRateLimiter";
+import { opt } from "./options";
+import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 
-const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 logger.info(`Server started with options`, opt);
@@ -60,29 +57,28 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const syncHandshakeLimiter = new RateLimiterMemory({
+const syncHandshakeLimiter = createRateLimiter({
   points: 10,
   duration: 30,
+});
+
+const worldStateMachine = new SyncStateMachine<WorldState>({
+  clientIds: () => syncServer.clientIds,
+  state: () => ({ actors: {} }),
+  clientVisibility: deriveWorldStateForClient(clients),
 });
 
 const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { actors: {} } satisfies WorldState,
-  logSyncPatches: opt.logSyncPatches,
+  state: worldStateMachine,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
-    if (result.isOk()) {
-      try {
-        await syncHandshakeLimiter.consume(result.value.id);
-      } catch {
-        return err("Rate limit exceeded");
-      }
-    }
-    return result;
+    return result.asyncAndThrough((user) =>
+      syncHandshakeLimiter.consume(user.id),
+    );
   },
-  createClientState: deriveWorldStateForClient(clients),
   onConnection: (clientId, user) => clients.add(clientId, user.id),
   onDisconnect: (clientId) => clients.remove(clientId),
 });
@@ -94,7 +90,7 @@ const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
   middleware: () => {
-    const state = syncServer.access("persist", (state) => state);
+    const state = syncServer.access((state) => state);
     return worldService.persist(state);
   },
 });
@@ -142,7 +138,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
 updateTicker.subscribe(movementBehavior(syncServer.access, areas));
 updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
-updateTicker.subscribe(syncServer.flush);
+updateTicker.subscribe(updateTicker.encapsulateAsyncHandler(syncServer.flush));
 characterRemoveBehavior(clients, syncServer.access, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>

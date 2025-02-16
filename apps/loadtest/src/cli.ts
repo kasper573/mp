@@ -14,28 +14,47 @@ export function readCliOptions(argv = process.argv) {
       "camel-case-expansion": false, // Ensures only the explicit option names are used
       "unknown-options-as-args": true, // Omits unknown args from the options object
     })
+    .option("verbose", {
+      type: "boolean",
+      default: false,
+    })
+    .option("wsUrl", {
+      type: "string",
+      default: process.env.MP_CLIENT_WS_URL,
+      demandOption: true,
+    })
     .option("httpServerUrl", {
-      alias: "hs",
       type: "string",
       default: `https://${process.env.MP_CLIENT_DOMAIN}`,
       demandOption: true,
     })
     .option("apiServerUrl", {
-      alias: "as",
       type: "string",
       default: process.env.MP_CLIENT_API_URL,
       demandOption: true,
     })
-    .option("connections", {
-      alias: "c",
+    .option("httpRequests", {
+      alias: "http",
       type: "number",
       default: 1,
     })
-    .option("requests", {
-      alias: "r",
+    .option("rpcRequests", {
+      alias: "rpc",
       type: "number",
       demandOption: true,
       default: 1,
+    })
+    .option("gameClients", {
+      alias: "gc",
+      type: "number",
+      demandOption: true,
+      default: 0,
+    })
+    .option("timeout", {
+      alias: "t",
+      type: "number",
+      demandOption: true,
+      default: 60_000,
     })
     .parseSync();
 

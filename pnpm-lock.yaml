@@ -208,6 +208,9 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../packages/path-finding
+      '@mp/rate-limiter':
+        specifier: workspace:*
+        version: link:../../packages/rate-limiter
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -247,9 +250,6 @@ importers:
       pg:
         specifier: 8.13.1
         version: 8.13.1
-      rate-limiter-flexible:
-        specifier: ^5.0.3
-        version: 5.0.3
       superjson:
         specifier: 2.2.1
         version: 2.2.1
@@ -406,6 +406,19 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/rate-limiter:
+    dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
+      rate-limiter-flexible:
+        specifier: 5.0.5
+        version: 5.0.5
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/solid-pixi:
     dependencies:
       '@mp/pixi':
@@ -497,6 +510,9 @@ importers:
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0
+      immer:
+        specifier: 10.1.1
+        version: 10.1.1
       rfc6902:
         specifier: 5.1.2
         version: 5.1.2
@@ -510,6 +526,9 @@ importers:
       '@types/ws':
         specifier: 8.5.12
         version: 8.5.12
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@22.10.2)(jsdom@23.2.0)
 
   packages/telemetry:
     dependencies:
@@ -3695,6 +3714,9 @@ packages:
     resolution: {integrity: sha512-5Fytz/IraMjqpwfd34ke28PTVMjZjJG2MPn5t7OE4eUCUNf8BAa7b5WUS9/Qvr6mwOQS7Mk6vdsMno5he+T8Xw==}
     engines: {node: '>= 4'}
 
+  immer@10.1.1:
+    resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
+
   import-fresh@3.3.0:
     resolution: {integrity: sha512-veYYhQa+D1QBKznvhUHxb8faxlrwUnxseDAbAp457E0wLNio2bOSKnjYDhMj+YiAq61xrMGhQk9iXVk5FzgQMw==}
     engines: {node: '>=6'}
@@ -4468,8 +4490,8 @@ packages:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
     engines: {node: '>= 0.6'}
 
-  rate-limiter-flexible@5.0.3:
-    resolution: {integrity: sha512-lWx2y8NBVlTOLPyqs+6y7dxfEpT6YFqKy3MzWbCy95sTTOhOuxufP2QvRyOHpfXpB9OUJPbVLybw3z3AVAS5fA==}
+  rate-limiter-flexible@5.0.5:
+    resolution: {integrity: sha512-+/dSQfo+3FYwYygUs/V2BBdwGa9nFtakDwKt4l0bnvNB53TNT++QSFewwHX9qXrZJuMe9j+TUaU21lm5ARgqdQ==}
 
   raw-body@2.5.2:
     resolution: {integrity: sha512-8zGqypfENjCIqGhgXToC8aB2r7YrBX+AQAfIPs/Mlk+BtPTztOvTS01NRW/3Eh60J+a48lt8qsCzirQ6loCVfA==}
@@ -8250,7 +8272,7 @@ snapshots:
 
   estree-walker@3.0.3:
     dependencies:
-      '@types/estree': 1.0.5
+      '@types/estree': 1.0.6
 
   esutils@2.0.3: {}
 
@@ -8588,6 +8610,8 @@ snapshots:
     optional: true
 
   ignore@5.3.1: {}
+
+  immer@10.1.1: {}
 
   import-fresh@3.3.0:
     dependencies:
@@ -9296,7 +9320,7 @@ snapshots:
 
   range-parser@1.2.1: {}
 
-  rate-limiter-flexible@5.0.3: {}
+  rate-limiter-flexible@5.0.5: {}
 
   raw-body@2.5.2:
     dependencies:
@@ -9839,7 +9863,7 @@ snapshots:
   vite-node@2.0.3(@types/node@22.10.2):
     dependencies:
       cac: 6.7.14
-      debug: 4.3.5
+      debug: 4.3.7
       pathe: 1.1.2
       tinyrainbow: 1.2.0
       vite: 5.4.10(@types/node@22.10.2)
@@ -9923,7 +9947,7 @@ snapshots:
       '@vitest/spy': 2.0.3
       '@vitest/utils': 2.0.3
       chai: 5.1.1
-      debug: 4.3.5
+      debug: 4.3.7
       execa: 8.0.1
       magic-string: 0.30.11
       pathe: 1.1.2

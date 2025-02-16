@@ -2,33 +2,30 @@ import type http from "node:http";
 import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { uuid } from "@mp/std";
-import { createPatch } from "rfc6902";
 import type { Result } from "@mp/std";
-import type { PatchStateMessage, ServerToClientMessage } from "./shared";
+import type { Patch } from "immer";
+import { enablePatches } from "immer";
 import {
   encodeServerToClientMessage,
   handshakeDataFromRequest,
   type ClientId,
   type HandshakeData,
 } from "./shared";
+import type { StateAccess, SyncState } from "./state";
+import type { SyncStateMachine } from "./state";
 
-export class SyncServer<ServerState, ClientState, HandshakeReturn> {
-  private state: ServerState;
-  private clients: ClientInfoMap<ClientState> = new Map();
+enablePatches();
+
+export class SyncServer<State extends SyncState, HandshakeReturn> {
+  private clients: ClientInfoMap = new Map();
   private wss: WebSocketServer;
+  private flushQueue = new Map<ClientId, Patch[]>();
 
   get clientIds(): Iterable<ClientId> {
     return this.clients.keys();
   }
 
-  constructor(
-    private options: SyncServerOptions<
-      ServerState,
-      ClientState,
-      HandshakeReturn
-    >,
-  ) {
-    this.state = this.options.initialState;
+  constructor(private options: SyncServerOptions<State, HandshakeReturn>) {
     this.wss = new WebSocketServer({
       server: this.options.httpServer,
       path: this.options.path,
@@ -44,18 +41,56 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     });
   }
 
-  access: StateAccess<ServerState> = (reference, accessFn) => {
-    const returnValue = accessFn(this.state);
-    if (returnValue instanceof Promise) {
-      throw new TypeError("State access mutations may not be asynchronous");
+  access: StateAccess<State> = (accessFn) => {
+    const { state } = this.options;
+    const [returnValue, clientPatches] = state.access(accessFn);
+
+    for (const client of this.clients.values()) {
+      let patchesToAdd: Patch[] | undefined;
+      if (client.needsFullState) {
+        client.needsFullState = false;
+        patchesToAdd = [
+          ...createFullStatePatches(state.readClientState(client.id)),
+          ...(clientPatches[client.id] ?? []),
+        ];
+      } else {
+        patchesToAdd = clientPatches[client.id];
+      }
+
+      if (patchesToAdd?.length) {
+        let patchQueue = this.flushQueue.get(client.id);
+        if (!patchQueue) {
+          patchQueue = [];
+          this.flushQueue.set(client.id, patchQueue);
+        }
+        patchQueue.push(...patchesToAdd);
+      }
     }
+
     return returnValue;
   };
 
-  flush = () => {
-    for (const [clientId, client] of this.clients.entries()) {
-      this.updateClientState(clientId, client);
+  flush = async () => {
+    const promises = this.flushQueue
+      .entries()
+      .flatMap(([clientId, patches]) => {
+        const client = this.clients.get(clientId);
+        if (client) {
+          const promise = encodeServerToClientMessage({
+            type: "patch",
+            patches,
+          }).then((message): [ClientInfo, Uint8Array] => [client, message]);
+          return [promise];
+        }
+        return [];
+      });
+
+    const jobs = await Promise.all(promises);
+    for (const [client, message] of jobs) {
+      client.socket.send(message);
     }
+
+    this.flushQueue.clear();
   };
 
   start = () => {
@@ -67,34 +102,6 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     this.wss.removeListener("connection", this.onConnection);
     this.wss.removeListener("close", this.handleClose);
   };
-
-  private updateClientState(
-    clientId: ClientId,
-    client: ClientInfo<ClientState>,
-  ) {
-    const nextClientState = this.options.createClientState(
-      this.state,
-      clientId,
-    );
-
-    let message: ServerToClientMessage<ClientState>;
-    if (client.state) {
-      const patch = createPatch(client.state, nextClientState);
-      if (patch.length === 0) {
-        return;
-      }
-
-      message = { type: "patch", patch };
-      if (this.options.logSyncPatches) {
-        this.options.logger?.info("SyncServer patch", { clientId, patch });
-      }
-    } else {
-      message = { type: "full", state: nextClientState };
-    }
-
-    client.state = structuredClone(nextClientState);
-    client.socket.send(encodeServerToClientMessage(message));
-  }
 
   private async verifyClient(req: http.IncomingMessage) {
     const clientId = newClientId();
@@ -126,7 +133,12 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
     const { clientId, handshakeReturn } =
       recallClientMetaData<HandshakeReturn>(req);
 
-    const clientInfo: ClientInfo<ClientState> = { socket };
+    const clientInfo: ClientInfo = {
+      socket,
+      needsFullState: true,
+      id: clientId,
+    };
+
     this.clients.set(clientId, clientInfo);
     this.options.onConnection?.(clientId, handshakeReturn);
 
@@ -143,53 +155,33 @@ export class SyncServer<ServerState, ClientState, HandshakeReturn> {
   };
 }
 
-export interface SyncServerOptions<ServerState, ClientState, HandshakeReturn> {
+export interface SyncServerOptions<State extends SyncState, HandshakeReturn> {
   path: string;
+  state: SyncStateMachine<State>;
   httpServer: http.Server;
-  initialState: ServerState;
   handshake: (
     clientId: ClientId,
     data: HandshakeData,
   ) => Promise<Result<HandshakeReturn, string>>;
-  createClientState: (
-    serverState: ServerState,
-    clientId: ClientId,
-  ) => ClientState;
-  onPatch?: PatchHandler;
-  logSyncPatches?: boolean;
   logger?: Pick<typeof console, "info" | "error">;
   onConnection?: (clientId: ClientId, handshake: HandshakeReturn) => unknown;
   onDisconnect?: (clientId: ClientId) => unknown;
 }
 
-export type StateAccess<State> = <Result>(
-  /**
-   * An explanation of what the access is for, for logging purposes.
-   */
-  reference: string,
-  /**
-   * Read or modify the state.
-   */
-  stateHandler: (draft: State) => Result,
-) => Result;
-
-export type PatchHandler = (props: {
-  clientId: ClientId;
-  reference: string;
-  patch: PatchStateMessage["patch"];
-}) => void;
-
-interface ClientInfo<ClientState> {
+interface ClientInfo {
+  id: ClientId;
   socket: WebSocket;
-  state?: ClientState;
   handshakeData?: HandshakeData;
+  needsFullState?: boolean;
 }
 
-type ClientInfoMap<ClientState> = Map<ClientId, ClientInfo<ClientState>>;
+type ClientInfoMap = Map<ClientId, ClientInfo>;
 
 const newClientId = uuid as unknown as () => ClientId;
 
 export type { ClientId, HandshakeData } from "./shared";
+
+export * from "./state";
 
 const clientMetaDataSymbol = Symbol("clientMetaData");
 
@@ -215,4 +207,16 @@ function recallClientMetaData<HandshakeReturn>(
     throw new Error("Client meta data not found on request");
   }
   return data;
+}
+
+function createFullStatePatches(state: object): Patch[] {
+  const patches: Patch[] = [];
+  for (const key in state) {
+    patches.push({
+      path: [key],
+      op: "replace",
+      value: state[key as keyof typeof state],
+    });
+  }
+  return patches;
 }

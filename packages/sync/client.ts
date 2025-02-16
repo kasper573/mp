@@ -1,4 +1,6 @@
+import type { Operation } from "rfc6902";
 import { applyPatch } from "rfc6902";
+import type { Patch } from "immer";
 import type {
   StateHandler,
   HandshakeData,
@@ -16,7 +18,7 @@ export class SyncClient<State extends object> {
 
   private stateHandlers = new Set<StateHandler<State>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
-  private errorHandlers = new Set<EventHandler<Event>>();
+  private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
   private connectAttempt = 0;
 
@@ -52,7 +54,9 @@ export class SyncClient<State extends object> {
     return () => this.readyStateHandlers.delete(handler);
   };
 
-  subscribeToErrors = (handler: EventHandler<Event>): Unsubscribe => {
+  subscribeToErrors = (
+    handler: EventHandler<SocketErrorEvent>,
+  ): Unsubscribe => {
     this.errorHandlers.add(handler);
     return () => this.errorHandlers.delete(handler);
   };
@@ -113,7 +117,7 @@ export class SyncClient<State extends object> {
     this.enqueueReconnect();
   };
 
-  private handleError = (event: Event) => {
+  private handleError = (event: SocketErrorEvent) => {
     this.emitReadyState();
     for (const handler of this.errorHandlers) {
       handler(event);
@@ -126,12 +130,10 @@ export class SyncClient<State extends object> {
     );
 
     switch (message.type) {
-      case "full":
-        return this.updateState((target) =>
-          Object.assign(target, message.state),
-        );
       case "patch":
-        return this.updateState((target) => applyPatch(target, message.patch));
+        return this.updateState((target) =>
+          applyPatch(target, message.patches.map(immerToRFCPatch)),
+        );
     }
   };
 
@@ -168,3 +170,13 @@ function coerceReadyState(
 }
 
 export { type ClientId } from "./shared";
+
+// Note: using a custom interface for the error event type because the types differ between node and browser.
+// This is a hack and should be replaced with some normalizing websocket package, ie. "ws".
+export interface SocketErrorEvent extends Event {
+  readonly message?: string;
+}
+
+function immerToRFCPatch({ path, ...rest }: Patch): Operation {
+  return { path: "/" + path.join("/"), ...rest } as Operation;
+}

@@ -22,7 +22,7 @@ export function createNPCRouter({
     spawnRandomNPC: t.procedure.use(roles(["spawn_npc"])).mutation(async () => {
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
 
-      accessState("world.spawnRandomNPC", (state) => {
+      accessState((state) => {
         const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
         state.actors[instance.id] = { type: "npc", ...instance };
       });

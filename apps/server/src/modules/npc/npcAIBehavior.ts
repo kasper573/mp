@@ -9,7 +9,7 @@ export function npcAIBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return () => {
-    accessState("npcAIBehavior", (state) => {
+    accessState((state) => {
       for (const subject of recordValues(state.actors)) {
         if (subject.type !== "npc") {
           continue;

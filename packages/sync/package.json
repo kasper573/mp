@@ -15,15 +15,22 @@
       "require": "./server.ts"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:inspect": "vitest --inspect-brk --no-file-parallelism"
+  },
   "dependencies": {
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
+    "immer": "10.1.1",
     "rfc6902": "5.1.2",
     "cbor-x": "1.6.0",
     "ws": "8.18.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/ws": "8.5.12"
+    "@types/ws": "8.5.12",
+    "vitest": "2.0.3"
   }
 }
