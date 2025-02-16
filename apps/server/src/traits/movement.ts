@@ -19,7 +19,7 @@ export function movementBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
-    accessState("movementBehavior", (state) => {
+    accessState((state) => {
       for (const subject of recordValues(state.actors)) {
         if (subject.path) {
           [subject.coords, subject.path] = moveAlongPath(

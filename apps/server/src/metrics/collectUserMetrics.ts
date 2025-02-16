@@ -23,16 +23,13 @@ export function collectUserMetrics(
     help: "Number of player characters currently active",
     registers: [registry],
     collect() {
-      worldState.access(
-        "collectUserMetrics.active_character_count",
-        (state) => {
-          this.set(
-            recordValues(state.actors)
-              .filter((actor) => actor.type === "character")
-              .toArray().length,
-          );
-        },
-      );
+      worldState.access((state) => {
+        this.set(
+          recordValues(state.actors)
+            .filter((actor) => actor.type === "character")
+            .toArray().length,
+        );
+      });
     },
   });
 
@@ -41,7 +38,7 @@ export function collectUserMetrics(
     help: "Number of non-player characters currently active",
     registers: [registry],
     collect() {
-      worldState.access("collectUserMetrics.active_npc_count", (state) => {
+      worldState.access((state) => {
         this.set(
           recordValues(state.actors)
             .filter((actor) => actor.type === "npc")

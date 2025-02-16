@@ -11,7 +11,7 @@ import { randomItem, uuid } from "@mp/std";
 import { clamp, vec, type Vector } from "@mp/math";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { WorldState } from "../../package";
+import type { NPCInstanceId, WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
 import type { NPCService } from "./service";
 import type { NPC, NPCInstance, NPCSpawn } from "./schema";
@@ -22,7 +22,7 @@ export function npcSpawnBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   void npcService.getAllSpawnsAndTheirNpcs().then((list) => {
-    accessState("npcSpawnBehavior", (state) => {
+    accessState((state) => {
       for (const { spawn, npc } of list) {
         const area = areas.get(spawn.areaId);
         if (!area) {
@@ -66,7 +66,7 @@ export function createNpcInstance(
   areaId: AreaId,
   coords: Vector<Tile>,
 ): NPCInstance {
-  const id = uuid();
+  const id = uuid() as NPCInstanceId;
   const name = uniqueNamesGenerator({
     dictionaries: [adjectives, animals, randomAndCustomNames],
     separator: " ",

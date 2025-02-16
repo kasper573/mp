@@ -27,7 +27,7 @@ export function createCharacterRouter({
       .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
       .use(auth())
       .mutation(({ input: { characterId, to }, ctx: { user } }) =>
-        accessState(`world.move`, (state) => {
+        accessState((state) => {
           const char = state.actors[characterId];
 
           if (!char || char.type !== "character") {
@@ -55,12 +55,10 @@ export function createCharacterRouter({
       .output(schemaFor<CharacterId>())
       .use(auth())
       .mutation(async ({ ctx: { user } }) => {
-        const existingCharacter = accessState(
-          "world.join (check existing character)",
-          (state) =>
-            recordValues(state.actors)
-              .filter((actor) => actor.type === "character")
-              .find((actor) => actor.userId === user.id),
+        const existingCharacter = accessState((state) =>
+          recordValues(state.actors)
+            .filter((actor) => actor.type === "character")
+            .find((actor) => actor.userId === user.id),
         );
 
         if (existingCharacter) {
@@ -70,7 +68,7 @@ export function createCharacterRouter({
         const char = await characterService.getOrCreateCharacterForUser(
           user.id,
         );
-        accessState("world.join (initialize character)", (state) => {
+        accessState((state) => {
           state.actors[char.id] = { type: "character", ...char };
         });
         return char.id;

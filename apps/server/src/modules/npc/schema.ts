@@ -1,16 +1,19 @@
-import { integer, pgTable, serial } from "drizzle-orm/pg-core";
+import { integer, pgTable, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
-import type { Tile } from "@mp/std";
+import type { Branded, Tile } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
 import { vector } from "../../db/types/vector";
 
+export type NPCId = Branded<string, "NPCId">;
+export const npcId = () => uuid().$type<NPCId>();
+
 /**
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
-  id: serial().primaryKey(),
+  id: npcId().primaryKey().defaultRandom(),
   speed: integer().$type<Tile>().notNull(),
 });
 
@@ -20,14 +23,17 @@ export const npcRelations = relations(npcTable, ({ many }) => ({
   posts: many(npcSpawnTable),
 }));
 
+export type NPCSpawnId = Branded<string, "NPCSpawnId">;
+export const npcSpawnId = () => uuid().$type<NPCSpawnId>();
+
 /**
  * Information about how npc instances should be spawned
  */
 export const npcSpawnTable = pgTable("npc_spawn", {
-  id: serial().primaryKey(),
+  id: npcSpawnId().primaryKey().defaultRandom(),
   count: integer().notNull(),
-  areaId: areaId.notNull(),
-  npcId: integer()
+  areaId: areaId().notNull(),
+  npcId: npcId()
     .notNull()
     .references(() => npcTable.id, { onDelete: "cascade" }),
   coords: vector<Tile>(),
@@ -47,4 +53,4 @@ export interface NPCInstance
   id: NPCInstanceId;
 }
 
-export type NPCInstanceId = string;
+export type NPCInstanceId = Branded<string, "NPCInstanceId">;

@@ -7,7 +7,7 @@ import createCors from "cors";
 import type { AuthToken } from "@mp/auth";
 import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import { SyncServer } from "@mp/sync/server";
+import { SyncServer, SyncStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { createServerContextFactory } from "./context";
@@ -16,7 +16,6 @@ import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
-import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 import { CharacterService } from "./modules/character/service";
 import type { WorldState, WorldSyncServer } from "./modules/world/WorldState";
 import { movementBehavior } from "./traits/movement";
@@ -33,6 +32,7 @@ import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
+import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -62,18 +62,23 @@ const syncHandshakeLimiter = createRateLimiter({
   duration: 30,
 });
 
+const worldStateMachine = new SyncStateMachine<WorldState>({
+  clientIds: () => syncServer.clientIds,
+  state: () => ({ actors: {} }),
+  clientVisibility: deriveWorldStateForClient(clients),
+});
+
 const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  initialState: { actors: {} } satisfies WorldState,
+  state: worldStateMachine,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
       syncHandshakeLimiter.consume(user.id),
     );
   },
-  transformStatePatches: deriveWorldStateForClient(clients),
   onConnection: (clientId, user) => clients.add(clientId, user.id),
   onDisconnect: (clientId) => clients.remove(clientId),
 });
@@ -85,7 +90,7 @@ const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
   middleware: () => {
-    const state = syncServer.access("persist", (state) => state);
+    const state = syncServer.access((state) => state);
     return worldService.persist(state);
   },
 });

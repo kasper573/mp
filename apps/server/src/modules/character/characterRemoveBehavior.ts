@@ -35,7 +35,7 @@ export function characterRemoveBehavior(
   });
 
   function removeCharacter(userId: UserId) {
-    accessState("removeCharacter", (state) => {
+    accessState((state) => {
       for (const char of recordValues(state.actors).filter(
         (actor) => actor.type === "character",
       )) {

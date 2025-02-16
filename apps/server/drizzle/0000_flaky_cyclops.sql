@@ -1,5 +1,5 @@
 CREATE TABLE "character" (
-	"id" serial PRIMARY KEY NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"coords" "point" NOT NULL,
 	"areaId" varchar(60) NOT NULL,
 	"speed" integer NOT NULL,
@@ -7,16 +7,16 @@ CREATE TABLE "character" (
 );
 --> statement-breakpoint
 CREATE TABLE "npc_spawn" (
-	"id" serial PRIMARY KEY NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"count" integer NOT NULL,
 	"areaId" varchar(60) NOT NULL,
-	"npcId" integer NOT NULL,
+	"npcId" uuid NOT NULL,
 	"coords" "point",
 	"randomRadius" integer
 );
 --> statement-breakpoint
 CREATE TABLE "npc" (
-	"id" serial PRIMARY KEY NOT NULL,
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"speed" integer NOT NULL
 );
 --> statement-breakpoint
