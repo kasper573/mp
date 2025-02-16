@@ -90,7 +90,7 @@ it("can produce client state patches for object changes", () => {
   });
 });
 
-it("can produce client state patches for additions to record", () => {
+it("can produce client state patches for additions to record due to changes in visibility", () => {
   const john = { id: "john" as ClientId, visibleToOthers: false };
   const jane = { id: "jane" as ClientId, visibleToOthers: false };
   const actorList = [john, jane];
@@ -129,7 +129,7 @@ it("can produce client state patches for additions to record", () => {
   });
 });
 
-it("can produce client state patches for removals in record", () => {
+it("can produce client state patches for removals in record due to changes in visibility", () => {
   const john = { id: "john" as ClientId, visibleToOthers: true };
   const jane = { id: "jane" as ClientId, visibleToOthers: true };
   const actorList = [john, jane];
@@ -163,5 +163,50 @@ it("can produce client state patches for removals in record", () => {
   const janesNewClientState = applyPatches(janesClientState, patches[jane.id]);
   expect(janesNewClientState.actors).toEqual({
     [jane.id]: { id: jane.id, visibleToOthers: false },
+  });
+});
+
+it("can produce client state patches for additions to record due to changes in state", () => {
+  const john = { id: "john" as ClientId };
+  const state = new SyncStateMachine({
+    state: () => ({ actors: { [john.id]: john } }),
+    clientIds: () => [john.id],
+    clientVisibility: (_, state) => ({
+      actors: new Set(Object.keys(state.actors)),
+    }),
+  });
+
+  const johnsClientState = state.readClientState(john.id);
+  const jane = { id: "jane" as ClientId };
+  const [, patches] = state.access((draft) => {
+    draft.actors[jane.id] = jane;
+  });
+
+  const johnsNewClientState = applyPatches(johnsClientState, patches[john.id]);
+  expect(johnsNewClientState.actors).toEqual({
+    [john.id]: john,
+    [jane.id]: jane,
+  });
+});
+
+it("can produce client state patches for removals in record due to changes in state", () => {
+  const john = { id: "john" as ClientId };
+  const jane = { id: "jane" as ClientId };
+  const state = new SyncStateMachine({
+    state: () => ({ actors: { [john.id]: john, [jane.id]: jane } }),
+    clientIds: () => [john.id],
+    clientVisibility: (_, state) => ({
+      actors: new Set(Object.keys(state.actors)),
+    }),
+  });
+
+  const johnsClientState = state.readClientState(john.id);
+  const [, patches] = state.access((draft) => {
+    delete draft.actors[jane.id];
+  });
+
+  const johnsNewClientState = applyPatches(johnsClientState, patches[john.id]);
+  expect(johnsNewClientState.actors).toEqual({
+    [john.id]: john,
   });
 });
