@@ -5,6 +5,7 @@ FROM base AS builder
 WORKDIR /workdir
 
 # Enable pnpm
+RUN npm install -g corepack@0.31.0
 RUN corepack enable
 COPY package.json .
 RUN corepack prepare
