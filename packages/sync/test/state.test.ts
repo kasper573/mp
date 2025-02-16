@@ -1,4 +1,4 @@
-import { expect, it, vi } from "vitest";
+import { expect, it } from "vitest";
 import type { Patch } from "immer";
 import { SyncStateMachine } from "../state";
 import type { ClientId } from "../shared";
@@ -10,9 +10,9 @@ it("can access initial state", () => {
     clientIds: () => [],
   });
 
-  const spy = vi.fn();
-  state.access(spy);
-  expect(spy).toBeCalledWith({ record: { foo: "bar" } });
+  state.access((draft) => {
+    expect(draft).toEqual({ record: { foo: "bar" } });
+  });
 });
 
 it("state access can return arbitrary value", () => {
@@ -22,8 +22,7 @@ it("state access can return arbitrary value", () => {
     clientIds: () => [],
   });
 
-  const spy = vi.fn(() => "return");
-  const [result] = state.access(spy);
+  const [result] = state.access(() => "return");
   expect(result).toEqual("return");
 });
 
