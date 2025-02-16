@@ -1,5 +1,7 @@
-import type { Patch } from "immer";
+import { enablePatches, produceWithPatches, type Patch } from "immer";
 import type { ClientId } from "./shared";
+
+enablePatches();
 
 export class SyncStateMachine<State extends SyncState> {
   private state: State;
@@ -9,9 +11,19 @@ export class SyncStateMachine<State extends SyncState> {
   }
 
   access = <Result>(
-    fn: StateAccessFn<State, Result>,
+    accessFn: StateAccessFn<State, Result>,
   ): [Result, ClientPatches] => {
-    throw new Error("Not implemented");
+    let result!: Result;
+
+    produceWithPatches(this.state, (draft) => {
+      result = accessFn(draft as State);
+    });
+
+    const clientPatches: ClientPatches = {};
+
+    // TODO
+
+    return [result, clientPatches];
   };
 
   readClientState = (clientId: ClientId): State => {
