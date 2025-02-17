@@ -46,7 +46,7 @@ export class PatchStateMachine<State extends SyncState> {
         for (const addedId of nextIds.difference(prevIds)) {
           patchesForClient.push({
             op: "add",
-            path: [entityName, idEncoder.encode(addedId)],
+            path: [entityName, addedId as EntityId],
             value: this.state.current[entityName][addedId],
           });
         }
@@ -54,14 +54,14 @@ export class PatchStateMachine<State extends SyncState> {
         for (const removedId of prevIds.difference(nextIds)) {
           patchesForClient.push({
             op: "remove",
-            path: [entityName, idEncoder.encode(removedId)],
+            path: [entityName, removedId as EntityId],
           });
         }
       }
 
       patchesForClient.push(
         ...patches.filter(({ path: [entityName, entityId] }) =>
-          nextVisibility[entityName].has(idEncoder.decode(entityId)),
+          nextVisibility[entityName].has(entityId),
         ),
       );
 
@@ -92,13 +92,6 @@ export class PatchStateMachine<State extends SyncState> {
     ) as State;
   };
 }
-
-const asString = <Ret>(value: PropertyKey): Ret => String(value) as Ret;
-
-const idEncoder = {
-  encode: asString,
-  decode: asString,
-};
 
 export interface PatchStateMachineOptions<State extends SyncState> {
   state: () => State;
