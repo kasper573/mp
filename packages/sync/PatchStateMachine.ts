@@ -12,7 +12,7 @@ export class PatchStateMachine<State extends SyncState> {
   }
 
   access = <Result>(
-    accessFn: StateHandler<State, Result>,
+    accessFn: (state: State) => Result,
   ): [Result, ClientPatches] => {
     const { clientIds: getClientIds, clientVisibility: getClientVisibility } =
       this.options;
@@ -113,10 +113,8 @@ export type ClientVisibilityFactory<State extends SyncState> = (
 
 export type ClientPatches = Record<ClientId, Patch[]>;
 
-export type StateHandler<State, Result> = (draft: State) => Result;
-
 export type StateAccess<State extends SyncState> = <Result>(
-  stateHandler: StateHandler<State, Result>,
+  stateHandler: (state: State) => Result,
 ) => Result;
 
 export type EntityId = string;

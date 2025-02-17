@@ -1,13 +1,7 @@
 import type { Operation } from "rfc6902";
 import { applyPatch } from "rfc6902";
 import type { Patch } from "immer";
-import type {
-  StateHandler,
-  HandshakeData,
-  Unsubscribe,
-  EventHandler,
-  StateMutation,
-} from "./shared";
+import type { HandshakeData } from "./shared";
 import {
   createUrlWithHandshakeData,
   decodeServerToClientMessage,
@@ -180,3 +174,11 @@ export interface SocketErrorEvent extends Event {
 function immerToRFCPatch({ path, ...rest }: Patch): Operation {
   return { path: "/" + path.join("/"), ...rest } as Operation;
 }
+
+type EventHandler<Payload> = (payload: Payload) => void;
+
+type StateMutation<State> = (state: State) => void;
+
+type StateHandler<State> = (updateState: StateMutation<State>) => void;
+
+type Unsubscribe = () => void;

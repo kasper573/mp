@@ -57,13 +57,6 @@ async function asyncIterableToArrayBuffer(
     combinedBuffer.byteOffset + combinedBuffer.byteLength,
   );
 }
-export type EventHandler<Payload> = (payload: Payload) => void;
-
-export type StateMutation<State> = (state: State) => void;
-
-export type StateHandler<State> = (updateState: StateMutation<State>) => void;
-
-export type Unsubscribe = () => void;
 
 export function handshakeDataFromRequest(
   req: http.IncomingMessage,
