@@ -1,52 +1,45 @@
-import { enablePatches, original, produceWithPatches, type Patch } from "immer";
+import { type Patch } from "immer";
 import type { ClientId } from "./shared";
+import { PatchObserver } from "./PatchObserver";
 
-enablePatches();
-
-export class SyncStateMachine<State extends SyncState> {
-  private state: State;
+export class PatchStateMachine<State extends SyncState> {
+  private state: PatchObserver<State>;
   private visibilities: Record<ClientId, ClientVisibility<State> | undefined> =
     {};
 
-  constructor(private options: SyncStateMachineOptions<State>) {
-    this.state = options.state();
+  constructor(private options: PatchStateMachineOptions<State>) {
+    this.state = new PatchObserver(options.state());
   }
 
   access = <Result>(
     accessFn: StateHandler<State, Result>,
   ): [Result, ClientPatches] => {
-    const { clientIds, clientVisibility } = this.options;
+    const { clientIds: getClientIds, clientVisibility: getClientVisibility } =
+      this.options;
 
-    let result!: Result;
-    const [nextState, patches] = produceWithPatches(this.state, (draft) => {
-      result = accessFn(draft as State);
+    const clientIds = Array.from(getClientIds());
+    const prevVisibilities: Record<
+      ClientId,
+      ClientVisibility<State>
+    > = Object.fromEntries(
+      clientIds.map((clientId) => [
+        clientId,
+        this.visibilities[clientId] ?? // Reuse last if it exists
+          getClientVisibility(clientId, this.state.current), // Derive new if not
+      ]),
+    );
 
-      if (result && typeof result === "object") {
-        result = original(result) as Result;
-      }
-      if (result instanceof Promise) {
-        throw new TypeError("State access mutations may not be asynchronous");
-      }
-    });
-
-    if (nextState === this.state) {
-      return [result, {}];
-    }
-
-    const prevState = this.state;
-    this.state = nextState;
+    const [result, patches] = this.state.update(accessFn);
 
     const clientPatches: ClientPatches = {};
 
-    for (const clientId of clientIds()) {
-      const prevVisibility =
-        this.visibilities[clientId] ?? clientVisibility(clientId, prevState);
-
-      const nextVisibility = clientVisibility(clientId, nextState);
+    for (const clientId of clientIds) {
+      const prevVisibility = prevVisibilities[clientId];
+      const nextVisibility = getClientVisibility(clientId, this.state.current);
 
       const patchesForClient: Patch[] = [];
 
-      for (const entityName in this.state) {
+      for (const entityName in this.state.current) {
         const prevIds = prevVisibility[entityName];
         const nextIds = nextVisibility[entityName];
 
@@ -54,7 +47,7 @@ export class SyncStateMachine<State extends SyncState> {
           patchesForClient.push({
             op: "add",
             path: [entityName, idEncoder.encode(addedId)],
-            value: nextState[entityName][addedId],
+            value: this.state.current[entityName][addedId],
           });
         }
 
@@ -84,12 +77,12 @@ export class SyncStateMachine<State extends SyncState> {
   readClientState = (clientId: ClientId): State => {
     const clientReferences = this.options.clientVisibility(
       clientId,
-      this.state,
+      this.state.current,
     );
     return Object.fromEntries(
       Object.entries(clientReferences).map(
         ([entityName, entityIds]: [string, ReadonlySet<EntityId>]) => {
-          const allEntities = this.state[entityName];
+          const allEntities = this.state.current[entityName];
           const referencedEntities = Object.fromEntries(
             entityIds.values().map((id) => [id, allEntities[id]]),
           );
@@ -107,7 +100,7 @@ const idEncoder = {
   decode: asString,
 };
 
-export interface SyncStateMachineOptions<State extends SyncState> {
+export interface PatchStateMachineOptions<State extends SyncState> {
   state: () => State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;

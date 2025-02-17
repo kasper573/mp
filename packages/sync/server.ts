@@ -4,17 +4,14 @@ import { WebSocketServer } from "ws";
 import { uuid } from "@mp/std";
 import type { Result } from "@mp/std";
 import type { Patch } from "immer";
-import { enablePatches } from "immer";
 import {
   encodeServerToClientMessage,
   handshakeDataFromRequest,
   type ClientId,
   type HandshakeData,
 } from "./shared";
-import type { StateAccess, SyncState } from "./state";
-import type { SyncStateMachine } from "./state";
-
-enablePatches();
+import type { StateAccess, SyncState } from "./PatchStateMachine";
+import type { PatchStateMachine } from "./PatchStateMachine";
 
 export class SyncServer<State extends SyncState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
@@ -157,7 +154,7 @@ export class SyncServer<State extends SyncState, HandshakeReturn> {
 
 export interface SyncServerOptions<State extends SyncState, HandshakeReturn> {
   path: string;
-  state: SyncStateMachine<State>;
+  state: PatchStateMachine<State>;
   httpServer: http.Server;
   handshake: (
     clientId: ClientId,
@@ -181,7 +178,7 @@ const newClientId = uuid as unknown as () => ClientId;
 
 export type { ClientId, HandshakeData } from "./shared";
 
-export * from "./state";
+export * from "./PatchStateMachine";
 
 const clientMetaDataSymbol = Symbol("clientMetaData");
 
