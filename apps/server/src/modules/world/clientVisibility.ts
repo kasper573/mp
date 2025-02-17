@@ -10,7 +10,7 @@ import type { Actor, ActorId, WorldState } from "./WorldState";
  * Includes client specific information (ie. fog of war),
  * but also common things like signed out players.
  */
-export function deriveWorldStateForClient(
+export function deriveClientVisibility(
   clients: ClientRegistry,
 ): ClientVisibilityFactory<WorldState> {
   return (clientId, state) => {

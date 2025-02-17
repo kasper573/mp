@@ -7,7 +7,7 @@ import createCors from "cors";
 import type { AuthToken } from "@mp/auth";
 import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import { SyncServer, SyncStateMachine } from "@mp/sync/server";
+import { SyncServer, PatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { createServerContextFactory } from "./context";
@@ -32,7 +32,7 @@ import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
-import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
+import { deriveClientVisibility } from "./modules/world/clientVisibility";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -62,10 +62,10 @@ const syncHandshakeLimiter = createRateLimiter({
   duration: 30,
 });
 
-const worldStateMachine = new SyncStateMachine<WorldState>({
+const worldStateMachine = new PatchStateMachine<WorldState>({
   clientIds: () => syncServer.clientIds,
   state: () => ({ actors: {} }),
-  clientVisibility: deriveWorldStateForClient(clients),
+  clientVisibility: deriveClientVisibility(clients),
 });
 
 const syncServer: WorldSyncServer = new SyncServer({
