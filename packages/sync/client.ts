@@ -1,9 +1,7 @@
-import { applyPatch } from "rfc6902";
-import type { HandshakeData } from "./shared";
-import {
-  createUrlWithHandshakeData,
-  decodeServerToClientMessage,
-} from "./shared";
+import { applyPatch } from "./patch";
+import type { HandshakeData } from "./handshake";
+import { createUrlWithHandshakeData } from "./handshake";
+import { decodeServerToClientMessage } from "./encoding";
 
 export class SyncClient<State extends object> {
   private socket?: WebSocket;

@@ -23,7 +23,6 @@
   "dependencies": {
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
-    "rfc6902": "5.1.2",
     "cbor-x": "1.6.0",
     "ws": "8.18.0"
   },

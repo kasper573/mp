@@ -1,7 +1,16 @@
-import type { Operation } from "rfc6902";
-import { type Patch, Pointer } from "rfc6902";
 import type { ReadonlyDeep } from "type-fest";
 import type { ClientId } from "./shared";
+import type { Patch, PatchPath, Operation } from "./patch";
+
+/**
+ * A state machine that records all state changes made as atomic patches,
+ * is aware of which patches should be visible per client,
+ * and allows flushing the collected patches at any given time.
+ */
+export type PatchStateMachine<State extends PatchableState> =
+  EntityRepositoryRecord<State> & {
+    [flushFunctionName]: FlushFn;
+  };
 
 export function createPatchStateMachine<State extends PatchableState>(
   opt: PatchStateMachineOptions<State>,
@@ -39,7 +48,7 @@ function createFlushFunction<State extends PatchableState>(
   const hasBeenGivenFullState = new Set<ClientId>();
   const visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
 
-  return () => {
+  return function flush() {
     const clientIds = Array.from(getClientIds());
     const prevVisibilities: Record<
       ClientId,
@@ -73,29 +82,24 @@ function createFlushFunction<State extends PatchableState>(
       for (const entityName in state) {
         const prevIds = prevVisibility[entityName];
         const nextIds = nextVisibility[entityName];
-        const entityPath = new Pointer().add(entityName);
 
         for (const addedId of nextIds.difference(prevIds)) {
           clientPatch.push({
-            op: "add",
-            path: entityPath.add(addedId as string).toString(),
-            value: state[entityName][addedId],
+            o: "a",
+            p: [entityName, addedId as string],
+            v: state[entityName][addedId],
           });
         }
 
         for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push({
-            op: "remove",
-            path: entityPath.add(removedId as string).toString(),
-          });
+          clientPatch.push({ o: "r", p: [entityName, removedId as string] });
         }
       }
 
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(({ path }) => {
-          const [, entityName, entityId] = Pointer.fromJSON(path).tokens;
+        ...serverPatch.filter(({ p: [entityName, entityId] }) => {
           return nextVisibility[entityName].has(entityId);
         }),
       );
@@ -140,29 +144,26 @@ function createEntityRepository<
   type Id = keyof Entities;
   type Entity = Entities[Id];
 
-  function fn() {
+  function entity() {
     // Type level immutability is enough, we don't need to check at runtime as it will impact performance
     return state[entityName] as ReadonlyDeep<Entities>;
   }
 
-  const basePath = new Pointer().add(entityName as string);
-
-  fn.set = (id: Id, entity: Entity) => {
+  entity.set = function setEntity(id: Id, entity: Entity) {
     serverPatch.push({
-      op: "replace",
-      path: basePath.add(id as string).toString(),
-      value: structuredClone(entity),
+      o: "u",
+      p: [entityName as string, id as string],
+      v: entity,
     });
     state[entityName][id] = entity;
   };
 
-  fn.update = (id: Id, value: Partial<Entity>) => {
-    const path = basePath.add(id as string);
+  entity.update = function updateEntity(id: Id, value: Partial<Entity>) {
     for (const prop in value) {
       const key = prop as keyof Entity;
       serverPatch.push(
         createSetOperation(
-          path.add(prop),
+          [entityName as string, id as string, prop],
           value[key],
           state[entityName][id][key],
         ),
@@ -171,60 +172,46 @@ function createEntityRepository<
     Object.assign(state[entityName][id] as object, value);
   };
 
-  fn.remove = (id: Id) => {
+  entity.remove = function removeEntity(id: Id) {
     serverPatch.push({
-      op: "remove",
-      path: basePath.add(id as string).toString(),
+      o: "r",
+      p: [entityName as string, id as string],
     });
     delete state[entityName][id];
   };
 
-  return fn;
+  return entity;
 }
 
 function createFullStatePatch<State extends PatchableState>(
   state: State,
 ): Patch {
   const patch: Patch = [];
-  const path = new Pointer();
   for (const key in state) {
     patch.push({
-      op: "add",
-      path: path.add(key).toString(),
-      value: state[key as keyof typeof state],
+      o: "a",
+      p: [key],
+      v: state[key as keyof typeof state],
     });
   }
   return patch;
 }
 
 function createSetOperation<Value>(
-  path: Pointer,
+  path: PatchPath,
   nextValue: Value,
   prevValue: Value,
 ): Operation {
   if (nextValue === undefined && prevValue !== undefined) {
-    return { op: "remove", path: path.toString() };
+    return { o: "r", p: path };
   }
   if (nextValue !== undefined && prevValue === undefined) {
-    return {
-      op: "add",
-      path: path.toString(),
-      value: structuredClone(nextValue),
-    };
+    return { o: "a", p: path, v: nextValue };
   }
-  return {
-    op: "replace",
-    path: path.toString(),
-    value: structuredClone(nextValue),
-  };
+  return { o: "u", p: path, v: nextValue };
 }
 
 const flushFunctionName = "flush";
-
-export type PatchStateMachine<State extends PatchableState> =
-  EntityRepositoryRecord<State> & {
-    [flushFunctionName]: FlushFn;
-  };
 
 export type EntityRepositoryRecord<State extends PatchableState> = {
   [EntityName in keyof State]: EntityRepository<State[EntityName]>;

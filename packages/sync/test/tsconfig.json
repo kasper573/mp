@@ -1,1 +1,11 @@
-{ "extends": "@mp/tsconfig/node.json", "include": [".", "../*.ts"] }
+{
+  "extends": "@mp/tsconfig/node.json",
+  "include": [
+    ".",
+    "../*.ts",
+    "../encoding.ts",
+    "../handshake.ts",
+    "../patch.ts",
+    "../PatchStateMachine.ts"
+  ]
+}

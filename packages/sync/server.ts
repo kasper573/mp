@@ -3,14 +3,12 @@ import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 import { uuid } from "@mp/std";
 import type { Result } from "@mp/std";
-import {
-  encodeServerToClientMessage,
-  handshakeDataFromRequest,
-  type ClientId,
-  type HandshakeData,
-} from "./shared";
+import { type ClientId } from "./shared";
+import { type HandshakeData } from "./handshake";
+import { handshakeDataFromRequest } from "./handshake";
 import type { PatchableState } from "./PatchStateMachine";
 import type { PatchStateMachine } from "./PatchStateMachine";
+import { encodeServerToClientMessage } from "./encoding";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
@@ -137,7 +135,7 @@ type ClientInfoMap = Map<ClientId, ClientInfo>;
 
 const newClientId = uuid as unknown as () => ClientId;
 
-export type { ClientId, HandshakeData } from "./shared";
+export type { ClientId } from "./shared";
 
 export * from "./PatchStateMachine";
 
