@@ -510,9 +510,6 @@ importers:
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0
-      immer:
-        specifier: 10.1.1
-        version: 10.1.1
       rfc6902:
         specifier: 5.1.2
         version: 5.1.2
@@ -526,6 +523,9 @@ importers:
       '@types/ws':
         specifier: 8.5.12
         version: 8.5.12
+      type-fest:
+        specifier: 4.35.0
+        version: 4.35.0
       vitest:
         specifier: 2.0.3
         version: 2.0.3(@types/node@22.10.2)(jsdom@23.2.0)
@@ -3714,9 +3714,6 @@ packages:
     resolution: {integrity: sha512-5Fytz/IraMjqpwfd34ke28PTVMjZjJG2MPn5t7OE4eUCUNf8BAa7b5WUS9/Qvr6mwOQS7Mk6vdsMno5he+T8Xw==}
     engines: {node: '>= 4'}
 
-  immer@10.1.1:
-    resolution: {integrity: sha512-s2MPrmjovJcoMaHtx6K11Ra7oD05NT97w1IC5zpMkT6Atjr7H8LjaDd81iIxUYpMKSRRNMJE703M1Fhr/TctHw==}
-
   import-fresh@3.3.0:
     resolution: {integrity: sha512-veYYhQa+D1QBKznvhUHxb8faxlrwUnxseDAbAp457E0wLNio2bOSKnjYDhMj+YiAq61xrMGhQk9iXVk5FzgQMw==}
     engines: {node: '>=6'}
@@ -4872,6 +4869,10 @@ packages:
 
   type-fest@4.29.0:
     resolution: {integrity: sha512-RPYt6dKyemXJe7I6oNstcH24myUGSReicxcHTvCLgzm4e0n8y05dGvcGB15/SoPRBmhlMthWQ9pvKyL81ko8nQ==}
+    engines: {node: '>=16'}
+
+  type-fest@4.35.0:
+    resolution: {integrity: sha512-2/AwEFQDFEy30iOLjrvHDIH7e4HEWH+f1Yl1bI5XMqzuoCUqwYCdxachgsgv0og/JdVZUhbfjcJAoHj5L1753A==}
     engines: {node: '>=16'}
 
   type-is@1.6.18:
@@ -8611,8 +8612,6 @@ snapshots:
 
   ignore@5.3.1: {}
 
-  immer@10.1.1: {}
-
   import-fresh@3.3.0:
     dependencies:
       parent-module: 1.0.1
@@ -9722,6 +9721,8 @@ snapshots:
   type-fest@0.8.1: {}
 
   type-fest@4.29.0: {}
+
+  type-fest@4.35.0: {}
 
   type-is@1.6.18:
     dependencies:

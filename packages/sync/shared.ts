@@ -1,29 +1,15 @@
 import type http from "node:http";
 import type { Branded } from "@mp/std";
 import { decode, encodeAsAsyncIterable } from "cbor-x";
-import type { Patch } from "immer";
+import type { Patch } from "rfc6902";
 
 export type ClientId = Branded<string, "ClientId">;
-
-export interface BaseMessage<Type extends string> {
-  type: Type;
-}
-
-export interface StatePatchMessage extends BaseMessage<"patch"> {
-  patches: Patch[];
-}
-
-export interface HandshakeMessage
-  extends BaseMessage<"handshake">,
-    HandshakeData {}
 
 export interface HandshakeData {
   token?: string;
 }
 
-export type ServerToClientMessage<State> = StatePatchMessage;
-
-export type ClientToServerMessage = HandshakeMessage;
+export type ServerToClientMessage<State> = Patch;
 
 const fixedDecode = <T>(buffer: ArrayBufferLike) =>
   decode(new Uint8Array(buffer)) as T;

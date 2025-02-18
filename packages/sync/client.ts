@@ -1,6 +1,4 @@
-import type { Operation } from "rfc6902";
 import { applyPatch } from "rfc6902";
-import type { Patch } from "immer";
 import type { HandshakeData } from "./shared";
 import {
   createUrlWithHandshakeData,
@@ -119,16 +117,11 @@ export class SyncClient<State extends object> {
   };
 
   private handleMessage = async (event: MessageEvent) => {
-    const message = decodeServerToClientMessage<State>(
+    const patch = decodeServerToClientMessage<State>(
       await (event.data as Blob).arrayBuffer(),
     );
 
-    switch (message.type) {
-      case "patch":
-        return this.updateState((target) =>
-          applyPatch(target, message.patches.map(immerToRFCPatch)),
-        );
-    }
+    this.updateState((target) => applyPatch(target, patch));
   };
 
   private updateState = (mutation: StateMutation<State>) => {
@@ -169,10 +162,6 @@ export { type ClientId } from "./shared";
 // This is a hack and should be replaced with some normalizing websocket package, ie. "ws".
 export interface SocketErrorEvent extends Event {
   readonly message?: string;
-}
-
-function immerToRFCPatch({ path, ...rest }: Patch): Operation {
-  return { path: "/" + path.join("/"), ...rest } as Operation;
 }
 
 type EventHandler<Payload> = (payload: Payload) => void;

@@ -1,4 +1,4 @@
-import type { StateAccess } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync/server";
 import { roles } from "../../middlewares/auth";
 import { t } from "../../trpc";
 import type { WorldState } from "../../package";
@@ -7,25 +7,22 @@ import { spawnNpcInstance } from "./npcSpawnBehavior";
 import type { NPCService } from "./service";
 
 export interface NPCRouterDependencies {
-  state: StateAccess<WorldState>;
+  state: PatchStateMachine<WorldState>;
   areas: AreaLookup;
   npcService: NPCService;
 }
 
 export type NPCRouter = ReturnType<typeof createNPCRouter>;
 export function createNPCRouter({
-  state: accessState,
+  state,
   areas,
   npcService,
 }: NPCRouterDependencies) {
   return t.router({
     spawnRandomNPC: t.procedure.use(roles(["spawn_npc"])).mutation(async () => {
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
-
-      accessState((state) => {
-        const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
-        state.actors[instance.id] = { type: "npc", ...instance };
-      });
+      const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
+      state.actors.set(instance.id, { type: "npc", ...instance });
     }),
   });
 }

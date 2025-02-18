@@ -1,5 +1,5 @@
 import { type Vector } from "@mp/math";
-import type { StateAccess } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
 import { auth } from "../../middlewares/auth";
@@ -11,14 +11,14 @@ import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 
 export interface CharacterRouterDependencies {
-  state: StateAccess<WorldState>;
+  state: PatchStateMachine<WorldState>;
   areas: AreaLookup;
   characterService: CharacterService;
 }
 
 export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
 export function createCharacterRouter({
-  state: accessState,
+  state,
   areas,
   characterService,
 }: CharacterRouterDependencies) {
@@ -26,40 +26,38 @@ export function createCharacterRouter({
     move: t.procedure
       .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
       .use(auth())
-      .mutation(({ input: { characterId, to }, ctx: { user } }) =>
-        accessState((state) => {
-          const char = state.actors[characterId];
+      .mutation(({ input: { characterId, to }, ctx: { user } }) => {
+        const char = state.actors()[characterId];
 
-          if (!char || char.type !== "character") {
-            throw new TRPCError({
-              code: "BAD_REQUEST",
-              message: "Character not found",
-            });
-          }
+        if (!char || char.type !== "character") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Character not found",
+          });
+        }
 
-          if (char.userId !== user.id) {
-            throw new TRPCError({
-              code: "FORBIDDEN",
-              message: "You don't have access to this character",
-            });
-          }
+        if (char.userId !== user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this character",
+          });
+        }
 
-          const result = moveTo(char, areas, to);
-          if (result.isErr()) {
-            throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
-          }
-        }),
-      ),
+        const result = moveTo(char, areas, to);
+        if (result.isErr()) {
+          throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+        }
+
+        state.actors.update(char.id, { path: result.value.path });
+      }),
 
     join: t.procedure
       .output(schemaFor<CharacterId>())
       .use(auth())
       .mutation(async ({ ctx: { user } }) => {
-        const existingCharacter = accessState((state) =>
-          recordValues(state.actors)
-            .filter((actor) => actor.type === "character")
-            .find((actor) => actor.userId === user.id),
-        );
+        const existingCharacter = recordValues(state.actors())
+          .filter((actor) => actor.type === "character")
+          .find((actor) => actor.userId === user.id);
 
         if (existingCharacter) {
           return existingCharacter.id;
@@ -68,9 +66,7 @@ export function createCharacterRouter({
         const char = await characterService.getOrCreateCharacterForUser(
           user.id,
         );
-        accessState((state) => {
-          state.actors[char.id] = { type: "character", ...char };
-        });
+        state.actors.set(char.id, { type: "character", ...char });
         return char.id;
       }),
   });

@@ -23,7 +23,6 @@
   "dependencies": {
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
-    "immer": "10.1.1",
     "rfc6902": "5.1.2",
     "cbor-x": "1.6.0",
     "ws": "8.18.0"
@@ -31,6 +30,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/ws": "8.5.12",
+    "type-fest": "4.35.0",
     "vitest": "2.0.3"
   }
 }
