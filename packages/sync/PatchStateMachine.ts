@@ -68,6 +68,8 @@ function createFlushFunction<State extends PatchableState>(
         hasBeenGivenFullState.add(clientId);
       }
 
+      // Emulate adds and removals of entities due to visibility changes
+
       for (const entityName in state) {
         const prevIds = prevVisibility[entityName];
         const nextIds = nextVisibility[entityName];
@@ -88,6 +90,8 @@ function createFlushFunction<State extends PatchableState>(
           });
         }
       }
+
+      // Select the patches visible to the client
 
       clientPatch.push(
         ...serverPatch.filter(({ path }) => {
