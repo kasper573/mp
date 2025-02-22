@@ -36,7 +36,7 @@ const tracerProvider = new NodeTracerProvider({
   resource: Resource.default().merge(
     new Resource({
       [ATTR_SERVICE_NAME]: "mp-server",
-      [ATTR_SERVICE_VERSION]: process.env.MP_SERVER_BUILD_VERSION,
+      [ATTR_SERVICE_VERSION]: Deno.env.get("MP_SERVER_BUILD_VERSION"),
     }),
   ),
 });
@@ -45,7 +45,7 @@ tracerProvider.addSpanProcessor(
   new BatchSpanProcessor(
     new OTLPTraceExporter({
       compression: CompressionAlgorithm.GZIP,
-      url: process.env.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT,
+      url: Deno.env.get("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT"),
     }),
   ),
 );

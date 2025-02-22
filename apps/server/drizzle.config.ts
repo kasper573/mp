@@ -3,6 +3,6 @@ export default {
   schema: "./src/modules/*/schema.ts",
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.MP_SERVER_DATABASE_URL,
+    url: Deno.env.get("MP_SERVER_DATABASE_URL"),
   },
 };

@@ -1,5 +1,5 @@
-import { hideBin } from "yargs/helpers";
-import yargs from "yargs";
+import { hideBin } from "npm:yargs/helpers";
+import yargs from "npm:yargs";
 
 export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
@@ -7,7 +7,7 @@ export type CliOptions = RemoveIndexSignature<
 
 export const cliEnvPrefix = "MP";
 
-export function readCliOptions(argv = process.argv) {
+export function readCliOptions(argv = Deno.args) {
   const options = yargs(hideBin(argv))
     .env(cliEnvPrefix)
     .parserConfiguration({
@@ -20,17 +20,17 @@ export function readCliOptions(argv = process.argv) {
     })
     .option("wsUrl", {
       type: "string",
-      default: process.env.MP_CLIENT_WS_URL,
+      default: Deno.env.get("MP_CLIENT_WS_URL"),
       demandOption: true,
     })
     .option("httpServerUrl", {
       type: "string",
-      default: `https://${process.env.MP_CLIENT_DOMAIN}`,
+      default: `https://${Deno.env.get("MP_CLIENT_DOMAIN")}`,
       demandOption: true,
     })
     .option("apiServerUrl", {
       type: "string",
-      default: process.env.MP_CLIENT_API_URL,
+      default: Deno.env.get("MP_CLIENT_API_URL"),
       demandOption: true,
     })
     .option("httpRequests", {
@@ -66,9 +66,9 @@ export function readCliOptions(argv = process.argv) {
 }
 
 type RemoveIndexSignature<T> = {
-  [K in keyof T as K extends string
-    ? string extends K
-      ? never
+  [
+    K in keyof T as K extends string ? string extends K ? never
       : K
-    : never]: T[K];
+      : never
+  ]: T[K];
 };
