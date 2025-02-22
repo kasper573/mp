@@ -1,5 +1,5 @@
 import type { UserId } from "@mp/auth";
-import type { StateAccess } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
 import type { ClientRegistry } from "../../ClientRegistry";
@@ -7,7 +7,7 @@ import type { WorldState } from "../world/WorldState";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,
-  accessState: StateAccess<WorldState>,
+  state: PatchStateMachine<WorldState>,
   logger: Logger,
   timeout: number,
 ) {
@@ -35,16 +35,14 @@ export function characterRemoveBehavior(
   });
 
   function removeCharacter(userId: UserId) {
-    accessState((state) => {
-      for (const char of recordValues(state.actors).filter(
-        (actor) => actor.type === "character",
-      )) {
-        if (char.userId === userId) {
-          logger.info("Removing character", char.id);
-          delete state.actors[char.id];
-        }
+    for (const char of recordValues(state.actors()).filter(
+      (actor) => actor.type === "character",
+    )) {
+      if (char.userId === userId) {
+        logger.info("Removing character", char.id);
+        state.actors.remove(char.id);
       }
-    });
+    }
   }
 
   return stop;

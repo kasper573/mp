@@ -1,13 +1,15 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
 import { recordValues } from "@mp/std";
-import type { WorldSyncServer } from "../modules/world/WorldState";
+import type { PatchStateMachine } from "@mp/sync/server";
+import type { WorldState, WorldSyncServer } from "../modules/world/WorldState";
 import type { ClientRegistry } from "../ClientRegistry";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  worldState: WorldSyncServer,
+  state: PatchStateMachine<WorldState>,
+  syncServer: WorldSyncServer,
 ) {
   new MetricsGague({
     name: "active_user_count",
@@ -23,13 +25,11 @@ export function collectUserMetrics(
     help: "Number of player characters currently active",
     registers: [registry],
     collect() {
-      worldState.access((state) => {
-        this.set(
-          recordValues(state.actors)
-            .filter((actor) => actor.type === "character")
-            .toArray().length,
-        );
-      });
+      this.set(
+        recordValues(state.actors())
+          .filter((actor) => actor.type === "character")
+          .toArray().length,
+      );
     },
   });
 
@@ -38,13 +38,11 @@ export function collectUserMetrics(
     help: "Number of non-player characters currently active",
     registers: [registry],
     collect() {
-      worldState.access((state) => {
-        this.set(
-          recordValues(state.actors)
-            .filter((actor) => actor.type === "npc")
-            .toArray().length,
-        );
-      });
+      this.set(
+        recordValues(state.actors())
+          .filter((actor) => actor.type === "npc")
+          .toArray().length,
+      );
     },
   });
 
@@ -53,7 +51,7 @@ export function collectUserMetrics(
     help: "Number of active websocket connections",
     registers: [registry],
     collect() {
-      this.set([...worldState.clientIds].length);
+      this.set([...syncServer.clientIds].length);
     },
   });
 }

@@ -1,17 +1,7 @@
-import type { Operation } from "rfc6902";
-import { applyPatch } from "rfc6902";
-import type { Patch } from "immer";
-import type {
-  StateHandler,
-  HandshakeData,
-  Unsubscribe,
-  EventHandler,
-  StateMutation,
-} from "./shared";
-import {
-  createUrlWithHandshakeData,
-  decodeServerToClientMessage,
-} from "./shared";
+import { applyPatch } from "./patch";
+import type { HandshakeData } from "./handshake";
+import { createUrlWithHandshakeData } from "./handshake";
+import { decodeServerToClientMessage } from "./messageDecoder";
 
 export class SyncClient<State extends object> {
   private socket?: WebSocket;
@@ -125,16 +115,11 @@ export class SyncClient<State extends object> {
   };
 
   private handleMessage = async (event: MessageEvent) => {
-    const message = decodeServerToClientMessage<State>(
+    const patch = decodeServerToClientMessage(
       await (event.data as Blob).arrayBuffer(),
     );
 
-    switch (message.type) {
-      case "patch":
-        return this.updateState((target) =>
-          applyPatch(target, message.patches.map(immerToRFCPatch)),
-        );
-    }
+    this.updateState((target) => applyPatch(target, patch));
   };
 
   private updateState = (mutation: StateMutation<State>) => {
@@ -177,6 +162,10 @@ export interface SocketErrorEvent extends Event {
   readonly message?: string;
 }
 
-function immerToRFCPatch({ path, ...rest }: Patch): Operation {
-  return { path: "/" + path.join("/"), ...rest } as Operation;
-}
+type EventHandler<Payload> = (payload: Payload) => void;
+
+type StateMutation<State> = (state: State) => void;
+
+type StateHandler<State> = (updateState: StateMutation<State>) => void;
+
+type Unsubscribe = () => void;

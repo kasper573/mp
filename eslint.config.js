@@ -84,6 +84,9 @@ export default tseslint.config(
       "unicorn/no-array-reduce": "off",
       "unicorn/prefer-spread": "off",
 
+      // export default foo where foo is an import is useful inside worker thread files
+      "unicorn/prefer-export-from": "off",
+
       // Typescript already catches these type of errors
       "unicorn/switch-case-braces": "off",
 

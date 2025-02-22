@@ -3,10 +3,10 @@ import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
-  private intervalId?: NodeJS.Timeout;
   private middleware: TickMiddleware;
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
+  private stopAsyncInterval?: () => void;
 
   #isEnabled = false;
   get isEnabled() {
@@ -28,47 +28,18 @@ export class Ticker {
     this.stop();
     this.#isEnabled = true;
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.intervalId = setInterval(
-      this.tick,
-      this.options.interval.totalMilliseconds,
-    );
+    this.stopAsyncInterval = setAsyncInterval(this.tick, this.options.interval);
   }
 
   stop() {
     this.#isEnabled = false;
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
-    if (this.intervalId !== undefined) {
-      clearInterval(this.intervalId);
-      this.intervalId = undefined;
-    }
+    this.stopAsyncInterval?.();
   }
 
-  /**
-   * Emulates synchronous tick behavior of the given async tick handler
-   * by pausing the ticker and resuming it after the handler completes.
-   */
-  encapsulateAsyncHandler(
-    asyncHandler: (event: TickEvent) => Promise<unknown>,
-  ): TickEventHandler {
-    return (event) => {
-      this.stop();
-      void asyncHandler(event)
-        .catch((error) => {
-          if (this.options.onError) {
-            this.options.onError(error);
-          } else {
-            throw error;
-          }
-        })
-        .finally(() => {
-          this.start();
-        });
-    };
-  }
-
-  private tick = () => {
+  private tick = async () => {
     try {
-      this.middleware({
+      await this.middleware({
         timeSinceLastTick: this.getTimeSinceLastTick(),
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
@@ -82,9 +53,9 @@ export class Ticker {
     }
   };
 
-  private emit: TickEventHandler = (...args) => {
+  private emit: TickEventHandler = async (...args) => {
     for (const fn of this.subscriptions) {
-      fn(...args);
+      await fn(...args);
     }
   };
 }
@@ -108,7 +79,7 @@ export interface TickerOptions {
 
 export type Unsubscribe = () => void;
 
-export type TickEventHandler = (event: TickEvent) => void;
+export type TickEventHandler = (event: TickEvent) => void | Promise<void>;
 
 const noopMiddleware: TickMiddleware = ({ next, ...event }) => next(event);
 
@@ -119,4 +90,33 @@ function createDeltaFn(): () => TimeSpan {
     getMeasurement = beginMeasuringTimeSpan();
     return delta;
   };
+}
+
+function setAsyncInterval(handler: () => Promise<void>, interval: TimeSpan) {
+  let enabled = true;
+  let timeoutId: NodeJS.Timeout;
+
+  function enqueue(lastRunTime: TimeSpan) {
+    timeoutId = setTimeout(
+      run as () => void,
+      interval.subtract(lastRunTime).totalMilliseconds,
+    );
+  }
+
+  async function run() {
+    const stopMeasuring = beginMeasuringTimeSpan();
+    await handler();
+    if (enabled) {
+      enqueue(stopMeasuring());
+    }
+  }
+
+  function stop() {
+    clearTimeout(timeoutId);
+    enabled = false;
+  }
+
+  enqueue(TimeSpan.Zero);
+
+  return stop;
 }

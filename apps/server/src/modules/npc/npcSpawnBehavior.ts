@@ -4,7 +4,7 @@ import {
   adjectives,
   animals,
 } from "unique-names-generator";
-import type { StateAccess } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";
@@ -17,24 +17,22 @@ import type { NPCService } from "./service";
 import type { NPC, NPCInstance, NPCSpawn } from "./schema";
 
 export function npcSpawnBehavior(
-  accessState: StateAccess<WorldState>,
+  state: PatchStateMachine<WorldState>,
   npcService: NPCService,
   areas: AreaLookup,
 ): TickEventHandler {
   void npcService.getAllSpawnsAndTheirNpcs().then((list) => {
-    accessState((state) => {
-      for (const { spawn, npc } of list) {
-        const area = areas.get(spawn.areaId);
-        if (!area) {
-          throw new Error(`Area not found: ${spawn.areaId}`);
-        }
-
-        for (let i = 0; i < spawn.count; i++) {
-          const instance = spawnNpcInstance(npc, spawn, area);
-          state.actors[instance.id] = { type: "npc", ...instance };
-        }
+    for (const { spawn, npc } of list) {
+      const area = areas.get(spawn.areaId);
+      if (!area) {
+        throw new Error(`Area not found: ${spawn.areaId}`);
       }
-    });
+
+      for (let i = 0; i < spawn.count; i++) {
+        const instance = spawnNpcInstance(npc, spawn, area);
+        state.actors.set(instance.id, { type: "npc", ...instance });
+      }
+    }
   });
 
   return () => {};

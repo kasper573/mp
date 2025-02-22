@@ -2,15 +2,12 @@ import type express from "express";
 import type { Branded } from "@mp/std";
 import type { AuthServer } from "@mp/auth/server";
 import type { Logger } from "@mp/logger";
-import type { StateAccess } from "@mp/sync/server";
 import type { AuthToken } from "@mp/auth";
-import type { WorldSyncServer, WorldState } from "./modules/world/WorldState";
 import type { ClientRegistry } from "./ClientRegistry";
 import { tokenHeaderName } from "./shared";
 
 export interface ServerContext {
   sessionId: HttpSessionId;
-  accessWorldState: StateAccess<WorldState>;
   authToken?: AuthToken;
   auth: AuthServer;
   clients: ClientRegistry;
@@ -22,7 +19,6 @@ export type HttpSessionId = Branded<string, "HttpSessionId">;
 
 export function createServerContextFactory(
   auth: AuthServer,
-  worldState: WorldSyncServer,
   clients: ClientRegistry,
   logger: Logger,
   exposeErrorDetails: boolean,
@@ -38,7 +34,6 @@ export function createServerContextFactory(
     ) as ServerContext["authToken"];
     return {
       sessionId,
-      accessWorldState: worldState.access,
       authToken,
       auth,
       logger,

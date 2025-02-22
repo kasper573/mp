@@ -1,8 +1,7 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "./*.js", "*.ts"],
+  "include": ["src", "*.ts"],
   "compilerOptions": {
-    "allowJs": true,
     "module": "Preserve",
     "target": "es2017"
   }

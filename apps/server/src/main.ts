@@ -7,7 +7,7 @@ import createCors from "cors";
 import type { AuthToken } from "@mp/auth";
 import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import { SyncServer, SyncStateMachine } from "@mp/sync/server";
+import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { createServerContextFactory } from "./context";
@@ -32,7 +32,7 @@ import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
-import { deriveWorldStateForClient } from "./modules/world/deriveWorldStateForClient";
+import { deriveClientVisibility } from "./modules/world/clientVisibility";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -62,17 +62,17 @@ const syncHandshakeLimiter = createRateLimiter({
   duration: 30,
 });
 
-const worldStateMachine = new SyncStateMachine<WorldState>({
+const worldState = createPatchStateMachine<WorldState>({
+  initialState: { actors: {} },
   clientIds: () => syncServer.clientIds,
-  state: () => ({ actors: {} }),
-  clientVisibility: deriveWorldStateForClient(clients),
+  clientVisibility: deriveClientVisibility(clients),
 });
 
 const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
   path: opt.wsEndpointPath,
-  state: worldStateMachine,
+  state: worldState,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
@@ -89,10 +89,7 @@ const worldService = new WorldService(db);
 const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
-  middleware: () => {
-    const state = syncServer.access((state) => state);
-    return worldService.persist(state);
-  },
+  middleware: () => worldService.persist(worldState),
 });
 
 const updateTicker = new Ticker({
@@ -108,7 +105,7 @@ const trpcRouter = createRootRouter({
   areas,
   npcService,
   characterService,
-  state: syncServer.access,
+  state: worldState,
   createUrl: createUrlResolver(opt),
   buildVersion: opt.buildVersion,
   updateTicker,
@@ -122,7 +119,6 @@ webServer.use(
     router: trpcRouter,
     createContext: createServerContextFactory(
       auth,
-      syncServer,
       clients,
       logger,
       opt.exposeErrorDetails,
@@ -132,14 +128,14 @@ webServer.use(
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, syncServer);
+collectUserMetrics(metrics, clients, worldState, syncServer);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAIBehavior(syncServer.access, areas));
-updateTicker.subscribe(movementBehavior(syncServer.access, areas));
-updateTicker.subscribe(npcSpawnBehavior(syncServer.access, npcService, areas));
-updateTicker.subscribe(updateTicker.encapsulateAsyncHandler(syncServer.flush));
-characterRemoveBehavior(clients, syncServer.access, logger, 5000);
+updateTicker.subscribe(npcAIBehavior(worldState, areas));
+updateTicker.subscribe(movementBehavior(worldState, areas));
+updateTicker.subscribe(npcSpawnBehavior(worldState, npcService, areas));
+updateTicker.subscribe(syncServer.flush);
+characterRemoveBehavior(clients, worldState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
   logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),

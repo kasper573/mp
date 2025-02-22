@@ -1,6 +1,6 @@
 import { moveAlongPath, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
-import type { StateAccess } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Result, Tile } from "@mp/std";
 import { err, ok, recordValues } from "@mp/std";
@@ -15,41 +15,47 @@ export interface MovementTrait {
 }
 
 export function movementBehavior(
-  accessState: StateAccess<WorldState>,
+  state: PatchStateMachine<WorldState>,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
-    accessState((state) => {
-      for (const subject of recordValues(state.actors)) {
-        if (subject.path) {
-          [subject.coords, subject.path] = moveAlongPath(
-            subject.coords,
-            subject.path,
-            subject.speed,
-            timeSinceLastTick,
-          );
-          if (subject.path?.length === 0) {
-            delete subject.path;
-          }
-        }
+    for (const subject of recordValues(state.actors())) {
+      if (subject.path) {
+        const [newCoords, newPath] = moveAlongPath(
+          subject.coords,
+          subject.path,
+          subject.speed,
+          timeSinceLastTick,
+        );
+        state.actors.update(subject.id, {
+          coords: newCoords,
+          path: newPath.length > 0 ? newPath : undefined,
+        });
+      }
 
-        const area = areas.get(subject.areaId);
-        if (area) {
-          for (const hit of area.hitTestObjects([subject], (c) => c.coords)) {
-            const targetArea = areas.get(
-              hit.object.properties.get("goto")?.value as AreaId,
-            );
-            if (targetArea) {
-              subject.areaId = targetArea.id;
-              subject.coords = targetArea.start;
-              delete subject.path;
-            }
+      const area = areas.get(subject.areaId);
+      if (area) {
+        for (const hit of area.hitTestObjects([subject], (c) => c.coords)) {
+          const targetArea = areas.get(
+            hit.object.properties.get("goto")?.value as AreaId,
+          );
+          if (targetArea) {
+            state.actors.update(subject.id, {
+              path: undefined,
+              areaId: targetArea.id,
+              coords: targetArea.start,
+            });
           }
         }
       }
-    });
+    }
   };
 }
+
+export type PathChange =
+  | { reason: "new"; path: Path<Tile> }
+  | { reason: "extended"; path: Path<Tile> }
+  | { reason: "truncated"; path: Path<Tile> };
 
 /**
  * Update the path of the subject to the path required to reach the given destination.
@@ -58,7 +64,7 @@ export function moveTo(
   subject: MovementTrait,
   areas: AreaLookup,
   dest: Vector<Tile>,
-): Result<"new" | "truncated" | "extended", string> {
+): Result<PathChange, string> {
   const area = areas.get(subject.areaId);
   if (!area) {
     return err(`Area not found: ${subject.areaId}`);
@@ -76,8 +82,7 @@ export function moveTo(
       (c) => c.x === destNode.data.vector.x && c.y === destNode.data.vector.y,
     );
     if (idx !== -1) {
-      subject.path = subject.path.slice(0, idx);
-      return ok("truncated");
+      return ok({ reason: "truncated", path: subject.path.slice(0, idx) });
     }
 
     // If the destination is new, we need to find a new path.
@@ -89,8 +94,10 @@ export function moveTo(
     if (nextNode) {
       const newPath = area.findPath(nextNode.id, destNode.id);
       if (newPath) {
-        subject.path = subject.path.slice(0, 1).concat(newPath);
-        return ok("extended");
+        return ok({
+          reason: "extended",
+          path: subject.path.slice(0, 1).concat(newPath),
+        });
       }
     }
   }
@@ -105,8 +112,7 @@ export function moveTo(
 
   const newPath = area.findPath(fromNode.id, destNode.id);
   if (newPath) {
-    subject.path = newPath;
-    return ok("new");
+    return ok({ reason: "new", path: newPath });
   }
 
   return err(`No path found to destination: ${dest.x},${dest.y}`);

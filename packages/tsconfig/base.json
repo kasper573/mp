@@ -24,7 +24,9 @@
   "include": [
     "${configDir}*.ts",
     "${configDir}*.tsx",
+    "${configDir}*.mjs",
     "${configDir}src/**/*.ts",
-    "${configDir}src/**/*.tsx"
+    "${configDir}src/**/*.tsx",
+    "${configDir}src/**/*.mjs"
   ]
 }
