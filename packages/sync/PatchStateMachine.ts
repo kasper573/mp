@@ -1,6 +1,6 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { ClientId } from "./shared";
-import type { Patch, PatchPath, Operation } from "./patch";
+import type { Patch, PatchPath } from "./patch";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -84,22 +84,21 @@ function createFlushFunction<State extends PatchableState>(
         const nextIds = nextVisibility[entityName];
 
         for (const addedId of nextIds.difference(prevIds)) {
-          clientPatch.push({
-            o: "a",
-            p: [entityName, addedId as string],
-            v: state[entityName][addedId],
-          });
+          clientPatch.push([
+            [entityName, addedId] as PatchPath,
+            state[entityName][addedId],
+          ]);
         }
 
         for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push({ o: "r", p: [entityName, removedId as string] });
+          clientPatch.push([[entityName, removedId] as PatchPath]);
         }
       }
 
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(({ p: [entityName, entityId] }) => {
+        ...serverPatch.filter(([[entityName, entityId]]) => {
           return nextVisibility[entityName].has(entityId);
         }),
       );
@@ -150,33 +149,20 @@ function createEntityRepository<
   }
 
   entity.set = function setEntity(id: Id, entity: Entity) {
-    serverPatch.push({
-      o: "u",
-      p: [entityName as string, id as string],
-      v: entity,
-    });
+    serverPatch.push([[entityName, id] as PatchPath, entity]);
     state[entityName][id] = entity;
   };
 
   entity.update = function updateEntity(id: Id, value: Partial<Entity>) {
     for (const prop in value) {
       const key = prop as keyof Entity;
-      serverPatch.push(
-        createSetOperation(
-          [entityName as string, id as string, prop],
-          value[key],
-          state[entityName][id][key],
-        ),
-      );
+      serverPatch.push([[entityName, id, prop] as PatchPath, value[key]]);
     }
     Object.assign(state[entityName][id] as object, value);
   };
 
   entity.remove = function removeEntity(id: Id) {
-    serverPatch.push({
-      o: "r",
-      p: [entityName as string, id as string],
-    });
+    serverPatch.push([[entityName, id] as PatchPath]);
     delete state[entityName][id];
   };
 
@@ -188,27 +174,9 @@ function createFullStatePatch<State extends PatchableState>(
 ): Patch {
   const patch: Patch = [];
   for (const key in state) {
-    patch.push({
-      o: "a",
-      p: [key],
-      v: state[key as keyof typeof state],
-    });
+    patch.push([[key], state[key as keyof typeof state]]);
   }
   return patch;
-}
-
-function createSetOperation<Value>(
-  path: PatchPath,
-  nextValue: Value,
-  prevValue: Value,
-): Operation {
-  if (nextValue === undefined && prevValue !== undefined) {
-    return { o: "r", p: path };
-  }
-  if (nextValue !== undefined && prevValue === undefined) {
-    return { o: "a", p: path, v: nextValue };
-  }
-  return { o: "u", p: path, v: nextValue };
 }
 
 const flushFunctionName = "flush";
