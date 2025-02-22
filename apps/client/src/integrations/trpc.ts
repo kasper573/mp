@@ -13,10 +13,10 @@ import { LoggerContext } from "../logger.ts";
 
 export function createTRPCClient(auth: AuthClient) {
   return createTRPCSolidClient<RootRouter>({
+    transformer,
     links: [
       httpBatchLink({
         url: env.apiUrl,
-        transformer,
         async headers() {
           await auth.refresh(); // Ensure we have the latest user identity
           return {

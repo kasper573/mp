@@ -123,10 +123,10 @@ async function testGameClient(n: number) {
 
 function createRPCClient(token?: string) {
   return createTRPCProxyClient<RootRouter>({
+    transformer,
     links: [
       httpBatchLink({
         url: apiServerUrl,
-        transformer,
         headers: () => ({ [tokenHeaderName]: token }),
       }),
     ],

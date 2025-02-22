@@ -37,6 +37,7 @@
     "npm:neverthrow@*": "8.1.1",
     "npm:ngraph.graph@*": "20.0.1",
     "npm:ngraph.path@*": "1.5.0",
+    "npm:oidc-client-ts@*": "3.1.0",
     "npm:opentelemetry-instrumentation-ws@*": "0.5.0_ws@8.18.0_@opentelemetry+api@1.9.0",
     "npm:pg@*": "8.13.1",
     "npm:pixi.js@*": "8.6.3",
@@ -44,6 +45,7 @@
     "npm:rate-limiter-flexible@*": "5.0.4",
     "npm:solid-js@*": "1.9.3_seroval@1.1.1",
     "npm:superjson@*": "2.2.2",
+    "npm:timespan-ts@*": "1.0.3",
     "npm:unique-names-generator@*": "4.7.1",
     "npm:uuid@*": "9.0.1",
     "npm:valibot@*": "1.0.0-beta.9",
@@ -2437,6 +2439,9 @@
         "universalify"
       ]
     },
+    "jwt-decode@4.0.0": {
+      "integrity": "sha512-+KJGIyHgkGuIq3IEBNftfhW/LfWhXUIY6OmyVWjliu5KH1y0fw7VQ8YndE2O4qZdMSd9SqbnC8GOcZEy0Om7sA=="
+    },
     "locate-path@6.0.0": {
       "integrity": "sha512-iPZK6eYjbxRu3uB4/WZ3EsEIMJFMqAoopl3R+zuq0UjcAm/MO6KCweDgPfP3elTztoKP3KtnVHxTn2NHBSDVUw==",
       "dependencies": [
@@ -2581,6 +2586,12 @@
     },
     "object-inspect@1.13.3": {
       "integrity": "sha512-kDCGIbxkDSXE3euJZZXzc6to7fCrKHNI/hSRQnRuQ+BWjFNzZwiFF8fj/6o2t2G9/jTj8PSIYTfCLelLZEeRpA=="
+    },
+    "oidc-client-ts@3.1.0": {
+      "integrity": "sha512-IDopEXjiwjkmJLYZo6BTlvwOtnlSniWZkKZoXforC/oLZHC9wkIxd25Kwtmo5yKFMMVcsp3JY6bhcNJqdYk8+g==",
+      "dependencies": [
+        "jwt-decode"
+      ]
     },
     "on-finished@2.4.1": {
       "integrity": "sha512-oVlzkg3ENAhCk2zdv7IJwd/QUD4z2RxRwpkcGY8psCVcCYZNq4wYnVWALHM+brtuJjePWiYF/ClmuDr8Ch5+kg==",
@@ -3000,6 +3011,9 @@
       "dependencies": [
         "bintrees"
       ]
+    },
+    "timespan-ts@1.0.3": {
+      "integrity": "sha512-FnrxI8Jd2595wuR9cjMUz1TfncTcbYJTKbuptwCnQZf124KQe0WCEreVJUi5PkzrGUn5s/wntb0tFLTgAbsoyw=="
     },
     "tiny-invariant@1.3.3": {
       "integrity": "sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg=="
