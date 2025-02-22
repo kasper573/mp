@@ -9,6 +9,7 @@ export default defineConfig({
   plugins: [
     deno(),
     solid(),
+    // @ts-expect-error typescript incorrectly says it's not callable, but it actually is
     topLevelAwait(),
     vanillaExtractPlugin(),
     ...(Deno.env.get("MP_CLIENT_EMBED_ENV") ? [embedEnvPlugin()] : []),
