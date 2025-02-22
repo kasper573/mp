@@ -1,10 +1,10 @@
 import { Show, useContext } from "npm:solid-js";
 import { AuthContext } from "@mp/auth-client";
-import { dock } from "@mp/style";
 import { useIsRouting } from "npm:@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion.ts";
 import * as styles from "./AppBar.css.ts";
 import { Button } from "./Button.tsx";
+import { dock } from "../ui/Dock.css.ts";
 import { Link } from "./Link.tsx";
 import { LinearProgress } from "./LinearProgress.tsx";
 

@@ -1,6 +1,6 @@
 import type { JSX } from "npm:solid-js";
-import type { StyledComponentProps } from "@mp/style";
-import { processStyleProps } from "@mp/style";
+import type { StyledComponentProps } from "../style/processStyleProps.ts";
+import { processStyleProps } from "../style/processStyleProps.ts";
 import * as styles from "./Dock.css.ts";
 
 export type DockProps =

@@ -21,7 +21,6 @@
     "packages/solid-trpc",
     "packages/state",
     "packages/std",
-    "packages/style",
     "packages/sync/server",
     "packages/sync/client",
     "packages/telemetry/faro",

@@ -1,4 +1,6 @@
-import { globalStyle, theme, style, tokens } from "@mp/style";
+import { globalStyle, style } from "npm:@vanilla-extract/css";
+import { theme } from "./style/theme.css.ts";
+import { typography } from "./style/tokens.ts";
 
 globalStyle(`html, body`, {
   overflow: "hidden",
@@ -8,7 +10,7 @@ globalStyle(`html, body`, {
   padding: 0,
   width: "100%",
   height: "100%",
-  ...tokens.typography.body,
+  ...typography.body,
 });
 
 export const root = style({

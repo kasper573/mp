@@ -1,4 +1,5 @@
-import { atoms, recipe } from "@mp/style";
+import { atoms } from "../style/atoms.css";
+import { recipe } from "npm:@vanilla-extract/recipes";
 
 export const dock = recipe({
   base: {

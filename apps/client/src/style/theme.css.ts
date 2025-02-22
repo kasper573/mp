@@ -1,6 +1,6 @@
 import { createThemeContract } from "npm:@vanilla-extract/css";
 
-export const themeContract = createThemeContract({
+export const theme = createThemeContract({
   color: {
     primary: {
       hover: null,

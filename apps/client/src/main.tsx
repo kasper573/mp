@@ -1,4 +1,4 @@
-import { themes } from "@mp/style";
+import { dark } from "./style/themes/dark.css.ts";
 import { ErrorBoundary, lazy, Suspense } from "npm:solid-js";
 import { render } from "npm:solid-js/web";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
@@ -13,7 +13,7 @@ import * as styles from "./main.css.ts";
 
 const App = lazy(() => import("./App.tsx"));
 
-document.documentElement.classList.add(themes.dark);
+document.documentElement.classList.add(dark);
 
 const rootElement = document.querySelector("div#root")!;
 rootElement.classList.add(styles.root);
