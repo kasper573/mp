@@ -2,7 +2,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
 import { tokenHeaderName, transformer } from "@mp/server";
-import { createTRPCClient, httpBatchLink } from "npm:@trpc/client";
+import { createTRPCProxyClient, httpBatchLink } from "npm:@trpc/client";
 import { SyncClient } from "@mp/sync-client";
 import { readCliOptions } from "./cli.ts";
 
@@ -122,7 +122,7 @@ async function testGameClient(n: number) {
 }
 
 function createRPCClient(token?: string) {
-  return createTRPCClient<RootRouter>({
+  return createTRPCProxyClient<RootRouter>({
     links: [
       httpBatchLink({
         url: apiServerUrl,

@@ -10,13 +10,13 @@ import {
   type SolidQueryOptions,
 } from "npm:@tanstack/solid-query";
 import type {
-  CreateTRPCClient,
   CreateTRPCClientOptions,
+  CreateTRPCProxyClient,
 } from "npm:@trpc/client";
-import { createTRPCClient } from "npm:@trpc/client";
+import { createTRPCProxyClient } from "npm:@trpc/client";
 import type {
   AnyProcedure,
-  AnyTRPCRouter,
+  AnyRouter,
   inferProcedureInput,
   inferProcedureOutput,
 } from "npm:@trpc/server";
@@ -24,11 +24,13 @@ import { createContext, useContext } from "npm:solid-js";
 import type { AnyFunction } from "./invocation-proxy.ts";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy.ts";
 
-export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
+export function createTRPCSolidClient<TRouter extends AnyRouter>({
   createMutationHandler: onMutation,
   ...clientOptions
 }: TRPCSolidClientOptions<TRouter>): TRPCSolidClient<TRouter> {
-  const client = createTRPCClient(clientOptions);
+  const client = createTRPCProxyClient(
+    clientOptions as CreateTRPCClientOptions<TRouter>,
+  );
   const proxy = createInvocationProxy((path) => {
     const last = path.at(-1);
     switch (last) {
@@ -50,8 +52,8 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
   return proxy as TRPCSolidClient<TRouter>;
 }
 
-function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
-  trpc: CreateTRPCClient<TRouter>,
+function createTRPCQueryFn<TRouter extends AnyRouter>(
+  trpc: CreateTRPCProxyClient<TRouter>,
   path: string[],
 ): CreateQueryFn<AnyProcedure> {
   return (createOptions) =>
@@ -73,8 +75,8 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
     });
 }
 
-function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
-  trpc: CreateTRPCClient<TRouter>,
+function createTRPCMutationFn<TRouter extends AnyRouter>(
+  trpc: CreateTRPCProxyClient<TRouter>,
   path: string[],
   createMutationHandler?: CreateMutationHandler,
 ): CreateMutationFn<AnyProcedure> {
@@ -98,7 +100,7 @@ function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
 }
 
 export function createTRPCHook<
-  TRouter extends AnyTRPCRouter,
+  TRouter extends AnyRouter,
 >(): TRPCSolidClientHook<TRouter> {
   return function useTRPC() {
     const clientLike = useContext(TRPCClientContext);
@@ -120,10 +122,11 @@ export interface TRPCSolidClientLike {
   [clientSymbol]: true;
 }
 
-export interface TRPCSolidClientOptions<TRouter extends AnyTRPCRouter>
-  extends CreateTRPCClientOptions<TRouter> {
-  createMutationHandler?: CreateMutationHandler;
-}
+export type TRPCSolidClientOptions<TRouter extends AnyRouter> =
+  & CreateTRPCClientOptions<TRouter>
+  & {
+    createMutationHandler?: CreateMutationHandler;
+  };
 
 export type CreateMutationHandler = () => (opt: {
   input: unknown;
@@ -131,14 +134,14 @@ export type CreateMutationHandler = () => (opt: {
   meta: MutationOptions["meta"];
 }) => unknown;
 
-export type TRPCSolidClient<TRouter extends AnyTRPCRouter> =
+export type TRPCSolidClient<TRouter extends AnyRouter> =
   & TRPCSolidClientLike
   & CreateTRPCSolidClient<TRouter>;
 
-export type TRPCSolidClientHook<TRouter extends AnyTRPCRouter> = () =>
+export type TRPCSolidClientHook<TRouter extends AnyRouter> = () =>
   TRPCSolidClient<TRouter>;
 
-type CreateTRPCSolidClient<TRouter extends AnyTRPCRouter> = RouterHooks<
+type CreateTRPCSolidClient<TRouter extends AnyRouter> = RouterHooks<
   TRouter["_def"]["record"]
 >;
 
@@ -151,9 +154,9 @@ type RouterHooks<Routes> = {
 const createQueryProperty = "createQuery";
 const createMutationProperty = "createMutation";
 
-type ProcedureHooks<Proc extends AnyProcedure> = Proc["_def"]["type"] extends
-  "query" ? { [createQueryProperty]: CreateQueryFn<Proc> }
-  : Proc["_def"]["type"] extends "mutation"
+type ProcedureHooks<Proc extends AnyProcedure> = Proc["_type"] extends "query"
+  ? { [createQueryProperty]: CreateQueryFn<Proc> }
+  : Proc["_type"] extends "mutation"
     ? { [createMutationProperty]: CreateMutationFn<Proc> }
   : never;
 
