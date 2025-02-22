@@ -8,11 +8,12 @@ import { type HandshakeData } from "./handshake";
 import { handshakeDataFromRequest } from "./handshake";
 import type { PatchableState } from "./PatchStateMachine";
 import type { PatchStateMachine } from "./PatchStateMachine";
-import { encodeServerToClientMessage } from "./encoding";
+import { createMessageEncoder } from "./messageEncoder";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
   private wss: WebSocketServer;
+  private encodeMessage = createMessageEncoder();
 
   get clientIds(): Iterable<ClientId> {
     return this.clients.keys();
@@ -34,13 +35,19 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
     });
   }
 
-  flush = () => {
+  flush = async () => {
+    const promises: Promise<unknown>[] = [];
+
     for (const [clientId, patch] of this.options.state.flush()) {
       const client = this.clients.get(clientId);
       if (client) {
-        client.socket.send(encodeServerToClientMessage(patch));
+        promises.push(
+          this.encodeMessage(patch).then((msg) => client.socket.send(msg)),
+        );
       }
     }
+
+    await Promise.all(promises);
   };
 
   start = () => {

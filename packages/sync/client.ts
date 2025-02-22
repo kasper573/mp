@@ -1,7 +1,7 @@
 import { applyPatch } from "./patch";
 import type { HandshakeData } from "./handshake";
 import { createUrlWithHandshakeData } from "./handshake";
-import { decodeServerToClientMessage } from "./encoding";
+import { decodeServerToClientMessage } from "./messageDecoder";
 
 export class SyncClient<State extends object> {
   private socket?: WebSocket;
