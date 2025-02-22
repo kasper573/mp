@@ -1,9 +1,9 @@
-import type { UserId } from "@mp/auth";
+import type { UserId } from "@mp/auth-server";
 import type { PatchStateMachine } from "@mp/sync-server";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
-import type { ClientRegistry } from "../../ClientRegistry";
-import type { WorldState } from "../world/WorldState";
+import type { ClientRegistry } from "../../ClientRegistry.ts";
+import type { WorldState } from "../world/WorldState.ts";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,
@@ -11,7 +11,7 @@ export function characterRemoveBehavior(
   logger: Logger,
   timeout: number,
 ) {
-  const removeTimeouts = new Map<UserId, NodeJS.Timeout>();
+  const removeTimeouts = new Map<UserId, number>();
 
   const stop = clients.on(({ type, userId }) => {
     switch (type) {

@@ -1,11 +1,11 @@
 import { dark } from "@mp/style/themes/dark.css";
-import { ErrorBoundary, lazy, Suspense } from "solid-js";
+import { ErrorBoundary, lazy, Suspense } from "npm:solid-js";
 import { render } from "solid-js/web";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import { LoadingSpinner } from "./ui/LoadingSpinner";
-import { ErrorFallback } from "./ui/ErrorFallback";
-import { LoggerContext } from "./logger";
-import * as styles from "./main.css";
+import { LoadingSpinner } from "./ui/LoadingSpinner.ts";
+import { ErrorFallback } from "./ui/ErrorFallback.ts";
+import { LoggerContext } from "./logger.ts";
+import * as styles from "./main.css.ts";
 
 // Note that main.tsx is not the composition root of the application,
 // only the entry point that then lazy loads the real composition root, App.tsx.

@@ -1,10 +1,10 @@
-import { integer, pgTable, uuid } from "drizzle-orm/pg-core";
-import type { UserId } from "@mp/auth";
+import { integer, pgTable, uuid } from "npm:drizzle-orm/pg-core";
+import type { UserId } from "@mp/auth-server";
 import type { Branded, Tile } from "@mp/std";
-import type { MovementTrait } from "../../traits/movement";
-import type { AppearanceTrait } from "../../traits/appearance";
-import { areaId } from "../area/schema";
-import { vector } from "../../db/types/vector";
+import type { MovementTrait } from "../../traits/movement.ts";
+import type { AppearanceTrait } from "../../traits/appearance.ts";
+import { areaId } from "../area/schema.ts";
+import { vector } from "../../db/types/vector.ts";
 
 export const userId = () => uuid().$type<UserId>();
 
@@ -21,8 +21,6 @@ export const characterTable = pgTable("character", {
 type DBCharacter = typeof characterTable.$inferSelect;
 
 export interface Character
-  extends DBCharacter,
-    MovementTrait,
-    AppearanceTrait {}
+  extends DBCharacter, MovementTrait, AppearanceTrait {}
 
 export type CharacterId = Branded<string, "CharacterId">;

@@ -1,3 +1,3 @@
-export { TimeSpan } from "timespan-ts";
-export * from "./ticker";
-export * from "./measure";
+export { TimeSpan } from "npm:timespan-ts";
+export * from "./ticker.ts";
+export * from "./measure.ts";

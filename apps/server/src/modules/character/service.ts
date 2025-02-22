@@ -1,12 +1,12 @@
-import { eq } from "drizzle-orm";
-import type { UserId } from "@mp/auth";
+import { eq } from "npm:drizzle-orm";
+import type { UserId } from "@mp/auth-server";
 import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
-import { uniqueNamesGenerator, names } from "unique-names-generator";
-import type { DBClient } from "../../db/client";
-import type { AreaLookup } from "../area/loadAreas";
-import { characterTable } from "./schema";
-import type { Character } from "./schema";
+import { names, uniqueNamesGenerator } from "npm:unique-names-generator";
+import type { DBClient } from "../../db/client.ts";
+import type { AreaLookup } from "../area/loadAreas.ts";
+import { characterTable } from "./schema.ts";
+import type { Character } from "./schema.ts";
 
 export class CharacterService {
   private defaultAreaId: AreaId;
@@ -31,13 +31,13 @@ export class CharacterService {
 
     return char
       ? {
-          ...char,
-          color: playerColor,
-          name: uniqueNamesGenerator({
-            dictionaries: [names],
-            seed: char.id,
-          }),
-        }
+        ...char,
+        color: playerColor,
+        name: uniqueNamesGenerator({
+          dictionaries: [names],
+          seed: char.id,
+        }),
+      }
       : undefined;
   }
 

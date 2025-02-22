@@ -1,6 +1,6 @@
-import { vec_distance, type Vector, vec, vec_add, vec_round } from "@mp/math";
-import createGraph from "ngraph.graph";
-import { aStar } from "ngraph.path";
+import { vec, vec_add, vec_distance, vec_round, type Vector } from "@mp/math";
+import createGraph from "npm:ngraph.graph";
+import { aStar } from "npm:ngraph.path";
 import type { Branded } from "@mp/std";
 
 export class VectorGraph<T extends number> {

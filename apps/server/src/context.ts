@@ -1,10 +1,10 @@
-import type express from "express";
+import type express from "npm:express";
 import type { Branded } from "@mp/std";
-import type { AuthServer } from "@mp/auth-client";
+import type { AuthServer } from "@mp/auth-server";
 import type { Logger } from "@mp/logger";
-import type { AuthToken } from "@mp/auth";
-import type { ClientRegistry } from "./ClientRegistry";
-import { tokenHeaderName } from "./shared";
+import type { AuthToken } from "@mp/auth-server";
+import type { ClientRegistry } from "./ClientRegistry.ts";
+import { tokenHeaderName } from "./shared.ts";
 
 export interface ServerContext {
   sessionId: HttpSessionId;

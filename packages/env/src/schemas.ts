@@ -1,14 +1,14 @@
-import type { BaseIssue, BaseSchema } from "valibot";
+import type { BaseIssue, BaseSchema } from "npm:valibot";
 import {
   boolean,
-  number,
   custom,
+  number,
+  parse,
   pipe,
   string,
   transform,
   union,
-  parse,
-} from "valibot";
+} from "npm:valibot";
 
 export function boolish() {
   return union([boolean(), booleanString()]);

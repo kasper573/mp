@@ -1,7 +1,7 @@
 import { type RouteDefinition } from "@solidjs/router";
-import { lazy } from "solid-js";
-import { env } from "./env";
-import { requireAuth } from "./ui/AuthBoundary";
+import { lazy } from "npm:solid-js";
+import { env } from "./env.ts";
+import { requireAuth } from "./ui/AuthBoundary.ts";
 
 export const routes: RouteDefinition[] = [
   {

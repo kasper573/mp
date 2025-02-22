@@ -1,17 +1,18 @@
 import type { UrlFactory } from "@mp/data";
-import { t } from "../trpc";
-import { createAreaRouter } from "./area/router";
-import type { SystemRouterDependencies } from "./system/router";
-import { createSystemRouter } from "./system/router";
-import type { CharacterRouterDependencies } from "./character/router";
-import { createCharacterRouter } from "./character/router";
-import type { NPCRouterDependencies } from "./npc/router";
-import { createNPCRouter } from "./npc/router";
+import { t } from "../trpc.ts";
+import { createAreaRouter } from "./area/router.ts";
+import type { SystemRouterDependencies } from "./system/router.ts";
+import { createSystemRouter } from "./system/router.ts";
+import type { CharacterRouterDependencies } from "./character/router.ts";
+import { createCharacterRouter } from "./character/router.ts";
+import type { NPCRouterDependencies } from "./npc/router.ts";
+import { createNPCRouter } from "./npc/router.ts";
 
 export type RootRouter = ReturnType<typeof createRootRouter>;
 
 export interface RootRouterDependencies
-  extends CharacterRouterDependencies,
+  extends
+    CharacterRouterDependencies,
     NPCRouterDependencies,
     SystemRouterDependencies {
   createUrl: UrlFactory;

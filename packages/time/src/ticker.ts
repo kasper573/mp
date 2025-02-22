@@ -1,5 +1,5 @@
-import { TimeSpan } from "timespan-ts";
-import { beginMeasuringTimeSpan } from "./measure";
+import { TimeSpan } from "npm:timespan-ts";
+import { beginMeasuringTimeSpan } from "./measure.ts";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
@@ -94,7 +94,7 @@ function createDeltaFn(): () => TimeSpan {
 
 function setAsyncInterval(handler: () => Promise<void>, interval: TimeSpan) {
   let enabled = true;
-  let timeoutId: NodeJS.Timeout;
+  let timeoutId: number;
 
   function enqueue(lastRunTime: TimeSpan) {
     timeoutId = setTimeout(

@@ -1,11 +1,11 @@
 import { type AreaId, moveAlongPath } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync-server";
-import { type TickEventHandler } from "@mp/time";
+import type { TickEventHandler } from "@mp/time";
 import type { Result, Tile } from "@mp/std";
 import { err, ok, recordValues } from "@mp/std";
-import type { AreaLookup } from "../modules/area/loadAreas";
-import type { WorldState } from "../package";
+import type { AreaLookup } from "../modules/area/loadAreas.ts";
+import type { WorldState } from "../package.ts";
 
 export interface MovementTrait {
   coords: Vector<Tile>;

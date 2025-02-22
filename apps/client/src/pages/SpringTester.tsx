@@ -1,4 +1,9 @@
-import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+} from "npm:solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 

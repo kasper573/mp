@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
 import { AreaResource } from "@mp/data";
-import { loadTiled } from "./loadTiled";
+import { loadTiled } from "./loadTiled.ts";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
   const files = await fs.readdir(dir);

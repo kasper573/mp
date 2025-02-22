@@ -1,8 +1,8 @@
-import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
-import { MetricsHistogram } from "../../../../packages/telemetry/prom/mod";
+import type { MetricsRegistry } from "@mp/telemetry-prom";
+import { MetricsHistogram } from "@mp/telemetry-prom";
 import { beginMeasuringTimeSpan } from "@mp/time";
 import { AreaResource } from "@mp/data";
-import { tickBuckets } from "./shared";
+import { tickBuckets } from "./shared.ts";
 
 export function collectPathFindingMetrics(registry: MetricsRegistry): void {
   const pathFinderHistogram = new MetricsHistogram({

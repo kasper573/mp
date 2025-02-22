@@ -1,14 +1,14 @@
-export { W3CTraceContextPropagator } from "@opentelemetry/core";
-export { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-grpc";
-export { CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
-export { registerInstrumentations } from "@opentelemetry/instrumentation";
-export { getNodeAutoInstrumentations } from "@opentelemetry/auto-instrumentations-node";
-export { WSInstrumentation } from "opentelemetry-instrumentation-ws";
-export { FsInstrumentation } from "@opentelemetry/instrumentation-fs";
-export { Resource } from "@opentelemetry/resources";
+export { W3CTraceContextPropagator } from "npm:@opentelemetry/core";
+export { OTLPTraceExporter } from "npm:@opentelemetry/exporter-trace-otlp-grpc";
+export { CompressionAlgorithm } from "npm:@opentelemetry/otlp-exporter-base";
+export { registerInstrumentations } from "npm:@opentelemetry/instrumentation";
+export { getNodeAutoInstrumentations } from "npm:@opentelemetry/auto-instrumentations-node";
+export { WSInstrumentation } from "npm:opentelemetry-instrumentation-ws";
+export { FsInstrumentation } from "npm:@opentelemetry/instrumentation-fs";
+export { Resource } from "npm:@opentelemetry/resources";
 export {
-  NodeTracerProvider,
   BatchSpanProcessor,
-} from "@opentelemetry/sdk-trace-node";
-export * from "@opentelemetry/semantic-conventions";
-export { diag, DiagConsoleLogger, DiagLogLevel } from "@opentelemetry/api";
+  NodeTracerProvider,
+} from "npm:@opentelemetry/sdk-trace-node";
+export * from "npm:@opentelemetry/semantic-conventions";
+export { diag, DiagConsoleLogger, DiagLogLevel } from "npm:@opentelemetry/api";

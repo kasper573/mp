@@ -1,6 +1,6 @@
 import path from "node:path";
 import type { PathToLocalFile, UrlToPublicFile } from "@mp/data";
-import type { ServerOptions } from "./options";
+import type { ServerOptions } from "./options.ts";
 
 export function createUrlResolver(
   opt: Pick<ServerOptions, "httpBaseUrl" | "publicDir" | "publicPath">,

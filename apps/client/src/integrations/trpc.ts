@@ -7,9 +7,9 @@ import {
 } from "@mp/solid-trpc";
 import { type AuthClient } from "@mp/auth-client";
 import { QueryClientContext } from "@tanstack/solid-query";
-import { useContext } from "solid-js";
-import { env } from "../env";
-import { LoggerContext } from "../logger";
+import { useContext } from "npm:solid-js";
+import { env } from "../env.ts";
+import { LoggerContext } from "../logger.ts";
 
 export function createTRPCClient(auth: AuthClient) {
   return createTRPCSolidClient<RootRouter>({

@@ -1,5 +1,5 @@
-import type { JSX } from "solid-js";
-import { For, createMemo, splitProps } from "solid-js";
+import type { JSX } from "npm:solid-js";
+import { createMemo, For, splitProps } from "npm:solid-js";
 
 export interface SelectProps<Value>
   extends Omit<JSX.HTMLAttributes<HTMLSelectElement>, "onChange"> {
@@ -16,15 +16,16 @@ export function Select<const Value>(props: SelectProps<Value>) {
   ]);
 
   const selectedIndex = createMemo(() =>
-    selectProps.options.indexOf(props.value),
+    selectProps.options.indexOf(props.value)
   );
 
   return (
     <select
       value={selectedIndex()}
       onChange={(e) =>
-        selectProps.onChange(selectProps.options[e.currentTarget.selectedIndex])
-      }
+        selectProps.onChange(
+          selectProps.options[e.currentTarget.selectedIndex],
+        )}
       {...htmlProps}
     >
       <For each={props.options}>

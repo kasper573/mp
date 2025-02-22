@@ -1,2 +1,2 @@
-export * from "./renderer";
-export * from "./spritesheet";
+export * from "./renderer.tsx";
+export * from "./spritesheet.ts";

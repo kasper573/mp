@@ -1,41 +1,41 @@
-import "dotenv/config";
+import "npm:dotenv/config";
 import http from "node:http";
 import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import express from "express";
-import createCors from "cors";
-import type { AuthToken } from "@mp/auth";
-import { createAuthServer } from "@mp/auth-client";
-import * as trpcExpress from "@trpc/server/adapters/express";
+import express from "npm:express";
+import createCors from "npm:cors";
+import type { AuthToken } from "@mp/auth-server";
+import { createAuthServer } from "@mp/auth-server";
+import * as trpcExpress from "npm:@trpc/server/adapters/express";
 import { createPatchStateMachine, SyncServer } from "@mp/sync-server";
 import { Ticker } from "@mp/time";
-import {
-  collectDefaultMetrics,
-  MetricsRegistry,
-} from "../../../packages/telemetry/prom/mod";
-import { createServerContextFactory } from "./context";
-import { createDBClient } from "./db/client";
-import { ClientRegistry } from "./ClientRegistry";
-import { createRootRouter } from "./modules/router";
-import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
-import { metricsMiddleware } from "./express/metricsMiddleware";
-import { CharacterService } from "./modules/character/service";
-import type { WorldState, WorldSyncServer } from "./modules/world/WorldState";
-import { movementBehavior } from "./traits/movement";
-import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
-import { collectUserMetrics } from "./metrics/collectUserMetrics";
-import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
-import { createExpressLogger } from "./express/createExpressLogger";
-import { createUrlResolver } from "./createUrlResolver";
-import { loadAreas } from "./modules/area/loadAreas";
-import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
-import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
-import { WorldService } from "./modules/world/service";
-import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
-import { NPCService } from "./modules/npc/service";
-import { createRateLimiter } from "./createRateLimiter";
-import { opt } from "./options";
-import { deriveClientVisibility } from "./modules/world/clientVisibility";
+import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry-prom";
+import { createServerContextFactory } from "./context.ts";
+import { createDBClient } from "./db/client.ts";
+import { ClientRegistry } from "./ClientRegistry.ts";
+import { createRootRouter } from "./modules/router.ts";
+import { collectProcessMetrics } from "./metrics/collectProcessMetrics.ts";
+import { metricsMiddleware } from "./express/metricsMiddleware.ts";
+import { CharacterService } from "./modules/character/service.ts";
+import type {
+  WorldState,
+  WorldSyncServer,
+} from "./modules/world/WorldState.ts";
+import { movementBehavior } from "./traits/movement.ts";
+import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior.ts";
+import { collectUserMetrics } from "./metrics/collectUserMetrics.ts";
+import { createTickMetricsObserver } from "./metrics/observeTickMetrics.ts";
+import { createExpressLogger } from "./express/createExpressLogger.ts";
+import { createUrlResolver } from "./createUrlResolver.ts";
+import { loadAreas } from "./modules/area/loadAreas.ts";
+import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics.ts";
+import { npcAIBehavior } from "./modules/npc/npcAIBehavior.ts";
+import { WorldService } from "./modules/world/service.ts";
+import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior.ts";
+import { NPCService } from "./modules/npc/service.ts";
+import { createRateLimiter } from "./createRateLimiter.ts";
+import { opt } from "./options.ts";
+import { deriveClientVisibility } from "./modules/world/clientVisibility.ts";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

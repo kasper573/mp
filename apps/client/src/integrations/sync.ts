@@ -8,14 +8,14 @@ import {
   createSignal,
   onCleanup,
   untrack,
-} from "solid-js";
+} from "npm:solid-js";
 import { vec_equals, type Vector } from "@mp/math";
 import type { AuthClient } from "@mp/auth-client";
 import type { Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
-import { dedupe, throttle } from "../state/functionComposition";
-import { env } from "../env";
-import { useTRPC } from "./trpc";
+import { dedupe, throttle } from "../state/functionComposition.ts";
+import { env } from "../env.ts";
+import { useTRPC } from "./trpc.ts";
 
 export function createSyncClient(auth: AuthClient) {
   const trpc = useTRPC();

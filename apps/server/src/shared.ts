@@ -15,4 +15,4 @@ export const clientViewDistance = {
   networkFogOfWarTileCount: 32 as Tile,
 };
 
-export { default as transformer } from "superjson";
+export { default as transformer } from "npm:superjson";

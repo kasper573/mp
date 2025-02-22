@@ -1,11 +1,11 @@
 import { createRemoteJWKSet, jwtVerify } from "npm:jose";
 import { err, ok, type Result } from "@mp/std";
 import {
-  isOurJWTPayload,
   type AuthToken,
+  isOurJWTPayload,
   type UserId,
   type UserIdentity,
-} from "../shared";
+} from "../shared.ts";
 
 export interface AuthServerOptions {
   jwksUri: string;
@@ -99,3 +99,5 @@ function createGuestUser(token: AuthToken): UserIdentity {
     roles: new Set(),
   };
 }
+
+export * from "../shared.ts";

@@ -1,6 +1,9 @@
-import type { PropertiesHyphen } from "csstype";
-import { type Property } from "csstype";
-import { defineProperties, createSprinkles } from "@vanilla-extract/sprinkles";
+import type { PropertiesHyphen } from "npm:csstype";
+import type { Property } from "npm:csstype";
+import {
+  createSprinkles,
+  defineProperties,
+} from "npm:@vanilla-extract/sprinkles";
 import {
   borders,
   colors,
@@ -13,9 +16,9 @@ import {
   spacing,
   transform,
   typography,
-} from "./tokens";
-import type { TransitionPreset } from "./animation";
-import { cssForTransition, transitionPresets } from "./animation";
+} from "./tokens.ts";
+import type { TransitionPreset } from "./animation.ts";
+import { cssForTransition, transitionPresets } from "./animation.ts";
 
 /**
  * The generated CSS of this file will be in the same order as the properties and values are defined,
@@ -66,7 +69,8 @@ const commonTransitions = Object.fromEntries(
     ]);
   }),
 ) as {
-  [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]: string;
+  [K in keyof typeof commonTransitionGroups as `${K}.${TransitionPreset}`]:
+    string;
 };
 
 const unconditionalProperties = defineProperties({

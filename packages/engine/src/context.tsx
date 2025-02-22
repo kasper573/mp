@@ -1,6 +1,6 @@
-import type { ParentProps } from "solid-js";
-import { createContext, createMemo, onCleanup, Show } from "solid-js";
-import { Engine } from "./engine";
+import type { ParentProps } from "npm:solid-js";
+import { createContext, createMemo, onCleanup, Show } from "npm:solid-js";
+import { Engine } from "./engine.ts";
 
 export const EngineContext = createContext<Engine>(
   new Proxy({} as Engine, {

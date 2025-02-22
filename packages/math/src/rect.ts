@@ -1,4 +1,4 @@
-import type { Vector } from "./vector";
+import type { Vector } from "./vector.ts";
 
 export interface Rect<T extends number> {
   x: T;

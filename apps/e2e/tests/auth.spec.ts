@@ -1,5 +1,5 @@
-import { test } from "@playwright/test";
-import { faker } from "@faker-js/faker";
+import { test } from "npm:@playwright/test";
+import { faker } from "npm:@faker-js/faker";
 
 test("can register, sign in, then sign out", async ({ page }) => {
   await page.goto("/");

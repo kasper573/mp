@@ -1,4 +1,4 @@
-import type { FontFaceDefinition } from "../convention";
+import type { FontFaceDefinition } from "../convention.ts";
 import inter100woff2 from "./inter-latin-100-normal.woff2";
 import inter200woff2 from "./inter-latin-200-normal.woff2";
 import inter300woff2 from "./inter-latin-300-normal.woff2";

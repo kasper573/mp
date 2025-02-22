@@ -3,10 +3,10 @@ import { vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Branded, Pixel, Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
-import { type TiledResource } from "./TiledResource";
-import { graphFromTiled } from "./graphFromTiled";
-import { TiledFixture } from "./TiledFixture";
-import { hitTestTiledObject } from "./hitTestTiledObject";
+import type { TiledResource } from "./TiledResource.ts";
+import { graphFromTiled } from "./graphFromTiled.ts";
+import { TiledFixture } from "./TiledFixture.ts";
+import { hitTestTiledObject } from "./hitTestTiledObject.ts";
 
 export type AreaId = Branded<string, "AreaId">;
 
@@ -46,8 +46,10 @@ export class AreaResource {
     subjects: Iterable<Subject>,
     getCoordOfSubject: (s: Subject) => Vector<Tile>,
   ) {
-    return hitTestObjects(this.objects, subjects, (subject) =>
-      this.tiled.tileCoordToWorld(getCoordOfSubject(subject)),
+    return hitTestObjects(
+      this.objects,
+      subjects,
+      (subject) => this.tiled.tileCoordToWorld(getCoordOfSubject(subject)),
     );
   }
 

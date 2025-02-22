@@ -11,10 +11,10 @@ import { randomItem, uuid } from "@mp/std";
 import { clamp, vec, type Vector } from "@mp/math";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { NPCInstanceId, WorldState } from "../../package";
-import type { AreaLookup } from "../area/loadAreas";
-import type { NPCService } from "./service";
-import type { NPC, NPCInstance, NPCSpawn } from "./schema";
+import type { NPCInstanceId, WorldState } from "../../package.ts";
+import type { AreaLookup } from "../area/loadAreas.ts";
+import type { NPCService } from "./service.ts";
+import type { NPC, NPCInstance, NPCSpawn } from "./schema.ts";
 
 export function npcSpawnBehavior(
   state: PatchStateMachine<WorldState>,

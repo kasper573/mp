@@ -1,5 +1,5 @@
 import type { Branded } from "@mp/std";
-import type { JWTPayload } from "jose";
+import type { JWTPayload } from "npm:jose";
 
 export type AuthToken = Branded<string, "AuthToken">;
 export type UserId = Branded<string, "UserId">;
@@ -28,4 +28,4 @@ export function extractRolesFromJWTPayload(
   return new Set(payload.realm_access.roles);
 }
 
-export { type JWTPayload } from "jose";
+export { type JWTPayload } from "npm:jose";

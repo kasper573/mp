@@ -1,5 +1,5 @@
-import { createEffect, Show, useContext } from "solid-js";
-import { LoggerContext } from "../logger";
+import { createEffect, Show, useContext } from "npm:solid-js";
+import { LoggerContext } from "../logger.ts";
 
 export function ErrorFallback(error: unknown, reset?: () => unknown) {
   const logger = useContext(LoggerContext);

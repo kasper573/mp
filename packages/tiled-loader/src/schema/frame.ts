@@ -1,4 +1,4 @@
-import type { LocalTileId, Milliseconds } from "./common";
+import type { LocalTileId, Milliseconds } from "./common.ts";
 
 export interface Frame {
   duration: Milliseconds;

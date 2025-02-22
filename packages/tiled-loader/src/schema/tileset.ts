@@ -1,21 +1,21 @@
-import type { Tile, Pixel } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type {
+  Coord,
+  FilePath,
   GlobalTileId,
   LocalTileId,
   ObjectAlignment,
-  Coord,
   RGB,
   TiledClass,
   TileRenderSize,
-  FilePath,
-} from "./common";
-import type { WangSet } from "./wang";
-import type { Transformations } from "./transformations";
-import type { Grid } from "./grid";
-import type { Property, PropertyMap } from "./property";
-import type { Terrain } from "./terrain";
-import type { Frame } from "./frame";
-import type { ObjectGroupLayer } from "./layer";
+} from "./common.ts";
+import type { WangSet } from "./wang.ts";
+import type { Transformations } from "./transformations.ts";
+import type { Grid } from "./grid.ts";
+import type { Property, PropertyMap } from "./property.ts";
+import type { Terrain } from "./terrain.ts";
+import type { Frame } from "./frame.ts";
+import type { ObjectGroupLayer } from "./layer.ts";
 
 export interface Tileset {
   backgroundcolor?: string;

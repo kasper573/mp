@@ -1,7 +1,7 @@
 import type { FillStyle } from "@mp/pixi";
 import type { AreaResource } from "@mp/data";
 import { Graphics } from "@mp/pixi";
-import { createEffect, useContext } from "solid-js";
+import { createEffect, useContext } from "npm:solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { vec_scale, type Vector } from "@mp/math";
 import { EngineContext } from "@mp/engine";

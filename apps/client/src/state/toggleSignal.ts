@@ -1,4 +1,4 @@
-import { createSignal } from "solid-js";
+import { createSignal } from "npm:solid-js";
 
 export function toggleSignal(initialValue = false) {
   const [value, setValue] = createSignal(initialValue);

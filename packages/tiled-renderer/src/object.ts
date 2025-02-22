@@ -12,7 +12,7 @@ import type {
   TiledText,
 } from "@mp/tiled-loader";
 
-export * from "./renderer";
+export * from "./renderer.tsx";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {

@@ -1,4 +1,4 @@
-import type { LoggerEventHandler } from "./logger";
+import type { LoggerEventHandler } from "./logger.ts";
 
 export function consoleLoggerHandler(
   target: typeof console,

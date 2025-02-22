@@ -8,9 +8,9 @@ import type {
   TileLayer,
 } from "@mp/tiled-loader";
 import { Container } from "@mp/pixi";
-import { createObjectView } from "./object";
-import { createTileSprite } from "./tile";
-import type { TextureLookup } from "./spritesheet";
+import { createObjectView } from "./object.ts";
+import { createTileSprite } from "./tile.ts";
+import type { TextureLookup } from "./spritesheet.ts";
 
 export type LayerView = Container;
 

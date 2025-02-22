@@ -1,6 +1,6 @@
-import type { ReadonlyDeep } from "type-fest";
-import type { ClientId } from "./shared";
-import type { Patch, PatchPath } from "./patch";
+import type { ReadonlyDeep } from "npm:type-fest";
+import type { ClientId } from "../shared.ts";
+import type { Patch, PatchPath } from "../patch.ts";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -8,7 +8,8 @@ import type { Patch, PatchPath } from "./patch";
  * and allows flushing the collected patches at any given time.
  */
 export type PatchStateMachine<State extends PatchableState> =
-  EntityRepositoryRecord<State> & {
+  & EntityRepositoryRecord<State>
+  & {
     [flushFunctionName]: FlushFn;
   };
 

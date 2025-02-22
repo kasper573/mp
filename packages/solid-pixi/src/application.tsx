@@ -1,5 +1,5 @@
 import { Application as PixiApplication } from "@mp/pixi";
-import type { JSX } from "solid-js";
+import type { JSX } from "npm:solid-js";
 import {
   createEffect,
   createMemo,
@@ -7,8 +7,8 @@ import {
   createSignal,
   onCleanup,
   Show,
-} from "solid-js";
-import { ParentContext } from "./context";
+} from "npm:solid-js";
+import { ParentContext } from "./context.ts";
 
 export interface ApplicationProps
   extends Omit<JSX.IntrinsicElements["div"], "children" | "style"> {

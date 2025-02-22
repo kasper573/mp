@@ -15,8 +15,8 @@ import {
   Resource,
   W3CTraceContextPropagator,
   WSInstrumentation,
-} from "../../../packages/telemetry/otel/mod";
-import { createAddHookMessageChannel } from "import-in-the-middle";
+} from "@mp/telemetry-otel";
+import { createAddHookMessageChannel } from "npm:import-in-the-middle";
 const { registerOptions, waitForAllMessagesAcknowledged } =
   createAddHookMessageChannel();
 

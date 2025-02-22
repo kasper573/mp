@@ -1,25 +1,28 @@
-import type { DefaultError, MutationOptions } from "@tanstack/solid-query";
+import type { DefaultError, MutationOptions } from "npm:@tanstack/solid-query";
 import {
   createMutation,
-  createQuery,
-  skipToken,
   type CreateMutationResult,
+  createQuery,
   type CreateQueryResult,
   type SkipToken,
+  skipToken,
   type SolidMutationOptions,
   type SolidQueryOptions,
-} from "@tanstack/solid-query";
-import type { CreateTRPCClient, CreateTRPCClientOptions } from "@trpc/client";
-import { createTRPCClient } from "@trpc/client";
+} from "npm:@tanstack/solid-query";
 import type {
-  AnyTRPCRouter,
+  CreateTRPCClient,
+  CreateTRPCClientOptions,
+} from "npm:@trpc/client";
+import { createTRPCClient } from "npm:@trpc/client";
+import type {
   AnyProcedure,
+  AnyTRPCRouter,
   inferProcedureInput,
   inferProcedureOutput,
-} from "@trpc/server";
-import { createContext, useContext } from "solid-js";
-import type { AnyFunction } from "./invocation-proxy";
-import { createInvocationProxy, getPropAt } from "./invocation-proxy";
+} from "npm:@trpc/server";
+import { createContext, useContext } from "npm:solid-js";
+import type { AnyFunction } from "./invocation-proxy.ts";
+import { createInvocationProxy, getPropAt } from "./invocation-proxy.ts";
 
 export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
   createMutationHandler: onMutation,
@@ -129,10 +132,11 @@ export type CreateMutationHandler = () => (opt: {
 }) => unknown;
 
 export type TRPCSolidClient<TRouter extends AnyTRPCRouter> =
-  TRPCSolidClientLike & CreateTRPCSolidClient<TRouter>;
+  & TRPCSolidClientLike
+  & CreateTRPCSolidClient<TRouter>;
 
-export type TRPCSolidClientHook<TRouter extends AnyTRPCRouter> =
-  () => TRPCSolidClient<TRouter>;
+export type TRPCSolidClientHook<TRouter extends AnyTRPCRouter> = () =>
+  TRPCSolidClient<TRouter>;
 
 type CreateTRPCSolidClient<TRouter extends AnyTRPCRouter> = RouterHooks<
   TRouter["_def"]["record"]
@@ -147,12 +151,11 @@ type RouterHooks<Routes> = {
 const createQueryProperty = "createQuery";
 const createMutationProperty = "createMutation";
 
-type ProcedureHooks<Proc extends AnyProcedure> =
-  Proc["_def"]["type"] extends "query"
-    ? { [createQueryProperty]: CreateQueryFn<Proc> }
-    : Proc["_def"]["type"] extends "mutation"
-      ? { [createMutationProperty]: CreateMutationFn<Proc> }
-      : never;
+type ProcedureHooks<Proc extends AnyProcedure> = Proc["_def"]["type"] extends
+  "query" ? { [createQueryProperty]: CreateQueryFn<Proc> }
+  : Proc["_def"]["type"] extends "mutation"
+    ? { [createMutationProperty]: CreateMutationFn<Proc> }
+  : never;
 
 type CreateQueryFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
@@ -166,30 +169,31 @@ type CreateMutationFn<Proc extends AnyProcedure> = <
   options?: () => TRPCMutationOptions<Proc, MappedType>,
 ) => CreateMutationResult<MappedType, DefaultError, inferProcedureInput<Proc>>;
 
-type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> = Omit<
-  SolidQueryOptions<
-    inferProcedureOutput<Proc>,
-    DefaultError,
-    inferProcedureInput<Proc>
-  >,
-  "queryKey"
-> &
-  WithInput<Proc> &
-  WithMapFn<Proc, MappedType>;
+type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> =
+  & Omit<
+    SolidQueryOptions<
+      inferProcedureOutput<Proc>,
+      DefaultError,
+      inferProcedureInput<Proc>
+    >,
+    "queryKey"
+  >
+  & WithInput<Proc>
+  & WithMapFn<Proc, MappedType>;
 
 type TRPCMutationOptions<
   Proc extends AnyProcedure,
   MappedType,
-> = SolidMutationOptions<
-  inferProcedureOutput<Proc>,
-  DefaultError,
-  inferProcedureInput<Proc>
-> &
-  WithMapFn<Proc, MappedType>;
+> =
+  & SolidMutationOptions<
+    inferProcedureOutput<Proc>,
+    DefaultError,
+    inferProcedureInput<Proc>
+  >
+  & WithMapFn<Proc, MappedType>;
 
 type WithInput<Proc extends AnyProcedure> =
-  IsRequired<inferProcedureInput<Proc>> extends true
-    ? InputProps<Proc>
+  IsRequired<inferProcedureInput<Proc>> extends true ? InputProps<Proc>
     : Partial<InputProps<Proc>>;
 
 interface InputProps<Proc extends AnyProcedure> {

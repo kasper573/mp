@@ -1,5 +1,5 @@
 import type { Container } from "@mp/pixi";
-import { createContext } from "solid-js";
+import { createContext } from "npm:solid-js";
 
 export const ParentContext = createContext<Container>(
   new Proxy({} as Container, {

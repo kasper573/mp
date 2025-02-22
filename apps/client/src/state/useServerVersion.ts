@@ -1,6 +1,6 @@
-import { createMemo } from "solid-js";
-import { useTRPC } from "../integrations/trpc";
-import { env } from "../env";
+import { createMemo } from "npm:solid-js";
+import { useTRPC } from "../integrations/trpc.ts";
+import { env } from "../env.ts";
 
 export const useVersionCompatibility = () => {
   const trpc = useTRPC();

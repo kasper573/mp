@@ -1,7 +1,7 @@
-import { applyPatch } from "../patch";
-import type { HandshakeData } from "../handshake";
-import { createUrlWithHandshakeData } from "../handshake";
-import { decodeServerToClientMessage } from "./messageDecoder";
+import { applyPatch } from "../patch.ts";
+import type { HandshakeData } from "../handshake.ts";
+import { createUrlWithHandshakeData } from "../handshake.ts";
+import { decodeServerToClientMessage } from "./messageDecoder.ts";
 
 export class SyncClient<State extends object> {
   private socket?: WebSocket;
@@ -155,7 +155,7 @@ function coerceReadyState(
   return webSocketToSyncClientReadyState[state];
 }
 
-export { type ClientId } from "../shared";
+export { type ClientId } from "../shared.ts";
 
 // Note: using a custom interface for the error event type because the types differ between node and browser.
 // This is a hack and should be replaced with some normalizing websocket package, ie. "ws".

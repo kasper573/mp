@@ -1,6 +1,6 @@
 import { AuthContext } from "@mp/auth-client";
 import { useNavigate } from "@solidjs/router";
-import { createResource, useContext } from "solid-js";
+import { createResource, useContext } from "npm:solid-js";
 
 export default function AuthCallback() {
   const navigate = useNavigate();

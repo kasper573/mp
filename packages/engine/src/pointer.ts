@@ -3,7 +3,7 @@ import { vec } from "@mp/math";
 import type { Computed } from "@mp/state";
 import { atom, computed } from "@mp/state";
 import type { Pixel } from "@mp/std";
-import type { Camera } from "./camera";
+import type { Camera } from "./camera.ts";
 
 export class Pointer {
   readonly #isDown = atom(false);

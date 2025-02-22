@@ -1,5 +1,5 @@
-import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
-import { MetricsGague } from "../../../../packages/telemetry/prom/mod";
+import type { MetricsRegistry } from "@mp/telemetry-prom";
+import { MetricsGague } from "@mp/telemetry-prom";
 
 export function collectProcessMetrics(metrics: MetricsRegistry) {
   new MetricsGague({

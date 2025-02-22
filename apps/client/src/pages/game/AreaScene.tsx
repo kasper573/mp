@@ -1,7 +1,7 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
-import type { ParentProps } from "solid-js";
-import { useContext, createEffect, createMemo, For } from "solid-js";
+import type { ParentProps } from "npm:solid-js";
+import { createEffect, createMemo, For, useContext } from "npm:solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
@@ -10,10 +10,10 @@ import type { Vector } from "@mp/math";
 import { vec } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
-import { SyncClientContext } from "../../integrations/sync";
-import { useAnimatedCoords } from "../../state/useAnimatedCoords";
-import { Actor } from "./Actor";
-import { TileHighlight } from "./TileHighlight";
+import { SyncClientContext } from "../../integrations/sync.ts";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords.ts";
+import { Actor } from "./Actor.ts";
+import { TileHighlight } from "./TileHighlight.ts";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
@@ -31,7 +31,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   );
 
   const myWorldPos = createMemo(() =>
-    props.area.tiled.tileCoordToWorld(myCoords()),
+    props.area.tiled.tileCoordToWorld(myCoords())
   );
 
   const cameraPos = useSpring(
@@ -48,7 +48,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
       props.area.tiled.tileSize,
       engine.camera.cameraSize,
       clientViewDistance.renderedTileCount,
-    ),
+    )
   );
 
   createEffect(() => {

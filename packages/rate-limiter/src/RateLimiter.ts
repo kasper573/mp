@@ -1,5 +1,5 @@
-import type { IRateLimiterOptions } from "rate-limiter-flexible";
-import { RateLimiterMemory } from "rate-limiter-flexible";
+import type { IRateLimiterOptions } from "npm:rate-limiter-flexible";
+import { RateLimiterMemory } from "npm:rate-limiter-flexible";
 import { ResultAsync } from "@mp/std";
 import { okAsync } from "@mp/std";
 
@@ -41,4 +41,4 @@ export type RateLimiterOK = "skipped-due-to-disabled" | "accepted";
 
 export type RateLimiterResult = ResultAsync<RateLimiterOK, string>;
 
-export { type RateLimiter };
+export type { RateLimiter };

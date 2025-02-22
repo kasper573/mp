@@ -1,4 +1,4 @@
-import { composeError } from "./composeError";
+import { composeError } from "./composeError.ts";
 
 export class Logger {
   private subscriptions = new Set<LoggerEventHandler>();

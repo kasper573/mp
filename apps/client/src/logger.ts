@@ -1,5 +1,5 @@
 import type { Logger } from "@mp/logger";
-import { createContext } from "solid-js";
+import { createContext } from "npm:solid-js";
 
 export const LoggerContext = createContext<Logger>(
   new Proxy({} as Logger, {

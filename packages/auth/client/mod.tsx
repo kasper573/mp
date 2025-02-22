@@ -1,20 +1,20 @@
-import type { User } from "oidc-client-ts";
-import { UserManager } from "oidc-client-ts";
-import type { Accessor } from "solid-js";
+import type { User } from "npm:oidc-client-ts";
+import { UserManager } from "npm:oidc-client-ts";
+import type { Accessor } from "npm:solid-js";
 import {
   createContext,
   createEffect,
   createMemo,
   createSignal,
   onCleanup,
-} from "solid-js";
+} from "npm:solid-js";
 import {
   type AuthToken,
   isOurJWTPayload,
   type JWTPayload,
   type UserId,
   type UserIdentity,
-} from "../shared";
+} from "../shared.ts";
 
 export const AuthContext = createContext<AuthClient>(
   new Proxy({} as AuthClient, {
@@ -114,3 +114,5 @@ function parseJWTPayload(jwtString: string): JWTPayload {
 function isEqual(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
+
+export * from "../shared.ts";

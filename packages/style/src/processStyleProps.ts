@@ -1,9 +1,11 @@
-import type { RuntimeFn } from "@vanilla-extract/recipes";
-import clsx from "clsx";
-import { splitProps } from "solid-js";
+import type { RuntimeFn } from "npm:@vanilla-extract/recipes";
+import clsx from "npm:clsx";
+import { splitProps } from "npm:solid-js";
 
-export type StyledComponentProps<Recipe> =
-  Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
+export type StyledComponentProps<Recipe> = Recipe extends RuntimeFn<infer _>
+  ? Parameters<Recipe>[0]
+  // deno-lint-ignore ban-types
+  : {};
 
 export function processStyleProps<Props extends { class?: string }>(
   props: Props,
@@ -34,5 +36,5 @@ export function processStyleProps<Props extends { class?: string }>(
 
 type AnyProps = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// deno-lint-ignore no-explicit-any
 type AnyRecipe = RuntimeFn<any>;

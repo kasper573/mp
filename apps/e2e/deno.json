@@ -1,7 +1,6 @@
 {
   "name": "@mp/e2e",
   "version": "0.0.0",
-  "exports": "./src/package.ts",
   "tasks": {
     "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- playwright test"
   }

@@ -1,5 +1,5 @@
 import { recipe } from "@vanilla-extract/recipes";
-import { atoms } from "./atoms.css";
+import { atoms } from "./atoms.css.ts";
 
 export const dock = recipe({
   base: atoms({

@@ -1,10 +1,10 @@
 import { integer, pgTable, uuid } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import type { Branded, Tile } from "@mp/std";
-import type { MovementTrait } from "../../traits/movement";
-import type { AppearanceTrait } from "../../traits/appearance";
-import { areaId } from "../area/schema";
-import { vector } from "../../db/types/vector";
+import type { MovementTrait } from "../../traits/movement.ts";
+import type { AppearanceTrait } from "../../traits/appearance.ts";
+import { areaId } from "../area/schema.ts";
+import { vector } from "../../db/types/vector.ts";
 
 export type NPCId = Branded<string, "NPCId">;
 export const npcId = () => uuid().$type<NPCId>();
@@ -47,9 +47,7 @@ export type NPCSpawn = typeof npcSpawnTable.$inferSelect;
  * Does not get persisted in the database.
  */
 export interface NPCInstance
-  extends Omit<NPC, "id">,
-    MovementTrait,
-    AppearanceTrait {
+  extends Omit<NPC, "id">, MovementTrait, AppearanceTrait {
   id: NPCInstanceId;
 }
 

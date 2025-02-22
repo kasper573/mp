@@ -1,6 +1,6 @@
 import path from "node:path";
 import { TimeSpan } from "@mp/time";
-import { authAlgorithms } from "@mp/auth-client";
+import { authAlgorithms } from "@mp/auth-server";
 import type { InferOutput } from "@mp/env";
 import {
   assertEnv,
@@ -14,7 +14,7 @@ import {
   string,
   transform,
 } from "@mp/env";
-import type { AuthToken } from "@mp/auth";
+import type { AuthToken } from "@mp/auth-server";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
 

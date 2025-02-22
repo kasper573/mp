@@ -1,7 +1,7 @@
-import { ok, err } from "@mp/std";
-import { setProperty } from "dot-prop";
-import type { BaseSchema, BaseIssue, InferOutput } from "valibot";
-import { safeParse } from "valibot";
+import { err, ok } from "@mp/std";
+import { setProperty } from "npm:dot-prop";
+import type { BaseIssue, BaseSchema, InferOutput } from "npm:valibot";
+import { safeParse } from "npm:valibot";
 
 export function assertEnv<
   const Schema extends BaseSchema<unknown, unknown, BaseIssue<unknown>>,

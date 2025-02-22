@@ -1,10 +1,10 @@
 import type { PatchStateMachine } from "@mp/sync-server";
-import { roles } from "../../middlewares/auth";
-import { t } from "../../trpc";
-import type { WorldState } from "../../package";
-import type { AreaLookup } from "../area/loadAreas";
-import { spawnNpcInstance } from "./npcSpawnBehavior";
-import type { NPCService } from "./service";
+import { roles } from "../../middlewares/auth.ts";
+import { t } from "../../trpc.ts";
+import type { WorldState } from "../../package.ts";
+import type { AreaLookup } from "../area/loadAreas.ts";
+import { spawnNpcInstance } from "./npcSpawnBehavior.ts";
+import type { NPCService } from "./service.ts";
 
 export interface NPCRouterDependencies {
   state: PatchStateMachine<WorldState>;

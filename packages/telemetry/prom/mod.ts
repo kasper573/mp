@@ -1,6 +1,6 @@
 export {
   collectDefaultMetrics,
   Gauge as MetricsGague,
-  Registry as MetricsRegistry,
   Histogram as MetricsHistogram,
-} from "prom-client";
+  Registry as MetricsRegistry,
+} from "npm:prom-client";

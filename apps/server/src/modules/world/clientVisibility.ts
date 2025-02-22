@@ -1,9 +1,9 @@
 import type { ClientVisibilityFactory } from "@mp/sync-server";
 import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
 import { recordValues } from "@mp/std";
-import { clientViewDistance } from "../../shared";
-import type { ClientRegistry } from "../../ClientRegistry";
-import type { Actor, ActorId, WorldState } from "./WorldState";
+import { clientViewDistance } from "../../shared.ts";
+import type { ClientRegistry } from "../../ClientRegistry.ts";
+import type { Actor, ActorId, WorldState } from "./WorldState.ts";
 
 /**
  * Removes any information that the given client should not have access to.

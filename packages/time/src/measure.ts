@@ -1,4 +1,4 @@
-import { TimeSpan } from "timespan-ts";
+import { TimeSpan } from "npm:timespan-ts";
 
 /**
  * Begins measuring the time span.

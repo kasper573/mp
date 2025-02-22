@@ -1,9 +1,9 @@
 import { TimeSpan } from "@mp/time";
 import type { Vector } from "@mp/math";
 import type { Pixel } from "@mp/std";
-import { Camera } from "./camera";
-import { PointerForCamera } from "./pointer";
-import { Keyboard } from "./keyboard";
+import { Camera } from "./camera.ts";
+import { PointerForCamera } from "./pointer.ts";
+import { Keyboard } from "./keyboard.ts";
 
 export class Engine {
   #previousFrameTime = performance.now();

@@ -1,10 +1,10 @@
 import type {
-  PropertiesHyphen as CSSProperties,
   DataType,
+  PropertiesHyphen as CSSProperties,
   Property,
-} from "csstype";
-import { flattened } from "./flattened";
-import * as tokens from "./tokens";
+} from "npm:csstype";
+import { flattened } from "./flattened.ts";
+import * as tokens from "./tokens.ts";
 
 /**
  * Typesafe and design token compliant way of defining css transitions.

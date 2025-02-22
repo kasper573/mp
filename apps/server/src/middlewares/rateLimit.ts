@@ -1,8 +1,8 @@
-import { TRPCError } from "@trpc/server";
+import { TRPCError } from "npm:@trpc/server";
 import type { RateLimiter, RateLimiterOptions } from "@mp/rate-limiter";
-import { t } from "../trpc";
-import type { ServerContext } from "../context";
-import { createRateLimiter } from "../createRateLimiter";
+import { t } from "../trpc.ts";
+import type { ServerContext } from "../context.ts";
+import { createRateLimiter } from "../createRateLimiter.ts";
 
 export function rateLimit(options: RateLimiterOptions) {
   const limiter = createRateLimiter(options);

@@ -1,2 +1,2 @@
-export * from "@trpc/client";
-export * from "./solid-trpc";
+export * from "npm:@trpc/client";
+export * from "./solid-trpc.tsx";

@@ -2,9 +2,9 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
 import { tokenHeaderName, transformer } from "@mp/server";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { createTRPCClient, httpBatchLink } from "npm:@trpc/client";
 import { SyncClient } from "@mp/sync-client";
-import { readCliOptions } from "./cli";
+import { readCliOptions } from "./cli.ts";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

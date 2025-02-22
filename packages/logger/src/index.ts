@@ -1,2 +1,2 @@
-export * from "./logger";
-export * from "./console";
+export * from "./logger.ts";
+export * from "./console.ts";

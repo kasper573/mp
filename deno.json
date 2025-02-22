@@ -50,7 +50,7 @@
   "compilerOptions": {
     "lib": ["ES2020", "DOM", "DOM.Iterable", "deno.ns"],
     "jsx": "react-jsx",
-    "jsxImportSource": "solid-js"
+    "jsxImportSource": "npm:solid-js"
   },
   "nodeModulesDir": "auto"
 }

@@ -1,8 +1,8 @@
 import type { PatchStateMachine } from "@mp/sync-server";
 import type { TickEventHandler } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
-import type { AreaLookup } from "../area/loadAreas";
-import type { WorldState } from "../world/WorldState";
+import type { AreaLookup } from "../area/loadAreas.ts";
+import type { WorldState } from "../world/WorldState.ts";
 
 export function npcAIBehavior(
   state: PatchStateMachine<WorldState>,

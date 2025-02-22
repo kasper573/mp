@@ -1,5 +1,5 @@
-import { fontFace } from "@vanilla-extract/css";
-import { interFontFaces } from "./inter";
+import { fontFace } from "npm:@vanilla-extract/css";
+import { interFontFaces } from "./inter.ts";
 
 export const inter = fontFace(
   interFontFaces.map(({ fontStyle, fontWeight, format, url }) => ({

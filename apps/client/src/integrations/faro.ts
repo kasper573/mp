@@ -1,15 +1,15 @@
-import type { UserIdentity } from "@mp/auth";
-import type { Faro, FaroUser } from "@mp/telemetry/faro";
+import type { UserIdentity } from "@mp/auth-client";
+import type { Faro, FaroUser } from "@mp/telemetry-faro";
 import {
   faroLoggerHandler,
   getWebInstrumentations,
   initializeFaro,
   TracingInstrumentation,
-} from "@mp/telemetry/faro";
-import { createEffect, onCleanup, useContext } from "solid-js";
+} from "@mp/telemetry-faro";
+import { createEffect, onCleanup, useContext } from "npm:solid-js";
 import type { AuthClient } from "@mp/auth-client";
-import { env } from "../env";
-import { LoggerContext } from "../logger";
+import { env } from "../env.ts";
+import { LoggerContext } from "../logger.ts";
 
 export function createFaroClient() {
   return initializeFaro({

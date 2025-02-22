@@ -5,13 +5,13 @@ import { path_copy, vec_distance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
+  batch,
   createEffect,
+  createMemo,
+  createSignal,
   onCleanup,
   useContext,
-  createMemo,
-  batch,
-  createSignal,
-} from "solid-js";
+} from "npm:solid-js";
 
 /**
  * Creates a vector signal that lerps each frame along the current path.

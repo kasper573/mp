@@ -1,14 +1,14 @@
-import { type Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync-server";
-import { TRPCError } from "@trpc/server";
+import { TRPCError } from "npm:@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
-import { auth } from "../../middlewares/auth";
-import { schemaFor, t } from "../../trpc";
-import { type WorldState } from "../world/WorldState";
-import { moveTo } from "../../traits/movement";
-import type { AreaLookup } from "../area/loadAreas";
-import { type CharacterId } from "./schema";
-import type { CharacterService } from "./service";
+import { auth } from "../../middlewares/auth.ts";
+import { schemaFor, t } from "../../trpc.ts";
+import type { WorldState } from "../world/WorldState.ts";
+import { moveTo } from "../../traits/movement.ts";
+import type { AreaLookup } from "../area/loadAreas.ts";
+import type { CharacterId } from "./schema.ts";
+import type { CharacterService } from "./service.ts";
 
 export interface CharacterRouterDependencies {
   state: PatchStateMachine<WorldState>;

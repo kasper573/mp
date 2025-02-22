@@ -1,4 +1,4 @@
-import { type Faro, LogLevel } from "@grafana/faro-web-sdk";
+import { type Faro, LogLevel } from "npm:@grafana/faro-web-sdk";
 import type { LoggerEventHandler } from "@mp/logger";
 
 /**

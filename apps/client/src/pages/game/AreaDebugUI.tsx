@@ -1,9 +1,9 @@
 import type { AreaResource, TiledResource } from "@mp/data";
-import { vec_round, type Path, type Vector } from "@mp/math";
+import { type Path, vec_round, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
-import type { Accessor } from "solid-js";
+import type { Accessor } from "npm:solid-js";
 import {
   batch,
   createEffect,
@@ -13,19 +13,19 @@ import {
   onCleanup,
   onMount,
   useContext,
-} from "solid-js";
+} from "npm:solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import type { Actor, Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";
-import { env } from "../../env";
-import { SyncClientContext } from "../../integrations/sync";
-import { Select } from "../../ui/Select";
-import { useTRPC } from "../../integrations/trpc";
-import { Button } from "../../ui/Button";
-import * as styles from "./AreaDebugUI.css";
+import { env } from "../../env.ts";
+import { SyncClientContext } from "../../integrations/sync.ts";
+import { Select } from "../../ui/Select.ts";
+import { useTRPC } from "../../integrations/trpc.ts";
+import { Button } from "../../ui/Button.ts";
+import * as styles from "./AreaDebugUI.css.ts";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
@@ -41,22 +41,24 @@ export function AreaDebugUI(props: {
   const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
     meta: { invalidateCache: false },
   }));
-  const [visibleGraphType, setVisibleGraphType] =
-    createSignal<VisibleGraphType>("none");
+  const [visibleGraphType, setVisibleGraphType] = createSignal<
+    VisibleGraphType
+  >("none");
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
       <DebugGraph area={props.area} visible={visibleGraphType} />
       <For each={props.drawPathsForActors}>
         {(actor) =>
-          actor.path ? (
-            <DebugPath
-              tiled={props.area.tiled}
-              path={actor.path}
-              color={uniqolor(actor.id).color}
-            />
-          ) : null
-        }
+          actor.path
+            ? (
+              <DebugPath
+                tiled={props.area.tiled}
+                path={actor.path}
+                color={uniqolor(actor.id).color}
+              />
+            )
+            : null}
       </For>
       <div class={styles.debugMenu}>
         <div on:pointerdown={(e) => e.stopPropagation()}>
@@ -158,9 +160,9 @@ function DebugText(props: { tiled: TiledResource }) {
         batch(() => {
           setFrameInterval(interval);
           setFrameDuration(duration);
-        }),
+        })
       ),
-    ),
+    )
   );
 
   const text = createMemo(() => {
@@ -172,8 +174,12 @@ function DebugText(props: { tiled: TiledResource }) {
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
       `tile (snapped): ${vecToString(vec_round(tilePos))}`,
-      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(world.character()), null, 2)}`,
+      `camera transform: ${
+        JSON.stringify(engine.camera.transform.data, null, 2)
+      }`,
+      `character: ${
+        JSON.stringify(trimCharacterInfo(world.character()), null, 2)
+      }`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,

@@ -5,17 +5,20 @@ import {
   Show,
   Switch,
   useContext,
-} from "solid-js";
+} from "npm:solid-js";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { AuthContext } from "@mp/auth-client";
 import { Application } from "@mp/solid-pixi";
-import { createSyncClient, SyncClientContext } from "../../integrations/sync";
-import { useAreaResource } from "../../state/useAreaResource";
-import { LoadingSpinner } from "../../ui/LoadingSpinner";
-import { toggleSignal } from "../../state/toggleSignal";
-import * as styles from "./GamePage.css";
-import { AreaDebugUI } from "./AreaDebugUI";
-import { AreaScene } from "./AreaScene";
+import {
+  createSyncClient,
+  SyncClientContext,
+} from "../../integrations/sync.ts";
+import { useAreaResource } from "../../state/useAreaResource.ts";
+import { LoadingSpinner } from "../../ui/LoadingSpinner.ts";
+import { toggleSignal } from "../../state/toggleSignal.ts";
+import * as styles from "./GamePage.css.ts";
+import { AreaDebugUI } from "./AreaDebugUI.ts";
+import { AreaScene } from "./AreaScene.ts";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);

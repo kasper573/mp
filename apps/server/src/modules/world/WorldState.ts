@@ -1,7 +1,7 @@
-import type { UserIdentity } from "@mp/auth";
+import type { UserIdentity } from "@mp/auth-server";
 import type { SyncServer } from "@mp/sync-server";
-import type { NPCInstance } from "../npc/schema";
-import type { Character } from "../character/schema";
+import type { NPCInstance } from "../npc/schema.ts";
+import type { Character } from "../character/schema.ts";
 
 export type WorldState = {
   actors: Record<ActorId, Actor>;

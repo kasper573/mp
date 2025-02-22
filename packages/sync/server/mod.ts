@@ -1,14 +1,14 @@
 import type http from "node:http";
-import type { WebSocket } from "ws";
-import { WebSocketServer } from "ws";
+import type { WebSocket } from "npm:ws";
+import { WebSocketServer } from "npm:ws";
 import { uuid } from "@mp/std";
 import type { Result } from "@mp/std";
-import { type ClientId } from "../shared";
-import { type HandshakeData } from "../handshake";
-import { handshakeDataFromRequest } from "../handshake";
-import type { PatchableState } from "../PatchStateMachine";
-import type { PatchStateMachine } from "../PatchStateMachine";
-import { encodeServerToClientMessage } from "../messageEncoder";
+import type { ClientId } from "../shared.ts";
+import type { HandshakeData } from "../handshake.ts";
+import { handshakeDataFromRequest } from "../handshake.ts";
+import type { PatchableState } from "./PatchStateMachine.ts";
+import type { PatchStateMachine } from "./PatchStateMachine.ts";
+import { encodeServerToClientMessage } from "./messageEncoder.ts";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
@@ -136,9 +136,9 @@ type ClientInfoMap = Map<ClientId, ClientInfo>;
 
 const newClientId = uuid as unknown as () => ClientId;
 
-export type { ClientId } from "../shared";
+export type { ClientId } from "../shared.ts";
 
-export * from "../PatchStateMachine";
+export * from "./PatchStateMachine.ts";
 
 const clientMetaDataSymbol = Symbol("clientMetaData");
 

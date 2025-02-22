@@ -1,8 +1,5 @@
 {
   "name": "@mp/data",
   "version": "0.0.0",
-  "exports": "./src/index.ts",
-  "compilerOptions": {
-    "lib": []
-  }
+  "exports": "./src/index.ts"
 }

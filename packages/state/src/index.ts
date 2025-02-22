@@ -1,13 +1,13 @@
-import { createSignal, type Setter, type Accessor } from "solid-js";
+import { type Accessor, createSignal, type Setter } from "npm:solid-js";
 
-export { createStore, type Store } from "solid-js/store";
+export { createStore, type Store } from "npm:solid-js/store";
 
 export function atom<T>(initial: T): Atom<T> {
   const [get, set] = createSignal(initial);
   return { get, set };
 }
 
-export { createMemo as computed, batch } from "solid-js";
+export { batch, createMemo as computed } from "npm:solid-js";
 
 export interface Atom<T> {
   get: Accessor<T>;

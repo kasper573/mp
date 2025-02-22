@@ -1,4 +1,4 @@
-import type { Tile, Pixel } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type {
   Color,
   CompressionLevel,
@@ -8,10 +8,10 @@ import type {
   StaggerAxis,
   StaggerIndex,
   TiledClass,
-} from "./common";
-import type { Layer } from "./layer";
-import type { PropertyMap } from "./property";
-import type { Tileset } from "./tileset";
+} from "./common.ts";
+import type { Layer } from "./layer.ts";
+import type { PropertyMap } from "./property.ts";
+import type { Tileset } from "./tileset.ts";
 
 export interface SharedMapProperties {
   type: "map";

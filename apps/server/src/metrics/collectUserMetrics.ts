@@ -1,9 +1,12 @@
-import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
-import { MetricsGague } from "../../../../packages/telemetry/prom/mod";
+import type { MetricsRegistry } from "@mp/telemetry-prom";
+import { MetricsGague } from "@mp/telemetry-prom";
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync-server";
-import type { WorldState, WorldSyncServer } from "../modules/world/WorldState";
-import type { ClientRegistry } from "../ClientRegistry";
+import type {
+  WorldState,
+  WorldSyncServer,
+} from "../modules/world/WorldState.ts";
+import type { ClientRegistry } from "../ClientRegistry.ts";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,

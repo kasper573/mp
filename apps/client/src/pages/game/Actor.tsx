@@ -2,10 +2,10 @@ import { Container, Graphics, Text } from "@mp/pixi";
 import type { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
-import { createEffect, Show } from "solid-js";
-import type { AppearanceTrait, Actor } from "@mp/server";
+import { createEffect, Show } from "npm:solid-js";
+import type { Actor, AppearanceTrait } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
-import { useAnimatedCoords } from "../../state/useAnimatedCoords";
+import { useAnimatedCoords } from "../../state/useAnimatedCoords.ts";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   const coords = useAnimatedCoords(

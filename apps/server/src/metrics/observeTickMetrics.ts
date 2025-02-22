@@ -1,8 +1,8 @@
-import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
-import { MetricsHistogram } from "../../../../packages/telemetry/prom/mod";
+import type { MetricsRegistry } from "@mp/telemetry-prom";
+import { MetricsHistogram } from "@mp/telemetry-prom";
 import type { TickMiddleware } from "@mp/time";
 import { beginMeasuringTimeSpan } from "@mp/time";
-import { tickBuckets } from "./shared";
+import { tickBuckets } from "./shared.ts";
 
 export function createTickMetricsObserver(
   metrics: MetricsRegistry,

@@ -1,8 +1,8 @@
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync-server";
-import type { DBClient } from "../../db/client";
-import { characterTable } from "../character/schema";
-import type { WorldState } from "./WorldState";
+import type { DBClient } from "../../db/client.ts";
+import { characterTable } from "../character/schema.ts";
+import type { WorldState } from "./WorldState.ts";
 
 export class WorldService {
   constructor(private db: DBClient) {}
