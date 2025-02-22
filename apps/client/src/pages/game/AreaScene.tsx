@@ -2,7 +2,7 @@ import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ParentProps } from "npm:solid-js";
 import { createEffect, createMemo, For, useContext } from "npm:solid-js";
-import { createQuery } from "@tanstack/solid-query";
+import { createQuery } from "npm:@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
@@ -12,8 +12,8 @@ import { clientViewDistance } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync.ts";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords.ts";
-import { Actor } from "./Actor.ts";
-import { TileHighlight } from "./TileHighlight.ts";
+import { Actor } from "./Actor.tsx";
+import { TileHighlight } from "./TileHighlight.tsx";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);

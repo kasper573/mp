@@ -1,6 +1,7 @@
 {
   "version": "4",
   "specifiers": {
+    "npm:@deno/vite-plugin@*": "1.0.2_vite@6.0.3__@types+node@22.10.1_@types+node@22.10.1",
     "npm:@faker-js/faker@*": "9.3.0",
     "npm:@grafana/faro-web-sdk@*": "1.13.3",
     "npm:@grafana/faro-web-tracing@*": "1.13.3_@opentelemetry+api@1.9.0",
@@ -19,9 +20,14 @@
     "npm:@trpc/client@*": "10.45.2_@trpc+server@10.45.2",
     "npm:@trpc/server@*": "10.45.2",
     "npm:@types/node@*": "22.10.1",
+    "npm:@vanilla-extract/css@*": "1.16.1",
+    "npm:@vanilla-extract/recipes@*": "0.5.5_@vanilla-extract+css@1.16.1",
+    "npm:@vanilla-extract/sprinkles@*": "1.6.3_@vanilla-extract+css@1.16.1",
     "npm:@vanilla-extract/vite-plugin@*": "4.0.18_vite@5.4.11__@types+node@22.10.1_@types+node@22.10.1",
     "npm:cbor-x@*": "1.6.0",
+    "npm:clsx@*": "2.1.1",
     "npm:cors@*": "2.8.5",
+    "npm:csstype@*": "3.1.3",
     "npm:dot-prop@*": "9.0.0",
     "npm:dotenv@*": "16.4.7",
     "npm:drizzle-orm@*": "0.37.0_@opentelemetry+api@1.9.0_pg@8.13.1",
@@ -217,6 +223,12 @@
     },
     "@cbor-extract/cbor-extract-win32-x64@2.2.0": {
       "integrity": "sha512-l2M+Z8DO2vbvADOBNLbbh9y5ST1RY5sqkWOg/58GkUPBYou/cuNZ68SGQ644f1CvZ8kcOxyZtw06+dxWHIoN/w=="
+    },
+    "@deno/vite-plugin@1.0.2_vite@6.0.3__@types+node@22.10.1_@types+node@22.10.1": {
+      "integrity": "sha512-ZaC5W1yCb1xdRURU5qHFHrxZABr1tC68tS73/YhXUUbe9nuytCV4CG/dpLxMkxS64Fs3YwcqEz2k1eAqE9W5SQ==",
+      "dependencies": [
+        "vite@6.0.3_@types+node@22.10.1"
+      ]
     },
     "@emotion/hash@0.9.2": {
       "integrity": "sha512-MyqliTZGuOm3+5ZRSaaBGP3USLw6+EGykkwZns2EPC5g8jJ4z9OrdZY9apkl3+UP9+sdz76YYkwCKP5gh8iY3g=="
@@ -1655,6 +1667,18 @@
     "@vanilla-extract/private@1.0.6": {
       "integrity": "sha512-ytsG/JLweEjw7DBuZ/0JCN4WAQgM9erfSTdS1NQY778hFQSZ6cfCDEZZ0sgVm4k54uNz6ImKB33AYvSR//fjxw=="
     },
+    "@vanilla-extract/recipes@0.5.5_@vanilla-extract+css@1.16.1": {
+      "integrity": "sha512-VadU7+IFUwLNLMgks29AHav/K5h7DOEfTU91RItn5vwdPfzduodNg317YbgWCcpm7FSXkuR3B3X8ZOi95UOozA==",
+      "dependencies": [
+        "@vanilla-extract/css"
+      ]
+    },
+    "@vanilla-extract/sprinkles@1.6.3_@vanilla-extract+css@1.16.1": {
+      "integrity": "sha512-oCHlQeYOBIJIA2yWy2GnY5wE2A7hGHDyJplJo4lb+KEIBcJWRnDJDg8ywDwQS5VfWJrBBO3drzYZPFpWQjAMiQ==",
+      "dependencies": [
+        "@vanilla-extract/css"
+      ]
+    },
     "@vanilla-extract/vite-plugin@4.0.18_vite@5.4.11__@types+node@22.10.1_@types+node@22.10.1": {
       "integrity": "sha512-j5vJVbvW33THGXG3ZI+nfgeYCknlBEWTJVphZWSAGmLO4XO4690m/iQQg+3gUtla3wvU8eyA2qmJNa05Wa7mVA==",
       "dependencies": [
@@ -1861,6 +1885,9 @@
         "strip-ansi",
         "wrap-ansi"
       ]
+    },
+    "clsx@2.1.1": {
+      "integrity": "sha512-eYm0QWBtUrBWZWG0d386OGAw16Z995PiOVo2B7bjWSbHedGl5e0ZWaq65kOGgUSNesEIDkB9ISbTg/JK9dhCZA=="
     },
     "color-convert@2.0.1": {
       "integrity": "sha512-RRECPsj7iu/xb5oKYcsFHSppFNnsj/52OVTRKb4zP5onXwVF3zVmmToNcOfGC+CRDpfK/U584fMg38ZHCaElKQ==",

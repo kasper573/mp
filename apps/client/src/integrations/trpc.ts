@@ -6,7 +6,7 @@ import {
   httpBatchLink,
 } from "@mp/solid-trpc";
 import { type AuthClient } from "@mp/auth-client";
-import { QueryClientContext } from "@tanstack/solid-query";
+import { QueryClientContext } from "npm:@tanstack/solid-query";
 import { useContext } from "npm:solid-js";
 import { env } from "../env.ts";
 import { LoggerContext } from "../logger.ts";

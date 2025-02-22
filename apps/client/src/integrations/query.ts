@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/solid-query";
+import { QueryClient } from "npm:@tanstack/solid-query";
 
 export function createQueryClient() {
   return new QueryClient({
@@ -13,7 +13,7 @@ export function createQueryClient() {
   });
 }
 
-declare module "@tanstack/solid-query" {
+declare module "npm:@tanstack/solid-query" {
   interface Register {
     mutationMeta: {
       invalidateCache?: boolean;

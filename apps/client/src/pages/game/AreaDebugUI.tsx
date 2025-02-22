@@ -19,12 +19,12 @@ import { EngineContext } from "@mp/engine";
 import type { Actor, Character } from "@mp/server";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
-import uniqolor from "uniqolor";
+import uniqolor from "npm:uniqolor";
 import { env } from "../../env.ts";
 import { SyncClientContext } from "../../integrations/sync.ts";
-import { Select } from "../../ui/Select.ts";
+import { Select } from "../../ui/Select.tsx";
 import { useTRPC } from "../../integrations/trpc.ts";
-import { Button } from "../../ui/Button.ts";
+import { Button } from "../../ui/Button.tsx";
 import * as styles from "./AreaDebugUI.css.ts";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;

@@ -1,6 +1,6 @@
 import { type AreaId, AreaResource, TiledResource } from "@mp/data";
 import { createTiledLoader } from "@mp/tiled-loader";
-import { skipToken } from "@tanstack/solid-query";
+import { skipToken } from "npm:@tanstack/solid-query";
 import { type Accessor } from "npm:solid-js";
 import { useTRPC } from "../integrations/trpc.ts";
 

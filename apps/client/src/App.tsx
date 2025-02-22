@@ -1,9 +1,9 @@
 import { AuthContext, createAuthClient } from "@mp/auth-client";
-import { QueryClientProvider } from "@tanstack/solid-query";
-import { Router } from "@solidjs/router";
+import { QueryClientProvider } from "npm:@tanstack/solid-query";
+import { Router } from "npm:@solidjs/router";
 import { TRPCClientContext } from "@mp/solid-trpc";
-import Layout from "./ui/Layout.ts";
-import { routes } from "./routes.ts";
+import Layout from "./ui/Layout.tsx";
+import { routes } from "./routes.tsx";
 import { createQueryClient } from "./integrations/query.ts";
 import { env } from "./env.ts";
 import { createFaroClient, useFaroIntegration } from "./integrations/faro.ts";

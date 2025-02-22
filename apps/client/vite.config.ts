@@ -1,5 +1,5 @@
 import { defineConfig } from "npm:vite";
-import { checker } from "npm:vite-plugin-checker";
+import deno from "npm:@deno/vite-plugin";
 import { vanillaExtractPlugin } from "npm:@vanilla-extract/vite-plugin";
 import solid from "npm:vite-plugin-solid";
 import topLevelAwait from "npm:vite-plugin-top-level-await";
@@ -7,10 +7,10 @@ import type { Plugin } from "npm:vite";
 
 export default defineConfig({
   plugins: [
-    vanillaExtractPlugin(),
+    deno(),
     solid(),
     topLevelAwait(),
-    checker({ typescript: true }),
+    vanillaExtractPlugin(),
     ...(Deno.env.get("MP_CLIENT_EMBED_ENV") ? [embedEnvPlugin()] : []),
   ],
 });

@@ -1,9 +1,9 @@
 {
-  "name": "@mp/client",
   "version": "0.0.0",
   "exports": "./src/package.ts",
   "tasks": {
     "build": "deno run -A --node-modules-dir npm:vite build",
-    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- deno run -A --node-modules-dir npm:vite --clearScreen=false --host"
+    "dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- deno task run",
+    "run": "deno run -A --node-modules-dir npm:vite --clearScreen=false --host"
   }
 }

@@ -31,10 +31,6 @@
     "packages/tiled-renderer",
     "packages/time"
   ],
-  "tasks": {
-    "dev": "deno task --recursive dev",
-    "build": "deno task --recursive build"
-  },
   "lint": {
     "rules": {
       "exclude": ["no-unused-vars"]

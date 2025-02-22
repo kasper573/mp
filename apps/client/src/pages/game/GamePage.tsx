@@ -14,11 +14,11 @@ import {
   SyncClientContext,
 } from "../../integrations/sync.ts";
 import { useAreaResource } from "../../state/useAreaResource.ts";
-import { LoadingSpinner } from "../../ui/LoadingSpinner.ts";
+import { LoadingSpinner } from "../../ui/LoadingSpinner.tsx";
 import { toggleSignal } from "../../state/toggleSignal.ts";
 import * as styles from "./GamePage.css.ts";
-import { AreaDebugUI } from "./AreaDebugUI.ts";
-import { AreaScene } from "./AreaScene.ts";
+import { AreaDebugUI } from "./AreaDebugUI.tsx";
+import { AreaScene } from "./AreaScene.tsx";
 
 export default function GamePage() {
   const auth = useContext(AuthContext);

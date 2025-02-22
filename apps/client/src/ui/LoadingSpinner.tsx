@@ -1,5 +1,5 @@
 import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css.ts";
-import { Dock } from "./Dock.ts";
+import { Dock } from "./Dock.tsx";
 
 export function LoadingSpinner() {
   return (

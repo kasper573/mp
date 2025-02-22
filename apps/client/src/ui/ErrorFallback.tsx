@@ -14,7 +14,7 @@ export function ErrorFallback(error: unknown, reset?: () => unknown) {
       </Show>
       {reset && (
         <div>
-          <button onClick={reset}>Try again</button>
+          <button type="button" onClick={reset}>Try again</button>
         </div>
       )}
     </>
