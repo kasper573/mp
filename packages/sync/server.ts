@@ -34,21 +34,13 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
     });
   }
 
-  flush = async () => {
-    const promises: Promise<unknown>[] = [];
-
+  flush = () => {
     for (const [clientId, patch] of this.options.state.flush()) {
       const client = this.clients.get(clientId);
       if (client) {
-        promises.push(
-          encodeServerToClientMessage(patch).then((msg) =>
-            client.socket.send(msg),
-          ),
-        );
+        client.socket.send(encodeServerToClientMessage(patch));
       }
     }
-
-    await Promise.all(promises);
   };
 
   start = () => {

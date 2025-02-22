@@ -1,4 +1,4 @@
-import { decode, encodeAsAsyncIterable } from "cbor-x";
+import { decode, encodeAsAsyncIterable, encode } from "cbor-x";
 import type { Patch } from "./patch";
 
 const fixedDecode = <T>(buffer: ArrayBufferLike) =>
@@ -8,9 +8,9 @@ export const decodeServerToClientMessage = fixedDecode as <State>(
   data: ArrayBufferLike,
 ) => ServerToClientMessage<State>;
 
-export const encodeServerToClientMessage = encodeAsync as <State>(
+export const encodeServerToClientMessage = encode as <State>(
   message: ServerToClientMessage<State>,
-) => Promise<Uint8Array>;
+) => Uint8Array;
 
 async function encodeAsync<T>(data: T): Promise<Uint8Array> {
   return new Uint8Array(

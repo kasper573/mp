@@ -134,7 +134,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAIBehavior(worldState, areas));
 updateTicker.subscribe(movementBehavior(worldState, areas));
 updateTicker.subscribe(npcSpawnBehavior(worldState, npcService, areas));
-updateTicker.subscribe(updateTicker.encapsulateAsyncHandler(syncServer.flush));
+updateTicker.subscribe(syncServer.flush);
 characterRemoveBehavior(clients, worldState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>

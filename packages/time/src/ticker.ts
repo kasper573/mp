@@ -43,29 +43,6 @@ export class Ticker {
     }
   }
 
-  /**
-   * Emulates synchronous tick behavior of the given async tick handler
-   * by pausing the ticker and resuming it after the handler completes.
-   */
-  encapsulateAsyncHandler(
-    asyncHandler: (event: TickEvent) => Promise<unknown>,
-  ): TickEventHandler {
-    return (event) => {
-      this.stop();
-      void asyncHandler(event)
-        .catch((error) => {
-          if (this.options.onError) {
-            this.options.onError(error);
-          } else {
-            throw error;
-          }
-        })
-        .finally(() => {
-          this.start();
-        });
-    };
-  }
-
   private tick = () => {
     try {
       this.middleware({
