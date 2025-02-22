@@ -1,0 +1,5 @@
+{
+  "name": "@mp/logger",
+  "version": "0.0.0",
+  "exports": "./src/index.ts"
+}

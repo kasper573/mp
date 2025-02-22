@@ -1,5 +1,5 @@
 import { Show, useContext } from "solid-js";
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { dock } from "@mp/style";
 import { useIsRouting } from "@solidjs/router";
 import { useVersionCompatibility } from "../state/useServerVersion";
@@ -26,15 +26,17 @@ export default function AppBar() {
           <Button onClick={() => window.location.reload()}>Reload</Button>
         </Show>
 
-        {auth.isSignedIn() ? (
-          <Button role="link" onClick={() => void auth.signOut()}>
-            Sign out
-          </Button>
-        ) : (
-          <Button role="link" onClick={() => void auth.redirectToSignIn()}>
-            Sign in
-          </Button>
-        )}
+        {auth.isSignedIn()
+          ? (
+            <Button role="link" onClick={() => void auth.signOut()}>
+              Sign out
+            </Button>
+          )
+          : (
+            <Button role="link" onClick={() => void auth.redirectToSignIn()}>
+              Sign in
+            </Button>
+          )}
       </div>
     </nav>
   );

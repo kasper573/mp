@@ -1,4 +1,4 @@
-import type { ClientVisibilityFactory } from "@mp/sync/server";
+import type { ClientVisibilityFactory } from "@mp/sync-server";
 import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
 import { recordValues } from "@mp/std";
 import { clientViewDistance } from "../../shared";
@@ -28,9 +28,11 @@ function visibleActors(
 ): ReadonlySet<ActorId> {
   const visible = new Set<ActorId>();
   if (observer) {
-    for (const other of recordValues(state.actors).filter((other) =>
-      canSeeSubject(observer, other),
-    )) {
+    for (
+      const other of recordValues(state.actors).filter((other) =>
+        canSeeSubject(observer, other)
+      )
+    ) {
       visible.add(other.id);
     }
   }

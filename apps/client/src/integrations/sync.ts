@@ -1,6 +1,6 @@
 import type { Character, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
-import { SyncClient } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync-client";
 import {
   createContext,
   createEffect,
@@ -10,7 +10,7 @@ import {
   untrack,
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/auth-client";
 import type { Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { dedupe, throttle } from "../state/functionComposition";
@@ -32,7 +32,7 @@ export function createSyncClient(auth: AuthClient) {
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
   const actors = createMemo(() => Object.values(worldState.actors));
   const actorsInArea = createMemo(() =>
-    actors().filter((actor) => actor.areaId === areaId()),
+    actors().filter((actor) => actor.areaId === areaId())
   );
 
   const moveMutation = trpc.character.move.createMutation(() => ({

@@ -1,10 +1,10 @@
 import {
-  names,
-  uniqueNamesGenerator,
   adjectives,
   animals,
+  names,
+  uniqueNamesGenerator,
 } from "unique-names-generator";
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync-server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";

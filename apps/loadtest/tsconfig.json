@@ -1,7 +1,0 @@
-{
-  "extends": "@mp/tsconfig/vite.json",
-  "compilerOptions": {
-    "outDir": "dist",
-    "noEmit": false
-  }
-}

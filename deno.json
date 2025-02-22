@@ -1,0 +1,56 @@
+{
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "workspace": [
+    "apps/client",
+    "apps/e2e",
+    "apps/loadtest",
+    "apps/server",
+    "packages/auth/client",
+    "packages/auth/server",
+    "packages/data",
+    "packages/engine",
+    "packages/env",
+    "packages/logger",
+    "packages/math",
+    "packages/path-finding",
+    "packages/pixi",
+    "packages/rate-limiter",
+    "packages/solid-pixi",
+    "packages/solid-trpc",
+    "packages/state",
+    "packages/std",
+    "packages/style",
+    "packages/sync/server",
+    "packages/sync/client",
+    "packages/telemetry/faro",
+    "packages/telemetry/otel",
+    "packages/telemetry/prom",
+    "packages/tiled-loader",
+    "packages/tiled-renderer",
+    "packages/time"
+  ],
+  "tasks": {
+    "dev": "deno task --recursive dev",
+    "build": "deno task --recursive build"
+  },
+  "lint": {
+    "rules": {
+      "exclude": ["no-unused-vars"]
+    }
+  },
+  "fmt": {
+    "exclude": [
+      "apps/server/drizzle/**",
+      "docker/grafana/dashboards/**",
+      "docker/keycloak/import/**"
+    ]
+  },
+  "compilerOptions": {
+    "lib": ["ES2020", "DOM", "DOM.Iterable", "deno.ns"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "solid-js"
+  },
+  "nodeModulesDir": "auto"
+}

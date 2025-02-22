@@ -1,6 +1,6 @@
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import type { Component, ComponentProps, JSX, ParentProps } from "solid-js";
-import { useContext, Switch, Match } from "solid-js";
+import { Match, Switch, useContext } from "solid-js";
 
 export function AuthBoundary(
   props: ParentProps<{ fallback: JSX.Element }>,

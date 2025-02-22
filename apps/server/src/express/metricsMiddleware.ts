@@ -1,5 +1,5 @@
 import type express from "express";
-import type { MetricsRegistry } from "@mp/telemetry/prom";
+import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
 
 /**
  * Middleware that serves the metrics from the given registry.

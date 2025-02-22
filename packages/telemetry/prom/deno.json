@@ -1,0 +1,5 @@
+{
+  "name": "@mp/telemetry-prom",
+  "version": "0.0.0",
+  "exports": "./mod.ts"
+}

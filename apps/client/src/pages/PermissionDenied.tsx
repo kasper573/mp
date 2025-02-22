@@ -1,4 +1,4 @@
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { useContext } from "solid-js";
 import { Button } from "../ui/Button";
 

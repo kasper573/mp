@@ -1,4 +1,4 @@
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { useNavigate } from "@solidjs/router";
 import { createResource, useContext } from "solid-js";
 

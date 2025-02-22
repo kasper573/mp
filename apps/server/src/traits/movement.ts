@@ -1,6 +1,6 @@
-import { moveAlongPath, type AreaId } from "@mp/data";
+import { type AreaId, moveAlongPath } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync-server";
 import { type TickEventHandler } from "@mp/time";
 import type { Result, Tile } from "@mp/std";
 import { err, ok, recordValues } from "@mp/std";

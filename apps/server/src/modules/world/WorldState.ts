@@ -1,5 +1,5 @@
 import type { UserIdentity } from "@mp/auth";
-import type { SyncServer } from "@mp/sync/server";
+import type { SyncServer } from "@mp/sync-server";
 import type { NPCInstance } from "../npc/schema";
 import type { Character } from "../character/schema";
 

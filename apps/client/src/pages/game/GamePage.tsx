@@ -2,12 +2,12 @@ import {
   createEffect,
   Match,
   onCleanup,
+  Show,
   Switch,
   useContext,
-  Show,
 } from "solid-js";
 import { EngineContext, EngineProvider } from "@mp/engine";
-import { AuthContext } from "@mp/auth/client";
+import { AuthContext } from "@mp/auth-client";
 import { Application } from "@mp/solid-pixi";
 import { createSyncClient, SyncClientContext } from "../../integrations/sync";
 import { useAreaResource } from "../../state/useAreaResource";
@@ -33,12 +33,10 @@ export default function GamePage() {
     <SyncClientContext.Provider value={world}>
       <Switch>
         <Match
-          when={
-            world.readyState() !== "open" ||
+          when={world.readyState() !== "open" ||
             area.isLoading ||
             // AreaId would be null if the initial world state hasn't been received yet
-            !world.areaId()
-          }
+            !world.areaId()}
         >
           {/** TODO replace with specialized loading screen for loading areas */}
           <LoadingSpinner />

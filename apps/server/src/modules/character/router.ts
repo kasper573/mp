@@ -1,5 +1,5 @@
 import { type Vector } from "@mp/math";
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync-server";
 import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
 import { auth } from "../../middlewares/auth";

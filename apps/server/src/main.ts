@@ -5,11 +5,14 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import type { AuthToken } from "@mp/auth";
-import { createAuthServer } from "@mp/auth/server";
+import { createAuthServer } from "@mp/auth-client";
 import * as trpcExpress from "@trpc/server/adapters/express";
-import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
+import { createPatchStateMachine, SyncServer } from "@mp/sync-server";
 import { Ticker } from "@mp/time";
-import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
+import {
+  collectDefaultMetrics,
+  MetricsRegistry,
+} from "../../../packages/telemetry/prom/mod";
 import { createServerContextFactory } from "./context";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
@@ -76,7 +79,7 @@ const syncServer: WorldSyncServer = new SyncServer({
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
-      syncHandshakeLimiter.consume(user.id),
+      syncHandshakeLimiter.consume(user.id)
     );
   },
   onConnection: (clientId, user) => clients.add(clientId, user.id),
@@ -138,7 +141,7 @@ updateTicker.subscribe(syncServer.flush);
 characterRemoveBehavior(clients, worldState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
+  logger.info(`[ClientRegistry][${type}]`, { clientId, userId })
 );
 
 httpServer.listen(opt.port, opt.hostname, () => {

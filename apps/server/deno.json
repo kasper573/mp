@@ -1,0 +1,11 @@
+{
+  "name": "@mp/server",
+  "version": "0.0.0",
+  "exports": "./src/package.ts",
+  "tasks": {
+    "build": "deno compile --output server -A src/main.ts",
+    "dev": "deno run -A src/main.ts",
+    "inspect": "deno run --inspect src/main.ts",
+    "db": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- deno run --node-modules-dir -A npm:drizzle-kit"
+  }
+}

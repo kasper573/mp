@@ -1,21 +1,21 @@
 import { register } from "node:module";
 import {
-  NodeTracerProvider,
-  Resource,
-  registerInstrumentations,
-  ATTR_SERVICE_VERSION,
   ATTR_SERVICE_NAME,
+  ATTR_SERVICE_VERSION,
   BatchSpanProcessor,
-  OTLPTraceExporter,
-  W3CTraceContextPropagator,
+  CompressionAlgorithm,
   diag,
   DiagConsoleLogger,
   DiagLogLevel,
-  CompressionAlgorithm,
-  getNodeAutoInstrumentations,
-  WSInstrumentation,
   FsInstrumentation,
-} from "@mp/telemetry/otel";
+  getNodeAutoInstrumentations,
+  NodeTracerProvider,
+  OTLPTraceExporter,
+  registerInstrumentations,
+  Resource,
+  W3CTraceContextPropagator,
+  WSInstrumentation,
+} from "../../../packages/telemetry/otel/mod";
 import { createAddHookMessageChannel } from "import-in-the-middle";
 const { registerOptions, waitForAllMessagesAcknowledged } =
   createAddHookMessageChannel();

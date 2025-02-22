@@ -1,4 +1,4 @@
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync-server";
 import { roles } from "../../middlewares/auth";
 import { t } from "../../trpc";
 import type { WorldState } from "../../package";

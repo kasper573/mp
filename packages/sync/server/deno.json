@@ -1,0 +1,5 @@
+{
+  "name": "@mp/sync-server",
+  "version": "0.0.0",
+  "exports": "./mod.ts"
+}

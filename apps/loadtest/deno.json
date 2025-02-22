@@ -1,0 +1,8 @@
+{
+  "name": "@mp/loadtest",
+  "version": "0.0.0",
+  "exports": "./index.ts",
+  "tasks": {
+    "start": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- deno run index.ts"
+  }
+}

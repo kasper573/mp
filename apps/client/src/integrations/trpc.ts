@@ -1,11 +1,11 @@
 import type { RootRouter } from "@mp/server";
-import { transformer, tokenHeaderName } from "@mp/server";
+import { tokenHeaderName, transformer } from "@mp/server";
 import {
+  createTRPCHook,
   createTRPCSolidClient,
   httpBatchLink,
-  createTRPCHook,
 } from "@mp/solid-trpc";
-import { type AuthClient } from "@mp/auth/client";
+import { type AuthClient } from "@mp/auth-client";
 import { QueryClientContext } from "@tanstack/solid-query";
 import { useContext } from "solid-js";
 import { env } from "../env";

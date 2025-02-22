@@ -3,7 +3,7 @@ import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
 import { tokenHeaderName, transformer } from "@mp/server";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { SyncClient } from "@mp/sync/client";
+import { SyncClient } from "@mp/sync-client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -59,7 +59,7 @@ async function loadTestRPC() {
 
   const results = await Promise.allSettled(
     range(rpcRequests).map(() =>
-      trpc.area.areaFileUrl.query("forest" as AreaId),
+      trpc.area.areaFileUrl.query("forest" as AreaId)
     ),
   );
 

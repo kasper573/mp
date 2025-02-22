@@ -1,5 +1,5 @@
-import type { MetricsRegistry } from "@mp/telemetry/prom";
-import { MetricsHistogram } from "@mp/telemetry/prom";
+import type { MetricsRegistry } from "../../../../packages/telemetry/prom/mod";
+import { MetricsHistogram } from "../../../../packages/telemetry/prom/mod";
 import { beginMeasuringTimeSpan } from "@mp/time";
 import { AreaResource } from "@mp/data";
 import { tickBuckets } from "./shared";

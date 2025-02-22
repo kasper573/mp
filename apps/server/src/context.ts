@@ -1,6 +1,6 @@
 import type express from "express";
 import type { Branded } from "@mp/std";
-import type { AuthServer } from "@mp/auth/server";
+import type { AuthServer } from "@mp/auth-client";
 import type { Logger } from "@mp/logger";
 import type { AuthToken } from "@mp/auth";
 import type { ClientRegistry } from "./ClientRegistry";

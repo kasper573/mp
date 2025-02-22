@@ -6,8 +6,8 @@ import {
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
-import { useContext, onCleanup, createEffect } from "solid-js";
-import type { AuthClient } from "@mp/auth/client";
+import { createEffect, onCleanup, useContext } from "solid-js";
+import type { AuthClient } from "@mp/auth-client";
 import { env } from "../env";
 import { LoggerContext } from "../logger";
 
