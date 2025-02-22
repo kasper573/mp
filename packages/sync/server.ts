@@ -8,12 +8,11 @@ import { type HandshakeData } from "./handshake";
 import { handshakeDataFromRequest } from "./handshake";
 import type { PatchableState } from "./PatchStateMachine";
 import type { PatchStateMachine } from "./PatchStateMachine";
-import { createMessageEncoder } from "./messageEncoder";
+import { encodeServerToClientMessage } from "./messageEncoder";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
   private wss: WebSocketServer;
-  private encodeMessage = createMessageEncoder();
 
   get clientIds(): Iterable<ClientId> {
     return this.clients.keys();
@@ -42,7 +41,9 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
       const client = this.clients.get(clientId);
       if (client) {
         promises.push(
-          this.encodeMessage(patch).then((msg) => client.socket.send(msg)),
+          encodeServerToClientMessage(patch).then((msg) =>
+            client.socket.send(msg),
+          ),
         );
       }
     }

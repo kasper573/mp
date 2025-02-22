@@ -115,7 +115,7 @@ export class SyncClient<State extends object> {
   };
 
   private handleMessage = async (event: MessageEvent) => {
-    const patch = decodeServerToClientMessage<State>(
+    const patch = decodeServerToClientMessage(
       await (event.data as Blob).arrayBuffer(),
     );
 
