@@ -5,7 +5,7 @@ import { Game } from "./game/Game";
 export default function HomePage() {
   return (
     <UserIdentityContext.Provider value={() => guestIdentity}>
-      <Game />
+      <Game interactive={false} />
     </UserIdentityContext.Provider>
   );
 }

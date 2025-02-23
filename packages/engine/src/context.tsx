@@ -10,10 +10,15 @@ export const EngineContext = createContext<Engine>(
   }),
 );
 
-export function EngineProvider(props: ParentProps<{ viewport: HTMLElement }>) {
+export function EngineProvider(
+  props: ParentProps<{
+    viewport: HTMLElement;
+    interactive: boolean;
+  }>,
+) {
   const engine = createMemo(() => {
     const engine = new Engine(props.viewport);
-    engine.start();
+    engine.start(props.interactive);
     onCleanup(engine.stop);
     return engine;
   });

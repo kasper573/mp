@@ -16,7 +16,7 @@ import { AreaDebugUI } from "./AreaDebugUI";
 import { AreaScene } from "./AreaScene";
 import * as styles from "./Game.css";
 
-export function Game() {
+export function Game(props: { interactive: boolean }) {
   const world = createSyncClient();
   const area = useAreaResource(world.areaId);
   const [debug, toggleDebug] = toggleSignal();
@@ -45,8 +45,13 @@ export function Game() {
           {(data) => (
             <Application class={styles.container}>
               {({ viewport }) => (
-                <EngineProvider viewport={viewport}>
-                  <Keybindings toggleDebug={toggleDebug} />
+                <EngineProvider
+                  viewport={viewport}
+                  interactive={props.interactive}
+                >
+                  {props.interactive && (
+                    <Keybindings toggleDebug={toggleDebug} />
+                  )}
                   <AreaScene area={data}>
                     <Show when={debug()}>
                       <AreaDebugUI
