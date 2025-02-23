@@ -24,18 +24,7 @@ export function createTRPCClient() {
       }),
     ],
     createRequestContext,
-    createMutationHandler() {
-      const query = useContext(QueryClientContext);
-      const logger = useContext(LoggerContext);
-      return function onMutation({ meta: { invalidateCache = true } = {} }) {
-        if (invalidateCache) {
-          // Invalidate all queries on successful mutations
-          // This is a bit inefficient, but it promotes correctness over performance.
-          logger.info("Invalidating all queries due to successful mutation");
-          void query?.().invalidateQueries();
-        }
-      };
-    },
+    createMutationHandler,
   });
 }
 
@@ -46,4 +35,17 @@ type RequestContext = ReturnType<typeof createRequestContext>;
 function createRequestContext() {
   const identity = useContext(UserIdentityContext);
   return { identity };
+}
+
+function createMutationHandler() {
+  const query = useContext(QueryClientContext);
+  const logger = useContext(LoggerContext);
+  return function onMutation({ meta: { invalidateCache = true } = {} }) {
+    if (invalidateCache) {
+      // Invalidate all queries on successful mutations
+      // This is a bit inefficient, but it promotes correctness over performance.
+      logger.info("Invalidating all queries due to successful mutation");
+      void query?.().invalidateQueries();
+    }
+  };
 }
