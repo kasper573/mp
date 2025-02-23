@@ -8,11 +8,13 @@ import { type HandshakeData } from "./handshake";
 import { handshakeDataFromRequest } from "./handshake";
 import type { PatchableState } from "./PatchStateMachine";
 import type { PatchStateMachine } from "./PatchStateMachine";
-import { encodeServerToClientMessage } from "./messageEncoder";
+import type { MessageEncoder } from "./messageEncoder";
+import { createMessageEncoder } from "./messageEncoder";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
   private wss: WebSocketServer;
+  private encoder?: MessageEncoder;
 
   get clientIds(): Iterable<ClientId> {
     return this.clients.keys();
@@ -35,15 +37,17 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
   }
 
   flush = async () => {
+    if (!this.encoder) {
+      throw new Error("Cannot flush without initializing an encoder");
+    }
+
     const promises: Promise<unknown>[] = [];
 
     for (const [clientId, patch] of this.options.state.flush()) {
       const client = this.clients.get(clientId);
       if (client) {
         promises.push(
-          encodeServerToClientMessage(patch).then((msg) =>
-            client.socket.send(msg),
-          ),
+          this.encoder.encode(patch).then((msg) => client.socket.send(msg)),
         );
       }
     }
@@ -52,11 +56,15 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
   };
 
   start = () => {
+    this.stop();
+    this.encoder = createMessageEncoder();
     this.wss.addListener("connection", this.onConnection);
     this.wss.addListener("close", this.handleClose);
   };
 
   stop = () => {
+    this.encoder?.dispose();
+    this.encoder = undefined;
     this.wss.removeListener("connection", this.onConnection);
     this.wss.removeListener("close", this.handleClose);
   };

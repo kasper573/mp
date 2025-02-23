@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "tsc",
-    "start": "tsx  --import ./src/otel.ts src/main.ts",
+    "start": "tsx src/main.otel.ts",
     "watch": "tsx watch src/main.ts",
     "db": "drizzle-kit",
     "dev": "pnpm devenv watch",
