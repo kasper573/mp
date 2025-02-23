@@ -63,9 +63,7 @@ export function createCharacterRouter({
           return existingCharacter.id;
         }
 
-        const char = await characterService.getOrCreateCharacterForUser(
-          user.id,
-        );
+        const char = await characterService.getOrCreateCharacterForUser(user);
         state.actors.set(char.id, { type: "character", ...char });
         return char.id;
       }),

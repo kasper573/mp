@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { UserId } from "@mp/auth";
+import type { UserId, UserIdentity } from "@mp/auth";
 import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
@@ -24,27 +24,31 @@ export class CharacterService {
     this.defaultAreaId = [...areas.keys()][0];
   }
 
-  async getCharacterForUser(userId: UserId): Promise<Character | undefined> {
+  private async getCharacterForUser(
+    user: UserIdentity,
+  ): Promise<Character | undefined> {
     const [char] = await this.db
       .select()
       .from(characterTable)
-      .where(eq(characterTable.userId, userId))
+      .where(eq(characterTable.userId, user.id))
       .limit(1);
 
     return char
       ? {
           ...char,
-          ...characterAppearance(userId),
-          name: uniqueNamesGenerator({
-            dictionaries: [names],
-            seed: char.id,
-          }),
+          ...characterAppearance(user.id),
+          name:
+            user.name ??
+            uniqueNamesGenerator({
+              dictionaries: [names],
+              seed: char.id,
+            }),
         }
       : undefined;
   }
 
-  async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
-    const char = await this.getCharacterForUser(userId);
+  async getOrCreateCharacterForUser(user: UserIdentity): Promise<Character> {
+    const char = await this.getCharacterForUser(user);
 
     if (char) {
       return char;
@@ -62,8 +66,8 @@ export class CharacterService {
       areaId: area.id,
       coords: area.start,
       speed: 3 as Tile,
-      userId,
-      ...characterAppearance(userId),
+      userId: user.id,
+      ...characterAppearance(user.id),
     };
 
     const [returned] = await this.db
@@ -78,10 +82,12 @@ export class CharacterService {
     return {
       ...input,
       ...returned,
-      name: uniqueNamesGenerator({
-        dictionaries: [names],
-        seed: returned.id,
-      }),
+      name:
+        user.name ??
+        uniqueNamesGenerator({
+          dictionaries: [names],
+          seed: returned.id,
+        }),
     };
   }
 }
