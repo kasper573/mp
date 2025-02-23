@@ -5,6 +5,8 @@ import type { Tile } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
+import { guestIdentity } from "../../shared";
+import type { AppearanceTrait } from "../../package";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 
@@ -32,7 +34,7 @@ export class CharacterService {
     return char
       ? {
           ...char,
-          color: playerColor,
+          ...characterAppearance(userId),
           name: uniqueNamesGenerator({
             dictionaries: [names],
             seed: char.id,
@@ -61,7 +63,7 @@ export class CharacterService {
       coords: area.start,
       speed: 3 as Tile,
       userId,
-      color: playerColor,
+      ...characterAppearance(userId),
     };
 
     const [returned] = await this.db
@@ -84,4 +86,10 @@ export class CharacterService {
   }
 }
 
-const playerColor = 0x00_ff_00;
+function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
+  if (userId === guestIdentity.id) {
+    // The guest is invisible because the guest is only used to show an observer UI of the game on the home screen
+    return { color: 0, opacity: 0 };
+  }
+  return { color: 0x00_ff_00 };
+}

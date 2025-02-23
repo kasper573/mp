@@ -20,6 +20,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
       color={props.actor.color}
       position={props.tiled.tileCoordToWorld(coords())}
       name={props.actor.name}
+      opacity={props.actor.opacity}
     />
   );
 }
@@ -38,8 +39,12 @@ function ActorGraphics(
 
   createEffect(() => {
     const { x: width, y: height } = props.tileSize;
+
     gfx.clear();
     gfx.fillStyle.color = props.color;
+    if (props.opacity !== undefined) {
+      container.alpha = props.opacity;
+    }
     gfx.rect(-width / 2, -height / 2, width, height);
     gfx.fill();
   });
