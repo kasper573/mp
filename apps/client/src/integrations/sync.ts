@@ -13,13 +13,13 @@ import {
 import { vec_equals, type Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
+import { AuthContext } from "@mp/auth/client";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { useTRPC } from "./trpc";
-import { UserIdentityContext } from "./userIdentity";
 
 export function createSyncClient() {
-  const identity = useContext(UserIdentityContext);
+  const { identity } = useContext(AuthContext);
   const trpc = useTRPC();
   const id = createMemo(() => identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({

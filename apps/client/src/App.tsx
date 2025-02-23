@@ -8,7 +8,6 @@ import { createQueryClient } from "./integrations/query";
 import { env } from "./env";
 import { createFaroClient, useFaroIntegration } from "./integrations/faro";
 import { createTRPCClient } from "./integrations/trpc";
-import { UserIdentityContext } from "./integrations/userIdentity";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -21,17 +20,17 @@ const query = createQueryClient();
 const faro = createFaroClient();
 const trpc = createTRPCClient();
 
+void auth.refresh();
+
 export default function App() {
   useFaroIntegration(faro, auth);
   return (
-    <UserIdentityContext.Provider value={auth.identity}>
-      <AuthContext.Provider value={auth}>
-        <QueryClientProvider client={query}>
-          <TRPCClientContext.Provider value={trpc}>
-            <Router root={Layout}>{routes}</Router>
-          </TRPCClientContext.Provider>
-        </QueryClientProvider>
-      </AuthContext.Provider>
-    </UserIdentityContext.Provider>
+    <AuthContext.Provider value={auth}>
+      <QueryClientProvider client={query}>
+        <TRPCClientContext.Provider value={trpc}>
+          <Router root={Layout}>{routes}</Router>
+        </TRPCClientContext.Provider>
+      </QueryClientProvider>
+    </AuthContext.Provider>
   );
 }

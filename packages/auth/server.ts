@@ -12,7 +12,6 @@ export interface AuthServerOptions {
   issuer: string;
   audience: string;
   algorithms: AuthAlgorithm[];
-  guestIdentity: UserIdentity;
 }
 
 export interface AuthServer {
@@ -24,7 +23,6 @@ export function createAuthServer({
   issuer,
   audience,
   algorithms,
-  guestIdentity,
 }: AuthServerOptions): AuthServer {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
@@ -32,10 +30,6 @@ export function createAuthServer({
     async verifyToken(token) {
       if (token === undefined) {
         return err("A token must be provided");
-      }
-
-      if (token === guestIdentity.token) {
-        return ok(guestIdentity);
       }
 
       let jwtPayload;

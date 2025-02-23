@@ -33,7 +33,6 @@ import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
 import { deriveClientVisibility } from "./modules/world/clientVisibility";
-import { guestIdentity } from "./shared";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -41,7 +40,7 @@ logger.info(`Server started with options`, opt);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const auth = createAuthServer({ ...opt.auth, guestIdentity });
+const auth = createAuthServer(opt.auth);
 const db = createDBClient(opt.databaseUrl, logger);
 
 const webServer = express()
