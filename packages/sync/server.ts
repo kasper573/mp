@@ -9,7 +9,7 @@ import { handshakeDataFromRequest } from "./handshake";
 import type { PatchableState } from "./PatchStateMachine";
 import type { PatchStateMachine } from "./PatchStateMachine";
 import type { MessageEncoder } from "./messageEncoder";
-import { createMessageEncoder } from "./messageEncoder";
+import { createSyncEncoder, createWorkerThreadEncoder } from "./messageEncoder";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
@@ -57,7 +57,10 @@ export class SyncServer<State extends PatchableState, HandshakeReturn> {
 
   start = () => {
     this.stop();
-    this.encoder = createMessageEncoder();
+    this.encoder =
+      this.options.encoder === "sync"
+        ? createSyncEncoder()
+        : createWorkerThreadEncoder();
     this.wss.addListener("connection", this.onConnection);
     this.wss.addListener("close", this.handleClose);
   };
@@ -122,6 +125,7 @@ export interface SyncServerOptions<
   HandshakeReturn,
 > {
   path: string;
+  encoder: "sync" | "worker";
   state: PatchStateMachine<State>;
   httpServer: http.Server;
   handshake: (

@@ -72,6 +72,7 @@ const worldState = createPatchStateMachine<WorldState>({
 const syncServer: WorldSyncServer = new SyncServer({
   logger,
   httpServer,
+  encoder: opt.syncPatchEncoder,
   path: opt.wsEndpointPath,
   state: worldState,
   async handshake(_, { token }) {
