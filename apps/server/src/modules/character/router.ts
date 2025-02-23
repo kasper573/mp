@@ -2,7 +2,7 @@ import { type Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
-import { auth } from "../../middlewares/auth";
+import { auth, roles } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import { type WorldState } from "../world/WorldState";
 import { moveTo } from "../../traits/movement";
@@ -25,7 +25,7 @@ export function createCharacterRouter({
   return t.router({
     move: t.procedure
       .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
-      .use(auth())
+      .use(roles(["move_character"]))
       .mutation(({ input: { characterId, to }, ctx: { user } }) => {
         const char = state.actors()[characterId];
 
