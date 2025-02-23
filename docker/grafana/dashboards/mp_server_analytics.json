@@ -281,7 +281,7 @@
             "uid": "loki"
           },
           "editorMode": "code",
-          "expr": "{service_name=\"mp-server\"}",
+          "expr": "{service_name=\"docker-mp-server-1\"}",
           "queryType": "range",
           "refId": "A"
         }
