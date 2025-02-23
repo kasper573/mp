@@ -1,7 +1,11 @@
+import { guestIdentity } from "@mp/server";
+import { UserIdentityContext } from "../integrations/userIdentity";
+import { Game } from "./game/Game";
+
 export default function HomePage() {
   return (
-    <div>
-      <h1>Welcome</h1>
-    </div>
+    <UserIdentityContext.Provider value={() => guestIdentity}>
+      <Game />
+    </UserIdentityContext.Provider>
   );
 }

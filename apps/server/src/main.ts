@@ -4,12 +4,12 @@ import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import type { AuthToken } from "@mp/auth";
 import { createAuthServer } from "@mp/auth/server";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
+import type { AuthToken } from "@mp/auth";
 import { createServerContextFactory } from "./context";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
@@ -33,6 +33,7 @@ import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
 import { deriveClientVisibility } from "./modules/world/clientVisibility";
+import { guestIdentity } from "./shared";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -40,7 +41,7 @@ logger.info(`Server started with options`, opt);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const auth = createAuthServer(opt.auth);
+const auth = createAuthServer({ ...opt.auth, guestIdentity });
 const db = createDBClient(opt.databaseUrl, logger);
 
 const webServer = express()
@@ -114,8 +115,7 @@ const trpcRouter = createRootRouter({
 webServer.use(
   opt.apiEndpointPath,
   trpcExpress.createExpressMiddleware({
-    onError: ({ path, error }) =>
-      logger.error(`[trpc error][${path}]: ${error.message}`),
+    onError: ({ path, error }) => logger.error(error),
     router: trpcRouter,
     createContext: createServerContextFactory(
       auth,
