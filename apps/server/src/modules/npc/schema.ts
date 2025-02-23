@@ -1,5 +1,5 @@
-import { integer, pgTable, uuid } from "drizzle-orm/pg-core";
-import { relations } from "drizzle-orm";
+import { integer, pgTable, uuid } from "npm:drizzle-orm/pg-core";
+import { relations } from "npm:drizzle-orm";
 import type { Branded, Tile } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement.ts";
 import type { AppearanceTrait } from "../../traits/appearance.ts";

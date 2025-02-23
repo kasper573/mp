@@ -1,4 +1,4 @@
-import pako from "pako";
+import pako from "npm:pako";
 
 export const decompressors = {
   zlib: pako.inflate,

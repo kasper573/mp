@@ -3,7 +3,7 @@ import {
   animals,
   names,
   uniqueNamesGenerator,
-} from "unique-names-generator";
+} from "npm:unique-names-generator";
 import type { PatchStateMachine } from "@mp/sync-server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";

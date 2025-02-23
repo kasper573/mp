@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq } from "npm:drizzle-orm";
 import type { DBClient } from "../../db/client.ts";
 import { npcSpawnTable, npcTable } from "./schema.ts";
 

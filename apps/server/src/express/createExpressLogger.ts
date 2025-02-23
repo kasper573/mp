@@ -1,5 +1,5 @@
 import type { Logger } from "@mp/logger";
-import type express from "express";
+import type express from "npm:express";
 
 export function createExpressLogger(logger: Logger): express.RequestHandler {
   return (req, _, next) => {
