@@ -24,6 +24,7 @@
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "cbor-x": "1.6.0",
+    "piscina": "5.0.0-alpha.0",
     "ws": "8.18.0"
   },
   "devDependencies": {

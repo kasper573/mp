@@ -1,6 +1,18 @@
-import { encode } from "cbor-x";
+import Piscina from "piscina";
 import type { Patch } from "./patch";
 
-export function encodeServerToClientMessage(patch: Patch): Promise<Uint8Array> {
-  return Promise.resolve(encode(patch));
+export type MessageEncoder = ReturnType<typeof createMessageEncoder>;
+
+export function createMessageEncoder() {
+  const piscina = new Piscina({
+    filename: new URL("messageEncoder.worker.mjs", import.meta.url).href,
+  });
+  return {
+    encode(patch: Patch): Promise<Uint8Array> {
+      return piscina.run(patch);
+    },
+    dispose() {
+      void piscina.close();
+    },
+  };
 }
