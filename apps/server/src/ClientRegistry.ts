@@ -2,7 +2,7 @@ import type { UserId } from "@mp/auth";
 import type { ClientId } from "@mp/sync/server";
 
 export class ClientRegistry {
-  map = new Map<ClientId, UserId>();
+  private map = new Map<ClientId, UserId>();
   private eventHandlers = new Set<ClientRegistryEventHandler>();
 
   add(clientId: ClientId, userId: UserId) {
@@ -22,8 +22,8 @@ export class ClientRegistry {
     return new Set(this.map.keys());
   }
 
-  getUserCount() {
-    return this.map.size;
+  getUserCount(): number {
+    return new Set(this.map.values()).size;
   }
 
   getUserId(clientId: ClientId): UserId | undefined {
