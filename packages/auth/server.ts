@@ -65,7 +65,9 @@ export function createAuthServer({
         id: jwtPayload.sub as UserId,
         token,
         roles: new Set(jwtPayload.realm_access.roles),
-        name: jwtPayload.name ? String(jwtPayload.name) : undefined,
+        name: jwtPayload.preferred_username
+          ? String(jwtPayload.preferred_username)
+          : undefined,
       };
 
       return ok(user);
