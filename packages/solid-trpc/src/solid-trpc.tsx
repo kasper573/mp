@@ -22,7 +22,8 @@ import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy";
 
 export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
-  createMutationHandler: onMutation,
+  createMutationHandler,
+  createRequestContext,
   ...clientOptions
 }: TRPCSolidClientOptions<TRouter>): TRPCSolidClient<TRouter> {
   const client = createTRPCClient(clientOptions);
@@ -30,12 +31,17 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
     const last = path.at(-1);
     switch (last) {
       case createQueryProperty:
-        return createTRPCQueryFn(client, path.slice(0, -1)) as AnyFunction;
+        return createTRPCQueryFn(
+          client,
+          path.slice(0, -1),
+          createRequestContext,
+        ) as AnyFunction;
       case createMutationProperty:
         return createTRPCMutationFn(
           client,
           path.slice(0, -1),
-          onMutation,
+          createMutationHandler,
+          createRequestContext,
         ) as AnyFunction;
       default:
         // Safe to assume that the path represents a function,
@@ -50,13 +56,15 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
 function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
   trpc: CreateTRPCClient<TRouter>,
   path: string[],
+  createRequestContext: RequestContextFactory | undefined,
 ): CreateQueryFn<AnyProcedure> {
-  return (createOptions) =>
-    createQuery(() => {
+  return (createOptions) => {
+    const context = createRequestContext?.();
+    return createQuery(() => {
       const options = createOptions?.();
       async function queryFn() {
         const query = getPropAt(trpc, [...path, "query"]) as AnyFunction;
-        const result = await query(options?.input);
+        const result = await query(options?.input, { context });
         if (options?.map) {
           return options.map(result, options.input);
         }
@@ -68,19 +76,22 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
         ...options,
       };
     });
+  };
 }
 
 function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
   trpc: CreateTRPCClient<TRouter>,
   path: string[],
-  createMutationHandler?: CreateMutationHandler,
+  createMutationHandler: MutationHandlerFactory | undefined,
+  createRequestContext: RequestContextFactory | undefined,
 ): CreateMutationFn<AnyProcedure> {
   return (createOptions) => {
     const onMutation = createMutationHandler?.();
+    const context = createRequestContext?.();
     return createMutation(() => {
       async function mutationFn(input: unknown) {
         const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
-        const output = await mutate(input);
+        const output = await mutate(input, { context });
         const { map, meta } = createOptions?.() ?? {};
         await onMutation?.({ input, output, meta });
         return map ? map(output, input) : output;
@@ -119,10 +130,13 @@ export interface TRPCSolidClientLike {
 
 export interface TRPCSolidClientOptions<TRouter extends AnyTRPCRouter>
   extends CreateTRPCClientOptions<TRouter> {
-  createMutationHandler?: CreateMutationHandler;
+  createMutationHandler?: MutationHandlerFactory;
+  createRequestContext?: RequestContextFactory;
 }
 
-export type CreateMutationHandler = () => (opt: {
+export type RequestContextFactory = () => unknown;
+
+export type MutationHandlerFactory = () => (opt: {
   input: unknown;
   output: unknown;
   meta: MutationOptions["meta"];

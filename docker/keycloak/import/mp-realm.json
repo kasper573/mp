@@ -63,6 +63,7 @@
         "composite": true,
         "composites": {
           "realm": [
+            "move_character",
             "offline_access",
             "uma_authorization"
           ],
@@ -81,6 +82,15 @@
         "id": "52cf1767-73ab-4127-b754-e4b33cd9c176",
         "name": "offline_access",
         "description": "${role_offline-access}",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
+        "attributes": {}
+      },
+      {
+        "id": "1a0c46ea-9489-4fa9-a157-4dd4df5bf61e",
+        "name": "move_character",
+        "description": "",
         "composite": false,
         "clientRole": false,
         "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",

@@ -26,9 +26,11 @@ export class Engine {
     this.keyboard = new Keyboard(window);
   }
 
-  start = () => {
-    this.pointer.start();
-    this.keyboard.start();
+  start = (interactive: boolean) => {
+    if (interactive) {
+      this.pointer.start();
+      this.keyboard.start();
+    }
     this.#isRunning = true;
     requestAnimationFrame(this.nextFrame);
     this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);

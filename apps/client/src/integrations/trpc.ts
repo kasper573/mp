@@ -5,26 +5,25 @@ import {
   httpBatchLink,
   createTRPCHook,
 } from "@mp/solid-trpc";
-import { type AuthClient } from "@mp/auth/client";
 import { QueryClientContext } from "@tanstack/solid-query";
 import { useContext } from "solid-js";
 import { env } from "../env";
 import { LoggerContext } from "../logger";
+import { UserIdentityContext } from "./userIdentity";
 
-export function createTRPCClient(auth: AuthClient) {
+export function createTRPCClient() {
   return createTRPCSolidClient<RootRouter>({
     links: [
       httpBatchLink({
         url: env.apiUrl,
         transformer,
-        async headers() {
-          await auth.refresh(); // Ensure we have the latest user identity
-          return {
-            [tokenHeaderName]: auth.identity()?.token ?? "",
-          };
+        headers({ opList: [{ context }] }) {
+          const { identity } = context as RequestContext;
+          return { [tokenHeaderName]: identity()?.token ?? "" };
         },
       }),
     ],
+    createRequestContext,
     createMutationHandler() {
       const query = useContext(QueryClientContext);
       const logger = useContext(LoggerContext);
@@ -41,3 +40,10 @@ export function createTRPCClient(auth: AuthClient) {
 }
 
 export const useTRPC = createTRPCHook<RootRouter>();
+
+type RequestContext = ReturnType<typeof createRequestContext>;
+
+function createRequestContext() {
+  const identity = useContext(UserIdentityContext);
+  return { identity };
+}

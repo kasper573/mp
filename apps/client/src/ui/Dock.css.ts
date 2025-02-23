@@ -11,6 +11,7 @@ export const dock = recipe({
         { transform: "translate(-50%, -50%)" },
       ],
       topRight: atoms({ top: 0, right: 0 }),
+      top: atoms({ top: 0, right: 0, left: 0 }),
     },
   },
 });

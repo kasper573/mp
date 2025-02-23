@@ -8,20 +8,22 @@ import {
   createSignal,
   onCleanup,
   untrack,
+  useContext,
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
-import type { AuthClient } from "@mp/auth/client";
 import type { Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { dedupe, throttle } from "../state/functionComposition";
 import { env } from "../env";
 import { useTRPC } from "./trpc";
+import { UserIdentityContext } from "./userIdentity";
 
-export function createSyncClient(auth: AuthClient) {
+export function createSyncClient() {
+  const identity = useContext(UserIdentityContext);
   const trpc = useTRPC();
-  const id = createMemo(() => auth.identity()?.id);
+  const id = createMemo(() => identity()?.id);
   const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
-    token: auth.identity()?.token,
+    token: identity()?.token,
   }));
   const worldState = createMutable<WorldState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
