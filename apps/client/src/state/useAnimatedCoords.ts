@@ -11,6 +11,7 @@ import {
   createMemo,
   batch,
   createSignal,
+  untrack,
 } from "solid-js";
 
 /**
@@ -34,7 +35,25 @@ export function useAnimatedCoords<T extends number>(
     }
   });
 
-  createEffect(() => setLocalPath(path_copy(externalPath())));
+  createEffect(() => {
+    const newPath = externalPath();
+    const currentPath = untrack(localPath);
+
+    // Sometimes when the server sends a "client has stopped moving" state,
+    // there is a race condition that can happen where the client side interpolator
+    // is not finished interpolating the final segment of the path.
+    // if we then trust the server stop message and stop interpolating,
+    // the entity will not end up on a full tile and instead stop somewhere in between.
+    const problemCanOccurWhen = currentPath?.length === 1 && !newPath?.length;
+    if (problemCanOccurWhen) {
+      // Just trust that it's okay to ignore the new path and let the local path finish interpolating and then unset itself locally.
+      // This may be problematic in the future, because clients could theoretically ignore actual stop signals,
+      // ie. certain game mechanics like "stun" or "root" effects that should indeed stun immediately,
+      // but this should be fine for now.
+    } else {
+      setLocalPath(path_copy(newPath));
+    }
+  });
 
   if (snapDistance) {
     createEffect(() => {
