@@ -36,3 +36,9 @@ export interface Vector<T extends number> {
 }
 
 export type Path<T extends number> = readonly Vector<T>[];
+
+export function vec_zero<T extends number>(): Vector<T> {
+  return vec_zero_const as Vector<T>;
+}
+
+const vec_zero_const = vec(0, 0);
