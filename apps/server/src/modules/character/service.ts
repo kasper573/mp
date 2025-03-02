@@ -3,6 +3,7 @@ import type { UserId, UserIdentity } from "@mp/auth";
 import type { AreaId } from "@mp/data";
 import type { Tile } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
+import { rect_from_diameter, vec_zero } from "@mp/math";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
 import type { AppearanceTrait } from "../../package";
@@ -36,6 +37,7 @@ export class CharacterService {
       ? {
           ...char,
           ...characterAppearance(user.id),
+          hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
           name:
             user.name ??
             uniqueNamesGenerator({
@@ -81,6 +83,7 @@ export class CharacterService {
     return {
       ...input,
       ...returned,
+      hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
       name:
         user.name ??
         uniqueNamesGenerator({

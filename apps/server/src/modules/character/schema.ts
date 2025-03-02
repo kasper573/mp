@@ -5,6 +5,7 @@ import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
 import { vector } from "../../db/types/vector";
+import type { CombatTrait } from "../../traits/combat";
 
 export const userId = () => uuid().$type<UserId>();
 
@@ -23,6 +24,7 @@ type DBCharacter = typeof characterTable.$inferSelect;
 export interface Character
   extends DBCharacter,
     MovementTrait,
-    AppearanceTrait {}
+    AppearanceTrait,
+    CombatTrait {}
 
 export type CharacterId = Branded<string, "CharacterId">;

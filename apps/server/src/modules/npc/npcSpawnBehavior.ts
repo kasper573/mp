@@ -8,7 +8,13 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";
-import { clamp, vec, type Vector } from "@mp/math";
+import {
+  clamp,
+  rect_from_diameter,
+  vec,
+  vec_zero,
+  type Vector,
+} from "@mp/math";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { NPCInstanceId, WorldState } from "../../package";
@@ -78,6 +84,7 @@ export function createNpcInstance(
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
     name,
+    hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
   };
 }
 

@@ -4,6 +4,7 @@ import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
+import type { ActorId } from "../world/WorldState";
 import { type WorldState } from "../world/WorldState";
 import { moveTo } from "../../traits/movement";
 import type { AreaLookup } from "../area/loadAreas";
@@ -49,6 +50,34 @@ export function createCharacterRouter({
         }
 
         state.actors.update(char.id, { path: result.value.path });
+      }),
+
+    attack: t.procedure
+      .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
+      .use(roles(["character_attack"]))
+      .mutation(({ input: { characterId, targetId }, ctx: { user } }) => {
+        const char = state.actors()[characterId];
+
+        if (!char || char.type !== "character") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Character not found",
+          });
+        }
+
+        if (char.userId !== user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this character",
+          });
+        }
+
+        // const result = moveTo(char, areas, to);
+        // if (result.isErr()) {
+        //   throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+        // }
+
+        //state.actors.update(char.id, { path: result.value.path });
       }),
 
     join: t.procedure

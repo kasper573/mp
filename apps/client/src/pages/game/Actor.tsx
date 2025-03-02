@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from "@mp/pixi";
-import type { Vector } from "@mp/math";
+import { vec_scale, type Rect, type Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
 import { createEffect, Show } from "solid-js";
@@ -16,6 +16,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   );
   return (
     <ActorGraphics
+      hitBox={props.actor.hitBox}
       tileSize={props.tiled.tileSize}
       color={props.actor.color}
       position={props.tiled.tileCoordToWorld(coords())}
@@ -27,6 +28,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
 
 function ActorGraphics(
   props: {
+    hitBox: Rect<Tile>;
     tileSize: Vector<Pixel>;
     position?: Vector<Pixel>;
   } & AppearanceTrait,
@@ -38,7 +40,10 @@ function ActorGraphics(
   container.addChild(text);
 
   createEffect(() => {
-    const { x: width, y: height } = props.tileSize;
+    const { x: width, y: height } = vec_scale(props.tileSize, {
+      x: props.hitBox.width,
+      y: props.hitBox.height,
+    });
 
     gfx.clear();
     gfx.fillStyle.color = props.color;
