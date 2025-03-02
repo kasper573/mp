@@ -33,9 +33,9 @@ export function combatBehavior(
     }
 
     const target = state.actors()[actor.attackTargetId];
-    if (!target) {
+    if (!target || target.areaId !== actor.areaId) {
       state.actors.update(actor.id, { attackTargetId: undefined });
-      return; // target doesnt exist
+      return; // target doesnt exist in area
     }
 
     const distance = vec_distance(actor.coords, target.coords);
