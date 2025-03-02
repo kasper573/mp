@@ -1,10 +1,10 @@
 import { Container, Graphics, Text } from "@mp/pixi";
-import { vec_scale, type Rect, type Vector } from "@mp/math";
+import { vec_scale } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { TiledResource } from "@mp/data";
-import { createEffect, Show } from "solid-js";
-import type { AppearanceTrait, Actor } from "@mp/server";
-import type { Pixel, Tile } from "@mp/std";
+import { createEffect, createMemo, Show } from "solid-js";
+import type { Actor } from "@mp/server";
+import type { Tile } from "@mp/std";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
@@ -14,25 +14,9 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
     () => props.actor.speed,
     () => 2 as Tile, // Magic number, no reason other than it seems to work well
   );
-  return (
-    <ActorGraphics
-      hitBox={props.actor.hitBox}
-      tileSize={props.tiled.tileSize}
-      color={props.actor.color}
-      position={props.tiled.tileCoordToWorld(coords())}
-      name={props.actor.name}
-      opacity={props.actor.opacity}
-    />
-  );
-}
 
-function ActorGraphics(
-  props: {
-    hitBox: Rect<Tile>;
-    tileSize: Vector<Pixel>;
-    position?: Vector<Pixel>;
-  } & AppearanceTrait,
-) {
+  const position = createMemo(() => props.tiled.tileCoordToWorld(coords()));
+
   const container = new Container();
   const gfx = new Graphics();
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
@@ -40,26 +24,26 @@ function ActorGraphics(
   container.addChild(text);
 
   createEffect(() => {
-    const { x: width, y: height } = vec_scale(props.tileSize, {
-      x: props.hitBox.width,
-      y: props.hitBox.height,
+    const { hitBox, opacity, color } = props.actor;
+    const { x: width, y: height } = vec_scale(props.tiled.tileSize, {
+      x: hitBox.width,
+      y: hitBox.height,
     });
 
     gfx.clear();
-    gfx.fillStyle.color = props.color;
-    if (props.opacity !== undefined) {
-      container.alpha = props.opacity;
-    }
+    gfx.fillStyle.color = color;
+    container.alpha = opacity ?? 1;
     gfx.rect(-width / 2, -height / 2, width, height);
     gfx.fill();
   });
 
   createEffect(() => {
-    text.text = props.name;
+    const { name, health, maxHealth } = props.actor;
+    text.text = name + `\n${health}/${maxHealth}`;
   });
 
   return (
-    <Show when={props.position}>
+    <Show when={position()}>
       {(pos) => <Pixi label="Actor" as={container} position={pos()} />}
     </Show>
   );

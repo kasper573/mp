@@ -67,6 +67,9 @@ export class CharacterService {
       areaId: area.id,
       coords: area.start,
       speed: 3 as Tile,
+      health: 100,
+      maxHealth: 100,
+      attack: 5,
       userId: user.id,
       ...characterAppearance(user.id),
     };

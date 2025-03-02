@@ -6,6 +6,7 @@ export type * from "./modules/world/WorldState";
 export type * from "./context";
 export type * from "./modules/router";
 export type * from "./traits/appearance";
+export type * from "./traits/combat";
 export type * from "./traits/movement";
 export type { ServerOptions } from "./options";
 

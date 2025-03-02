@@ -72,12 +72,15 @@ export function createCharacterRouter({
           });
         }
 
-        // const result = moveTo(char, areas, to);
-        // if (result.isErr()) {
-        //   throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
-        // }
+        const target = state.actors()[targetId];
+        if (!target) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Target not found",
+          });
+        }
 
-        //state.actors.update(char.id, { path: result.value.path });
+        state.actors.update(targetId, { health: target.health - char.attack });
       }),
 
     join: t.procedure

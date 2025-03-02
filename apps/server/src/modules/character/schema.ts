@@ -17,6 +17,9 @@ export const characterTable = pgTable("character", {
   areaId: areaId().notNull(),
   speed: integer().$type<Tile>().notNull(),
   userId: userId().notNull(),
+  health: integer().notNull(),
+  maxHealth: integer().notNull(),
+  attack: integer().notNull(),
 });
 
 type DBCharacter = typeof characterTable.$inferSelect;

@@ -85,6 +85,9 @@ export function createNpcInstance(
     color: 0xff_00_00, // Hard coded to enemy color for now
     name,
     hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
+    health: 25,
+    maxHealth: 25,
+    attack: 5,
   };
 }
 
