@@ -3,7 +3,7 @@ import { rect_from_diameter, rect_hit_test } from "@mp/math";
 import { recordValues } from "@mp/std";
 import { clientViewDistance } from "../../shared";
 import type { ClientRegistry } from "../../ClientRegistry";
-import type { MovementTrait } from "../../package";
+import type { MovementTrait } from "../../traits/movement";
 import type { Actor, ActorId, WorldState } from "./WorldState";
 
 /**

@@ -33,7 +33,7 @@ import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
 import { deriveClientVisibility } from "./modules/world/clientVisibility";
-import { combatBehavior } from "./modules/npc/combatBehavior";
+import { combatBehavior } from "./traits/combat";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

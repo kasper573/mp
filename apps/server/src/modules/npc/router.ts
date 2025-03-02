@@ -1,8 +1,8 @@
 import type { PatchStateMachine } from "@mp/sync/server";
 import { roles } from "../../middlewares/auth";
 import { t } from "../../trpc";
-import type { WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
+import type { WorldState } from "../world/WorldState";
 import { spawnNpcInstance } from "./npcSpawnBehavior";
 import type { NPCService } from "./service";
 

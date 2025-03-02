@@ -44,7 +44,10 @@ export function createCharacterRouter({
           });
         }
 
-        state.actors.update(char.id, { moveTarget: to });
+        state.actors.update(char.id, {
+          attackTargetId: undefined,
+          moveTarget: to,
+        });
       }),
 
     attack: t.procedure
@@ -83,7 +86,9 @@ export function createCharacterRouter({
             });
           }
 
-          state.actors.update(characterId, { attackTargetId: targetId });
+          state.actors.update(characterId, {
+            attackTargetId: targetId,
+          });
         },
       ),
 

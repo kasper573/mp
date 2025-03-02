@@ -17,10 +17,10 @@ import {
 } from "@mp/math";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { NPCInstanceId, WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
+import type { WorldState } from "../world/WorldState";
 import type { NPCService } from "./service";
-import type { NPC, NPCInstance, NPCSpawn } from "./schema";
+import type { NPC, NPCInstance, NPCInstanceId, NPCSpawn } from "./schema";
 
 export function npcSpawnBehavior(
   state: PatchStateMachine<WorldState>,

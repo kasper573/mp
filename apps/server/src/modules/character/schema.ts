@@ -28,8 +28,8 @@ type DBCharacter = typeof characterTable.$inferSelect;
 
 export interface Character
   extends DBCharacter,
-    MovementTrait,
     AppearanceTrait,
+    MovementTrait,
     CombatTrait {}
 
 export type CharacterId = Branded<string, "CharacterId">;

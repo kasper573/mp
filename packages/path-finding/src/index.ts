@@ -25,8 +25,12 @@ export class VectorGraph<T extends number> {
   };
 
   getNearestNode(vector: Vector<T>): VectorGraphNode<T> | undefined {
-    const id = nodeIdFromVector(vec_round(vector));
-    return this.hasNode(id) ? this.getNode(id) : undefined;
+    const [nearestNode] = this.getAdjacentNodes(vector).toSorted(
+      (a, b) =>
+        vec_distance(a.data.vector, vector) -
+        vec_distance(b.data.vector, vector),
+    );
+    return nearestNode;
   }
 
   getAdjacentNodes(v: Vector<T>): VectorGraphNode<T>[] {

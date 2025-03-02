@@ -6,7 +6,7 @@ import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
-import type { AppearanceTrait } from "../../package";
+import type { AppearanceTrait } from "../../traits/appearance";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 

@@ -5,7 +5,7 @@ import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import type { AreaLookup } from "../modules/area/loadAreas";
-import type { WorldState } from "../package";
+import type { WorldState } from "../modules/world/WorldState";
 
 export interface MovementTrait {
   /**
@@ -70,7 +70,7 @@ export function movementBehavior(
 }
 
 function findPathForSubject(
-  subject: MovementTrait,
+  subject: MovementTrait & { id: unknown },
   areas: AreaLookup,
   dest: Vector<Tile>,
 ): Path<Tile> | undefined {
