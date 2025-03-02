@@ -29,10 +29,11 @@ export function npcAIBehavior(
       switch (task.id) {
         case "fight":
           if (!subject.attackTargetId) {
+            const others = Object.keys(state.actors()).filter(
+              (id) => id !== subject.id,
+            ) as ActorId[];
             state.actors.update(subject.id, {
-              attackTargetId: randomItem(
-                Object.keys(state.actors()),
-              ) as ActorId,
+              attackTargetId: randomItem(others),
             });
           }
           break;
@@ -43,11 +44,12 @@ export function npcAIBehavior(
               throw new Error(`Area not found: ${subject.areaId}`);
             }
 
-            const fromNode = area.graph.getNearestNode(subject.coords);
             const toNode = randomItem(Array.from(area.graph.getNodes()));
-            if (fromNode && toNode) {
-              const path = area.findPath(fromNode.id, toNode.id);
-              state.actors.update(subject.id, { path });
+            if (toNode) {
+              state.actors.update(subject.id, {
+                moveTarget: toNode.data.vector,
+                attackTargetId: undefined,
+              });
             }
           }
           break;
