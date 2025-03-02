@@ -97,7 +97,7 @@ async function testGameClient(n: number) {
     logger.info(`Starting game client ${n}`);
   }
 
-  const token = process.env.MP_SERVER_AUTH__GUEST_USER_TOKEN;
+  const token = process.env.MP_SERVER_AUTH__BYPASS_USER;
   const sync = new SyncClient(wsUrl, () => ({ token }));
   const rpc = createRPCClient(token);
 

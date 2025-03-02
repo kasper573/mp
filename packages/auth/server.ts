@@ -12,6 +12,10 @@ export interface AuthServerOptions {
   issuer: string;
   audience: string;
   algorithms: AuthAlgorithm[];
+  /**
+   * A user that will bypass token verification
+   */
+  bypassUser?: UserIdentity;
 }
 
 export interface AuthServer {
@@ -23,6 +27,7 @@ export function createAuthServer({
   issuer,
   audience,
   algorithms,
+  bypassUser,
 }: AuthServerOptions): AuthServer {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
@@ -30,6 +35,10 @@ export function createAuthServer({
     async verifyToken(token) {
       if (token === undefined) {
         return err("A token must be provided");
+      }
+
+      if (token === bypassUser?.token) {
+        return ok(bypassUser);
       }
 
       let jwtPayload;
