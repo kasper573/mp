@@ -4,8 +4,8 @@ import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
+import type { ActorId } from "../world/WorldState";
 import { type WorldState } from "../world/WorldState";
-import { moveTo } from "../../traits/movement";
 import type { AreaLookup } from "../area/loadAreas";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
@@ -43,12 +43,42 @@ export function createCharacterRouter({
           });
         }
 
-        const result = moveTo(char, areas, to);
-        if (result.isErr()) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
+        state.actors.update(char.id, {
+          attackTargetId: undefined,
+          moveTarget: to,
+        });
+      }),
+
+    attack: t.procedure
+      .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
+      .use(roles(["character_attack"]))
+      .mutation(({ input: { characterId, targetId }, ctx: { user } }) => {
+        const char = state.actors()[characterId];
+
+        if (!char || char.type !== "character") {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Character not found",
+          });
         }
 
-        state.actors.update(char.id, { path: result.value.path });
+        if (char.userId !== user.id) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You don't have access to this character",
+          });
+        }
+
+        if (targetId === characterId) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "You can't attack yourself",
+          });
+        }
+
+        state.actors.update(characterId, {
+          attackTargetId: targetId,
+        });
       }),
 
     join: t.procedure

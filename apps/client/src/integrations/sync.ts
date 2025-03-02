@@ -1,4 +1,4 @@
-import type { Character, WorldState } from "@mp/server";
+import type { ActorId, Character, WorldState } from "@mp/server";
 import { type CharacterId } from "@mp/server";
 import { SyncClient } from "@mp/sync/client";
 import {
@@ -56,6 +56,13 @@ export function createSyncClient() {
     vec_equals,
   );
 
+  const attackMutation = trpc.character.attack.createMutation(() => ({
+    meta: { invalidateCache: false },
+  }));
+
+  const attack = (targetId: ActorId) =>
+    attackMutation.mutate({ characterId: characterId()!, targetId });
+
   onCleanup(sync.subscribeToState((applyPatch) => applyPatch(worldState)));
   onCleanup(sync.subscribeToReadyState(setReadyState));
 
@@ -75,6 +82,7 @@ export function createSyncClient() {
     character,
     join,
     move,
+    attack,
   };
 }
 

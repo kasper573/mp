@@ -1,13 +1,12 @@
-import type {
-  EllipseObject,
-  PointObject,
-  PolygonObject,
-  PolylineObject,
-  RectangleObject,
-  TextObject,
-  TiledObject,
-} from "@mp/tiled-loader";
-import type { Vector } from "@mp/math";
+import type { TiledObject } from "@mp/tiled-loader";
+import {
+  ellipse_hit_test,
+  polygon_hit_test,
+  polyline_hit_test,
+  type Vector,
+  vec_equals,
+  rect_hit_test,
+} from "@mp/math";
 import type { Pixel } from "@mp/std";
 
 export function hitTestTiledObject(
@@ -16,46 +15,16 @@ export function hitTestTiledObject(
 ): boolean {
   switch (obj.objectType) {
     case "point":
-      return point(obj, pos);
+      return vec_equals(obj, pos);
     case "ellipse":
-      return ellipse(obj, pos);
+      return ellipse_hit_test(obj, pos);
     case "rectangle":
-      return rectangle(obj, pos);
+      return rect_hit_test(obj, pos);
     case "polygon":
-      return polygon(obj, pos);
+      return polygon_hit_test(obj, pos);
     case "polyline":
-      return polyline(obj, pos);
+      return polyline_hit_test(obj, pos);
     case "text":
-      return text(obj, pos);
+      return false;
   }
-}
-
-function point(obj: PointObject, pos: Vector<Pixel>): boolean {
-  return obj.x === pos.x && obj.y === pos.y;
-}
-
-function ellipse(obj: EllipseObject, pos: Vector<Pixel>): boolean {
-  const { x, y, width, height } = obj;
-  const dx = x - pos.x;
-  const dy = y - pos.y;
-  const rx = width / 2;
-  const ry = height / 2;
-  return (dx * dx) / (rx * rx) + (dy * dy) / (ry * ry) <= 1;
-}
-
-function rectangle(obj: RectangleObject, pos: Vector<Pixel>): boolean {
-  const { x, y, width, height } = obj;
-  return pos.x >= x && pos.x <= x + width && pos.y >= y && pos.y <= y + height;
-}
-
-function polygon(obj: PolygonObject, pos: Vector<Pixel>): boolean {
-  return false;
-}
-
-function polyline(obj: PolylineObject, pos: Vector<Pixel>): boolean {
-  return false;
-}
-
-function text(obj: TextObject, pos: Vector<Pixel>): boolean {
-  return false;
 }

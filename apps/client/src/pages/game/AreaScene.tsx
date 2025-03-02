@@ -1,18 +1,19 @@
 import { type AreaResource } from "@mp/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ParentProps } from "solid-js";
-import { useContext, createEffect, createMemo, For } from "solid-js";
+import { useContext, createEffect, createMemo, For, untrack } from "solid-js";
 import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
+import { rect_from_diameter, rect_hit_test, rect_offset, vec } from "@mp/math";
 import { clientViewDistance } from "@mp/server";
 import type { Pixel, Tile } from "@mp/std";
 import { SyncClientContext } from "../../integrations/sync";
 import { useAnimatedCoords } from "../../state/useAnimatedCoords";
 import { Actor } from "./Actor";
+import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
@@ -51,12 +52,47 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     ),
   );
 
+  const pointerTile = createMemo(() =>
+    props.area.tiled.worldCoordToTile(engine.pointer.worldPosition),
+  );
+
+  const entityAtPointer = createMemo(() =>
+    world
+      .actorsInArea()
+      .find((actor) =>
+        rect_hit_test(rect_offset(actor.hitBox, actor.coords), pointerTile()),
+      ),
+  );
+
+  const highlightTarget = createMemo((): TileHighlightTarget | undefined => {
+    const entity = entityAtPointer();
+    if (entity) {
+      return {
+        type: "attack",
+        rect: rect_offset(entity.hitBox, entity.coords),
+      };
+    } else {
+      const tileNode = props.area.graph.getNearestNode(pointerTile());
+      if (tileNode) {
+        return {
+          rect: rect_from_diameter(tileNode.data.vector, 1 as Tile),
+          type: "move",
+        };
+      }
+    }
+  });
+
   createEffect(() => {
-    const tileNode = props.area.graph.getNearestNode(
-      props.area.tiled.worldCoordToTile(engine.pointer.worldPosition),
-    );
-    if (engine.pointer.isDown && tileNode) {
-      world.move(tileNode.data.vector);
+    if (engine.pointer.isDown) {
+      const entity = untrack(entityAtPointer);
+      if (entity) {
+        world.attack(entity.id);
+      } else {
+        const tileNode = props.area.graph.getNearestNode(pointerTile());
+        if (tileNode) {
+          world.move(tileNode.data.vector);
+        }
+      }
     }
   });
 
@@ -88,7 +124,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         </TiledRenderer>
       )}
       {props.children}
-      <TileHighlight area={props.area} />
+      <TileHighlight area={props.area} target={highlightTarget()} />
     </Pixi>
   );
 }

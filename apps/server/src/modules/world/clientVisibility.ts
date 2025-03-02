@@ -1,8 +1,9 @@
 import type { ClientVisibilityFactory } from "@mp/sync/server";
-import { rect_fromDiameter, rect_intersectsPoint } from "@mp/math";
+import { rect_from_diameter, rect_hit_test } from "@mp/math";
 import { recordValues } from "@mp/std";
 import { clientViewDistance } from "../../shared";
 import type { ClientRegistry } from "../../ClientRegistry";
+import type { MovementTrait } from "../../traits/movement";
 import type { Actor, ActorId, WorldState } from "./WorldState";
 
 /**
@@ -37,16 +38,13 @@ function visibleActors(
   return visible;
 }
 
-function canSeeSubject(a: Actor, b: Actor) {
-  if (a.id === b.id) {
-    return true;
-  }
+export function canSeeSubject(a: MovementTrait, b: MovementTrait) {
   if (a.areaId !== b.areaId) {
     return false;
   }
-  const viewbox = rect_fromDiameter(
+  const viewbox = rect_from_diameter(
     a.coords,
     clientViewDistance.networkFogOfWarTileCount,
   );
-  return rect_intersectsPoint(viewbox, b.coords);
+  return rect_hit_test(viewbox, b.coords);
 }

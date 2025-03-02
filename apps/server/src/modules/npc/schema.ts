@@ -5,6 +5,7 @@ import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
 import { vector } from "../../db/types/vector";
+import type { CombatTrait } from "../../traits/combat";
 
 export type NPCId = Branded<string, "NPCId">;
 export const npcId = () => uuid().$type<NPCId>();
@@ -49,8 +50,10 @@ export type NPCSpawn = typeof npcSpawnTable.$inferSelect;
 export interface NPCInstance
   extends Omit<NPC, "id">,
     MovementTrait,
-    AppearanceTrait {
+    AppearanceTrait,
+    CombatTrait {
   id: NPCInstanceId;
+  npcId: NPCId;
 }
 
 export type NPCInstanceId = Branded<string, "NPCInstanceId">;

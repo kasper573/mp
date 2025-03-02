@@ -6,36 +6,51 @@ import {
 } from "unique-names-generator";
 import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
-import type { Tile } from "@mp/std";
-import { randomItem, uuid } from "@mp/std";
-import { clamp, vec, type Vector } from "@mp/math";
+import type { Tile, TimesPerSecond } from "@mp/std";
+import { randomItem, recordValues, uuid } from "@mp/std";
+import {
+  clamp,
+  rect_from_diameter,
+  vec,
+  vec_zero,
+  type Vector,
+} from "@mp/math";
 import type { AreaId, AreaResource } from "@mp/data";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { NPCInstanceId, WorldState } from "../../package";
 import type { AreaLookup } from "../area/loadAreas";
+import type { WorldState } from "../world/WorldState";
 import type { NPCService } from "./service";
-import type { NPC, NPCInstance, NPCSpawn } from "./schema";
+import type { NPC, NPCInstance, NPCInstanceId, NPCSpawn } from "./schema";
 
 export function npcSpawnBehavior(
   state: PatchStateMachine<WorldState>,
   npcService: NPCService,
   areas: AreaLookup,
 ): TickEventHandler {
+  let spawns: Awaited<ReturnType<NPCService["getAllSpawnsAndTheirNpcs"]>> = [];
   void npcService.getAllSpawnsAndTheirNpcs().then((list) => {
-    for (const { spawn, npc } of list) {
+    spawns = list;
+  });
+
+  return () => {
+    for (const { spawn, npc } of spawns) {
       const area = areas.get(spawn.areaId);
       if (!area) {
         throw new Error(`Area not found: ${spawn.areaId}`);
       }
 
-      for (let i = 0; i < spawn.count; i++) {
+      const existingNpcs = recordValues(state.actors())
+        .filter((a) => a.type === "npc" && a.npcId === npc.id)
+        .toArray().length;
+
+      const amountToSpawn = spawn.count - existingNpcs;
+
+      for (let i = 0; i < amountToSpawn; i++) {
         const instance = spawnNpcInstance(npc, spawn, area);
         state.actors.set(instance.id, { type: "npc", ...instance });
       }
     }
-  });
-
-  return () => {};
+  };
 }
 
 const randomAndCustomNames = [
@@ -73,11 +88,18 @@ export function createNpcInstance(
   });
   return {
     id,
+    npcId: npc.id,
     areaId,
     coords,
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
     name,
+    hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
+    health: 25,
+    maxHealth: 25,
+    attackDamage: 5,
+    attackRange: 1 as Tile,
+    attackSpeed: 1 as TimesPerSecond,
   };
 }
 

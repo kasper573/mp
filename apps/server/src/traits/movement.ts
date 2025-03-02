@@ -2,15 +2,25 @@ import { moveAlongPath, type AreaId } from "@mp/data";
 import type { Path, Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
-import type { Result, Tile } from "@mp/std";
-import { err, ok, recordValues } from "@mp/std";
+import type { Tile } from "@mp/std";
+import { recordValues } from "@mp/std";
 import type { AreaLookup } from "../modules/area/loadAreas";
-import type { WorldState } from "../package";
+import type { WorldState } from "../modules/world/WorldState";
 
 export interface MovementTrait {
+  /**
+   * Current position of the subject.
+   */
   coords: Vector<Tile>;
   speed: Tile;
   areaId: AreaId;
+  /**
+   * A desired target. Will be consumed by the movement behavior to find a new path.
+   */
+  moveTarget?: Vector<Tile>;
+  /**
+   * The current path the subject is following.
+   */
   path?: Path<Tile>;
 }
 
@@ -20,6 +30,13 @@ export function movementBehavior(
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
     for (const subject of recordValues(state.actors())) {
+      if (subject.moveTarget) {
+        state.actors.update(subject.id, {
+          path: findPathForSubject(subject, areas, subject.moveTarget),
+          moveTarget: undefined,
+        });
+      }
+
       if (subject.path) {
         const [newCoords, newPath] = moveAlongPath(
           subject.coords,
@@ -52,27 +69,19 @@ export function movementBehavior(
   };
 }
 
-export type PathChange =
-  | { reason: "new"; path: Path<Tile> }
-  | { reason: "extended"; path: Path<Tile> }
-  | { reason: "truncated"; path: Path<Tile> };
-
-/**
- * Update the path of the subject to the path required to reach the given destination.
- */
-export function moveTo(
-  subject: MovementTrait,
+function findPathForSubject(
+  subject: MovementTrait & { id: unknown },
   areas: AreaLookup,
   dest: Vector<Tile>,
-): Result<PathChange, string> {
+): Path<Tile> | undefined {
   const area = areas.get(subject.areaId);
   if (!area) {
-    return err(`Area not found: ${subject.areaId}`);
+    return; // area not found
   }
 
   const destNode = area.graph.getNearestNode(dest);
   if (!destNode) {
-    return err(`Destination not reachable: ${dest.x},${dest.y}`);
+    return; // Destination not reachable (no closest node available)
   }
 
   // If the subject is already on a path we can reuse that information for better path finding
@@ -82,7 +91,7 @@ export function moveTo(
       (c) => c.x === destNode.data.vector.x && c.y === destNode.data.vector.y,
     );
     if (idx !== -1) {
-      return ok({ reason: "truncated", path: subject.path.slice(0, idx) });
+      return subject.path.slice(0, idx); // Path truncated
     }
 
     // If the destination is new, we need to find a new path.
@@ -94,10 +103,7 @@ export function moveTo(
     if (nextNode) {
       const newPath = area.findPath(nextNode.id, destNode.id);
       if (newPath) {
-        return ok({
-          reason: "extended",
-          path: subject.path.slice(0, 1).concat(newPath),
-        });
+        return subject.path.slice(0, 1).concat(newPath); // Path extended
       }
     }
   }
@@ -112,8 +118,8 @@ export function moveTo(
 
   const newPath = area.findPath(fromNode.id, destNode.id);
   if (newPath) {
-    return ok({ reason: "new", path: newPath });
+    return newPath;
   }
 
-  return err(`No path found to destination: ${dest.x},${dest.y}`);
+  // No path available between A and B
 }
