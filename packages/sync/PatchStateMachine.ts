@@ -187,6 +187,8 @@ export type EntityRepositoryRecord<State extends PatchableState> = {
 
 type FlushFn = () => ClientPatches;
 
+export type { ReadonlyDeep };
+
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;

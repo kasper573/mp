@@ -1,6 +1,6 @@
-import { integer, pgTable, uuid } from "drizzle-orm/pg-core";
+import { pgTable, uuid, real } from "drizzle-orm/pg-core";
 import type { UserId } from "@mp/auth";
-import type { Branded, Tile } from "@mp/std";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
 import { areaId } from "../area/schema";
@@ -15,11 +15,13 @@ export const characterTable = pgTable("character", {
   id: characterId().primaryKey().defaultRandom(),
   coords: vector<Tile>().notNull(),
   areaId: areaId().notNull(),
-  speed: integer().$type<Tile>().notNull(),
+  speed: real().$type<Tile>().notNull(),
   userId: userId().notNull(),
-  health: integer().notNull(),
-  maxHealth: integer().notNull(),
-  attack: integer().notNull(),
+  health: real().notNull(),
+  maxHealth: real().notNull(),
+  attackDamage: real().notNull(),
+  attackSpeed: real().$type<TimesPerSecond>().notNull(),
+  attackRange: real().$type<Tile>().notNull(),
 });
 
 type DBCharacter = typeof characterTable.$inferSelect;

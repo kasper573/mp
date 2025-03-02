@@ -9,3 +9,5 @@ export type Pixel = Branded<number, "Pixel">;
  * Unit of measurement in 2D tile space.
  */
 export type Tile = Branded<number, "Tile">;
+
+export type TimesPerSecond = Branded<number, "TimesPerSecond">;

@@ -6,8 +6,8 @@ import { auth, roles } from "../../middlewares/auth";
 import { schemaFor, t } from "../../trpc";
 import type { ActorId } from "../world/WorldState";
 import { type WorldState } from "../world/WorldState";
-import { moveTo } from "../../traits/movement";
 import type { AreaLookup } from "../area/loadAreas";
+import { canSeeSubject } from "../world/clientVisibility";
 import { type CharacterId } from "./schema";
 import type { CharacterService } from "./service";
 
@@ -44,44 +44,48 @@ export function createCharacterRouter({
           });
         }
 
-        const result = moveTo(char, areas, to);
-        if (result.isErr()) {
-          throw new TRPCError({ code: "BAD_REQUEST", message: result.error });
-        }
-
-        state.actors.update(char.id, { path: result.value.path });
+        state.actors.update(char.id, { moveTarget: to });
       }),
 
     attack: t.procedure
       .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
       .use(roles(["character_attack"]))
-      .mutation(({ input: { characterId, targetId }, ctx: { user } }) => {
-        const char = state.actors()[characterId];
+      .mutation(
+        ({ input: { characterId, targetId }, ctx: { user, clients } }) => {
+          const char = state.actors()[characterId];
 
-        if (!char || char.type !== "character") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Character not found",
-          });
-        }
+          if (!char || char.type !== "character") {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Character not found",
+            });
+          }
 
-        if (char.userId !== user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You don't have access to this character",
-          });
-        }
+          if (char.userId !== user.id) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "You don't have access to this character",
+            });
+          }
 
-        const target = state.actors()[targetId];
-        if (!target) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Target not found",
-          });
-        }
+          const target = state.actors()[targetId];
+          if (!target) {
+            throw new TRPCError({
+              code: "BAD_REQUEST",
+              message: "Target not found",
+            });
+          }
 
-        state.actors.update(targetId, { health: target.health - char.attack });
-      }),
+          if (!canSeeSubject(char, target)) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "You can't attack this target",
+            });
+          }
+
+          state.actors.update(characterId, { attackTargetId: targetId });
+        },
+      ),
 
     join: t.procedure
       .output(schemaFor<CharacterId>())

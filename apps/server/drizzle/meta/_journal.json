@@ -15,6 +15,20 @@
       "when": 1740874743043,
       "tag": "0001_oval_moondragon",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1740876709798,
+      "tag": "0002_aberrant_squadron_supreme",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1740877462077,
+      "tag": "0003_silky_red_hulk",
+      "breakpoints": true
     }
   ]
 }

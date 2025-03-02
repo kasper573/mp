@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import type { UserId, UserIdentity } from "@mp/auth";
 import type { AreaId } from "@mp/data";
-import type { Tile } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
 import type { DBClient } from "../../db/client";
@@ -69,7 +69,9 @@ export class CharacterService {
       speed: 3 as Tile,
       health: 100,
       maxHealth: 100,
-      attack: 5,
+      attackDamage: 5,
+      attackSpeed: 1 as TimesPerSecond,
+      attackRange: 1 as Tile,
       userId: user.id,
       ...characterAppearance(user.id),
     };

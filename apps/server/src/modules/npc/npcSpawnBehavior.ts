@@ -6,7 +6,7 @@ import {
 } from "unique-names-generator";
 import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
-import type { Tile } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import { randomItem, uuid } from "@mp/std";
 import {
   clamp,
@@ -87,7 +87,9 @@ export function createNpcInstance(
     hitBox: rect_from_diameter(vec_zero(), 1 as Tile),
     health: 25,
     maxHealth: 25,
-    attack: 5,
+    attackDamage: 5,
+    attackRange: 1 as Tile,
+    attackSpeed: 1 as TimesPerSecond,
   };
 }
 
