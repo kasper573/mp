@@ -40,7 +40,9 @@ export function npcSpawnBehavior(
       }
 
       const existingNpcs = recordValues(state.actors())
-        .filter((a) => a.type === "npc" && a.npcId === npc.id)
+        .filter(
+          (a) => a.type === "npc" && a.npcId === npc.id && a.areaId === area.id,
+        )
         .toArray().length;
 
       const amountToSpawn = spawn.count - existingNpcs;
