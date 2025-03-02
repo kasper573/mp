@@ -33,6 +33,7 @@ import { NPCService } from "./modules/npc/service";
 import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
 import { deriveClientVisibility } from "./modules/world/clientVisibility";
+import { combatBehavior } from "./modules/npc/combatBehavior";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -134,6 +135,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAIBehavior(worldState, areas));
 updateTicker.subscribe(movementBehavior(worldState, areas));
 updateTicker.subscribe(npcSpawnBehavior(worldState, npcService, areas));
+updateTicker.subscribe(combatBehavior(worldState));
 updateTicker.subscribe(syncServer.flush);
 characterRemoveBehavior(clients, worldState, logger, 5000);
 
