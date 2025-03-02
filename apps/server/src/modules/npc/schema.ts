@@ -53,6 +53,7 @@ export interface NPCInstance
     AppearanceTrait,
     CombatTrait {
   id: NPCInstanceId;
+  npcId: NPCId;
 }
 
 export type NPCInstanceId = Branded<string, "NPCInstanceId">;
