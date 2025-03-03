@@ -91,3 +91,21 @@ docker compose file as in development but with production environment variables
 provided via github action variables and secrets.
 
 Review the workflow to see which variables and secrets you need to provide.
+
+# Monorepo package convention
+
+This repository utilizes pnpm workspaces to organize and separate concerns. Lower level workspaces pay not depend on higher level workspaces.
+
+These are the workspaces, in order:
+
+## apps
+
+Deployable artifacts. Composes all other packages.
+
+## modules
+
+Concrete game mechanics and business logic.
+
+## packages
+
+Generic and low level systems.
