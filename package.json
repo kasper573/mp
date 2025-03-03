@@ -7,7 +7,7 @@
   "workspaces": [
     "apps/*",
     "modules/*",
-    "packages/*"
+    "libraries/*"
   ],
   "scripts": {
     "build": "pnpm -r --stream build",
