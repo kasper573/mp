@@ -1,4 +1,3 @@
-import type { UrlFactory } from "@mp/data";
 import { t } from "@mp-modules/trpc";
 import { createAreaRouter } from "./area/router";
 import type { SystemRouterDependencies } from "./system/router";
@@ -13,18 +12,13 @@ export type RootRouter = ReturnType<typeof createRootRouter>;
 export interface RootRouterDependencies
   extends CharacterRouterDependencies,
     NPCRouterDependencies,
-    SystemRouterDependencies {
-  createUrl: UrlFactory;
-}
+    SystemRouterDependencies {}
 
-export function createRootRouter({
-  createUrl,
-  ...dependencies
-}: RootRouterDependencies) {
+export function createRootRouter({ ...dependencies }: RootRouterDependencies) {
   return t.router({
     character: createCharacterRouter(dependencies),
     system: createSystemRouter(dependencies),
-    area: createAreaRouter(createUrl),
+    area: createAreaRouter(),
     npc: createNPCRouter(dependencies),
   });
 }

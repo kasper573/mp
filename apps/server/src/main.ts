@@ -40,7 +40,6 @@ import { deriveClientVisibility } from "./modules/world/clientVisibility";
 import { combatBehavior } from "./traits/combat";
 import { errorFormatter } from "./etc/errorFormatter";
 import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
-import { urlResolver } from "./etc/urlResolver";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -117,7 +116,6 @@ const trpcRouter = createRootRouter({
   npcService,
   characterService,
   state: worldState,
-  createUrl: urlResolver,
   buildVersion: opt.buildVersion,
   updateTicker,
 });

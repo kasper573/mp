@@ -7,4 +7,3 @@ export interface FileReference {
 
 export type PathToLocalFile = Branded<string, "PathToLocalFile">;
 export type UrlToPublicFile = Branded<string, "UrlToPublicFile">;
-export type UrlFactory = (path: PathToLocalFile) => UrlToPublicFile;
