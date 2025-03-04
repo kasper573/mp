@@ -10,7 +10,7 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
 import { Injector } from "@mp/injector";
-import { authServerContext, requestContext } from "@mp-modules/user";
+import { ctx_authServer, requestContext } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 import {
   ctx_globalMiddleware,
@@ -121,7 +121,7 @@ const trpcRouter = createRootRouter({
 });
 
 const injector = Injector.new()
-  .provide(authServerContext, auth)
+  .provide(ctx_authServer, auth)
   .provide(ctx_globalMiddleware, rateLimiterMiddleware)
   .provide(ctx_trpcErrorFormatter, errorFormatter);
 
