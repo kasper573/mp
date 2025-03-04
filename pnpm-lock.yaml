@@ -56,9 +56,9 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp-modules/user':
+      '@mp-modules/trpc':
         specifier: workspace:*
-        version: link:../../modules/user
+        version: link:../../modules/trpc
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
@@ -162,9 +162,9 @@ importers:
 
   apps/loadtest:
     dependencies:
-      '@mp-modules/user':
+      '@mp-modules/trpc':
         specifier: workspace:*
-        version: link:../../modules/user
+        version: link:../../modules/trpc
       '@mp/data':
         specifier: workspace:*
         version: link:../../libraries/data
@@ -196,6 +196,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@mp-modules/trpc':
+        specifier: workspace:*
+        version: link:../../modules/trpc
       '@mp-modules/user':
         specifier: workspace:*
         version: link:../../modules/user
@@ -244,9 +247,6 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
-      '@trpc/server':
-        specifier: 11.0.0-rc.593
-        version: 11.0.0-rc.593
       cors:
         specifier: 2.8.5
         version: 2.8.5
@@ -265,9 +265,6 @@ importers:
       pg:
         specifier: 8.13.1
         version: 8.13.1
-      superjson:
-        specifier: 2.2.1
-        version: 2.2.1
       unique-names-generator:
         specifier: 4.7.1
         version: 4.7.1
@@ -676,8 +673,27 @@ importers:
         specifier: 5.7.2
         version: 5.7.2
 
+  modules/trpc:
+    dependencies:
+      '@mp/injector':
+        specifier: workspace:*
+        version: link:../../libraries/injector
+      '@trpc/server':
+        specifier: 11.0.0-rc.593
+        version: 11.0.0-rc.593
+      superjson:
+        specifier: 2.2.1
+        version: 2.2.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
   modules/user:
     devDependencies:
+      '@mp-modules/trpc':
+        specifier: workspace:*
+        version: link:../trpc
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth

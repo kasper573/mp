@@ -37,8 +37,8 @@
     "@mp/time": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
+    "@mp-modules/trpc": "workspace:*",
     "@mp-modules/user": "workspace:*",
-    "@trpc/server": "11.0.0-rc.593",
     "import-in-the-middle": "1.12.0",
     "cors": "2.8.5",
     "dotenv": "16.4.5",
@@ -46,7 +46,6 @@
     "express": "4.19.2",
     "pg": "8.13.1",
     "unique-names-generator": "4.7.1",
-    "superjson": "2.2.1",
     "yargs": "17.7.2"
   },
   "devDependencies": {

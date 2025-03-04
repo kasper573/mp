@@ -106,6 +106,14 @@ Deployable artifacts. Composes all other packages.
 
 Concrete game mechanics and business logic.
 
+Should be highly configurable and may not contain hard coded configuration. May do so either by composition, or dependency injection.
+
+Dependencies on other modules must be done via dependency injection (See [@mp/injector](libraries/injector/)).
+
 ## libraries
 
 Generic and low level systems.
+
+Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
+
+Dependencies must instead be provided as arguments.

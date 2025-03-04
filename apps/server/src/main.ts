@@ -5,13 +5,18 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import * as trpcExpress from "@trpc/server/adapters/express";
 import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
 import { Injector } from "@mp/injector";
 import { authServerContext, requestContext } from "@mp-modules/user";
+import { RateLimiter } from "@mp/rate-limiter";
+import {
+  ctx_globalMiddleware,
+  ctx_trpcErrorFormatter,
+  trpcExpress,
+} from "@mp-modules/trpc";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
@@ -24,21 +29,24 @@ import { characterRemoveBehavior } from "./modules/character/characterRemoveBeha
 import { collectUserMetrics } from "./metrics/collectUserMetrics";
 import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
-import { createUrlResolver } from "./createUrlResolver";
 import { loadAreas } from "./modules/area/loadAreas";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
 import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
 import { WorldService } from "./modules/world/service";
 import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
 import { NPCService } from "./modules/npc/service";
-import { createRateLimiter } from "./createRateLimiter";
 import { opt } from "./options";
 import { deriveClientVisibility } from "./modules/world/clientVisibility";
 import { combatBehavior } from "./traits/combat";
+import { errorFormatter } from "./etc/errorFormatter";
+import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
+import { urlResolver } from "./etc/urlResolver";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 logger.info(`Server started with options`, opt);
+
+RateLimiter.enabled = opt.rateLimit;
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
@@ -59,7 +67,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const syncHandshakeLimiter = createRateLimiter({
+const syncHandshakeLimiter = new RateLimiter({
   points: 10,
   duration: 30,
 });
@@ -109,12 +117,15 @@ const trpcRouter = createRootRouter({
   npcService,
   characterService,
   state: worldState,
-  createUrl: createUrlResolver(opt),
+  createUrl: urlResolver,
   buildVersion: opt.buildVersion,
   updateTicker,
 });
 
-const injector = Injector.new().provide(authServerContext, auth);
+const injector = Injector.new()
+  .provide(authServerContext, auth)
+  .provide(ctx_globalMiddleware, rateLimiterMiddleware)
+  .provide(ctx_trpcErrorFormatter, errorFormatter);
 
 webServer.use(
   opt.apiEndpointPath,

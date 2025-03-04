@@ -1,6 +1,6 @@
 import type { RootRouter } from "@mp/server";
-import { transformer } from "@mp/server";
-import { authTokenHeaderName } from "@mp-modules/user";
+import { transformer } from "@mp-modules/trpc/transformer";
+
 import {
   createTRPCSolidClient,
   httpBatchLink,
@@ -20,7 +20,10 @@ export function createTRPCClient() {
         transformer,
         headers({ opList: [{ context }] }) {
           const { identity } = context as RequestContext;
-          return { [authTokenHeaderName]: identity()?.token ?? "" };
+          const token = identity()?.token;
+          return {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          };
         },
       }),
     ],

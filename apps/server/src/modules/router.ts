@@ -1,5 +1,5 @@
 import type { UrlFactory } from "@mp/data";
-import { t } from "../trpc";
+import { t } from "@mp-modules/trpc";
 import { createAreaRouter } from "./area/router";
 import type { SystemRouterDependencies } from "./system/router";
 import { createSystemRouter } from "./system/router";

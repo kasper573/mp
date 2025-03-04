@@ -1,8 +1,7 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp/data";
 import type { RootRouter } from "@mp/server";
-import { transformer } from "@mp/server";
-import { authTokenHeaderName } from "@mp-modules/user";
+import { transformer } from "@mp-modules/trpc/transformer";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { SyncClient } from "@mp/sync/client";
 import { readCliOptions } from "./cli";
@@ -128,7 +127,9 @@ function createRPCClient(token?: string) {
       httpBatchLink({
         url: apiServerUrl,
         transformer,
-        headers: () => ({ [authTokenHeaderName]: token }),
+        headers: () => ({
+          Authorization: token ? `Bearer ${token}` : undefined,
+        }),
       }),
     ],
   });

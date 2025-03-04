@@ -4,7 +4,7 @@ import type {
   UrlFactory,
   UrlToPublicFile,
 } from "@mp/data";
-import { schemaFor, t } from "../../trpc";
+import { schemaFor, t } from "@mp-modules/trpc";
 
 export type AreaRouter = ReturnType<typeof createAreaRouter>;
 export function createAreaRouter(createUrl: UrlFactory) {

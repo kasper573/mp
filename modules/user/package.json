@@ -12,6 +12,7 @@
     }
   },
   "devDependencies": {
+    "@mp-modules/trpc": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/tsconfig": "workspace:*",

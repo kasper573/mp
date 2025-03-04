@@ -3,30 +3,17 @@ import { RateLimiterMemory } from "rate-limiter-flexible";
 import { ResultAsync } from "@mp/std";
 import { okAsync } from "@mp/std";
 
-export interface RateLimiterOptions extends IRateLimiterOptions {
-  enabled?: boolean;
-}
+export type RateLimiterOptions = IRateLimiterOptions;
 
-export function createRateLimiterFactory(
-  baseOptions: Partial<RateLimiterOptions>,
-) {
-  return function createRateLimiter(options: RateLimiterOptions): RateLimiter {
-    return new RateLimiter({
-      ...baseOptions,
-      ...options,
-    });
-  };
-}
-
-class RateLimiter {
+export class RateLimiter {
   private memoryLimiter: RateLimiterMemory;
 
-  constructor(private options: RateLimiterOptions) {
+  constructor(options: RateLimiterOptions) {
     this.memoryLimiter = new RateLimiterMemory(options);
   }
 
   consume(key: string): RateLimiterResult {
-    if (this.options.enabled === false) {
+    if (RateLimiter.enabled === false) {
       return okAsync("skipped-due-to-disabled");
     }
 
@@ -35,10 +22,14 @@ class RateLimiter {
       String,
     );
   }
+
+  /**
+   * Enable or disable all rate limiting.
+   * @internal This is a development feature and should not be used in production.
+   */
+  static enabled: boolean = true;
 }
 
 export type RateLimiterOK = "skipped-due-to-disabled" | "accepted";
 
 export type RateLimiterResult = ResultAsync<RateLimiterOK, string>;
-
-export { type RateLimiter };

@@ -1,6 +1,6 @@
 import type { PatchStateMachine } from "@mp/sync/server";
-import { roles } from "../../middlewares/auth";
-import { t } from "../../trpc";
+import { roles } from "@mp-modules/user";
+import { t } from "@mp-modules/trpc";
 import type { AreaLookup } from "../area/loadAreas";
 import type { WorldState } from "../world/WorldState";
 import { spawnNpcInstance } from "./npcSpawnBehavior";

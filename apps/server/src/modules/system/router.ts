@@ -1,6 +1,6 @@
 import type { Ticker } from "@mp/time";
-import { schemaFor, t } from "../../trpc";
-import { roles } from "../../middlewares/auth";
+import { schemaFor, t } from "@mp-modules/trpc";
+import { roles } from "@mp-modules/user";
 
 export interface SystemRouterDependencies {
   buildVersion: string;
