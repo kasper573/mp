@@ -1,21 +1,21 @@
 import { TRPCError } from "@trpc/server";
 import type { RateLimiter, RateLimiterOptions } from "@mp/rate-limiter";
+import { sessionIdContext, type SessionId } from "@mp-modules/user";
 import { t } from "../trpc";
-import type { ServerContext } from "../context";
 import { createRateLimiter } from "../createRateLimiter";
 
 export function rateLimit(options: RateLimiterOptions) {
   const limiter = createRateLimiter(options);
 
   return t.middleware(async ({ ctx, next }) => {
-    await consumeLimiterForTRPC(limiter, ctx);
+    await consumeLimiterForTRPC(limiter, ctx.injector.get(sessionIdContext));
     return next({ ctx });
   });
 }
 
 export async function consumeLimiterForTRPC(
   limiter: RateLimiter,
-  { sessionId }: ServerContext,
+  sessionId: SessionId | undefined,
 ) {
   if (sessionId) {
     const result = await limiter.consume(sessionId);

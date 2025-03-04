@@ -3,7 +3,6 @@
 export type * from "./modules/character/schema";
 export type * from "./modules/npc/schema";
 export type * from "./modules/world/WorldState";
-export type * from "./context";
 export type * from "./modules/router";
 export type * from "./traits/appearance";
 export type * from "./traits/combat";

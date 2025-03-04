@@ -1,13 +1,15 @@
 import { initTRPC } from "@trpc/server";
+import type { Injector } from "@mp/injector";
+import { sessionIdContext } from "@mp-modules/user";
 import { transformer } from "./shared";
-import type { ServerContext } from "./context";
 import { consumeLimiterForTRPC } from "./middlewares/rateLimit";
 import { createRateLimiter } from "./createRateLimiter";
+import { serverOptionsContext } from "./options";
 
-const trpc = initTRPC.context<ServerContext>().create({
+const trpc = initTRPC.context<{ injector: Injector }>().create({
   transformer,
   errorFormatter: ({ shape, ctx }) => {
-    if (ctx?.exposeErrorDetails) {
+    if (ctx?.injector.get(serverOptionsContext).exposeErrorDetails) {
       return shape;
     }
 
@@ -28,7 +30,10 @@ const globalRequestLimit = createRateLimiter({
 });
 
 const globalMiddleware = trpc.middleware(async ({ ctx, next }) => {
-  await consumeLimiterForTRPC(globalRequestLimit, ctx);
+  await consumeLimiterForTRPC(
+    globalRequestLimit,
+    ctx.injector.get(sessionIdContext),
+  );
   return next({ ctx });
 });
 

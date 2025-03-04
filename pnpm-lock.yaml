@@ -56,6 +56,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@mp-modules/user':
+        specifier: workspace:*
+        version: link:../../modules/user
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
@@ -159,6 +162,9 @@ importers:
 
   apps/loadtest:
     dependencies:
+      '@mp-modules/user':
+        specifier: workspace:*
+        version: link:../../modules/user
       '@mp/data':
         specifier: workspace:*
         version: link:../../libraries/data
@@ -190,6 +196,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@mp-modules/user':
+        specifier: workspace:*
+        version: link:../../modules/user
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
@@ -199,6 +208,9 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
+      '@mp/injector':
+        specifier: workspace:*
+        version: link:../../libraries/injector
       '@mp/keycloak-provision':
         specifier: workspace:*
         version: link:../../libraries/keycloak-provision
@@ -356,6 +368,15 @@ importers:
       valibot:
         specifier: 1.0.0-beta.9
         version: 1.0.0-beta.9(typescript@5.7.2)
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      vitest:
+        specifier: 2.0.3
+        version: 2.0.3(@types/node@22.10.2)(jsdom@23.2.0)
+
+  libraries/injector:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -654,6 +675,24 @@ importers:
       typescript:
         specifier: 5.7.2
         version: 5.7.2
+
+  modules/user:
+    devDependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/injector':
+        specifier: workspace:*
+        version: link:../../libraries/injector
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      '@types/express':
+        specifier: 4.17.21
+        version: 4.17.21
 
 packages:
 

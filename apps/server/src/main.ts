@@ -10,7 +10,8 @@ import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
-import { createServerContextFactory } from "./context";
+import { Injector } from "@mp/injector";
+import { authServerContext, requestContext } from "@mp-modules/user";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
 import { createRootRouter } from "./modules/router";
@@ -113,17 +114,16 @@ const trpcRouter = createRootRouter({
   updateTicker,
 });
 
+const injector = Injector.new().provide(authServerContext, auth);
+
 webServer.use(
   opt.apiEndpointPath,
   trpcExpress.createExpressMiddleware({
     onError: ({ path, error }) => logger.error(error),
     router: trpcRouter,
-    createContext: createServerContextFactory(
-      auth,
-      clients,
-      logger,
-      opt.exposeErrorDetails,
-    ),
+    createContext: ({ req }: { req: express.Request }) => ({
+      injector: injector.provide(requestContext, req),
+    }),
   }),
 );
 

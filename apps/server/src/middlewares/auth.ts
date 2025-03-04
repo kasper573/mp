@@ -1,9 +1,10 @@
 import { TRPCError } from "@trpc/server";
+import { authServerContext, authTokenContext } from "@mp-modules/user";
 import { t } from "../trpc";
 
 export function auth() {
   return t.middleware(async ({ ctx, next }) => {
-    const { authToken, auth } = ctx;
+    const authToken = ctx.injector.get(authTokenContext);
     if (!authToken) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -11,7 +12,8 @@ export function auth() {
       });
     }
 
-    const result = await auth.verifyToken(authToken);
+    const authServer = ctx.injector.get(authServerContext);
+    const result = await authServer.verifyToken(authToken);
     if (result.isErr()) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: result.error });
     }
@@ -35,8 +37,11 @@ export function roles(requiredRoles: string[]) {
 
 export function optionalAuth() {
   return t.middleware(async ({ ctx, next }) => {
-    const { authToken, auth } = ctx;
-    const result = authToken ? await auth.verifyToken(authToken) : undefined;
+    const authToken = ctx.injector.get(authTokenContext);
+    const result = authToken
+      ? await ctx.injector.get(authServerContext).verifyToken(authToken)
+      : undefined;
+
     return next({
       ctx: { ...ctx, user: result?.isOk() ? result.value : undefined },
     });
