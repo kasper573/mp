@@ -4,6 +4,7 @@ import type { AreaId } from "@mp/data";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
+import { InjectionContext } from "@mp/injector";
 import type { DBClient } from "../../db/client";
 import type { AreaLookup } from "../area/loadAreas";
 import type { AppearanceTrait } from "../../traits/appearance";
@@ -102,3 +103,5 @@ export class CharacterService {
 function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
   return { color: 0x00_ff_00 };
 }
+
+export const ctx_characterService = InjectionContext.new<CharacterService>();

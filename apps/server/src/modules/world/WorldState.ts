@@ -1,5 +1,6 @@
 import type { UserIdentity } from "@mp/auth";
-import type { SyncServer } from "@mp/sync/server";
+import type { PatchStateMachine, SyncServer } from "@mp/sync/server";
+import { InjectionContext } from "@mp/injector";
 import type { NPCInstance } from "../npc/schema";
 import type { Character } from "../character/schema";
 
@@ -14,3 +15,6 @@ export type ActorId = Actor["id"];
 export type Actor =
   | ({ type: "character" } & Character)
   | ({ type: "npc" } & NPCInstance);
+
+export const ctx_worldStateMachine =
+  InjectionContext.new<PatchStateMachine<WorldState>>();

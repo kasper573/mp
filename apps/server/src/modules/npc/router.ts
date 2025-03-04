@@ -1,28 +1,20 @@
-import type { PatchStateMachine } from "@mp/sync/server";
 import { roles } from "@mp-modules/user";
 import { t } from "@mp-modules/trpc";
-import type { AreaLookup } from "../area/loadAreas";
-import type { WorldState } from "../world/WorldState";
+import { ctx_areaLookup } from "../area/loadAreas";
+import { ctx_worldStateMachine } from "../world/WorldState";
 import { spawnNpcInstance } from "./npcSpawnBehavior";
-import type { NPCService } from "./service";
+import { ctx_npcService } from "./service";
 
-export interface NPCRouterDependencies {
-  state: PatchStateMachine<WorldState>;
-  areas: AreaLookup;
-  npcService: NPCService;
-}
-
-export type NPCRouter = ReturnType<typeof createNPCRouter>;
-export function createNPCRouter({
-  state,
-  areas,
-  npcService,
-}: NPCRouterDependencies) {
-  return t.router({
-    spawnRandomNPC: t.procedure.use(roles(["spawn_npc"])).mutation(async () => {
+export type NPCRouter = typeof npcRouter;
+export const npcRouter = t.router({
+  spawnRandomNPC: t.procedure
+    .use(roles(["spawn_npc"]))
+    .mutation(async ({ ctx }) => {
+      const npcService = ctx.injector.get(ctx_npcService);
+      const state = ctx.injector.get(ctx_worldStateMachine);
+      const areas = ctx.injector.get(ctx_areaLookup);
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
       const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
       state.actors.set(instance.id, { type: "npc", ...instance });
     }),
-  });
-}
+});

@@ -1,24 +1,14 @@
 import { t } from "@mp-modules/trpc";
-import { createAreaRouter } from "./area/router";
-import type { SystemRouterDependencies } from "./system/router";
-import { createSystemRouter } from "./system/router";
-import type { CharacterRouterDependencies } from "./character/router";
-import { createCharacterRouter } from "./character/router";
-import type { NPCRouterDependencies } from "./npc/router";
-import { createNPCRouter } from "./npc/router";
+import { areaRouter } from "./area/router";
+import { systemRouter } from "./system/router";
+import { characterRouter } from "./character/router";
+import { npcRouter } from "./npc/router";
 
-export type RootRouter = ReturnType<typeof createRootRouter>;
+export type RootRouter = typeof rootRouter;
 
-export interface RootRouterDependencies
-  extends CharacterRouterDependencies,
-    NPCRouterDependencies,
-    SystemRouterDependencies {}
-
-export function createRootRouter({ ...dependencies }: RootRouterDependencies) {
-  return t.router({
-    character: createCharacterRouter(dependencies),
-    system: createSystemRouter(dependencies),
-    area: createAreaRouter(),
-    npc: createNPCRouter(dependencies),
-  });
-}
+export const rootRouter = t.router({
+  character: characterRouter,
+  system: systemRouter,
+  area: areaRouter,
+  npc: npcRouter,
+});

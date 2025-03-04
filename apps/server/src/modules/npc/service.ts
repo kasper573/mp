@@ -1,4 +1,5 @@
 import { eq } from "drizzle-orm";
+import { InjectionContext } from "@mp/injector";
 import type { DBClient } from "../../db/client";
 import { npcSpawnTable, npcTable } from "./schema";
 
@@ -19,3 +20,5 @@ export class NPCService {
     });
   }
 }
+
+export const ctx_npcService = InjectionContext.new<NPCService>();

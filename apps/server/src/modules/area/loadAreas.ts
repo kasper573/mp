@@ -2,6 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
 import { AreaResource } from "@mp/data";
+import { InjectionContext } from "@mp/injector";
 import { loadTiled } from "./loadTiled";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
@@ -18,3 +19,5 @@ export async function loadAreas(dir: string): Promise<AreaLookup> {
 }
 
 export type AreaLookup = ReadonlyMap<AreaId, AreaResource>;
+
+export const ctx_areaLookup = InjectionContext.new<AreaLookup>();

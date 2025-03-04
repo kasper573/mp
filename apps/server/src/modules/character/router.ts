@@ -1,58 +1,47 @@
 import { type Vector } from "@mp/math";
-import type { PatchStateMachine } from "@mp/sync/server";
 import { TRPCError } from "@trpc/server";
 import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "@mp-modules/user";
 import { schemaFor, t } from "@mp-modules/trpc";
-import type { ActorId } from "../world/WorldState";
-import { type WorldState } from "../world/WorldState";
-import type { AreaLookup } from "../area/loadAreas";
+import { ctx_worldStateMachine, type ActorId } from "../world/WorldState";
 import { type CharacterId } from "./schema";
-import type { CharacterService } from "./service";
+import { ctx_characterService } from "./service";
 
-export interface CharacterRouterDependencies {
-  state: PatchStateMachine<WorldState>;
-  areas: AreaLookup;
-  characterService: CharacterService;
-}
+export type CharacterRouter = typeof characterRouter;
+export const characterRouter = t.router({
+  move: t.procedure
+    .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
+    .use(roles(["move_character"]))
+    .mutation(({ input: { characterId, to }, ctx: { user, injector } }) => {
+      const state = injector.get(ctx_worldStateMachine);
+      const char = state.actors()[characterId];
 
-export type CharacterRouter = ReturnType<typeof createCharacterRouter>;
-export function createCharacterRouter({
-  state,
-  areas,
-  characterService,
-}: CharacterRouterDependencies) {
-  return t.router({
-    move: t.procedure
-      .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
-      .use(roles(["move_character"]))
-      .mutation(({ input: { characterId, to }, ctx: { user } }) => {
-        const char = state.actors()[characterId];
-
-        if (!char || char.type !== "character") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Character not found",
-          });
-        }
-
-        if (char.userId !== user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You don't have access to this character",
-          });
-        }
-
-        state.actors.update(char.id, {
-          attackTargetId: undefined,
-          moveTarget: to,
+      if (!char || char.type !== "character") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Character not found",
         });
-      }),
+      }
 
-    attack: t.procedure
-      .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
-      .use(roles(["character_attack"]))
-      .mutation(({ input: { characterId, targetId }, ctx: { user } }) => {
+      if (char.userId !== user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this character",
+        });
+      }
+
+      state.actors.update(char.id, {
+        attackTargetId: undefined,
+        moveTarget: to,
+      });
+    }),
+
+  attack: t.procedure
+    .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
+    .use(roles(["character_attack"]))
+    .mutation(
+      ({ input: { characterId, targetId }, ctx: { user, injector } }) => {
+        const state = injector.get(ctx_worldStateMachine);
         const char = state.actors()[characterId];
 
         if (!char || char.type !== "character") {
@@ -79,23 +68,25 @@ export function createCharacterRouter({
         state.actors.update(characterId, {
           attackTargetId: targetId,
         });
-      }),
+      },
+    ),
 
-    join: t.procedure
-      .output(schemaFor<CharacterId>())
-      .use(auth())
-      .mutation(async ({ ctx: { user } }) => {
-        const existingCharacter = recordValues(state.actors())
-          .filter((actor) => actor.type === "character")
-          .find((actor) => actor.userId === user.id);
+  join: t.procedure
+    .output(schemaFor<CharacterId>())
+    .use(auth())
+    .mutation(async ({ ctx: { user, injector } }) => {
+      const state = injector.get(ctx_worldStateMachine);
+      const characterService = injector.get(ctx_characterService);
+      const existingCharacter = recordValues(state.actors())
+        .filter((actor) => actor.type === "character")
+        .find((actor) => actor.userId === user.id);
 
-        if (existingCharacter) {
-          return existingCharacter.id;
-        }
+      if (existingCharacter) {
+        return existingCharacter.id;
+      }
 
-        const char = await characterService.getOrCreateCharacterForUser(user);
-        state.actors.set(char.id, { type: "character", ...char });
-        return char.id;
-      }),
-  });
-}
+      const char = await characterService.getOrCreateCharacterForUser(user);
+      state.actors.set(char.id, { type: "character", ...char });
+      return char.id;
+    }),
+});
