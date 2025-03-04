@@ -7,8 +7,6 @@ import type {
 } from "@trpc/server/unstable-core-do-not-import";
 import { transformer } from "../transformer";
 
-export const ctx_exposeErrorDetails = InjectionContext.new<boolean>();
-
 export const ctx_globalMiddleware = InjectionContext.new<AnyMiddleware>();
 
 export const ctx_trpcErrorFormatter = InjectionContext.new<AnyErrorFormatter>();
