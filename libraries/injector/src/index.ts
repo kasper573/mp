@@ -1,8 +1,11 @@
-export class Injector {
-  private constructor(private map: InjectionMap) {}
+export class InjectionContainer {
+  constructor(private map: InjectionMap = new Map()) {}
 
-  provide<Value>(context: InjectionContext<Value>, value: Value): Injector {
-    return new Injector(
+  provide<Value>(
+    context: InjectionContext<Value>,
+    value: Value,
+  ): InjectionContainer {
+    return new InjectionContainer(
       new Map([
         ...this.map.entries(),
         [context as InjectionContext<unknown>, value],
@@ -12,10 +15,6 @@ export class Injector {
 
   get<Value>(context: InjectionContext<Value>): Value {
     return context[readSymbol](this.map);
-  }
-
-  static new(): Injector {
-    return new Injector(new Map());
   }
 }
 
@@ -35,16 +34,16 @@ export class InjectionContext<Value> {
     return new InjectionContext((map) => deriveFn(this.read(map)));
   }
 
-  static new<Value>(defaultValue?: Value): InjectionContext<Value> {
-    if (arguments.length === 1) {
-      return new InjectionContext<Value>(function (map) {
-        if (map.has(this as InjectionContext<unknown>)) {
-          return map.get(this as InjectionContext<unknown>) as Value;
-        }
-        return defaultValue as Value;
-      });
-    }
+  static withDefault<Value>(defaultValue: Value): InjectionContext<Value> {
+    return new InjectionContext<Value>(function (map) {
+      if (map.has(this as InjectionContext<unknown>)) {
+        return map.get(this as InjectionContext<unknown>) as Value;
+      }
+      return defaultValue;
+    });
+  }
 
+  static new<Value>(): InjectionContext<Value> {
     return new InjectionContext<Value>(function (map) {
       if (map.has(this as InjectionContext<unknown>)) {
         return map.get(this as InjectionContext<unknown>) as Value;

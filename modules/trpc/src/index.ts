@@ -1,5 +1,5 @@
 import { initTRPC } from "@trpc/server";
-import { InjectionContext, type Injector } from "@mp/injector";
+import { InjectionContext, type InjectionContainer } from "@mp/injector";
 import type {
   DefaultErrorShape,
   ErrorFormatter,
@@ -41,7 +41,7 @@ function createInjectableTRPC() {
 }
 
 export interface TRPCContext {
-  injector: Injector;
+  injector: InjectionContainer;
 }
 
 export type AnyErrorFormatter = ErrorFormatter<TRPCContext, DefaultErrorShape>;
