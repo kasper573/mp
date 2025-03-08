@@ -4,7 +4,7 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { AreaLookup } from "../modules/area/loadAreas";
+import type { AreaLookup } from "@mp-modules/area";
 import type { WorldState } from "../modules/world/WorldState";
 
 export interface MovementTrait {

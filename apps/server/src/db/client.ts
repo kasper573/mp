@@ -1,5 +1,5 @@
 import pg from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
+import { drizzle } from "@mp-modules/drizzle";
 import type { Logger } from "@mp/logger";
 
 export type DBClient = ReturnType<typeof createDBClient>;

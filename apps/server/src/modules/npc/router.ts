@@ -1,6 +1,6 @@
 import { roles } from "@mp-modules/user";
 import { t } from "@mp-modules/trpc";
-import { ctx_areaLookup } from "../area/loadAreas";
+import { ctx_areaLookup } from "@mp-modules/area";
 import { ctx_worldStateMachine } from "../world/WorldState";
 import { spawnNpcInstance } from "./npcSpawnBehavior";
 import { ctx_npcService } from "./service";

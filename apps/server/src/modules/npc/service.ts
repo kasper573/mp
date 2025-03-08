@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq } from "@mp-modules/drizzle";
 import { InjectionContext } from "@mp/ioc";
 import type { DBClient } from "../../db/client";
 import { npcSpawnTable, npcTable } from "./schema";

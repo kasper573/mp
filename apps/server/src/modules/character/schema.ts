@@ -1,9 +1,9 @@
-import { pgTable, uuid, real } from "drizzle-orm/pg-core";
+import { pgTable, uuid, real } from "@mp-modules/drizzle";
 import type { UserId } from "@mp/auth";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import { areaId } from "@mp-modules/area";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
-import { areaId } from "../area/schema";
 import { vector } from "../../db/types/vector";
 import type { CombatTrait } from "../../traits/combat";
 

@@ -196,6 +196,12 @@ importers:
 
   apps/server:
     dependencies:
+      '@mp-modules/area':
+        specifier: workspace:*
+        version: link:../../modules/area
+      '@mp-modules/drizzle':
+        specifier: workspace:*
+        version: link:../../modules/drizzle
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
@@ -253,9 +259,6 @@ importers:
       dotenv:
         specifier: 16.4.5
         version: 16.4.5
-      drizzle-orm:
-        specifier: 0.38.3
-        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@18.3.3)(pg@8.13.1)(postgres@3.4.5)(react@18.3.1)
       express:
         specifier: 4.19.2
         version: 4.19.2
@@ -673,6 +676,38 @@ importers:
         specifier: 5.7.2
         version: 5.7.2
 
+  modules/area:
+    dependencies:
+      '@mp-modules/drizzle':
+        specifier: workspace:*
+        version: link:../drizzle
+      '@mp-modules/trpc':
+        specifier: workspace:*
+        version: link:../trpc
+      '@mp/data':
+        specifier: workspace:*
+        version: link:../../libraries/data
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../../libraries/ioc
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
+  modules/drizzle:
+    dependencies:
+      drizzle-orm:
+        specifier: 0.38.3
+        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@18.3.3)(pg@8.13.1)(postgres@3.4.5)(react@18.3.1)
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
   modules/trpc:
     dependencies:
       '@mp/ioc':
@@ -690,7 +725,7 @@ importers:
         version: link:../../libraries/tsconfig
 
   modules/user:
-    devDependencies:
+    dependencies:
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../trpc
@@ -703,6 +738,7 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+    devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig

@@ -17,6 +17,12 @@ import {
   ctx_trpcErrorFormatter,
   trpcExpress,
 } from "@mp-modules/trpc";
+import type { LocalFile } from "@mp/data";
+import {
+  ctx_areaFileUrlResolver,
+  ctx_areaLookup,
+  loadAreas,
+} from "@mp-modules/area";
 import { createDBClient } from "./db/client";
 import { ClientRegistry } from "./ClientRegistry";
 import { rootRouter } from "./modules/router";
@@ -36,7 +42,6 @@ import { characterRemoveBehavior } from "./modules/character/characterRemoveBeha
 import { collectUserMetrics } from "./metrics/collectUserMetrics";
 import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
-import { ctx_areaLookup, loadAreas } from "./modules/area/loadAreas";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
 import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
 import { WorldService } from "./modules/world/service";
@@ -47,6 +52,7 @@ import { deriveClientVisibility } from "./modules/world/clientVisibility";
 import { combatBehavior } from "./traits/combat";
 import { errorFormatter } from "./etc/errorFormatter";
 import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
+import { serverFileToPublicUrl } from "./etc/serverFileToPublicUrl";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -125,7 +131,10 @@ const ioc = new InjectionContainer()
   .provide(ctx_npcService, npcService)
   .provide(ctx_characterService, characterService)
   .provide(ctx_worldStateMachine, worldState)
-  .provide(ctx_areaLookup, areas);
+  .provide(ctx_areaLookup, areas)
+  .provide(ctx_areaFileUrlResolver, (id) =>
+    serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
+  );
 
 webServer.use(
   opt.apiEndpointPath,

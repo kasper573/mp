@@ -1,5 +1,5 @@
 import { t } from "@mp-modules/trpc";
-import { areaRouter } from "./area/router";
+import { areaRouter } from "@mp-modules/area";
 import { systemRouter } from "./system/router";
 import { characterRouter } from "./character/router";
 import { npcRouter } from "./npc/router";
