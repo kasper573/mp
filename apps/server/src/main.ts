@@ -10,7 +10,7 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
 import { Injector } from "@mp/injector";
-import { ctx_authServer, requestContext } from "@mp-modules/user";
+import { ctx_authServer, ctx_request } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 import {
   ctx_globalMiddleware,
@@ -133,7 +133,7 @@ webServer.use(
     onError: ({ path, error }) => logger.error(error),
     router: rootRouter,
     createContext: ({ req }: { req: express.Request }) => ({
-      injector: deps.provide(requestContext, req),
+      injector: deps.provide(ctx_request, req),
     }),
   }),
 );

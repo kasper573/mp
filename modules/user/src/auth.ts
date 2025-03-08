@@ -3,11 +3,11 @@ import { InjectionContext } from "@mp/injector";
 import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
 import type express from "express";
-import { requestContext } from "./session";
+import { ctx_request } from "./session";
 
 export const ctx_authServer = InjectionContext.new<AuthServer>();
 
-export const ctx_authToken = requestContext.derive(deriveAuthToken);
+export const ctx_authToken = ctx_request.derive(deriveAuthToken);
 
 export function deriveAuthToken(req: express.Request) {
   const parsedBearerToken =

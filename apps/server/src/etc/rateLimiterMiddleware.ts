@@ -1,12 +1,12 @@
 import { type AnyMiddleware, TRPCError } from "@mp-modules/trpc";
-import { sessionIdContext } from "@mp-modules/user";
+import { ctx_sessionId } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 
 const globalRequestLimit = new RateLimiter({ points: 20, duration: 1 });
 
 export const rateLimiterMiddleware: AnyMiddleware = async ({ ctx, next }) => {
   const result = await globalRequestLimit.consume(
-    ctx.injector.get(sessionIdContext),
+    ctx.injector.get(ctx_sessionId),
   );
   if (result.isErr()) {
     throw new TRPCError({
