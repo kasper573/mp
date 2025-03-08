@@ -2,7 +2,8 @@ import { type Vector } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc";
-import { ctx_worldStateMachine, type ActorId } from "../world/WorldState";
+import type { ActorId } from "../traits/actor";
+import { ctx_worldStateMachine } from "../world/WorldState";
 import { type CharacterId } from "./schema";
 import { ctx_characterService } from "./service";
 

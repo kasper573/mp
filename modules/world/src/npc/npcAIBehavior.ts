@@ -3,7 +3,8 @@ import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
 import type { AreaLookup } from "@mp-modules/area";
-import type { ActorId, WorldState } from "../world/WorldState";
+import type { ActorId } from "../traits/actor";
+import type { WorldState } from "../world/WorldState";
 import type { NPCInstanceId } from "./schema";
 
 export function npcAIBehavior(

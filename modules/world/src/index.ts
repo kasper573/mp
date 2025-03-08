@@ -12,4 +12,6 @@ export * from "./world/clientVisibility";
 export * from "./world/service";
 export * from "./traits/combat";
 export * from "./traits/movement";
+export * from "./traits/appearance";
+export * from "./traits/actor";
 export * from "./ClientRegistry";

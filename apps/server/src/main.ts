@@ -54,6 +54,7 @@ import { errorFormatter } from "./etc/errorFormatter";
 import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
 import { serverFileToPublicUrl } from "./etc/serverFileToPublicUrl";
 import { rootRouter } from "./router";
+import { clientViewDistance } from "./shared";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -90,7 +91,10 @@ const syncHandshakeLimiter = new RateLimiter({
 const worldState = createPatchStateMachine<WorldState>({
   initialState: { actors: {} },
   clientIds: () => syncServer.clientIds,
-  clientVisibility: deriveClientVisibility(clients),
+  clientVisibility: deriveClientVisibility(
+    clients,
+    clientViewDistance.networkFogOfWarTileCount,
+  ),
 });
 
 const syncServer: WorldSyncServer = new SyncServer({

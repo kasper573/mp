@@ -1,10 +1,11 @@
 import type { ClientVisibilityFactory } from "@mp/sync/server";
 import { rect_from_diameter, rect_hit_test } from "@mp/math";
+import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import { clientViewDistance } from "../../../../apps/server/src/shared";
 import type { ClientRegistry } from "../ClientRegistry";
 import type { MovementTrait } from "../traits/movement";
-import type { Actor, ActorId, WorldState } from "./WorldState";
+import type { Actor, ActorId } from "../traits/actor";
+import type { WorldState } from "./WorldState";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -13,6 +14,7 @@ import type { Actor, ActorId, WorldState } from "./WorldState";
  */
 export function deriveClientVisibility(
   clients: ClientRegistry,
+  clientViewDistance: Tile,
 ): ClientVisibilityFactory<WorldState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
@@ -21,30 +23,27 @@ export function deriveClientVisibility(
     );
     return { actors: visibleActors(state, clientCharacter) };
   };
-}
 
-function visibleActors(
-  state: WorldState,
-  observer?: Actor,
-): ReadonlySet<ActorId> {
-  const visible = new Set<ActorId>();
-  if (observer) {
-    for (const other of recordValues(state.actors).filter((other) =>
-      canSeeSubject(observer, other),
-    )) {
-      visible.add(other.id);
+  function visibleActors(
+    state: WorldState,
+    observer?: Actor,
+  ): ReadonlySet<ActorId> {
+    const visible = new Set<ActorId>();
+    if (observer) {
+      for (const other of recordValues(state.actors).filter((other) =>
+        canSeeSubject(observer, other),
+      )) {
+        visible.add(other.id);
+      }
     }
+    return visible;
   }
-  return visible;
-}
 
-export function canSeeSubject(a: MovementTrait, b: MovementTrait) {
-  if (a.areaId !== b.areaId) {
-    return false;
+  function canSeeSubject(a: MovementTrait, b: MovementTrait) {
+    if (a.areaId !== b.areaId) {
+      return false;
+    }
+    const viewbox = rect_from_diameter(a.coords, clientViewDistance);
+    return rect_hit_test(viewbox, b.coords);
   }
-  const viewbox = rect_from_diameter(
-    a.coords,
-    clientViewDistance.networkFogOfWarTileCount,
-  );
-  return rect_hit_test(viewbox, b.coords);
 }
