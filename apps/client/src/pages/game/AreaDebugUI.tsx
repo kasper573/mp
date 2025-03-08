@@ -16,7 +16,7 @@ import {
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import type { Actor, Character } from "@mp/server";
+import type { Actor, Character } from "@mp-modules/world";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";

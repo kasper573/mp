@@ -29,6 +29,7 @@
     "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
+    "@mp-modules/world": "workspace:*",
     "@solidjs/router": "0.14.7",
     "@tanstack/solid-query": "5.56.2",
     "solid-js": "1.9.3",
