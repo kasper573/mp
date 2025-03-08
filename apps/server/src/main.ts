@@ -9,7 +9,7 @@ import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
-import { InjectionContainer } from "@mp/injector";
+import { InjectionContainer } from "@mp/ioc";
 import { ctx_authServer, ctx_request } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 import {
@@ -118,7 +118,7 @@ const updateTicker = new Ticker({
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 const characterService = new CharacterService(db, areas);
 
-const deps = new InjectionContainer()
+const ioc = new InjectionContainer()
   .provide(ctx_authServer, auth)
   .provide(ctx_globalMiddleware, rateLimiterMiddleware)
   .provide(ctx_trpcErrorFormatter, errorFormatter)
@@ -133,7 +133,7 @@ webServer.use(
     onError: ({ path, error }) => logger.error(error),
     router: rootRouter,
     createContext: ({ req }: { req: express.Request }) => ({
-      injector: deps.provide(ctx_request, req),
+      ioc: ioc.provide(ctx_request, req),
     }),
   }),
 );

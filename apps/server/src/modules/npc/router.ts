@@ -10,9 +10,9 @@ export const npcRouter = t.router({
   spawnRandomNPC: t.procedure
     .use(roles(["spawn_npc"]))
     .mutation(async ({ ctx }) => {
-      const npcService = ctx.injector.get(ctx_npcService);
-      const state = ctx.injector.get(ctx_worldStateMachine);
-      const areas = ctx.injector.get(ctx_areaLookup);
+      const npcService = ctx.ioc.get(ctx_npcService);
+      const state = ctx.ioc.get(ctx_worldStateMachine);
+      const areas = ctx.ioc.get(ctx_areaLookup);
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
       const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
       state.actors.set(instance.id, { type: "npc", ...instance });

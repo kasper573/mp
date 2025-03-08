@@ -17,7 +17,7 @@
     }
   },
   "dependencies": {
-    "@mp/injector": "workspace:*",
+    "@mp/ioc": "workspace:*",
     "@trpc/server": "11.0.0-rc.593",
     "superjson": "2.2.1"
   },

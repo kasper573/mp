@@ -1,5 +1,5 @@
 import { initTRPC } from "@trpc/server";
-import { InjectionContext, type InjectionContainer } from "@mp/injector";
+import { InjectionContext, type InjectionContainer } from "@mp/ioc";
 import type {
   DefaultErrorShape,
   ErrorFormatter,
@@ -25,11 +25,11 @@ export * as trpcExpress from "@trpc/server/adapters/express";
 function createInjectableTRPC() {
   const trpc = initTRPC.context<TRPCContext>().create({
     transformer,
-    errorFormatter: (opt) => opt.ctx?.injector.get(ctx_trpcErrorFormatter)(opt),
+    errorFormatter: (opt) => opt.ctx?.ioc.get(ctx_trpcErrorFormatter)(opt),
   });
 
   const globalMiddleware = trpc.middleware(async (opt) => {
-    const middleware = opt.ctx.injector.get(ctx_globalMiddleware);
+    const middleware = opt.ctx.ioc.get(ctx_globalMiddleware);
     return middleware(opt);
   });
 
@@ -41,7 +41,7 @@ function createInjectableTRPC() {
 }
 
 export interface TRPCContext {
-  injector: InjectionContainer;
+  ioc: InjectionContainer;
 }
 
 export type AnyErrorFormatter = ErrorFormatter<TRPCContext, DefaultErrorShape>;

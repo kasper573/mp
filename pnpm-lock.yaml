@@ -211,9 +211,9 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
-      '@mp/injector':
+      '@mp/ioc':
         specifier: workspace:*
-        version: link:../../libraries/injector
+        version: link:../../libraries/ioc
       '@mp/keycloak-provision':
         specifier: workspace:*
         version: link:../../libraries/keycloak-provision
@@ -373,7 +373,7 @@ importers:
         specifier: 2.0.3
         version: 2.0.3(@types/node@22.10.2)(jsdom@23.2.0)
 
-  libraries/injector:
+  libraries/ioc:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -675,9 +675,9 @@ importers:
 
   modules/trpc:
     dependencies:
-      '@mp/injector':
+      '@mp/ioc':
         specifier: workspace:*
-        version: link:../../libraries/injector
+        version: link:../../libraries/ioc
       '@trpc/server':
         specifier: 11.0.0-rc.593
         version: 11.0.0-rc.593
@@ -697,9 +697,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/injector':
+      '@mp/ioc':
         specifier: workspace:*
-        version: link:../../libraries/injector
+        version: link:../../libraries/ioc
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std

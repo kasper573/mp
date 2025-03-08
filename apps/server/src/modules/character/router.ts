@@ -11,8 +11,8 @@ export const characterRouter = t.router({
   move: t.procedure
     .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
     .use(roles(["move_character"]))
-    .mutation(({ input: { characterId, to }, ctx: { user, injector } }) => {
-      const state = injector.get(ctx_worldStateMachine);
+    .mutation(({ input: { characterId, to }, ctx: { user, ioc } }) => {
+      const state = ioc.get(ctx_worldStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -38,44 +38,42 @@ export const characterRouter = t.router({
   attack: t.procedure
     .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
     .use(roles(["character_attack"]))
-    .mutation(
-      ({ input: { characterId, targetId }, ctx: { user, injector } }) => {
-        const state = injector.get(ctx_worldStateMachine);
-        const char = state.actors()[characterId];
+    .mutation(({ input: { characterId, targetId }, ctx: { user, ioc } }) => {
+      const state = ioc.get(ctx_worldStateMachine);
+      const char = state.actors()[characterId];
 
-        if (!char || char.type !== "character") {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "Character not found",
-          });
-        }
-
-        if (char.userId !== user.id) {
-          throw new TRPCError({
-            code: "FORBIDDEN",
-            message: "You don't have access to this character",
-          });
-        }
-
-        if (targetId === characterId) {
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: "You can't attack yourself",
-          });
-        }
-
-        state.actors.update(characterId, {
-          attackTargetId: targetId,
+      if (!char || char.type !== "character") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Character not found",
         });
-      },
-    ),
+      }
+
+      if (char.userId !== user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this character",
+        });
+      }
+
+      if (targetId === characterId) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "You can't attack yourself",
+        });
+      }
+
+      state.actors.update(characterId, {
+        attackTargetId: targetId,
+      });
+    }),
 
   join: t.procedure
     .output(schemaFor<CharacterId>())
     .use(auth())
-    .mutation(async ({ ctx: { user, injector } }) => {
-      const state = injector.get(ctx_worldStateMachine);
-      const characterService = injector.get(ctx_characterService);
+    .mutation(async ({ ctx: { user, ioc } }) => {
+      const state = ioc.get(ctx_worldStateMachine);
+      const characterService = ioc.get(ctx_characterService);
       const existingCharacter = recordValues(state.actors())
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === user.id);

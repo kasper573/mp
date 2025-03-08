@@ -1,4 +1,4 @@
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 import type { Branded } from "@mp/std";
 import type express from "express";
 

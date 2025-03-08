@@ -16,7 +16,7 @@
     "@mp/std": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "@mp/injector": "workspace:*",
+    "@mp/ioc": "workspace:*",
     "@types/express": "4.17.21"
   }
 }

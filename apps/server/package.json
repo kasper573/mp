@@ -26,7 +26,7 @@
     "@mp/keycloak-provision": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/injector": "workspace:*",
+    "@mp/ioc": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/logger": "workspace:*",

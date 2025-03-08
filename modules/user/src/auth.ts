@@ -1,5 +1,5 @@
 import { TRPCError, t } from "@mp-modules/trpc";
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
 import type express from "express";
@@ -20,7 +20,7 @@ export function deriveAuthToken(req: express.Request) {
 
 export function auth() {
   return t.middleware(async ({ ctx, next }) => {
-    const authToken = ctx.injector.get(ctx_authToken);
+    const authToken = ctx.ioc.get(ctx_authToken);
     if (!authToken) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -28,7 +28,7 @@ export function auth() {
       });
     }
 
-    const authServer = ctx.injector.get(ctx_authServer);
+    const authServer = ctx.ioc.get(ctx_authServer);
     const result = await authServer.verifyToken(authToken);
     if (result.isErr()) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: result.error });
@@ -53,9 +53,9 @@ export function roles(requiredRoles: string[]) {
 
 export function optionalAuth() {
   return t.middleware(async ({ ctx, next }) => {
-    const authToken = ctx.injector.get(ctx_authToken);
+    const authToken = ctx.ioc.get(ctx_authToken);
     const result = authToken
-      ? await ctx.injector.get(ctx_authServer).verifyToken(authToken)
+      ? await ctx.ioc.get(ctx_authServer).verifyToken(authToken)
       : undefined;
 
     return next({

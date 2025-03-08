@@ -18,7 +18,7 @@ export class InjectionContainer {
   }
 }
 
-// Symbol not exported to make it impossible to access a context value without going through the injector
+// Symbol not exported to make it impossible to access a context value without going through the ioc
 const readSymbol = Symbol("read");
 
 export class InjectionContext<Value> {
@@ -48,7 +48,7 @@ export class InjectionContext<Value> {
       if (map.has(this as InjectionContext<unknown>)) {
         return map.get(this as InjectionContext<unknown>) as Value;
       }
-      throw new Error("Context not available in injector");
+      throw new Error("Context not available in ioc");
     });
   }
 }

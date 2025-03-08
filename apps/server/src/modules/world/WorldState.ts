@@ -1,6 +1,6 @@
 import type { UserIdentity } from "@mp/auth";
 import type { PatchStateMachine, SyncServer } from "@mp/sync/server";
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 import type { NPCInstance } from "../npc/schema";
 import type { Character } from "../character/schema";
 

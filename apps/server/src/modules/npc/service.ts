@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 import type { DBClient } from "../../db/client";
 import { npcSpawnTable, npcTable } from "./schema";
 

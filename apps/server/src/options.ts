@@ -15,7 +15,7 @@ import {
   transform,
 } from "@mp/env";
 import type { AuthToken, UserId, UserIdentity } from "@mp/auth";
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
 

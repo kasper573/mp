@@ -108,7 +108,7 @@ Concrete game mechanics and business logic.
 
 Should be highly configurable and may not contain hard coded configuration. May do so either by composition, or dependency injection.
 
-Dependencies on other modules must be done via dependency injection (See [@mp/injector](libraries/injector/)).
+Dependencies on other modules must be done via dependency injection (See [@mp/ioc](libraries/ioc/)).
 
 ## libraries
 

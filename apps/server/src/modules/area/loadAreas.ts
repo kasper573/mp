@@ -2,7 +2,7 @@ import path from "node:path";
 import fs from "node:fs/promises";
 import type { AreaId, PathToLocalFile } from "@mp/data";
 import { AreaResource } from "@mp/data";
-import { InjectionContext } from "@mp/injector";
+import { InjectionContext } from "@mp/ioc";
 import { loadTiled } from "./loadTiled";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
