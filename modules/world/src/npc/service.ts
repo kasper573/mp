@@ -1,6 +1,6 @@
 import { eq } from "@mp-modules/db";
 import { InjectionContext } from "@mp/ioc";
-import type { DBClient } from "../../../../../modules/db/src/client";
+import type { DBClient } from "../../../db/src/client";
 import { npcSpawnTable, npcTable } from "./schema";
 
 export class NPCService {

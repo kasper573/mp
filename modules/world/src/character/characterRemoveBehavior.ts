@@ -2,7 +2,7 @@ import type { UserId } from "@mp/auth";
 import type { PatchStateMachine } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
-import type { ClientRegistry } from "../../ClientRegistry";
+import type { ClientRegistry } from "../ClientRegistry";
 import type { WorldState } from "../world/WorldState";
 
 export function characterRemoveBehavior(

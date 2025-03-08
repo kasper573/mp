@@ -1,3 +1,4 @@
+import type { DBClient } from "@mp-modules/db";
 import { eq } from "@mp-modules/db";
 import type { UserId, UserIdentity } from "@mp/auth";
 import type { AreaId } from "@mp/data";
@@ -6,8 +7,7 @@ import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
 import type { AreaLookup } from "@mp-modules/area";
-import type { DBClient } from "../../../../../modules/db/src/client";
-import type { AppearanceTrait } from "../../traits/appearance";
+import type { AppearanceTrait } from "../traits/appearance";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 

@@ -2,7 +2,7 @@ import { vec_distance, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync/server";
-import type { Actor, ActorId, WorldState } from "../modules/world/WorldState";
+import type { Actor, ActorId, WorldState } from "../world/WorldState";
 
 export interface CombatTrait {
   hitBox: Rect<Tile>;

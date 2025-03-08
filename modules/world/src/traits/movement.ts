@@ -5,7 +5,7 @@ import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import type { AreaLookup } from "@mp-modules/area";
-import type { WorldState } from "../modules/world/WorldState";
+import type { WorldState } from "../world/WorldState";
 
 export interface MovementTrait {
   /**

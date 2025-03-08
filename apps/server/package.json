@@ -41,11 +41,11 @@
     "@mp-modules/db": "workspace:*",
     "@mp-modules/user": "workspace:*",
     "@mp-modules/area": "workspace:*",
+    "@mp-modules/world": "workspace:*",
     "import-in-the-middle": "1.12.0",
     "cors": "2.8.5",
     "dotenv": "16.4.5",
     "express": "4.19.2",
-    "unique-names-generator": "4.7.1",
     "yargs": "17.7.2"
   },
   "devDependencies": {

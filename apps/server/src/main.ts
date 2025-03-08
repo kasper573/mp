@@ -24,35 +24,36 @@ import {
   loadAreas,
 } from "@mp-modules/area";
 import { createDBClient } from "@mp-modules/db";
-import { ClientRegistry } from "./ClientRegistry";
-import { rootRouter } from "./modules/router";
-import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
-import { metricsMiddleware } from "./express/metricsMiddleware";
 import {
+  ClientRegistry,
+  movementBehavior,
+  npcSpawnBehavior,
+  combatBehavior,
+  characterRemoveBehavior,
   CharacterService,
   ctx_characterService,
-} from "./modules/character/service";
-import {
+  npcAIBehavior,
+  ctx_npcService,
   ctx_worldStateMachine,
-  type WorldState,
-  type WorldSyncServer,
-} from "./modules/world/WorldState";
-import { movementBehavior } from "./traits/movement";
-import { characterRemoveBehavior } from "./modules/character/characterRemoveBehavior";
+  deriveClientVisibility,
+  NPCService,
+  WorldService,
+} from "@mp-modules/world";
+import type {
+  WorldState,
+  WorldSyncServer,
+} from "../../../modules/world/src/world/WorldState";
+import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
+import { metricsMiddleware } from "./express/metricsMiddleware";
 import { collectUserMetrics } from "./metrics/collectUserMetrics";
 import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
 import { createExpressLogger } from "./express/createExpressLogger";
 import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
-import { npcAIBehavior } from "./modules/npc/npcAIBehavior";
-import { WorldService } from "./modules/world/service";
-import { npcSpawnBehavior } from "./modules/npc/npcSpawnBehavior";
-import { ctx_npcService, NPCService } from "./modules/npc/service";
 import { opt } from "./options";
-import { deriveClientVisibility } from "./modules/world/clientVisibility";
-import { combatBehavior } from "./traits/combat";
 import { errorFormatter } from "./etc/errorFormatter";
 import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
 import { serverFileToPublicUrl } from "./etc/serverFileToPublicUrl";
+import { rootRouter } from "./router";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

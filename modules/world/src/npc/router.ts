@@ -14,7 +14,11 @@ export const npcRouter = t.router({
       const state = ctx.ioc.get(ctx_worldStateMachine);
       const areas = ctx.ioc.get(ctx_areaLookup);
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
-      const instance = spawnNpcInstance(npc, spawn, areas.get(spawn.areaId)!);
+      const area = areas.get(spawn.areaId);
+      if (!area) {
+        throw new Error(`Area not found: ${spawn.areaId}`);
+      }
+      const instance = spawnNpcInstance(npc, spawn, area);
       state.actors.set(instance.id, { type: "npc", ...instance });
     }),
 });
