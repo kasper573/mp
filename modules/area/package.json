@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@mp-modules/trpc": "workspace:*",
-    "@mp-modules/drizzle": "workspace:*",
+    "@mp-modules/db": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/data": "workspace:*",
     "@mp/tiled-loader": "workspace:*"

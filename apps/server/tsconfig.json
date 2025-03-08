@@ -1,6 +1,11 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "*.ts"],
+  "include": [
+    "src",
+    "*.ts",
+    "../../modules/db/src/types",
+    "../../modules/db/src/client.ts"
+  ],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017"

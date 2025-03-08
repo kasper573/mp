@@ -23,7 +23,7 @@ import {
   ctx_areaLookup,
   loadAreas,
 } from "@mp-modules/area";
-import { createDBClient } from "./db/client";
+import { createDBClient } from "@mp-modules/db";
 import { ClientRegistry } from "./ClientRegistry";
 import { rootRouter } from "./modules/router";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
@@ -63,7 +63,9 @@ RateLimiter.enabled = opt.rateLimit;
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const auth = createAuthServer(opt.auth);
-const db = createDBClient(opt.databaseUrl, logger);
+const db = createDBClient(opt.databaseUrl);
+
+db.$client.on("error", logger.error);
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)

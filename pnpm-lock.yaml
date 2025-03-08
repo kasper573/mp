@@ -199,9 +199,9 @@ importers:
       '@mp-modules/area':
         specifier: workspace:*
         version: link:../../modules/area
-      '@mp-modules/drizzle':
+      '@mp-modules/db':
         specifier: workspace:*
-        version: link:../../modules/drizzle
+        version: link:../../modules/db
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
@@ -265,9 +265,6 @@ importers:
       import-in-the-middle:
         specifier: 1.12.0
         version: 1.12.0
-      pg:
-        specifier: 8.13.1
-        version: 8.13.1
       unique-names-generator:
         specifier: 4.7.1
         version: 4.7.1
@@ -284,9 +281,6 @@ importers:
       '@types/express':
         specifier: 4.17.21
         version: 4.17.21
-      '@types/pg':
-        specifier: 8.11.10
-        version: 8.11.10
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -678,9 +672,9 @@ importers:
 
   modules/area:
     dependencies:
-      '@mp-modules/drizzle':
+      '@mp-modules/db':
         specifier: workspace:*
-        version: link:../drizzle
+        version: link:../db
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../trpc
@@ -698,15 +692,24 @@ importers:
         specifier: workspace:*
         version: link:../../libraries/tsconfig
 
-  modules/drizzle:
+  modules/db:
     dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
       drizzle-orm:
         specifier: 0.38.3
         version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@18.3.3)(pg@8.13.1)(postgres@3.4.5)(react@18.3.1)
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
 
   modules/trpc:
     dependencies:

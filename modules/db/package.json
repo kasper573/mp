@@ -1,5 +1,5 @@
 {
-  "name": "@mp-modules/drizzle",
+  "name": "@mp-modules/db",
   "version": "0.0.0",
   "sideEffects": false,
   "type": "module",
@@ -12,9 +12,12 @@
     }
   },
   "dependencies": {
-    "drizzle-orm": "0.38.3"
+    "drizzle-orm": "0.38.3",
+    "pg": "8.13.1",
+    "@mp/math": "workspace:*"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/pg": "8.11.10"
   }
 }

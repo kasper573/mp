@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import { point } from "@mp-modules/drizzle";
+import { point } from "drizzle-orm/pg-core";
 
 /**
  * A drizzle/postgres representation of the Vector type from @mp/std

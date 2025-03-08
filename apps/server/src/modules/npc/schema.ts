@@ -1,9 +1,9 @@
-import { integer, pgTable, uuid, relations } from "@mp-modules/drizzle";
+import { integer, pgTable, uuid, relations } from "@mp-modules/db";
 import type { Branded, Tile } from "@mp/std";
 import { areaId } from "@mp-modules/area";
 import type { MovementTrait } from "../../traits/movement";
 import type { AppearanceTrait } from "../../traits/appearance";
-import { vector } from "../../db/types/vector";
+import { vector } from "../../../../../modules/db/src/types/vector";
 import type { CombatTrait } from "../../traits/combat";
 
 export type NPCId = Branded<string, "NPCId">;
