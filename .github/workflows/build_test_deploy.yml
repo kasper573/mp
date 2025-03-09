@@ -60,7 +60,7 @@ jobs:
       - name: Install node dependencies
         uses: ./.github/workflows/composites/install_node_things/
       - name: Install playwright dependencies
-        run: pnpm dlx playwright install --with-deps
+        run: pnpm exec playwright install --with-deps
       - name: Start application
         run: cd ./docker && ./dockerctl.sh test up --no-build -d
       - name: Run end-to-end tests
