@@ -3,7 +3,6 @@ import type { Tile } from "@mp/std";
 // This file should only expose runtime code that is shared between client/server.
 
 // This should end up being primarily constants and utility functions.
-export const tokenHeaderName = "token";
 
 /**
  * Diameter in tiles around the player that determines what a player can see and the zoom level of the camera.
@@ -14,5 +13,3 @@ export const clientViewDistance = {
   renderedTileCount: 24 as Tile,
   networkFogOfWarTileCount: 32 as Tile,
 };
-
-export { default as transformer } from "superjson";

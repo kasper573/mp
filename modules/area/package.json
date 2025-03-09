@@ -1,0 +1,24 @@
+{
+  "name": "@mp-modules/area",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@mp-modules/trpc": "workspace:*",
+    "@mp-modules/db": "workspace:*",
+    "@mp/ioc": "workspace:*",
+    "@mp/data": "workspace:*",
+    "@mp/tiled-loader": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

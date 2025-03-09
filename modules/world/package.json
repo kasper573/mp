@@ -1,0 +1,33 @@
+{
+  "name": "@mp-modules/world",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@mp/std": "workspace:*",
+    "@mp/ioc": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/data": "workspace:*",
+    "@mp/time": "workspace:*",
+    "@mp/path-finding": "workspace:*",
+    "@mp/auth": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/sync": "workspace:*",
+    "@mp-modules/db": "workspace:*",
+    "@mp-modules/trpc": "workspace:*",
+    "@mp-modules/user": "workspace:*",
+    "@mp-modules/area": "workspace:*",
+    "unique-names-generator": "4.7.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

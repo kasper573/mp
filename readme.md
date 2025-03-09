@@ -11,7 +11,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 - 2d graphics: [Pixi](https://pixijs.com/)
 - maps: [Tiled](https://www.mapeditor.org/) (+custom
-  [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
+  [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle orm](https://orm.drizzle.team/)
@@ -24,7 +24,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - CI/CD: Lint, test, build, deploy in pipeline.
 - Highly replicable: Containerized development, test and production environments.
 - (near) Zero config: Just clone and run.
-- [Modular and encapsulated concerns](packages).
+- [Modular and encapsulated concerns](libraries).
 - Authorative server, dead simple client
   - little to no optimistic operations (maybe some lerping)
   - subscribe to state changes, render them.
@@ -91,3 +91,29 @@ docker compose file as in development but with production environment variables
 provided via github action variables and secrets.
 
 Review the workflow to see which variables and secrets you need to provide.
+
+# Monorepo package convention
+
+This repository utilizes pnpm workspaces to organize and separate concerns. Lower level workspaces pay not depend on higher level workspaces.
+
+These are the workspaces, in order:
+
+## apps
+
+Deployable artifacts. Composes all other packages.
+
+## modules
+
+Concrete game mechanics and business logic.
+
+Should be highly configurable and may not contain hard coded configuration. May do so either by composition, or dependency injection.
+
+Dependencies on other modules must be done via dependency injection (See [@mp/ioc](libraries/ioc/)).
+
+## libraries
+
+Generic and low level systems.
+
+Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
+
+Dependencies must instead be provided as arguments.

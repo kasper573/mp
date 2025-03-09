@@ -6,7 +6,8 @@
   "license": "MIT",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "modules/*",
+    "libraries/*"
   ],
   "scripts": {
     "build": "pnpm -r --stream build",

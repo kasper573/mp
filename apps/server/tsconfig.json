@@ -1,6 +1,15 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "*.ts"],
+  "include": [
+    "src",
+    "*.ts",
+    "../../modules/db/src/types",
+    "../../modules/db/src/client.ts",
+    "../../modules/world/src/npc",
+    "../../modules/world/src/world",
+    "../../modules/world/src/ClientRegistry.ts",
+    "../../modules/world/src/traits"
+  ],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017"

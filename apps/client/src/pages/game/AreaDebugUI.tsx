@@ -16,7 +16,7 @@ import {
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import type { Actor, Character } from "@mp/server";
+import type { Actor, Character } from "@mp-modules/world";
 import type { TimeSpan } from "@mp/time";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";
@@ -36,8 +36,6 @@ export function AreaDebugUI(props: {
 }) {
   const trpc = useTRPC();
 
-  const isTickEnabled = trpc.system.isTickEnabled.createQuery();
-  const setTickEnabled = trpc.system.setTickEnabled.createMutation();
   const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
     meta: { invalidateCache: false },
   }));
@@ -66,17 +64,6 @@ export function AreaDebugUI(props: {
               options={visibleGraphTypes}
               value={visibleGraphType()}
               onChange={setVisibleGraphType}
-            />
-          </div>
-          <div>
-            Server tick:
-            <input
-              type="checkbox"
-              checked={isTickEnabled.data ?? false}
-              on:click={(e) => {
-                e.preventDefault();
-                setTickEnabled.mutate(!isTickEnabled.data);
-              }}
             />
           </div>
           <div>

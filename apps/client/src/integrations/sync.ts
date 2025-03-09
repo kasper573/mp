@@ -1,5 +1,5 @@
-import type { ActorId, Character, WorldState } from "@mp/server";
-import { type CharacterId } from "@mp/server";
+import type { ActorId, Character, WorldState } from "@mp-modules/world";
+import { type CharacterId } from "@mp-modules/world";
 import { SyncClient } from "@mp/sync/client";
 import {
   createContext,
@@ -28,7 +28,7 @@ export function createSyncClient() {
   const worldState = createMutable<WorldState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
-    () => worldState.actors[characterId()!] as Character | undefined,
+    () => worldState.actors[characterId()!] as Character,
   );
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
