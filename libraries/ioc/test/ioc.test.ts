@@ -11,9 +11,7 @@ it("can get injected value via context", () => {
 it("attempting to access unavailable context throws an error", () => {
   const context = InjectionContext.new<number>();
   const container = new InjectionContainer();
-  expect(() => container.get(context)).toThrowError(
-    "Context not available in container",
-  );
+  expect(() => container.get(context)).toThrowError("Context not available");
 });
 
 it("can access a context that is unavailable in the container if the context has a default value", () => {
@@ -42,7 +40,5 @@ it("can access derived values from default values", () => {
 it("attempting to access unavailable derived context throws an error", () => {
   const context = InjectionContext.new<number>().derive((value) => value * 2);
   const container = new InjectionContainer();
-  expect(() => container.get(context)).toThrowError(
-    "Context not available in container",
-  );
+  expect(() => container.get(context)).toThrowError("Context not available");
 });

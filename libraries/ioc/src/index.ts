@@ -48,7 +48,7 @@ export class InjectionContext<Value> {
       if (map.has(this as InjectionContext<unknown>)) {
         return map.get(this as InjectionContext<unknown>) as Value;
       }
-      throw new Error("Context not available in ioc");
+      throw new Error("Context not available");
     });
   }
 }
