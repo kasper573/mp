@@ -24,13 +24,13 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - CI/CD: Lint, test, build, deploy in pipeline.
 - Highly replicable: Containerized development, test and production environments.
 - (near) Zero config: Just clone and run.
-- [Modular and encapsulated concerns](libraries).
+- [Modular](#monorepo-package-convention).
 - Authorative server, dead simple client
   - little to no optimistic operations (maybe some lerping)
   - subscribe to state changes, render them.
 - Dynamically loaded and served game content
   - only reusable and built-in game mechanics is part of this repo.
-  - assets, models, scripts, etc. is not part of this repo.
+  - game content like models, maps, npcs, monsters, etc. is not part of this repo.
   - should be provided externally when deploying.
 
 ## Development
