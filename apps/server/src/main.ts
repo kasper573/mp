@@ -24,6 +24,7 @@ import {
   loadAreas,
 } from "@mp-modules/area";
 import { createDBClient } from "@mp-modules/db";
+import type { WorldState, WorldSyncServer } from "@mp-modules/world";
 import {
   ClientRegistry,
   movementBehavior,
@@ -39,10 +40,6 @@ import {
   NPCService,
   WorldService,
 } from "@mp-modules/world";
-import type {
-  WorldState,
-  WorldSyncServer,
-} from "../../../modules/world/src/world/WorldState";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { collectUserMetrics } from "./metrics/collectUserMetrics";

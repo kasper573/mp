@@ -3,10 +3,10 @@ import { MetricsGague } from "@mp/telemetry/prom";
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync/server";
 import type {
+  ClientRegistry,
   WorldState,
   WorldSyncServer,
-} from "../../../../modules/world/src/world/WorldState";
-import type { ClientRegistry } from "../../../../modules/world/src/ClientRegistry";
+} from "@mp-modules/world";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
