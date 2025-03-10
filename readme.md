@@ -94,7 +94,7 @@ Review the workflow to see which variables and secrets you need to provide.
 
 # Monorepo package convention
 
-This repository utilizes pnpm workspaces to organize and separate concerns. Lower level workspaces pay not depend on higher level workspaces.
+This repository utilizes pnpm workspaces to organize and separate concerns. Lower level workspaces may not depend on higher level workspaces.
 
 These are the workspaces, in order:
 
