@@ -5,7 +5,7 @@ import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
 import solid from "eslint-plugin-solid/configs/typescript";
 import * as tsParser from "@typescript-eslint/parser";
-import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
+import boundariesPlugin from "eslint-plugin-boundaries";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
 
 export default tseslint.config(
@@ -22,8 +22,6 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
-  monorepoCopPlugin.configs.recommended,
   {
     languageOptions: {
       parserOptions: {
@@ -39,10 +37,11 @@ export default tseslint.config(
     },
   },
   {
+    languageOptions: { parser: tsParser },
     plugins: {
       import: importPlugin,
       "unused-imports": unusedImportsPlugin,
-      "monorepo-cop": monorepoCopPlugin,
+      boundaries: boundariesPlugin,
     },
     rules: {
       // Consistent order of imports makes a modules dependencies easier to grasp mentally for humans
@@ -61,17 +60,46 @@ export default tseslint.config(
 
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
+
+      "boundaries/element-types": [
+        2,
+        {
+          default: "disallow",
+          message: "${file.type} is not allowed to import ${dependency.type}",
+          rules: [
+            {
+              from: ["apps"],
+              allow: ["apps", "modules", "libraries"],
+            },
+            {
+              from: ["modules"],
+              allow: ["modules", "libraries"],
+            },
+            {
+              from: ["libraries"],
+              allow: ["libraries"],
+            },
+          ],
+        },
+      ],
+    },
+    settings: {
+      "boundaries/elements": [
+        { type: "apps", pattern: "apps/*" },
+        { type: "modules", pattern: "modules/*" },
+        { type: "libraries", pattern: "libraries/*" },
+      ],
+      "import/resolver": {
+        typescript: {
+          alwaysTryTypes: true,
+        },
+      },
     },
   },
   {
     files: ["**/*.{ts,tsx}"],
     ...solid,
-    languageOptions: {
-      parser: tsParser,
-      parserOptions: {
-        project: "tsconfig.json",
-      },
-    },
+    languageOptions: { parser: tsParser },
   },
   eslintPluginUnicorn.configs["flat/recommended"],
   {
