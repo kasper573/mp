@@ -1,7 +1,7 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import type { AreaId } from "@mp-modules/data";
+import type { AreaId } from "@mp-modules/area";
 import type { RootRouter } from "@mp/server";
-import { transformer } from "@mp-modules/trpc/transformer";
+import { transformer } from "@mp-modules/trpc";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { SyncClient } from "@mp/sync/client";
 import { readCliOptions } from "./cli";

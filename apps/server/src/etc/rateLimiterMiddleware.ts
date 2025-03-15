@@ -1,4 +1,4 @@
-import { type AnyMiddleware, TRPCError } from "@mp-modules/trpc";
+import { type AnyMiddleware, TRPCError } from "@mp-modules/trpc/server";
 import { ctx_sessionId } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 

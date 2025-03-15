@@ -1,4 +1,4 @@
 {
-  "extends": "@mp/tsconfig/node.json",
+  "extends": "@mp/tsconfig/vite.json",
   "include": ["src", "themes"]
 }

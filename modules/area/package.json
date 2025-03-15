@@ -5,18 +5,27 @@
   "type": "module",
   "license": "MIT",
   "exports": {
+    "./server": {
+      "types": "./server/index.ts",
+      "import": "./server/index.ts",
+      "require": "./server/index.ts"
+    },
     ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts",
-      "require": "./src/index.ts"
+      "types": "./shared/index.ts",
+      "import": "./shared/index.ts",
+      "require": "./shared/index.ts"
     }
   },
   "dependencies": {
+    "@mp/ioc": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/path-finding": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/db": "workspace:*",
-    "@mp/ioc": "workspace:*",
-    "@mp-modules/data": "workspace:*",
-    "@mp/tiled-loader": "workspace:*"
+    "@mp-modules/area": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

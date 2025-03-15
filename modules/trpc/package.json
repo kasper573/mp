@@ -5,15 +5,15 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": {
-      "types": "./src/index.ts",
-      "import": "./src/index.ts",
-      "require": "./src/index.ts"
+    "./server": {
+      "types": "./server/index.ts",
+      "import": "./server/index.ts",
+      "require": "./server/index.ts"
     },
-    "./transformer": {
-      "types": "./transformer.ts",
-      "import": "./transformer.ts",
-      "require": "./transformer.ts"
+    ".": {
+      "types": "./shared/index.ts",
+      "import": "./shared/index.ts",
+      "require": "./shared/index.ts"
     }
   },
   "dependencies": {

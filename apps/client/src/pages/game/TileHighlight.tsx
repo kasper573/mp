@@ -1,5 +1,5 @@
 import type { FillStyle } from "@mp/pixi";
-import type { AreaResource } from "@mp-modules/data";
+import type { AreaResource } from "@mp-modules/area";
 import { Graphics } from "@mp/pixi";
 import { createEffect } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";

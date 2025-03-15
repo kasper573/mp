@@ -1,10 +1,10 @@
-import { moveAlongPath, type AreaId } from "@mp-modules/data";
+import { moveAlongPath, type AreaId } from "@mp-modules/area";
 import type { Path, Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { AreaLookup } from "@mp-modules/area";
+import type { AreaLookup } from "@mp-modules/area/server";
 import type { WorldState } from "../world/WorldState";
 
 export interface MovementTrait {

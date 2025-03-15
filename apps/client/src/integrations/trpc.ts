@@ -1,5 +1,5 @@
 import type { RootRouter } from "@mp/server";
-import { transformer } from "@mp-modules/trpc/transformer";
+import { transformer } from "@mp-modules/trpc";
 
 import {
   createTRPCSolidClient,

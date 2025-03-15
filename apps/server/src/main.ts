@@ -16,12 +16,12 @@ import {
   ctx_globalMiddleware,
   ctx_trpcErrorFormatter,
   trpcExpress,
-} from "@mp-modules/trpc";
+} from "@mp-modules/trpc/server";
 import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,
   loadAreas,
-} from "@mp-modules/area";
+} from "@mp-modules/area/server";
 import { createDBClient } from "@mp-modules/db";
 import type { WorldState, WorldSyncServer } from "@mp-modules/world";
 import {
@@ -39,7 +39,7 @@ import {
   NPCService,
   WorldService,
 } from "@mp-modules/world";
-import type { LocalFile } from "@mp-modules/data";
+import type { LocalFile } from "@mp/std";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { collectUserMetrics } from "./metrics/collectUserMetrics";
