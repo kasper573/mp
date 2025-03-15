@@ -39,7 +39,9 @@ export function AreaDebugUI(props: {
   drawPathsForActors: Actor[];
 }) {
   const trpc = useTRPC();
-  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation();
+  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
+    meta: { invalidateCache: false },
+  }));
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
