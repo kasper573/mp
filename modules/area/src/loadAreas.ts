@@ -1,10 +1,9 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { AreaId, LocalFile } from "../../data/src";
-import { AreaResource } from "../../data/src";
 import { InjectionContext } from "@mp/ioc";
-import { TiledResource } from "../../data/src";
 import { createTiledLoader } from "@mp/tiled-loader";
+import type { AreaId, LocalFile } from "@mp-modules/data";
+import { AreaResource, TiledResource } from "@mp-modules/data";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
   const files = await fs.readdir(dir);

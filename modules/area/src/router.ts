@@ -1,4 +1,4 @@
-import type { AreaId, PublicUrl } from "../../data/src";
+import type { AreaId, PublicUrl } from "@mp-modules/data";
 import { schemaFor, t } from "@mp-modules/trpc";
 import { InjectionContext } from "@mp/ioc";
 
