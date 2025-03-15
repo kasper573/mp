@@ -7,6 +7,7 @@ import solid from "eslint-plugin-solid/configs/typescript";
 import * as tsParser from "@typescript-eslint/parser";
 import boundariesPlugin from "eslint-plugin-boundaries";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
+import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
 
 export default tseslint.config(
   {
@@ -22,6 +23,8 @@ export default tseslint.config(
   },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked,
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
+  monorepoCopPlugin.configs.recommended,
   {
     languageOptions: {
       parserOptions: {
@@ -42,6 +45,7 @@ export default tseslint.config(
       import: importPlugin,
       "unused-imports": unusedImportsPlugin,
       boundaries: boundariesPlugin,
+      "monorepo-cop": monorepoCopPlugin,
     },
     rules: {
       // Consistent order of imports makes a modules dependencies easier to grasp mentally for humans
