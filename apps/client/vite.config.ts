@@ -7,6 +7,7 @@ import type { Plugin } from "vite";
 
 export default defineConfig({
   plugins: [
+    disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     solid(),
     topLevelAwait(),
@@ -25,6 +26,23 @@ function embedEnvPlugin(): Plugin {
         ),
       );
       return html.replaceAll("__ENV_PLACEHOLDER__", JSON.stringify(env));
+    },
+  };
+}
+
+// This warning usually shows up when a server module is being bundled into the client,
+// which is almost always an error in this repo, so we disallow it.
+function disallowExternalizingPlugin(): Plugin {
+  return {
+    name: "error-on-externalized-modules",
+    configResolved(config) {
+      config.logger.warn = (message) => {
+        if (message.includes("has been externalized")) {
+          throw new Error(`Externalizing is not allowed: ${message}`);
+        }
+        // eslint-disable-next-line no-console
+        console.warn(message); // Preserve other warnings
+      };
     },
   };
 }
