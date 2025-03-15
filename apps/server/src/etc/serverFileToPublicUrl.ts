@@ -1,5 +1,5 @@
 import path from "node:path";
-import type { LocalFile, PublicUrl } from "@mp/data";
+import type { LocalFile, PublicUrl } from "@mp-modules/data";
 import { opt } from "../options";
 
 export function serverFileToPublicUrl(fileInPublicDir: LocalFile): PublicUrl {

@@ -1,4 +1,4 @@
-import { moveAlongPath } from "@mp/data";
+import { moveAlongPath } from "@mp-modules/data";
 import { EngineContext } from "@mp/engine";
 import type { Path } from "@mp/math";
 import { path_copy, vec_distance, type Vector } from "@mp/math";

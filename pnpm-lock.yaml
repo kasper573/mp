@@ -56,6 +56,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@mp-modules/data':
+        specifier: workspace:*
+        version: link:../../modules/data
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
@@ -65,9 +68,6 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/data':
-        specifier: workspace:*
-        version: link:../../libraries/data
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
@@ -165,12 +165,12 @@ importers:
 
   apps/loadtest:
     dependencies:
+      '@mp-modules/data':
+        specifier: workspace:*
+        version: link:../../modules/data
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
-      '@mp/data':
-        specifier: workspace:*
-        version: link:../../libraries/data
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -202,6 +202,9 @@ importers:
       '@mp-modules/area':
         specifier: workspace:*
         version: link:../../modules/area
+      '@mp-modules/data':
+        specifier: workspace:*
+        version: link:../../modules/data
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../../modules/db
@@ -217,9 +220,6 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/data':
-        specifier: workspace:*
-        version: link:../../libraries/data
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -305,28 +305,6 @@ importers:
       solid-js:
         specifier: 1.9.3
         version: 1.9.3
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
-  libraries/data:
-    dependencies:
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
-      '@mp/path-finding':
-        specifier: workspace:*
-        version: link:../path-finding
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../tiled-loader
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../time
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -675,21 +653,43 @@ importers:
 
   modules/area:
     dependencies:
+      '@mp-modules/data':
+        specifier: workspace:*
+        version: link:../data
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../db
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../trpc
-      '@mp/data':
-        specifier: workspace:*
-        version: link:../../libraries/data
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../../libraries/tiled-loader
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
+  modules/data:
+    dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../libraries/path-finding
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../libraries/time
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -757,6 +757,9 @@ importers:
       '@mp-modules/area':
         specifier: workspace:*
         version: link:../area
+      '@mp-modules/data':
+        specifier: workspace:*
+        version: link:../data
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../db
@@ -769,9 +772,6 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/data':
-        specifier: workspace:*
-        version: link:../../libraries/data
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc

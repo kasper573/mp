@@ -1,7 +1,7 @@
 import type { DBClient } from "@mp-modules/db";
 import { eq } from "@mp-modules/db";
 import type { UserId, UserIdentity } from "@mp/auth";
-import type { AreaId } from "@mp/data";
+import type { AreaId } from "../../../data/src";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";

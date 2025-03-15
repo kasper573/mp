@@ -1,5 +1,5 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import type { AreaId } from "@mp/data";
+import type { AreaId } from "@mp-modules/data";
 import type { RootRouter } from "@mp/server";
 import { transformer } from "@mp-modules/trpc/transformer";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";

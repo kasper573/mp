@@ -1,4 +1,4 @@
-import { type AreaResource } from "@mp/data";
+import { type AreaResource } from "@mp-modules/data";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ParentProps } from "solid-js";
 import { useContext, createEffect, createMemo, For, untrack } from "solid-js";

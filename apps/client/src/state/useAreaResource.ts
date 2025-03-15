@@ -1,4 +1,4 @@
-import { AreaResource, TiledResource, type AreaId } from "@mp/data";
+import { AreaResource, TiledResource, type AreaId } from "@mp-modules/data";
 import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@tanstack/solid-query";
 import { type Accessor } from "solid-js";

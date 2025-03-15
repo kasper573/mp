@@ -17,7 +17,6 @@ import {
   ctx_trpcErrorFormatter,
   trpcExpress,
 } from "@mp-modules/trpc";
-import type { LocalFile } from "@mp/data";
 import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,
@@ -40,6 +39,7 @@ import {
   NPCService,
   WorldService,
 } from "@mp-modules/world";
+import type { LocalFile } from "@mp-modules/data";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { collectUserMetrics } from "./metrics/collectUserMetrics";

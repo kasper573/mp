@@ -15,7 +15,7 @@
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/db": "workspace:*",
     "@mp/ioc": "workspace:*",
-    "@mp/data": "workspace:*",
+    "@mp-modules/data": "workspace:*",
     "@mp/tiled-loader": "workspace:*"
   },
   "devDependencies": {

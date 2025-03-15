@@ -15,7 +15,7 @@ import {
   vec_zero,
   type Vector,
 } from "@mp/math";
-import type { AreaId, AreaResource } from "@mp/data";
+import type { AreaId, AreaResource } from "../../../data/src";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { AreaLookup } from "@mp-modules/area";
 import type { WorldState } from "../world/WorldState";
