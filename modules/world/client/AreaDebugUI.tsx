@@ -6,6 +6,7 @@ import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
   batch,
+  createContext,
   createEffect,
   createMemo,
   createSignal,
@@ -16,29 +17,29 @@ import {
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import type { Actor, Character } from "@mp-modules/world";
+import type { Tile, Pixel } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
-import type { Pixel, Tile } from "@mp/std";
+import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
-import { env } from "../../env";
-import { SyncClientContext } from "../../integrations/sync";
-import { Select } from "../../ui/Select";
-import { useTRPC } from "../../integrations/trpc";
-import { Button } from "../../ui/Button";
+import type { Actor, Character } from "../shared";
+import { WorldSyncClientContext } from "./WorldSyncClient";
 import * as styles from "./AreaDebugUI.css";
+import { useTRPC } from "./trpc";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
+
+export const AreaDebugUIContext = createContext({
+  serverVersion: () => "unknown" as string,
+  clientVersion: () => "unknown" as string,
+});
 
 export function AreaDebugUI(props: {
   area: AreaResource;
   drawPathsForActors: Actor[];
 }) {
   const trpc = useTRPC();
-
-  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
-    meta: { invalidateCache: false },
-  }));
+  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -132,10 +133,10 @@ function DebugPath(props: {
 }
 
 function DebugText(props: { tiled: TiledResource }) {
-  const trpc = useTRPC();
-  const world = useContext(SyncClientContext);
+  const { clientVersion, serverVersion } = useContext(AreaDebugUIContext);
+  const world = useContext(WorldSyncClientContext);
   const engine = useContext(EngineContext);
-  const serverVersion = trpc.system.buildVersion.createQuery();
+
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 
@@ -154,7 +155,7 @@ function DebugText(props: { tiled: TiledResource }) {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
     return [
-      `build: (client: ${env.buildVersion}, server: ${serverVersion.data})`,
+      `build: (client: ${clientVersion()}, server: ${serverVersion()})`,
       `viewport: ${vecToString(viewportPosition)}`,
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,

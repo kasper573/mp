@@ -1,5 +1,3 @@
-import type { ActorId, Character, WorldState } from "@mp-modules/world";
-import { type CharacterId } from "@mp-modules/world";
 import { SyncClient } from "@mp/sync/client";
 import {
   createContext,
@@ -14,15 +12,17 @@ import { vec_equals, type Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
-import { dedupe, throttle } from "../state/functionComposition";
-import { env } from "../env";
-import { useTRPC } from "./trpc";
 
-export function createSyncClient() {
-  const { identity } = useContext(AuthContext);
+import { dedupe, throttle } from "./functionComposition";
+import { useTRPC } from "./trpc";
+import { type CharacterId } from "@mp-modules/world";
+import type { ActorId, Character, WorldState } from "@mp-modules/world";
+
+export function createWorldSyncClient(wsUrl: string) {
   const trpc = useTRPC();
+  const { identity } = useContext(AuthContext);
   const id = createMemo(() => identity()?.id);
-  const sync = new SyncClient<WorldState>(env.wsUrl, () => ({
+  const sync = new SyncClient<WorldState>(wsUrl, () => ({
     token: identity()?.token,
   }));
   const worldState = createMutable<WorldState>({ actors: {} });
@@ -37,31 +37,21 @@ export function createSyncClient() {
     actors().filter((actor) => actor.areaId === areaId()),
   );
 
-  const moveMutation = trpc.character.move.createMutation(() => ({
-    meta: { invalidateCache: false },
-  }));
-  const res = trpc.character.join.createMutation(() => ({
-    onSuccess: setCharacterId,
-  }));
-
-  const join = res.mutate;
+  const moveMutation = trpc.character.move.createMutation(config);
+  const joinMutation = trpc.character.join.createMutation(config);
+  const attackMutation = trpc.character.attack.createMutation(config);
 
   const move = dedupe(
     throttle(
       // eslint-disable-next-line solid/reactivity
       (to: Vector<Tile>) =>
-        moveMutation.mutate({ characterId: characterId()!, to }),
+        moveMutation.mutateAsync({ characterId: characterId()!, to }),
       100,
     ),
     vec_equals,
   );
-
-  const attackMutation = trpc.character.attack.createMutation(() => ({
-    meta: { invalidateCache: false },
-  }));
-
   const attack = (targetId: ActorId) =>
-    attackMutation.mutate({ characterId: characterId()!, targetId });
+    attackMutation.mutateAsync({ characterId: characterId()!, targetId });
 
   onCleanup(sync.subscribeToState((applyPatch) => applyPatch(worldState)));
   onCleanup(sync.subscribeToReadyState(setReadyState));
@@ -72,6 +62,8 @@ export function createSyncClient() {
       onCleanup(sync.stop);
     }
   });
+
+  const join = () => joinMutation.mutateAsync().then(setCharacterId);
 
   return {
     actorsInArea,
@@ -86,7 +78,9 @@ export function createSyncClient() {
   };
 }
 
-export const SyncClientContext = createContext<WorldSyncClient>(
+const config = () => ({ meta: { invalidateCache: false } });
+
+export const WorldSyncClientContext = createContext<WorldSyncClient>(
   new Proxy({} as WorldSyncClient, {
     get() {
       throw new Error("WorldClientContext not provided");
@@ -94,4 +88,4 @@ export const SyncClientContext = createContext<WorldSyncClient>(
   }),
 );
 
-export type WorldSyncClient = ReturnType<typeof createSyncClient>;
+export type WorldSyncClient = ReturnType<typeof createWorldSyncClient>;

@@ -1,24 +1,30 @@
-import { type AreaResource } from "@mp-modules/area";
-import { TiledRenderer } from "@mp/tiled-renderer";
-import type { ParentProps } from "solid-js";
-import { useContext, createEffect, createMemo, For, untrack } from "solid-js";
-import { createQuery } from "@tanstack/solid-query";
-import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
-import { Pixi } from "@mp/solid-pixi";
+import type { AreaResource } from "@mp-modules/area";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
-import { rect_from_diameter, rect_hit_test, rect_offset, vec } from "@mp/math";
-import { clientViewDistance } from "@mp/server";
-import type { Pixel, Tile } from "@mp/std";
-import { SyncClientContext } from "../../integrations/sync";
-import { useAnimatedCoords } from "../../state/useAnimatedCoords";
+import { vec, rect_hit_test, rect_offset, rect_from_diameter } from "@mp/math";
+import { Pixi } from "@mp/solid-pixi";
+import type { Tile, Pixel } from "@mp/std";
+import type { ParentProps } from "solid-js";
+import {
+  useContext,
+  createMemo,
+  createEffect,
+  untrack,
+  For,
+  createContext,
+} from "solid-js";
+import { createQuery } from "@mp/solid-trpc";
+import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import { Actor } from "./Actor";
+import { WorldSyncClientContext } from "./WorldSyncClient";
 import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
+import { useAnimatedCoords } from "./useAnimatedCoords";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
-  const world = useContext(SyncClientContext);
+  const world = useContext(WorldSyncClientContext);
+  const { renderedTileCount } = useContext(AreaSceneContext);
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],
@@ -48,7 +54,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     createZoomLevelForViewDistance(
       props.area.tiled.tileSize,
       engine.camera.cameraSize,
-      clientViewDistance.renderedTileCount,
+      renderedTileCount,
     ),
   );
 
@@ -86,7 +92,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     if (engine.pointer.isDown) {
       const entity = untrack(entityAtPointer);
       if (entity) {
-        world.attack(entity.id);
+        void world.attack(entity.id);
       } else {
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
@@ -128,6 +134,14 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     </Pixi>
   );
 }
+
+export const AreaSceneContext = createContext(
+  new Proxy({} as { renderedTileCount: Tile }, {
+    get() {
+      throw new Error("AreaSceneContext not provided");
+    },
+  }),
+);
 
 function createZoomLevelForViewDistance(
   tileSize: Vector<Pixel>,

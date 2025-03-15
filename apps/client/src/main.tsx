@@ -2,8 +2,7 @@ import { dark } from "@mp/style/themes/dark.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import { LoadingSpinner } from "./ui/LoadingSpinner";
-import { ErrorFallback } from "./ui/ErrorFallback";
+import { ErrorFallback, ErrorFallbackContext, LoadingSpinner } from "@mp/ui";
 import { LoggerContext } from "./logger";
 import * as styles from "./main.css";
 
@@ -24,11 +23,13 @@ logger.subscribe(consoleLoggerHandler(console));
 render(
   () => (
     <LoggerContext.Provider value={logger}>
-      <ErrorBoundary fallback={ErrorFallback}>
-        <Suspense fallback={<LoadingSpinner />}>
-          <App />
-        </Suspense>
-      </ErrorBoundary>
+      <ErrorFallbackContext.Provider value={{ handleError: logger.error }}>
+        <ErrorBoundary fallback={ErrorFallback}>
+          <Suspense fallback={<LoadingSpinner />}>
+            <App />
+          </Suspense>
+        </ErrorBoundary>
+      </ErrorFallbackContext.Provider>
     </LoggerContext.Provider>
   ),
   rootElement,

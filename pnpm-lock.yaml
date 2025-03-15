@@ -95,6 +95,9 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
+      '@mp/ui':
+        specifier: workspace:*
+        version: link:../../libraries/ui
       '@solidjs/router':
         specifier: 0.14.7
         version: 0.14.7(solid-js@1.9.3)
@@ -104,9 +107,6 @@ importers:
       solid-js:
         specifier: 1.9.3
         version: 1.9.3
-      uniqolor:
-        specifier: 1.1.1
-        version: 1.1.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -663,6 +663,19 @@ importers:
         specifier: 5.7.2
         version: 5.7.2
 
+  libraries/ui:
+    dependencies:
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../style
+      solid-js:
+        specifier: 1.9.3
+        version: 1.9.3
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   modules/area:
     dependencies:
       '@mp-modules/area':
@@ -771,6 +784,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
+      '@mp/engine':
+        specifier: workspace:*
+        version: link:../../libraries/engine
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
@@ -783,15 +799,42 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
+      '@mp/pixi':
+        specifier: workspace:*
+        version: link:../../libraries/pixi
+      '@mp/solid-pixi':
+        specifier: workspace:*
+        version: link:../../libraries/solid-pixi
+      '@mp/solid-trpc':
+        specifier: workspace:*
+        version: link:../../libraries/solid-trpc
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../../libraries/style
       '@mp/sync':
         specifier: workspace:*
         version: link:../../libraries/sync
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+      '@mp/tiled-renderer':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-renderer
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
+      '@mp/ui':
+        specifier: workspace:*
+        version: link:../../libraries/ui
+      solid-js:
+        specifier: 1.9.3
+        version: 1.9.3
+      uniqolor:
+        specifier: 1.1.1
+        version: 1.1.1
       unique-names-generator:
         specifier: 4.7.1
         version: 4.7.1

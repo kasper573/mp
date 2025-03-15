@@ -1,6 +1,15 @@
 {
   "extends": "@mp/tsconfig/vite.json",
-  "include": ["src", "*.ts"],
+  "include": [
+    "src",
+    "*.ts",
+    "../../modules/world/client/functionComposition.ts",
+    "../../modules/world/client/toggleSignal.ts",
+    "../../modules/world/client/useAnimatedCoords.ts",
+    "../../modules/world/client/useAreaResource.ts",
+    "src/ui/LoadingSpinner.tsx",
+    "src/ui/LoadingSpinner.css.ts"
+  ],
   "exclude": ["../server/public"],
   "compilerOptions": {
     "allowJs": true,

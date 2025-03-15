@@ -1,4 +1,4 @@
-import { Button } from "../ui/Button";
+import { Button } from "@mp/ui";
 import { Link } from "../ui/Link";
 
 export default function HomePage() {

@@ -1,6 +1,6 @@
 import { AuthContext } from "@mp/auth/client";
+import { Button } from "@mp/ui";
 import { useContext } from "solid-js";
-import { Button } from "../ui/Button";
 
 export default function PermissionDenied() {
   const auth = useContext(AuthContext);

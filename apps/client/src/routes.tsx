@@ -11,7 +11,7 @@ export const routes: RouteDefinition[] = [
   {
     path: "/play",
     component: requireAuth(
-      lazy(() => import("./pages/game/PlayPage")),
+      lazy(() => import("./pages/PlayPage")),
       lazy(() => import("./pages/PermissionDenied")),
     ),
   },

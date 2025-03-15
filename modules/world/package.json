@@ -14,22 +14,37 @@
       "types": "./server/index.ts",
       "import": "./server/index.ts",
       "require": "./server/index.ts"
+    },
+    "./client": {
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
     }
   },
   "dependencies": {
+    "solid-js": "1.9.3",
     "@mp/std": "workspace:*",
     "@mp/ioc": "workspace:*",
+    "@mp/ui": "workspace:*",
+    "@mp/style": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
+    "@mp/pixi": "workspace:*",
+    "@mp/engine": "workspace:*",
+    "@mp/solid-pixi": "workspace:*",
+    "@mp/solid-trpc": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/auth": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/tiled-renderer": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp-modules/db": "workspace:*",
     "@mp-modules/area": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/user": "workspace:*",
-    "unique-names-generator": "4.7.1"
+    "unique-names-generator": "4.7.1",
+    "uniqolor": "1.1.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
