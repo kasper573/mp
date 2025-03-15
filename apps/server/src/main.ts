@@ -23,7 +23,7 @@ import {
   loadAreas,
 } from "@mp-modules/area/server";
 import { createDBClient } from "@mp-modules/db";
-import type { WorldState, WorldSyncServer } from "@mp-modules/world";
+import type { WorldState, WorldSyncServer } from "@mp-modules/world/server";
 import {
   ClientRegistry,
   movementBehavior,
@@ -38,7 +38,7 @@ import {
   deriveClientVisibility,
   NPCService,
   WorldService,
-} from "@mp-modules/world";
+} from "@mp-modules/world/server";
 import type { LocalFile } from "@mp/std";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";

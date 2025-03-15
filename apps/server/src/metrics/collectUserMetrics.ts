@@ -6,7 +6,7 @@ import type {
   ClientRegistry,
   WorldState,
   WorldSyncServer,
-} from "@mp-modules/world";
+} from "@mp-modules/world/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
