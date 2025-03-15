@@ -4,7 +4,7 @@
   "compilerOptions": {
     "skipLibCheck": true,
     "lib": ["ESNext"],
-    "types": ["node"],
+    "types": [],
     "module": "ESNext"
   }
 }
