@@ -22,3 +22,5 @@ export const npcRouter = t.router({
       state.actors.set(instance.id, { type: "npc", ...instance });
     }),
 });
+
+export const npcRouterSlice = { npc: npcRouter };

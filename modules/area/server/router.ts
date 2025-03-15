@@ -14,5 +14,7 @@ export const areaRouter = t.router({
     }),
 });
 
+export const areaRouterSlice = { area: areaRouter };
+
 export const ctx_areaFileUrlResolver =
   InjectionContext.new<(areaId: AreaId) => PublicUrl>();

@@ -88,3 +88,5 @@ export const characterRouter = t.router({
       return char.id;
     }),
 });
+
+export const characterRouterSlice = { character: characterRouter };
