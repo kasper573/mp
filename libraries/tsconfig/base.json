@@ -25,8 +25,10 @@
     "${configDir}*.ts",
     "${configDir}*.tsx",
     "${configDir}*.mjs",
+    "${configDir}*.js",
     "${configDir}src/**/*.ts",
     "${configDir}src/**/*.tsx",
-    "${configDir}src/**/*.mjs"
+    "${configDir}src/**/*.mjs",
+    "${configDir}src/**/*.js"
   ]
 }
