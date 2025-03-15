@@ -73,16 +73,20 @@ export default tseslint.config(
           message: "${file.type} is not allowed to import ${dependency.type}",
           rules: [
             {
-              from: ["apps"],
-              allow: ["apps", "modules", "libraries"],
+              from: ["app"],
+              allow: ["app", "module", "server_module", "library"],
             },
             {
-              from: ["modules"],
-              allow: ["modules", "libraries"],
+              from: ["client_app"],
+              allow: ["app", "module", "library"],
             },
             {
-              from: ["libraries"],
-              allow: ["libraries"],
+              from: ["module", "server_module"],
+              allow: ["module", "server_module", "library"],
+            },
+            {
+              from: ["library"],
+              allow: ["library"],
             },
           ],
         },
@@ -90,9 +94,11 @@ export default tseslint.config(
     },
     settings: {
       "boundaries/elements": [
-        { type: "apps", pattern: "apps/*" },
-        { type: "modules", pattern: "modules/*" },
-        { type: "libraries", pattern: "libraries/*" },
+        { type: "client_app", pattern: "apps/client/**" },
+        { type: "server_module", pattern: "modules/*/server/**" },
+        { type: "app", pattern: "apps/*" },
+        { type: "module", pattern: "modules/*" },
+        { type: "library", pattern: "libraries/*" },
       ],
       "import/resolver": {
         typescript: {
