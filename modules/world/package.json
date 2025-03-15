@@ -15,7 +15,7 @@
     "@mp/std": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp-modules/data": "workspace:*",
+    "@mp-modules/area": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/auth": "workspace:*",

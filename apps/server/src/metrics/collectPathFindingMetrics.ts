@@ -1,7 +1,7 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
 import { beginMeasuringTimeSpan } from "@mp/time";
-import { AreaResource } from "@mp-modules/data";
+import { AreaResource } from "@mp-modules/area";
 import { tickBuckets } from "./shared";
 
 export function collectPathFindingMetrics(registry: MetricsRegistry): void {

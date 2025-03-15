@@ -12,11 +12,15 @@
     }
   },
   "dependencies": {
+    "@mp/ioc": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/path-finding": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/db": "workspace:*",
-    "@mp/ioc": "workspace:*",
-    "@mp-modules/data": "workspace:*",
-    "@mp/tiled-loader": "workspace:*"
+    "@mp-modules/area": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

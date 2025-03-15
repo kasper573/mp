@@ -1,4 +1,4 @@
-import type { AreaResource, TiledResource } from "@mp-modules/data";
+import type { AreaResource, TiledResource } from "@mp-modules/area";
 import { vec_round, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";

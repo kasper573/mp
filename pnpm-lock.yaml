@@ -32,9 +32,9 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp-modules/data':
+      '@mp-modules/area':
         specifier: workspace:*
-        version: link:../../modules/data
+        version: link:../../modules/area
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
@@ -141,9 +141,9 @@ importers:
 
   apps/loadtest:
     dependencies:
-      '@mp-modules/data':
+      '@mp-modules/area':
         specifier: workspace:*
-        version: link:../../modules/data
+        version: link:../../modules/area
       '@mp-modules/trpc':
         specifier: workspace:*
         version: link:../../modules/trpc
@@ -178,9 +178,6 @@ importers:
       '@mp-modules/area':
         specifier: workspace:*
         version: link:../../modules/area
-      '@mp-modules/data':
-        specifier: workspace:*
-        version: link:../../modules/data
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../../modules/db
@@ -668,9 +665,9 @@ importers:
 
   modules/area:
     dependencies:
-      '@mp-modules/data':
+      '@mp-modules/area':
         specifier: workspace:*
-        version: link:../data
+        version: 'link:'
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../db
@@ -680,16 +677,6 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-loader
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-
-  modules/data:
-    dependencies:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
@@ -772,9 +759,6 @@ importers:
       '@mp-modules/area':
         specifier: workspace:*
         version: link:../area
-      '@mp-modules/data':
-        specifier: workspace:*
-        version: link:../data
       '@mp-modules/db':
         specifier: workspace:*
         version: link:../db

@@ -39,7 +39,7 @@ import {
   NPCService,
   WorldService,
 } from "@mp-modules/world";
-import type { LocalFile } from "@mp-modules/data";
+import type { LocalFile } from "@mp/std";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
 import { collectUserMetrics } from "./metrics/collectUserMetrics";

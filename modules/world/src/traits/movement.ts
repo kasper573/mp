@@ -1,4 +1,4 @@
-import { moveAlongPath, type AreaId } from "@mp-modules/data";
+import { moveAlongPath, type AreaId } from "@mp-modules/area";
 import type { Path, Vector } from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";

@@ -1,7 +1,7 @@
 import { Container, Graphics, Text } from "@mp/pixi";
 import { vec_scale } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import type { TiledResource } from "@mp-modules/data";
+import type { TiledResource } from "@mp-modules/area";
 import { createEffect, createMemo, Show } from "solid-js";
 import type { Actor } from "@mp-modules/world";
 import type { Tile } from "@mp/std";
