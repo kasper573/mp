@@ -1,4 +1,4 @@
-import type { AnyErrorFormatter } from "@mp-modules/trpc";
+import type { AnyErrorFormatter } from "@mp-modules/trpc/server";
 import { opt } from "../options";
 
 export const errorFormatter: AnyErrorFormatter = ({ shape }) => {

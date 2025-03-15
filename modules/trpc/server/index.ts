@@ -5,7 +5,7 @@ import type {
   ErrorFormatter,
   MiddlewareFunction,
 } from "@trpc/server/unstable-core-do-not-import";
-import { transformer } from "../transformer";
+import { transformer } from "../shared";
 
 export const ctx_globalMiddleware = InjectionContext.new<AnyMiddleware>();
 

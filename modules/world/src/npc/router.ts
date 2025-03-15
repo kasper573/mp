@@ -1,5 +1,5 @@
 import { roles } from "@mp-modules/user";
-import { t } from "@mp-modules/trpc";
+import { t } from "@mp-modules/trpc/server";
 import { ctx_areaLookup } from "@mp-modules/area/server";
 import { ctx_worldStateMachine } from "../world/WorldState";
 import { spawnNpcInstance } from "./npcSpawnBehavior";

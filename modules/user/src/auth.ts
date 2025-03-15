@@ -1,4 +1,4 @@
-import { TRPCError, t } from "@mp-modules/trpc";
+import { TRPCError, t } from "@mp-modules/trpc/server";
 import { InjectionContext } from "@mp/ioc";
 import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";

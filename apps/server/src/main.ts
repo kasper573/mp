@@ -16,7 +16,7 @@ import {
   ctx_globalMiddleware,
   ctx_trpcErrorFormatter,
   trpcExpress,
-} from "@mp-modules/trpc";
+} from "@mp-modules/trpc/server";
 import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,

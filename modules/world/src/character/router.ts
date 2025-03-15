@@ -1,7 +1,7 @@
 import { type Vector } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "@mp-modules/user";
-import { schemaFor, t, TRPCError } from "@mp-modules/trpc";
+import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
 import type { ActorId } from "../traits/actor";
 import { ctx_worldStateMachine } from "../world/WorldState";
 import { type CharacterId } from "./schema";
