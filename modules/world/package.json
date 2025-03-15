@@ -15,16 +15,15 @@
     "@mp/std": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp-modules/area": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp-modules/db": "workspace:*",
+    "@mp-modules/area": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/user": "workspace:*",
-    "@mp-modules/area": "workspace:*",
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {
