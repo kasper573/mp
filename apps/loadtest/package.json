@@ -12,7 +12,6 @@
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp-modules/area": "workspace:*",
-    "@mp/state": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@trpc/client": "11.0.0-rc.593"
   },

@@ -24,8 +24,7 @@
     "@mp/math": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
-    "@mp-modules/db": "workspace:*",
-    "@mp-modules/area": "workspace:*"
+    "@mp-modules/db": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
