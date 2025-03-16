@@ -115,7 +115,7 @@ export const serverOptionsSchema = object({
     transform((ms) => TimeSpan.fromMilliseconds(ms)),
   ),
   /**
-   * How often (in milliseconds) to save the world state to the database
+   * How often (in milliseconds) to save the game state to the database
    */
   persistInterval: pipe(
     numeric(),

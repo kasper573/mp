@@ -2,4 +2,4 @@ export {
   npcTable,
   npcSpawnTable,
   characterTable,
-} from "@mp-modules/world/server";
+} from "@mp-modules/game/server";

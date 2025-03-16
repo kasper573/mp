@@ -15,7 +15,7 @@ import {
 import { createQuery } from "@mp/solid-trpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import type { AreaResource } from "../../shared";
-import { WorldSyncClientContext } from "../WorldSyncClient";
+import { GameStateClientContext } from "../GameStateClient";
 import { Actor } from "./Actor";
 import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
@@ -23,7 +23,7 @@ import { useAnimatedCoords } from "./useAnimatedCoords";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
-  const world = useContext(WorldSyncClientContext);
+  const state = useContext(GameStateClientContext);
   const { renderedTileCount } = useContext(AreaSceneContext);
 
   const spritesheets = createQuery(() => ({
@@ -32,9 +32,9 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   }));
 
   const myCoords = useAnimatedCoords(
-    () => world.character()?.coords ?? vec(0 as Tile, 0 as Tile),
-    () => world.character()?.path,
-    () => world.character()?.speed ?? (0 as Tile),
+    () => state.character()?.coords ?? vec(0 as Tile, 0 as Tile),
+    () => state.character()?.path,
+    () => state.character()?.speed ?? (0 as Tile),
   );
 
   const myWorldPos = createMemo(() =>
@@ -63,7 +63,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   );
 
   const entityAtPointer = createMemo(() =>
-    world
+    state
       .actorsInArea()
       .find((actor) =>
         rect_hit_test(rect_offset(actor.hitBox, actor.coords), pointerTile()),
@@ -92,11 +92,11 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     if (engine.pointer.isDown) {
       const entity = untrack(entityAtPointer);
       if (entity) {
-        void world.attack(entity.id);
+        void state.attack(entity.id);
       } else {
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
-          world.move(tileNode.data.vector);
+          state.move(tileNode.data.vector);
         }
       }
     }
@@ -122,7 +122,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         >
           {{
             [props.area.characterLayer.name]: () => (
-              <For each={world.actorsInArea()}>
+              <For each={state.actorsInArea()}>
                 {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
               </For>
             ),

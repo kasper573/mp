@@ -24,7 +24,7 @@ import type { Actor, Character } from "../../server";
 import type { AreaResource } from "../../shared";
 import type { TiledResource } from "../../shared/area/TiledResource";
 import { useTRPC } from "../trpc";
-import { WorldSyncClientContext } from "../WorldSyncClient";
+import { GameStateClientContext } from "../GameStateClient";
 import * as styles from "./AreaDebugUI.css";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
@@ -137,7 +137,7 @@ function DebugPath(props: {
 
 function DebugText(props: { tiled: TiledResource }) {
   const { clientVersion, serverVersion } = useContext(AreaDebugUIContext);
-  const world = useContext(WorldSyncClientContext);
+  const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
 
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
@@ -164,7 +164,7 @@ function DebugText(props: { tiled: TiledResource }) {
       `tile: ${vecToString(tilePos)}`,
       `tile (snapped): ${vecToString(vec_round(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(world.character()), null, 2)}`,
+      `character: ${JSON.stringify(trimCharacterInfo(state.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
       `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
       `frame callbacks: ${engine.frameCallbackCount}`,

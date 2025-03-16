@@ -3,7 +3,7 @@ import { recordValues, type Tile } from "@mp/std";
 import { auth, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
 import type { ActorId } from "../traits/actor";
-import { ctx_worldStateMachine } from "../world/WorldState";
+import { ctx_gameStateMachine } from "../GameState";
 import { type CharacterId } from "./schema";
 import { ctx_characterService } from "./service";
 
@@ -13,7 +13,7 @@ export const characterRouter = t.router({
     .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
     .use(roles(["move_character"]))
     .mutation(({ input: { characterId, to }, ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_worldStateMachine);
+      const state = ioc.get(ctx_gameStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -40,7 +40,7 @@ export const characterRouter = t.router({
     .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
     .use(roles(["character_attack"]))
     .mutation(({ input: { characterId, targetId }, ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_worldStateMachine);
+      const state = ioc.get(ctx_gameStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -73,7 +73,7 @@ export const characterRouter = t.router({
     .output(schemaFor<CharacterId>())
     .use(auth())
     .mutation(async ({ ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_worldStateMachine);
+      const state = ioc.get(ctx_gameStateMachine);
       const characterService = ioc.get(ctx_characterService);
       const existingCharacter = recordValues(state.actors())
         .filter((actor) => actor.type === "character")

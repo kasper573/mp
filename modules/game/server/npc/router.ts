@@ -1,6 +1,6 @@
 import { roles } from "@mp-modules/user";
 import { t } from "@mp-modules/trpc/server";
-import { ctx_worldStateMachine } from "../world/WorldState";
+import { ctx_gameStateMachine } from "../GameState";
 import { ctx_areaLookup } from "../area/loadAreas";
 import { spawnNpcInstance } from "./npcSpawnBehavior";
 import { ctx_npcService } from "./service";
@@ -11,7 +11,7 @@ export const npcRouter = t.router({
     .use(roles(["spawn_npc"]))
     .mutation(async ({ ctx }) => {
       const npcService = ctx.ioc.get(ctx_npcService);
-      const state = ctx.ioc.get(ctx_worldStateMachine);
+      const state = ctx.ioc.get(ctx_gameStateMachine);
       const areas = ctx.ioc.get(ctx_areaLookup);
       const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
       const area = areas.get(spawn.areaId);

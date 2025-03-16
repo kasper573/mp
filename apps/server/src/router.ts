@@ -3,7 +3,7 @@ import {
   areaRouterSlice,
   characterRouterSlice,
   npcRouterSlice,
-} from "@mp-modules/world/server";
+} from "@mp-modules/game/server";
 import { opt } from "./options";
 
 export type RootRouter = typeof rootRouter;

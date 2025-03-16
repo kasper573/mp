@@ -8,9 +8,9 @@ import {
 // This is a d.ts file so that we can use function syntax to define the router slice and
 // infer a type from it without that function (and subsequent package imports) ending in the client bundle.
 
-export type WorldRouter = ReturnType<typeof defineWorldRPCSlice>;
+export type GameModuleTRPCSlice = ReturnType<typeof defineSlice>;
 
-function defineWorldRPCSlice() {
+function defineSlice() {
   return t.router({
     ...characterRouterSlice,
     ...areaRouterSlice,

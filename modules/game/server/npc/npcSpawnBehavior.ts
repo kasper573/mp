@@ -16,7 +16,7 @@ import {
   type Vector,
 } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { WorldState } from "../world/WorldState";
+import type { GameState } from "../GameState";
 import type { AreaLookup } from "../area/loadAreas";
 import type { AreaId } from "../../shared/area/AreaId";
 import type { AreaResource } from "../../shared/area/AreaResource";
@@ -24,7 +24,7 @@ import type { NPCService } from "./service";
 import type { NPC, NPCInstance, NPCInstanceId, NPCSpawn } from "./schema";
 
 export function npcSpawnBehavior(
-  state: PatchStateMachine<WorldState>,
+  state: PatchStateMachine<GameState>,
   npcService: NPCService,
   areas: AreaLookup,
 ): TickEventHandler {

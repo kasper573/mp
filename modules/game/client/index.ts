@@ -1,4 +1,4 @@
 export * from "./Game";
-export * from "./WorldSyncClient";
+export * from "./GameStateClient";
 export * from "./area/AreaDebugUI";
 export * from "./area/AreaScene";

@@ -4,15 +4,15 @@ import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync/server";
 import type {
   ClientRegistry,
-  WorldState,
-  WorldSyncServer,
-} from "@mp-modules/world/server";
+  GameState,
+  GameStateServer,
+} from "@mp-modules/game/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  state: PatchStateMachine<WorldState>,
-  syncServer: WorldSyncServer,
+  state: PatchStateMachine<GameState>,
+  syncServer: GameStateServer,
 ) {
   new MetricsGague({
     name: "active_user_count",

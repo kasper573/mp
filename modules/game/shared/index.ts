@@ -1,4 +1,4 @@
-export type * from "../server/world/WorldState";
+export type * from "../server/GameState";
 export type * from "../server/character/schema";
 export type * from "../server/npc/schema";
 export type * from "../server/traits/actor";

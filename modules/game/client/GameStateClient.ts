@@ -13,24 +13,24 @@ import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
 import { useTRPC } from "./trpc";
-import { type CharacterId } from "@mp-modules/world";
-import type { ActorId, Character, WorldState } from "@mp-modules/world";
+import { type CharacterId } from "@mp-modules/game";
+import type { ActorId, Character, GameState } from "@mp-modules/game";
 
-export function createWorldSyncClient(wsUrl: string) {
+export function createGameStateClient(wsUrl: string) {
   const trpc = useTRPC();
   const { identity } = useContext(AuthContext);
   const id = createMemo(() => identity()?.id);
-  const sync = new SyncClient<WorldState>(wsUrl, () => ({
+  const sync = new SyncClient<GameState>(wsUrl, () => ({
     token: identity()?.token,
   }));
-  const worldState = createMutable<WorldState>({ actors: {} });
+  const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
-    () => worldState.actors[characterId()!] as Character,
+    () => gameState.actors[characterId()!] as Character,
   );
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(sync.getReadyState());
-  const actors = createMemo(() => Object.values(worldState.actors));
+  const actors = createMemo(() => Object.values(gameState.actors));
   const actorsInArea = createMemo(() =>
     actors().filter((actor) => actor.areaId === areaId()),
   );
@@ -51,7 +51,7 @@ export function createWorldSyncClient(wsUrl: string) {
   const attack = (targetId: ActorId) =>
     attackMutation.mutateAsync({ characterId: characterId()!, targetId });
 
-  onCleanup(sync.subscribeToState((applyPatch) => applyPatch(worldState)));
+  onCleanup(sync.subscribeToState((applyPatch) => applyPatch(gameState)));
   onCleanup(sync.subscribeToReadyState(setReadyState));
 
   createEffect(() => {
@@ -66,7 +66,7 @@ export function createWorldSyncClient(wsUrl: string) {
   return {
     actorsInArea,
     readyState,
-    worldState,
+    gameState,
     areaId,
     characterId,
     character,
@@ -78,12 +78,12 @@ export function createWorldSyncClient(wsUrl: string) {
 
 const config = () => ({ meta: { invalidateCache: false } });
 
-export const WorldSyncClientContext = createContext<WorldSyncClient>(
-  new Proxy({} as WorldSyncClient, {
+export const GameStateClientContext = createContext<GameStateClient>(
+  new Proxy({} as GameStateClient, {
     get() {
-      throw new Error("WorldClientContext not provided");
+      throw new Error("GameStateClientContext not provided");
     },
   }),
 );
 
-export type WorldSyncClient = ReturnType<typeof createWorldSyncClient>;
+export type GameStateClient = ReturnType<typeof createGameStateClient>;

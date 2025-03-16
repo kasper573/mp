@@ -3,12 +3,12 @@ import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
 import type { ActorId } from "../traits/actor";
-import type { WorldState } from "../world/WorldState";
+import type { GameState } from "../GameState";
 import type { AreaLookup } from "../area/loadAreas";
 import type { NPCInstanceId } from "./schema";
 
 export function npcAIBehavior(
-  state: PatchStateMachine<WorldState>,
+  state: PatchStateMachine<GameState>,
   areas: AreaLookup,
 ): TickEventHandler {
   const tasks = new Map<NPCInstanceId, Task>();

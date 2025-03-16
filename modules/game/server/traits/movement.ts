@@ -3,7 +3,7 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { WorldState } from "../world/WorldState";
+import type { GameState } from "../GameState";
 import type { AreaLookup } from "../area/loadAreas";
 import type { AreaId } from "../../shared/area/AreaId";
 import { moveAlongPath } from "../../shared/area/moveAlongPath";
@@ -26,7 +26,7 @@ export interface MovementTrait {
 }
 
 export function movementBehavior(
-  state: PatchStateMachine<WorldState>,
+  state: PatchStateMachine<GameState>,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {

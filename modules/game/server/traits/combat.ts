@@ -2,7 +2,7 @@ import { vec_distance, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync/server";
-import type { WorldState } from "../world/WorldState";
+import type { GameState } from "../GameState";
 import type { ActorId, Actor } from "./actor";
 
 export interface CombatTrait {
@@ -17,7 +17,7 @@ export interface CombatTrait {
 }
 
 export function combatBehavior(
-  state: PatchStateMachine<WorldState>,
+  state: PatchStateMachine<GameState>,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
     for (const actor of recordValues(state.actors())) {

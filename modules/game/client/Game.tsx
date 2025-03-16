@@ -12,7 +12,7 @@ import {
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
 import * as styles from "./Game.css";
-import { WorldSyncClientContext } from "./WorldSyncClient";
+import { GameStateClientContext } from "./GameStateClient";
 import { AreaDebugUI } from "./area/AreaDebugUI";
 import { AreaScene } from "./area/AreaScene";
 import { toggleSignal } from "./area/toggleSignal";
@@ -23,13 +23,13 @@ export function Game(props: {
   class?: string;
   style?: JSX.CSSProperties;
 }) {
-  const world = useContext(WorldSyncClientContext);
-  const area = useAreaResource(world.areaId);
+  const state = useContext(GameStateClientContext);
+  const area = useAreaResource(state.areaId);
   const [debug, toggleDebug] = toggleSignal();
 
   createEffect(() => {
-    if (world.readyState() === "open") {
-      void world.join();
+    if (state.readyState() === "open") {
+      void state.join();
     }
   });
 
@@ -37,10 +37,10 @@ export function Game(props: {
     <Switch>
       <Match
         when={
-          world.readyState() !== "open" ||
+          state.readyState() !== "open" ||
           area.isLoading ||
-          // AreaId would be null if the initial world state hasn't been received yet
-          !world.areaId()
+          // AreaId would be null if the initial game state hasn't been received yet
+          !state.areaId()
         }
       >
         {/** TODO replace with specialized loading screen for loading areas */}
@@ -62,7 +62,7 @@ export function Game(props: {
                   <Show when={debug()}>
                     <AreaDebugUI
                       area={data}
-                      drawPathsForActors={world.actorsInArea()}
+                      drawPathsForActors={state.actorsInArea()}
                     />
                   </Show>
                 </AreaScene>

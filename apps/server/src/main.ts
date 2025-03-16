@@ -21,9 +21,9 @@ import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,
   loadAreas,
-} from "@mp-modules/world/server";
+} from "@mp-modules/game/server";
 import { createDBClient } from "@mp-modules/db";
-import type { WorldState, WorldSyncServer } from "@mp-modules/world/server";
+import type { GameState, GameStateServer } from "@mp-modules/game/server";
 import {
   ClientRegistry,
   movementBehavior,
@@ -34,11 +34,11 @@ import {
   ctx_characterService,
   npcAIBehavior,
   ctx_npcService,
-  ctx_worldStateMachine,
+  ctx_gameStateMachine,
   deriveClientVisibility,
   NPCService,
-  WorldService,
-} from "@mp-modules/world/server";
+  GameService,
+} from "@mp-modules/game/server";
 import type { LocalFile } from "@mp/std";
 import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
 import { metricsMiddleware } from "./express/metricsMiddleware";
@@ -85,7 +85,7 @@ const syncHandshakeLimiter = new RateLimiter({
   duration: 30,
 });
 
-const worldState = createPatchStateMachine<WorldState>({
+const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
   clientIds: () => syncServer.clientIds,
   clientVisibility: deriveClientVisibility(
@@ -94,12 +94,12 @@ const worldState = createPatchStateMachine<WorldState>({
   ),
 });
 
-const syncServer: WorldSyncServer = new SyncServer({
+const syncServer: GameStateServer = new SyncServer({
   logger,
   httpServer,
   encoder: opt.syncPatchEncoder,
   path: opt.wsEndpointPath,
-  state: worldState,
+  state: gameState,
   async handshake(_, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
@@ -111,12 +111,12 @@ const syncServer: WorldSyncServer = new SyncServer({
 });
 
 const npcService = new NPCService(db);
-const worldService = new WorldService(db);
+const gameService = new GameService(db);
 
 const persistTicker = new Ticker({
   onError: logger.error,
   interval: opt.persistInterval,
-  middleware: () => worldService.persist(worldState),
+  middleware: () => gameService.persist(gameState),
 });
 
 const updateTicker = new Ticker({
@@ -134,7 +134,7 @@ const ioc = new InjectionContainer()
   .provide(ctx_trpcErrorFormatter, errorFormatter)
   .provide(ctx_npcService, npcService)
   .provide(ctx_characterService, characterService)
-  .provide(ctx_worldStateMachine, worldState)
+  .provide(ctx_gameStateMachine, gameState)
   .provide(ctx_areaLookup, areas)
   .provide(ctx_areaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
@@ -153,15 +153,15 @@ webServer.use(
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, worldState, syncServer);
+collectUserMetrics(metrics, clients, gameState, syncServer);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAIBehavior(worldState, areas));
-updateTicker.subscribe(movementBehavior(worldState, areas));
-updateTicker.subscribe(npcSpawnBehavior(worldState, npcService, areas));
-updateTicker.subscribe(combatBehavior(worldState));
+updateTicker.subscribe(npcAIBehavior(gameState, areas));
+updateTicker.subscribe(movementBehavior(gameState, areas));
+updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
+updateTicker.subscribe(combatBehavior(gameState));
 updateTicker.subscribe(syncServer.flush);
-characterRemoveBehavior(clients, worldState, logger, 5000);
+characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
   logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),

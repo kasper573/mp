@@ -3,11 +3,11 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
 import type { ClientRegistry } from "../ClientRegistry";
-import type { WorldState } from "../world/WorldState";
+import type { GameState } from "../GameState";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,
-  state: PatchStateMachine<WorldState>,
+  state: PatchStateMachine<GameState>,
   logger: Logger,
   timeout: number,
 ) {

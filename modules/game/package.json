@@ -1,5 +1,5 @@
 {
-  "name": "@mp-modules/world",
+  "name": "@mp-modules/game",
   "version": "0.0.0",
   "sideEffects": false,
   "type": "module",

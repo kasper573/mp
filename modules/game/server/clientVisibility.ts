@@ -2,10 +2,10 @@ import type { ClientVisibilityFactory } from "@mp/sync/server";
 import { rect_from_diameter, rect_hit_test } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { ClientRegistry } from "../ClientRegistry";
-import type { MovementTrait } from "../traits/movement";
-import type { Actor, ActorId } from "../traits/actor";
-import type { WorldState } from "./WorldState";
+import type { ClientRegistry } from "./ClientRegistry";
+import type { MovementTrait } from "./traits/movement";
+import type { Actor, ActorId } from "./traits/actor";
+import type { GameState } from "./GameState";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -15,7 +15,7 @@ import type { WorldState } from "./WorldState";
 export function deriveClientVisibility(
   clients: ClientRegistry,
   clientViewDistance: Tile,
-): ClientVisibilityFactory<WorldState> {
+): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
     const clientCharacter = recordValues(state.actors).find(
@@ -25,7 +25,7 @@ export function deriveClientVisibility(
   };
 
   function visibleActors(
-    state: WorldState,
+    state: GameState,
     observer?: Actor,
   ): ReadonlySet<ActorId> {
     const visible = new Set<ActorId>();

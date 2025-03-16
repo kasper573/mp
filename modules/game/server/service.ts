@@ -1,13 +1,13 @@
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync/server";
-import type { DBClient } from "../../../db/src/client";
-import { characterTable } from "../character/schema";
-import type { WorldState } from "./WorldState";
+import type { DBClient } from "../../db/src/client";
+import { characterTable } from "./character/schema";
+import type { GameState } from "./GameState";
 
-export class WorldService {
+export class GameService {
   constructor(private db: DBClient) {}
 
-  persist = (state: PatchStateMachine<WorldState>) => {
+  persist = (state: PatchStateMachine<GameState>) => {
     return this.db.transaction((tx) =>
       Promise.all(
         recordValues(state.actors())
