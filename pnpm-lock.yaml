@@ -80,9 +80,6 @@ importers:
       '@solidjs/router':
         specifier: 0.14.7
         version: 0.14.7(solid-js@1.9.3)
-      '@tanstack/solid-query':
-        specifier: 5.56.2
-        version: 5.56.2(solid-js@1.9.3)
       solid-js:
         specifier: 1.9.3
         version: 1.9.3

@@ -1,5 +1,5 @@
 import { AuthContext, createAuthClient } from "@mp/auth/client";
-import { QueryClientProvider } from "@tanstack/solid-query";
+import { QueryClientProvider } from "@mp/solid-trpc";
 import { Router } from "@solidjs/router";
 import { TRPCClientContext } from "@mp/solid-trpc";
 import Layout from "./ui/Layout";

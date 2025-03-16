@@ -6,7 +6,7 @@ import {
   httpBatchLink,
   createTRPCHook,
 } from "@mp/solid-trpc";
-import { QueryClientContext } from "@tanstack/solid-query";
+import { QueryClientContext } from "@mp/solid-trpc";
 import { useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { env } from "../env";

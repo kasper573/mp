@@ -1,4 +1,4 @@
-import { QueryClient } from "@tanstack/solid-query";
+import { QueryClient } from "@mp/solid-trpc";
 
 export function createQueryClient() {
   return new QueryClient({
@@ -13,7 +13,7 @@ export function createQueryClient() {
   });
 }
 
-declare module "@tanstack/solid-query" {
+declare module "@mp/solid-trpc" {
   interface Register {
     mutationMeta: {
       invalidateCache?: boolean;
