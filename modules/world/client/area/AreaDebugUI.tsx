@@ -1,4 +1,3 @@
-import type { AreaResource, TiledResource } from "@mp-modules/area";
 import { vec_round, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
@@ -21,10 +20,12 @@ import type { Tile, Pixel } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
 import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
-import type { Actor, Character } from "../shared";
-import { WorldSyncClientContext } from "./WorldSyncClient";
+import type { Actor, Character } from "../../server";
+import type { AreaResource } from "../../shared";
+import type { TiledResource } from "../../shared/area/TiledResource";
+import { useTRPC } from "../trpc";
+import { WorldSyncClientContext } from "../WorldSyncClient";
 import * as styles from "./AreaDebugUI.css";
-import { useTRPC } from "./trpc";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];

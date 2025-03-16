@@ -11,12 +11,12 @@ import {
 } from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
-import { AreaDebugUI } from "./AreaDebugUI";
-import { AreaScene } from "./AreaScene";
 import * as styles from "./Game.css";
 import { WorldSyncClientContext } from "./WorldSyncClient";
-import { toggleSignal } from "./toggleSignal";
-import { useAreaResource } from "./useAreaResource";
+import { AreaDebugUI } from "./area/AreaDebugUI";
+import { AreaScene } from "./area/AreaScene";
+import { toggleSignal } from "./area/toggleSignal";
+import { useAreaResource } from "./area/useAreaResource";
 
 export function Game(props: {
   interactive: boolean;

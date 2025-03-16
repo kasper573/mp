@@ -1,4 +1,3 @@
-import { moveAlongPath } from "@mp-modules/area";
 import { EngineContext } from "@mp/engine";
 import type { Path } from "@mp/math";
 import { path_copy, vec_distance, type Vector } from "@mp/math";
@@ -13,6 +12,7 @@ import {
   createSignal,
   untrack,
 } from "solid-js";
+import { moveAlongPath } from "../../shared/area/moveAlongPath";
 
 /**
  * Creates a vector signal that lerps each frame along the current path.

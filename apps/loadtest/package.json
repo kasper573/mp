@@ -11,7 +11,7 @@
     "@mp/sync": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp-modules/area": "workspace:*",
+    "@mp-modules/world": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@trpc/client": "11.0.0-rc.593"
   },

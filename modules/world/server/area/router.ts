@@ -1,7 +1,7 @@
 import { schemaFor, t } from "@mp-modules/trpc/server";
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
-import type { AreaId } from "../shared";
+import type { AreaId } from "../../shared/area/AreaId";
 
 export type AreaRouter = typeof areaRouter;
 export const areaRouter = t.router({

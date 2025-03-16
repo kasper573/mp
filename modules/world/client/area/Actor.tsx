@@ -1,10 +1,10 @@
 import { Container, Graphics, Text } from "@mp/pixi";
 import { vec_scale } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import type { TiledResource } from "@mp-modules/area";
 import { createEffect, createMemo, Show } from "solid-js";
 import type { Tile } from "@mp/std";
-import type { Actor } from "../server/traits/actor";
+import type { TiledResource } from "../../shared/area/TiledResource";
+import type { Actor } from "../../server/traits/actor";
 import { useAnimatedCoords } from "./useAnimatedCoords";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {

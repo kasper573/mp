@@ -1,4 +1,3 @@
-import type { AreaResource } from "@mp-modules/area";
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { vec, rect_hit_test, rect_offset, rect_from_diameter } from "@mp/math";
@@ -15,8 +14,9 @@ import {
 } from "solid-js";
 import { createQuery } from "@mp/solid-trpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
+import type { AreaResource } from "../../shared";
+import { WorldSyncClientContext } from "../WorldSyncClient";
 import { Actor } from "./Actor";
-import { WorldSyncClientContext } from "./WorldSyncClient";
 import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
 import { useAnimatedCoords } from "./useAnimatedCoords";

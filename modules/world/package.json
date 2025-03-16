@@ -40,7 +40,6 @@
     "@mp/logger": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp-modules/db": "workspace:*",
-    "@mp-modules/area": "workspace:*",
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/user": "workspace:*",
     "unique-names-generator": "4.7.1",

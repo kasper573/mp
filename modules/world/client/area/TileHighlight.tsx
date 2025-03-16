@@ -1,10 +1,10 @@
 import type { FillStyle } from "@mp/pixi";
-import type { AreaResource } from "@mp-modules/area";
 import { Graphics } from "@mp/pixi";
 import { createEffect } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
+import type { AreaResource } from "@mp-modules/world";
 
 export interface TileHighlightProps {
   area: AreaResource;

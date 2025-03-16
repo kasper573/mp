@@ -1,9 +1,9 @@
 import { integer, pgTable, uuid, relations, vector } from "@mp-modules/db";
 import type { Branded, Tile } from "@mp/std";
-import { areaId } from "@mp-modules/area/server";
 import type { MovementTrait } from "../traits/movement";
 import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
+import { areaId } from "../area/schema";
 
 export type NPCId = Branded<string, "NPCId">;
 export const npcId = () => uuid().$type<NPCId>();

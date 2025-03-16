@@ -1,10 +1,10 @@
 import { pgTable, uuid, real, vector } from "@mp-modules/db";
 import type { UserId } from "@mp/auth";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
-import { areaId } from "@mp-modules/area/server";
 import type { MovementTrait } from "../traits/movement";
 import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
+import { areaId } from "../area/schema";
 
 export const userId = () => uuid().$type<UserId>();
 

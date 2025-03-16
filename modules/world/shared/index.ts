@@ -5,3 +5,6 @@ export type * from "../server/traits/actor";
 export type * from "../server/traits/appearance";
 export type * from "../server/traits/combat";
 export type * from "../server/traits/movement";
+export type * from "../server/area/schema";
+export * from "./area/AreaResource";
+export * from "./area/AreaId";

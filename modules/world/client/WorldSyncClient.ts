@@ -9,10 +9,9 @@ import {
   useContext,
 } from "solid-js";
 import { vec_equals, type Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
+import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
-import { dedupe, throttle } from "./functionComposition";
 import { useTRPC } from "./trpc";
 import { type CharacterId } from "@mp-modules/world";
 import type { ActorId, Character, WorldState } from "@mp-modules/world";

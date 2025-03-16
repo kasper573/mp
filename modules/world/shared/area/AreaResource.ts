@@ -1,14 +1,13 @@
 import type { Vector } from "@mp/math";
 import { vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import type { Branded, Pixel, Tile } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./TiledResource";
 import { graphFromTiled } from "./graphFromTiled";
 import { TiledFixture } from "./TiledFixture";
 import { hitTestTiledObject } from "./hitTestTiledObject";
-
-export type AreaId = Branded<string, "AreaId">;
+import type { AreaId } from "./AreaId";
 
 export class AreaResource {
   readonly start: Vector<Tile>;

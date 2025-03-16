@@ -35,7 +35,6 @@
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/db": "workspace:*",
     "@mp-modules/user": "workspace:*",
-    "@mp-modules/area": "workspace:*",
     "@mp-modules/world": "workspace:*",
     "import-in-the-middle": "1.12.0",
     "cors": "2.8.5",

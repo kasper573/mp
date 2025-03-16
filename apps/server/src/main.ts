@@ -21,7 +21,7 @@ import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,
   loadAreas,
-} from "@mp-modules/area/server";
+} from "@mp-modules/world/server";
 import { createDBClient } from "@mp-modules/db";
 import type { WorldState, WorldSyncServer } from "@mp-modules/world/server";
 import {

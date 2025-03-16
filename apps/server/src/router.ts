@@ -1,6 +1,9 @@
 import { t } from "@mp-modules/trpc/server";
-import { areaRouterSlice } from "@mp-modules/area/server";
-import { characterRouterSlice, npcRouterSlice } from "@mp-modules/world/server";
+import {
+  areaRouterSlice,
+  characterRouterSlice,
+  npcRouterSlice,
+} from "@mp-modules/world/server";
 import { opt } from "./options";
 
 export type RootRouter = typeof rootRouter;

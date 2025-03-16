@@ -1,13 +1,13 @@
 import type { DBClient } from "@mp-modules/db";
 import { eq } from "@mp-modules/db";
 import type { UserId, UserIdentity } from "@mp/auth";
-import type { AreaId } from "@mp-modules/area";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
-import type { AreaLookup } from "@mp-modules/area/server";
 import type { AppearanceTrait } from "../traits/appearance";
+import type { AreaLookup } from "../area/loadAreas";
+import type { AreaId } from "../../shared/area/AreaId";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 
