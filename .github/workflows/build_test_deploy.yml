@@ -66,6 +66,20 @@ jobs:
         run: cd ./docker && ./dockerctl.sh test up --no-build -d
       - name: Run end-to-end tests
         run: pnpm -F @mp/e2e start
+      - name: Dump Docker logs
+        if: always()
+        run: |
+          mkdir -p docker-logs
+          for container in $(docker ps -aq); do
+            name=$(docker inspect --format='{{.Name}}' "$container" | sed 's|/||g')
+            docker logs "$container" &> "docker-logs/${name}.log"
+          done
+      - name: Upload Docker logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-logs
+          path: docker-logs/
       - uses: actions/upload-artifact@v4
         if: always()
         with:
