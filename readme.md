@@ -67,6 +67,12 @@ You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
 
 Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
 
+### If you change user roles
+
+User roles are defined in typescript source code as a single source of truth and provisioned to keycloak via the `provision` script in the `server` package. If you make changes to the user roles you will have to run the provisioning script to update your keycloak instance.
+
+> Production is provisioned automatically when changes are pushed to master, so you don't have to handle that manually.
+
 ### Quirks
 
 While most of the repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
