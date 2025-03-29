@@ -1,5 +1,6 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { groupedRoles } from "./src/roles";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -17,11 +18,6 @@ await client.auth({
   grantType: "password",
   clientId: "admin-cli",
 });
-
-const groupedRoles = {
-  admin: ["foo", "bar"],
-  player: ["baz"],
-};
 
 await upsertRolesAndGroups(groupedRoles);
 

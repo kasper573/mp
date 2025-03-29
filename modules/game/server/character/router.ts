@@ -1,17 +1,25 @@
 import { type Vector } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
-import { auth, roles } from "@mp-modules/user";
+import { defineRoles, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
 import type { ActorId } from "../traits/actor";
 import { ctx_gameStateMachine } from "../GameState";
 import { type CharacterId } from "./schema";
 import { ctx_characterService } from "./service";
 
+export const characterRoles = defineRoles("character", [
+  "join",
+  "move",
+  "attack",
+  "kill",
+  "respawn",
+]);
+
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = t.router({
   move: t.procedure
     .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
-    .use(roles(["move_character"]))
+    .use(roles([characterRoles.move]))
     .mutation(({ input: { characterId, to }, ctx: { user, ioc } }) => {
       const state = ioc.get(ctx_gameStateMachine);
       const char = state.actors()[characterId];
@@ -38,7 +46,7 @@ export const characterRouter = t.router({
 
   attack: t.procedure
     .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
-    .use(roles(["character_attack"]))
+    .use(roles([characterRoles.attack]))
     .mutation(({ input: { characterId, targetId }, ctx: { user, ioc } }) => {
       const state = ioc.get(ctx_gameStateMachine);
       const char = state.actors()[characterId];
@@ -71,7 +79,7 @@ export const characterRouter = t.router({
 
   join: t.procedure
     .output(schemaFor<CharacterId>())
-    .use(auth())
+    .use(roles([characterRoles.join]))
     .mutation(async ({ ctx: { user, ioc } }) => {
       const state = ioc.get(ctx_gameStateMachine);
       const characterService = ioc.get(ctx_characterService);
@@ -90,7 +98,7 @@ export const characterRouter = t.router({
 
   kill: t.procedure
     .input(schemaFor<{ targetId: ActorId }>())
-    .use(roles(["kill_actor"])) // TODO new role
+    .use(roles([characterRoles.kill])) // TODO new role
     .mutation(({ input: { targetId }, ctx: { ioc } }) => {
       const state = ioc.get(ctx_gameStateMachine);
       const target = state.actors()[targetId];
@@ -99,7 +107,7 @@ export const characterRouter = t.router({
 
   respawn: t.procedure
     .input(schemaFor<CharacterId>())
-    .use(roles(["respawn_character"])) // TODO new role
+    .use(roles([characterRoles.respawn])) // TODO new role
     .mutation(({ input: characterId, ctx: { user, ioc } }) => {
       const state = ioc.get(ctx_gameStateMachine);
       const char = state.actors()[characterId];

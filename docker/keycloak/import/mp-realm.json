@@ -48,24 +48,12 @@
   "roles": {
     "realm": [
       {
-        "id": "ba73811c-3212-4245-809d-3a9527b3aef1",
-        "name": "spawn_npc",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
         "id": "8c31d78d-1b59-469c-b083-f7488a488723",
         "name": "default-roles-mp",
         "description": "${role_default-roles}",
         "composite": true,
         "composites": {
           "realm": [
-            "move_character",
-            "respawn_character",
-            "character_attack",
             "offline_access",
             "uma_authorization"
           ],
@@ -80,60 +68,7 @@
         "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
         "attributes": {}
       },
-      {
-        "id": "52cf1767-73ab-4127-b754-e4b33cd9c176",
-        "name": "offline_access",
-        "description": "${role_offline-access}",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
-        "id": "1a0c46ea-9489-4fa9-a157-4dd4df5bf61e",
-        "name": "move_character",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
-        "id": "0195e33b-0941-76fe-a1e1-5b7097fafc2e",
-        "name": "respawn_character",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
-        "id": "0195e33b-0942-771d-bf3a-e4e0f32015f7",
-        "name": "kill_actor",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
-        "id": "01955429-78cd-72f8-bf44-f1edbfc65449",
-        "name": "character_attack",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
-      {
-        "id": "60d6e765-3432-48fa-9f26-e594c19be2fc",
-        "name": "toggle_server_tick",
-        "description": "",
-        "composite": false,
-        "clientRole": false,
-        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-        "attributes": {}
-      },
+     
       {
         "id": "593fc145-b104-409f-8ae3-09219f6fb01c",
         "name": "admin",
@@ -505,11 +440,7 @@
       "path": "/admin",
       "subGroups": [],
       "attributes": {},
-      "realmRoles": [
-        "spawn_npc",
-        "toggle_server_tick",
-        "kill_actor"
-      ],
+      "realmRoles": [],
       "clientRoles": {}
     }
   ],
@@ -521,6 +452,9 @@
     "clientRole": false,
     "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3"
   },
+  "defaultGroups": [
+    "/player"
+  ],
   "requiredCredentials": [
     "password"
   ],
