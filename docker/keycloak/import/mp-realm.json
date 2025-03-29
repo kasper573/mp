@@ -64,6 +64,7 @@
         "composites": {
           "realm": [
             "move_character",
+            "respawn_character",
             "character_attack",
             "offline_access",
             "uma_authorization"
@@ -91,6 +92,24 @@
       {
         "id": "1a0c46ea-9489-4fa9-a157-4dd4df5bf61e",
         "name": "move_character",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
+        "attributes": {}
+      },
+      {
+        "id": "0195e33b-0941-76fe-a1e1-5b7097fafc2e",
+        "name": "respawn_character",
+        "description": "",
+        "composite": false,
+        "clientRole": false,
+        "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3",
+        "attributes": {}
+      },
+      {
+        "id": "0195e33b-0942-771d-bf3a-e4e0f32015f7",
+        "name": "kill_actor",
         "description": "",
         "composite": false,
         "clientRole": false,
@@ -488,7 +507,8 @@
       "attributes": {},
       "realmRoles": [
         "spawn_npc",
-        "toggle_server_tick"
+        "toggle_server_tick",
+        "kill_actor"
       ],
       "clientRoles": {}
     }
