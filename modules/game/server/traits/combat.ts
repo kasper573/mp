@@ -22,8 +22,16 @@ export function combatBehavior(
   return ({ totalTimeElapsed }) => {
     for (const actor of recordValues(state.actors())) {
       attemptAttack(actor, totalTimeElapsed);
-      if (actor.health <= 0 && actor.type == "npc") {
-        state.actors.remove(actor.id);
+
+      // Dying should stop all actions
+      if (actor.health <= 0) {
+        state.actors.update(actor.id, {
+          health: 0, // Clamp
+          path: undefined,
+          moveTarget: undefined,
+          attackTargetId: undefined,
+        });
+        continue;
       }
     }
   };
