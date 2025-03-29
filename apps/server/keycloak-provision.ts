@@ -5,14 +5,16 @@ import { groupedRoles, playerGroup } from "./src/roles";
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
-logger.info("Provisioning!");
+function log(...args: unknown[]) {
+  logger.info("[keycloak provision]", ...args);
+}
 
 const realm = "mp";
 const client = new KeycloakAdminClient({
-  baseUrl: process.env.KC_HOSTNAME as string,
+  baseUrl: process.env.KC_PUBLIC_BASE_URL as string,
 });
 
-logger.info("Authenticating with Keycloak");
+log("Authenticating with Keycloak at", process.env.KC_PUBLIC_BASE_URL);
 await client.auth({
   username: process.env.KC_ADMIN_USERNAME,
   password: process.env.KC_ADMIN_PASSWORD,
@@ -20,7 +22,7 @@ await client.auth({
   clientId: "admin-cli",
 });
 
-logger.info("Setting default group to", playerGroup);
+log("Setting default group to", playerGroup);
 await client.realms.update({ realm }, { defaultGroups: [playerGroup] });
 
 await upsertRolesAndGroups(groupedRoles);
@@ -32,7 +34,7 @@ async function upsertRolesAndGroups(groupedRoles: Record<string, string[]>) {
   for (const roleName of allNewRoles) {
     const exists = existingRoles.find((r) => r.name === roleName);
     if (!exists) {
-      logger.info("Creating new role", roleName);
+      log("Creating new role", roleName);
       await client.roles.create({ realm, name: roleName });
     }
   }
@@ -44,12 +46,12 @@ async function upsertRolesAndGroups(groupedRoles: Record<string, string[]>) {
     let group = existingGroups.find((g) => g.name === groupName);
     const roleNames = groupedRoles[groupName];
     if (!group) {
-      logger.info("Creating new group", groupName);
+      log("Creating new group", groupName);
       group = await client.groups.create({ realm, name: groupName });
     }
 
     const roles = existingRoles.filter((r) => roleNames.includes(r.name!));
-    logger.info(
+    log(
       `Adding roles to group "${groupName}":`,
       roles.map((r) => r.name),
     );
