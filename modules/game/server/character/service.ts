@@ -49,6 +49,18 @@ export class CharacterService {
       : undefined;
   }
 
+  getDefaultSpawnPoint() {
+    const area = this.areas.get(this.defaultAreaId);
+    if (!area) {
+      throw new Error("Default area not found: " + this.defaultAreaId);
+    }
+
+    return {
+      areaId: area.id,
+      coords: area.start,
+    };
+  }
+
   async getOrCreateCharacterForUser(user: UserIdentity): Promise<Character> {
     const char = await this.getCharacterForUser(user);
 
@@ -56,17 +68,8 @@ export class CharacterService {
       return char;
     }
 
-    const area = this.areas.get(this.defaultAreaId);
-    if (!area) {
-      throw new Error(
-        "Could not create character, default area not found: " +
-          this.defaultAreaId,
-      );
-    }
-
     const input = {
-      areaId: area.id,
-      coords: area.start,
+      ...this.getDefaultSpawnPoint(),
       speed: 3 as Tile,
       health: 100,
       maxHealth: 100,

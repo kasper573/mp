@@ -35,9 +35,11 @@ export function createGameStateClient(wsUrl: string) {
     actors().filter((actor) => actor.areaId === areaId()),
   );
 
+  // TODO: refactor
   const moveMutation = trpc.character.move.createMutation(config);
   const joinMutation = trpc.character.join.createMutation(config);
   const attackMutation = trpc.character.attack.createMutation(config);
+  const respawnMutation = trpc.character.respawn.createMutation(config);
 
   const move = dedupe(
     throttle(
@@ -50,6 +52,8 @@ export function createGameStateClient(wsUrl: string) {
   );
   const attack = (targetId: ActorId) =>
     attackMutation.mutateAsync({ characterId: characterId()!, targetId });
+
+  const respawn = () => respawnMutation.mutateAsync(characterId()!);
 
   onCleanup(sync.subscribeToState((applyPatch) => applyPatch(gameState)));
   onCleanup(sync.subscribeToReadyState(setReadyState));
@@ -67,6 +71,7 @@ export function createGameStateClient(wsUrl: string) {
     actorsInArea,
     readyState,
     gameState,
+    respawn,
     areaId,
     characterId,
     character,
