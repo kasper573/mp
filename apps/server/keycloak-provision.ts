@@ -18,32 +18,48 @@ await client.auth({
   clientId: "admin-cli",
 });
 
-await upsertGuestUser();
+const groupedRoles = {
+  admin: ["foo", "bar"],
+  player: ["baz"],
+};
 
-async function upsertGuestUser() {
-  const email = "guest@k573.dev";
+await upsertRolesAndGroups(groupedRoles);
 
-  try {
-    const [user] = await client.users.find({ realm, email });
-    logger.info("Deleting", user.id);
-    await client.users.del({ realm, id: user.id! });
-  } catch {
-    // guest user didn't exist, nothing to remove
+async function upsertRolesAndGroups(groupedRoles: Record<string, string[]>) {
+  const allNewRoles = new Set(Object.values(groupedRoles).flat());
+
+  let existingRoles = await client.roles.find({ realm });
+  for (const roleName of allNewRoles) {
+    const exists = existingRoles.find((r) => r.name === roleName);
+    if (!exists) {
+      logger.info("Creating new role", roleName);
+      await client.roles.create({ realm, name: roleName });
+    }
   }
 
-  // void client.users.create({
-  //   realm,
-  //   email,
-  //   username: "guest",
-  //   enabled: true,
-  //   firstName: "Guest",
-  //   lastName: "User",
-  //   credentials: [
-  //     {
-  //       type: "password",
-  //       value: "guest",
-  //       temporary: false,
-  //     },
-  //   ],
-  // });
+  existingRoles = await client.roles.find({ realm });
+  const existingGroups = await client.groups.find({ realm });
+
+  for (const groupName of Object.keys(groupedRoles)) {
+    let group = existingGroups.find((g) => g.name === groupName);
+    const roleNames = groupedRoles[groupName];
+    if (!group) {
+      logger.info("Creating new group", groupName);
+      group = await client.groups.create({ realm, name: groupName });
+    }
+
+    const roles = existingRoles.filter((r) => roleNames.includes(r.name!));
+    logger.info(
+      `Adding roles to group "${groupName}":`,
+      roles.map((r) => r.name),
+    );
+    await client.groups.addRealmRoleMappings({
+      realm,
+      id: group.id!,
+      roles: roles.map((role) => ({
+        id: role.id!,
+        name: role.name!,
+      })),
+    });
+  }
 }
