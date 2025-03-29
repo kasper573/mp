@@ -48,6 +48,9 @@ Local development is done using node and docker compose.
 - Run `./docker/install-cert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
+- Run `pnpm -F server devenv db push` to initialize your database
+- Run `pnpm -F server devenv provision` to provision keycloak roles
+- Sign in as admin to `auth.mp.localhost` and create a test account and yourself to the `admin` group
 
 ### Before each development session
 
@@ -63,6 +66,12 @@ You will have to perform the appropriate docker compose commands to apply your c
 You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
 
 Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
+
+### If you change user roles
+
+User roles are defined in typescript source code as a single source of truth and provisioned to keycloak via the `provision` script in the `server` package. If you make changes to the user roles you will have to run the provisioning script to update your keycloak instance.
+
+> Production is provisioned automatically when changes are pushed to master, so you don't have to handle that manually.
 
 ### Quirks
 

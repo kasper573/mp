@@ -1,14 +1,16 @@
-import { roles } from "@mp-modules/user";
+import { defineRoles, roles } from "@mp-modules/user";
 import { t } from "@mp-modules/trpc/server";
 import { ctx_gameStateMachine } from "../GameState";
 import { ctx_areaLookup } from "../area/loadAreas";
 import { spawnNpcInstance } from "./npcSpawnBehavior";
 import { ctx_npcService } from "./service";
 
+export const npcRoles = defineRoles("npc", ["spawnRandom"]);
+
 export type NPCRouter = typeof npcRouter;
 export const npcRouter = t.router({
   spawnRandomNPC: t.procedure
-    .use(roles(["spawn_npc"]))
+    .use(roles([npcRoles.spawnRandom]))
     .mutation(async ({ ctx }) => {
       const npcService = ctx.ioc.get(ctx_npcService);
       const state = ctx.ioc.get(ctx_gameStateMachine);

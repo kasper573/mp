@@ -4,6 +4,7 @@ import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
 import type express from "express";
 import { ctx_request } from "./session";
+import type { RoleDefinition } from "./defineRoles";
 
 export const ctx_authServer = InjectionContext.new<AuthServer>();
 
@@ -38,7 +39,7 @@ export function auth() {
   });
 }
 
-export function roles(requiredRoles: string[]) {
+export function roles(requiredRoles: RoleDefinition[]) {
   return auth().unstable_pipe(async ({ ctx, next }) => {
     if (!new Set(requiredRoles).isSubsetOf(ctx.user.roles)) {
       throw new TRPCError({
