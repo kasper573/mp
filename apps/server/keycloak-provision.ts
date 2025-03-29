@@ -1,6 +1,6 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import { groupedRoles } from "./src/roles";
+import { groupedRoles, playerGroup } from "./src/roles";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -12,12 +12,16 @@ const client = new KeycloakAdminClient({
   baseUrl: process.env.KC_HOSTNAME as string,
 });
 
+logger.info("Authenticating with Keycloak");
 await client.auth({
   username: "admin",
   password: "admin",
   grantType: "password",
   clientId: "admin-cli",
 });
+
+logger.info("Setting default group to", playerGroup);
+await client.realms.update({ realm }, { defaultGroups: [playerGroup] });
 
 await upsertRolesAndGroups(groupedRoles);
 

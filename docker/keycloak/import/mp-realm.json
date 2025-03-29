@@ -452,9 +452,7 @@
     "clientRole": false,
     "containerId": "024a6c08-e66b-4433-8686-f58644f3bbc3"
   },
-  "defaultGroups": [
-    "/player"
-  ],
+  "defaultGroups": [],
   "requiredCredentials": [
     "password"
   ],
