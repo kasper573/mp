@@ -111,6 +111,8 @@ jobs:
             echo "KC_SMTP_PORT=\"${{ vars.KC_SMTP_PORT }}\"" >> .env
             echo "KC_SMTP_USER=\"${{ vars.KC_SMTP_USER }}\"" >> .env
             echo "KC_SMTP_PASSWORD=\"${{ secrets.KC_SMTP_PASSWORD }}\"" >> .env
+            echo "KC_ADMIN_USERNAME=\"${{ secrets.KC_ADMIN_USERNAME }}\"" >> .env
+            echo "KC_ADMIN_PASSWORD=\"${{ secrets.KC_ADMIN_PASSWORD }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             ./dockerctl.sh prod pull

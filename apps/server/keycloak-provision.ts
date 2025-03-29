@@ -14,8 +14,8 @@ const client = new KeycloakAdminClient({
 
 logger.info("Authenticating with Keycloak");
 await client.auth({
-  username: "admin",
-  password: "admin",
+  username: process.env.KC_ADMIN_USERNAME,
+  password: process.env.KC_ADMIN_PASSWORD,
   grantType: "password",
   clientId: "admin-cli",
 });
