@@ -87,6 +87,41 @@ export const characterRouter = t.router({
       state.actors.set(char.id, { type: "character", ...char });
       return char.id;
     }),
+
+  respawn: t.procedure
+    .input(schemaFor<CharacterId>())
+    .use(roles(["respawn_character"])) // TODO new role
+    .mutation(({ input: characterId, ctx: { user, ioc } }) => {
+      const state = ioc.get(ctx_gameStateMachine);
+      const char = state.actors()[characterId];
+
+      if (!char || char.type !== "character") {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Character not found",
+        });
+      }
+
+      if (char.userId !== user.id) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You don't have access to this character",
+        });
+      }
+
+      if (char.health > 0) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Character is not dead",
+        });
+      }
+
+      const characterService = ioc.get(ctx_characterService);
+      state.actors.update(char.id, {
+        health: char.maxHealth,
+        ...characterService.getDefaultSpawnPoint(),
+      });
+    }),
 });
 
 export const characterRouterSlice = { character: characterRouter };

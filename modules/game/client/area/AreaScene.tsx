@@ -20,6 +20,7 @@ import { Actor } from "./Actor";
 import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
 import { useAnimatedCoords } from "./useAnimatedCoords";
+import { RespawnDialog } from "./RespawnDialog";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
@@ -107,31 +108,35 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   });
 
   return (
-    <Pixi
-      label="AreaScene"
-      sortableChildren
-      matrix={engine.camera.transform.data}
-    >
-      {spritesheets.data && (
-        <TiledRenderer
-          layers={props.area.tiled.map.layers.filter(
-            (l) => l.type !== "objectgroup",
-          )}
-          spritesheets={spritesheets.data}
-          label={props.area.id}
-        >
-          {{
-            [props.area.characterLayer.name]: () => (
-              <For each={state.actorsInArea()}>
-                {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
-              </For>
-            ),
-          }}
-        </TiledRenderer>
-      )}
-      {props.children}
-      <TileHighlight area={props.area} target={highlightTarget()} />
-    </Pixi>
+    <>
+      <Pixi
+        label="AreaScene"
+        sortableChildren
+        matrix={engine.camera.transform.data}
+      >
+        {spritesheets.data && (
+          <TiledRenderer
+            layers={props.area.tiled.map.layers.filter(
+              (l) => l.type !== "objectgroup",
+            )}
+            spritesheets={spritesheets.data}
+            label={props.area.id}
+          >
+            {{
+              [props.area.characterLayer.name]: () => (
+                <For each={state.actorsInArea()}>
+                  {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
+                </For>
+              ),
+            }}
+          </TiledRenderer>
+        )}
+        {props.children}
+        <TileHighlight area={props.area} target={highlightTarget()} />
+      </Pixi>
+
+      <RespawnDialog open={state.character().health <= 0} />
+    </>
   );
 }
 
