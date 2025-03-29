@@ -88,6 +88,15 @@ export const characterRouter = t.router({
       return char.id;
     }),
 
+  kill: t.procedure
+    .input(schemaFor<{ targetId: ActorId }>())
+    .use(roles(["kill_actor"])) // TODO new role
+    .mutation(({ input: { targetId }, ctx: { ioc } }) => {
+      const state = ioc.get(ctx_gameStateMachine);
+      const target = state.actors()[targetId];
+      state.actors.update(target.id, { health: 0 });
+    }),
+
   respawn: t.procedure
     .input(schemaFor<CharacterId>())
     .use(roles(["respawn_character"])) // TODO new role

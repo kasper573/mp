@@ -40,7 +40,11 @@ export function AreaDebugUI(props: {
   drawPathsForActors: Actor[];
 }) {
   const trpc = useTRPC();
+  const state = useContext(GameStateClientContext);
   const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
+    meta: { invalidateCache: false },
+  }));
+  const kill = trpc.character.kill.createMutation(() => ({
     meta: { invalidateCache: false },
   }));
   const [visibleGraphType, setVisibleGraphType] =
@@ -72,6 +76,11 @@ export function AreaDebugUI(props: {
           </div>
           <div>
             <Button on:click={() => spawnNPC.mutate()}>Spawn random NPC</Button>
+            <Button
+              on:click={() => kill.mutate({ targetId: state.characterId()! })}
+            >
+              Die
+            </Button>
           </div>
         </div>
         <DebugText tiled={props.area.tiled} />
