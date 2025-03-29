@@ -34,9 +34,9 @@ export function combatBehavior(
     }
 
     const target = state.actors()[actor.attackTargetId];
-    if (!target || target.areaId !== actor.areaId) {
+    if (!target || !isTargetable(actor, target)) {
       state.actors.update(actor.id, { attackTargetId: undefined });
-      return; // target doesnt exist in area
+      return;
     }
 
     const distance = vec_distance(actor.coords, target.coords);
@@ -69,3 +69,10 @@ export function combatBehavior(
 }
 
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
+
+export function isTargetable(
+  actor: ReadonlyDeep<Actor>,
+  target: ReadonlyDeep<Actor>,
+): boolean {
+  return target.areaId === actor.areaId && target.health > 0;
+}
