@@ -48,6 +48,9 @@ Local development is done using node and docker compose.
 - Run `./docker/install-cert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
+- Run `pnpm -F server devenv db push` to initialize your database
+- Run `pnpm -F server devenv provision` to provision keycloak roles
+- Sign in as admin to `auth.mp.localhost` and create a test account and yourself to the `admin` group
 
 ### Before each development session
 
