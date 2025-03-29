@@ -2,9 +2,9 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
-import type { ActorId } from "../traits/actor";
 import type { GameState } from "../GameState";
 import type { AreaLookup } from "../area/loadAreas";
+import { isTargetable } from "../traits/combat";
 import type { NPCInstanceId } from "./schema";
 
 export function npcAIBehavior(
@@ -30,9 +30,12 @@ export function npcAIBehavior(
       switch (task.id) {
         case "fight":
           if (!subject.attackTargetId) {
-            const others = Object.keys(state.actors()).filter(
-              (id) => id !== subject.id,
-            ) as ActorId[];
+            const others = Object.values(state.actors())
+              .filter(
+                (other) =>
+                  other.id !== subject.id && isTargetable(subject, other),
+              )
+              .map((other) => other.id);
             state.actors.update(subject.id, {
               attackTargetId: randomItem(others),
             });
