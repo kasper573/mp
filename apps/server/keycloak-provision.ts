@@ -22,10 +22,10 @@ await client.auth({
   clientId: "admin-cli",
 });
 
+await upsertRolesAndGroups(groupedRoles);
+
 log("Setting default group to", playerGroup);
 await client.realms.update({ realm }, { defaultGroups: [playerGroup] });
-
-await upsertRolesAndGroups(groupedRoles);
 
 async function upsertRolesAndGroups(groupedRoles: Record<string, string[]>) {
   const allNewRoles = new Set(Object.values(groupedRoles).flat());
