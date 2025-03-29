@@ -34,6 +34,13 @@ export function npcSpawnBehavior(
   });
 
   return () => {
+    // Clean up dead NPCs
+    for (const actor of recordValues(state.actors())) {
+      if (actor.type === "npc" && actor.health <= 0) {
+        state.actors.remove(actor.id);
+      }
+    }
+
     for (const { spawn, npc } of spawns) {
       const area = areas.get(spawn.areaId);
       if (!area) {
