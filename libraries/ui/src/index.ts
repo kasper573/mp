@@ -4,3 +4,4 @@ export * from "./LinearProgress";
 export * from "./LoadingSpinner";
 export * from "./ErrorFallback";
 export * from "./Select";
+export * from "./Dialog";
