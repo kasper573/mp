@@ -7,6 +7,7 @@ import type { ClientRegistry } from "./ClientRegistry";
 import type { MovementTrait } from "./traits/movement";
 import type { Actor, ActorId } from "./traits/actor";
 import type { GameState } from "./GameState";
+import type { AreaLookup } from "./area/loadAreas";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -16,6 +17,7 @@ import type { GameState } from "./GameState";
 export function deriveClientVisibility(
   clients: ClientRegistry,
   clientViewDistance: Tile,
+  areas: AreaLookup,
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
@@ -44,7 +46,15 @@ export function deriveClientVisibility(
     if (a.areaId !== b.areaId) {
       return false;
     }
-    const box = clientViewDistanceRect(a.coords, clientViewDistance);
+    const area = areas.get(a.areaId);
+    if (!area) {
+      throw new Error(`Area ${a.areaId} not found`);
+    }
+    const box = clientViewDistanceRect(
+      a.coords,
+      area.tiled.tileCount,
+      clientViewDistance,
+    );
     return rect_hit_test(box, b.coords);
   }
 }

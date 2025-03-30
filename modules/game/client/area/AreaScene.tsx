@@ -11,6 +11,8 @@ import {
   untrack,
   For,
   createContext,
+  Show,
+  onCleanup,
 } from "solid-js";
 import { createQuery } from "@mp/solid-trpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
@@ -21,11 +23,14 @@ import type { TileHighlightTarget } from "./TileHighlight";
 import { TileHighlight } from "./TileHighlight";
 import { useAnimatedCoords } from "./useAnimatedCoords";
 import { RespawnDialog } from "./RespawnDialog";
+import { AreaDebugUI } from "./AreaDebugUI";
+import { toggleSignal } from "./toggleSignal";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
   const { renderedTileCount } = useContext(AreaSceneContext);
+  const [debug, toggleDebug] = toggleSignal();
 
   const spritesheets = createQuery(() => ({
     queryKey: ["tiled-spritesheets", props.area.id],
@@ -133,9 +138,18 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         )}
         {props.children}
         <TileHighlight area={props.area} target={highlightTarget()} />
+        <Show when={debug()}>
+          <AreaDebugUI
+            area={props.area}
+            playerCoords={myCoords()}
+            drawPathsForActors={state.actorsInArea()}
+          />
+        </Show>
       </Pixi>
 
       <RespawnDialog open={state.character().health <= 0} />
+
+      <Keybindings toggleDebug={toggleDebug} />
     </>
   );
 }
@@ -165,4 +179,12 @@ function createZoomLevelForViewDistance(
       ? cameraSize.x / tileSize.x
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
+}
+
+function Keybindings(props: { toggleDebug: () => void }) {
+  const engine = useContext(EngineContext);
+  createEffect(() => {
+    onCleanup(engine.keyboard.on("keydown", "F2", props.toggleDebug));
+  });
+  return null;
 }

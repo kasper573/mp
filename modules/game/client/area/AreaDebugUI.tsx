@@ -1,4 +1,3 @@
-import type { Rect } from "@mp/math";
 import { rect_scale, vec_round, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
@@ -54,13 +53,6 @@ export function AreaDebugUI(props: {
   }));
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
-  const { networkFogOfWarTileCount } = useContext(AreaSceneContext);
-
-  const fogOfWarRect = createMemo(
-    () =>
-      props.playerCoords &&
-      clientViewDistanceRect(props.playerCoords, networkFogOfWarTileCount),
-  );
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
@@ -101,18 +93,14 @@ export function AreaDebugUI(props: {
                 checked={showViewbox()}
                 on:change={() => setShowViewbox(!showViewbox())}
               />
-              Toggle viewbox
+              Visualize network fog of war
             </label>
           </div>
         </div>
         <DebugText tiled={props.area.tiled} />
-        <Show when={showViewbox() && fogOfWarRect()}>
-          {(rect) => (
-            <DebugRect
-              rect={rect()}
-              area={props.area}
-              color="rgba(0, 255, 0, 0.5)"
-            />
+        <Show when={showViewbox() && props.playerCoords}>
+          {(coords) => (
+            <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
           )}
         </Show>
       </div>
@@ -214,21 +202,38 @@ function DebugText(props: { tiled: TiledResource }) {
   return <p>{text()}</p>;
 }
 
-function DebugRect(props: {
-  rect: Rect<Tile>;
+function DebugNetworkFogOfWar(props: {
+  playerCoords: Vector<Tile>;
   area: AreaResource;
-  color: string;
 }) {
+  const { networkFogOfWarTileCount } = useContext(AreaSceneContext);
+
   const gfx = new Graphics();
+
+  const rect = createMemo(() =>
+    rect_scale(
+      clientViewDistanceRect(
+        props.playerCoords,
+        props.area.tiled.tileCount,
+        networkFogOfWarTileCount,
+      ),
+      props.area.tiled.tileSize,
+    ),
+  );
+
+  const width = createMemo(() => rect().width);
+  const height = createMemo(() => rect().height);
+  const x = createMemo(() => rect().x);
+  const y = createMemo(() => rect().y);
 
   createEffect(() => {
     gfx.clear();
+    gfx.rect(0, 0, width(), height());
+    gfx.fill({ color: "rgba(0, 255, 0, 0.5)" });
+  });
 
-    drawRect(
-      gfx,
-      rect_scale(props.rect, props.area.tiled.tileSize),
-      props.color,
-    );
+  createEffect(() => {
+    gfx.position.set(x(), y());
   });
 
   return <Pixi label="DebugViewbox" as={gfx} />;
@@ -260,11 +265,6 @@ function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
     ctx.lineTo(x, y);
   }
   ctx.stroke();
-}
-
-function drawRect(ctx: Graphics, rect: Rect<Pixel>, color: string) {
-  ctx.rect(rect.x, rect.y, rect.width, rect.height);
-  ctx.fill({ color });
 }
 
 function drawStar(

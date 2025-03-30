@@ -17,14 +17,12 @@ import {
   ctx_trpcErrorFormatter,
   trpcExpress,
 } from "@mp-modules/trpc/server";
+import { createDBClient } from "@mp-modules/db";
+import type { GameState, GameStateServer } from "@mp-modules/game/server";
 import {
   ctx_areaFileUrlResolver,
   ctx_areaLookup,
   loadAreas,
-} from "@mp-modules/game/server";
-import { createDBClient } from "@mp-modules/db";
-import type { GameState, GameStateServer } from "@mp-modules/game/server";
-import {
   ClientRegistry,
   movementBehavior,
   npcSpawnBehavior,
@@ -85,12 +83,15 @@ const syncHandshakeLimiter = new RateLimiter({
   duration: 30,
 });
 
+const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
+
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
   clientIds: () => syncServer.clientIds,
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
+    areas,
   ),
 });
 
@@ -125,7 +126,6 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
-const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 const characterService = new CharacterService(db, areas);
 
 const ioc = new InjectionContainer()
