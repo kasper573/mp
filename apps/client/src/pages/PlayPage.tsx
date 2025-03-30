@@ -22,7 +22,7 @@ export default function PlayPage() {
     >
       <AreaSceneContext.Provider value={clientViewDistance}>
         <GameStateClientContext.Provider value={sync}>
-          <Game interactive />
+          <Game />
         </GameStateClientContext.Provider>
       </AreaSceneContext.Provider>
     </AreaDebugUIContext.Provider>
