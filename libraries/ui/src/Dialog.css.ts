@@ -9,7 +9,7 @@ export const dialog = recipe({
       padding: "2xl",
       border: "thin",
       borderColor: "surface.face_subtle",
-      position: "fixed",
+      position: "absolute",
       top: "50%",
       left: "50%",
       display: "block",
