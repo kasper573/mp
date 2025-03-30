@@ -153,8 +153,10 @@ function createZoomLevelForViewDistance(
   cameraSize: Vector<Pixel>,
   tileViewDistance: Tile,
 ): number {
-  return Math.max(
-    cameraSize.x / tileSize.x / tileViewDistance,
-    cameraSize.y / tileSize.y / tileViewDistance,
-  );
+  // Never show more tiles than the view distance on any axis
+  const numTilesFitInCamera =
+    cameraSize.x > cameraSize.y
+      ? cameraSize.x / tileSize.x
+      : cameraSize.y / tileSize.y;
+  return numTilesFitInCamera / tileViewDistance;
 }
