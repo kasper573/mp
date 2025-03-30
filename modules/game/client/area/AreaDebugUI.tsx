@@ -1,4 +1,5 @@
-import { vec_round, type Path, type Vector } from "@mp/math";
+import type { Rect } from "@mp/math";
+import { rect_scale, vec_round, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
@@ -12,6 +13,7 @@ import {
   For,
   onCleanup,
   onMount,
+  Show,
   useContext,
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
@@ -21,11 +23,12 @@ import type { TimeSpan } from "@mp/time";
 import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
 import type { Actor, Character } from "../../server";
-import type { AreaResource } from "../../shared";
+import { clientViewDistanceRect, type AreaResource } from "../../shared";
 import type { TiledResource } from "../../shared/area/TiledResource";
 import { useTRPC } from "../trpc";
 import { GameStateClientContext } from "../GameStateClient";
 import * as styles from "./AreaDebugUI.css";
+import { AreaSceneContext } from "./AreaScene";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
@@ -38,7 +41,9 @@ export const AreaDebugUIContext = createContext({
 export function AreaDebugUI(props: {
   area: AreaResource;
   drawPathsForActors: Actor[];
+  playerCoords?: Vector<Tile>;
 }) {
+  const [showViewbox, setShowViewbox] = createSignal(false);
   const trpc = useTRPC();
   const state = useContext(GameStateClientContext);
   const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
@@ -49,6 +54,13 @@ export function AreaDebugUI(props: {
   }));
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
+  const { networkFogOfWarTileCount } = useContext(AreaSceneContext);
+
+  const fogOfWarRect = createMemo(
+    () =>
+      props.playerCoords &&
+      clientViewDistanceRect(props.playerCoords, networkFogOfWarTileCount),
+  );
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
@@ -82,8 +94,27 @@ export function AreaDebugUI(props: {
               Die
             </Button>
           </div>
+          <div>
+            <label>
+              <input
+                type="checkbox"
+                checked={showViewbox()}
+                on:change={() => setShowViewbox(!showViewbox())}
+              />
+              Toggle viewbox
+            </label>
+          </div>
         </div>
         <DebugText tiled={props.area.tiled} />
+        <Show when={showViewbox() && fogOfWarRect()}>
+          {(rect) => (
+            <DebugRect
+              rect={rect()}
+              area={props.area}
+              color="rgba(0, 255, 0, 0.5)"
+            />
+          )}
+        </Show>
       </div>
     </Pixi>
   );
@@ -183,6 +214,26 @@ function DebugText(props: { tiled: TiledResource }) {
   return <p>{text()}</p>;
 }
 
+function DebugRect(props: {
+  rect: Rect<Tile>;
+  area: AreaResource;
+  color: string;
+}) {
+  const gfx = new Graphics();
+
+  createEffect(() => {
+    gfx.clear();
+
+    drawRect(
+      gfx,
+      rect_scale(props.rect, props.area.tiled.tileSize),
+      props.color,
+    );
+  });
+
+  return <Pixi label="DebugViewbox" as={gfx} />;
+}
+
 function drawGraphNode(
   ctx: Graphics,
   tiled: TiledResource,
@@ -209,6 +260,11 @@ function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
     ctx.lineTo(x, y);
   }
   ctx.stroke();
+}
+
+function drawRect(ctx: Graphics, rect: Rect<Pixel>, color: string) {
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fill({ color });
 }
 
 function drawStar(

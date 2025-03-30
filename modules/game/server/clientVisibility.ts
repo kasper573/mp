@@ -1,7 +1,8 @@
 import type { ClientVisibilityFactory } from "@mp/sync/server";
-import { rect_from_diameter, rect_hit_test } from "@mp/math";
+import { rect_hit_test } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
+import { clientViewDistanceRect } from "../shared/clientViewDistanceRect";
 import type { ClientRegistry } from "./ClientRegistry";
 import type { MovementTrait } from "./traits/movement";
 import type { Actor, ActorId } from "./traits/actor";
@@ -43,7 +44,7 @@ export function deriveClientVisibility(
     if (a.areaId !== b.areaId) {
       return false;
     }
-    const viewbox = rect_from_diameter(a.coords, clientViewDistance);
-    return rect_hit_test(viewbox, b.coords);
+    const box = clientViewDistanceRect(a.coords, clientViewDistance);
+    return rect_hit_test(box, b.coords);
   }
 }

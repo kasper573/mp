@@ -141,11 +141,17 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
 }
 
 export const AreaSceneContext = createContext(
-  new Proxy({} as { renderedTileCount: Tile }, {
-    get() {
-      throw new Error("AreaSceneContext not provided");
+  new Proxy(
+    {} as {
+      renderedTileCount: Tile;
+      networkFogOfWarTileCount: Tile;
     },
-  }),
+    {
+      get() {
+        throw new Error("AreaSceneContext not provided");
+      },
+    },
+  ),
 );
 
 function createZoomLevelForViewDistance(

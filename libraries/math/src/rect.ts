@@ -36,3 +36,13 @@ export function rect_offset<T extends number>(
     height: rect.height,
   };
 }
+
+export const rect_scale = <A extends number, B extends number>(
+  a: Rect<A>,
+  b: Vector<B>,
+): Rect<B> => ({
+  x: (a.x * b.x) as B,
+  y: (a.y * b.y) as B,
+  width: (a.width * b.x) as B,
+  height: (a.height * b.y) as B,
+});

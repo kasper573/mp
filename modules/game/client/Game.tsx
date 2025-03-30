@@ -62,6 +62,7 @@ export function Game(props: {
                   <Show when={debug()}>
                     <AreaDebugUI
                       area={data}
+                      playerCoords={state.character()?.coords}
                       drawPathsForActors={state.actorsInArea()}
                     />
                   </Show>

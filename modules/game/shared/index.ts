@@ -8,3 +8,4 @@ export type * from "../server/traits/movement";
 export type * from "../server/area/schema";
 export * from "./area/AreaResource";
 export * from "./area/AreaId";
+export * from "./clientViewDistanceRect";
