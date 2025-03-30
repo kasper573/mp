@@ -50,7 +50,7 @@ Local development is done using node and docker compose.
   > on which browser you are using.
 - Run `pnpm -F server devenv db push` to initialize your database
 - Run `pnpm -F server devenv provision` to provision keycloak roles
-- Sign in as admin to `auth.mp.localhost` and create a test account and yourself to the `admin` group
+- Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
 ### Before each development session
 
