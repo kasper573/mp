@@ -94,7 +94,7 @@ The `/docker` folder is designed to serve both as the required configuration for
 
 Building images: You can build docker images from source, and it will depend on the rest of the source code from the repo to be present.
 
-Starting containers: You can also start containers for the built docker images, in which case the rest of the source code is no longer required. You can do so by running `dockerctl.sh` with `prod` or `test` environment. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `dockerctl.sh prod <docker compose command>`.
+Starting containers: You can also start containers for prebuilt docker images, in which case only the `/docker` folder is required to be present. You can do so by running `dockerctl.sh` with `prod` or `test` environment. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `dockerctl.sh prod <docker compose command>`.
 
 # Production deployment
 
