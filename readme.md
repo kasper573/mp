@@ -90,6 +90,12 @@ coupled with the rest of the codebase. Docker should only be aware of
 application and package build/dev tasks, their output artifacts and environment
 variables.
 
+The `/docker` folder is designed to serve both as the required configuration for building docker images and running docker containers:
+
+Building images: You can build docker images from source, and it will depend on the rest of the source code from the repo to be present.
+
+Starting containers: You can also start containers for the built docker images, in which case the rest of the source code is no longer required. You can do so by running `dockerctl.sh` with `prod` or `test` environment. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `dockerctl.sh prod <docker compose command>`.
+
 # Production deployment
 
 This repository comes with a github actions workflow that performs automatic
