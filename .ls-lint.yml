@@ -7,6 +7,10 @@ ls:
   .ts: snake_case
   .tsx: snake_case
   .d.ts: snake_case
+  .github:
+    .dir: regex:.*
+  .husky:
+    .dir: regex:.*
 
 ignore:
   - .git
