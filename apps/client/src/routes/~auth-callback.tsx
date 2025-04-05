@@ -3,7 +3,7 @@ import { AuthContext } from "@mp/auth/client";
 import { useNavigate } from "@tanstack/solid-router";
 import { createResource, useContext } from "solid-js";
 
-export const Route = createFileRoute("/authCallback")({
+export const Route = createFileRoute("/auth-callback")({
   component: RouteComponent,
 });
 

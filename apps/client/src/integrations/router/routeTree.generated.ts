@@ -13,7 +13,7 @@
 import { Route as rootRoute } from './../../routes/~__root'
 import { Route as SpringImport } from './../../routes/~spring'
 import { Route as PlayImport } from './../../routes/~play'
-import { Route as AuthCallbackImport } from './../../routes/~authCallback'
+import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
 import { Route as IndexImport } from './../../routes/~index'
 
 // Create/Update Routes
@@ -31,8 +31,8 @@ const PlayRoute = PlayImport.update({
 } as any)
 
 const AuthCallbackRoute = AuthCallbackImport.update({
-  id: '/authCallback',
-  path: '/authCallback',
+  id: '/auth-callback',
+  path: '/auth-callback',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -53,10 +53,10 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
-    '/authCallback': {
-      id: '/authCallback'
-      path: '/authCallback'
-      fullPath: '/authCallback'
+    '/auth-callback': {
+      id: '/auth-callback'
+      path: '/auth-callback'
+      fullPath: '/auth-callback'
       preLoaderRoute: typeof AuthCallbackImport
       parentRoute: typeof rootRoute
     }
@@ -81,14 +81,14 @@ declare module '@tanstack/solid-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/authCallback': typeof AuthCallbackRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
   '/spring': typeof SpringRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/authCallback': typeof AuthCallbackRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
   '/spring': typeof SpringRoute
 }
@@ -96,17 +96,17 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
-  '/authCallback': typeof AuthCallbackRoute
+  '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
   '/spring': typeof SpringRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/authCallback' | '/play' | '/spring'
+  fullPaths: '/' | '/auth-callback' | '/play' | '/spring'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/authCallback' | '/play' | '/spring'
-  id: '__root__' | '/' | '/authCallback' | '/play' | '/spring'
+  to: '/' | '/auth-callback' | '/play' | '/spring'
+  id: '__root__' | '/' | '/auth-callback' | '/play' | '/spring'
   fileRoutesById: FileRoutesById
 }
 
@@ -135,7 +135,7 @@ export const routeTree = rootRoute
       "filePath": "~__root.tsx",
       "children": [
         "/",
-        "/authCallback",
+        "/auth-callback",
         "/play",
         "/spring"
       ]
@@ -143,8 +143,8 @@ export const routeTree = rootRoute
     "/": {
       "filePath": "~index.tsx"
     },
-    "/authCallback": {
-      "filePath": "~authCallback.tsx"
+    "/auth-callback": {
+      "filePath": "~auth-callback.tsx"
     },
     "/play": {
       "filePath": "~play.tsx"
