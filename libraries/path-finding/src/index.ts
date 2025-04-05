@@ -1,4 +1,4 @@
-import { vec_distance, type Vector, vec, vec_add, vec_round } from "@mp/math";
+import { vecDistance, type Vector, vec, vecAdd, vecRound } from "@mp/math";
 import createGraph from "ngraph.graph";
 import { aStar } from "ngraph.path";
 import type { Branded } from "@mp/std";
@@ -27,22 +27,21 @@ export class VectorGraph<T extends number> {
   getNearestNode(vector: Vector<T>): VectorGraphNode<T> | undefined {
     const [nearestNode] = this.getAdjacentNodes(vector).toSorted(
       (a, b) =>
-        vec_distance(a.data.vector, vector) -
-        vec_distance(b.data.vector, vector),
+        vecDistance(a.data.vector, vector) - vecDistance(b.data.vector, vector),
     );
     return nearestNode;
   }
 
   getAdjacentNodes(v: Vector<T>): VectorGraphNode<T>[] {
-    const from = vec_round(v);
+    const from = vecRound(v);
     const xOffset = (v.x - 0.5) % 1 < 0.5 ? -1 : 1;
     const yOffset = (v.y - 0.5) % 1 < 0.5 ? -1 : 1;
 
     return [
       from,
-      vec_add(from, vec<T>(xOffset as T, 0 as T)),
-      vec_add(from, vec<T>(0 as T, yOffset as T)),
-      vec_add(from, vec<T>(xOffset as T, yOffset as T)),
+      vecAdd(from, vec<T>(xOffset as T, 0 as T)),
+      vecAdd(from, vec<T>(0 as T, yOffset as T)),
+      vecAdd(from, vec<T>(xOffset as T, yOffset as T)),
     ]
       .map(nodeIdFromVector)
       .filter(this.hasNode)
@@ -57,7 +56,7 @@ export class VectorGraph<T extends number> {
 
   addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
     this.ng.addLink(nodeIdFromVector(fromVector), nodeIdFromVector(toVector), {
-      distance: vec_distance(fromVector, toVector),
+      distance: vecDistance(fromVector, toVector),
     });
   };
 
@@ -73,11 +72,11 @@ export class VectorGraph<T extends number> {
   createPathFinder = (): VectorPathFinder<T> => {
     const pathFinder = aStar(this.ng, {
       distance: (n1, n2, link) => link.data.distance,
-      heuristic: (from, to) => vec_distance(from.data.vector, to.data.vector),
+      heuristic: (from, to) => vecDistance(from.data.vector, to.data.vector),
     });
     return (start, end) => {
       // Skip the first node since it's the start node
-      const [_, ...path] = pathFinder
+      const [, ...path] = pathFinder
         .find(end, start) // aStar seems to return the path in reverse order, so we flip the args to avoid having to reverse the path
         .map((node) => node.data.vector);
       return path;

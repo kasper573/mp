@@ -25,7 +25,7 @@ export function createPatchStateMachine<State extends PatchableState>(
   );
   const repositories = {} as EntityRepositoryRecord<State>;
   return new Proxy({} as PatchStateMachine<State>, {
-    get(_, prop) {
+    get(target, prop) {
       if (prop === flushFunctionName) {
         return flush;
       }
