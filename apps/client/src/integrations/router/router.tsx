@@ -6,10 +6,10 @@ import { routeTree } from "./routeTree.generated";
 export function createClientRouter() {
   return createRouter({
     routeTree,
-    defaultPendingComponent: LoadingSpinner,
-    defaultErrorComponent: ErrorFallback,
-    defaultNotFoundComponent: PageNotFound,
     defaultPreload: "intent",
+    defaultPendingComponent: LoadingSpinner,
+    defaultNotFoundComponent: PageNotFound,
+    defaultErrorComponent: ({ error, reset }) => ErrorFallback(error, reset),
   });
 }
 

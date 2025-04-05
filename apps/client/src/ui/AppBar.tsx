@@ -1,14 +1,14 @@
 import { Show, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
-//import { useIsRouting } from "@tanstack/solid-router";
+import { useRouterState } from "@tanstack/solid-router";
 import { Button, LinearProgress } from "@mp/ui";
 import { useVersionCompatibility } from "../state/useServerVersion";
 import * as styles from "./AppBar.css";
 import { Link } from "./Link";
 
 export default function AppBar() {
-  //const isRouting = useIsRouting();
+  const state = useRouterState();
 
   const auth = useContext(AuthContext);
   const versionCompatibility = useVersionCompatibility();
@@ -21,8 +21,14 @@ export default function AppBar() {
         Spring
       </Link>
 
-      <LinearProgress class={dock({ position: "top" })} active={isRouting()} />
+      <LinearProgress
+        class={dock({ position: "top" })}
+        active={state().isTransitioning}
+      />
       <div class={styles.right}>
+        <pre>
+          {JSON.stringify({ isTransitioning: state().isTransitioning })}
+        </pre>
         <Show when={versionCompatibility() === "incompatible"}>
           There is a new version available{" "}
           <Button onClick={() => window.location.reload()}>Reload</Button>

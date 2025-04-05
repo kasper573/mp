@@ -14,6 +14,7 @@ export default defineConfig({
       routeFilePrefix: "~",
       routesDirectory: "src/routes",
       generatedRouteTree: "src/integrations/router/routeTree.generated.ts",
+      autoCodeSplitting: true,
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),

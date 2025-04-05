@@ -1,4 +1,8 @@
 export function composeError(args: unknown[]): Error {
+  if (args.length === 0 && args[0] instanceof Error) {
+    return args[0];
+  }
+
   const realErrors: Error[] = [];
   const excessArgs: unknown[] = [];
   for (const arg of args) {
