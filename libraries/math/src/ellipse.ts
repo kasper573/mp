@@ -1,7 +1,7 @@
 import type { Rect } from "./rect";
 import type { Vector } from "./vector";
 
-export function ellipse_hit_test<T extends number>(
+export function ellipseHitTest<T extends number>(
   ellipse: Rect<T>,
   test: Vector<T>,
 ): boolean {

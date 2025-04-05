@@ -1,5 +1,5 @@
 import type { Path } from "@mp/math";
-import { vec, vec_distance, type Vector } from "@mp/math";
+import { vec, vecDistance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath<T extends number>(
@@ -14,7 +14,7 @@ export function moveAlongPath<T extends number>(
 
   while (newPath.length > 0 && distanceToMove > 0) {
     const destination = newPath[0];
-    const distanceToDestination = vec_distance(destination, newCoords);
+    const distanceToDestination = vecDistance(destination, newCoords);
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;

@@ -1,10 +1,10 @@
 import type { TiledObject } from "@mp/tiled-loader";
 import {
-  ellipse_hit_test,
+  ellipseHitTest,
   polygon_hit_test,
   polyline_hit_test,
   type Vector,
-  vec_equals,
+  vecEquals,
   rect_hit_test,
 } from "@mp/math";
 import type { Pixel } from "@mp/std";
@@ -15,9 +15,9 @@ export function hitTestTiledObject(
 ): boolean {
   switch (obj.objectType) {
     case "point":
-      return vec_equals(obj, pos);
+      return vecEquals(obj, pos);
     case "ellipse":
-      return ellipse_hit_test(obj, pos);
+      return ellipseHitTest(obj, pos);
     case "rectangle":
       return rect_hit_test(obj, pos);
     case "polygon":

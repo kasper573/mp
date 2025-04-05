@@ -1,4 +1,4 @@
-import { rect_scale, vec_round, type Path, type Vector } from "@mp/math";
+import { rect_scale, vecRound, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
@@ -190,7 +190,7 @@ function DebugText(props: { tiled: TiledResource }) {
       `viewport: ${vecToString(viewportPosition)}`,
       `world: ${vecToString(worldPosition)}`,
       `tile: ${vecToString(tilePos)}`,
-      `tile (snapped): ${vecToString(vec_round(tilePos))}`,
+      `tile (snapped): ${vecToString(vecRound(tilePos))}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       `character: ${JSON.stringify(trimCharacterInfo(state.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
