@@ -1,4 +1,4 @@
-import { rect_scale, vecRound, type Path, type Vector } from "@mp/math";
+import { rectScale, vecRound, type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
@@ -211,7 +211,7 @@ function DebugNetworkFogOfWar(props: {
   const gfx = new Graphics();
 
   const rect = createMemo(() =>
-    rect_scale(
+    rectScale(
       clientViewDistanceRect(
         props.playerCoords,
         props.area.tiled.tileCount,

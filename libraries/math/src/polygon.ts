@@ -1,8 +1,9 @@
 import type { Vector } from "./vector";
 
-export function polygon_hit_test<T extends number>(
+export function polygonHitTest<T extends number>(
   obj: unknown,
   test: Vector<T>,
 ): boolean {
+  // TODO implement
   return false;
 }

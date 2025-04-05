@@ -1,11 +1,11 @@
 import type { TiledObject } from "@mp/tiled-loader";
 import {
   ellipseHitTest,
-  polygon_hit_test,
-  polyline_hit_test,
+  polygonHitTest,
+  polylineHitTest,
   type Vector,
   vecEquals,
-  rect_hit_test,
+  rectHitTest,
 } from "@mp/math";
 import type { Pixel } from "@mp/std";
 
@@ -19,11 +19,11 @@ export function hitTestTiledObject(
     case "ellipse":
       return ellipseHitTest(obj, pos);
     case "rectangle":
-      return rect_hit_test(obj, pos);
+      return rectHitTest(obj, pos);
     case "polygon":
-      return polygon_hit_test(obj, pos);
+      return polygonHitTest(obj, pos);
     case "polyline":
-      return polyline_hit_test(obj, pos);
+      return polylineHitTest(obj, pos);
     case "text":
       return false;
   }

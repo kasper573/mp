@@ -1,5 +1,5 @@
 import type { ClientVisibilityFactory } from "@mp/sync/server";
-import { rect_hit_test } from "@mp/math";
+import { rectHitTest } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import { clientViewDistanceRect } from "../shared/client-view-distance-rect";
@@ -55,6 +55,6 @@ export function deriveClientVisibility(
       area.tiled.tileCount,
       clientViewDistance,
     );
-    return rect_hit_test(box, b.coords);
+    return rectHitTest(box, b.coords);
   }
 }
