@@ -3,12 +3,12 @@ import { InjectionContext } from "@mp/ioc";
 import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
 import type express from "express";
-import { ctx_request } from "./session";
+import { ctxRequest } from "./session";
 import type { RoleDefinition } from "./define-roles";
 
-export const ctx_authServer = InjectionContext.new<AuthServer>();
+export const ctxAuthServer = InjectionContext.new<AuthServer>();
 
-export const ctx_authToken = ctx_request.derive(deriveAuthToken);
+export const ctxAuthToken = ctxRequest.derive(deriveAuthToken);
 
 export function deriveAuthToken(req: express.Request) {
   const parsedBearerToken =
@@ -21,7 +21,7 @@ export function deriveAuthToken(req: express.Request) {
 
 export function auth() {
   return t.middleware(async ({ ctx, next }) => {
-    const authToken = ctx.ioc.get(ctx_authToken);
+    const authToken = ctx.ioc.get(ctxAuthToken);
     if (!authToken) {
       throw new TRPCError({
         code: "UNAUTHORIZED",
@@ -29,7 +29,7 @@ export function auth() {
       });
     }
 
-    const authServer = ctx.ioc.get(ctx_authServer);
+    const authServer = ctx.ioc.get(ctxAuthServer);
     const result = await authServer.verifyToken(authToken);
     if (result.isErr()) {
       throw new TRPCError({ code: "UNAUTHORIZED", message: result.error });
@@ -54,9 +54,9 @@ export function roles(requiredRoles: RoleDefinition[]) {
 
 export function optionalAuth() {
   return t.middleware(async ({ ctx, next }) => {
-    const authToken = ctx.ioc.get(ctx_authToken);
+    const authToken = ctx.ioc.get(ctxAuthToken);
     const result = authToken
-      ? await ctx.ioc.get(ctx_authServer).verifyToken(authToken)
+      ? await ctx.ioc.get(ctxAuthServer).verifyToken(authToken)
       : undefined;
 
     return next({

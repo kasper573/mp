@@ -22,7 +22,7 @@ export async function loadAreas(dir: string): Promise<AreaLookup> {
 
 export type AreaLookup = ReadonlyMap<AreaId, AreaResource>;
 
-export const ctx_areaLookup = InjectionContext.new<AreaLookup>();
+export const ctxAreaLookup = InjectionContext.new<AreaLookup>();
 
 async function loadTiled(tmxFile: string) {
   const result = await load(tmxFile);

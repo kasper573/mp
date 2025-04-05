@@ -3,9 +3,9 @@ import { recordValues, type Tile } from "@mp/std";
 import { defineRoles, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
 import type { ActorId } from "../traits/actor";
-import { ctx_gameStateMachine } from "../game-state";
+import { ctxGameStateMachine } from "../game-state";
 import { type CharacterId } from "./schema";
-import { ctx_characterService } from "./service";
+import { ctxCharacterService } from "./service";
 
 export const characterRoles = defineRoles("character", [
   "join",
@@ -21,7 +21,7 @@ export const characterRouter = t.router({
     .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
     .use(roles([characterRoles.move]))
     .mutation(({ input: { characterId, to }, ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_gameStateMachine);
+      const state = ioc.get(ctxGameStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -48,7 +48,7 @@ export const characterRouter = t.router({
     .input(schemaFor<{ characterId: CharacterId; targetId: ActorId }>())
     .use(roles([characterRoles.attack]))
     .mutation(({ input: { characterId, targetId }, ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_gameStateMachine);
+      const state = ioc.get(ctxGameStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -81,8 +81,8 @@ export const characterRouter = t.router({
     .output(schemaFor<CharacterId>())
     .use(roles([characterRoles.join]))
     .mutation(async ({ ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_gameStateMachine);
-      const characterService = ioc.get(ctx_characterService);
+      const state = ioc.get(ctxGameStateMachine);
+      const characterService = ioc.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors())
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === user.id);
@@ -100,7 +100,7 @@ export const characterRouter = t.router({
     .input(schemaFor<{ targetId: ActorId }>())
     .use(roles([characterRoles.kill])) // TODO new role
     .mutation(({ input: { targetId }, ctx: { ioc } }) => {
-      const state = ioc.get(ctx_gameStateMachine);
+      const state = ioc.get(ctxGameStateMachine);
       const target = state.actors()[targetId];
       state.actors.update(target.id, { health: 0 });
     }),
@@ -109,7 +109,7 @@ export const characterRouter = t.router({
     .input(schemaFor<CharacterId>())
     .use(roles([characterRoles.respawn])) // TODO new role
     .mutation(({ input: characterId, ctx: { user, ioc } }) => {
-      const state = ioc.get(ctx_gameStateMachine);
+      const state = ioc.get(ctxGameStateMachine);
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
@@ -133,7 +133,7 @@ export const characterRouter = t.router({
         });
       }
 
-      const characterService = ioc.get(ctx_characterService);
+      const characterService = ioc.get(ctxCharacterService);
       state.actors.update(char.id, {
         health: char.maxHealth,
         ...characterService.getDefaultSpawnPoint(),
