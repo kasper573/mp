@@ -10,7 +10,7 @@ import * as styles from "./main.css";
 // only the entry point that then lazy loads the real composition root, App.tsx.
 // This file should have a minimal amount of dependencies to keep the initial load time low.
 
-const App = lazy(() => import("./App"));
+const App = lazy(() => import("./app"));
 
 document.documentElement.classList.add(dark);
 

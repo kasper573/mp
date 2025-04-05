@@ -1,4 +1,4 @@
-export type * from "../server/GameState";
+export type * from "../server/game-state";
 export type * from "../server/character/schema";
 export type * from "../server/npc/schema";
 export type * from "../server/traits/actor";
@@ -6,6 +6,6 @@ export type * from "../server/traits/appearance";
 export type * from "../server/traits/combat";
 export type * from "../server/traits/movement";
 export type * from "../server/area/schema";
-export * from "./area/AreaResource";
-export * from "./area/AreaId";
-export * from "./clientViewDistanceRect";
+export * from "./area/area-resource";
+export * from "./area/area-id";
+export * from "./client-view-distance-rect";

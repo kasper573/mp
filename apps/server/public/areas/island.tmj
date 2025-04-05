@@ -114,7 +114,7 @@
  "tilesets":[
         {
          "firstgid":1,
-         "source":"..\/tilesets\/beach_tileset.tsj"
+         "source":"..\/tilesets\/beach-tileset.tsj"
         }],
  "tilewidth":16,
  "type":"map",

@@ -1,10 +1,13 @@
-import type { DefaultError, MutationOptions } from "@tanstack/solid-query";
+import type {
+  DefaultError,
+  MutationOptions,
+  UseMutationResult,
+  UseQueryResult,
+} from "@tanstack/solid-query";
 import {
   createMutation,
   createQuery,
   skipToken,
-  type CreateMutationResult,
-  type CreateQueryResult,
   type SkipToken,
   type SolidMutationOptions,
   type SolidQueryOptions,
@@ -172,13 +175,13 @@ type CreateQueryFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
 >(
   options?: () => TRPCQueryOptions<Proc, MappedType>,
-) => CreateQueryResult<MappedType, DefaultError>;
+) => UseQueryResult<MappedType, DefaultError>;
 
 type CreateMutationFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
 >(
   options?: () => TRPCMutationOptions<Proc, MappedType>,
-) => CreateMutationResult<MappedType, DefaultError, inferProcedureInput<Proc>>;
+) => UseMutationResult<MappedType, DefaultError, inferProcedureInput<Proc>>;
 
 type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> = Omit<
   SolidQueryOptions<

@@ -3,7 +3,7 @@ import { recordValues, type Tile } from "@mp/std";
 import { defineRoles, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
 import type { ActorId } from "../traits/actor";
-import { ctx_gameStateMachine } from "../GameState";
+import { ctx_gameStateMachine } from "../game-state";
 import { type CharacterId } from "./schema";
 import { ctx_characterService } from "./service";
 

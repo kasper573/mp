@@ -38,16 +38,16 @@ import {
   GameService,
 } from "@mp-modules/game/server";
 import type { LocalFile } from "@mp/std";
-import { collectProcessMetrics } from "./metrics/collectProcessMetrics";
-import { metricsMiddleware } from "./express/metricsMiddleware";
-import { collectUserMetrics } from "./metrics/collectUserMetrics";
-import { createTickMetricsObserver } from "./metrics/observeTickMetrics";
-import { createExpressLogger } from "./express/createExpressLogger";
-import { collectPathFindingMetrics } from "./metrics/collectPathFindingMetrics";
+import { collectProcessMetrics } from "./metrics/process";
+import { metricsMiddleware } from "./express/metrics-middleware";
+import { collectUserMetrics } from "./metrics/user";
+import { createTickMetricsObserver } from "./metrics/tick";
+import { createExpressLogger } from "./express/logger";
+import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
-import { errorFormatter } from "./etc/errorFormatter";
-import { rateLimiterMiddleware } from "./etc/rateLimiterMiddleware";
-import { serverFileToPublicUrl } from "./etc/serverFileToPublicUrl";
+import { errorFormatter } from "./etc/error-formatter";
+import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
+import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
 import { clientViewDistance } from "./shared";
 

@@ -10,9 +10,9 @@
       "require": "./shared.ts"
     },
     "./client": {
-      "types": "./client.tsx",
-      "import": "./client.tsx",
-      "require": "./client.tsx"
+      "types": "./client.ts",
+      "import": "./client.ts",
+      "require": "./client.ts"
     },
     "./server": {
       "types": "./server.ts",
