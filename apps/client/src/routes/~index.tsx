@@ -1,7 +1,12 @@
+import { createFileRoute } from "@tanstack/solid-router";
 import { Button } from "@mp/ui";
 import { Link } from "../ui/Link";
 
-export default function HomePage() {
+export const Route = createFileRoute("/")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
   return (
     <div
       style={{
@@ -13,7 +18,7 @@ export default function HomePage() {
       }}
     >
       <h1 style={{ "font-size": "64px" }}>MP</h1>
-      <Link href="/play">
+      <Link to="/play">
         <Button>Play the game</Button>
       </Link>
     </div>

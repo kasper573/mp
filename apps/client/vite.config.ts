@@ -3,10 +3,18 @@ import { checker } from "vite-plugin-checker";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import solid from "vite-plugin-solid";
 import topLevelAwait from "vite-plugin-top-level-await";
+import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
+
 import type { Plugin } from "vite";
 
 export default defineConfig({
   plugins: [
+    tanstackRouterPlugin({
+      target: "solid",
+      routeFilePrefix: "~",
+      routesDirectory: "src/routes",
+      generatedRouteTree: "src/integrations/router/routeTree.generated.ts",
+    }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     solid(),

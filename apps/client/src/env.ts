@@ -14,10 +14,6 @@ const clientEnvSchema = object({
      * The full URI that OIDC should redirect back to
      */
     redirectUri: string(),
-    /**
-     * The relative path the web server should serve the OIDC redirect callback at
-     */
-    callbackPath: string(),
   }),
   faro: object({
     receiverUrl: string(),

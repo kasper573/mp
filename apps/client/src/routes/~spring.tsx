@@ -1,8 +1,13 @@
+import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 
-export default function SpringTester() {
+export const Route = createFileRoute("/spring")({
+  component: RouteComponent,
+});
+
+function RouteComponent() {
   const [autoFlip, setAutoFlip] = createSignal(false);
   const [stiffness, setStiffness] = createSignal(200);
   const [damping, setDamping] = createSignal(40);

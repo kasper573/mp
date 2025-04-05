@@ -1,7 +1,9 @@
-import type { AnchorProps } from "@solidjs/router";
-import { A } from "@solidjs/router";
+import { createLink } from "@tanstack/solid-router";
+import type { JSX } from "solid-js";
 import * as styles from "./Link.css";
 
-export function Link(props: AnchorProps) {
-  return <A classList={{ [styles.link]: true }} {...props} />;
+export const Link = createLink(LinkComponent);
+
+function LinkComponent(props: JSX.IntrinsicElements["a"]) {
+  return <a classList={{ [styles.link]: true }} {...props} />;
 }
