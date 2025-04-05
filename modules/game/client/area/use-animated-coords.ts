@@ -1,6 +1,6 @@
 import { EngineContext } from "@mp/engine";
 import type { Path } from "@mp/math";
-import { path_copy, vec_distance, type Vector } from "@mp/math";
+import { pathCopy, vecDistance, type Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
@@ -26,7 +26,7 @@ export function useAnimatedCoords<T extends number>(
 ): Accessor<Vector<NoInfer<T>>> {
   const engine = useContext(EngineContext);
   const [localCoords, setLocalCoords] = createSignal(externalCoords());
-  const [localPath, setLocalPath] = createSignal(path_copy(externalPath()));
+  const [localPath, setLocalPath] = createSignal(pathCopy(externalPath()));
   const isMoving = createMemo(() => !!localPath());
 
   createEffect(() => {
@@ -51,7 +51,7 @@ export function useAnimatedCoords<T extends number>(
       // ie. certain game mechanics like "stun" or "root" effects that should indeed stun immediately,
       // but this should be fine for now.
     } else {
-      setLocalPath(path_copy(newPath));
+      setLocalPath(pathCopy(newPath));
     }
   });
 
@@ -59,7 +59,7 @@ export function useAnimatedCoords<T extends number>(
     createEffect(() => {
       const coords = externalCoords();
       // If the distance between real and animated coords is too large, snap to real coords
-      if (vec_distance(coords, localCoords()) >= snapDistance()) {
+      if (vecDistance(coords, localCoords()) >= snapDistance()) {
         setLocalCoords(coords);
       }
     });

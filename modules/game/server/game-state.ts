@@ -9,5 +9,5 @@ export type GameState = {
 
 export type GameStateServer = SyncServer<GameState, UserIdentity>;
 
-export const ctx_gameStateMachine =
+export const ctxGameStateMachine =
   InjectionContext.new<PatchStateMachine<GameState>>();

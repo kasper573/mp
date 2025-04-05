@@ -1,4 +1,4 @@
-import { vec_distance, type Rect } from "@mp/math";
+import { vecDistance, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync/server";
@@ -47,7 +47,7 @@ export function combatBehavior(
       return;
     }
 
-    const distance = vec_distance(actor.coords, target.coords);
+    const distance = vecDistance(actor.coords, target.coords);
     if (distance > actor.attackRange + tileMargin) {
       // target too far away, move closer, but don't attack yet
       state.actors.update(actor.id, {

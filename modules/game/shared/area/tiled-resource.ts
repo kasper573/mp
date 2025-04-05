@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import { vec, vec_scale } from "@mp/math";
+import { vec, vecScale } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
 import type {
   TiledMap,
@@ -18,7 +18,7 @@ export class TiledResource {
   }
 
   get mapSize(): Vector<Pixel> {
-    return vec_scale(this.tileCount, this.tileSize);
+    return vecScale(this.tileCount, this.tileSize);
   }
 
   get tileCount(): Vector<Tile> {

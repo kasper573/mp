@@ -10,18 +10,18 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken } from "@mp/auth";
 import { InjectionContainer } from "@mp/ioc";
-import { ctx_authServer, ctx_request } from "@mp-modules/user";
+import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
 import {
-  ctx_globalMiddleware,
-  ctx_trpcErrorFormatter,
+  ctxGlobalMiddleware,
+  ctxTrpcErrorFormatter,
   trpcExpress,
 } from "@mp-modules/trpc/server";
 import { createDBClient } from "@mp-modules/db";
 import type { GameState, GameStateServer } from "@mp-modules/game/server";
 import {
-  ctx_areaFileUrlResolver,
-  ctx_areaLookup,
+  ctxAreaFileUrlResolver,
+  ctxAreaLookup,
   loadAreas,
   ClientRegistry,
   movementBehavior,
@@ -29,10 +29,10 @@ import {
   combatBehavior,
   characterRemoveBehavior,
   CharacterService,
-  ctx_characterService,
+  ctxCharacterService,
   npcAIBehavior,
-  ctx_npcService,
-  ctx_gameStateMachine,
+  ctxNpcService,
+  ctxGameStateMachine,
   deriveClientVisibility,
   NPCService,
   GameService,
@@ -67,7 +67,7 @@ db.$client.on("error", logger.error);
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use(metricsMiddleware(metrics))
-  .use("/health", (_, res) => res.send("OK"))
+  .use("/health", (req, res) => res.send("OK"))
   // the above is intentionally placed before logger since it's so verbose and unnecessary to log
   .use(createExpressLogger(logger))
   .use(createCors({ origin: opt.corsOrigin }))
@@ -101,7 +101,7 @@ const syncServer: GameStateServer = new SyncServer({
   encoder: opt.syncPatchEncoder,
   path: opt.wsEndpointPath,
   state: gameState,
-  async handshake(_, { token }) {
+  async handshake(clientId, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
       syncHandshakeLimiter.consume(user.id),
@@ -129,14 +129,14 @@ const updateTicker = new Ticker({
 const characterService = new CharacterService(db, areas);
 
 const ioc = new InjectionContainer()
-  .provide(ctx_authServer, auth)
-  .provide(ctx_globalMiddleware, rateLimiterMiddleware)
-  .provide(ctx_trpcErrorFormatter, errorFormatter)
-  .provide(ctx_npcService, npcService)
-  .provide(ctx_characterService, characterService)
-  .provide(ctx_gameStateMachine, gameState)
-  .provide(ctx_areaLookup, areas)
-  .provide(ctx_areaFileUrlResolver, (id) =>
+  .provide(ctxAuthServer, auth)
+  .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
+  .provide(ctxTrpcErrorFormatter, errorFormatter)
+  .provide(ctxNpcService, npcService)
+  .provide(ctxCharacterService, characterService)
+  .provide(ctxGameStateMachine, gameState)
+  .provide(ctxAreaLookup, areas)
+  .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
   );
 
@@ -146,7 +146,7 @@ webServer.use(
     onError: ({ path, error }) => logger.error(error),
     router: rootRouter,
     createContext: ({ req }: { req: express.Request }) => ({
-      ioc: ioc.provide(ctx_request, req),
+      ioc: ioc.provide(ctxRequest, req),
     }),
   }),
 );

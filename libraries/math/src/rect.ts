@@ -7,7 +7,7 @@ export interface Rect<T extends number> {
   height: T;
 }
 
-export const rect_from_diameter = <T extends number>(
+export const rectFromDiameter = <T extends number>(
   center: Vector<T>,
   diameter: T,
 ): Rect<T> => ({
@@ -17,7 +17,7 @@ export const rect_from_diameter = <T extends number>(
   height: diameter,
 });
 
-export function rect_hit_test<T extends number>(
+export function rectHitTest<T extends number>(
   rect: Rect<T>,
   v: Vector<T>,
 ): boolean {
@@ -25,7 +25,7 @@ export function rect_hit_test<T extends number>(
   return v.x >= x && v.x <= x + width && v.y >= y && v.y <= y + height;
 }
 
-export function rect_offset<T extends number>(
+export function rectOffset<T extends number>(
   rect: Rect<T>,
   offset: Vector<T>,
 ): Rect<T> {
@@ -37,7 +37,7 @@ export function rect_offset<T extends number>(
   };
 }
 
-export const rect_scale = <A extends number, B extends number>(
+export const rectScale = <A extends number, B extends number>(
   a: Rect<A>,
   b: Vector<B>,
 ): Rect<B> => ({

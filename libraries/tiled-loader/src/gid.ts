@@ -16,17 +16,17 @@ export function readGlobalIdBuffer(
     (buffer[offset + 3] << 24);
 
   // Read out the flags
-  const flippedHorizontally = (i & FLIPPED_HORIZONTALLY_FLAG) !== 0;
-  const flippedVertically = (i & FLIPPED_VERTICALLY_FLAG) !== 0;
-  const flippedDiagonally = (i & FLIPPED_DIAGONALLY_FLAG) !== 0;
-  const rotatedHexagonal120 = (i & ROTATED_HEXAGONAL_120_FLAG) !== 0;
+  const flippedHorizontally = (i & flippedHorizontallyFlag) !== 0;
+  const flippedVertically = (i & flippedVerticallyFlag) !== 0;
+  const flippedDiagonally = (i & flippedDiagonallyFlag) !== 0;
+  const rotatedHexagonal120 = (i & rotatedHexagonal120Flag) !== 0;
 
   // Clear all four flags
   i &= ~(
-    FLIPPED_HORIZONTALLY_FLAG |
-    FLIPPED_VERTICALLY_FLAG |
-    FLIPPED_DIAGONALLY_FLAG |
-    ROTATED_HEXAGONAL_120_FLAG
+    flippedHorizontallyFlag |
+    flippedVerticallyFlag |
+    flippedDiagonallyFlag |
+    rotatedHexagonal120Flag
   );
 
   return {
@@ -62,7 +62,7 @@ export function globalToLocalId(
   return (globalId - tilesetFirstGID) as LocalTileId;
 }
 
-const FLIPPED_HORIZONTALLY_FLAG = 0x80_00_00_00;
-const FLIPPED_VERTICALLY_FLAG = 0x40_00_00_00;
-const FLIPPED_DIAGONALLY_FLAG = 0x20_00_00_00;
-const ROTATED_HEXAGONAL_120_FLAG = 0x10_00_00_00;
+const flippedHorizontallyFlag = 0x80_00_00_00;
+const flippedVerticallyFlag = 0x40_00_00_00;
+const flippedDiagonallyFlag = 0x20_00_00_00;
+const rotatedHexagonal120Flag = 0x10_00_00_00;

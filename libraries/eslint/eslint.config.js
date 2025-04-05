@@ -1,4 +1,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
@@ -8,6 +10,11 @@ import * as tsParser from "@typescript-eslint/parser";
 import boundariesPlugin from "eslint-plugin-boundaries";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
 import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
+
+const rootDir = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../../",
+);
 
 export default tseslint.config(
   {
@@ -30,8 +37,14 @@ export default tseslint.config(
     languageOptions: {
       parserOptions: {
         projectService: true,
-        tsconfigRootDir: import.meta.dirname,
+        tsconfigRootDir: rootDir,
         alwaysTryTypes: true,
+        project: [
+          "./tsconfig.json",
+          "./apps/*/tsconfig.json",
+          "./libraries/*/tsconfig.json",
+          "./modules/*/tsconfig.json",
+        ],
       },
     },
   },
@@ -66,6 +79,11 @@ export default tseslint.config(
 
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
+
+      "@typescript-eslint/naming-convention": [
+        "error",
+        { selector: "variableLike", format: ["camelCase", "PascalCase"] },
+      ],
 
       "boundaries/element-types": [
         2,
@@ -111,7 +129,9 @@ export default tseslint.config(
   {
     files: ["**/*.{ts,tsx}"],
     ...solid,
-    languageOptions: { parser: tsParser },
+    languageOptions: {
+      parser: tsParser,
+    },
   },
   eslintPluginUnicorn.configs["flat/recommended"],
   {

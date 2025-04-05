@@ -7,9 +7,9 @@ import type {
 } from "@trpc/server/unstable-core-do-not-import";
 import { transformer } from "../shared";
 
-export const ctx_globalMiddleware = InjectionContext.new<AnyMiddleware>();
+export const ctxGlobalMiddleware = InjectionContext.new<AnyMiddleware>();
 
-export const ctx_trpcErrorFormatter = InjectionContext.new<AnyErrorFormatter>();
+export const ctxTrpcErrorFormatter = InjectionContext.new<AnyErrorFormatter>();
 
 // We don't really care for runtime validation, but since trpc requires a parse
 // function instead of allowing simply a type, we use this factory for a
@@ -25,11 +25,11 @@ export * as trpcExpress from "@trpc/server/adapters/express";
 function createInjectableTRPC() {
   const trpc = initTRPC.context<TRPCContext>().create({
     transformer,
-    errorFormatter: (opt) => opt.ctx?.ioc.get(ctx_trpcErrorFormatter)(opt),
+    errorFormatter: (opt) => opt.ctx?.ioc.get(ctxTrpcErrorFormatter)(opt),
   });
 
   const globalMiddleware = trpc.middleware(async (opt) => {
-    const middleware = opt.ctx.ioc.get(ctx_globalMiddleware);
+    const middleware = opt.ctx.ioc.get(ctxGlobalMiddleware);
     return middleware(opt);
   });
 

@@ -1,6 +1,6 @@
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
-import { vec, rect_hit_test, rect_offset, rect_from_diameter } from "@mp/math";
+import { vec, rectHitTest, rectOffset, rectFromDiameter } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { Tile, Pixel } from "@mp/std";
 import type { ParentProps } from "solid-js";
@@ -72,7 +72,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     state
       .actorsInArea()
       .find((actor) =>
-        rect_hit_test(rect_offset(actor.hitBox, actor.coords), pointerTile()),
+        rectHitTest(rectOffset(actor.hitBox, actor.coords), pointerTile()),
       ),
   );
 
@@ -81,13 +81,13 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     if (entity) {
       return {
         type: "attack",
-        rect: rect_offset(entity.hitBox, entity.coords),
+        rect: rectOffset(entity.hitBox, entity.coords),
       };
     } else {
       const tileNode = props.area.graph.getNearestNode(pointerTile());
       if (tileNode) {
         return {
-          rect: rect_from_diameter(tileNode.data.vector, 1 as Tile),
+          rect: rectFromDiameter(tileNode.data.vector, 1 as Tile),
           type: "move",
         };
       }

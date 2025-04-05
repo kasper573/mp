@@ -9,12 +9,12 @@ export const areaRouter = t.router({
     .input(schemaFor<AreaId>())
     .output(schemaFor<PublicUrl>())
     .query(({ input: areaId, ctx }) => {
-      const resolveUrl = ctx.ioc.get(ctx_areaFileUrlResolver);
+      const resolveUrl = ctx.ioc.get(ctxAreaFileUrlResolver);
       return resolveUrl(areaId);
     }),
 });
 
 export const areaRouterSlice = { area: areaRouter };
 
-export const ctx_areaFileUrlResolver =
+export const ctxAreaFileUrlResolver =
   InjectionContext.new<(areaId: AreaId) => PublicUrl>();
