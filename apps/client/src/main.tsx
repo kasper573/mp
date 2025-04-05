@@ -9,7 +9,6 @@ import * as styles from "./main.css";
 // This file should have a minimal amount of dependencies to keep the initial load time low.
 const App = lazy(() => import("./app"));
 
-// TODO compile this into the index.html file
 document.documentElement.classList.add(dark);
 
 const rootElement = document.querySelector("div#root")!;
