@@ -203,7 +203,7 @@ it("can produce client state patches for additions to record due to changes in s
   const state = createPatchStateMachine({
     initialState,
     clientIds: () => [john.id],
-    clientVisibility: (_, state) => ({
+    clientVisibility: (clientId, state) => ({
       actors: new Set(Object.keys(state.actors)),
     }),
   });
@@ -229,7 +229,7 @@ it("can produce client state patches for removals in record due to changes in st
   const state = createPatchStateMachine({
     initialState,
     clientIds: () => [john.id],
-    clientVisibility: (_, state) => ({
+    clientVisibility: (clientId, state) => ({
       actors: new Set(Object.keys(state.actors)),
     }),
   });

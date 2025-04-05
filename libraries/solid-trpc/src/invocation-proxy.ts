@@ -3,8 +3,9 @@ export function createInvocationProxy(
   path: string[] = [],
 ) {
   return new Proxy(empty as object, {
-    get: (_, prop) => createInvocationProxy(resolveFn, [...path, String(prop)]),
-    apply: (_, _2, args: unknown[]) => resolveFn(path)(...args),
+    get: (target, prop) =>
+      createInvocationProxy(resolveFn, [...path, String(prop)]),
+    apply: (target, thisArg, args: unknown[]) => resolveFn(path)(...args),
   });
 }
 
