@@ -3,7 +3,8 @@
   "version": "1.0.0",
   "description": "",
   "scripts": {
-    "start": "dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- playwright test"
+    "start": "dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- playwright test",
+    "start:dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- playwright test"
   },
   "license": "MIT",
   "devDependencies": {
