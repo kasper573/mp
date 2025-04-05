@@ -148,7 +148,7 @@ async function connect<State extends object>(sync: SyncClient<State>) {
 }
 
 function range(n: number) {
-  return Array.from({ length: n }, (_, i) => i + 1);
+  return Array.from({ length: n }, (v, i) => i + 1);
 }
 
 function wait(ms: number) {

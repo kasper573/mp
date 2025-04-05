@@ -101,7 +101,7 @@ const syncServer: GameStateServer = new SyncServer({
   encoder: opt.syncPatchEncoder,
   path: opt.wsEndpointPath,
   state: gameState,
-  async handshake(_, { token }) {
+  async handshake(clientId, { token }) {
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
       syncHandshakeLimiter.consume(user.id),
