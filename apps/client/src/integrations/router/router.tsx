@@ -9,7 +9,7 @@ export function createClientRouter() {
     defaultPreload: "intent",
     defaultPendingComponent: LoadingSpinner,
     defaultNotFoundComponent: PageNotFound,
-    defaultErrorComponent: ({ error, reset }) => ErrorFallback(error, reset),
+    defaultErrorComponent: ErrorFallback,
   });
 }
 

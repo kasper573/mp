@@ -1,1 +1,1 @@
-export * from "@tanstack/solid-query-devtools";
+export { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
