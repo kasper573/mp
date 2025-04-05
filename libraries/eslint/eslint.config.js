@@ -80,6 +80,11 @@ export default tseslint.config(
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
 
+      "@typescript-eslint/naming-convention": [
+        "error",
+        { selector: "variableLike", format: ["camelCase", "PascalCase"] },
+      ],
+
       "boundaries/element-types": [
         2,
         {
@@ -124,7 +129,9 @@ export default tseslint.config(
   {
     files: ["**/*.{ts,tsx}"],
     ...solid,
-    languageOptions: { parser: tsParser },
+    languageOptions: {
+      parser: tsParser,
+    },
   },
   eslintPluginUnicorn.configs["flat/recommended"],
   {
