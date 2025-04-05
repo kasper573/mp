@@ -2,7 +2,7 @@ import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { QueryClientProvider } from "@mp/solid-trpc";
 import { TRPCClientContext } from "@mp/solid-trpc";
 import { RouterProvider } from "@tanstack/solid-router";
-import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
+import { lazy } from "solid-js";
 import { createQueryClient } from "./integrations/query";
 import { env } from "./env";
 import { createFaroClient, useFaroIntegration } from "./integrations/faro";
@@ -30,9 +30,14 @@ export default function App() {
       <QueryClientProvider client={query}>
         <TRPCClientContext.Provider value={trpc}>
           <RouterProvider router={router} />
-          <TanStackRouterDevtools router={router} />
+          <DevtoolsOnlyInDev router={router} />
         </TRPCClientContext.Provider>
       </QueryClientProvider>
     </AuthContext.Provider>
   );
 }
+
+const DevtoolsOnlyInDev =
+  import.meta.env.MODE === "development"
+    ? lazy(() => import("./Devtools"))
+    : () => null;
