@@ -7,12 +7,16 @@ ls:
   .ts: camelCase
   .tsx: PascalCase
   .d.ts: camelCase
+
   .github:
     .dir: regex:.*
   .husky:
     .dir: regex:.*
+  apps/client/src/routes/**:
+    .*: regex:((~(__)?[a-z0-9\-]+)|[a-zA-Z0-9]+)
 
 ignore:
   - .git
   - "**/dist"
   - "**/node_modules"
+  - apps/client/src/main.tsx
