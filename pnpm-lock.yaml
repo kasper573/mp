@@ -17,6 +17,9 @@ importers:
       '@dotenvx/dotenvx':
         specifier: 1.31.3
         version: 1.31.3
+      '@ls-lint/ls-lint':
+        specifier: 2.3.0
+        version: 2.3.0
       '@mp/eslint':
         specifier: workspace:*
         version: link:libraries/eslint
@@ -1623,6 +1626,12 @@ packages:
   '@keycloak/keycloak-admin-client@26.1.2':
     resolution: {integrity: sha512-WiYrPQ+M4o7SF8pD0mxSfazCpUOA28rJFWwVjyijJPPSvLxAeZxHjIFNm5q/FzPxsN8+7VdjFsWg/U/UYZ5uHg==}
     engines: {node: '>=18'}
+
+  '@ls-lint/ls-lint@2.3.0':
+    resolution: {integrity: sha512-lsT5/7SxtImOIjpefC9wcoXt2lkikKhCjd6U+Q9Z6X5h2HBU/71ggt+XStdodZ0HkJGO333zDUeec7JROMCPFw==}
+    cpu: [x64, arm64, s390x, ppc64le]
+    os: [darwin, linux, win32]
+    hasBin: true
 
   '@napi-rs/nice-android-arm-eabi@1.0.1':
     resolution: {integrity: sha512-5qpvOu5IGwDo7MEKVqqyAxF90I6aLj4n07OzpARdgDRfz8UbBztTByBp0RC59r3J1Ij8uzYi6jI7r5Lws7nn6w==}
@@ -6365,6 +6374,8 @@ snapshots:
       camelize-ts: 3.0.0
       url-join: 5.0.0
       url-template: 3.1.1
+
+  '@ls-lint/ls-lint@2.3.0': {}
 
   '@napi-rs/nice-android-arm-eabi@1.0.1':
     optional: true

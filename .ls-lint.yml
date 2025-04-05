@@ -1,0 +1,14 @@
+ls:
+  .dir: snake_case
+  .mjs: snake_case
+  .js: snake_case
+  .jsx: snake_case
+  .mts: snake_case
+  .ts: snake_case
+  .tsx: snake_case
+  .d.ts: snake_case
+
+ignore:
+  - .git
+  - "**/dist"
+  - "**/node_modules"
