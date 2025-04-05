@@ -3,9 +3,9 @@ import { vec_scale } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";
 import type { Tile } from "@mp/std";
-import type { TiledResource } from "../../shared/area/TiledResource";
+import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
-import { useAnimatedCoords } from "./useAnimatedCoords";
+import { useAnimatedCoords } from "./use-animated-coords";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   const coords = useAnimatedCoords(

@@ -12,7 +12,7 @@ import {
   createSignal,
   untrack,
 } from "solid-js";
-import { moveAlongPath } from "../../shared/area/moveAlongPath";
+import { moveAlongPath } from "../../shared/area/move-along-path";
 
 /**
  * Creates a vector signal that lerps each frame along the current path.

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import { Button } from "@mp/ui";
-import { Link } from "../ui/Link";
+import { Link } from "../ui/link";
 
 export const Route = createFileRoute("/")({
   component: RouteComponent,

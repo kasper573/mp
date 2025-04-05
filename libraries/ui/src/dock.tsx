@@ -1,7 +1,7 @@
 import type { JSX } from "solid-js";
 import type { StyledComponentProps } from "@mp/style";
 import { processStyleProps } from "@mp/style";
-import * as styles from "./Dock.css";
+import * as styles from "./dock.css";
 
 export type DockProps = JSX.HTMLAttributes<HTMLDivElement> &
   StyledComponentProps<typeof styles.dock>;

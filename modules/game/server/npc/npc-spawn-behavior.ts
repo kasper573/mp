@@ -16,10 +16,10 @@ import {
   type Vector,
 } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
-import type { GameState } from "../GameState";
-import type { AreaLookup } from "../area/loadAreas";
-import type { AreaId } from "../../shared/area/AreaId";
-import type { AreaResource } from "../../shared/area/AreaResource";
+import type { GameState } from "../game-state";
+import type { AreaLookup } from "../area/load-areas";
+import type { AreaId } from "../../shared/area/area-id";
+import type { AreaResource } from "../../shared/area/area-resource";
 import type { NPCService } from "./service";
 import type { NPC, NPCInstance, NPCInstanceId, NPCSpawn } from "./schema";
 

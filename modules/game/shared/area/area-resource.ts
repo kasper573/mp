@@ -3,11 +3,11 @@ import { vec_round } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Pixel, Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
-import { type TiledResource } from "./TiledResource";
-import { graphFromTiled } from "./graphFromTiled";
-import { TiledFixture } from "./TiledFixture";
-import { hitTestTiledObject } from "./hitTestTiledObject";
-import type { AreaId } from "./AreaId";
+import { type TiledResource } from "./tiled-resource";
+import { graphFromTiled } from "./graph-from-tiled";
+import { TiledFixture } from "./tiled-fixture";
+import { hitTestTiledObject } from "./hit-test-tiled-object";
+import type { AreaId } from "./area-id";
 
 export class AreaResource {
   readonly start: Vector<Tile>;

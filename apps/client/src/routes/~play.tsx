@@ -10,12 +10,12 @@ import { clientViewDistance } from "@mp/server";
 import { lazy } from "solid-js";
 import { useTRPC } from "../integrations/trpc";
 import { env } from "../env";
-import { requireAuth } from "../ui/AuthBoundary";
+import { requireAuth } from "../ui/auth-boundary";
 
 export const Route = createFileRoute("/play")({
   component: requireAuth(
     RouteComponent,
-    lazy(() => import("./PermissionDenied")),
+    lazy(() => import("./permission-denied")),
   ),
 });
 

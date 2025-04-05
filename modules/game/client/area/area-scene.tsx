@@ -17,14 +17,14 @@ import {
 import { createQuery } from "@mp/solid-trpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import type { AreaResource } from "../../shared";
-import { GameStateClientContext } from "../GameStateClient";
-import { Actor } from "./Actor";
-import type { TileHighlightTarget } from "./TileHighlight";
-import { TileHighlight } from "./TileHighlight";
-import { useAnimatedCoords } from "./useAnimatedCoords";
-import { RespawnDialog } from "./RespawnDialog";
-import { AreaDebugUI } from "./AreaDebugUI";
-import { toggleSignal } from "./toggleSignal";
+import { GameStateClientContext } from "../game-state-client";
+import { Actor } from "./actor";
+import type { TileHighlightTarget } from "./tile-highlight";
+import { TileHighlight } from "./tile-highlight";
+import { useAnimatedCoords } from "./use-animated-coords";
+import { RespawnDialog } from "./respawn-dialog";
+import { AreaDebugUI } from "./area-debug-ui";
+import { toggleSignal } from "./toggle-signal";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);

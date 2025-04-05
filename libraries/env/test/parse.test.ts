@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { boolean, number, object, parse, string } from "valibot";
-import { parseEnv } from "../src/parseEnv";
+import { parseEnv } from "../src/parse";
 import {
   booleanString,
   boolish,

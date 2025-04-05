@@ -1,8 +1,8 @@
 import { defineRoles, roles } from "@mp-modules/user";
 import { t } from "@mp-modules/trpc/server";
-import { ctx_gameStateMachine } from "../GameState";
-import { ctx_areaLookup } from "../area/loadAreas";
-import { spawnNpcInstance } from "./npcSpawnBehavior";
+import { ctx_gameStateMachine } from "../game-state";
+import { ctx_areaLookup } from "../area/load-areas";
+import { spawnNpcInstance } from "./npc-spawn-behavior";
 import { ctx_npcService } from "./service";
 
 export const npcRoles = defineRoles("npc", ["spawnRandom"]);

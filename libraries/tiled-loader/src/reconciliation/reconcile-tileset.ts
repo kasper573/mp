@@ -1,8 +1,8 @@
 import type { LoaderContext } from "../context";
 import type { LocalTileId } from "../schema/common";
 import type { Tileset, TilesetTile } from "../schema/tileset";
-import { reconcileFilePath } from "./reconcileFilePath";
-import { reconcileProperties } from "./reconcileProperties";
+import { reconcileFilePath } from "./reconcile-file-path";
+import { reconcileProperties } from "./reconcile-properties";
 
 export async function reconcileTileset(
   context: LoaderContext,

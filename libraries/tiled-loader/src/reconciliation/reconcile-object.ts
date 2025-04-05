@@ -1,6 +1,6 @@
 import type { TiledObject } from "../schema/object";
 import type { Tileset } from "../schema/tileset";
-import { reconcileProperties } from "./reconcileProperties";
+import { reconcileProperties } from "./reconcile-properties";
 
 export function reconcileObject(
   obj: TiledObject | ObjectTemplate,

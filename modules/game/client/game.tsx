@@ -4,10 +4,10 @@ import type { JSX } from "solid-js";
 import { useContext, createEffect, Switch, Match } from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
-import * as styles from "./Game.css";
-import { GameStateClientContext } from "./GameStateClient";
-import { AreaScene } from "./area/AreaScene";
-import { useAreaResource } from "./area/useAreaResource";
+import * as styles from "./game.css";
+import { GameStateClientContext } from "./game-state-client";
+import { AreaScene } from "./area/area-scene";
+import { useAreaResource } from "./area/use-area-resource";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);

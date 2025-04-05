@@ -2,8 +2,8 @@ import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@mp/solid-trpc";
 import { type Accessor } from "solid-js";
 import { AreaResource } from "../../shared";
-import type { AreaId } from "../../shared/area/AreaId";
-import { TiledResource } from "../../shared/area/TiledResource";
+import type { AreaId } from "../../shared/area/area-id";
+import { TiledResource } from "../../shared/area/tiled-resource";
 import { useTRPC } from "../trpc";
 
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {

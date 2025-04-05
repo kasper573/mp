@@ -1,6 +1,6 @@
 import { createLink } from "@tanstack/solid-router";
 import type { JSX } from "solid-js";
-import * as styles from "./Link.css";
+import * as styles from "./link.css";
 
 export const Link = createLink(LinkComponent);
 

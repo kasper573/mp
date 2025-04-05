@@ -39,5 +39,5 @@ export default function App() {
 
 const DevtoolsOnlyInDev =
   import.meta.env.MODE === "development"
-    ? lazy(() => import("./Devtools"))
+    ? lazy(() => import("./devtools"))
     : () => null;

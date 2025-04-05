@@ -23,11 +23,11 @@ import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
 import type { Actor, Character } from "../../server";
 import { clientViewDistanceRect, type AreaResource } from "../../shared";
-import type { TiledResource } from "../../shared/area/TiledResource";
+import type { TiledResource } from "../../shared/area/tiled-resource";
 import { useTRPC } from "../trpc";
-import { GameStateClientContext } from "../GameStateClient";
-import * as styles from "./AreaDebugUI.css";
-import { AreaSceneContext } from "./AreaScene";
+import { GameStateClientContext } from "../game-state-client";
+import * as styles from "./area-debug-ui.css";
+import { AreaSceneContext } from "./area-scene";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];

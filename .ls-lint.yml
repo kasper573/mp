@@ -1,22 +1,19 @@
 ls:
   .dir: kebab-case
-  .mjs: camelCase
-  .js: camelCase
-  .jsx: PascalCase
-  .mts: camelCase
-  .ts: camelCase
-  .tsx: PascalCase
-  .d.ts: camelCase
+  .*: kebab-case
 
   .github:
     .dir: regex:.*
   .husky:
     .dir: regex:.*
   apps/client/src/routes/**:
-    .*: regex:((~(__)?[a-z0-9\-]+)|[a-zA-Z0-9]+)
+    .*: regex:~?(__)?[a-z0-9\-]+
 
 ignore:
   - .git
   - "**/dist"
   - "**/node_modules"
   - apps/client/src/main.tsx
+  - "apps/server/drizzle/**"
+  - "apps/server/public/**"
+  - "docker/**"

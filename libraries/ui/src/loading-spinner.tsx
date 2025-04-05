@@ -1,5 +1,5 @@
-import { container, dot1, dot2, dot3, dot4 } from "./LoadingSpinner.css";
-import { Dock } from "./Dock";
+import { container, dot1, dot2, dot3, dot4 } from "./loading-spinner.css";
+import { Dock } from "./dock";
 
 export function LoadingSpinner() {
   return (

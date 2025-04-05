@@ -1,6 +1,6 @@
 import { createRouter } from "@tanstack/solid-router";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
-import { PageNotFound } from "../../routes/PageNotFound";
+import { PageNotFound } from "../../routes/page-not-found";
 import { routeTree } from "./routeTree.generated";
 
 export function createClientRouter() {

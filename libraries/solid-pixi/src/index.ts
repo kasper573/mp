@@ -1,3 +1,3 @@
 export * from "./application";
-export * from "./node";
+export * from "./pixi";
 export * from "./context";

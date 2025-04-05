@@ -4,7 +4,7 @@ import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
 import type express from "express";
 import { ctx_request } from "./session";
-import type { RoleDefinition } from "./defineRoles";
+import type { RoleDefinition } from "./define-roles";
 
 export const ctx_authServer = InjectionContext.new<AuthServer>();
 

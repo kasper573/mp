@@ -1,6 +1,6 @@
 import type { JSX } from "solid-js";
 import { processStyleProps, type StyledComponentProps } from "@mp/style";
-import * as styles from "./Dialog.css";
+import * as styles from "./dialog.css";
 
 export type DialogProps = JSX.HTMLAttributes<HTMLDialogElement> &
   StyledComponentProps<typeof styles.dialog>;

@@ -1,7 +1,7 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
 import { useContext } from "solid-js";
-import { GameStateClientContext } from "../GameStateClient";
+import { GameStateClientContext } from "../game-state-client";
 
 export function RespawnDialog(props: DialogProps) {
   const state = useContext(GameStateClientContext);

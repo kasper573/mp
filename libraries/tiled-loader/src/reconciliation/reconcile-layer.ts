@@ -1,13 +1,13 @@
 import type { LoaderContext } from "../context";
 import type { Layer, TileLayer } from "../schema/layer";
 import type { TiledMap } from "../schema/map";
-import { reconcileFilePath } from "./reconcileFilePath";
+import { reconcileFilePath } from "./reconcile-file-path";
 import {
   decompressTileLayer,
   isCompressedTileLayer,
-} from "./decompressTileLayer";
-import { reconcileObject } from "./reconcileObject";
-import { reconcileProperties } from "./reconcileProperties";
+} from "./decompress-tile-layer";
+import { reconcileObject } from "./reconcile-object";
+import { reconcileProperties } from "./reconcile-properties";
 
 /**
  * Since layers contain data that needs to be reconciled,

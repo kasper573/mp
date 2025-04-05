@@ -6,7 +6,7 @@ export type MessageEncoder = ReturnType<typeof createWorkerThreadEncoder>;
 
 export function createWorkerThreadEncoder() {
   const piscina = new Piscina({
-    filename: new URL("messageEncoder.worker.mjs", import.meta.url).href,
+    filename: new URL("message-encoder.worker.mjs", import.meta.url).href,
   });
   return {
     encode(patch: Patch): Promise<Uint8Array> {

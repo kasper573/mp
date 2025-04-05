@@ -3,9 +3,9 @@ import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
 import { Button, LinearProgress } from "@mp/ui";
-import { useVersionCompatibility } from "../state/useServerVersion";
-import * as styles from "./AppBar.css";
-import { Link } from "./Link";
+import { useVersionCompatibility } from "../state/use-server-version";
+import * as styles from "./app-bar.css";
+import { Link } from "./link";
 
 export default function AppBar() {
   const state = useRouterState();

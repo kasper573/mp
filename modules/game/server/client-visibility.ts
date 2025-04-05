@@ -2,12 +2,12 @@ import type { ClientVisibilityFactory } from "@mp/sync/server";
 import { rect_hit_test } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import { clientViewDistanceRect } from "../shared/clientViewDistanceRect";
-import type { ClientRegistry } from "./ClientRegistry";
+import { clientViewDistanceRect } from "../shared/client-view-distance-rect";
+import type { ClientRegistry } from "./client-registry";
 import type { MovementTrait } from "./traits/movement";
 import type { Actor, ActorId } from "./traits/actor";
-import type { GameState } from "./GameState";
-import type { AreaLookup } from "./area/loadAreas";
+import type { GameState } from "./game-state";
+import type { AreaLookup } from "./area/load-areas";
 
 /**
  * Removes any information that the given client should not have access to.
