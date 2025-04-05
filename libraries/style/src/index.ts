@@ -7,4 +7,4 @@ export { themeContract as theme } from "./theme.css";
 export * from "./atoms.css";
 export * from "./layout.css";
 export * from "./animation";
-export * from "./processStyleProps";
+export * from "./process-style-props";

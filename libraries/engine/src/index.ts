@@ -4,5 +4,5 @@ export * from "./engine";
 export * from "./pointer";
 export * from "./context";
 export * from "./spring";
-export * from "./spring_solid";
-export * from "./spring_vector";
+export * from "./spring-solid";
+export * from "./spring-vector";

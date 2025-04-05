@@ -12,8 +12,8 @@
     }
   },
   "dependencies": {
-    "solid-js": "1.9.3",
-    "@mp/style": "workspace:*"
+    "@mp/style": "workspace:*",
+    "solid-js": "1.9.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

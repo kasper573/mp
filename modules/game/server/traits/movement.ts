@@ -3,10 +3,10 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { GameState } from "../GameState";
-import type { AreaLookup } from "../area/loadAreas";
-import type { AreaId } from "../../shared/area/AreaId";
-import { moveAlongPath } from "../../shared/area/moveAlongPath";
+import type { GameState } from "../game-state";
+import type { AreaLookup } from "../area/load-areas";
+import type { AreaId } from "../../shared/area/area-id";
+import { moveAlongPath } from "../../shared/area/move-along-path";
 
 export interface MovementTrait {
   /**

@@ -550,11 +550,11 @@
  "tilesets":[
         {
          "firstgid":1,
-         "source":"..\/tilesets\/forest_tileset.tsj"
+         "source":"..\/tilesets\/forest-tileset.tsj"
         }, 
         {
          "firstgid":289,
-         "source":"..\/tilesets\/beach_tileset.tsj"
+         "source":"..\/tilesets\/beach-tileset.tsj"
         }],
  "tilewidth":16,
  "type":"map",

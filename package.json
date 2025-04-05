@@ -13,7 +13,8 @@
     "build": "pnpm -r --stream build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r --stream test",
-    "lint": "eslint . --max-warnings=0",
+    "lint": "eslint . --max-warnings=0 && pnpm lint:ls",
+    "lint:ls": "ls-lint",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
@@ -30,7 +31,8 @@
     "husky": "9.0.11",
     "knip": "^5.46.0",
     "prettier": "3.3.3",
-    "typescript": "^5.8.2"
+    "typescript": "^5.8.2",
+    "@ls-lint/ls-lint": "2.3.0"
   },
   "engines": {
     "node": "22.12.0"

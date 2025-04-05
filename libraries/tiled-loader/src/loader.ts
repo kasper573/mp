@@ -1,7 +1,7 @@
 import { err, ok, type Result } from "@mp/std";
 import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
-import { reconcileTiledMap } from "./reconciliation/reconcileTiledMap";
+import { reconcileTiledMap } from "./reconciliation/reconcile-tiled-map";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 

@@ -11,10 +11,10 @@
     }
   },
   "dependencies": {
-    "@mp/tiled-loader": "workspace:*",
     "@mp/pixi": "workspace:*",
     "@mp/solid-pixi": "workspace:*",
-    "solid-js": "1.9.3"
+    "@mp/tiled-loader": "workspace:*",
+    "solid-js": "1.9.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

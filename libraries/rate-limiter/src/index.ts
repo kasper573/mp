@@ -1,1 +1,1 @@
-export * from "./RateLimiter";
+export * from "./rate-limiter";

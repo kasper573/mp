@@ -6,10 +6,13 @@ import type { Result } from "@mp/std";
 import { type ClientId } from "./shared";
 import { type HandshakeData } from "./handshake";
 import { handshakeDataFromRequest } from "./handshake";
-import type { PatchableState } from "./PatchStateMachine";
-import type { PatchStateMachine } from "./PatchStateMachine";
-import type { MessageEncoder } from "./messageEncoder";
-import { createSyncEncoder, createWorkerThreadEncoder } from "./messageEncoder";
+import type { PatchableState } from "./patch-state-machine";
+import type { PatchStateMachine } from "./patch-state-machine";
+import type { MessageEncoder } from "./message-encoder";
+import {
+  createSyncEncoder,
+  createWorkerThreadEncoder,
+} from "./message-encoder";
 
 export class SyncServer<State extends PatchableState, HandshakeReturn> {
   private clients: ClientInfoMap = new Map();
@@ -149,7 +152,7 @@ const newClientId = uuid as unknown as () => ClientId;
 
 export type { ClientId } from "./shared";
 
-export * from "./PatchStateMachine";
+export * from "./patch-state-machine";
 
 const clientMetaDataSymbol = Symbol("clientMetaData");
 

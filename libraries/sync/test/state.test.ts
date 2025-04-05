@@ -1,5 +1,5 @@
 import { expect, it } from "vitest";
-import { createPatchStateMachine } from "../PatchStateMachine";
+import { createPatchStateMachine } from "../patch-state-machine";
 import type { ClientId } from "../shared";
 import { applyPatch } from "../patch";
 

@@ -6,8 +6,8 @@ import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { rect_from_diameter, vec_zero } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
 import type { AppearanceTrait } from "../traits/appearance";
-import type { AreaLookup } from "../area/loadAreas";
-import type { AreaId } from "../../shared/area/AreaId";
+import type { AreaLookup } from "../area/load-areas";
+import type { AreaId } from "../../shared/area/area-id";
 import { characterTable } from "./schema";
 import type { Character } from "./schema";
 

@@ -10,9 +10,9 @@
       "require": "./shared.ts"
     },
     "./client": {
-      "types": "./client.tsx",
-      "import": "./client.tsx",
-      "require": "./client.tsx"
+      "types": "./client.ts",
+      "import": "./client.ts",
+      "require": "./client.ts"
     },
     "./server": {
       "types": "./server.ts",
@@ -22,9 +22,9 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
+    "jose": "5.9.6",
     "oidc-client-ts": "3.1.0",
-    "solid-js": "1.9.3",
-    "jose": "5.9.6"
+    "solid-js": "1.9.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

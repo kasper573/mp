@@ -19,6 +19,7 @@ export default tseslint.config(
       "**/docker/**.js",
       "pnpm-lock.yaml",
       "**/apps/server/public/tilesets/**",
+      "**/*.generated.*",
     ],
   },
   eslint.configs.recommended,

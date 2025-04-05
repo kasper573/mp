@@ -8,13 +8,19 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./devtools": {
+      "types": "./src/devtools.ts",
+      "import": "./src/devtools.ts",
+      "require": "./src/devtools.ts"
     }
   },
   "dependencies": {
-    "solid-js": "1.9.3",
+    "@tanstack/solid-query": "5.71.10",
+    "@tanstack/solid-query-devtools": "5.71.10",
+    "@trpc/client": "11.0.0-rc.593",
     "@trpc/server": "11.0.0-rc.593",
-    "@tanstack/solid-query": "5.56.2",
-    "@trpc/client": "11.0.0-rc.593"
+    "solid-js": "1.9.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
