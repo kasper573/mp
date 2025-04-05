@@ -1,4 +1,4 @@
-import { Show, useContext } from "solid-js";
+import { createMemo, Show, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
@@ -9,6 +9,7 @@ import { Link } from "./Link";
 
 export default function AppBar() {
   const state = useRouterState();
+  const isNavigating = createMemo(() => state().status === "pending");
 
   const auth = useContext(AuthContext);
   const versionCompatibility = useVersionCompatibility();
@@ -17,18 +18,13 @@ export default function AppBar() {
     <nav class={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
-      <Link to="/spring" search={{ test: 123 }}>
-        Spring
-      </Link>
+      <Link to="/spring">Spring</Link>
 
       <LinearProgress
         class={dock({ position: "top" })}
-        active={state().isTransitioning}
+        active={isNavigating()}
       />
       <div class={styles.right}>
-        <pre>
-          {JSON.stringify({ isTransitioning: state().isTransitioning })}
-        </pre>
         <Show when={versionCompatibility() === "incompatible"}>
           There is a new version available{" "}
           <Button onClick={() => window.location.reload()}>Reload</Button>
