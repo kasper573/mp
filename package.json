@@ -13,7 +13,7 @@
     "build": "pnpm -r --stream build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r --stream test",
-    "lint": "eslint . --max-warnings=0 && lint:ls",
+    "lint": "eslint . --max-warnings=0 && pnpm lint:ls",
     "lint:ls": "ls-lint",
     "lint:fix": "eslint . --fix",
     "format": "prettier --check .",
