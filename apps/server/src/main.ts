@@ -181,7 +181,7 @@ webServer.use(
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, gameState, syncServer);
+collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
 updateTicker.subscribe(npcAIBehavior(gameState, areas));

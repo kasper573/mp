@@ -2,17 +2,12 @@ import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync/server";
-import type {
-  ClientRegistry,
-  GameState,
-  GameStateServer,
-} from "@mp-modules/game/server";
+import type { ClientRegistry, GameState } from "@mp-modules/game/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
   state: PatchStateMachine<GameState>,
-  syncServer: GameStateServer,
 ) {
   new MetricsGague({
     name: "active_user_count",
@@ -54,7 +49,7 @@ export function collectUserMetrics(
     help: "Number of active websocket connections",
     registers: [registry],
     collect() {
-      this.set([...syncServer.clientIds].length);
+      this.set(clients.getClientIds().size);
     },
   });
 }
