@@ -52,5 +52,4 @@ export interface SyncServerOptions<State extends PatchableState> {
   onError?: (...args: unknown[]) => unknown;
 }
 
-export * from "./handshake";
 export * from "./patch-state-machine";

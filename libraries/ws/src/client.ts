@@ -1,12 +1,6 @@
-import { applyPatch } from "./patch";
-import type { HandshakeData } from "./handshake";
-import { createUrlWithHandshakeData } from "./handshake";
-import { decodeServerToClientMessage } from "./message-decoder";
-
-export class SyncClient<State extends object> {
+export class EnhancedWebSocket {
   private socket?: WebSocket;
-
-  private stateHandlers = new Set<StateHandler<State>>();
+  private messageHandlers = new Set<EventHandler<MessageEvent>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
   private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
@@ -14,7 +8,6 @@ export class SyncClient<State extends object> {
 
   constructor(
     private url: string,
-    private getHandshakeData: () => HandshakeData,
     private reconnectDelay = (attemptNumber: number) =>
       1000 * Math.min(Math.pow(2, attemptNumber - 1), 10),
   ) {}
@@ -32,9 +25,9 @@ export class SyncClient<State extends object> {
     this.disconnect();
   };
 
-  subscribeToState = (handler: StateHandler<State>): Unsubscribe => {
-    this.stateHandlers.add(handler);
-    return () => this.stateHandlers.delete(handler);
+  subscribeToMessage = (handler: EventHandler<MessageEvent>): Unsubscribe => {
+    this.messageHandlers.add(handler);
+    return () => this.messageHandlers.delete(handler);
   };
 
   subscribeToReadyState = (
@@ -57,19 +50,14 @@ export class SyncClient<State extends object> {
     }
 
     this.connectAttempt++;
-    this.socket = new WebSocket(
-      createUrlWithHandshakeData(this.url, this.getHandshakeData()),
-    );
+    this.socket = new WebSocket(this.url);
 
     this.emitReadyState();
 
     this.socket.addEventListener("open", this.handleOpen);
     this.socket.addEventListener("close", this.handleClose);
     this.socket.addEventListener("error", this.handleError);
-    this.socket.addEventListener(
-      "message",
-      this.handleMessage as EventHandler<MessageEvent>,
-    );
+    this.socket.addEventListener("message", this.handleMessage);
   }
 
   private disconnect() {
@@ -81,10 +69,7 @@ export class SyncClient<State extends object> {
     this.socket.removeEventListener("open", this.handleOpen);
     this.socket.removeEventListener("close", this.handleClose);
     this.socket.removeEventListener("error", this.handleError);
-    this.socket.removeEventListener(
-      "message",
-      this.handleMessage as EventHandler<MessageEvent>,
-    );
+    this.socket.removeEventListener("message", this.handleMessage);
     this.socket = undefined;
   }
 
@@ -114,17 +99,9 @@ export class SyncClient<State extends object> {
     }
   };
 
-  private handleMessage = async (event: MessageEvent) => {
-    const patch = decodeServerToClientMessage(
-      await (event.data as Blob).arrayBuffer(),
-    );
-
-    this.updateState((target) => applyPatch(target, patch));
-  };
-
-  private updateState = (mutation: StateMutation<State>) => {
-    for (const handler of this.stateHandlers) {
-      handler(mutation);
+  private handleMessage = (event: MessageEvent) => {
+    for (const handler of this.messageHandlers) {
+      handler(event);
     }
   };
 
@@ -161,9 +138,5 @@ export interface SocketErrorEvent extends Event {
 }
 
 type EventHandler<Payload> = (payload: Payload) => void;
-
-type StateMutation<State> = (state: State) => void;
-
-type StateHandler<State> = (updateState: StateMutation<State>) => void;
 
 type Unsubscribe = () => void;

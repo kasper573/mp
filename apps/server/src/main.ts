@@ -5,15 +5,11 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import {
-  SyncServer,
-  createPatchStateMachine,
-  handshakeDataFromRequest,
-} from "@mp/sync/server";
+import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
-import { createWSSWithHandshake } from "@mp/wss";
+import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -55,7 +51,11 @@ import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import { clientViewDistance, registerSyncExtensions } from "./shared";
+import {
+  clientViewDistance,
+  registerSyncExtensions,
+  webSocketTokenParam,
+} from "./shared";
 
 registerSyncExtensions();
 
@@ -95,21 +95,23 @@ const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
 const webSockets = new Map<ClientId, WebSocket>();
 
-const wss = createWSSWithHandshake<UserIdentity>({
+const wss = createWSSWithHandshake<UserIdentity, ClientId>({
   httpServer,
   path: opt.wsEndpointPath,
   onConnection: (socket, handshake) => {
-    clients.add(handshake.clientId, handshake.payload.id);
-    webSockets.set(handshake.clientId, socket);
+    clients.add(handshake.id, handshake.payload.id);
+    webSockets.set(handshake.id, socket);
     socket.addEventListener("close", () => {
-      clients.remove(handshake.clientId);
-      webSockets.delete(handshake.clientId);
+      clients.remove(handshake.id);
+      webSockets.delete(handshake.id);
     });
   },
-  createClientId: () => uuid() as ClientId,
+  createSocketId: () => uuid() as ClientId,
   onError: (...args) => logger.error("[WSS]", ...args),
   async handshake(clientId, req) {
-    const { token } = handshakeDataFromRequest(req);
+    // .url is in fact a path, so baseUrl does not matter
+    const url = req.url ? new URL(req.url, "http://localhost") : undefined;
+    const token = url?.searchParams.get(webSocketTokenParam);
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
       syncHandshakeLimiter.consume(user.id),

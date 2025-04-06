@@ -1,4 +1,3 @@
-import { SyncClient } from "@mp/sync/client";
 import {
   createContext,
   createEffect,
@@ -12,24 +11,28 @@ import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
+import { EnhancedWebSocket } from "@mp/ws/client";
+import { parsePatchMessage } from "@mp/sync/client";
 import { useTRPC } from "./trpc";
 import { type CharacterId } from "@mp-modules/game";
 import type { ActorId, Character, GameState } from "@mp-modules/game";
 
-export function createGameStateClient(wsUrl: string) {
+export function createGameStateClient(
+  wsUrlForToken: (token?: string) => string,
+) {
   const trpc = useTRPC();
   const { identity } = useContext(AuthContext);
   const id = createMemo(() => identity()?.id);
-  const sync = new SyncClient<GameState>(wsUrl, () => ({
-    token: identity()?.token,
-  }));
+
+  // TODO EnhancedWebSocket must be reactive. It has to be recreated when the token changes.
+  const socket = new EnhancedWebSocket(wsUrlForToken(identity()?.token));
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
     () => gameState.actors[characterId()!] as Character,
   );
   const areaId = createMemo(() => character()?.areaId);
-  const [readyState, setReadyState] = createSignal(sync.getReadyState());
+  const [readyState, setReadyState] = createSignal(socket.getReadyState());
   const actors = createMemo(() => Object.values(gameState.actors));
   const actorsInArea = createMemo(() =>
     actors().filter((actor) => actor.areaId === areaId()),
@@ -55,13 +58,21 @@ export function createGameStateClient(wsUrl: string) {
 
   const respawn = () => respawnMutation.mutateAsync(characterId()!);
 
-  onCleanup(sync.subscribeToState((applyPatch) => applyPatch(gameState)));
-  onCleanup(sync.subscribeToReadyState(setReadyState));
+  onCleanup(
+    socket.subscribeToMessage(
+      (message) =>
+        void parsePatchMessage(message).then((applyPatch) =>
+          applyPatch(gameState),
+        ),
+    ),
+  );
+
+  onCleanup(socket.subscribeToReadyState(setReadyState));
 
   createEffect(() => {
     if (id() !== undefined) {
-      untrack(() => sync.start());
-      onCleanup(sync.stop);
+      untrack(() => socket.start());
+      onCleanup(socket.stop);
     }
   });
 

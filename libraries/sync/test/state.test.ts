@@ -1,7 +1,7 @@
 import { expect, it } from "vitest";
-import { createPatchStateMachine } from "../patch-state-machine";
-import type { ClientId } from "../shared";
-import { applyPatch } from "../patch";
+import { createPatchStateMachine } from "../src/patch-state-machine";
+import type { ClientId } from "../src/shared";
+import { applyPatch } from "../src/patch";
 
 it("can access initial state", () => {
   const state = createPatchStateMachine({

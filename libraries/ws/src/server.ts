@@ -1,26 +1,27 @@
 import type http from "node:http";
 import { type Result } from "@mp/std";
 import { WebSocketServer } from "ws";
-import type { ClientId } from "../../sync/shared";
 
-export interface WSSWithHandshakeOptions<HandshakePayload> {
+export { type WebSocketServer } from "ws";
+
+export interface WSSWithHandshakeOptions<HandshakePayload, SocketId> {
   httpServer: http.Server;
   path: string;
-  handshake: WSSHandshakeFn<HandshakePayload>;
-  createClientId: () => ClientId;
+  handshake: WSSHandshakeFn<HandshakePayload, SocketId>;
+  createSocketId: () => SocketId;
   onError?: (...args: unknown[]) => unknown;
   onConnection?: (
     ws: WebSocket,
-    handshake: WSSHandshake<HandshakePayload>,
+    handshake: WSSHandshake<HandshakePayload, SocketId>,
   ) => unknown;
 }
 
-export function createWSSWithHandshake<HandshakePayload>(
-  opt: WSSWithHandshakeOptions<HandshakePayload>,
-) {
+export function createWSSWithHandshake<HandshakePayload, SocketId>(
+  opt: WSSWithHandshakeOptions<HandshakePayload, SocketId>,
+): WebSocketServer {
   const handshakes = new Map<
     http.IncomingMessage,
-    { clientId: ClientId; payload: HandshakePayload }
+    WSSHandshake<HandshakePayload, SocketId>
   >();
 
   const wss = new WebSocketServer({
@@ -52,13 +53,13 @@ export function createWSSWithHandshake<HandshakePayload>(
   return wss;
 
   async function verifyClient(req: http.IncomingMessage) {
-    const clientId = opt.createClientId();
+    const id = opt.createSocketId();
 
     try {
-      const result = await opt.handshake(clientId, req);
+      const result = await opt.handshake(id, req);
 
       if (result.isOk()) {
-        handshakes.set(req, { clientId, payload: result.value });
+        handshakes.set(req, { id, payload: result.value });
         return true;
       } else {
         opt.onError?.("Handshake failed", result.error);
@@ -72,12 +73,12 @@ export function createWSSWithHandshake<HandshakePayload>(
   }
 }
 
-export interface WSSHandshake<Payload> {
-  clientId: ClientId;
+export interface WSSHandshake<Payload, SocketId> {
+  id: SocketId;
   payload: Payload;
 }
 
-export type WSSHandshakeFn<Payload> = (
-  clientId: ClientId,
+export type WSSHandshakeFn<Payload, SocketId> = (
+  id: SocketId,
   req: http.IncomingMessage,
 ) => Promise<Result<Payload, string>>;
