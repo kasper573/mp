@@ -5,10 +5,14 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
+import {
+  SyncServer,
+  createPatchStateMachine,
+  createWSSWithHandshake,
+} from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import type { AuthToken } from "@mp/auth";
+import type { AuthToken, UserIdentity } from "@mp/auth";
 import { InjectionContainer } from "@mp/ioc";
 import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -37,7 +41,8 @@ import {
   NPCService,
   GameService,
 } from "@mp-modules/game/server";
-import type { LocalFile } from "@mp/std";
+import { uuid, type LocalFile } from "@mp/std";
+import type { ClientId } from "@mp/sync";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -87,9 +92,32 @@ const syncHandshakeLimiter = new RateLimiter({
 
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
+const webSocketToClientId = new Map<WebSocket, ClientId>();
+
+const wss = createWSSWithHandshake<UserIdentity>({
+  httpServer,
+  path: opt.wsEndpointPath,
+  onConnection: (socket, handshake) => {
+    clients.add(handshake.clientId, handshake.payload.id);
+    webSocketToClientId.set(socket, handshake.clientId);
+    socket.addEventListener("close", () => {
+      clients.remove(handshake.clientId);
+      webSocketToClientId.delete(socket);
+    });
+  },
+  createClientId: () => uuid() as ClientId,
+  onError: (...args) => logger.error("[WSS]", ...args),
+  async handshake(clientId, { token }) {
+    const result = await auth.verifyToken(token as AuthToken);
+    return result.asyncAndThrough((user) =>
+      syncHandshakeLimiter.consume(user.id),
+    );
+  },
+});
+
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  clientIds: () => syncServer.clientIds,
+  clientIds: () => webSocketToClientId.values(),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -98,19 +126,11 @@ const gameState = createPatchStateMachine<GameState>({
 });
 
 const syncServer: GameStateServer = new SyncServer({
-  logger,
-  httpServer,
+  wss,
   encoder: opt.syncPatchEncoder,
-  path: opt.wsEndpointPath,
   state: gameState,
-  async handshake(clientId, { token }) {
-    const result = await auth.verifyToken(token as AuthToken);
-    return result.asyncAndThrough((user) =>
-      syncHandshakeLimiter.consume(user.id),
-    );
-  },
-  onConnection: (clientId, user) => clients.add(clientId, user.id),
-  onDisconnect: (clientId) => clients.remove(clientId),
+  getClientId: (socket) => webSocketToClientId.get(socket),
+  onError: (...args) => logger.error("[SyncServer]", ...args),
 });
 
 const npcService = new NPCService(db);
