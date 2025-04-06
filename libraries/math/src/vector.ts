@@ -31,15 +31,15 @@ export class Vector<T extends number> implements VectorLike<T> {
   }
 
   static zero<T extends number>(): Vector<T> {
-    return Vector.vecZeroConst as Vector<T>;
+    return vecZeroConst as Vector<T>;
   }
 
   static from<T extends number>(obj: VectorLike<T>): Vector<T> {
     return new Vector<T>(obj.x, obj.y);
   }
-
-  private static vecZeroConst = new Vector(0, 0);
 }
+
+const vecZeroConst = new Vector(0, 0);
 
 export type Path<T extends number> = readonly Vector<T>[];
 
