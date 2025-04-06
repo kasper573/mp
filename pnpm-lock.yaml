@@ -491,9 +491,6 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      '@mp/wss':
-        specifier: workspace:*
-        version: link:../wss
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0

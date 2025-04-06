@@ -1,4 +1,3 @@
-import type { WebSocketServer } from "@mp/wss";
 import type { PatchableState } from "./patch-state-machine";
 import type { PatchStateMachine } from "./patch-state-machine";
 import type { MessageEncoder } from "./message-encoder";
@@ -49,7 +48,6 @@ export class SyncServer<State extends PatchableState> {
 export interface SyncServerOptions<State extends PatchableState> {
   encoder: "sync" | "worker";
   state: PatchStateMachine<State>;
-  wss: WebSocketServer;
   getSocket: (clientId: ClientId) => WebSocket | undefined;
   onError?: (...args: unknown[]) => unknown;
 }

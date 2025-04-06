@@ -128,7 +128,6 @@ const gameState = createPatchStateMachine<GameState>({
 });
 
 const syncServer: GameStateServer = new SyncServer({
-  wss,
   encoder: opt.syncPatchEncoder,
   state: gameState,
   onError: (...args) => logger.error("[SyncServer]", ...args),
