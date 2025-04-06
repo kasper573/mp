@@ -1,6 +1,6 @@
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import type { Vector } from "@mp/math";
-import { vec, rectHitTest, rectOffset, rectFromDiameter } from "@mp/math";
+import { Vector } from "@mp/math";
+import { rectHitTest, rectOffset, rectFromDiameter } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { Tile, Pixel } from "@mp/std";
 import type { ParentProps } from "solid-js";
@@ -38,13 +38,15 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   }));
 
   const myCoords = useAnimatedCoords(
-    () => state.character()?.coords ?? vec(0 as Tile, 0 as Tile),
+    () => state.character()?.coords ?? new Vector(0 as Tile, 0 as Tile),
     () => state.character()?.path,
     () => state.character()?.speed ?? (0 as Tile),
   );
 
   const myWorldPos = createMemo(() =>
-    props.area.tiled.tileCoordToWorld(state.character()?.coords ?? vec(0, 0)),
+    props.area.tiled.tileCoordToWorld(
+      state.character()?.coords ?? new Vector(0, 0),
+    ),
   );
 
   const cameraPos = useSpring(

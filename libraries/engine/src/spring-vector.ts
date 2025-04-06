@@ -1,5 +1,4 @@
-import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import type { Computed } from "@mp/state";
 import { batch } from "@mp/state";
@@ -18,8 +17,8 @@ export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
   ) {
     this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
     this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);
-    this.value = computed(() =>
-      vec(this.xSpring.value(), this.ySpring.value()),
+    this.value = computed(
+      () => new Vector(this.xSpring.value(), this.ySpring.value()),
     );
   }
 

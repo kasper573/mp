@@ -1,4 +1,3 @@
-import { vecDistance } from "@mp/math";
 import { VectorGraph } from "@mp/path-finding";
 import type { Tile } from "@mp/std";
 import { type TiledResource } from "./tiled-resource";
@@ -28,7 +27,7 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
     for (const to of walkableTileCoords) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
-      const distance = vecDistance(from, to);
+      const distance = from.distance(to);
       if (distance === 1 || distance === Math.SQRT2) {
         graph.addLink(from, to);
       }

@@ -1,5 +1,4 @@
-import type { Vector } from "@mp/math";
-import { vec, vecScale } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
 import type {
   TiledMap,
@@ -14,26 +13,26 @@ export class TiledResource {
   constructor(public readonly map: TiledMap) {}
 
   get tileSize() {
-    return vec(this.map.tilewidth, this.map.tileheight);
+    return new Vector(this.map.tilewidth, this.map.tileheight);
   }
 
   get mapSize(): Vector<Pixel> {
-    return vecScale(this.tileCount, this.tileSize);
+    return this.tileCount.scale(this.tileSize);
   }
 
   get tileCount(): Vector<Tile> {
-    return vec(this.map.width, this.map.height);
+    return new Vector(this.map.width, this.map.height);
   }
 
   worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<Tile> => {
-    return vec(
+    return new Vector(
       (x / this.map.tilewidth - 0.5) as Tile,
       (y / this.map.tileheight - 0.5) as Tile,
     );
   };
 
   tileCoordToWorld = ({ x, y }: Vector<Tile>): Vector<Pixel> => {
-    return vec(
+    return new Vector(
       ((x + 0.5) * this.map.tilewidth) as Pixel,
       ((y + 0.5) * this.map.tileheight) as Pixel,
     );
@@ -49,7 +48,7 @@ export class TiledResource {
       this.map.layers
         .flatMap((layer) => filterTileLayerTiles(layer, all))
         .map((layerTile) => ({
-          pos: vec(layerTile.x, layerTile.y),
+          pos: new Vector(layerTile.x, layerTile.y),
           propertyValue: getValue(layerTile),
         })),
       ({ pos: { x, y } }) => `${x}|${y}`,

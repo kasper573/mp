@@ -1,4 +1,4 @@
-import { vecDistance, type Vector, vec, vecAdd, vecRound } from "@mp/math";
+import { Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import { aStar } from "ngraph.path";
 import type { Branded } from "@mp/std";
@@ -26,22 +26,21 @@ export class VectorGraph<T extends number> {
 
   getNearestNode(vector: Vector<T>): VectorGraphNode<T> | undefined {
     const [nearestNode] = this.getAdjacentNodes(vector).toSorted(
-      (a, b) =>
-        vecDistance(a.data.vector, vector) - vecDistance(b.data.vector, vector),
+      (a, b) => a.data.vector.distance(vector) - b.data.vector.distance(vector),
     );
     return nearestNode;
   }
 
   getAdjacentNodes(v: Vector<T>): VectorGraphNode<T>[] {
-    const from = vecRound(v);
+    const from = v.round();
     const xOffset = (v.x - 0.5) % 1 < 0.5 ? -1 : 1;
     const yOffset = (v.y - 0.5) % 1 < 0.5 ? -1 : 1;
 
     return [
       from,
-      vecAdd(from, vec<T>(xOffset as T, 0 as T)),
-      vecAdd(from, vec<T>(0 as T, yOffset as T)),
-      vecAdd(from, vec<T>(xOffset as T, yOffset as T)),
+      from.add(new Vector<T>(xOffset as T, 0 as T)),
+      from.add(new Vector<T>(0 as T, yOffset as T)),
+      from.add(new Vector<T>(xOffset as T, yOffset as T)),
     ]
       .map(nodeIdFromVector)
       .filter(this.hasNode)
@@ -56,7 +55,7 @@ export class VectorGraph<T extends number> {
 
   addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
     this.ng.addLink(nodeIdFromVector(fromVector), nodeIdFromVector(toVector), {
-      distance: vecDistance(fromVector, toVector),
+      distance: fromVector.distance(toVector),
     });
   };
 
@@ -72,7 +71,7 @@ export class VectorGraph<T extends number> {
   createPathFinder = (): VectorPathFinder<T> => {
     const pathFinder = aStar(this.ng, {
       distance: (n1, n2, link) => link.data.distance,
-      heuristic: (from, to) => vecDistance(from.data.vector, to.data.vector),
+      heuristic: (from, to) => from.data.vector.distance(to.data.vector),
     });
     return (start, end) => {
       // Skip the first node since it's the start node

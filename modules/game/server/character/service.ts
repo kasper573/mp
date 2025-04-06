@@ -3,7 +3,7 @@ import { eq } from "@mp-modules/db";
 import type { UserId, UserIdentity } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
-import { rectFromDiameter, vecZero } from "@mp/math";
+import { rectFromDiameter, Vector } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
 import type { AppearanceTrait } from "../traits/appearance";
 import type { AreaLookup } from "../area/load-areas";
@@ -38,7 +38,7 @@ export class CharacterService {
       ? {
           ...char,
           ...characterAppearance(user.id),
-          hitBox: rectFromDiameter(vecZero(), 1 as Tile),
+          hitBox: rectFromDiameter(Vector.zero(), 1 as Tile),
           name:
             user.name ??
             uniqueNamesGenerator({
@@ -92,7 +92,7 @@ export class CharacterService {
     return {
       ...input,
       ...returned,
-      hitBox: rectFromDiameter(vecZero(), 1 as Tile),
+      hitBox: rectFromDiameter(Vector.zero(), 1 as Tile),
       name:
         user.name ??
         uniqueNamesGenerator({

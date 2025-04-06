@@ -3,8 +3,7 @@ import {
   ellipseHitTest,
   polygonHitTest,
   polylineHitTest,
-  type Vector,
-  vecEquals,
+  Vector,
   rectHitTest,
 } from "@mp/math";
 import type { Pixel } from "@mp/std";
@@ -15,7 +14,7 @@ export function hitTestTiledObject(
 ): boolean {
   switch (obj.objectType) {
     case "point":
-      return vecEquals(obj, pos);
+      return Vector.from(obj).equals(pos);
     case "ellipse":
       return ellipseHitTest(obj, pos);
     case "rectangle":
