@@ -138,9 +138,9 @@ importers:
       '@mp/server':
         specifier: workspace:*
         version: link:../server
-      '@mp/sync':
+      '@mp/ws':
         specifier: workspace:*
-        version: link:../../libraries/sync
+        version: link:../../libraries/ws
       '@trpc/client':
         specifier: 11.0.0-rc.593
         version: 11.0.0-rc.593(@trpc/server@11.0.0-rc.593)

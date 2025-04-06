@@ -1,9 +1,9 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import type { AreaId } from "@mp-modules/game";
-import type { RootRouter } from "@mp/server";
+import { webSocketTokenParam, type RootRouter } from "@mp/server";
 import { transformer } from "@mp-modules/trpc";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { SyncClient } from "@mp/sync/client";
+import { EnhancedWebSocket } from "@mp/ws/client";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -98,11 +98,13 @@ async function testGameClient(n: number) {
   }
 
   const token = process.env.MP_SERVER_AUTH__BYPASS_USER;
-  const sync = new SyncClient(wsUrl, () => ({ token }));
+  const url = new URL(wsUrl);
+  url.searchParams.set(webSocketTokenParam, token!);
+  const socket = new EnhancedWebSocket(url.toString());
   const rpc = createRPCClient(token);
 
   try {
-    await connect(sync);
+    await connect(socket);
     if (verbose) {
       logger.info(`Game client ${n} connected`);
     }
@@ -117,7 +119,7 @@ async function testGameClient(n: number) {
       logger.error(`Game client ${n} error:`, error);
     }
   } finally {
-    sync.stop();
+    socket.stop();
   }
 }
 
@@ -135,15 +137,15 @@ function createRPCClient(token?: string) {
   });
 }
 
-async function connect<State extends object>(sync: SyncClient<State>) {
+async function connect(socket: EnhancedWebSocket) {
   await new Promise<void>((resolve, reject) => {
-    sync.subscribeToErrors((e) => reject(new Error(e.message)));
-    sync.subscribeToReadyState((readyState) => {
+    socket.subscribeToErrors((e) => reject(new Error(e.message)));
+    socket.subscribeToReadyState((readyState) => {
       if (readyState === "open") {
         resolve();
       }
     });
-    sync.start();
+    socket.start();
   });
 }
 
