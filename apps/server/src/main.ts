@@ -42,7 +42,7 @@ import {
   NPCService,
   GameService,
 } from "@mp-modules/game/server";
-import { err, ok, uuid, type LocalFile } from "@mp/std";
+import { uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
@@ -93,17 +93,17 @@ const syncHandshakeLimiter = new RateLimiter({
 
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
-const webSocketToClientId = new Map<WebSocket, ClientId>();
+const webSockets = new Map<ClientId, WebSocket>();
 
 const wss = createWSSWithHandshake<UserIdentity>({
   httpServer,
   path: opt.wsEndpointPath,
   onConnection: (socket, handshake) => {
     clients.add(handshake.clientId, handshake.payload.id);
-    webSocketToClientId.set(socket, handshake.clientId);
+    webSockets.set(handshake.clientId, socket);
     socket.addEventListener("close", () => {
       clients.remove(handshake.clientId);
-      webSocketToClientId.delete(socket);
+      webSockets.delete(handshake.clientId);
     });
   },
   createClientId: () => uuid() as ClientId,
@@ -119,7 +119,7 @@ const wss = createWSSWithHandshake<UserIdentity>({
 
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  clientIds: () => webSocketToClientId.values(),
+  clientIds: () => webSockets.keys(),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -132,10 +132,7 @@ const syncServer: GameStateServer = new SyncServer({
   encoder: opt.syncPatchEncoder,
   state: gameState,
   onError: (...args) => logger.error("[SyncServer]", ...args),
-  getClientId: (socket) => {
-    const id = webSocketToClientId.get(socket);
-    return id === undefined ? err("No client id") : ok(id);
-  },
+  getSocket: (clientId) => webSockets.get(clientId),
 });
 
 const npcService = new NPCService(db);
