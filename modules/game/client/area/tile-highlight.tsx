@@ -2,7 +2,7 @@ import type { FillStyle } from "@mp/pixi";
 import { Graphics } from "@mp/pixi";
 import { createEffect } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
-import type { Rect } from "@mp/math";
+import { type Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { AreaResource } from "@mp-modules/game";
 
@@ -27,12 +27,12 @@ export function TileHighlight(props: TileHighlightProps) {
     }
 
     const { tiled } = props.area;
-    const { x, y } = tiled.tileCoordToWorld(props.target.rect);
-    const width = tiled.tileUnitToWorld(props.target.rect.width);
-    const height = tiled.tileUnitToWorld(props.target.rect.height);
+    const pos = tiled.tileCoordToWorld(props.target.rect.position);
+    const width = tiled.tileToWorldUnit(props.target.rect.size.x);
+    const height = tiled.tileToWorldUnit(props.target.rect.size.y);
 
     gfx.fillStyle = visibleStyles[props.target.type];
-    gfx.position.set(x, y);
+    gfx.position.set(pos.x, pos.y);
     gfx.rect(0, 0, width, height);
     gfx.fill();
   });

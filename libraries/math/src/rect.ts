@@ -1,48 +1,69 @@
-import type { Vector } from "./vector";
+import { Vector } from "./vector";
 
-export interface Rect<T extends number> {
+export class Rect<T extends number> implements RectLike<T> {
+  get x(): T {
+    return this.position.x;
+  }
+  get y(): T {
+    return this.position.y;
+  }
+  get width(): T {
+    return this.size.x;
+  }
+  get height(): T {
+    return this.size.y;
+  }
+
+  constructor(
+    public readonly position: Vector<T>,
+    public readonly size: Vector<T>,
+  ) {}
+
+  contains(v: Vector<T>): boolean {
+    return (
+      v.x >= this.x &&
+      v.x <= this.x + this.width &&
+      v.y >= this.y &&
+      v.y <= this.y + this.height
+    );
+  }
+
+  offset(offset: Vector<T>): Rect<T> {
+    return new Rect(this.position.add(offset), this.size);
+  }
+
+  scale<B extends number>(b: Vector<B>): Rect<B> {
+    return new Rect(this.position.scale(b), this.size.scale(b));
+  }
+
+  static fromDiameter<T extends number>(
+    center: Vector<T>,
+    diameter: T,
+  ): Rect<T> {
+    return Rect.fromComponents(
+      (center.x - diameter / 2) as T,
+      (center.y - diameter / 2) as T,
+      diameter,
+      diameter,
+    );
+  }
+
+  static fromComponents<T extends number>(
+    ...[x, y, width, height]: RectComponents<T>
+  ): Rect<T> {
+    return new Rect(new Vector(x, y), new Vector(width, height));
+  }
+
+  static from<T extends number>(like: RectLike<T>): Rect<T> {
+    return Rect.fromComponents(like.x, like.y, like.width, like.height);
+  }
+}
+
+export interface RectLike<T extends number> {
   x: T;
   y: T;
   width: T;
   height: T;
 }
 
-export const rectFromDiameter = <T extends number>(
-  center: Vector<T>,
-  diameter: T,
-): Rect<T> => ({
-  x: (center.x - diameter / 2) as T,
-  y: (center.y - diameter / 2) as T,
-  width: diameter,
-  height: diameter,
-});
-
-export function rectHitTest<T extends number>(
-  rect: Rect<T>,
-  v: Vector<T>,
-): boolean {
-  const { x, y, width, height } = rect;
-  return v.x >= x && v.x <= x + width && v.y >= y && v.y <= y + height;
-}
-
-export function rectOffset<T extends number>(
-  rect: Rect<T>,
-  offset: Vector<T>,
-): Rect<T> {
-  return {
-    x: (rect.x + offset.x) as T,
-    y: (rect.y + offset.y) as T,
-    width: rect.width,
-    height: rect.height,
-  };
-}
-
-export const rectScale = <A extends number, B extends number>(
-  a: Rect<A>,
-  b: Vector<B>,
-): Rect<B> => ({
-  x: (a.x * b.x) as B,
-  y: (a.y * b.y) as B,
-  width: (a.width * b.x) as B,
-  height: (a.height * b.y) as B,
-});
+export type RectComponents<T> = [x: T, y: T, width: T, height: T];

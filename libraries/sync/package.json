@@ -13,6 +13,11 @@
       "types": "./server.ts",
       "import": "./server.ts",
       "require": "./server.ts"
+    },
+    ".": {
+      "types": "./shared.ts",
+      "import": "./shared.ts",
+      "require": "./shared.ts"
     }
   },
   "scripts": {

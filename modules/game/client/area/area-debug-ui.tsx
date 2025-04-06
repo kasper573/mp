@@ -1,4 +1,4 @@
-import { rectScale, vecRound, type Path, type Vector } from "@mp/math";
+import { type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "@mp/pixi";
@@ -187,10 +187,10 @@ function DebugText(props: { tiled: TiledResource }) {
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
     return [
       `build: (client: ${clientVersion()}, server: ${serverVersion()})`,
-      `viewport: ${vecToString(viewportPosition)}`,
-      `world: ${vecToString(worldPosition)}`,
-      `tile: ${vecToString(tilePos)}`,
-      `tile (snapped): ${vecToString(vecRound(tilePos))}`,
+      `viewport: ${viewportPosition.toString()}`,
+      `world: ${worldPosition.toString()}`,
+      `tile: ${tilePos.toString()}`,
+      `tile (snapped): ${tilePos.round().toString()}`,
       `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
       `character: ${JSON.stringify(trimCharacterInfo(state.character()), null, 2)}`,
       `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
@@ -211,14 +211,11 @@ function DebugNetworkFogOfWar(props: {
   const gfx = new Graphics();
 
   const rect = createMemo(() =>
-    rectScale(
-      clientViewDistanceRect(
-        props.playerCoords,
-        props.area.tiled.tileCount,
-        networkFogOfWarTileCount,
-      ),
-      props.area.tiled.tileSize,
-    ),
+    clientViewDistanceRect(
+      props.playerCoords,
+      props.area.tiled.tileCount,
+      networkFogOfWarTileCount,
+    ).scale(props.area.tiled.tileSize),
   );
 
   const width = createMemo(() => rect().width);
@@ -286,12 +283,8 @@ function trimCharacterInfo(char?: Character) {
   return (
     char && {
       ...char,
-      coords: vecToString(char.coords),
-      path: char.path?.map(vecToString).join(" -> "),
+      coords: char.coords.toString(),
+      path: char.path?.map((v) => v.toString()).join(" -> "),
     }
   );
-}
-
-function vecToString(v: Vector<number>): string {
-  return `${v.x.toFixed(1)}, ${v.y.toFixed(1)}`;
 }

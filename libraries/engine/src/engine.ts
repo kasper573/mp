@@ -1,5 +1,5 @@
 import { TimeSpan } from "@mp/time";
-import type { Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { Pixel } from "@mp/std";
 import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
@@ -78,14 +78,10 @@ export class Engine {
 }
 
 function elementSize(element: HTMLElement): Vector<Pixel> {
-  return {
-    get x() {
-      return element.clientWidth as Pixel;
-    },
-    get y() {
-      return element.clientHeight as Pixel;
-    },
-  };
+  return new Vector(
+    element.clientWidth as Pixel,
+    element.clientHeight as Pixel,
+  );
 }
 
 export type FrameCallback = (

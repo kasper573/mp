@@ -1,6 +1,6 @@
 import { EngineContext } from "@mp/engine";
-import type { Path } from "@mp/math";
-import { pathCopy, vecDistance, type Vector } from "@mp/math";
+import type { Path, Vector } from "@mp/math";
+import { pathCopy } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import {
   type Accessor,
@@ -59,7 +59,7 @@ export function useAnimatedCoords<T extends number>(
     createEffect(() => {
       const coords = externalCoords();
       // If the distance between real and animated coords is too large, snap to real coords
-      if (vecDistance(coords, localCoords()) >= snapDistance()) {
+      if (coords.distance(localCoords()) >= snapDistance()) {
         setLocalCoords(coords);
       }
     });

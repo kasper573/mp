@@ -8,7 +8,7 @@ import type { PatchStateMachine } from "@mp/sync/server";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { randomItem, recordValues, uuid } from "@mp/std";
-import { clamp, rectFromDiameter, vec, vecZero, type Vector } from "@mp/math";
+import { clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/load-areas";
@@ -98,7 +98,7 @@ export function createNpcInstance(
     speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
     name,
-    hitBox: rectFromDiameter(vecZero(), 1 as Tile),
+    hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
     health: 25,
     maxHealth: 25,
     attackDamage: 5,
@@ -120,7 +120,7 @@ function determineSpawnCoords(
     const angle = Math.random() * Math.PI * 2;
     const radius = Math.random() * spawn.randomRadius;
 
-    const randomTile = vec(
+    const randomTile = new Vector(
       clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,
       clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as Tile,
     );

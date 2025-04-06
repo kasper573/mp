@@ -16,6 +16,12 @@ rootElement.classList.add(styles.root);
 
 render(Root, rootElement);
 
+function handleError(error: unknown) {
+  // eslint-disable-next-line no-console
+  console.error(error);
+  return String(error);
+}
+
 function Root() {
   return (
     <>
@@ -24,7 +30,7 @@ function Root() {
         but it's here for safety so that if the error fallbacks in the inner error boundaries should fall, 
         this serves as a final bastion of hope to display our error message! 
         */}
-      <ErrorBoundary fallback={String}>
+      <ErrorBoundary fallback={handleError}>
         <Suspense fallback={<LoadingSpinner />}>
           <App />
         </Suspense>

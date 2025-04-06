@@ -1,4 +1,4 @@
-import { type Vector, clamp, rectFromDiameter } from "@mp/math";
+import { Rect, type Vector, clamp } from "@mp/math";
 import type { Tile } from "@mp/std";
 
 export function clientViewDistanceRect(
@@ -11,5 +11,5 @@ export function clientViewDistanceRect(
     x: clamp(coords.x, halfViewDistance, mapSize.x - halfViewDistance),
     y: clamp(coords.y, halfViewDistance, mapSize.y - halfViewDistance),
   } as Vector<Tile>;
-  return rectFromDiameter(clampedCoords, viewDistance);
+  return Rect.fromDiameter(clampedCoords, viewDistance);
 }

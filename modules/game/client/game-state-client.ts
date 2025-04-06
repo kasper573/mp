@@ -8,7 +8,7 @@ import {
   untrack,
   useContext,
 } from "solid-js";
-import { vecEquals, type Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
@@ -48,7 +48,7 @@ export function createGameStateClient(wsUrl: string) {
         moveMutation.mutateAsync({ characterId: characterId()!, to }),
       100,
     ),
-    vecEquals,
+    (a, b) => a.equals(b),
   );
   const attack = (targetId: ActorId) =>
     attackMutation.mutateAsync({ characterId: characterId()!, targetId });

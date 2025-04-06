@@ -154,8 +154,6 @@ function coerceReadyState(
   return webSocketToSyncClientReadyState[state];
 }
 
-export { type ClientId } from "./shared";
-
 // Note: using a custom interface for the error event type because the types differ between node and browser.
 // This is a hack and should be replaced with some normalizing websocket package, ie. "ws".
 export interface SocketErrorEvent extends Event {

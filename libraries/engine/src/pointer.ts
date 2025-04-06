@@ -1,5 +1,4 @@
-import type { Vector } from "@mp/math";
-import { vec } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { Computed } from "@mp/state";
 import { atom, computed } from "@mp/state";
 import type { Pixel } from "@mp/std";
@@ -7,7 +6,7 @@ import type { Camera } from "./camera";
 
 export class Pointer {
   readonly #isDown = atom(false);
-  readonly #position = atom(vec(0 as Pixel, 0 as Pixel));
+  readonly #position = atom(new Vector(0 as Pixel, 0 as Pixel));
 
   get position(): Vector<Pixel> {
     return this.#position.get();
@@ -35,7 +34,7 @@ export class Pointer {
   private onPointerMove = (e: PointerEvent) => {
     const relativeX = (e.clientX - this.target.offsetLeft) as Pixel;
     const relativeY = (e.clientY - this.target.offsetTop) as Pixel;
-    this.#position.set(vec(relativeX, relativeY));
+    this.#position.set(new Vector(relativeX, relativeY));
   };
 }
 

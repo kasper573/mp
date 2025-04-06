@@ -1,5 +1,5 @@
 import { Container, Graphics, Text } from "@mp/pixi";
-import { vecScale } from "@mp/math";
+import { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";
 import type { Tile } from "@mp/std";
@@ -25,10 +25,9 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
 
   createEffect(() => {
     const { hitBox, opacity, color } = props.actor;
-    const { x: width, y: height } = vecScale(props.tiled.tileSize, {
-      x: hitBox.width,
-      y: hitBox.height,
-    });
+    const { x: width, y: height } = props.tiled.tileSize.scale(
+      new Vector(hitBox.width, hitBox.height),
+    );
 
     gfx.clear();
     gfx.fillStyle.color = color;

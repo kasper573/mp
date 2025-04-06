@@ -1,4 +1,7 @@
 import type { Tile } from "@mp/std";
+import { addEncoderExtensionToSync } from "@mp/sync";
+import type { RectComponents } from "@mp/math";
+import { Rect, Vector } from "@mp/math";
 
 // This file should only expose runtime code that is shared between client/server.
 
@@ -13,3 +16,21 @@ export const clientViewDistance = {
   renderedTileCount: 24 as Tile,
   networkFogOfWarTileCount: 32 as Tile,
 };
+
+export function registerSyncExtensions(): void {
+  // All tags below this are reserved by cbor-x
+  const startTag = 40_501;
+  addEncoderExtensionToSync<Vector<number>, [number, number]>({
+    Class: Vector<number>,
+    tag: startTag,
+    encode: (v, encode) => encode([v.x, v.y]),
+    decode: (v) => new Vector(v[0], v[1]),
+  });
+
+  addEncoderExtensionToSync<Rect<number>, RectComponents<number>>({
+    Class: Rect<number>,
+    tag: startTag + 1,
+    encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),
+    decode: (v) => Rect.fromComponents(...v),
+  });
+}

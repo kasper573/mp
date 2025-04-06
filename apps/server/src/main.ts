@@ -49,7 +49,9 @@ import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import { clientViewDistance } from "./shared";
+import { clientViewDistance, registerSyncExtensions } from "./shared";
+
+registerSyncExtensions();
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

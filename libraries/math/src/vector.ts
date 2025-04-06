@@ -1,44 +1,53 @@
-export const vecDistance = <T extends number>(a: Vector<T>, b: Vector<T>): T =>
-  Math.hypot(a.x - b.x, a.y - b.y) as T;
+export class Vector<T extends number> implements VectorLike<T> {
+  constructor(
+    public readonly x: T,
+    public readonly y: T,
+  ) {
+    Object.freeze(this);
+  }
 
-export const vecAdd = <T extends number>(
-  a: Vector<T>,
-  b: Vector<T>,
-): Vector<T> => vec<T>((a.x + b.x) as T, (a.y + b.y) as T);
+  distance(b: Vector<T>): T {
+    return Math.hypot(this.x - b.x, this.y - b.y) as T;
+  }
 
-export const vecScale = <A extends number, B extends number>(
-  a: Vector<A>,
-  b: Vector<B>,
-): Vector<B> => vec<B>((a.x * b.x) as B, (a.y * b.y) as B);
+  add(b: Vector<T>): Vector<T> {
+    return new Vector<T>((this.x + b.x) as T, (this.y + b.y) as T);
+  }
 
-export const vecEquals = <T extends number>(
-  a: Vector<T>,
-  b: Vector<T>,
-): boolean => a.x === b.x && a.y === b.y;
+  scale<B extends number>(b: Vector<B>): Vector<B> {
+    return new Vector<B>((this.x * b.x) as B, (this.y * b.y) as B);
+  }
 
-export const vec = <const T extends number>(x: T, y: T): Vector<T> =>
-  Object.freeze({
-    x,
-    y,
-  });
+  equals(b: Vector<T>): boolean {
+    return this.x === b.x && this.y === b.y;
+  }
 
-export function vecRound<T extends number>({ x, y }: Vector<T>): Vector<T> {
-  return vec<T>(Math.round(x) as T, Math.round(y) as T);
+  round(): Vector<T> {
+    return new Vector<T>(Math.round(this.x) as T, Math.round(this.y) as T);
+  }
+
+  toString(): string {
+    return `${this.x.toFixed(1)}, ${this.y.toFixed(1)}`;
+  }
+
+  static zero<T extends number>(): Vector<T> {
+    return vecZeroConst as Vector<T>;
+  }
+
+  static from<T extends number>(obj: VectorLike<T>): Vector<T> {
+    return new Vector<T>(obj.x, obj.y);
+  }
 }
+
+const vecZeroConst = new Vector(0, 0);
+
+export type Path<T extends number> = readonly Vector<T>[];
 
 export function pathCopy<P extends Path<number> | undefined>(path: P): P {
   return path ? (Object.freeze([...path]) as P) : (undefined as P);
 }
 
-export interface Vector<T extends number> {
-  readonly x: T;
-  readonly y: T;
+export interface VectorLike<T extends number> {
+  x: T;
+  y: T;
 }
-
-export type Path<T extends number> = readonly Vector<T>[];
-
-export function vecZero<T extends number>(): Vector<T> {
-  return vecZeroConst as Vector<T>;
-}
-
-const vecZeroConst = vec(0, 0);
