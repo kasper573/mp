@@ -4,7 +4,7 @@ import {
   polygonHitTest,
   polylineHitTest,
   Vector,
-  rectHitTest,
+  Rect,
 } from "@mp/math";
 import type { Pixel } from "@mp/std";
 
@@ -16,9 +16,9 @@ export function hitTestTiledObject(
     case "point":
       return Vector.from(obj).equals(pos);
     case "ellipse":
-      return ellipseHitTest(obj, pos);
+      return ellipseHitTest(Rect.from(obj), pos);
     case "rectangle":
-      return rectHitTest(obj, pos);
+      return Rect.from(obj).contains(pos);
     case "polygon":
       return polygonHitTest(obj, pos);
     case "polyline":

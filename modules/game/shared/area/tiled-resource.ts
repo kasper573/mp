@@ -38,7 +38,7 @@ export class TiledResource {
     );
   };
 
-  tileUnitToWorld = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
+  tileToWorldUnit = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
 
   getMatchingTileCoords = <T>(
     getValue: (tile: TileLayerTile) => T,

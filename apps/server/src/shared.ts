@@ -1,6 +1,7 @@
 import type { Tile } from "@mp/std";
 import { addEncoderExtensionToSync } from "@mp/sync";
-import { Vector } from "@mp/math";
+import type { RectComponents } from "@mp/math";
+import { Rect, Vector } from "@mp/math";
 
 // This file should only expose runtime code that is shared between client/server.
 
@@ -24,5 +25,12 @@ export function registerSyncExtensions(): void {
     tag: startTag,
     encode: (v, encode) => encode([v.x, v.y]),
     decode: (v) => new Vector(v[0], v[1]),
+  });
+
+  addEncoderExtensionToSync<Rect<number>, RectComponents<number>>({
+    Class: Rect<number>,
+    tag: startTag + 1,
+    encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),
+    decode: (v) => Rect.fromComponents(...v),
   });
 }
