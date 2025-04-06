@@ -5,7 +5,7 @@ import { type ColumnBaseConfig } from "drizzle-orm";
 import { PgPointObject, PgPointObjectBuilder } from "drizzle-orm/pg-core";
 
 /**
- * A drizzle/postgres representation of the Vector type from @mp/std
+ * A drizzle/postgres representation of the Vector type from @mp/math
  */
 export function vector<T extends number>(name = "") {
   return new VectorBuilder<T>(name);
