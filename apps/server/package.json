@@ -27,6 +27,7 @@
     "@mp/keycloak-provision": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/ioc": "workspace:*",
+    "@mp/wss": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/sync": "workspace:*",

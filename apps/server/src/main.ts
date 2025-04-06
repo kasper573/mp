@@ -8,11 +8,12 @@ import { createAuthServer } from "@mp/auth/server";
 import {
   SyncServer,
   createPatchStateMachine,
-  createWSSWithHandshake,
+  handshakeDataFromRequest,
 } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
+import { createWSSWithHandshake } from "@mp/wss";
 import { InjectionContainer } from "@mp/ioc";
 import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -107,7 +108,8 @@ const wss = createWSSWithHandshake<UserIdentity>({
   },
   createClientId: () => uuid() as ClientId,
   onError: (...args) => logger.error("[WSS]", ...args),
-  async handshake(clientId, { token }) {
+  async handshake(clientId, req) {
+    const { token } = handshakeDataFromRequest(req);
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
       syncHandshakeLimiter.consume(user.id),

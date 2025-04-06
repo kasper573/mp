@@ -1,9 +1,7 @@
 import type http from "node:http";
 import { type Result } from "@mp/std";
 import { WebSocketServer } from "ws";
-import type { HandshakeData } from "./handshake";
-import { handshakeDataFromRequest } from "./handshake";
-import type { ClientId } from "./shared";
+import type { ClientId } from "../../sync/shared";
 
 export interface WSSWithHandshakeOptions<HandshakePayload> {
   httpServer: http.Server;
@@ -57,10 +55,7 @@ export function createWSSWithHandshake<HandshakePayload>(
     const clientId = opt.createClientId();
 
     try {
-      const result = await opt.handshake(
-        clientId,
-        handshakeDataFromRequest(req),
-      );
+      const result = await opt.handshake(clientId, req);
 
       if (result.isOk()) {
         handshakes.set(req, { clientId, payload: result.value });
@@ -84,5 +79,5 @@ export interface WSSHandshake<Payload> {
 
 export type WSSHandshakeFn<Payload> = (
   clientId: ClientId,
-  data: HandshakeData,
+  req: http.IncomingMessage,
 ) => Promise<Result<Payload, string>>;

@@ -1,4 +1,4 @@
-import type { WebSocketServer } from "ws";
+import type { WebSocketServer } from "@mp/wss";
 import { type ClientId } from "./shared";
 import type { PatchableState } from "./patch-state-machine";
 import type { PatchStateMachine } from "./patch-state-machine";
@@ -69,5 +69,5 @@ export interface SyncServerOptions<State extends PatchableState> {
   onError?: (...args: unknown[]) => unknown;
 }
 
+export * from "./handshake";
 export * from "./patch-state-machine";
-export * from "./wss";

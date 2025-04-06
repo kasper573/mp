@@ -27,13 +27,12 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
+    "@mp/wss": "workspace:*",
     "cbor-x": "1.6.0",
-    "piscina": "5.0.0-alpha.0",
-    "ws": "8.18.0"
+    "piscina": "5.0.0-alpha.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/ws": "8.5.12",
     "type-fest": "4.35.0",
     "vitest": "2.0.3"
   }
