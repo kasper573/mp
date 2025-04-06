@@ -20,11 +20,9 @@ export class SyncServer<State extends PatchableState> {
     const promises: Promise<unknown>[] = [];
 
     for (const [clientId, patch] of this.options.state.flush()) {
-      const socket = this.options.getSocket(clientId);
-      if (socket) {
-        promises.push(
-          this.encoder.encode(patch).then((msg) => socket.send(msg)),
-        );
+      const send = this.options.getSender(clientId);
+      if (send) {
+        promises.push(this.encoder.encode(patch).then(send));
       }
     }
 
@@ -48,7 +46,9 @@ export class SyncServer<State extends PatchableState> {
 export interface SyncServerOptions<State extends PatchableState> {
   encoder: "sync" | "worker";
   state: PatchStateMachine<State>;
-  getSocket: (clientId: ClientId) => WebSocket | undefined;
+  getSender: (
+    clientId: ClientId,
+  ) => ((buffer: Uint8Array<ArrayBufferLike>) => unknown) | undefined;
   onError?: (...args: unknown[]) => unknown;
 }
 

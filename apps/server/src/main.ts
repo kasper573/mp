@@ -133,7 +133,10 @@ const syncServer: GameStateServer = new SyncServer({
   encoder: opt.syncPatchEncoder,
   state: gameState,
   onError: (...args) => logger.error("[SyncServer]", ...args),
-  getSocket: (clientId) => webSockets.get(clientId),
+  getSender: (clientId) => {
+    const socket = webSockets.get(clientId);
+    return socket?.send.bind(socket);
+  },
 });
 
 const npcService = new NPCService(db);
