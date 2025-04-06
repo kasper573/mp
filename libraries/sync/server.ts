@@ -1,5 +1,5 @@
 import type { WebSocketServer } from "@mp/wss";
-import { type ClientId } from "./shared";
+import type { Result } from "@mp/std";
 import type { PatchableState } from "./patch-state-machine";
 import type { PatchStateMachine } from "./patch-state-machine";
 import type { MessageEncoder } from "./message-encoder";
@@ -7,6 +7,7 @@ import {
   createSyncEncoder,
   createWorkerThreadEncoder,
 } from "./message-encoder";
+import type { ClientId } from "./shared";
 
 export class SyncServer<State extends PatchableState> {
   private sockets: Map<ClientId, WebSocket> = new Map();
@@ -49,15 +50,16 @@ export class SyncServer<State extends PatchableState> {
   };
 
   private onConnection = (socket: WebSocket) => {
-    const clientId = this.options.getClientId(socket);
-    if (clientId === undefined) {
+    const result = this.options.getClientId(socket);
+    if (result.isErr()) {
       this.options.onError?.(
         "Received connection but would not retrieve client id for socket",
+        result.error,
       );
       return;
     }
-    this.sockets.set(clientId, socket);
-    socket.addEventListener("close", () => this.sockets.delete(clientId));
+    this.sockets.set(result.value, socket);
+    socket.addEventListener("close", () => this.sockets.delete(result.value));
   };
 }
 
@@ -65,7 +67,7 @@ export interface SyncServerOptions<State extends PatchableState> {
   encoder: "sync" | "worker";
   state: PatchStateMachine<State>;
   wss: WebSocketServer;
-  getClientId: (socket: WebSocket) => ClientId | undefined;
+  getClientId: (socket: WebSocket) => Result<ClientId, string>;
   onError?: (...args: unknown[]) => unknown;
 }
 

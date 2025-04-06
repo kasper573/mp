@@ -42,7 +42,7 @@ import {
   NPCService,
   GameService,
 } from "@mp-modules/game/server";
-import { uuid, type LocalFile } from "@mp/std";
+import { err, ok, uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
@@ -131,8 +131,11 @@ const syncServer: GameStateServer = new SyncServer({
   wss,
   encoder: opt.syncPatchEncoder,
   state: gameState,
-  getClientId: (socket) => webSocketToClientId.get(socket),
   onError: (...args) => logger.error("[SyncServer]", ...args),
+  getClientId: (socket) => {
+    const id = webSocketToClientId.get(socket);
+    return id === undefined ? err("No client id") : ok(id);
+  },
 });
 
 const npcService = new NPCService(db);
