@@ -1,4 +1,4 @@
-import { type Vector } from "@mp/math";
+import { Vector, type VectorLike } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
 import { defineRoles, roles } from "@mp-modules/user";
 import { schemaFor, t, TRPCError } from "@mp-modules/trpc/server";
@@ -18,7 +18,7 @@ export const characterRoles = defineRoles("character", [
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = t.router({
   move: t.procedure
-    .input(schemaFor<{ characterId: CharacterId; to: Vector<Tile> }>())
+    .input(schemaFor<{ characterId: CharacterId; to: VectorLike<Tile> }>())
     .use(roles([characterRoles.move]))
     .mutation(({ input: { characterId, to }, ctx: { user, ioc } }) => {
       const state = ioc.get(ctxGameStateMachine);
@@ -40,7 +40,7 @@ export const characterRouter = t.router({
 
       state.actors.update(char.id, {
         attackTargetId: undefined,
-        moveTarget: to,
+        moveTarget: Vector.from(to),
       });
     }),
 

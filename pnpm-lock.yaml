@@ -184,6 +184,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../libraries/rate-limiter
@@ -551,7 +554,7 @@ importers:
         version: 1.27.0
       opentelemetry-instrumentation-ws:
         specifier: 0.5.0
-        version: 0.5.0(ws@8.18.0)
+        version: 0.5.0(ws@8.18.1)
       prom-client:
         specifier: 15.1.3
         version: 15.1.3
@@ -10648,7 +10651,7 @@ snapshots:
       whatwg-encoding: 3.1.1
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
-      ws: 8.18.1
+      ws: 8.18.0
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - bufferutil
@@ -10946,7 +10949,7 @@ snapshots:
     dependencies:
       mimic-fn: 4.0.0
 
-  opentelemetry-instrumentation-ws@0.5.0(ws@8.18.0):
+  opentelemetry-instrumentation-ws@0.5.0(ws@8.18.1):
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 1.26.0(@opentelemetry/api@1.9.0)
@@ -10954,7 +10957,7 @@ snapshots:
       '@opentelemetry/instrumentation-http': 0.44.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.27.0
       is-promise: 4.0.0
-      ws: 8.18.0
+      ws: 8.18.1
     transitivePeerDependencies:
       - supports-color
 
@@ -12032,8 +12035,7 @@ snapshots:
 
   ws@8.18.0: {}
 
-  ws@8.18.1:
-    optional: true
+  ws@8.18.1: {}
 
   xml-name-validator@5.0.0:
     optional: true

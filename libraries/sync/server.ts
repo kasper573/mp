@@ -150,8 +150,6 @@ type ClientInfoMap = Map<ClientId, ClientInfo>;
 
 const newClientId = uuid as unknown as () => ClientId;
 
-export type { ClientId } from "./shared";
-
 export * from "./patch-state-machine";
 
 const clientMetaDataSymbol = Symbol("clientMetaData");

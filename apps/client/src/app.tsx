@@ -7,6 +7,7 @@ import { QueryClientProvider, TRPCClientContext } from "@mp/solid-trpc";
 import { RouterProvider } from "@tanstack/solid-router";
 import { SolidQueryDevtools } from "@mp/solid-trpc/devtools";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
+import { registerSyncExtensions } from "@mp/server";
 import { createFaroClient, deriveFaroUser } from "./integrations/faro";
 import { createQueryClient } from "./integrations/query";
 import { createClientRouter } from "./integrations/router/router";
@@ -19,6 +20,8 @@ import { LoggerContext } from "./logger";
 // They should be passed down to the solidjs tree via context.
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
+
+registerSyncExtensions();
 
 const auth = createAuthClient(env.auth);
 const query = createQueryClient();
