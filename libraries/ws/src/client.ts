@@ -137,6 +137,6 @@ export interface SocketErrorEvent extends Event {
   readonly message?: string;
 }
 
-type EventHandler<Payload> = (payload: Payload) => void;
+type EventHandler<Payload> = (payload: Payload) => unknown;
 
 type Unsubscribe = () => void;

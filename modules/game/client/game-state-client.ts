@@ -12,7 +12,7 @@ import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
 import { EnhancedWebSocket } from "@mp/ws/client";
-import { parsePatchMessage } from "@mp/sync/client";
+import { isSyncMessage, parseSyncMessage } from "@mp/sync/client";
 import { useTRPC } from "./trpc";
 import { type CharacterId } from "@mp-modules/game";
 import type { ActorId, Character, GameState } from "@mp-modules/game";
@@ -59,12 +59,12 @@ export function createGameStateClient(
   const respawn = () => respawnMutation.mutateAsync(characterId()!);
 
   onCleanup(
-    socket.subscribeToMessage(
-      (message) =>
-        void parsePatchMessage(message).then((applyPatch) =>
-          applyPatch(gameState),
-        ),
-    ),
+    socket.subscribeToMessage(async (message) => {
+      if (isSyncMessage(message)) {
+        const applyPatch = await parseSyncMessage(message);
+        applyPatch(gameState);
+      }
+    }),
   );
 
   onCleanup(socket.subscribeToReadyState(setReadyState));
