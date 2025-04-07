@@ -8,7 +8,8 @@ import { createAuthServer } from "@mp/auth/server";
 import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import type { AuthToken } from "@mp/auth";
+import type { AuthToken, UserIdentity } from "@mp/auth";
+import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -37,7 +38,8 @@ import {
   NPCService,
   GameService,
 } from "@mp-modules/game/server";
-import type { LocalFile } from "@mp/std";
+import { uuid, type LocalFile } from "@mp/std";
+import type { ClientId } from "@mp/sync";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -49,7 +51,11 @@ import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import { clientViewDistance, registerSyncExtensions } from "./shared";
+import {
+  clientViewDistance,
+  registerSyncExtensions,
+  webSocketTokenParam,
+} from "./shared";
 
 registerSyncExtensions();
 
@@ -87,9 +93,35 @@ const syncHandshakeLimiter = new RateLimiter({
 
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
+const webSockets = new Map<ClientId, WebSocket>();
+
+const wss = createWSSWithHandshake<UserIdentity, ClientId>({
+  httpServer,
+  path: opt.wsEndpointPath,
+  onConnection: (socket, handshake) => {
+    clients.add(handshake.id, handshake.payload.id);
+    webSockets.set(handshake.id, socket);
+    socket.addEventListener("close", () => {
+      clients.remove(handshake.id);
+      webSockets.delete(handshake.id);
+    });
+  },
+  createSocketId: () => uuid() as ClientId,
+  onError: (...args) => logger.error("[WSS]", ...args),
+  async handshake(clientId, req) {
+    // .url is in fact a path, so baseUrl does not matter
+    const url = req.url ? new URL(req.url, "http://localhost") : undefined;
+    const token = url?.searchParams.get(webSocketTokenParam);
+    const result = await auth.verifyToken(token as AuthToken);
+    return result.asyncAndThrough((user) =>
+      syncHandshakeLimiter.consume(user.id),
+    );
+  },
+});
+
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  clientIds: () => syncServer.clientIds,
+  clientIds: () => webSockets.keys(),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -98,19 +130,13 @@ const gameState = createPatchStateMachine<GameState>({
 });
 
 const syncServer: GameStateServer = new SyncServer({
-  logger,
-  httpServer,
   encoder: opt.syncPatchEncoder,
-  path: opt.wsEndpointPath,
   state: gameState,
-  async handshake(clientId, { token }) {
-    const result = await auth.verifyToken(token as AuthToken);
-    return result.asyncAndThrough((user) =>
-      syncHandshakeLimiter.consume(user.id),
-    );
+  onError: (...args) => logger.error("[SyncServer]", ...args),
+  getSender: (clientId) => {
+    const socket = webSockets.get(clientId);
+    return socket?.send.bind(socket);
   },
-  onConnection: (clientId, user) => clients.add(clientId, user.id),
-  onDisconnect: (clientId) => clients.remove(clientId),
 });
 
 const npcService = new NPCService(db);
@@ -155,7 +181,7 @@ webServer.use(
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, gameState, syncServer);
+collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
 updateTicker.subscribe(npcAIBehavior(gameState, areas));

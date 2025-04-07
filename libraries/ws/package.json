@@ -1,8 +1,9 @@
 {
-  "name": "@mp/sync",
+  "name": "@mp/ws",
   "version": "0.0.0",
-  "private": true,
+  "sideEffects": false,
   "type": "module",
+  "license": "MIT",
   "exports": {
     "./client": {
       "types": "./src/client.ts",
@@ -13,26 +14,14 @@
       "types": "./src/server.ts",
       "import": "./src/server.ts",
       "require": "./src/server.ts"
-    },
-    ".": {
-      "types": "./src/shared.ts",
-      "import": "./src/shared.ts",
-      "require": "./src/shared.ts"
     }
-  },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "test:inspect": "vitest --inspect-brk --no-file-parallelism"
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "cbor-x": "1.6.0",
-    "piscina": "5.0.0-alpha.0"
+    "ws": "8.18.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "type-fest": "4.35.0",
-    "vitest": "2.0.3"
+    "@types/ws": "8.18.1"
   }
 }

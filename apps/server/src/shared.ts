@@ -17,6 +17,8 @@ export const clientViewDistance = {
   networkFogOfWarTileCount: 32 as Tile,
 };
 
+export const webSocketTokenParam = "token";
+
 export function registerSyncExtensions(): void {
   // All tags below this are reserved by cbor-x
   const startTag = 40_501;

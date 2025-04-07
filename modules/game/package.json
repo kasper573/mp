@@ -26,6 +26,7 @@
     "@mp-modules/trpc": "workspace:*",
     "@mp-modules/user": "workspace:*",
     "@mp/auth": "workspace:*",
+    "@mp/ws": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",

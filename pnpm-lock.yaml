@@ -138,9 +138,9 @@ importers:
       '@mp/server':
         specifier: workspace:*
         version: link:../server
-      '@mp/sync':
+      '@mp/ws':
         specifier: workspace:*
-        version: link:../../libraries/sync
+        version: link:../../libraries/ws
       '@trpc/client':
         specifier: 11.0.0-rc.593
         version: 11.0.0-rc.593(@trpc/server@11.0.0-rc.593)
@@ -202,6 +202,9 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
       cors:
         specifier: 2.8.5
         version: 2.8.5
@@ -494,16 +497,10 @@ importers:
       piscina:
         specifier: 5.0.0-alpha.0
         version: 5.0.0-alpha.0
-      ws:
-        specifier: 8.18.0
-        version: 8.18.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      '@types/ws':
-        specifier: 8.5.12
-        version: 8.5.12
       type-fest:
         specifier: 4.35.0
         version: 4.35.0
@@ -636,6 +633,22 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  libraries/ws:
+    dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
+      ws:
+        specifier: 8.18.1
+        version: 8.18.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      '@types/ws':
+        specifier: 8.18.1
+        version: 8.18.1
+
   modules/db:
     dependencies:
       '@mp/math':
@@ -714,6 +727,9 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../libraries/ui
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
       solid-js:
         specifier: 1.9.5
         version: 1.9.5
@@ -3307,8 +3323,8 @@ packages:
   '@types/tedious@4.0.14':
     resolution: {integrity: sha512-KHPsfX/FoVbUGbyYvk1q9MMQHLPeRZhRJZdO45Q4YjvFkv4hMNghCWTvy7rdKessBsmtz4euWCWAB6/tVpI1Iw==}
 
-  '@types/ws@8.5.12':
-    resolution: {integrity: sha512-3tPRkv1EtkDpzlgyKyI8pGsGZAGPEaXeu0DOj5DI25Ja91bdAYddYHbADRYVrZMRbfW+1l5YwXVDKohDJNQxkQ==}
+  '@types/ws@8.18.1':
+    resolution: {integrity: sha512-ThVF6DCVhA8kUGy+aazFQ4kXQ7E1Ty7A3ypFOe0IcJV8O/M511G99AW24irKrW56Wt44yG9+ij8FaqoBGkuBXg==}
 
   '@types/yargs-parser@21.0.3':
     resolution: {integrity: sha512-I4q9QU9MQv4oEOz4tAHJtNz1cwuLxn2F3xcc2iV5WdqLPpUnj30aUuxt1mAxYTG+oe8CZMV/+6rU4S4gRDzqtQ==}
@@ -6261,18 +6277,6 @@ packages:
     resolution: {integrity: sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==}
     engines: {node: '>=10'}
 
-  ws@8.18.0:
-    resolution: {integrity: sha512-8VbfWfHLbbwu3+N6OKsOMpBdT4kXPDDB9cJk2bJ6mh9ucxdlnNvH1e+roYkKmN9Nxw2yjz7VzeO9oOz2zJ04Pw==}
-    engines: {node: '>=10.0.0'}
-    peerDependencies:
-      bufferutil: ^4.0.1
-      utf-8-validate: '>=5.0.2'
-    peerDependenciesMeta:
-      bufferutil:
-        optional: true
-      utf-8-validate:
-        optional: true
-
   ws@8.18.1:
     resolution: {integrity: sha512-RKW2aJZMXeMxVpnZ6bck+RswznaxmzdULiBr6KY7XkTnW8uvt0iT9H5DkHUChXrc+uurzwa0rVI16n/Xzjdz1w==}
     engines: {node: '>=10.0.0'}
@@ -8787,9 +8791,9 @@ snapshots:
     dependencies:
       '@types/node': 22.10.2
 
-  '@types/ws@8.5.12':
+  '@types/ws@8.18.1':
     dependencies:
-      '@types/node': 22.10.2
+      '@types/node': 22.13.10
 
   '@types/yargs-parser@21.0.3': {}
 
@@ -10651,7 +10655,7 @@ snapshots:
       whatwg-encoding: 3.1.1
       whatwg-mimetype: 4.0.0
       whatwg-url: 14.2.0
-      ws: 8.18.0
+      ws: 8.18.1
       xml-name-validator: 5.0.0
     transitivePeerDependencies:
       - bufferutil
@@ -12032,8 +12036,6 @@ snapshots:
       ansi-styles: 4.3.0
       string-width: 4.2.3
       strip-ansi: 6.0.1
-
-  ws@8.18.0: {}
 
   ws@8.18.1: {}
 

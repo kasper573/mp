@@ -6,7 +6,7 @@ import {
   Game,
   GameStateClientContext,
 } from "@mp-modules/game/client";
-import { clientViewDistance } from "@mp/server";
+import { clientViewDistance, webSocketTokenParam } from "@mp/server";
 import { lazy } from "solid-js";
 import { useTRPC } from "../integrations/trpc";
 import { env } from "../env";
@@ -21,7 +21,13 @@ export const Route = createFileRoute("/play")({
 
 function RouteComponent() {
   const trpc = useTRPC();
-  const sync = createGameStateClient(env.wsUrl);
+  const sync = createGameStateClient((token) => {
+    const url = new URL(env.wsUrl);
+    if (token) {
+      url.searchParams.set(webSocketTokenParam, token);
+    }
+    return url.toString();
+  });
   const serverVersion = trpc.system.buildVersion.createQuery();
   return (
     <AreaDebugUIContext.Provider
