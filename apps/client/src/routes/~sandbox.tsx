@@ -2,12 +2,48 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
+import { useTRPC } from "../integrations/trpc";
 
-export const Route = createFileRoute("/spring")({
+export const Route = createFileRoute("/sandbox")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
+  return (
+    <div style={{ padding: "20px" }}>
+      <ErrorTester />
+      <SpringTester />
+    </div>
+  );
+}
+
+function ErrorTester() {
+  const trpc = useTRPC();
+  const [uiError, setUIError] = createSignal(false);
+  const [rpcError, setRPCError] = createSignal(false);
+
+  const query = trpc.system.testError.createQuery(() => ({
+    enabled: rpcError(),
+  }));
+
+  return (
+    <div>
+      <button onClick={() => setUIError(true)}>Trigger UI error</button>
+      <button onClick={() => setRPCError(true)} disabled={query.isLoading}>
+        Trigger RPC error
+      </button>
+      {query.isError && <pre>{String(query.error)}</pre>}
+      {uiError() && <ForcedError />}
+    </div>
+  );
+}
+
+function ForcedError() {
+  throw new Error("This is a test error that was thrown in the UI");
+  return null;
+}
+
+function SpringTester() {
   const [autoFlip, setAutoFlip] = createSignal(false);
   const [stiffness, setStiffness] = createSignal(200);
   const [damping, setDamping] = createSignal(40);
@@ -37,7 +73,7 @@ function RouteComponent() {
   });
 
   return (
-    <div style={{ padding: "20px" }}>
+    <>
       <h1>Spring Tester</h1>
       <Range
         label="Stiffness"
@@ -114,7 +150,7 @@ function RouteComponent() {
           }}
         />
       </div>
-    </div>
+    </>
   );
 }
 

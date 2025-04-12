@@ -18,7 +18,7 @@ export default function AppBar() {
     <nav class={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
-      <Link to="/spring">Spring</Link>
+      <Link to="/sandbox">Developer Sandbox</Link>
 
       <LinearProgress
         class={dock({ position: "top" })}

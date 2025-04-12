@@ -11,16 +11,16 @@
 // Import Routes
 
 import { Route as rootRoute } from './../../routes/~__root'
-import { Route as SpringImport } from './../../routes/~spring'
+import { Route as SandboxImport } from './../../routes/~sandbox'
 import { Route as PlayImport } from './../../routes/~play'
 import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
 import { Route as IndexImport } from './../../routes/~index'
 
 // Create/Update Routes
 
-const SpringRoute = SpringImport.update({
-  id: '/spring',
-  path: '/spring',
+const SandboxRoute = SandboxImport.update({
+  id: '/sandbox',
+  path: '/sandbox',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -67,11 +67,11 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof PlayImport
       parentRoute: typeof rootRoute
     }
-    '/spring': {
-      id: '/spring'
-      path: '/spring'
-      fullPath: '/spring'
-      preLoaderRoute: typeof SpringImport
+    '/sandbox': {
+      id: '/sandbox'
+      path: '/sandbox'
+      fullPath: '/sandbox'
+      preLoaderRoute: typeof SandboxImport
       parentRoute: typeof rootRoute
     }
   }
@@ -83,14 +83,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
-  '/spring': typeof SpringRoute
+  '/sandbox': typeof SandboxRoute
 }
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
-  '/spring': typeof SpringRoute
+  '/sandbox': typeof SandboxRoute
 }
 
 export interface FileRoutesById {
@@ -98,15 +98,15 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
   '/play': typeof PlayRoute
-  '/spring': typeof SpringRoute
+  '/sandbox': typeof SandboxRoute
 }
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth-callback' | '/play' | '/spring'
+  fullPaths: '/' | '/auth-callback' | '/play' | '/sandbox'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth-callback' | '/play' | '/spring'
-  id: '__root__' | '/' | '/auth-callback' | '/play' | '/spring'
+  to: '/' | '/auth-callback' | '/play' | '/sandbox'
+  id: '__root__' | '/' | '/auth-callback' | '/play' | '/sandbox'
   fileRoutesById: FileRoutesById
 }
 
@@ -114,14 +114,14 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
   PlayRoute: typeof PlayRoute
-  SpringRoute: typeof SpringRoute
+  SandboxRoute: typeof SandboxRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthCallbackRoute: AuthCallbackRoute,
   PlayRoute: PlayRoute,
-  SpringRoute: SpringRoute,
+  SandboxRoute: SandboxRoute,
 }
 
 export const routeTree = rootRoute
@@ -137,7 +137,7 @@ export const routeTree = rootRoute
         "/",
         "/auth-callback",
         "/play",
-        "/spring"
+        "/sandbox"
       ]
     },
     "/": {
@@ -149,8 +149,8 @@ export const routeTree = rootRoute
     "/play": {
       "filePath": "~play.tsx"
     },
-    "/spring": {
-      "filePath": "~spring.tsx"
+    "/sandbox": {
+      "filePath": "~sandbox.tsx"
     }
   }
 }
