@@ -7,19 +7,23 @@ import {
   GameStateClientContext,
 } from "@mp-modules/game/client";
 import { clientViewDistance, webSocketTokenParam } from "@mp/server";
-import { lazy } from "solid-js";
 import { useTRPC } from "../integrations/trpc";
 import { env } from "../env";
-import { requireAuth } from "../ui/auth-boundary";
+import { AuthBoundary } from "../ui/auth-boundary";
 
 export const Route = createFileRoute("/play")({
-  component: requireAuth(
-    RouteComponent,
-    lazy(() => import("./permission-denied")),
-  ),
+  component: RouteComponent,
 });
 
 function RouteComponent() {
+  return (
+    <AuthBoundary>
+      <PlayPage />
+    </AuthBoundary>
+  );
+}
+
+function PlayPage() {
   const trpc = useTRPC();
   const sync = createGameStateClient((token) => {
     const url = new URL(env.wsUrl);
