@@ -1,14 +1,11 @@
-import { createEffect, onCleanup } from "solid-js";
-import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { Logger } from "@mp/logger";
 import { AuthContext, createAuthClient } from "@mp/auth/client";
-import { faroLoggerHandler } from "@mp/telemetry/faro";
 import { ErrorFallbackContext } from "@mp/ui";
 import { QueryClientProvider, TRPCClientContext } from "@mp/solid-trpc";
 import { RouterProvider } from "@tanstack/solid-router";
 import { SolidQueryDevtools } from "@mp/solid-trpc/devtools";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
-import { createFaroClient, deriveFaroUser } from "./integrations/faro";
 import { createQueryClient } from "./integrations/query";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
@@ -25,15 +22,17 @@ registerSyncExtensions();
 
 const auth = createAuthClient(env.auth);
 const query = createQueryClient();
-const faro = createFaroClient();
+
 const trpc = createTRPCClient();
 const router = createClientRouter();
 const logger = new Logger();
 
-logger.subscribe(consoleLoggerHandler(console));
-onCleanup(logger.subscribe(faroLoggerHandler(faro)));
-createEffect(() => faro.api.setUser(deriveFaroUser(auth.identity())));
 void auth.refresh();
+
+// eslint-disable-next-line unicorn/prefer-top-level-await
+void import("./integrations/faro").then((faro) =>
+  faro.init(logger, auth.identity),
+);
 
 export default function App() {
   return (
