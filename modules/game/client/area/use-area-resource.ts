@@ -14,7 +14,10 @@ export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
     input: areaId?.() ?? skipToken,
     async map(url, input) {
       const result = await loadTiled(url);
-      return new AreaResource(input, new TiledResource(result._unsafeUnwrap()));
+      if (result.isErr()) {
+        throw result.error;
+      }
+      return new AreaResource(input, new TiledResource(result.value));
     },
   }));
 }
