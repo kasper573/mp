@@ -1,5 +1,5 @@
 import type { FlatObject, InferOutput } from "@mp/env";
-import { object, string, parseEnv, csv } from "@mp/env";
+import { object, string, parseEnv, csv, boolish, fallback } from "@mp/env";
 
 export type ClientEnv = InferOutput<typeof clientEnvSchema>;
 
@@ -7,6 +7,7 @@ const clientEnvSchema = object({
   apiUrl: string(),
   wsUrl: string(),
   buildVersion: string(),
+  retryRpcQueries: fallback(boolish(), false),
   auth: object({
     authority: string(),
     audience: string(),
