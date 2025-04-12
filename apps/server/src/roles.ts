@@ -2,7 +2,7 @@ import { characterRoles, npcRoles } from "@mp-modules/game/server";
 
 export const playerGroup = "player";
 
-const playerRoles = [
+export const playerRoles = [
   characterRoles.join,
   characterRoles.move,
   characterRoles.attack,
