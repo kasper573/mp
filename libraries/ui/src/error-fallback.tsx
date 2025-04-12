@@ -14,9 +14,7 @@ export function ErrorFallback(props: { error: unknown; reset: () => void }) {
       <h1>Oops! Something went wrong.</h1>
       <Show when={props.error}>
         <pre>
-          {props.error instanceof Error
-            ? props.error.stack
-            : String(props.error)}
+          <ErrorToString error={props.error} />
         </pre>
       </Show>
       {props.reset && (
@@ -37,3 +35,23 @@ export const ErrorFallbackContext = createContext<ErrorFallbackContextValue>({
     throw new Error("ErrorFallbackContext must be provided");
   },
 });
+
+export function ErrorToString(props: { error: unknown }) {
+  return (
+    <>
+      {props.error instanceof Error ? (
+        <>
+          <Show when={!props.error.stack?.includes(props.error.message)}>
+            {props.error.message + "\n"}
+          </Show>
+          {props.error.stack}
+          {props.error.cause ? (
+            <ErrorToString error={props.error.cause} />
+          ) : null}
+        </>
+      ) : (
+        String(props.error)
+      )}
+    </>
+  );
+}

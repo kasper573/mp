@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
+import { ErrorToString } from "@mp/ui";
 import { useTRPC } from "../integrations/trpc";
 
 export const Route = createFileRoute("/sandbox")({
@@ -33,7 +34,11 @@ function ErrorTester() {
       <button onClick={() => setRPCError(true)} disabled={query.isLoading}>
         Trigger RPC error
       </button>
-      {query.isError && <pre>{String(query.error)}</pre>}
+      {query.isError && (
+        <pre>
+          <ErrorToString error={query.error} />
+        </pre>
+      )}
       {uiError() && <ForcedError />}
     </div>
   );
