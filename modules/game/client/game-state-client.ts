@@ -59,9 +59,9 @@ export function createGameStateClient(
   const respawn = () => respawnMutation.mutateAsync(characterId()!);
 
   onCleanup(
-    socket.subscribeToMessage(async (message) => {
+    socket.subscribeToMessage((message) => {
       if (isSyncMessage(message)) {
-        const applyPatch = await parseSyncMessage(message);
+        const applyPatch = parseSyncMessage(message);
         applyPatch(gameState);
       }
     }),

@@ -1,6 +1,6 @@
 export class EnhancedWebSocket {
   private socket?: WebSocket;
-  private messageHandlers = new Set<EventHandler<MessageEvent>>();
+  private messageHandlers = new Set<EventHandler<ArrayBuffer>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
   private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
@@ -25,7 +25,7 @@ export class EnhancedWebSocket {
     this.disconnect();
   };
 
-  subscribeToMessage = (handler: EventHandler<MessageEvent>): Unsubscribe => {
+  subscribeToMessage = (handler: EventHandler<ArrayBuffer>): Unsubscribe => {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
   };
@@ -51,6 +51,7 @@ export class EnhancedWebSocket {
 
     this.connectAttempt++;
     this.socket = new WebSocket(this.url);
+    this.socket.binaryType = "arraybuffer";
 
     this.emitReadyState();
 
@@ -101,7 +102,7 @@ export class EnhancedWebSocket {
 
   private handleMessage = (event: MessageEvent) => {
     for (const handler of this.messageHandlers) {
-      handler(event);
+      handler(event.data as ArrayBuffer);
     }
   };
 
