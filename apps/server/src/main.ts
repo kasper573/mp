@@ -86,7 +86,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const syncHandshakeLimiter = new RateLimiter({
+const wsHandshakeLimiter = new RateLimiter({
   points: 10,
   duration: 30,
 });
@@ -114,7 +114,7 @@ const wss = createWSSWithHandshake<UserIdentity, ClientId>({
     const token = url?.searchParams.get(webSocketTokenParam);
     const result = await auth.verifyToken(token as AuthToken);
     return result.asyncAndThrough((user) =>
-      syncHandshakeLimiter.consume(user.id),
+      wsHandshakeLimiter.consume(user.id),
     );
   },
 });
