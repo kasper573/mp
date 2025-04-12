@@ -28,6 +28,7 @@ function ErrorTester() {
 
   return (
     <div>
+      <h1>Error Tester</h1>
       <button onClick={() => setUIError(true)}>Trigger UI error</button>
       <button onClick={() => setRPCError(true)} disabled={query.isLoading}>
         Trigger RPC error
