@@ -12,7 +12,7 @@ export function LoadingSpinner(props: ParentProps) {
           <div class={dot3} />
           <div class={dot4} />
         </div>
-        {props.children}
+        {props.children ?? <>&nbsp;</>}
       </div>
     </Dock>
   );
