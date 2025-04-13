@@ -5,5 +5,5 @@ export const Route = createFileRoute("/contact")({
 });
 
 function RouteComponent() {
-  return <div style={{ padding: "20px" }}>Contact: admin@k573.dev</div>;
+  return <div style={{ padding: "20px" }}>Contact: k573business@gmail.com</div>;
 }
