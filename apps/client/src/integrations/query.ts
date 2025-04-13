@@ -5,7 +5,7 @@ export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
-        retry: env.retryRpcQueries ? 3 : false,
+        retry: env.retryRpcQueries ? 1 : false,
         throwOnError: true,
         refetchOnWindowFocus: true,
         refetchOnMount: true,
