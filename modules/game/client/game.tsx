@@ -1,7 +1,7 @@
 import { EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import { useContext, createEffect, Switch, Match } from "solid-js";
+import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
 import * as styles from "./game.css";
@@ -22,29 +22,31 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
 
   return (
     <Switch>
-      <Match
-        when={
-          state.readyState() !== "open" ||
-          area.isLoading() ||
-          // AreaId would be null if the initial game state hasn't been received yet
-          !state.areaId()
-        }
-      >
-        {/** TODO replace with specialized loading screen for loading areas */}
-        <LoadingSpinner />
+      <Match when={state.readyState() !== "open"}>
+        <LoadingSpinner>Connecting to game server</LoadingSpinner>
+      </Match>
+      <Match when={!state.areaId()}>
+        <LoadingSpinner>Waiting for game state</LoadingSpinner>
+      </Match>
+      <Match when={area.isLoading()}>
+        <LoadingSpinner>Loading area</LoadingSpinner>
       </Match>
       <Match when={area.data()} keyed>
         {(data) => (
-          <Application
-            class={clsx(styles.container, props.class)}
-            style={props.style}
+          <Suspense
+            fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
           >
-            {({ viewport }) => (
-              <EngineProvider viewport={viewport}>
-                <AreaScene area={data} />
-              </EngineProvider>
-            )}
-          </Application>
+            <Application
+              class={clsx(styles.container, props.class)}
+              style={props.style}
+            >
+              {({ viewport }) => (
+                <EngineProvider viewport={viewport}>
+                  <AreaScene area={data} />
+                </EngineProvider>
+              )}
+            </Application>
+          </Suspense>
         )}
       </Match>
     </Switch>
