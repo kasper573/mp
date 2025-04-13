@@ -1,4 +1,4 @@
-import { style, keyframes } from "@mp/style";
+import { style, keyframes, atoms } from "@mp/style";
 
 const left = keyframes({
   "0%": { transform: "scale(0)" },
@@ -15,7 +15,13 @@ const right = keyframes({
   "100%": { transform: "scale(0)" },
 });
 
-export const container = style({
+export const container = atoms({
+  display: "flex",
+  flexDirection: "column",
+  alignItems: "center",
+});
+
+export const dots = style({
   display: "inline-block",
   position: "relative",
   width: "80px",
