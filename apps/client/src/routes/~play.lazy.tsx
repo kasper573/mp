@@ -35,7 +35,7 @@ function PlayPage() {
   return (
     <AreaDebugUIContext.Provider
       value={{
-        serverVersion: () => serverVersion.data() ?? "unknown",
+        serverVersion: () => serverVersion.data ?? "unknown",
         clientVersion: () => env.buildVersion,
       }}
     >

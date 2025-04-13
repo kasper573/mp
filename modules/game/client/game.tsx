@@ -22,16 +22,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
 
   return (
     <Switch>
-      <Match when={state.readyState() !== "open"}>
-        <LoadingSpinner>Connecting to game server</LoadingSpinner>
-      </Match>
-      <Match when={!state.areaId()}>
-        <LoadingSpinner>Waiting for game state</LoadingSpinner>
-      </Match>
-      <Match when={area.isLoading()}>
-        <LoadingSpinner>Loading area</LoadingSpinner>
-      </Match>
-      <Match when={area.data()} keyed>
+      <Match when={area.data} keyed>
         {(data) => (
           <Suspense
             fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
@@ -48,6 +39,15 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
             </Application>
           </Suspense>
         )}
+      </Match>
+      <Match when={state.readyState() !== "open"}>
+        <LoadingSpinner>Connecting to game server</LoadingSpinner>
+      </Match>
+      <Match when={!state.areaId()}>
+        <LoadingSpinner>Waiting for game state</LoadingSpinner>
+      </Match>
+      <Match when={area.isLoading}>
+        <LoadingSpinner>Loading area</LoadingSpinner>
       </Match>
     </Switch>
   );
