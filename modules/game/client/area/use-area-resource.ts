@@ -1,17 +1,23 @@
 import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@mp/solid-trpc";
-import { type Accessor } from "solid-js";
+import { useContext, type Accessor } from "solid-js";
 import { AreaResource } from "../../shared";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
 import { useTRPC } from "../trpc";
+import { BuildVersionContext } from "../build-version-context";
 
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const trpc = useTRPC();
+  const { server: serverVersion } = useContext(BuildVersionContext);
 
   return trpc.area.areaFileUrl.createQuery(() => ({
     input: areaId?.() ?? skipToken,
     async map(url, input) {
+      const loadTiled = createTiledLoader({
+        loadJson,
+        relativePath: (path, base) => relativeURL(path, base, serverVersion()),
+      });
       const result = await loadTiled(url);
       if (result.isErr()) {
         throw result.error;
@@ -20,11 +26,6 @@ export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
     },
   }));
 }
-
-const loadTiled = createTiledLoader({
-  loadJson,
-  relativePath: relativeURL,
-});
 
 async function loadJson(url: string) {
   const response = await fetch(url, {
@@ -37,7 +38,13 @@ async function loadJson(url: string) {
   return json as Record<string, unknown>;
 }
 
-function relativeURL(url: string, base: string) {
+function relativeURL(path: string, base: string, version: string) {
   base = base.startsWith("//") ? window.location.protocol + base : base;
-  return new URL(url, base).toString();
+  const url = new URL(path, base);
+
+  // Since relative urls in tile map files are resolved on the client side we have to add
+  // the version param manually (it's easier than dynamically updating the tile map files to have the version params embedded)
+  url.searchParams.set("v", version);
+
+  return url.toString();
 }

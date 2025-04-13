@@ -5,7 +5,6 @@ import { Graphics } from "@mp/pixi";
 import type { Accessor } from "solid-js";
 import {
   batch,
-  createContext,
   createEffect,
   createMemo,
   createSignal,
@@ -26,16 +25,12 @@ import { clientViewDistanceRect, type AreaResource } from "../../shared";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import { useTRPC } from "../trpc";
 import { GameStateClientContext } from "../game-state-client";
+import { BuildVersionContext } from "../build-version-context";
 import * as styles from "./area-debug-ui.css";
 import { AreaSceneContext } from "./area-scene";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
-
-export const AreaDebugUIContext = createContext({
-  serverVersion: () => "unknown" as string,
-  clientVersion: () => "unknown" as string,
-});
 
 export function AreaDebugUI(props: {
   area: AreaResource;
@@ -160,7 +155,7 @@ function DebugPath(props: {
 }
 
 function DebugText(props: { tiled: TiledResource }) {
-  const { clientVersion, serverVersion } = useContext(AreaDebugUIContext);
+  const versions = useContext(BuildVersionContext);
   const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
 
@@ -182,7 +177,7 @@ function DebugText(props: { tiled: TiledResource }) {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
     return [
-      `build: (client: ${clientVersion()}, server: ${serverVersion()})`,
+      `build: (client: ${versions.client()}, server: ${versions.server()})`,
       `viewport: ${viewportPosition.toString()}`,
       `world: ${worldPosition.toString()}`,
       `tile: ${tilePos.toString()}`,

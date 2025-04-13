@@ -1,6 +1,6 @@
 import { createLazyFileRoute } from "@tanstack/solid-router";
 import {
-  AreaDebugUIContext,
+  BuildVersionContext,
   AreaSceneContext,
   createGameStateClient,
   Game,
@@ -33,10 +33,10 @@ function PlayPage() {
   });
 
   return (
-    <AreaDebugUIContext.Provider
+    <BuildVersionContext.Provider
       value={{
-        serverVersion: () => serverVersion.data ?? "unknown",
-        clientVersion: () => env.buildVersion,
+        server: () => serverVersion.data ?? "unknown",
+        client: () => env.buildVersion,
       }}
     >
       <AreaSceneContext.Provider value={clientViewDistance}>
@@ -44,6 +44,6 @@ function PlayPage() {
           <Game />
         </GameStateClientContext.Provider>
       </AreaSceneContext.Provider>
-    </AreaDebugUIContext.Provider>
+    </BuildVersionContext.Provider>
   );
 }
