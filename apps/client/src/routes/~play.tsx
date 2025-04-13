@@ -25,18 +25,17 @@ function RouteComponent() {
 
 function PlayPage() {
   const trpc = useTRPC();
+  const serverVersion = trpc.system.buildVersion.createQuery();
   const sync = createGameStateClient((token) => {
     const url = new URL(env.wsUrl);
-    if (token) {
-      url.searchParams.set(webSocketTokenParam, token);
-    }
+    url.searchParams.set(webSocketTokenParam, token);
     return url.toString();
   });
-  const serverVersion = trpc.system.buildVersion.createQuery();
+
   return (
     <AreaDebugUIContext.Provider
       value={{
-        serverVersion: () => serverVersion.data ?? "unknown",
+        serverVersion: () => serverVersion.data() ?? "unknown",
         clientVersion: () => env.buildVersion,
       }}
     >
