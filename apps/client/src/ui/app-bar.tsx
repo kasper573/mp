@@ -18,7 +18,7 @@ export default function AppBar() {
     <nav class={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
-      <Link to="/sandbox">Developer Sandbox</Link>
+      <Link to="/sandbox">Dev Tools</Link>
       <Link to="/contact">Contact</Link>
 
       <LinearProgress

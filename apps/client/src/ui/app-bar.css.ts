@@ -13,6 +13,7 @@ export const nav = style([
     backgroundColor: "info.base",
     color: "info.face",
     padding: "xl",
+    whiteSpace: "nowrap",
   }),
 ]);
 
