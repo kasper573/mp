@@ -56,6 +56,7 @@ import {
   registerSyncExtensions,
   webSocketTokenParam,
 } from "./shared";
+import { customFileTypes } from "./etc/custom-filetypes";
 
 registerSyncExtensions();
 
@@ -81,7 +82,17 @@ const webServer = express()
   .use(createCors({ origin: opt.corsOrigin }))
   .use(
     opt.publicPath,
-    express.static(opt.publicDir, { maxAge: opt.publicMaxAge * 1000 }),
+    express.static(opt.publicDir, {
+      maxAge: opt.publicMaxAge * 1000,
+      setHeaders: (res, filePath) => {
+        for (const fileType of customFileTypes) {
+          if (filePath.endsWith(fileType.extension)) {
+            res.setHeader("Content-Type", fileType.contentType);
+            break;
+          }
+        }
+      },
+    }),
   );
 
 const httpServer = http.createServer(webServer);
