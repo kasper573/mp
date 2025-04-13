@@ -1,11 +1,11 @@
-import { createLazyFileRoute } from "@tanstack/solid-router";
+import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorToString } from "@mp/ui";
 import { useTRPC } from "../integrations/trpc";
 
-export const Route = createLazyFileRoute("/sandbox")({
+export const Route = createFileRoute("/sandbox")({
   component: RouteComponent,
 });
 
