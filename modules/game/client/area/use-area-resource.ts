@@ -27,7 +27,12 @@ const loadTiled = createTiledLoader({
 });
 
 async function loadJson(url: string) {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  });
   const json: unknown = await response.json();
   return json as Record<string, unknown>;
 }
