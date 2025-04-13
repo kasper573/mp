@@ -59,7 +59,11 @@ export function decompressTileLayer(
       const match = tileLookup.get(gid);
       if (!match) {
         throw new Error(
-          `Could not find tile for GID ${gid} (layer: ${layer.name}, x: ${x}, y: ${y})`,
+          [
+            `Could not find tile for GID ${gid}`,
+            `Layer: ${layer.name}, x: ${x}, y: ${y}`,
+            `Number of tiles available: ${tileLookup.size}`,
+          ].join("\n"),
         );
       }
 
