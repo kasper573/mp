@@ -78,13 +78,14 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
     const error = createMemo(() => store[storeKey]?.error);
     const isLoading = createMemo(() => store[storeKey]?.isLoading);
     const getInput = createMemo(() => createOptions?.().input as unknown);
+    const enabled = createMemo(() => createOptions?.().enabled ?? true);
 
     // We don't use useQuery because we don't want to use suspense
     // (it uses createResource, which triggers suspense implicitly.
     // We want suspense to be an opt-in feature)
     createEffect(() => {
       const input = getInput();
-      if (input === skipToken) {
+      if (input === skipToken || !enabled()) {
         return;
       }
 
