@@ -16,6 +16,11 @@ export function characterRemoveBehavior(
   const stop = clients.on(({ type, userId }) => {
     switch (type) {
       case "remove": {
+        if (clients.hasClient(userId)) {
+          // User is still connected with another client, no need to remove character
+          break;
+        }
+
         logger.info("Scheduling character removal for user", userId);
         const timeoutId = setTimeout(() => removeCharacter(userId), timeout);
         removeTimeouts.set(userId, timeoutId);

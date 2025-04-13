@@ -30,6 +30,10 @@ export class ClientRegistry {
     return this.map.get(clientId);
   }
 
+  hasClient(userId: UserId): boolean {
+    return this.map.values().some((id) => id === userId);
+  }
+
   on(handler: ClientRegistryEventHandler): Unsubscribe {
     this.eventHandlers.add(handler);
     return () => this.eventHandlers.delete(handler);

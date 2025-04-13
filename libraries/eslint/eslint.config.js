@@ -169,6 +169,7 @@ export default tseslint.config(
 
       // Has false positives
       "unicorn/no-useless-undefined": "off",
+      "unicorn/prefer-includes": "off",
     },
   },
 );
