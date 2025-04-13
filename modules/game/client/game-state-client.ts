@@ -24,8 +24,7 @@ export function createGameStateClient(
   const { identity } = useContext(AuthContext);
   const id = createMemo(() => identity()?.id);
 
-  // TODO EnhancedWebSocket must be reactive. It has to be recreated when the token changes.
-  const socket = new EnhancedWebSocket(wsUrlForToken(identity()?.token));
+  const socket = new EnhancedWebSocket();
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
@@ -71,7 +70,8 @@ export function createGameStateClient(
 
   createEffect(() => {
     if (id() !== undefined) {
-      untrack(() => socket.start());
+      const url = wsUrlForToken(identity()?.token);
+      untrack(() => socket.start(url));
       onCleanup(socket.stop);
     }
   });

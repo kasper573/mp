@@ -5,9 +5,9 @@ export class EnhancedWebSocket {
   private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
   private connectAttempt = 0;
+  private url?: string;
 
   constructor(
-    private url: string,
     private reconnectDelay = (attemptNumber: number) =>
       1000 * Math.min(Math.pow(2, attemptNumber - 1), 10),
   ) {}
@@ -15,7 +15,8 @@ export class EnhancedWebSocket {
   getReadyState = (): SyncClientReadyState =>
     coerceReadyState(this.socket?.readyState as WebSocketReadyState);
 
-  start = () => {
+  start = (url: string) => {
+    this.url = url;
     this.isEnabled = true;
     this.connect();
   };
@@ -47,6 +48,9 @@ export class EnhancedWebSocket {
   private connect() {
     if (this.socket) {
       throw new Error("Socket already created");
+    }
+    if (!this.url) {
+      throw new Error("Socket URL not set");
     }
 
     this.connectAttempt++;
