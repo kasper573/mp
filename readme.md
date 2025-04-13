@@ -15,7 +15,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle orm](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws) + [trpc](https://trpc.io/)
+- network: [ws](https://www.npmjs.com/package/ws) + [custom rpc](libraries/rpc)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
 
@@ -117,14 +117,6 @@ These are the workspaces, in order:
 
 Deployable artifacts. Composes all other packages.
 
-## modules
-
-Concrete game mechanics and business logic.
-
-Should be highly configurable and may not contain hard coded configuration. May do so either by composition, or dependency injection.
-
-Dependencies on other modules must be done via dependency injection (See [@mp/ioc](libraries/ioc/)).
-
 ## libraries
 
 Generic and low level systems.
@@ -132,3 +124,7 @@ Generic and low level systems.
 Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
 
 Dependencies must instead be provided as arguments.
+
+## The game module
+
+While `libraries/game` is technically just a package, it deserves special note since it's the composition of almost all other packages. This is the module that essentially is the game. It's however not an app because the game is composed of client and server details, so the apps only select their relevant game mechanisms.

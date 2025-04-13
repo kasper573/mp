@@ -11,9 +11,8 @@
     "@mp/ws": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp-modules/game": "workspace:*",
-    "@mp-modules/trpc": "workspace:*",
-    "@trpc/client": "11.0.0-rc.593"
+    "@mp/rpc": "workspace:*",
+    "@mp/game": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

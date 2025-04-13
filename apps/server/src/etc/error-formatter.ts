@@ -1,15 +1,11 @@
-import type { AnyErrorFormatter } from "@mp-modules/trpc/server";
+import { RPCError, type RPCErrorFormatter } from "@mp/rpc";
 import { opt } from "../options";
 
-export const errorFormatter: AnyErrorFormatter = ({ shape }) => {
-  if (opt.exposeErrorDetails) {
-    return shape;
-  }
-
-  // Hide error details
-  return {
-    ...shape,
-    data: { ...shape.data, path: undefined, stack: undefined },
-    message: "An error occurred",
-  };
+export const errorFormatter: RPCErrorFormatter<unknown> = ({ error }) => {
+  return opt.exposeErrorDetails
+    ? error
+    : new RPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Internal server error",
+      });
 };

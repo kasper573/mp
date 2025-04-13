@@ -6,7 +6,6 @@
   "license": "MIT",
   "workspaces": [
     "apps/*",
-    "modules/*",
     "libraries/*"
   ],
   "scripts": {

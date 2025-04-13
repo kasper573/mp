@@ -1,15 +1,13 @@
 import { Logger } from "@mp/logger";
 import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
-import { QueryClientProvider, TRPCClientContext } from "@mp/solid-trpc";
 import { RouterProvider } from "@tanstack/solid-router";
-import { SolidQueryDevtools } from "@mp/solid-trpc/devtools";
+import { RPCClientProvider, RPCDevtools } from "@mp/rpc";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
-import { createQueryClient } from "./integrations/query";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
-import { createTRPCClient } from "./integrations/trpc";
+import { createRPCClient } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 
 // This is effectively the composition root of the application.
@@ -21,9 +19,7 @@ import { LoggerContext } from "./logger";
 registerSyncExtensions();
 
 const auth = createAuthClient(env.auth);
-const query = createQueryClient();
-
-const trpc = createTRPCClient();
+const rpc = createRPCClient();
 const router = createClientRouter();
 const logger = new Logger();
 
@@ -40,13 +36,11 @@ export default function App() {
       <LoggerContext.Provider value={logger}>
         <ErrorFallbackContext.Provider value={{ handleError: logger.error }}>
           <AuthContext.Provider value={auth}>
-            <QueryClientProvider client={query}>
-              <TRPCClientContext.Provider value={trpc}>
-                <RouterProvider router={router} />
-                <TanStackRouterDevtools router={router} />
-                <SolidQueryDevtools />
-              </TRPCClientContext.Provider>
-            </QueryClientProvider>
+            <RPCClientProvider client={rpc}>
+              <RouterProvider router={router} />
+              <TanStackRouterDevtools router={router} />
+              <RPCDevtools />
+            </RPCClientProvider>
           </AuthContext.Provider>
         </ErrorFallbackContext.Provider>
       </LoggerContext.Provider>

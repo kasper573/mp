@@ -44,7 +44,6 @@ export default tseslint.config(
           "./tsconfig.json",
           "./apps/*/tsconfig.json",
           "./libraries/*/tsconfig.json",
-          "./modules/*/tsconfig.json",
         ],
       },
     },
@@ -94,19 +93,15 @@ export default tseslint.config(
           rules: [
             {
               from: ["app"],
-              allow: ["app", "module", "server_module", "library"],
+              allow: ["app", "package"],
             },
             {
               from: ["client_app"],
-              allow: ["app", "module", "library"],
+              allow: ["app", "package"],
             },
             {
-              from: ["module", "server_module"],
-              allow: ["module", "server_module", "library"],
-            },
-            {
-              from: ["library"],
-              allow: ["library"],
+              from: ["package"],
+              allow: ["package"],
             },
           ],
         },
@@ -115,10 +110,8 @@ export default tseslint.config(
     settings: {
       "boundaries/elements": [
         { type: "client_app", pattern: "apps/client/**" },
-        { type: "server_module", pattern: "modules/*/server/**" },
         { type: "app", pattern: "apps/*" },
-        { type: "module", pattern: "modules/*" },
-        { type: "library", pattern: "libraries/*" },
+        { type: "package", pattern: "libraries/*" },
       ],
       "import/resolver": {
         typescript: {

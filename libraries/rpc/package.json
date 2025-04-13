@@ -1,0 +1,21 @@
+{
+  "name": "@mp/rpc",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "dependencies": {
+    "@mp/std": "workspace:*",
+    "solid-js": "1.9.5"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

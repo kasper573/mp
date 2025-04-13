@@ -1,9 +1,9 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import type { AreaId } from "@mp-modules/game";
 import { webSocketTokenParam, type RootRouter } from "@mp/server";
-import { transformer } from "@mp-modules/trpc";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import { RPCClient } from "@mp/rpc";
 import { EnhancedWebSocket } from "@mp/ws/client";
+import { rpcTransformer } from "@mp/game";
+import type { AreaId } from "@mp/game";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -55,11 +55,11 @@ async function loadTestHTTP() {
 
 async function loadTestRPC() {
   logger.info("Testing", rpcRequests, "RPC requests");
-  const trpc = createRPCClient();
+  const rpc = createRPCClient();
 
   const results = await Promise.allSettled(
     range(rpcRequests).map(() =>
-      trpc.area.areaFileUrl.query("forest" as AreaId),
+      rpc.area.areaFileUrl.query("forest" as AreaId),
     ),
   );
 
@@ -99,12 +99,12 @@ async function testGameClient(n: number) {
 
   const token = process.env.MP_SERVER_AUTH__BYPASS_USER;
   const url = new URL(wsUrl);
-  url.searchParams.set(webSocketTokenParam, token!);
-  const socket = new EnhancedWebSocket(url.toString());
+  url.searchParams.set(webSocketTokenParam, token);
+  const socket = new EnhancedWebSocket();
   const rpc = createRPCClient(token);
 
   try {
-    await connect(socket);
+    await connect(socket, url.toString());
     if (verbose) {
       logger.info(`Game client ${n} connected`);
     }
@@ -124,20 +124,16 @@ async function testGameClient(n: number) {
 }
 
 function createRPCClient(token?: string) {
-  return createTRPCClient<RootRouter>({
-    links: [
-      httpBatchLink({
-        url: apiServerUrl,
-        transformer,
-        headers: () => ({
-          Authorization: token ? `Bearer ${token}` : undefined,
-        }),
-      }),
-    ],
+  return new RPCClient<RootRouter>({
+    url: apiServerUrl,
+    transformer: rpcTransformer,
+    headers: () => ({
+      Authorization: token ? `Bearer ${token}` : undefined,
+    }),
   });
 }
 
-async function connect(socket: EnhancedWebSocket) {
+async function connect(socket: EnhancedWebSocket, url: string) {
   await new Promise<void>((resolve, reject) => {
     socket.subscribeToErrors((e) => reject(new Error(e.message)));
     socket.subscribeToReadyState((readyState) => {
@@ -145,7 +141,7 @@ async function connect(socket: EnhancedWebSocket) {
         resolve();
       }
     });
-    socket.start();
+    socket.start(url);
   });
 }
 

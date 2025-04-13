@@ -11,15 +11,13 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
 import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
+import { ctxAuthServer, ctxRequest } from "@mp/game";
 import { RateLimiter } from "@mp/rate-limiter";
-import {
-  ctxGlobalMiddleware,
-  ctxTrpcErrorFormatter,
-  trpcExpress,
-} from "@mp-modules/trpc/server";
-import { createDBClient } from "@mp-modules/db";
-import type { GameState, GameStateServer } from "@mp-modules/game/server";
+import { createDBClient } from "@mp/db";
+import { uuid, type LocalFile } from "@mp/std";
+import type { ClientId } from "@mp/sync";
+import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game";
+import type { GameState, GameStateServer } from "@mp/game";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -37,9 +35,7 @@ import {
   deriveClientVisibility,
   NPCService,
   GameService,
-} from "@mp-modules/game/server";
-import { uuid, type LocalFile } from "@mp/std";
-import type { ClientId } from "@mp/sync";
+} from "@mp/game";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -170,7 +166,7 @@ const characterService = new CharacterService(db, areas);
 const ioc = new InjectionContainer()
   .provide(ctxAuthServer, auth)
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
-  .provide(ctxTrpcErrorFormatter, errorFormatter)
+  .provide(ctxRpcErrorFormatter, errorFormatter)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameStateMachine, gameState)
