@@ -24,7 +24,7 @@ export function combatBehavior(
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
-      if (actor.health <= 0) {
+      if (!actor.health) {
         state.actors.update(actor.id, {
           health: 0, // Clamp
           path: undefined,

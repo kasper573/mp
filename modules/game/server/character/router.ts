@@ -38,6 +38,13 @@ export const characterRouter = t.router({
         });
       }
 
+      if (!char.health) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: "Cannot move a dead character",
+        });
+      }
+
       state.actors.update(char.id, {
         attackTargetId: undefined,
         moveTarget: Vector.from(to),
