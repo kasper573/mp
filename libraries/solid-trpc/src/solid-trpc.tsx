@@ -19,7 +19,13 @@ import type {
   inferProcedureOutput,
 } from "@trpc/server";
 import type { Accessor } from "solid-js";
-import { createContext, createEffect, createMemo, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  untrack,
+  useContext,
+} from "solid-js";
 import { createMutable } from "solid-js/store";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy";
@@ -83,17 +89,21 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
     // We want suspense to be an opt-in feature)
     createEffect(() => {
       const input = getInput();
+
+      const queryState = untrack(() => {
+        if (!store[storeKey]) {
+          store[storeKey] = defaultQueryState();
+        }
+        return store[storeKey];
+      });
+
       if (input === skipToken || !enabled()) {
+        Object.assign(queryState, defaultQueryState());
         return;
       }
 
       void (async () => {
         try {
-          store[storeKey] = {
-            data: undefined,
-            error: undefined,
-            isLoading: true,
-          };
           const res = await client.fetchQuery({
             queryKey: [storeKey],
             async queryFn() {
@@ -106,11 +116,11 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
               return result;
             },
           });
-          store[storeKey].data = res;
+          queryState.data = res;
         } catch (error) {
-          store[storeKey].error = error;
+          queryState.error = error;
         } finally {
-          store[storeKey].isLoading = false;
+          queryState.isLoading = false;
         }
       })();
     });
@@ -120,6 +130,14 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
       error,
       isLoading,
     };
+  };
+}
+
+function defaultQueryState() {
+  return {
+    data: undefined,
+    error: undefined,
+    isLoading: true,
   };
 }
 
