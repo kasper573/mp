@@ -1,7 +1,14 @@
 import { EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
+import {
+  useContext,
+  createEffect,
+  Switch,
+  Match,
+  Suspense,
+  Show,
+} from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
 import * as styles from "./game.css";
@@ -22,7 +29,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
 
   return (
     <Switch>
-      <Match when={area.isSuccess} keyed>
+      <Match when={area.isSuccess}>
         <Suspense fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}>
           <Application
             class={clsx(styles.container, props.class)}
@@ -30,7 +37,9 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
           >
             {({ viewport }) => (
               <EngineProvider viewport={viewport}>
-                {area.data && <AreaScene area={area.data} />}
+                <Show when={area.data} keyed>
+                  {(data) => <AreaScene area={data} />}
+                </Show>
               </EngineProvider>
             )}
           </Application>
