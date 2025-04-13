@@ -2,6 +2,8 @@ ls:
   .dir: kebab-case
   .*: kebab-case
 
+  .vscode:
+    .dir: regex:.*
   .github:
     .dir: regex:.*
   .husky:
