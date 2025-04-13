@@ -26,7 +26,7 @@ export function createGameStateClient(
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
-    () => gameState.actors[characterId()!] as Character,
+    () => gameState.actors[characterId()!] as Character | undefined,
   );
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(socket.getReadyState());

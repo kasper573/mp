@@ -39,14 +39,14 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   }));
 
   const myCoords = useAnimatedCoords(
-    () => state.character()?.coords ?? new Vector(0 as Tile, 0 as Tile),
+    () => state.character()?.coords ?? Vector.zero<Tile>(),
     () => state.character()?.path,
     () => state.character()?.speed ?? (0 as Tile),
   );
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(
-      state.character()?.coords ?? new Vector(0, 0),
+      state.character()?.coords ?? Vector.zero(),
     ),
   );
 
@@ -150,7 +150,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         </Show>
       </Pixi>
 
-      <RespawnDialog open={state.character().health <= 0} />
+      <RespawnDialog open={!state.character()?.health} />
 
       <Keybindings toggleDebug={toggleDebug} />
     </>
