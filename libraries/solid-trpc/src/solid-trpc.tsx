@@ -5,9 +5,9 @@ import type {
   UseQueryResult,
 } from "@tanstack/solid-query";
 import {
-  createMutation,
-  createQuery,
   skipToken,
+  useMutation,
+  useQuery,
   type SkipToken,
   type SolidMutationOptions,
   type SolidQueryOptions,
@@ -63,7 +63,7 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
 ): CreateQueryFn<AnyProcedure> {
   return (createOptions) => {
     const context = createRequestContext?.();
-    return createQuery(() => {
+    return useQuery(() => {
       const options = createOptions?.();
       async function queryFn() {
         const query = getPropAt(trpc, [...path, "query"]) as AnyFunction;
@@ -91,7 +91,7 @@ function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
   return (createOptions) => {
     const onMutation = createMutationHandler?.();
     const context = createRequestContext?.();
-    return createMutation(() => {
+    return useMutation(() => {
       async function mutationFn(input: unknown) {
         const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
         const output = await mutate(input, { context });
