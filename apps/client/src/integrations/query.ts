@@ -14,11 +14,3 @@ export function createQueryClient() {
     },
   });
 }
-
-declare module "@mp/solid-trpc" {
-  interface Register {
-    mutationMeta: {
-      invalidateCache?: boolean;
-    };
-  }
-}

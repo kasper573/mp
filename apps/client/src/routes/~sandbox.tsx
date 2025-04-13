@@ -31,14 +31,14 @@ function ErrorTester() {
     <div>
       <h1>Error Tester</h1>
       <button onClick={() => setUIError(true)}>Trigger UI error</button>
-      <button onClick={() => setRPCError(true)} disabled={query.isLoading}>
+      <button onClick={() => setRPCError(true)} disabled={query.isLoading()}>
         Trigger RPC error
       </button>
-      {query.isError && (
+      {query.error() ? (
         <pre>
-          <ErrorToString error={query.error} />
+          <ErrorToString error={query.error()} />
         </pre>
-      )}
+      ) : null}
       {uiError() && <ForcedError />}
     </div>
   );

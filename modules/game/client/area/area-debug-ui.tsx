@@ -45,12 +45,8 @@ export function AreaDebugUI(props: {
   const [showViewbox, setShowViewbox] = createSignal(false);
   const trpc = useTRPC();
   const state = useContext(GameStateClientContext);
-  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation(() => ({
-    meta: { invalidateCache: false },
-  }));
-  const kill = trpc.character.kill.createMutation(() => ({
-    meta: { invalidateCache: false },
-  }));
+  const spawnNPC = trpc.npc.spawnRandomNPC.createMutation();
+  const kill = trpc.character.kill.createMutation();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 

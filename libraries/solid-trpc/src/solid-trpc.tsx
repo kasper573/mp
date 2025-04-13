@@ -2,12 +2,11 @@ import type {
   DefaultError,
   MutationOptions,
   UseMutationResult,
-  UseQueryResult,
 } from "@tanstack/solid-query";
 import {
   skipToken,
   useMutation,
-  useQuery,
+  useQueryClient,
   type SkipToken,
   type SolidMutationOptions,
   type SolidQueryOptions,
@@ -20,7 +19,9 @@ import type {
   inferProcedureInput,
   inferProcedureOutput,
 } from "@trpc/server";
-import { createContext, useContext } from "solid-js";
+import type { Accessor } from "solid-js";
+import { createContext, createEffect, createMemo, useContext } from "solid-js";
+import { createMutable } from "solid-js/store";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy, getPropAt } from "./invocation-proxy";
 
@@ -30,6 +31,7 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
   ...clientOptions
 }: TRPCSolidClientOptions<TRouter>): TRPCSolidClient<TRouter> {
   const client = createTRPCClient(clientOptions);
+  const store = createMutable({} as QueryDataStore);
   const proxy = createInvocationProxy((path) => {
     const last = path.at(-1);
     switch (last) {
@@ -38,6 +40,7 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
           client,
           path.slice(0, -1),
           createRequestContext,
+          store,
         ) as AnyFunction;
       case createMutationProperty:
         return createTRPCMutationFn(
@@ -56,29 +59,68 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
   return proxy as TRPCSolidClient<TRouter>;
 }
 
+type QueryDataStore = Record<
+  string,
+  { isLoading: boolean; data: unknown; error: unknown }
+>;
+
 function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
   trpc: CreateTRPCClient<TRouter>,
   path: string[],
   createRequestContext: RequestContextFactory | undefined,
+  store: QueryDataStore,
 ): CreateQueryFn<AnyProcedure> {
+  const storeKey = path.join(".");
   return (createOptions) => {
     const context = createRequestContext?.();
-    return useQuery(() => {
-      const options = createOptions?.();
-      async function queryFn() {
-        const query = getPropAt(trpc, [...path, "query"]) as AnyFunction;
-        const result = await query(options?.input, { context });
-        if (options?.map) {
-          return options.map(result, options.input);
-        }
-        return result;
+    const client = useQueryClient();
+    const data = createMemo(() => store[storeKey]?.data as never);
+    const error = createMemo(() => store[storeKey]?.error);
+    const isLoading = createMemo(() => store[storeKey]?.isLoading);
+    const getInput = createMemo(() => createOptions?.().input as unknown);
+
+    // We don't use useQuery because we don't want to use suspense
+    // (it uses createResource, which triggers suspense implicitly.
+    // We want suspense to be an opt-in feature)
+    createEffect(() => {
+      const input = getInput();
+      if (input === skipToken) {
+        return;
       }
-      return {
-        queryKey: [...path, options?.input],
-        queryFn: options?.input === skipToken ? skipToken : queryFn,
-        ...options,
-      };
+
+      void (async () => {
+        try {
+          store[storeKey] = {
+            data: undefined,
+            error: undefined,
+            isLoading: true,
+          };
+          const res = await client.fetchQuery({
+            queryKey: [storeKey],
+            async queryFn() {
+              const query = getPropAt(trpc, [...path, "query"]) as AnyFunction;
+              const result = await query(input, { context });
+              const { map } = createOptions?.() ?? {};
+              if (map) {
+                return map(result, input);
+              }
+              return result;
+            },
+          });
+          store[storeKey].data = res;
+        } catch (error) {
+          store[storeKey].error = error;
+        } finally {
+          store[storeKey].isLoading = false;
+        }
+      })();
     });
+
+    return {
+      data,
+      error,
+      isLoading,
+    };
   };
 }
 
@@ -175,7 +217,11 @@ type CreateQueryFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
 >(
   options?: () => TRPCQueryOptions<Proc, MappedType>,
-) => UseQueryResult<MappedType, DefaultError>;
+) => {
+  data: Accessor<MappedType | undefined>;
+  error: Accessor<unknown>;
+  isLoading: Accessor<boolean>;
+};
 
 type CreateMutationFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
@@ -183,13 +229,13 @@ type CreateMutationFn<Proc extends AnyProcedure> = <
   options?: () => TRPCMutationOptions<Proc, MappedType>,
 ) => UseMutationResult<MappedType, DefaultError, inferProcedureInput<Proc>>;
 
-type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> = Omit<
+type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> = Pick<
   SolidQueryOptions<
     inferProcedureOutput<Proc>,
     DefaultError,
     inferProcedureInput<Proc>
   >,
-  "queryKey"
+  "meta" | "enabled"
 > &
   WithInput<Proc> &
   WithMapFn<Proc, MappedType>;

@@ -70,10 +70,10 @@ export function useGameActions() {
   const state = useContext(GameStateClientContext);
 
   const trpc = useTRPC();
-  const moveMutation = trpc.character.move.createMutation(config);
-  const joinMutation = trpc.character.join.createMutation(config);
-  const attackMutation = trpc.character.attack.createMutation(config);
-  const respawnMutation = trpc.character.respawn.createMutation(config);
+  const moveMutation = trpc.character.move.createMutation();
+  const joinMutation = trpc.character.join.createMutation();
+  const attackMutation = trpc.character.attack.createMutation();
+  const respawnMutation = trpc.character.respawn.createMutation();
 
   const move = dedupe(
     throttle(
@@ -97,8 +97,6 @@ export function useGameActions() {
     attack,
   };
 }
-
-const config = () => ({ meta: { invalidateCache: false } });
 
 export const GameStateClientContext = createContext<GameStateClient>(
   new Proxy({} as GameStateClient, {

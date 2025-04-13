@@ -10,7 +10,6 @@ export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const trpc = useTRPC();
 
   return trpc.area.areaFileUrl.createQuery(() => ({
-    refetchOnWindowFocus: false,
     input: areaId?.() ?? skipToken,
     async map(url, input) {
       const result = await loadTiled(url);

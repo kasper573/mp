@@ -25,7 +25,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
       <Match
         when={
           state.readyState() !== "open" ||
-          area.isLoading ||
+          area.isLoading() ||
           // AreaId would be null if the initial game state hasn't been received yet
           !state.areaId()
         }
@@ -33,7 +33,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
         {/** TODO replace with specialized loading screen for loading areas */}
         <LoadingSpinner />
       </Match>
-      <Match when={area.data} keyed>
+      <Match when={area.data()} keyed>
         {(data) => (
           <Application
             class={clsx(styles.container, props.class)}

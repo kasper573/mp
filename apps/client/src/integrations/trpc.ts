@@ -6,11 +6,9 @@ import {
   httpBatchLink,
   createTRPCHook,
 } from "@mp/solid-trpc";
-import { QueryClientContext } from "@mp/solid-trpc";
 import { useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { env } from "../env";
-import { LoggerContext } from "../logger";
 
 export function createTRPCClient() {
   return createTRPCSolidClient<RootRouter>({
@@ -28,7 +26,6 @@ export function createTRPCClient() {
       }),
     ],
     createRequestContext,
-    createMutationHandler,
   });
 }
 
@@ -39,17 +36,4 @@ type RequestContext = ReturnType<typeof createRequestContext>;
 function createRequestContext() {
   const { identity } = useContext(AuthContext);
   return { identity };
-}
-
-function createMutationHandler() {
-  const query = useContext(QueryClientContext);
-  const logger = useContext(LoggerContext);
-  return function onMutation({ meta: { invalidateCache = true } = {} }) {
-    if (invalidateCache) {
-      // Invalidate all queries on successful mutations
-      // This is a bit inefficient, but it promotes correctness over performance.
-      logger.info("Invalidating all queries due to successful mutation");
-      void query?.().invalidateQueries();
-    }
-  };
 }
