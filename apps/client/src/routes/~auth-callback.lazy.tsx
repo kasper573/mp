@@ -1,9 +1,9 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createLazyFileRoute } from "@tanstack/solid-router";
 import { AuthContext } from "@mp/auth/client";
 import { useNavigate } from "@tanstack/solid-router";
 import { createResource, useContext } from "solid-js";
 
-export const Route = createFileRoute("/auth-callback")({
+export const Route = createLazyFileRoute("/auth-callback")({
   component: RouteComponent,
 });
 

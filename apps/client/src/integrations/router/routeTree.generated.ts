@@ -8,46 +8,57 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
+import { createFileRoute } from '@tanstack/solid-router'
+
 // Import Routes
 
 import { Route as rootRoute } from './../../routes/~__root'
-import { Route as SandboxImport } from './../../routes/~sandbox'
-import { Route as PlayImport } from './../../routes/~play'
-import { Route as ContactImport } from './../../routes/~contact'
-import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
-import { Route as IndexImport } from './../../routes/~index'
+
+// Create Virtual Routes
+
+const SandboxLazyImport = createFileRoute('/sandbox')()
+const PlayLazyImport = createFileRoute('/play')()
+const ContactLazyImport = createFileRoute('/contact')()
+const AuthCallbackLazyImport = createFileRoute('/auth-callback')()
+const IndexLazyImport = createFileRoute('/')()
 
 // Create/Update Routes
 
-const SandboxRoute = SandboxImport.update({
+const SandboxLazyRoute = SandboxLazyImport.update({
   id: '/sandbox',
   path: '/sandbox',
   getParentRoute: () => rootRoute,
-} as any)
+} as any).lazy(() =>
+  import('./../../routes/~sandbox.lazy').then((d) => d.Route),
+)
 
-const PlayRoute = PlayImport.update({
+const PlayLazyRoute = PlayLazyImport.update({
   id: '/play',
   path: '/play',
   getParentRoute: () => rootRoute,
-} as any)
+} as any).lazy(() => import('./../../routes/~play.lazy').then((d) => d.Route))
 
-const ContactRoute = ContactImport.update({
+const ContactLazyRoute = ContactLazyImport.update({
   id: '/contact',
   path: '/contact',
   getParentRoute: () => rootRoute,
-} as any)
+} as any).lazy(() =>
+  import('./../../routes/~contact.lazy').then((d) => d.Route),
+)
 
-const AuthCallbackRoute = AuthCallbackImport.update({
+const AuthCallbackLazyRoute = AuthCallbackLazyImport.update({
   id: '/auth-callback',
   path: '/auth-callback',
   getParentRoute: () => rootRoute,
-} as any)
+} as any).lazy(() =>
+  import('./../../routes/~auth-callback.lazy').then((d) => d.Route),
+)
 
-const IndexRoute = IndexImport.update({
+const IndexLazyRoute = IndexLazyImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRoute,
-} as any)
+} as any).lazy(() => import('./../../routes/~index.lazy').then((d) => d.Route))
 
 // Populate the FileRoutesByPath interface
 
@@ -57,35 +68,35 @@ declare module '@tanstack/solid-router' {
       id: '/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexImport
+      preLoaderRoute: typeof IndexLazyImport
       parentRoute: typeof rootRoute
     }
     '/auth-callback': {
       id: '/auth-callback'
       path: '/auth-callback'
       fullPath: '/auth-callback'
-      preLoaderRoute: typeof AuthCallbackImport
+      preLoaderRoute: typeof AuthCallbackLazyImport
       parentRoute: typeof rootRoute
     }
     '/contact': {
       id: '/contact'
       path: '/contact'
       fullPath: '/contact'
-      preLoaderRoute: typeof ContactImport
+      preLoaderRoute: typeof ContactLazyImport
       parentRoute: typeof rootRoute
     }
     '/play': {
       id: '/play'
       path: '/play'
       fullPath: '/play'
-      preLoaderRoute: typeof PlayImport
+      preLoaderRoute: typeof PlayLazyImport
       parentRoute: typeof rootRoute
     }
     '/sandbox': {
       id: '/sandbox'
       path: '/sandbox'
       fullPath: '/sandbox'
-      preLoaderRoute: typeof SandboxImport
+      preLoaderRoute: typeof SandboxLazyImport
       parentRoute: typeof rootRoute
     }
   }
@@ -94,28 +105,28 @@ declare module '@tanstack/solid-router' {
 // Create and export the route tree
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
+  '/': typeof IndexLazyRoute
+  '/auth-callback': typeof AuthCallbackLazyRoute
+  '/contact': typeof ContactLazyRoute
+  '/play': typeof PlayLazyRoute
+  '/sandbox': typeof SandboxLazyRoute
 }
 
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
+  '/': typeof IndexLazyRoute
+  '/auth-callback': typeof AuthCallbackLazyRoute
+  '/contact': typeof ContactLazyRoute
+  '/play': typeof PlayLazyRoute
+  '/sandbox': typeof SandboxLazyRoute
 }
 
 export interface FileRoutesById {
   __root__: typeof rootRoute
-  '/': typeof IndexRoute
-  '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
+  '/': typeof IndexLazyRoute
+  '/auth-callback': typeof AuthCallbackLazyRoute
+  '/contact': typeof ContactLazyRoute
+  '/play': typeof PlayLazyRoute
+  '/sandbox': typeof SandboxLazyRoute
 }
 
 export interface FileRouteTypes {
@@ -128,19 +139,19 @@ export interface FileRouteTypes {
 }
 
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  AuthCallbackRoute: typeof AuthCallbackRoute
-  ContactRoute: typeof ContactRoute
-  PlayRoute: typeof PlayRoute
-  SandboxRoute: typeof SandboxRoute
+  IndexLazyRoute: typeof IndexLazyRoute
+  AuthCallbackLazyRoute: typeof AuthCallbackLazyRoute
+  ContactLazyRoute: typeof ContactLazyRoute
+  PlayLazyRoute: typeof PlayLazyRoute
+  SandboxLazyRoute: typeof SandboxLazyRoute
 }
 
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  AuthCallbackRoute: AuthCallbackRoute,
-  ContactRoute: ContactRoute,
-  PlayRoute: PlayRoute,
-  SandboxRoute: SandboxRoute,
+  IndexLazyRoute: IndexLazyRoute,
+  AuthCallbackLazyRoute: AuthCallbackLazyRoute,
+  ContactLazyRoute: ContactLazyRoute,
+  PlayLazyRoute: PlayLazyRoute,
+  SandboxLazyRoute: SandboxLazyRoute,
 }
 
 export const routeTree = rootRoute
@@ -161,19 +172,19 @@ export const routeTree = rootRoute
       ]
     },
     "/": {
-      "filePath": "~index.tsx"
+      "filePath": "~index.lazy.tsx"
     },
     "/auth-callback": {
-      "filePath": "~auth-callback.tsx"
+      "filePath": "~auth-callback.lazy.tsx"
     },
     "/contact": {
-      "filePath": "~contact.tsx"
+      "filePath": "~contact.lazy.tsx"
     },
     "/play": {
-      "filePath": "~play.tsx"
+      "filePath": "~play.lazy.tsx"
     },
     "/sandbox": {
-      "filePath": "~sandbox.tsx"
+      "filePath": "~sandbox.lazy.tsx"
     }
   }
 }

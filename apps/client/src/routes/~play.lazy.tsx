@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createLazyFileRoute } from "@tanstack/solid-router";
 import {
   AreaDebugUIContext,
   AreaSceneContext,
@@ -11,7 +11,7 @@ import { useTRPC } from "../integrations/trpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";
 
-export const Route = createFileRoute("/play")({
+export const Route = createLazyFileRoute("/play")({
   component: RouteComponent,
 });
 

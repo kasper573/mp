@@ -14,7 +14,11 @@ export default defineConfig({
       routeFilePrefix: "~",
       routesDirectory: "src/routes",
       generatedRouteTree: "src/integrations/router/routeTree.generated.ts",
-      autoCodeSplitting: true,
+      // Can't use auto code splitting for some reason.
+      // It seems to be causing weird suspense boundary triggers
+      // (debugged for a full day, i have no idea why. I suspect bugs in tanstack router)
+      // Instead, just use the manual code splitting by naming route files .lazy.tsx
+      autoCodeSplitting: false,
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),

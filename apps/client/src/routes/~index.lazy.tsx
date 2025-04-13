@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createLazyFileRoute } from "@tanstack/solid-router";
 import { Button } from "@mp/ui";
 import { Link } from "../ui/link";
 
-export const Route = createFileRoute("/")({
+export const Route = createLazyFileRoute("/")({
   component: RouteComponent,
 });
 
