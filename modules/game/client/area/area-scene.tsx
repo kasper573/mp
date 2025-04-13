@@ -17,7 +17,7 @@ import {
 import { createQuery } from "@mp/solid-trpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import type { AreaResource } from "../../shared";
-import { GameStateClientContext } from "../game-state-client";
+import { GameStateClientContext, useGameActions } from "../game-state-client";
 import { Actor } from "./actor";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
@@ -29,6 +29,7 @@ import { toggleSignal } from "./toggle-signal";
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
+  const actions = useGameActions();
   const { renderedTileCount } = useContext(AreaSceneContext);
   const [debug, toggleDebug] = toggleSignal();
 
@@ -100,11 +101,11 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     if (engine.pointer.isDown) {
       const entity = untrack(entityAtPointer);
       if (entity) {
-        void state.attack(entity.id);
+        void actions.attack(entity.id);
       } else {
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
-          state.move(tileNode.data.vector);
+          actions.move(tileNode.data.vector);
         }
       }
     }

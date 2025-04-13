@@ -20,9 +20,8 @@ import type { ActorId, Character, GameState } from "@mp-modules/game";
 export function createGameStateClient(
   wsUrlForToken: (token?: string) => string,
 ) {
-  const trpc = useTRPC();
-  const { identity } = useContext(AuthContext);
-  const id = createMemo(() => identity()?.id);
+  const auth = useContext(AuthContext);
+  const id = createMemo(() => auth.identity()?.id);
 
   const socket = new EnhancedWebSocket();
   const gameState = createMutable<GameState>({ actors: {} });
@@ -37,26 +36,6 @@ export function createGameStateClient(
     actors().filter((actor) => actor.areaId === areaId()),
   );
 
-  // TODO: refactor
-  const moveMutation = trpc.character.move.createMutation(config);
-  const joinMutation = trpc.character.join.createMutation(config);
-  const attackMutation = trpc.character.attack.createMutation(config);
-  const respawnMutation = trpc.character.respawn.createMutation(config);
-
-  const move = dedupe(
-    throttle(
-      // eslint-disable-next-line solid/reactivity
-      (to: Vector<Tile>) =>
-        moveMutation.mutateAsync({ characterId: characterId()!, to }),
-      100,
-    ),
-    (a, b) => a.equals(b),
-  );
-  const attack = (targetId: ActorId) =>
-    attackMutation.mutateAsync({ characterId: characterId()!, targetId });
-
-  const respawn = () => respawnMutation.mutateAsync(characterId()!);
-
   onCleanup(
     socket.subscribeToMessage((message) => {
       if (isSyncMessage(message)) {
@@ -70,22 +49,49 @@ export function createGameStateClient(
 
   createEffect(() => {
     if (id() !== undefined) {
-      const url = wsUrlForToken(identity()?.token);
+      const url = wsUrlForToken(auth.identity()?.token);
       untrack(() => socket.start(url));
       onCleanup(socket.stop);
     }
   });
 
-  const join = () => joinMutation.mutateAsync().then(setCharacterId);
-
   return {
     actorsInArea,
     readyState,
     gameState,
-    respawn,
+    setCharacterId,
     areaId,
     characterId,
     character,
+  };
+}
+
+export function useGameActions() {
+  const state = useContext(GameStateClientContext);
+
+  const trpc = useTRPC();
+  const moveMutation = trpc.character.move.createMutation(config);
+  const joinMutation = trpc.character.join.createMutation(config);
+  const attackMutation = trpc.character.attack.createMutation(config);
+  const respawnMutation = trpc.character.respawn.createMutation(config);
+
+  const move = dedupe(
+    throttle(
+      (to: Vector<Tile>) =>
+        moveMutation.mutateAsync({ characterId: state.characterId()!, to }),
+      100,
+    ),
+    (a, b) => a.equals(b),
+  );
+  const attack = (targetId: ActorId) =>
+    attackMutation.mutateAsync({ characterId: state.characterId()!, targetId });
+
+  const respawn = () => respawnMutation.mutateAsync(state.characterId()!);
+
+  const join = () => joinMutation.mutateAsync().then(state.setCharacterId);
+
+  return {
+    respawn,
     join,
     move,
     attack,

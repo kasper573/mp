@@ -1,15 +1,14 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { useContext } from "solid-js";
-import { GameStateClientContext } from "../game-state-client";
+import { useGameActions } from "../game-state-client";
 
 export function RespawnDialog(props: DialogProps) {
-  const state = useContext(GameStateClientContext);
+  const actions = useGameActions();
 
   return (
     <Dialog {...props}>
       <h1>You are dead</h1>
-      <Button onClick={() => void state.respawn()}>Respawn</Button>
+      <Button onClick={() => void actions.respawn()}>Respawn</Button>
     </Dialog>
   );
 }

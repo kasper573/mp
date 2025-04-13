@@ -5,17 +5,18 @@ import { useContext, createEffect, Switch, Match } from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
 import * as styles from "./game.css";
-import { GameStateClientContext } from "./game-state-client";
+import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);
+  const actions = useGameActions();
   const area = useAreaResource(state.areaId);
 
   createEffect(() => {
     if (state.readyState() === "open") {
-      void state.join();
+      void actions.join();
     }
   });
 
