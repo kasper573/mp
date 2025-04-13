@@ -75,9 +75,9 @@ export function AreaDebugUI(props: {
             />
           </div>
           <div>
-            <Button on:click={() => spawnNPC.mutate()}>Spawn random NPC</Button>
+            <Button on:click={() => void spawnNPC()}>Spawn random NPC</Button>
             <Button
-              on:click={() => kill.mutate({ targetId: state.characterId()! })}
+              on:click={() => void kill({ targetId: state.characterId()! })}
             >
               Die
             </Button>

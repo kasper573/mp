@@ -5,7 +5,6 @@ import type {
 } from "@tanstack/solid-query";
 import {
   skipToken,
-  useMutation,
   useQueryClient,
   type SkipToken,
   type SolidMutationOptions,
@@ -46,7 +45,6 @@ export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
         return createTRPCMutationFn(
           client,
           path.slice(0, -1),
-          createMutationHandler,
           createRequestContext,
         ) as AnyFunction;
       default:
@@ -128,26 +126,15 @@ function createTRPCQueryFn<TRouter extends AnyTRPCRouter>(
 function createTRPCMutationFn<TRouter extends AnyTRPCRouter>(
   trpc: CreateTRPCClient<TRouter>,
   path: string[],
-  createMutationHandler: MutationHandlerFactory | undefined,
   createRequestContext: RequestContextFactory | undefined,
 ): CreateMutationFn<AnyProcedure> {
-  return (createOptions) => {
-    const onMutation = createMutationHandler?.();
+  return () => {
     const context = createRequestContext?.();
-    return useMutation(() => {
-      async function mutationFn(input: unknown) {
-        const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
-        const output = await mutate(input, { context });
-        const { map, meta } = createOptions?.() ?? {};
-        await onMutation?.({ input, output, meta });
-        return map ? map(output, input) : output;
-      }
-      return {
-        ...createOptions?.(),
-        mutationKey: path,
-        mutationFn,
-      } as never;
-    });
+    return async function mutationFn(input: unknown): Promise<never> {
+      const mutate = getPropAt(trpc, [...path, "mutate"]) as AnyFunction;
+      const output = await mutate(input, { context });
+      return output as never;
+    };
   };
 }
 
@@ -226,9 +213,11 @@ type CreateQueryFn<Proc extends AnyProcedure> = <
 
 type CreateMutationFn<Proc extends AnyProcedure> = <
   MappedType = inferProcedureOutput<Proc>,
->(
-  options?: () => TRPCMutationOptions<Proc, MappedType>,
-) => UseMutationResult<MappedType, DefaultError, inferProcedureInput<Proc>>;
+>() => UseMutationResult<
+  MappedType,
+  DefaultError,
+  inferProcedureInput<Proc>
+>["mutateAsync"];
 
 type TRPCQueryOptions<Proc extends AnyProcedure, MappedType> = Pick<
   SolidQueryOptions<

@@ -78,17 +78,17 @@ export function useGameActions() {
   const move = dedupe(
     throttle(
       (to: Vector<Tile>) =>
-        moveMutation.mutateAsync({ characterId: state.characterId()!, to }),
+        moveMutation({ characterId: state.characterId()!, to }),
       100,
     ),
     (a, b) => a.equals(b),
   );
   const attack = (targetId: ActorId) =>
-    attackMutation.mutateAsync({ characterId: state.characterId()!, targetId });
+    attackMutation({ characterId: state.characterId()!, targetId });
 
-  const respawn = () => respawnMutation.mutateAsync(state.characterId()!);
+  const respawn = () => respawnMutation(state.characterId()!);
 
-  const join = () => joinMutation.mutateAsync().then(state.setCharacterId);
+  const join = () => joinMutation().then(state.setCharacterId);
 
   return {
     respawn,
