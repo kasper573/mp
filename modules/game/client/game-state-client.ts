@@ -18,12 +18,11 @@ import { type CharacterId } from "@mp-modules/game";
 import type { ActorId, Character, GameState } from "@mp-modules/game";
 
 export function createGameStateClient(
-  wsUrlForToken: (token?: string) => string,
+  wsUrlForToken: (token: string) => string,
 ) {
-  const auth = useContext(AuthContext);
-  const id = createMemo(() => auth.identity()?.id);
-
   const socket = new EnhancedWebSocket();
+  const auth = useContext(AuthContext);
+  const getToken = createMemo(() => auth.identity()?.token);
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
@@ -48,8 +47,9 @@ export function createGameStateClient(
   onCleanup(socket.subscribeToReadyState(setReadyState));
 
   createEffect(() => {
-    if (id() !== undefined) {
-      const url = wsUrlForToken(auth.identity()?.token);
+    const token = getToken();
+    if (token !== undefined) {
+      const url = wsUrlForToken(token);
       untrack(() => socket.start(url));
       onCleanup(socket.stop);
     }
