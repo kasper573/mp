@@ -6,3 +6,4 @@ pnpm-lock.yaml
 docker/grafana/dashboards
 docker/keycloak/import
 **/*.generated.*
+**/*.gen.*

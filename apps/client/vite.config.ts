@@ -13,7 +13,7 @@ export default defineConfig({
       target: "solid",
       routeFilePrefix: "~",
       routesDirectory: "src/routes",
-      generatedRouteTree: "src/integrations/router/routeTree.generated.ts",
+      generatedRouteTree: "src/integrations/router/routeTree.gen.ts",
       autoCodeSplitting: true,
     }),
     disallowExternalizingPlugin(),

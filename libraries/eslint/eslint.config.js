@@ -27,6 +27,7 @@ export default tseslint.config(
       "pnpm-lock.yaml",
       "**/apps/server/public/tilesets/**",
       "**/*.generated.*",
+      "**/*.gen.*",
     ],
   },
   eslint.configs.recommended,
