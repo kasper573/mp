@@ -1,9 +1,16 @@
 import { EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
+import {
+  useContext,
+  createEffect,
+  Switch,
+  Match,
+  Suspense,
+  ErrorBoundary,
+} from "solid-js";
 import { clsx } from "@mp/style";
-import { LoadingSpinner } from "@mp/ui";
+import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
@@ -27,16 +34,25 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
           <Suspense
             fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
           >
-            <Application
-              class={clsx(styles.container, props.class)}
-              style={props.style}
-            >
-              {({ viewport }) => (
-                <EngineProvider viewport={viewport}>
-                  <AreaScene area={data} />
-                </EngineProvider>
+            <ErrorBoundary
+              fallback={(error, reset) => (
+                <ErrorFallback
+                  error={new Error("Renderer error", { cause: error })}
+                  reset={reset}
+                />
               )}
-            </Application>
+            >
+              <Application
+                class={clsx(styles.container, props.class)}
+                style={props.style}
+              >
+                {({ viewport }) => (
+                  <EngineProvider viewport={viewport}>
+                    <AreaScene area={data} />
+                  </EngineProvider>
+                )}
+              </Application>
+            </ErrorBoundary>
           </Suspense>
         )}
       </Match>
