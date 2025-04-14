@@ -13,8 +13,8 @@ import {
   createContext,
   Show,
   onCleanup,
+  createResource,
 } from "solid-js";
-import { createQuery } from "@mp/rpc";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import type { AreaResource } from "../..";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
@@ -33,10 +33,10 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const { renderedTileCount } = useContext(AreaSceneContext);
   const [debug, toggleDebug] = toggleSignal();
 
-  const spritesheets = createQuery(() => ({
-    queryKey: ["tiled-spritesheets", props.area.id],
-    queryFn: () => loadTiledMapSpritesheets(props.area.tiled.map),
-  }));
+  const [spritesheets] = createResource(
+    () => props.area.tiled.map,
+    loadTiledMapSpritesheets,
+  );
 
   const myCoords = useAnimatedCoords(
     () => state.character()?.coords ?? Vector.zero<Tile>(),
@@ -122,23 +122,27 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         sortableChildren
         matrix={engine.camera.transform.data}
       >
-        {spritesheets.data && (
-          <TiledRenderer
-            layers={props.area.tiled.map.layers.filter(
-              (l) => l.type !== "objectgroup",
-            )}
-            spritesheets={spritesheets.data}
-            label={props.area.id}
-          >
-            {{
-              [props.area.characterLayer.name]: () => (
-                <For each={state.actorsInArea()}>
-                  {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
-                </For>
-              ),
-            }}
-          </TiledRenderer>
-        )}
+        <Show when={spritesheets()} keyed>
+          {(data) => (
+            <TiledRenderer
+              layers={props.area.tiled.map.layers.filter(
+                (l) => l.type !== "objectgroup",
+              )}
+              spritesheets={data}
+              label={props.area.id}
+            >
+              {{
+                [props.area.characterLayer.name]: () => (
+                  <For each={state.actorsInArea()}>
+                    {(actor) => (
+                      <Actor tiled={props.area.tiled} actor={actor} />
+                    )}
+                  </For>
+                ),
+              }}
+            </TiledRenderer>
+          )}
+        </Show>
         {props.children}
         <TileHighlight area={props.area} target={highlightTarget()} />
         <Show when={debug()}>
