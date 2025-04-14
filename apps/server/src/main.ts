@@ -5,7 +5,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import { createPatchStateMachine, flushPatches } from "@mp/sync";
+import { createPatchStateMachine, flushAndSendPatches } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
@@ -211,11 +211,8 @@ persistTicker.start();
 updateTicker.start();
 
 function flushGameState() {
-  return flushPatches({
-    state: gameState,
-    getSender: (clientId) => {
-      const socket = webSockets.get(clientId);
-      return socket?.send.bind(socket);
-    },
+  return flushAndSendPatches(gameState, (clientId) => {
+    const socket = webSockets.get(clientId);
+    return socket?.send.bind(socket);
   });
 }

@@ -1,16 +1,16 @@
 import { encodeServerToClientMessage } from "./encoding";
 import type { PatchableState } from "./patch-state-machine";
 import type { PatchStateMachine } from "./patch-state-machine";
-
 import type { ClientId } from "./shared";
 
-export async function flushPatches<State extends PatchableState>(
-  opt: FlushPatchesOptions<State>,
+export async function flushAndSendPatches<State extends PatchableState>(
+  state: PatchStateMachine<State>,
+  getSenderForClient: (clientId: ClientId) => BufferSender | undefined,
 ): Promise<void> {
   const promises: Promise<unknown>[] = [];
 
-  for (const [clientId, patch] of opt.state.flush()) {
-    const send = opt.getSender(clientId);
+  for (const [clientId, patch] of state.flush()) {
+    const send = getSenderForClient(clientId);
     if (send) {
       const result = send(encodeServerToClientMessage(patch));
       if (result instanceof Promise) {
@@ -22,9 +22,4 @@ export async function flushPatches<State extends PatchableState>(
   await Promise.all(promises);
 }
 
-export interface FlushPatchesOptions<State extends PatchableState> {
-  state: PatchStateMachine<State>;
-  getSender: (
-    clientId: ClientId,
-  ) => ((buffer: Uint8Array<ArrayBufferLike>) => unknown) | undefined;
-}
+export type BufferSender = (buffer: Uint8Array<ArrayBufferLike>) => unknown;
