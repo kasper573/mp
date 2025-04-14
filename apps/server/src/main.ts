@@ -13,7 +13,7 @@ import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import { ctxSessionId, ctxUserIdentity } from "@mp/game";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createDBClient } from "@mp/db";
+import { createDBClient } from "@mp/db/server";
 import { uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
 import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game";
