@@ -4,7 +4,7 @@ import {
   adjectives,
   animals,
 } from "unique-names-generator";
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { randomItem, recordValues, uuid } from "@mp/std";

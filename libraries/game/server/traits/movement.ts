@@ -1,5 +1,5 @@
 import type { Path, Vector } from "@mp/math";
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";

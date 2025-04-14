@@ -134,10 +134,6 @@ export const serverOptionsSchema = object({
    * Whether to enable rate limiting
    */
   rateLimit: boolish(),
-  /**
-   * The type of encoder to use for syncing patches to clients
-   */
-  syncPatchEncoder: picklist(["sync", "worker"]),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

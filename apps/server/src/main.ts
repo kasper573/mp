@@ -5,7 +5,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
+import { createPatchStateMachine, flushPatches } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
@@ -17,7 +17,7 @@ import { createDBClient } from "@mp/db";
 import { uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
 import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game";
-import type { GameState, GameStateServer, SessionId } from "@mp/game";
+import type { GameState, SessionId } from "@mp/game";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -159,16 +159,6 @@ const gameState = createPatchStateMachine<GameState>({
   ),
 });
 
-const syncServer: GameStateServer = new SyncServer({
-  encoder: opt.syncPatchEncoder,
-  state: gameState,
-  onError: logger.error,
-  getSender: (clientId) => {
-    const socket = webSockets.get(clientId);
-    return socket?.send.bind(socket);
-  },
-});
-
 const npcService = new NPCService(db);
 const gameService = new GameService(db);
 
@@ -206,7 +196,7 @@ updateTicker.subscribe(npcAIBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
 updateTicker.subscribe(combatBehavior(gameState));
-updateTicker.subscribe(syncServer.flush);
+updateTicker.subscribe(flushGameState);
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
@@ -219,4 +209,13 @@ httpServer.listen(opt.port, opt.hostname, () => {
 
 persistTicker.start();
 updateTicker.start();
-syncServer.start();
+
+function flushGameState() {
+  return flushPatches({
+    state: gameState,
+    getSender: (clientId) => {
+      const socket = webSockets.get(clientId);
+      return socket?.send.bind(socket);
+    },
+  });
+}

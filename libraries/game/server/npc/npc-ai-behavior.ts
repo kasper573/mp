@@ -1,4 +1,4 @@
-import type { PatchStateMachine } from "@mp/sync/server";
+import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";

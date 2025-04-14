@@ -1,4 +1,4 @@
-import type { ClientVisibilityFactory } from "@mp/sync/server";
+import type { ClientVisibilityFactory } from "@mp/sync";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import { clientViewDistanceRect } from "../shared/client-view-distance-rect";

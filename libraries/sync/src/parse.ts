@@ -1,5 +1,5 @@
 import { applyPatch } from "./patch";
-import { decodeServerToClientMessage } from "./message-decoder";
+import { decodeServerToClientMessage } from "./encoding";
 
 export function parseSyncMessage(buffer: SyncMessage) {
   const patch = decodeServerToClientMessage(buffer);

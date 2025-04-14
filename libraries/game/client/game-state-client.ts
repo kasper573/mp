@@ -12,7 +12,7 @@ import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { AuthContext } from "@mp/auth/client";
 import { EnhancedWebSocket } from "@mp/ws/client";
-import { isSyncMessage, parseSyncMessage } from "@mp/sync/client";
+import { isSyncMessage, parseSyncMessage } from "@mp/sync";
 import { useRPC } from "../rpc.slice";
 import { type CharacterId } from "@mp/game";
 import type { ActorId, Character, GameState } from "@mp/game";
