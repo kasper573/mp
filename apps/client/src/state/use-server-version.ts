@@ -6,7 +6,7 @@ export const useVersionCompatibility = () => {
   const rpc = useRPC();
   const serverVersion = rpc.system.buildVersion.createQuery();
   const compatibility = createMemo(() => {
-    if (serverVersion.status === "success") {
+    if (serverVersion.data) {
       return env.buildVersion === serverVersion.data
         ? "compatible"
         : "incompatible";

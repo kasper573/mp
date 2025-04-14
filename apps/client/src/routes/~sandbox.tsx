@@ -3,6 +3,7 @@ import { createSignal, createMemo, onCleanup, createEffect } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorToString } from "@mp/ui";
+import { skipToken } from "@mp/rpc";
 import { useRPC } from "../integrations/rpc";
 
 export const Route = createFileRoute("/sandbox")({
@@ -24,7 +25,7 @@ function ErrorTester() {
   const [rpcError, setRPCError] = createSignal(false);
 
   const query = rpc.system.testError.createQuery(() => ({
-    enabled: rpcError(),
+    input: rpcError() ? void 0 : skipToken,
   }));
 
   return (

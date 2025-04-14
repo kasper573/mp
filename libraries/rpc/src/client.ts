@@ -91,13 +91,15 @@
 //   };
 // }
 
-export const TRPCClientContext = createContext(
-  new Proxy({} as TRPCSolidClientLike, {
-    get() {
-      throw new Error("TRPCClientContext must be provided");
-    },
-  }),
-);
+export const foo = 123;
+
+// export const TRPCClientContext = createContext(
+//   new Proxy({} as TRPCSolidClientLike, {
+//     get() {
+//       throw new Error("TRPCClientContext must be provided");
+//     },
+//   }),
+// );
 
 const clientSymbol = Symbol("TRPCClient");
 
