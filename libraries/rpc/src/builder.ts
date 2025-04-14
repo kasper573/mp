@@ -61,7 +61,8 @@ interface MutationNode<Context, Input, Output, MWContext>
   handler: ProcedureHandler<Context, Input, Output, MWContext>;
 }
 
-interface RouterNode<Routes extends AnyRouteRecord> extends RPCNode<"router"> {
+export interface RouterNode<Routes extends AnyRouteRecord>
+  extends RPCNode<"router"> {
   routes: Routes;
 }
 

@@ -4,7 +4,6 @@ import { object, string, parseEnv, csv, boolish, fallback } from "@mp/env";
 export type ClientEnv = InferOutput<typeof clientEnvSchema>;
 
 const clientEnvSchema = object({
-  apiUrl: string(),
   wsUrl: string(),
   buildVersion: string(),
   retryRpcQueries: fallback(boolish(), false),

@@ -11,13 +11,13 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
 import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxAuthServer, ctxAuthToken, ctxSessionId } from "@mp/game";
+import { ctxSessionId, ctxUserIdentity } from "@mp/game";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db";
 import { uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
 import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game";
-import type { GameState, GameStateServer } from "@mp/game";
+import type { GameState, GameStateServer, SessionId } from "@mp/game";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -53,9 +53,7 @@ import {
   webSocketTokenParam,
 } from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
-import { deriveAuthToken } from "./express/auth-token";
-import { deriveSessionId } from "./express/session-id";
-import { createExpressRpcMiddleware } from "./express/rpc";
+import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
 
 registerSyncExtensions();
 
@@ -104,20 +102,16 @@ const wsHandshakeLimiter = new RateLimiter({
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
 const webSockets = new Map<ClientId, WebSocket>();
+const socketInfo = new Map<
+  WebSocket,
+  { user: UserIdentity; sessionId: SessionId }
+>();
 
 const wss = createWSSWithHandshake<UserIdentity, ClientId>({
   httpServer,
   path: opt.wsEndpointPath,
-  onConnection: (socket, handshake) => {
-    clients.add(handshake.id, handshake.payload.id);
-    webSockets.set(handshake.id, socket);
-    socket.addEventListener("close", () => {
-      clients.remove(handshake.id);
-      webSockets.delete(handshake.id);
-    });
-  },
   createSocketId: () => uuid() as ClientId,
-  onError: (...args) => logger.error("[WSS]", ...args),
+  onError: logger.error,
   async handshake(clientId, req) {
     // .url is in fact a path, so baseUrl does not matter
     const url = req.url ? new URL(req.url, "http://localhost") : undefined;
@@ -126,6 +120,32 @@ const wss = createWSSWithHandshake<UserIdentity, ClientId>({
     return result.asyncAndThrough((user) =>
       wsHandshakeLimiter.consume(user.id),
     );
+  },
+  onConnection(socket, handshake) {
+    const sessionId = String(handshake.id) as SessionId;
+    socketInfo.set(socket, { user: handshake.payload, sessionId });
+    clients.add(handshake.id, handshake.payload.id);
+    webSockets.set(handshake.id, socket);
+    socket.addEventListener("close", () => {
+      clients.remove(handshake.id);
+      webSockets.delete(handshake.id);
+      socketInfo.delete(socket);
+    });
+  },
+});
+
+acceptRpcViaWebSockets({
+  wss,
+  onError: logger.error,
+  router: rootRouter,
+  createContext: (socket) => {
+    const info = socketInfo.get(socket);
+    if (info) {
+      return ioc
+        .provide(ctxSessionId, info.sessionId)
+        .provide(ctxUserIdentity, info.user);
+    }
+    return ioc;
   },
 });
 
@@ -142,7 +162,7 @@ const gameState = createPatchStateMachine<GameState>({
 const syncServer: GameStateServer = new SyncServer({
   encoder: opt.syncPatchEncoder,
   state: gameState,
-  onError: (...args) => logger.error("[SyncServer]", ...args),
+  onError: logger.error,
   getSender: (clientId) => {
     const socket = webSockets.get(clientId);
     return socket?.send.bind(socket);
@@ -167,7 +187,6 @@ const updateTicker = new Ticker({
 const characterService = new CharacterService(db, areas);
 
 const ioc = new InjectionContainer()
-  .provide(ctxAuthServer, auth)
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
   .provide(ctxRpcErrorFormatter, errorFormatter)
   .provide(ctxNpcService, npcService)
@@ -177,18 +196,6 @@ const ioc = new InjectionContainer()
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
   );
-
-webServer.use(
-  opt.apiEndpointPath,
-  createExpressRpcMiddleware({
-    onError: ({ error }) => logger.error(error),
-    router: rootRouter,
-    createContext: (req) =>
-      ioc
-        .provide(ctxSessionId, deriveSessionId(req))
-        .provide(ctxAuthToken, deriveAuthToken(req)),
-  }),
-);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);

@@ -9,7 +9,7 @@ export interface WSSWithHandshakeOptions<HandshakePayload, SocketId> {
   path: string;
   handshake: WSSHandshakeFn<HandshakePayload, SocketId>;
   createSocketId: () => SocketId;
-  onError?: (...args: unknown[]) => unknown;
+  onError?: (error: Error) => unknown;
   onConnection?: (
     ws: WebSocket,
     handshake: WSSHandshake<HandshakePayload, SocketId>,
@@ -43,7 +43,7 @@ export function createWSSWithHandshake<HandshakePayload, SocketId>(
     handshakes.delete(req);
     if (!handshake) {
       opt.onError?.(
-        "Connection received but no handshake available for request",
+        new Error("Connection received but no handshake available for request"),
       );
       return;
     }
@@ -62,11 +62,14 @@ export function createWSSWithHandshake<HandshakePayload, SocketId>(
         handshakes.set(req, { id, payload: result.value });
         return true;
       } else {
-        opt.onError?.("Handshake failed", result.error);
+        opt.onError?.(
+          new Error("Handshake failed", { cause: new Error(result.error) }),
+        );
       }
     } catch (error) {
-      opt.onError?.("Error during handshake", error);
-      // noop
+      opt.onError?.(
+        new Error("Unexpected error during handshake", { cause: error }),
+      );
     }
 
     return false;

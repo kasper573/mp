@@ -1,12 +1,3 @@
-export class RPCClient<Routes> {
-  constructor(public options: RPCClientOptions) {}
-}
-
-export interface RPCClientOptions {
-  url: string;
-  headers?: () => Record<string, string | undefined>;
-}
-
 // export function createTRPCSolidClient<TRouter extends AnyTRPCRouter>({
 //   createMutationHandler,
 //   createRequestContext,

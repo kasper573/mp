@@ -1,20 +1,20 @@
 import type { RootRouter } from "@mp/server";
-import { createRPCHook, RPCClient } from "@mp/rpc";
-import { useContext } from "solid-js";
-import { AuthContext } from "@mp/auth/client";
-import { env } from "../env";
+import type { RPCNodeApi } from "@mp/rpc";
+import { createRPCNodeApi } from "@mp/rpc";
+import { createContext, useContext } from "solid-js";
 
-export function createRPCClient() {
-  return new RPCClient<RootRouter>({
-    url: env.apiUrl,
-    headers() {
-      const { identity } = useContext(AuthContext);
-      const token = identity()?.token;
-      return {
-        Authorization: token ? `Bearer ${token}` : undefined,
-      };
-    },
-  });
+export type RPCClient = RPCNodeApi<RootRouter>;
+
+export function createRPCClient(): RPCClient {
+  return createRPCNodeApi<RootRouter>();
 }
 
-export const useRPC = createRPCHook<RootRouter>();
+export function useRPC() {
+  const rpc = useContext(RPCClientContext);
+  if (!rpc) {
+    throw new Error("useRPC must be used within a RPCClientProvider");
+  }
+  return rpc;
+}
+
+export const RPCClientContext = createContext<RPCClient>();

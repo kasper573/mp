@@ -28,20 +28,9 @@ export function readCliOptions(argv = process.argv) {
       default: `https://${process.env.MP_CLIENT_DOMAIN}`,
       demandOption: true,
     })
-    .option("apiServerUrl", {
-      type: "string",
-      default: process.env.MP_CLIENT_API_URL,
-      demandOption: true,
-    })
     .option("httpRequests", {
       alias: "http",
       type: "number",
-      default: 1,
-    })
-    .option("rpcRequests", {
-      alias: "rpc",
-      type: "number",
-      demandOption: true,
       default: 1,
     })
     .option("gameClients", {

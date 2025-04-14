@@ -1,10 +1,10 @@
-import { createRPCHook } from "@mp/rpc";
+import type { RouterNode, RPCNodeApi } from "@mp/rpc";
+import { createContext, useContext } from "solid-js";
 import {
   areaRouterSlice,
   npcRouterSlice,
   characterRouterSlice,
 } from "./server";
-import { rpc } from "./rpc";
 
 export const gameRpcSlice = {
   ...characterRouterSlice,
@@ -12,4 +12,14 @@ export const gameRpcSlice = {
   ...npcRouterSlice,
 };
 
-export const useRPC = createRPCHook(rpc.router(gameRpcSlice));
+type SliceApi = RPCNodeApi<RouterNode<typeof gameRpcSlice>>;
+
+export function useRPC() {
+  const rpc = useContext(GameRPCSliceApiContext);
+  if (!rpc) {
+    throw new Error("useRPC must be used within a GameRPCProvider");
+  }
+  return rpc;
+}
+
+export const GameRPCSliceApiContext = createContext<SliceApi>();

@@ -14,7 +14,10 @@ export class SyncServer<State extends PatchableState> {
 
   flush = async () => {
     if (!this.encoder) {
-      throw new Error("Cannot flush without initializing an encoder");
+      this.options.onError?.(
+        new Error("Cannot flush without initializing an encoder"),
+      );
+      return;
     }
 
     const promises: Promise<unknown>[] = [];
@@ -49,7 +52,7 @@ export interface SyncServerOptions<State extends PatchableState> {
   getSender: (
     clientId: ClientId,
   ) => ((buffer: Uint8Array<ArrayBufferLike>) => unknown) | undefined;
-  onError?: (...args: unknown[]) => unknown;
+  onError?: (error: Error) => unknown;
 }
 
 export * from "./patch-state-machine";

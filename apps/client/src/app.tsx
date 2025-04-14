@@ -2,12 +2,12 @@ import { Logger } from "@mp/logger";
 import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
-import { RPCClientProvider, RPCDevtools } from "@mp/rpc";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
+import { GameRPCSliceApiContext } from "@mp/game";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
-import { createRPCClient } from "./integrations/rpc";
+import { createRPCClient, RPCClientContext } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 
 // This is effectively the composition root of the application.
@@ -36,11 +36,12 @@ export default function App() {
       <LoggerContext.Provider value={logger}>
         <ErrorFallbackContext.Provider value={{ handleError: logger.error }}>
           <AuthContext.Provider value={auth}>
-            <RPCClientProvider client={rpc}>
-              <RouterProvider router={router} />
-              <TanStackRouterDevtools router={router} />
-              <RPCDevtools />
-            </RPCClientProvider>
+            <RPCClientContext.Provider value={rpc}>
+              <GameRPCSliceApiContext.Provider value={rpc}>
+                <RouterProvider router={router} />
+                <TanStackRouterDevtools router={router} />
+              </GameRPCSliceApiContext.Provider>
+            </RPCClientContext.Provider>
           </AuthContext.Provider>
         </ErrorFallbackContext.Provider>
       </LoggerContext.Provider>

@@ -1,31 +1,21 @@
 import { RPCError } from "@mp/rpc";
 import { InjectionContext } from "@mp/ioc";
-import type { AuthToken } from "@mp/auth";
-import type { AuthServer } from "@mp/auth/server";
+import type { UserIdentity } from "@mp/auth";
 import { rpc } from "../rpc";
 import type { RoleDefinition } from "./define-roles";
 
-export const ctxAuthServer = InjectionContext.new<AuthServer>();
-
-export const ctxAuthToken = InjectionContext.new<AuthToken | undefined>();
+export const ctxUserIdentity = InjectionContext.new<UserIdentity | undefined>();
 
 export function auth() {
-  return rpc.middleware(async ({ ctx }) => {
-    const authToken = ctx.get(ctxAuthToken);
-    if (!authToken) {
+  return rpc.middleware(({ ctx }) => {
+    const user = ctx.get(ctxUserIdentity);
+    if (!user) {
       throw new RPCError({
         code: "UNAUTHORIZED",
-        message: "No token provided",
+        message: "User is not authenticated",
       });
     }
-
-    const authServer = ctx.get(ctxAuthServer);
-    const result = await authServer.verifyToken(authToken);
-    if (result.isErr()) {
-      throw new RPCError({ code: "UNAUTHORIZED", message: result.error });
-    }
-
-    return { user: result.value };
+    return { user };
   });
 }
 
@@ -43,14 +33,8 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return rpc.middleware(async ({ ctx }) => {
-    const authToken = ctx.get(ctxAuthToken);
-    const result = authToken
-      ? await ctx.get(ctxAuthServer).verifyToken(authToken)
-      : undefined;
-
-    return {
-      user: result?.isOk() ? result.value : undefined,
-    };
+  return rpc.middleware(({ ctx }) => {
+    const user = ctx.get(ctxUserIdentity);
+    return { user };
   });
 }

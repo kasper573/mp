@@ -56,10 +56,6 @@ export const serverOptionsSchema = object({
    */
   httpBaseUrl: string(),
   /**
-   * The relative path to expose the API endpoint on
-   */
-  apiEndpointPath: string(),
-  /**
    * The relative path to expose the WS endpoint on
    */
   wsEndpointPath: string(),

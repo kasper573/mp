@@ -8,56 +8,60 @@ import type {
   RPCError,
 } from "./builder";
 
-export type RPCNodeHook<Node extends AnyRPCNode> = Node extends AnyRouterNode
-  ? RouterHook<Node>
+export function createRPCNodeApi<Node extends AnyRPCNode>(): RPCNodeApi<Node> {
+  throw new Error("Not implemented");
+}
+
+export type RPCNodeApi<Node extends AnyRPCNode> = Node extends AnyRouterNode
+  ? RouterApi<Node>
   : Node extends AnyQueryNode
-    ? QueryHook<Node>
+    ? QueryApi<Node>
     : Node extends AnyMutationNode
-      ? MutationHook<Node>
+      ? MutationApi<Node>
       : never;
 
-export type RouterHook<Router extends AnyRouterNode> = {
-  [K in keyof Router["routes"]]: RPCNodeHook<Router["routes"][K]>;
+export type RouterApi<Router extends AnyRouterNode> = {
+  [K in keyof Router["routes"]]: RPCNodeApi<Router["routes"][K]>;
 };
 
-export interface QueryHookOptions<Input, Output, MappedOutput> {
+export interface QueryApiOptions<Input, Output, MappedOutput> {
   input: Input | SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface QueryHook<Node extends AnyQueryNode> {
+export interface QueryApi<Node extends AnyQueryNode> {
   createQuery: <MappedOutput = inferOutput<Node["handler"]>>(
-    options?: () => QueryHookOptions<
+    options?: () => QueryApiOptions<
       inferInput<Node["handler"]>,
       inferOutput<Node["handler"]>,
       MappedOutput
     >,
-  ) => QueryLike<MappedOutput>;
+  ) => UseQueryReturn<MappedOutput>;
+  query: (
+    input: inferInput<Node["handler"]>,
+  ) => Promise<inferOutput<Node["handler"]>>;
 }
 
-export interface QueryLike<Output> {
+export interface UseQueryReturn<Output> {
   data?: Output;
   error?: RPCError;
   isLoading: boolean;
   refetch: () => void;
 }
 
-export interface MutationHook<Node extends AnyMutationNode> {
-  createMutation: () => MutationLike<
+export interface MutationApi<Node extends AnyMutationNode> {
+  createMutation: () => UseMutationReturn<
     inferInput<Node["handler"]>,
     inferOutput<Node["handler"]>
   >;
+  mutate: (
+    input: inferInput<Node["handler"]>,
+  ) => Promise<inferOutput<Node["handler"]>>;
 }
 
-export interface MutationLike<Input, Output> {
+export interface UseMutationReturn<Input, Output> {
   mutate: (input: Input) => void;
   mutateAsync: (input: Input) => Promise<Output>;
-}
-
-export function createRPCHook<Node extends AnyRPCNode>(
-  node?: Node,
-): () => RPCNodeHook<Node> {
-  throw new Error("Not implemented");
 }
 
 export type SkipToken = typeof skipToken;
