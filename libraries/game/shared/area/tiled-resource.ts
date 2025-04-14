@@ -56,7 +56,7 @@ export class TiledResource {
 
     const coordinates: Vector<Tile>[] = [];
     for (const tiles of tilesPerCoordinate.values()) {
-      const values = tiles.map((t) => rpc.propertyValue);
+      const values = tiles.map((t) => t.propertyValue);
       if (coordinateTest(values)) {
         coordinates.push(tiles[0].pos);
       }
