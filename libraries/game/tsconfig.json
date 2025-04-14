@@ -1,1 +1,6 @@
-{ "extends": "@mp/tsconfig/vite.json" }
+{
+  "extends": "@mp/tsconfig/vite.json",
+  "compilerOptions": {
+    "lib": ["ESNext"]
+  }
+}

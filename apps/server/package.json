@@ -35,6 +35,7 @@
     "@mp/time": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
     "@mp/db": "workspace:*",
     "@mp/game": "workspace:*",
     "import-in-the-middle": "1.12.0",

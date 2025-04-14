@@ -21,7 +21,6 @@ import type { GameState, GameStateServer, SessionId } from "@mp/game";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
-  loadAreas,
   ClientRegistry,
   movementBehavior,
   npcSpawnBehavior,
@@ -54,6 +53,7 @@ import {
 } from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
 import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
+import { loadAreas } from "./etc/load-areas";
 
 registerSyncExtensions();
 

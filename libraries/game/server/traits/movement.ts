@@ -4,7 +4,7 @@ import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import type { GameState } from "../game-state";
-import type { AreaLookup } from "../area/load-areas";
+import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
 

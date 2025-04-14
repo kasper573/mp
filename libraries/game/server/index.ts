@@ -10,7 +10,7 @@ export * from "./character/schema";
 export * from "./game-state";
 export * from "./client-visibility";
 export * from "./service";
-export * from "./area/load-areas";
+export * from "./area/lookup";
 export * from "./area/router";
 export * from "./area/schema";
 export * from "./traits/combat";

@@ -190,6 +190,9 @@ importers:
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time

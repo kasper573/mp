@@ -6,7 +6,7 @@ import type { ClientRegistry } from "./client-registry";
 import type { MovementTrait } from "./traits/movement";
 import type { Actor, ActorId } from "./traits/actor";
 import type { GameState } from "./game-state";
-import type { AreaLookup } from "./area/load-areas";
+import type { AreaLookup } from "./area/lookup";
 
 /**
  * Removes any information that the given client should not have access to.

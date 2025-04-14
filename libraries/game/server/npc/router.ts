@@ -1,5 +1,5 @@
 import { ctxGameStateMachine } from "../game-state";
-import { ctxAreaLookup } from "../area/load-areas";
+import { ctxAreaLookup } from "../area/lookup";
 import { spawnNpcInstance } from "./npc-spawn-behavior";
 import { ctxNpcService } from "./service";
 import { rpc } from "@mp/game";

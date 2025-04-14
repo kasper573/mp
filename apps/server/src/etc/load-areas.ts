@@ -1,11 +1,9 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import { InjectionContext } from "@mp/ioc";
-import { createTiledLoader } from "@mp/tiled-loader";
+import type { AreaLookup, AreaId } from "@mp/game";
+import { AreaResource, TiledResource } from "@mp/game";
 import type { LocalFile } from "@mp/std";
-import type { AreaId } from "../../shared/area/area-id";
-import { AreaResource } from "../../shared/area/area-resource";
-import { TiledResource } from "../../shared/area/tiled-resource";
+import { createTiledLoader } from "@mp/tiled-loader";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
   const files = await fs.readdir(dir);
@@ -19,10 +17,6 @@ export async function loadAreas(dir: string): Promise<AreaLookup> {
 
   return new Map(entries);
 }
-
-export type AreaLookup = ReadonlyMap<AreaId, AreaResource>;
-
-export const ctxAreaLookup = InjectionContext.new<AreaLookup>();
 
 async function loadTiled(tmxFile: string) {
   const result = await load(tmxFile);

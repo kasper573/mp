@@ -3,7 +3,7 @@ import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
 import type { GameState } from "../game-state";
-import type { AreaLookup } from "../area/load-areas";
+import type { AreaLookup } from "../area/lookup";
 import { isTargetable } from "../traits/combat";
 import type { NPCInstanceId } from "./schema";
 

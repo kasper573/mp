@@ -9,6 +9,7 @@ export type * from "./server/area/schema";
 export * from "./server/";
 export * from "./client/";
 export * from "./shared/area/area-resource";
+export * from "./shared/area/tiled-resource";
 export * from "./shared/area/area-id";
 export * from "./shared/client-view-distance-rect";
 export * from "./rpc";

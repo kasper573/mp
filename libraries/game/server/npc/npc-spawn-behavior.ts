@@ -11,7 +11,7 @@ import { randomItem, recordValues, uuid } from "@mp/std";
 import { clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameState } from "../game-state";
-import type { AreaLookup } from "../area/load-areas";
+import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { NPCService } from "./service";
