@@ -1,5 +1,4 @@
 import { InjectionContext, type InjectionContainer } from "@mp/ioc";
-import { default as superjson } from "superjson";
 import type { RPCFactories, RPCMiddleware } from "@mp/rpc";
 import { RPCBuilder, type RPCErrorFormatter } from "@mp/rpc";
 
@@ -15,11 +14,6 @@ export type GameRPCContext = InjectionContainer;
 export type GameRPCErrorFormatter = RPCErrorFormatter<GameRPCContext>;
 
 export type GameRPCMiddleware = RPCMiddleware<GameRPCContext, unknown, unknown>;
-
-export const rpcTransformer = {
-  encode: superjson.stringify,
-  decode: superjson.parse,
-};
 
 function buildRPC(): RPCFactories<GameRPCContext> {
   const rpc = new RPCBuilder().context<GameRPCContext>().build();

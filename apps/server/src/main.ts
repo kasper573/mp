@@ -11,7 +11,7 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
 import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxAuthServer, ctxRequest } from "@mp/game";
+import { ctxAuthServer, ctxAuthToken, ctxSessionId } from "@mp/game";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db";
 import { uuid, type LocalFile } from "@mp/std";
@@ -53,6 +53,9 @@ import {
   webSocketTokenParam,
 } from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
+import { deriveAuthToken } from "./express/auth-token";
+import { deriveSessionId } from "./express/session-id";
+import { createExpressRpcMiddleware } from "./express/rpc";
 
 registerSyncExtensions();
 
@@ -177,12 +180,13 @@ const ioc = new InjectionContainer()
 
 webServer.use(
   opt.apiEndpointPath,
-  trpcExpress.createExpressMiddleware({
-    onError: ({ path, error }) => logger.error(error),
+  createExpressRpcMiddleware({
+    onError: ({ error }) => logger.error(error),
     router: rootRouter,
-    createContext: ({ req }: { req: express.Request }) => ({
-      ioc: ioc.provide(ctxRequest, req),
-    }),
+    createContext: (req) =>
+      ioc
+        .provide(ctxSessionId, deriveSessionId(req))
+        .provide(ctxAuthToken, deriveAuthToken(req)),
   }),
 );
 

@@ -2,23 +2,12 @@ import { RPCError } from "@mp/rpc";
 import { InjectionContext } from "@mp/ioc";
 import type { AuthToken } from "@mp/auth";
 import type { AuthServer } from "@mp/auth/server";
-import type express from "express";
 import { rpc } from "../rpc";
-import { ctxRequest } from "./session";
 import type { RoleDefinition } from "./define-roles";
 
 export const ctxAuthServer = InjectionContext.new<AuthServer>();
 
-export const ctxAuthToken = ctxRequest.derive(deriveAuthToken);
-
-export function deriveAuthToken(req: express.Request) {
-  const parsedBearerToken =
-    req.headers["authorization"]?.match(/^Bearer (.+)$/);
-
-  if (parsedBearerToken) {
-    return parsedBearerToken[1] as AuthToken;
-  }
-}
+export const ctxAuthToken = InjectionContext.new<AuthToken | undefined>();
 
 export function auth() {
   return rpc.middleware(async ({ ctx }) => {

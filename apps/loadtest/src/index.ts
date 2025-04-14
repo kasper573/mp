@@ -2,7 +2,6 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { webSocketTokenParam, type RootRouter } from "@mp/server";
 import { RPCClient } from "@mp/rpc";
 import { EnhancedWebSocket } from "@mp/ws/client";
-import { rpcTransformer } from "@mp/game";
 import type { AreaId } from "@mp/game";
 import { readCliOptions } from "./cli";
 
@@ -97,7 +96,7 @@ async function testGameClient(n: number) {
     logger.info(`Starting game client ${n}`);
   }
 
-  const token = process.env.MP_SERVER_AUTH__BYPASS_USER;
+  const token = process.env.MP_SERVER_AUTH__BYPASS_USER!;
   const url = new URL(wsUrl);
   url.searchParams.set(webSocketTokenParam, token);
   const socket = new EnhancedWebSocket();
@@ -108,7 +107,7 @@ async function testGameClient(n: number) {
     if (verbose) {
       logger.info(`Game client ${n} connected`);
     }
-    const characterId = await rpc.character.join.mutate();
+    const characterId = await rpc.character.join.mutateAsync();
     if (verbose) {
       logger.info(`Game client ${n} joined as character ${characterId}`);
     }
@@ -126,7 +125,6 @@ async function testGameClient(n: number) {
 function createRPCClient(token?: string) {
   return new RPCClient<RootRouter>({
     url: apiServerUrl,
-    transformer: rpcTransformer,
     headers: () => ({
       Authorization: token ? `Bearer ${token}` : undefined,
     }),

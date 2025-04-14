@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 export class RPCBuilder<Context> {
   context<Context>() {
     return new RPCBuilder<Context>();
@@ -64,14 +65,21 @@ interface RouterNode<Routes extends AnyRouteRecord> extends RPCNode<"router"> {
   routes: Routes;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyMutationNode = MutationNode<any, any, any, any>;
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyQueryNode = QueryNode<any, any, any, any>;
-export type AnyProcedureNode = AnyMutationNode | AnyQueryNode;
-export type AnyRouterNode = RouterNode<AnyRouteRecord>;
-export type AnyRPCNode = AnyProcedureNode | AnyRouterNode;
-export type AnyRouteRecord = Record<string, AnyRPCNode>;
+export type AnyMutationNode<Context = any> = MutationNode<
+  Context,
+  any,
+  any,
+  any
+>;
+export type AnyQueryNode<Context = any> = QueryNode<Context, any, any, any>;
+export type AnyProcedureNode<Context = any> =
+  | AnyMutationNode<Context>
+  | AnyQueryNode<Context>;
+export type AnyRouterNode<Context = any> = RouterNode<AnyRouteRecord<Context>>;
+export type AnyRPCNode<Context = any> =
+  | AnyProcedureNode<Context>
+  | AnyRouterNode<Context>;
+export type AnyRouteRecord<Context = any> = Record<string, AnyRPCNode<Context>>;
 
 export interface ProcedureBuilder<Context, Input, Output, MWContext> {
   use: <NewMWContext, PipedMWContext>(
