@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
+
 export class RPCBuilder<Context> {
   context<Context>() {
     return new RPCBuilder<Context>();
@@ -6,11 +7,29 @@ export class RPCBuilder<Context> {
 
   build(): RPCFactories<Context> {
     return {
-      router: () => ({}),
-      procedure: () => ({}),
-      middleware: () => ({}),
+      router: (routes) => ({ type: "router", routes }),
+      procedure: new ProcedureBuilder(),
+      middleware: createMiddleware,
     };
   }
+}
+
+function createMiddleware<Context, MWContext, PipedMWContext>(
+  handler: RPCMiddlewareHandler<Context, MWContext, PipedMWContext>,
+): RPCMiddleware<Context, MWContext, PipedMWContext> {
+  function middleware(...args: Parameters<typeof handler>) {
+    return handler(...args);
+  }
+
+  const pipe: MiddlewareBuilder<Context, MWContext> = (nextHandler) =>
+    createMiddleware(async (opt) => {
+      const mwc = await handler(opt as never);
+      return nextHandler({ ...opt, mwc });
+    });
+
+  middleware.pipe = pipe;
+
+  return middleware;
 }
 
 export interface RPCFactories<Context> {
@@ -25,7 +44,7 @@ export interface RouterBuilder {
 
 export interface MiddlewareBuilder<Context, PipedMWContext> {
   <MWContext>(
-    middlewareFn: RPCMiddlewareFn<Context, MWContext, PipedMWContext>,
+    middlewareFn: RPCMiddlewareHandler<Context, MWContext, PipedMWContext>,
   ): RPCMiddleware<Context, MWContext, PipedMWContext>;
 }
 
@@ -82,28 +101,33 @@ export type AnyRPCNode<Context = any> =
   | AnyRouterNode<Context>;
 export type AnyRouteRecord<Context = any> = Record<string, AnyRPCNode<Context>>;
 
-export interface ProcedureBuilder<Context, Input, Output, MWContext> {
-  use: <NewMWContext, PipedMWContext>(
+export class ProcedureBuilder<Context, Input, Output, MWContext> {
+  use<NewMWContext, PipedMWContext>(
     middleware: RPCMiddleware<Context, NewMWContext, PipedMWContext>,
-  ) => ProcedureBuilder<Context, Input, Output, NewMWContext>;
-  input: <NewInput>() => ProcedureBuilder<Context, NewInput, Output, MWContext>;
-  output: <NewOutput>() => ProcedureBuilder<
-    Context,
-    Input,
-    NewOutput,
-    MWContext
-  >;
+  ): ProcedureBuilder<Context, Input, Output, NewMWContext> {
+    throw new Error("Not implemented");
+  }
+  input<NewInput>(): ProcedureBuilder<Context, NewInput, Output, MWContext> {
+    throw new Error("Not implemented");
+  }
+  output<NewOutput>(): ProcedureBuilder<Context, Input, NewOutput, MWContext> {
+    throw new Error("Not implemented");
+  }
 
-  query: (
+  query(
     handler: ProcedureHandler<Context, Input, Output, MWContext>,
-  ) => QueryNode<Context, Input, Output, MWContext>;
+  ): QueryNode<Context, Input, Output, MWContext> {
+    return { type: "query", handler };
+  }
 
-  mutation: (
+  mutation(
     handler: ProcedureHandler<Context, Input, Output, MWContext>,
-  ) => MutationNode<Context, Input, Output, MWContext>;
+  ): MutationNode<Context, Input, Output, MWContext> {
+    return { type: "mutation", handler };
+  }
 }
 
-export interface RPCMiddlewareFn<Context, MWContext, PipedMWContext> {
+export interface RPCMiddlewareHandler<Context, MWContext, PipedMWContext> {
   (opt: {
     /**
      * The global rpc context
@@ -117,7 +141,7 @@ export interface RPCMiddlewareFn<Context, MWContext, PipedMWContext> {
 }
 
 export interface RPCMiddleware<Context, MWContext, PipedMWContext>
-  extends RPCMiddlewareFn<Context, MWContext, PipedMWContext> {
+  extends RPCMiddlewareHandler<Context, MWContext, PipedMWContext> {
   pipe: MiddlewareBuilder<Context, MWContext>;
 }
 
