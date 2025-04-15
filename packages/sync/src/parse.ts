@@ -1,8 +1,9 @@
+import { decode } from "@mp/encoding";
+import type { Patch } from "./patch";
 import { applyPatch } from "./patch";
-import { decodeServerToClientMessage } from "./encoding";
 
 export function parseSyncMessage(buffer: SyncMessage) {
-  const patch = decodeServerToClientMessage(buffer);
+  const patch = decode<Patch>(buffer);
   return function applyOnePatch(target: object) {
     applyPatch(target, patch);
   };

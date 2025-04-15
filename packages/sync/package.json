@@ -17,7 +17,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "cbor-x": "1.6.0"
+    "@mp/encoding": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

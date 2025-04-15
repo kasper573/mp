@@ -1,5 +1,5 @@
 import type { Tile } from "@mp/std";
-import { addEncoderExtensionToSync } from "@mp/sync";
+import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
 
@@ -20,16 +20,16 @@ export const clientViewDistance = {
 export const webSocketTokenParam = "token";
 
 export function registerSyncExtensions(): void {
-  // All tags below this are reserved by cbor-x
+  // All tags below this are reserved by @mp/encoding
   const startTag = 40_501;
-  addEncoderExtensionToSync<Vector<number>, [number, number]>({
+  addEncoderExtension<Vector<number>, [number, number]>({
     Class: Vector<number>,
     tag: startTag,
     encode: (v, encode) => encode([v.x, v.y]),
     decode: (v) => new Vector(v[0], v[1]),
   });
 
-  addEncoderExtensionToSync<Rect<number>, RectComponents<number>>({
+  addEncoderExtension<Rect<number>, RectComponents<number>>({
     Class: Rect<number>,
     tag: startTag + 1,
     encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),

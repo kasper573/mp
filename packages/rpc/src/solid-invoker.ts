@@ -5,7 +5,7 @@ import type {
   AnyRPCNode,
   RPCError,
 } from "./builder";
-import type { inferOutput, inferInput } from "./invoker";
+import type { inferOutput, inferInput } from "./proxy-invoker";
 
 export function createSolidRPCInvoker<
   Node extends AnyRPCNode,

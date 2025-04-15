@@ -1,9 +1,8 @@
 {
-  "name": "@mp/rpc",
+  "name": "@mp/encoding",
   "version": "0.0.0",
-  "sideEffects": false,
+  "private": true,
   "type": "module",
-  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -12,9 +11,7 @@
     }
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "@mp/encoding": "workspace:*",
-    "@mp/ws": "workspace:*"
+    "cbor-x": "1.6.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

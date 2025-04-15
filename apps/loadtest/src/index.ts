@@ -1,6 +1,6 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { webSocketTokenParam, type RootRouter } from "@mp/server";
-import { createRPCNodeApi } from "@mp/rpc";
+import { BinaryRPCTransmitter, createRPCProxyInvoker } from "@mp/rpc";
 import { EnhancedWebSocket } from "@mp/ws/client";
 import { readCliOptions } from "./cli";
 
@@ -67,14 +67,16 @@ async function testSocketWithRPC(n: number) {
   const url = new URL(wsUrl);
   url.searchParams.set(webSocketTokenParam, token);
   const socket = new EnhancedWebSocket();
-  const rpc = createRPCNodeApi<RootRouter>(); // TODO pipe rpc to socket
+  const transmitter = new BinaryRPCTransmitter(socket.send);
+  const rpc = createRPCProxyInvoker<RootRouter>(transmitter);
+  socket.subscribeToMessage(transmitter.handleMessage);
 
   try {
     await connect(socket, url.toString());
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
-    const characterId = await rpc.character.join.mutate();
+    const characterId = await rpc.character.join();
     if (verbose) {
       logger.info(`Socket ${n} joined as character ${characterId}`);
     }

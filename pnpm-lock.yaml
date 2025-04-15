@@ -224,6 +224,9 @@ importers:
       '@mp/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../../packages/encoding
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -329,6 +332,16 @@ importers:
       '@types/pg':
         specifier: 8.11.10
         version: 8.11.10
+
+  packages/encoding:
+    dependencies:
+      cbor-x:
+        specifier: 1.6.0
+        version: 1.6.0
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
 
   packages/engine:
     dependencies:
@@ -484,6 +497,16 @@ importers:
         version: link:../tsconfig
 
   packages/rpc:
+    dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../encoding
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../ws
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -552,12 +575,12 @@ importers:
 
   packages/sync:
     dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../encoding
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      cbor-x:
-        specifier: 1.6.0
-        version: 1.6.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

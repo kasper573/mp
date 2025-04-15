@@ -1,8 +1,9 @@
 import type http from "node:http";
 import { type Result } from "@mp/std";
+import type { WebSocket } from "ws";
 import { WebSocketServer } from "ws";
 
-export { type WebSocketServer } from "ws";
+export type { WebSocketServer, WebSocket };
 
 export interface WSSWithHandshakeOptions<HandshakePayload, SocketId> {
   httpServer: http.Server;

@@ -26,6 +26,8 @@ export class EnhancedWebSocket {
     this.disconnect();
   };
 
+  send = (data: Uint8Array) => this.socket?.send(data);
+
   subscribeToMessage = (handler: EventHandler<ArrayBuffer>): Unsubscribe => {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);

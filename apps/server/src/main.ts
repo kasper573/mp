@@ -35,6 +35,7 @@ import {
   NPCService,
   GameService,
 } from "@mp/game";
+import type { WebSocket } from "@mp/ws/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
