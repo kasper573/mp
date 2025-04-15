@@ -1,12 +1,12 @@
 import type { RootRouter } from "@mp/server";
-import type { RPCNodeApi } from "@mp/rpc";
-import { createRPCNodeApi } from "@mp/rpc";
+import type { SolidRPCInvoker } from "@mp/rpc";
+import { createSolidRPCInvoker } from "@mp/rpc";
 import { createContext, useContext } from "solid-js";
 
-export type RPCClient = RPCNodeApi<RootRouter>;
+export type RPCClient = SolidRPCInvoker<RootRouter>;
 
 export function createRPCClient(): RPCClient {
-  return createRPCNodeApi<RootRouter>();
+  return createSolidRPCInvoker<RootRouter>();
 }
 
 export function useRPC() {

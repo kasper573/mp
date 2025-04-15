@@ -1,3 +1,3 @@
 export * from "./builder";
 export * from "./client";
-export * from "./solid";
+export * from "./solid-invoker";

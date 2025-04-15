@@ -1,37 +1,39 @@
 import type {
   AnyMutationNode,
-  AnyProcedureNode,
   AnyQueryNode,
   AnyRouterNode,
   AnyRPCNode,
-  ProcedureHandler,
   RPCError,
 } from "./builder";
+import type { inferOutput, inferInput } from "./invoker";
 
-export function createRPCNodeApi<Node extends AnyRPCNode>(): RPCNodeApi<Node> {
+export function createSolidRPCInvoker<
+  Node extends AnyRPCNode,
+>(): SolidRPCInvoker<Node> {
   throw new Error("Not implemented");
 }
 
-export type RPCNodeApi<Node extends AnyRPCNode> = Node extends AnyRouterNode
-  ? RouterApi<Node>
-  : Node extends AnyQueryNode
-    ? QueryApi<Node>
-    : Node extends AnyMutationNode
-      ? MutationApi<Node>
-      : never;
+export type SolidRPCInvoker<Node extends AnyRPCNode> =
+  Node extends AnyRouterNode
+    ? SolidRPCRouterInvoker<Node>
+    : Node extends AnyQueryNode
+      ? SolidRPCQueryInvoker<Node>
+      : Node extends AnyMutationNode
+        ? SolidRPCMutationInvoker<Node>
+        : never;
 
-export type RouterApi<Router extends AnyRouterNode> = {
-  [K in keyof Router["routes"]]: RPCNodeApi<Router["routes"][K]>;
+export type SolidRPCRouterInvoker<Router extends AnyRouterNode> = {
+  [K in keyof Router["routes"]]: SolidRPCInvoker<Router["routes"][K]>;
 };
 
-export interface QueryApiOptions<Input, Output, MappedOutput> {
+export interface SolidRPCQueryOptions<Input, Output, MappedOutput> {
   input: Input | SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface QueryApi<Node extends AnyQueryNode> {
+export interface SolidRPCQueryInvoker<Node extends AnyQueryNode> {
   createQuery: <MappedOutput = inferOutput<Node["handler"]>>(
-    options?: () => QueryApiOptions<
+    options?: () => SolidRPCQueryOptions<
       inferInput<Node["handler"]>,
       inferOutput<Node["handler"]>,
       MappedOutput
@@ -49,7 +51,7 @@ export interface UseQueryReturn<Output> {
   refetch: () => void;
 }
 
-export interface MutationApi<Node extends AnyMutationNode> {
+export interface SolidRPCMutationInvoker<Node extends AnyMutationNode> {
   createMutation: () => UseMutationReturn<
     inferInput<Node["handler"]>,
     inferOutput<Node["handler"]>
@@ -66,9 +68,3 @@ export interface UseMutationReturn<Input, Output> {
 
 export type SkipToken = typeof skipToken;
 export const skipToken = Symbol("skipToken");
-
-type inferInput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer C, infer I, infer O, infer MW> ? I : never;
-
-type inferOutput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer C, infer I, infer O, infer MW> ? O : never;

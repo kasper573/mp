@@ -1,4 +1,4 @@
-import type { RouterNode, RPCNodeApi } from "@mp/rpc";
+import type { RouterNode, SolidRPCInvoker } from "@mp/rpc";
 import { createContext, useContext } from "solid-js";
 import {
   areaRouterSlice,
@@ -12,7 +12,7 @@ export const gameRpcSlice = {
   ...npcRouterSlice,
 };
 
-type SliceApi = RPCNodeApi<RouterNode<typeof gameRpcSlice>>;
+type SliceApi = SolidRPCInvoker<RouterNode<typeof gameRpcSlice>>;
 
 export function useRPC() {
   const rpc = useContext(GameRPCSliceApiContext);
