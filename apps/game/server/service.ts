@@ -1,6 +1,6 @@
 import { recordValues } from "@mp/std";
 import type { PatchStateMachine } from "@mp/sync";
-import type { DBClient } from "../../db/src/client";
+import type { DBClient } from "@mp/db";
 import { characterTable } from "./character/schema";
 import type { GameState } from "./game-state";
 
