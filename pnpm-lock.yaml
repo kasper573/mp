@@ -132,9 +132,6 @@ importers:
       '@mp/engine':
         specifier: workspace:*
         version: link:../../packages/engine
-      '@mp/game':
-        specifier: workspace:*
-        version: 'link:'
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../packages/ioc
@@ -196,9 +193,6 @@ importers:
 
   apps/loadtest:
     dependencies:
-      '@mp/game':
-        specifier: workspace:*
-        version: link:../game
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -490,13 +484,6 @@ importers:
         version: link:../tsconfig
 
   packages/rpc:
-    dependencies:
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      solid-js:
-        specifier: 1.9.5
-        version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

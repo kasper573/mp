@@ -11,9 +11,7 @@
       "require": "./src/index.ts"
     }
   },
-  "dependencies": {
-    "solid-js": "1.9.5"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
   }
