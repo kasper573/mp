@@ -3,9 +3,11 @@ import { recordValues, type Tile } from "@mp/std";
 import { RPCError } from "@mp/rpc";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
-import { type CharacterId } from "./schema";
+import { defineRoles } from "../../user/define-roles";
+import { rpc } from "../../rpc";
+import { roles } from "../../user/auth";
 import { ctxCharacterService } from "./service";
-import { defineRoles, roles, rpc } from "@mp/game";
+import { type CharacterId } from "./schema";
 
 export const characterRoles = defineRoles("character", [
   "join",

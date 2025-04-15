@@ -1,7 +1,7 @@
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import type { AreaId } from "../../shared/area/area-id";
-import { rpc } from "@mp/game";
+import { rpc } from "../../rpc";
 
 export type AreaRouter = typeof areaRouter;
 export const areaRouter = rpc.router({

@@ -6,7 +6,7 @@ export function defineRoles<const RoleNames extends string[]>(
 ): RoleDefinitionRecord<RoleNames> {
   const record = Object.fromEntries(
     shortNames.map((shortName) => {
-      const fullName = `${prefix}${delimiter}${shortName}` as RoleDefinition;
+      const fullName = `${prefix}.${shortName}` as RoleDefinition;
       return [shortName, fullName];
     }),
   );
@@ -19,5 +19,3 @@ export type RoleDefinition = Branded<string, "RoleDefinition">;
 export type RoleDefinitionRecord<ShortNames extends string[]> = {
   [ShortName in ShortNames[number]]: RoleDefinition;
 };
-
-const delimiter = ".";

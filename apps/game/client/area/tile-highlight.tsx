@@ -4,7 +4,7 @@ import { createEffect } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { type Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
-import type { AreaResource } from "@mp/game";
+import type { AreaResource } from "../../shared/area/area-resource";
 
 export interface TileHighlightProps {
   area: AreaResource;

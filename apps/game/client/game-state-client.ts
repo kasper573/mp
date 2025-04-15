@@ -14,8 +14,9 @@ import { AuthContext } from "@mp/auth/client";
 import { EnhancedWebSocket } from "@mp/ws/client";
 import { isSyncMessage, parseSyncMessage } from "@mp/sync";
 import { useRPC } from "../rpc.slice";
-import { type CharacterId } from "@mp/game";
-import type { ActorId, Character, GameState } from "@mp/game";
+import type { GameState } from "../server/game-state";
+import type { CharacterId } from "../server/character/schema";
+import type { ActorId } from "../server";
 
 export function createGameStateClient(
   wsUrlForToken: (token: string) => string,
@@ -25,9 +26,7 @@ export function createGameStateClient(
   const getToken = createMemo(() => auth.identity()?.token);
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-  const character = createMemo(
-    () => gameState.actors[characterId()!] as Character | undefined,
-  );
+  const character = createMemo(() => gameState.actors[characterId()!]);
   const areaId = createMemo(() => character()?.areaId);
   const [readyState, setReadyState] = createSignal(socket.getReadyState());
   const actors = createMemo(() => Object.values(gameState.actors));

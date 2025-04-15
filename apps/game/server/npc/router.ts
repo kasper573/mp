@@ -1,9 +1,10 @@
 import { ctxGameStateMachine } from "../game-state";
 import { ctxAreaLookup } from "../area/lookup";
-import { spawnNpcInstance } from "./npc-spawn-behavior";
+import { defineRoles } from "../../user/define-roles";
+import { rpc } from "../../rpc";
+import { roles } from "../../user";
 import { ctxNpcService } from "./service";
-import { rpc } from "@mp/game";
-import { defineRoles, roles } from "@mp/game";
+import { spawnNpcInstance } from "./npc-spawn-behavior";
 
 export const npcRoles = defineRoles("npc", ["spawnRandom"]);
 
