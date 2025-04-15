@@ -11,11 +11,11 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 - 2d graphics: [Pixi](https://pixijs.com/)
 - maps: [Tiled](https://www.mapeditor.org/) (+custom
-  [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
+  [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle orm](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws) + [custom rpc](libraries/rpc)
+- network: [ws](https://www.npmjs.com/package/ws) + [custom rpc](packages/rpc)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
 
@@ -115,16 +115,12 @@ These are the workspaces, in order:
 
 ## apps
 
-Deployable artifacts. Composes all other packages.
+Compositions of packages. Often has deployable artifacts, but is not required to. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
-## libraries
+## packages
 
 Generic and low level systems.
 
 Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
 
 Dependencies must instead be provided as arguments.
-
-## The game module
-
-While `libraries/game` is technically just a package, it deserves special note since it's the composition of almost all other packages. This is the module that essentially is the game. It's however not an app because the game is composed of client and server details, so the apps only select their relevant game mechanisms.

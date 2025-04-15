@@ -43,7 +43,7 @@ export default tseslint.config(
         project: [
           "./tsconfig.json",
           "./apps/*/tsconfig.json",
-          "./libraries/*/tsconfig.json",
+          "./packages/*/tsconfig.json",
         ],
       },
     },
@@ -111,7 +111,7 @@ export default tseslint.config(
       "boundaries/elements": [
         { type: "client_app", pattern: "apps/client/**" },
         { type: "app", pattern: "apps/*" },
-        { type: "package", pattern: "libraries/*" },
+        { type: "package", pattern: "packages/*" },
       ],
       "import/resolver": {
         typescript: {

@@ -55,7 +55,7 @@ importers:
         version: link:../../libraries/env
       '@mp/game':
         specifier: workspace:*
-        version: link:../../libraries/game
+        version: link:../game
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -121,11 +121,84 @@ importers:
         specifier: 1.50.0
         version: 1.50.0
 
+  apps/game:
+    dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/db':
+        specifier: workspace:*
+        version: link:../../libraries/db
+      '@mp/engine':
+        specifier: workspace:*
+        version: link:../../libraries/engine
+      '@mp/game':
+        specifier: workspace:*
+        version: 'link:'
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../../libraries/ioc
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../libraries/path-finding
+      '@mp/pixi':
+        specifier: workspace:*
+        version: link:../../libraries/pixi
+      '@mp/rpc':
+        specifier: workspace:*
+        version: link:../../libraries/rpc
+      '@mp/solid-pixi':
+        specifier: workspace:*
+        version: link:../../libraries/solid-pixi
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../../libraries/style
+      '@mp/sync':
+        specifier: workspace:*
+        version: link:../../libraries/sync
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+      '@mp/tiled-renderer':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-renderer
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../libraries/time
+      '@mp/ui':
+        specifier: workspace:*
+        version: link:../../libraries/ui
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
+      uniqolor:
+        specifier: 1.1.1
+        version: 1.1.1
+      unique-names-generator:
+        specifier: 4.7.1
+        version: 4.7.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
   apps/loadtest:
     dependencies:
       '@mp/game':
         specifier: workspace:*
-        version: link:../../libraries/game
+        version: link:../game
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -162,7 +235,7 @@ importers:
         version: link:../../libraries/env
       '@mp/game':
         specifier: workspace:*
-        version: link:../../libraries/game
+        version: link:../game
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
@@ -343,79 +416,6 @@ importers:
         specifier: 8.4.0
         version: 8.4.0(eslint@9.7.0)(typescript@5.8.2)
 
-  libraries/game:
-    dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../auth
-      '@mp/db':
-        specifier: workspace:*
-        version: link:../db
-      '@mp/engine':
-        specifier: workspace:*
-        version: link:../engine
-      '@mp/game':
-        specifier: workspace:*
-        version: 'link:'
-      '@mp/ioc':
-        specifier: workspace:*
-        version: link:../ioc
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
-      '@mp/path-finding':
-        specifier: workspace:*
-        version: link:../path-finding
-      '@mp/pixi':
-        specifier: workspace:*
-        version: link:../pixi
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../rpc
-      '@mp/solid-pixi':
-        specifier: workspace:*
-        version: link:../solid-pixi
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      '@mp/style':
-        specifier: workspace:*
-        version: link:../style
-      '@mp/sync':
-        specifier: workspace:*
-        version: link:../sync
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../tiled-loader
-      '@mp/tiled-renderer':
-        specifier: workspace:*
-        version: link:../tiled-renderer
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../time
-      '@mp/ui':
-        specifier: workspace:*
-        version: link:../ui
-      '@mp/ws':
-        specifier: workspace:*
-        version: link:../ws
-      solid-js:
-        specifier: 1.9.5
-        version: 1.9.5
-      uniqolor:
-        specifier: 1.1.1
-        version: 1.1.1
-      unique-names-generator:
-        specifier: 4.7.1
-        version: 4.7.1
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   libraries/ioc:
     devDependencies:
       '@mp/tsconfig':
@@ -571,9 +571,6 @@ importers:
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0
-      piscina:
-        specifier: 5.0.0-alpha.0
-        version: 5.0.0-alpha.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -1809,106 +1806,6 @@ packages:
     resolution: {integrity: sha512-lsT5/7SxtImOIjpefC9wcoXt2lkikKhCjd6U+Q9Z6X5h2HBU/71ggt+XStdodZ0HkJGO333zDUeec7JROMCPFw==}
     os: [darwin, linux, win32]
     hasBin: true
-
-  '@napi-rs/nice-android-arm-eabi@1.0.1':
-    resolution: {integrity: sha512-5qpvOu5IGwDo7MEKVqqyAxF90I6aLj4n07OzpARdgDRfz8UbBztTByBp0RC59r3J1Ij8uzYi6jI7r5Lws7nn6w==}
-    engines: {node: '>= 10'}
-    cpu: [arm]
-    os: [android]
-
-  '@napi-rs/nice-android-arm64@1.0.1':
-    resolution: {integrity: sha512-GqvXL0P8fZ+mQqG1g0o4AO9hJjQaeYG84FRfZaYjyJtZZZcMjXW5TwkL8Y8UApheJgyE13TQ4YNUssQaTgTyvA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [android]
-
-  '@napi-rs/nice-darwin-arm64@1.0.1':
-    resolution: {integrity: sha512-91k3HEqUl2fsrz/sKkuEkscj6EAj3/eZNCLqzD2AA0TtVbkQi8nqxZCZDMkfklULmxLkMxuUdKe7RvG/T6s2AA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@napi-rs/nice-darwin-x64@1.0.1':
-    resolution: {integrity: sha512-jXnMleYSIR/+TAN/p5u+NkCA7yidgswx5ftqzXdD5wgy/hNR92oerTXHc0jrlBisbd7DpzoaGY4cFD7Sm5GlgQ==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [darwin]
-
-  '@napi-rs/nice-freebsd-x64@1.0.1':
-    resolution: {integrity: sha512-j+iJ/ezONXRQsVIB/FJfwjeQXX7A2tf3gEXs4WUGFrJjpe/z2KB7sOv6zpkm08PofF36C9S7wTNuzHZ/Iiccfw==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [freebsd]
-
-  '@napi-rs/nice-linux-arm-gnueabihf@1.0.1':
-    resolution: {integrity: sha512-G8RgJ8FYXYkkSGQwywAUh84m946UTn6l03/vmEXBYNJxQJcD+I3B3k5jmjFG/OPiU8DfvxutOP8bi+F89MCV7Q==}
-    engines: {node: '>= 10'}
-    cpu: [arm]
-    os: [linux]
-
-  '@napi-rs/nice-linux-arm64-gnu@1.0.1':
-    resolution: {integrity: sha512-IMDak59/W5JSab1oZvmNbrms3mHqcreaCeClUjwlwDr0m3BoR09ZiN8cKFBzuSlXgRdZ4PNqCYNeGQv7YMTjuA==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
-
-  '@napi-rs/nice-linux-arm64-musl@1.0.1':
-    resolution: {integrity: sha512-wG8fa2VKuWM4CfjOjjRX9YLIbysSVV1S3Kgm2Fnc67ap/soHBeYZa6AGMeR5BJAylYRjnoVOzV19Cmkco3QEPw==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [linux]
-
-  '@napi-rs/nice-linux-ppc64-gnu@1.0.1':
-    resolution: {integrity: sha512-lxQ9WrBf0IlNTCA9oS2jg/iAjQyTI6JHzABV664LLrLA/SIdD+I1i3Mjf7TsnoUbgopBcCuDztVLfJ0q9ubf6Q==}
-    engines: {node: '>= 10'}
-    cpu: [ppc64]
-    os: [linux]
-
-  '@napi-rs/nice-linux-riscv64-gnu@1.0.1':
-    resolution: {integrity: sha512-3xs69dO8WSWBb13KBVex+yvxmUeEsdWexxibqskzoKaWx9AIqkMbWmE2npkazJoopPKX2ULKd8Fm9veEn0g4Ig==}
-    engines: {node: '>= 10'}
-    cpu: [riscv64]
-    os: [linux]
-
-  '@napi-rs/nice-linux-s390x-gnu@1.0.1':
-    resolution: {integrity: sha512-lMFI3i9rlW7hgToyAzTaEybQYGbQHDrpRkg+1gJWEpH0PLAQoZ8jiY0IzakLfNWnVda1eTYYlxxFYzW8Rqczkg==}
-    engines: {node: '>= 10'}
-    cpu: [s390x]
-    os: [linux]
-
-  '@napi-rs/nice-linux-x64-gnu@1.0.1':
-    resolution: {integrity: sha512-XQAJs7DRN2GpLN6Fb+ZdGFeYZDdGl2Fn3TmFlqEL5JorgWKrQGRUrpGKbgZ25UeZPILuTKJ+OowG2avN8mThBA==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
-
-  '@napi-rs/nice-linux-x64-musl@1.0.1':
-    resolution: {integrity: sha512-/rodHpRSgiI9o1faq9SZOp/o2QkKQg7T+DK0R5AkbnI/YxvAIEHf2cngjYzLMQSQgUhxym+LFr+UGZx4vK4QdQ==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [linux]
-
-  '@napi-rs/nice-win32-arm64-msvc@1.0.1':
-    resolution: {integrity: sha512-rEcz9vZymaCB3OqEXoHnp9YViLct8ugF+6uO5McifTedjq4QMQs3DHz35xBEGhH3gJWEsXMUbzazkz5KNM5YUg==}
-    engines: {node: '>= 10'}
-    cpu: [arm64]
-    os: [win32]
-
-  '@napi-rs/nice-win32-ia32-msvc@1.0.1':
-    resolution: {integrity: sha512-t7eBAyPUrWL8su3gDxw9xxxqNwZzAqKo0Szv3IjVQd1GpXXVkb6vBBQUuxfIYaXMzZLwlxRQ7uzM2vdUE9ULGw==}
-    engines: {node: '>= 10'}
-    cpu: [ia32]
-    os: [win32]
-
-  '@napi-rs/nice-win32-x64-msvc@1.0.1':
-    resolution: {integrity: sha512-JlF+uDcatt3St2ntBG8H02F1mM45i5SF9W+bIKiReVE6wiy3o16oBP/yxt+RZ+N6LbCImJXJ6bXNO2kn9AXicg==}
-    engines: {node: '>= 10'}
-    cpu: [x64]
-    os: [win32]
-
-  '@napi-rs/nice@1.0.1':
-    resolution: {integrity: sha512-zM0mVWSXE0a0h9aKACLwKmD6nHcRiKrPpCfvaKqG1CqDEyjEawId0ocXxVzPMCAm6kkWr2P025msfxXEnt8UGQ==}
-    engines: {node: '>= 10'}
 
   '@napi-rs/wasm-runtime@0.2.7':
     resolution: {integrity: sha512-5yximcFK5FNompXfJFoWanu5l8v1hNGqNHh9du1xETp9HWk/B/PzvchX55WYOPaIeNglG8++68AAiauBAtbnzw==}
@@ -5284,10 +5181,6 @@ packages:
     resolution: {integrity: sha512-M7BAV6Rlcy5u+m6oPhAPFgJTzAioX/6B0DxyvDlo9l8+T3nLKbrczg2WLUyzd45L8RqfUMyGPzekbMvX2Ldkwg==}
     engines: {node: '>=12'}
 
-  piscina@5.0.0-alpha.0:
-    resolution: {integrity: sha512-h82sk3I9Pm2lHx5FCC4qayvv1EkNH5VI7sRJVsCkAlsnhWWYpWz/0Tr1UeoPBhtuCFs6ZdNeYCYF9AOTw4Itfg==}
-    engines: {node: '>=18.x'}
-
   pixi.js@8.3.3:
     resolution: {integrity: sha512-dpucBKAqEm0K51MQKlXvyIJ40bcxniP82uz4ZPEQejGtPp0P+vueuG5DyArHCkC48mkVE2FEDvyYvBa45/JlQg==}
 
@@ -7101,74 +6994,6 @@ snapshots:
       url-template: 3.1.1
 
   '@ls-lint/ls-lint@2.3.0': {}
-
-  '@napi-rs/nice-android-arm-eabi@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-android-arm64@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-darwin-arm64@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-darwin-x64@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-freebsd-x64@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-arm-gnueabihf@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-arm64-gnu@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-arm64-musl@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-ppc64-gnu@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-riscv64-gnu@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-s390x-gnu@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-x64-gnu@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-linux-x64-musl@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-win32-arm64-msvc@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-win32-ia32-msvc@1.0.1':
-    optional: true
-
-  '@napi-rs/nice-win32-x64-msvc@1.0.1':
-    optional: true
-
-  '@napi-rs/nice@1.0.1':
-    optionalDependencies:
-      '@napi-rs/nice-android-arm-eabi': 1.0.1
-      '@napi-rs/nice-android-arm64': 1.0.1
-      '@napi-rs/nice-darwin-arm64': 1.0.1
-      '@napi-rs/nice-darwin-x64': 1.0.1
-      '@napi-rs/nice-freebsd-x64': 1.0.1
-      '@napi-rs/nice-linux-arm-gnueabihf': 1.0.1
-      '@napi-rs/nice-linux-arm64-gnu': 1.0.1
-      '@napi-rs/nice-linux-arm64-musl': 1.0.1
-      '@napi-rs/nice-linux-ppc64-gnu': 1.0.1
-      '@napi-rs/nice-linux-riscv64-gnu': 1.0.1
-      '@napi-rs/nice-linux-s390x-gnu': 1.0.1
-      '@napi-rs/nice-linux-x64-gnu': 1.0.1
-      '@napi-rs/nice-linux-x64-musl': 1.0.1
-      '@napi-rs/nice-win32-arm64-msvc': 1.0.1
-      '@napi-rs/nice-win32-ia32-msvc': 1.0.1
-      '@napi-rs/nice-win32-x64-msvc': 1.0.1
-    optional: true
 
   '@napi-rs/wasm-runtime@0.2.7':
     dependencies:
@@ -11007,10 +10832,6 @@ snapshots:
   picomatch@2.3.1: {}
 
   picomatch@4.0.2: {}
-
-  piscina@5.0.0-alpha.0:
-    optionalDependencies:
-      '@napi-rs/nice': 1.0.1
 
   pixi.js@8.3.3:
     dependencies:
