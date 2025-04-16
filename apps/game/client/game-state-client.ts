@@ -9,7 +9,7 @@ import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import type { EnhancedWebSocket } from "@mp/ws/client";
-import { isSyncMessage, parseSyncMessage } from "@mp/sync";
+import { applyPatch, syncPatchEncoding } from "@mp/sync";
 import { useRPC } from "../rpc.slice";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
@@ -30,9 +30,9 @@ export function createGameStateClient(socket: EnhancedWebSocket) {
 
   onCleanup(
     socket.subscribeToMessage((message) => {
-      if (isSyncMessage(message)) {
-        const applyPatch = parseSyncMessage(message);
-        applyPatch(gameState);
+      const patch = syncPatchEncoding.decode(message);
+      if (patch) {
+        applyPatch(gameState, patch);
       }
     }),
   );

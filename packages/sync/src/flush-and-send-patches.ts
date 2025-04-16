@@ -1,7 +1,7 @@
-import { encode } from "@mp/encoding";
 import type { PatchableState } from "./patch-state-machine";
 import type { PatchStateMachine } from "./patch-state-machine";
 import type { ClientId } from "./shared";
+import { syncPatchEncoding } from "./encoding";
 
 export async function flushAndSendPatches<State extends PatchableState>(
   state: PatchStateMachine<State>,
@@ -12,7 +12,7 @@ export async function flushAndSendPatches<State extends PatchableState>(
   for (const [clientId, patch] of state.flush()) {
     const send = getSenderForClient(clientId);
     if (send) {
-      const result = send(encode(patch));
+      const result = send(syncPatchEncoding.encode(patch));
       if (result instanceof Promise) {
         promises.push(result);
       }
@@ -22,4 +22,4 @@ export async function flushAndSendPatches<State extends PatchableState>(
   await Promise.all(promises);
 }
 
-export type BufferSender = (buffer: Uint8Array<ArrayBufferLike>) => unknown;
+export type BufferSender = (buffer: ArrayBufferLike) => unknown;

@@ -1,6 +1,6 @@
 export class EnhancedWebSocket {
   private socket?: WebSocket;
-  private messageHandlers = new Set<EventHandler<ArrayBuffer>>();
+  private messageHandlers = new Set<EventHandler<ArrayBufferLike>>();
   private readyStateHandlers = new Set<EventHandler<SyncClientReadyState>>();
   private errorHandlers = new Set<EventHandler<SocketErrorEvent>>();
   private isEnabled = false;
@@ -26,9 +26,11 @@ export class EnhancedWebSocket {
     this.disconnect();
   };
 
-  send = (data: Uint8Array) => this.socket?.send(data);
+  send = (data: ArrayBufferLike) => this.socket?.send(data);
 
-  subscribeToMessage = (handler: EventHandler<ArrayBuffer>): Unsubscribe => {
+  subscribeToMessage = (
+    handler: EventHandler<ArrayBufferLike>,
+  ): Unsubscribe => {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
   };
@@ -108,7 +110,7 @@ export class EnhancedWebSocket {
 
   private handleMessage = (event: MessageEvent) => {
     for (const handler of this.messageHandlers) {
-      handler(event.data as ArrayBuffer);
+      handler(event.data as ArrayBufferLike);
     }
   };
 
