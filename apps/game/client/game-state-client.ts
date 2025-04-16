@@ -1,29 +1,21 @@
 import {
   createContext,
-  createEffect,
   createMemo,
   createSignal,
   onCleanup,
-  untrack,
   useContext,
 } from "solid-js";
 import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
-import { AuthContext } from "@mp/auth/client";
-import { EnhancedWebSocket } from "@mp/ws/client";
+import type { EnhancedWebSocket } from "@mp/ws/client";
 import { isSyncMessage, parseSyncMessage } from "@mp/sync";
 import { useRPC } from "../rpc.slice";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 
-export function createGameStateClient(
-  wsUrlForToken: (token: string) => string,
-) {
-  const socket = new EnhancedWebSocket();
-  const auth = useContext(AuthContext);
-  const getToken = createMemo(() => auth.identity()?.token);
+export function createGameStateClient(socket: EnhancedWebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
@@ -46,15 +38,6 @@ export function createGameStateClient(
   );
 
   onCleanup(socket.subscribeToReadyState(setReadyState));
-
-  createEffect(() => {
-    const token = getToken();
-    if (token !== undefined) {
-      const url = wsUrlForToken(token);
-      untrack(() => socket.start(url));
-      onCleanup(socket.stop);
-    }
-  });
 
   return {
     actorsInArea,

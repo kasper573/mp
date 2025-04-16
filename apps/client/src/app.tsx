@@ -5,9 +5,14 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
 import { GameRPCSliceApiContext } from "@mp/game";
+import { EnhancedWebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
-import { createRPCClient, RPCClientContext } from "./integrations/rpc";
+import {
+  createRPCClient,
+  RPCClientContext,
+  SocketContext,
+} from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 
 // This is effectively the composition root of the application.
@@ -18,11 +23,13 @@ import { LoggerContext } from "./logger";
 
 registerSyncExtensions();
 
+const socket = new EnhancedWebSocket();
 const auth = createAuthClient(env.auth);
-const rpc = createRPCClient();
+const rpc = createRPCClient(socket);
 const router = createClientRouter();
 const logger = new Logger();
 
+socket.start(env.wsUrl);
 void auth.refresh();
 
 // eslint-disable-next-line unicorn/prefer-top-level-await
@@ -36,12 +43,14 @@ export default function App() {
       <LoggerContext.Provider value={logger}>
         <ErrorFallbackContext.Provider value={{ handleError: logger.error }}>
           <AuthContext.Provider value={auth}>
-            <RPCClientContext.Provider value={rpc}>
-              <GameRPCSliceApiContext.Provider value={rpc}>
-                <RouterProvider router={router} />
-                <TanStackRouterDevtools router={router} />
-              </GameRPCSliceApiContext.Provider>
-            </RPCClientContext.Provider>
+            <SocketContext.Provider value={socket}>
+              <RPCClientContext.Provider value={rpc}>
+                <GameRPCSliceApiContext.Provider value={rpc}>
+                  <RouterProvider router={router} />
+                  <TanStackRouterDevtools router={router} />
+                </GameRPCSliceApiContext.Provider>
+              </RPCClientContext.Provider>
+            </SocketContext.Provider>
           </AuthContext.Provider>
         </ErrorFallbackContext.Provider>
       </LoggerContext.Provider>

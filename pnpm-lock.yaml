@@ -77,6 +77,9 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../packages/ws
       '@tanstack/solid-router':
         specifier: 1.115.3
         version: 1.115.3(solid-js@1.9.5)

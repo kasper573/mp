@@ -6,10 +6,11 @@ import type {
   RPCError,
 } from "./builder";
 import type { inferOutput, inferInput } from "./proxy-invoker";
+import type { AnyRPCTransmitter } from "./transmitter";
 
-export function createSolidRPCInvoker<
-  Node extends AnyRPCNode,
->(): SolidRPCInvoker<Node> {
+export function createSolidRPCInvoker<Node extends AnyRPCNode>(
+  transmitter: AnyRPCTransmitter,
+): SolidRPCInvoker<Node> {
   throw new Error("Not implemented");
 }
 
