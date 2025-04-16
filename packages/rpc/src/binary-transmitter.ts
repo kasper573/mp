@@ -7,6 +7,7 @@ export class BinaryRPCTransmitter<
   Output,
   Context = void,
 > extends RPCTransmitter<Input, Output, Context> {
+  // Claiming the range 41_000 - 41_999 for the binary RPC protocol
   private callEncoding = createEncoding<Call<Input>>(41_000);
   private responseEncoding = createEncoding<Response<Output>>(41_001);
 
