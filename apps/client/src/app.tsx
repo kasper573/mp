@@ -4,7 +4,7 @@ import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
-import { GameRPCSliceApiContext } from "@mp/game";
+import { GameRPCSliceApiContext } from "@mp/game/client";
 import { EnhancedWebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";

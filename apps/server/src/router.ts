@@ -1,5 +1,5 @@
-import { rpc } from "@mp/game";
-import { gameRpcSlice } from "@mp/game";
+import { rpc } from "@mp/game/server";
+import { gameRpcSlice } from "@mp/game/server";
 import { opt } from "./options";
 
 export type RootRouter = typeof rootRouter;

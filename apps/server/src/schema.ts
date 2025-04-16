@@ -1,1 +1,1 @@
-export { npcTable, npcSpawnTable, characterTable } from "@mp/game";
+export { npcTable, npcSpawnTable, characterTable } from "@mp/game/server";

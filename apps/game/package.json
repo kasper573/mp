@@ -5,10 +5,15 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": {
-      "types": "./index.ts",
-      "import": "./index.ts",
-      "require": "./index.ts"
+    "./client": {
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
+    },
+    "./server": {
+      "types": "./server/index.ts",
+      "import": "./server/index.ts",
+      "require": "./server/index.ts"
     }
   },
   "dependencies": {

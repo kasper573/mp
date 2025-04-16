@@ -10,10 +10,10 @@ import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import type { EnhancedWebSocket } from "@mp/ws/client";
 import { applyPatch, syncPatchEncoding } from "@mp/sync";
-import { useRPC } from "../rpc.slice";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
+import { useRPC } from "./useRPC";
 
 export function createGameStateClient(socket: EnhancedWebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });

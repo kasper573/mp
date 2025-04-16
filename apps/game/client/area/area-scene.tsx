@@ -16,8 +16,8 @@ import {
   createResource,
 } from "solid-js";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
-import type { AreaResource } from "../..";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
+import type { AreaResource } from "../../shared/area/area-resource";
 import { Actor } from "./actor";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";

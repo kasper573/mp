@@ -21,11 +21,12 @@ import type { TimeSpan } from "@mp/time";
 import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
 import type { Actor, Character } from "../../server";
-import { clientViewDistanceRect, type AreaResource } from "../..";
 import type { TiledResource } from "../../shared/area/tiled-resource";
-import { useRPC } from "../../rpc.slice";
+import { useRPC } from "../useRPC";
 import { GameStateClientContext } from "../game-state-client";
 import { BuildVersionContext } from "../build-version-context";
+import type { AreaResource } from "../../shared/area/area-resource";
+import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import * as styles from "./area-debug-ui.css";
 import { AreaSceneContext } from "./area-scene";
 

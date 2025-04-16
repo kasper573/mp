@@ -1,7 +1,7 @@
 import { RPCError } from "@mp/rpc";
 import { InjectionContext } from "@mp/ioc";
 import type { UserIdentity } from "@mp/auth";
-import { rpc } from "../rpc";
+import { rpc } from "../server/rpc";
 import type { RoleDefinition } from "./define-roles";
 
 export const ctxUserIdentity = InjectionContext.new<UserIdentity | undefined>();

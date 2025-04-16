@@ -1,4 +1,4 @@
-import type { SessionId } from "@mp/game";
+import type { SessionId } from "@mp/game/server";
 import type express from "express";
 
 export function deriveSessionId(req: express.Request): SessionId {

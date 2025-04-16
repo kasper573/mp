@@ -1,7 +1,7 @@
 import { ctxGameStateMachine } from "../game-state";
 import { ctxAreaLookup } from "../area/lookup";
 import { defineRoles } from "../../user/define-roles";
-import { rpc } from "../../rpc";
+import { rpc } from "../rpc";
 import { roles } from "../../user";
 import { ctxNpcService } from "./service";
 import { spawnNpcInstance } from "./npc-spawn-behavior";

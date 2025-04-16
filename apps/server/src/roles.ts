@@ -1,4 +1,4 @@
-import { characterRoles, npcRoles } from "@mp/game";
+import { characterRoles, npcRoles } from "@mp/game/server";
 
 export const playerGroup = "player";
 

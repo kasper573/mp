@@ -8,7 +8,7 @@ import {
   createGameStateClient,
   Game,
   GameStateClientContext,
-} from "@mp/game";
+} from "@mp/game/client";
 import { SocketContext, useRPC } from "../integrations/rpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";

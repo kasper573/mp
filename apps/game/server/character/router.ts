@@ -4,7 +4,7 @@ import { RPCError } from "@mp/rpc";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
 import { defineRoles } from "../../user/define-roles";
-import { rpc } from "../../rpc";
+import { rpc } from "../rpc";
 import { roles } from "../../user/auth";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./schema";

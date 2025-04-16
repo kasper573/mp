@@ -1,11 +1,11 @@
 import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@mp/rpc";
 import { useContext, type Accessor } from "solid-js";
-import { AreaResource } from "../..";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
-import { useRPC } from "../../rpc.slice";
+import { useRPC } from "../useRPC";
 import { BuildVersionContext } from "../build-version-context";
+import { AreaResource } from "../../shared/area/area-resource";
 
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const rpc = useRPC();

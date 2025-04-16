@@ -11,13 +11,13 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import type { AuthToken, UserIdentity } from "@mp/auth";
 import { createWSSWithHandshake } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxSessionId, ctxUserIdentity } from "@mp/game";
+import { ctxSessionId, ctxUserIdentity } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db/server";
 import { uuid, type LocalFile } from "@mp/std";
 import type { ClientId } from "@mp/sync";
-import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game";
-import type { GameState, SessionId } from "@mp/game";
+import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game/server";
+import type { GameState, SessionId } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -34,7 +34,7 @@ import {
   deriveClientVisibility,
   NPCService,
   GameService,
-} from "@mp/game";
+} from "@mp/game/server";
 import type { WebSocket } from "@mp/ws/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
