@@ -14,7 +14,3 @@ type FunctionResolver = (path: string[]) => AnyFunction;
 export type AnyFunction = (...args: unknown[]) => unknown;
 
 const empty = Object.freeze(function () {});
-
-export function getPropAt(obj: object, path: string[]) {
-  return path.reduce((acc, key) => acc[key as never], obj);
-}
