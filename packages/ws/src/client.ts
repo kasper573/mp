@@ -6,6 +6,7 @@ export class EnhancedWebSocket {
   private isEnabled = false;
   private connectAttempt = 0;
   private url?: string;
+  private messageQueue: ArrayBufferLike[] = [];
 
   constructor(
     private reconnectDelay = (attemptNumber: number) =>
@@ -18,17 +19,19 @@ export class EnhancedWebSocket {
   start = (url: string) => {
     this.url = url;
     this.isEnabled = true;
+    this.messageQueue = [];
     this.connect();
   };
 
   stop = () => {
+    this.messageQueue = [];
     this.isEnabled = false;
     this.disconnect();
   };
 
   send = (data: ArrayBufferLike) => {
     if (this.socket?.readyState !== WebSocket.OPEN) {
-      this.handleError(new Event("socket-not-ready-to-send"));
+      this.messageQueue.push(data);
       return;
     }
     this.socket.send(data);
@@ -98,6 +101,10 @@ export class EnhancedWebSocket {
 
   private handleOpen = () => {
     this.connectAttempt = 0;
+    for (const message of this.messageQueue) {
+      this.socket?.send(message);
+    }
+    this.messageQueue = [];
     this.emitReadyState();
   };
 
