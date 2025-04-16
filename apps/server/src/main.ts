@@ -5,17 +5,15 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createAuthServer } from "@mp/auth/server";
-import { createPatchStateMachine, flushAndSendPatches } from "@mp/sync";
+import { createPatchStateMachine } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import type { AuthToken, UserIdentity } from "@mp/auth";
-import { createWSSWithHandshake } from "@mp/ws/server";
+import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxSessionId, ctxUserIdentity } from "@mp/game/server";
+import { ctxSessionId } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db/server";
-import { uuid, type LocalFile } from "@mp/std";
-import type { ClientId } from "@mp/sync";
+import { type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game/server";
 import type { GameState, SessionId } from "@mp/game/server";
 import {
@@ -35,7 +33,6 @@ import {
   NPCService,
   GameService,
 } from "@mp/game/server";
-import type { WebSocket } from "@mp/ws/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -47,14 +44,12 @@ import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import {
-  clientViewDistance,
-  registerSyncExtensions,
-  webSocketTokenParam,
-} from "./shared";
+import { clientViewDistance, registerSyncExtensions } from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
 import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
+import { getSocketId } from "./etc/get-socket-id";
+import { flushGameState } from "./etc/flush-game-state";
 
 registerSyncExtensions();
 
@@ -95,44 +90,11 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const wsHandshakeLimiter = new RateLimiter({
-  points: 10,
-  duration: 30,
-});
-
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
-const webSockets = new Map<ClientId, WebSocket>();
-const socketInfo = new Map<
-  WebSocket,
-  { user: UserIdentity; sessionId: SessionId }
->();
-
-const wss = createWSSWithHandshake<UserIdentity, ClientId>({
-  httpServer,
+const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
-  createSocketId: () => uuid() as ClientId,
-  onError: logger.error,
-  async handshake(clientId, req) {
-    // .url is in fact a path, so baseUrl does not matter
-    const url = req.url ? new URL(req.url, "http://localhost") : undefined;
-    const token = url?.searchParams.get(webSocketTokenParam);
-    const result = await auth.verifyToken(token as AuthToken);
-    return result.asyncAndThrough((user) =>
-      wsHandshakeLimiter.consume(user.id),
-    );
-  },
-  onConnection(socket, handshake) {
-    const sessionId = String(handshake.id) as SessionId;
-    socketInfo.set(socket, { user: handshake.payload, sessionId });
-    clients.add(handshake.id, handshake.payload.id);
-    webSockets.set(handshake.id, socket);
-    socket.addEventListener("close", () => {
-      clients.remove(handshake.id);
-      webSockets.delete(handshake.id);
-      socketInfo.delete(socket);
-    });
-  },
+  server: httpServer,
 });
 
 acceptRpcViaWebSockets({
@@ -140,19 +102,16 @@ acceptRpcViaWebSockets({
   onError: logger.error,
   router: rootRouter,
   createContext: (socket) => {
-    const info = socketInfo.get(socket);
-    if (info) {
-      return ioc
-        .provide(ctxSessionId, info.sessionId)
-        .provide(ctxUserIdentity, info.user);
-    }
-    return ioc;
+    return ioc.provide(
+      ctxSessionId,
+      getSocketId(socket) as unknown as SessionId,
+    );
   },
 });
 
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  clientIds: () => webSockets.keys(),
+  clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -197,7 +156,7 @@ updateTicker.subscribe(npcAIBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
 updateTicker.subscribe(combatBehavior(gameState));
-updateTicker.subscribe(flushGameState);
+updateTicker.subscribe(() => flushGameState(gameState, wss.clients));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, userId }) =>
@@ -210,10 +169,3 @@ httpServer.listen(opt.port, opt.hostname, () => {
 
 persistTicker.start();
 updateTicker.start();
-
-function flushGameState() {
-  return flushAndSendPatches(gameState, (clientId) => {
-    const socket = webSockets.get(clientId);
-    return socket?.send.bind(socket);
-  });
-}
