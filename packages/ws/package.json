@@ -6,19 +6,20 @@
   "license": "MIT",
   "exports": {
     "./client": {
-      "types": "./src/client.ts",
-      "import": "./src/client.ts",
-      "require": "./src/client.ts"
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
     },
     "./server": {
-      "types": "./src/server.ts",
-      "import": "./src/server.ts",
-      "require": "./src/server.ts"
+      "types": "./server/index.ts",
+      "import": "./server/index.ts",
+      "require": "./server/index.ts"
     }
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "ws": "8.18.1"
+    "ws": "8.18.1",
+    "partysocket": "1.1.3"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

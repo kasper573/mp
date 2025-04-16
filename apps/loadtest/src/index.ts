@@ -1,7 +1,7 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type RootRouter } from "@mp/server";
 import { BinaryRPCTransmitter, createRPCProxyInvoker } from "@mp/rpc";
-import { EnhancedWebSocket } from "@mp/ws/client";
+import { WebSocket } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
 
@@ -64,14 +64,13 @@ async function testSocketWithRPC(n: number) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const url = new URL(wsUrl);
-  const socket = new EnhancedWebSocket();
-  const transmitter = new BinaryRPCTransmitter(socket.send);
+  const socket = new WebSocket(wsUrl);
+  const transmitter = new BinaryRPCTransmitter(socket.send.bind(socket));
   const rpc = createRPCProxyInvoker<RootRouter>(transmitter);
-  socket.subscribeToMessage(transmitter.handleMessage);
+  socket.addEventListener("message", transmitter.handleMessageEvent);
 
   try {
-    await connect(socket, url.toString());
+    await waitForOpen(socket);
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
@@ -89,19 +88,17 @@ async function testSocketWithRPC(n: number) {
       logger.error(`Socket ${n} error:`, error);
     }
   } finally {
-    socket.stop();
+    socket.close();
+    socket.removeEventListener("message", transmitter.handleMessageEvent);
   }
 }
 
-async function connect(socket: EnhancedWebSocket, url: string) {
-  await new Promise<void>((resolve, reject) => {
-    socket.subscribeToErrors((e) => reject(new Error(e.message)));
-    socket.subscribeToReadyState((readyState) => {
-      if (readyState === "open") {
-        resolve();
-      }
-    });
-    socket.start(url);
+async function waitForOpen(socket: WebSocket) {
+  await new Promise<Event>((resolve, reject) => {
+    socket.addEventListener("error", (cause) =>
+      reject(new Error("Socket error", { cause })),
+    );
+    socket.addEventListener("open", resolve);
   });
 }
 

@@ -8,41 +8,41 @@ import {
 import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
-import type { EnhancedWebSocket } from "@mp/ws/client";
 import { applyPatch, syncPatchEncoding } from "@mp/sync";
+import { subscribeToReadyState } from "@mp/ws/client";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRPC } from "./useRPC";
 
-export function createGameStateClient(socket: EnhancedWebSocket) {
+export function createGameStateClient(socket: WebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const character = createMemo(
     () => gameState.actors[characterId()!] as Character | undefined,
   );
+  const [readyState, setReadyState] = createSignal(socket.readyState);
   const areaId = createMemo(() => character()?.areaId);
-  const [readyState, setReadyState] = createSignal(socket.getReadyState());
   const actors = createMemo(() => Object.values(gameState.actors));
   const actorsInArea = createMemo(() =>
     actors().filter((actor) => actor.areaId === areaId()),
   );
 
-  onCleanup(
-    socket.subscribeToMessage((message) => {
-      const patch = syncPatchEncoding.decode(message);
-      if (patch) {
-        applyPatch(gameState, patch);
-      }
-    }),
-  );
+  const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
+    const patch = syncPatchEncoding.decode(e.data);
+    if (patch) {
+      applyPatch(gameState, patch);
+    }
+  };
 
-  onCleanup(socket.subscribeToReadyState(setReadyState));
+  socket.addEventListener("message", handleMessage);
+  onCleanup(() => socket.removeEventListener("message", handleMessage));
+  onCleanup(subscribeToReadyState(socket, setReadyState));
 
   return {
     actorsInArea,
-    readyState,
     gameState,
+    readyState,
     setCharacterId,
     areaId,
     characterId,

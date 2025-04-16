@@ -15,7 +15,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const area = useAreaResource(state.areaId);
 
   createEffect(() => {
-    if (state.readyState() === "open") {
+    if (state.readyState() === WebSocket.OPEN) {
       void actions.join();
     }
   });
@@ -40,7 +40,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
           </Suspense>
         )}
       </Match>
-      <Match when={state.readyState() !== "open"}>
+      <Match when={state.readyState() !== WebSocket.OPEN}>
         <LoadingSpinner>Connecting to game server</LoadingSpinner>
       </Match>
       <Match when={!state.areaId()}>

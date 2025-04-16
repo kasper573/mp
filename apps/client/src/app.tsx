@@ -5,7 +5,7 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerSyncExtensions } from "@mp/server";
 import { GameRPCSliceApiContext } from "@mp/game/client";
-import { EnhancedWebSocket } from "@mp/ws/client";
+import { WebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -23,15 +23,14 @@ import { LoggerContext } from "./logger";
 
 registerSyncExtensions();
 
-const socket = new EnhancedWebSocket();
+const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
 const rpc = createRPCClient(socket);
 const router = createClientRouter();
 const logger = new Logger();
 
 logger.subscribe(consoleLoggerHandler(console));
-socket.subscribeToErrors((evt) => logger.error("socket error", evt.type));
-socket.start(env.wsUrl);
+socket.addEventListener("error", logger.error);
 void auth.refresh();
 
 // eslint-disable-next-line unicorn/prefer-top-level-await

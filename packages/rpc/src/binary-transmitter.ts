@@ -32,4 +32,14 @@ export class BinaryRPCTransmitter<
       return this.handleResponse(response);
     }
   };
+
+  /**
+   * Convenience method to easily bind event based message handlers
+   * (Common for sockets and other transports)
+   */
+  handleMessageEvent = (event: { data: ArrayBufferLike }, context: Context) => {
+    // Promise is voided because most event emitters expect a void return.
+    // If you need to handle the promise, use the handleMessage method directly.
+    void this.handleMessage(event.data, context);
+  };
 }
