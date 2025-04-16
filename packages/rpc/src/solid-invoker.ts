@@ -1,4 +1,4 @@
-import { createMemo, createResource } from "solid-js";
+import { createResource } from "solid-js";
 import type {
   AnyMutationNode,
   AnyQueryNode,
@@ -34,13 +34,13 @@ function createUseQuery(
   function useQuery<MappedOutput>(
     options?: () => SolidRPCQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryReturn<unknown> {
-    const input = createMemo(() => options?.()?.input);
-    const [resource, { refetch }] = createResource(input, async (input) => {
+    const [resource, { refetch }] = createResource(async () => {
+      const { input, map } = options?.() ?? {};
       if (input === skipToken) {
         return;
       }
       const result = (await transmitter.call([path, input])) as unknown;
-      const { map } = options?.() ?? {};
+
       if (map) {
         return map(result, input);
       }
@@ -51,9 +51,7 @@ function createUseQuery(
       get isLoading() {
         return resource.loading;
       },
-      get data() {
-        return resource();
-      },
+      data: resource(),
       get error() {
         return resource.error as unknown;
       },

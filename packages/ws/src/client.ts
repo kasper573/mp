@@ -26,7 +26,13 @@ export class EnhancedWebSocket {
     this.disconnect();
   };
 
-  send = (data: ArrayBufferLike) => this.socket?.send(data);
+  send = (data: ArrayBufferLike) => {
+    if (this.socket?.readyState !== WebSocket.OPEN) {
+      this.handleError(new Event("socket-not-ready-to-send"));
+      return;
+    }
+    this.socket.send(data);
+  };
 
   subscribeToMessage = (
     handler: EventHandler<ArrayBufferLike>,

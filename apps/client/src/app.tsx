@@ -1,4 +1,4 @@
-import { Logger } from "@mp/logger";
+import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
@@ -29,6 +29,8 @@ const rpc = createRPCClient(socket);
 const router = createClientRouter();
 const logger = new Logger();
 
+logger.subscribe(consoleLoggerHandler(console));
+socket.subscribeToErrors((evt) => logger.error("socket error", evt.type));
 socket.start(env.wsUrl);
 void auth.refresh();
 

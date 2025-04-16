@@ -14,10 +14,15 @@ export function acceptRpcViaWebSockets<Context>(opt: {
   createContext: (socket: WebSocket) => Context;
 }) {
   opt.wss.on("connection", (socket) => {
+    socket.binaryType = "arraybuffer";
     const invokeRPC = createRPCInvoker(opt.router);
     const transmitter = new BinaryRPCTransmitter(
       socket.send.bind(socket),
       invokeRPC,
+    );
+
+    socket.addEventListener("error", (error) =>
+      opt.onError?.(new Error("Socket error", { cause: error })),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
