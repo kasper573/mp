@@ -3,6 +3,10 @@ import * as cbor from "cbor-x";
 export { addExtension as addEncoderExtension } from "cbor-x";
 
 export function createEncoding<T>(header: number) {
+  if (header > encodingHeaderMaxLength) {
+    throw new Error(`Header must be a 16-bit unsigned integer`);
+  }
+
   return {
     decode(data: ArrayBufferLike): T | undefined {
       const view = new DataView(data);
@@ -22,3 +26,5 @@ export function createEncoding<T>(header: number) {
     },
   };
 }
+
+const encodingHeaderMaxLength = 0xff_ff;

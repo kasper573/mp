@@ -39,7 +39,7 @@ function createUseQuery(
       if (input === skipToken) {
         return;
       }
-      const result = (await transmitter.call([path, input])) as unknown;
+      const result = (await transmitter.call(path, input)) as unknown;
 
       if (map) {
         return map(result, input);
@@ -69,8 +69,8 @@ function createUseMutation(
   path: string[],
 ): UseMutation<AnyMutationNode> {
   const mutation = {
-    mutate: (input: unknown) => void transmitter.call([path, input]),
-    mutateAsync: (input: unknown) => transmitter.call([path, input]),
+    mutate: (input: unknown) => void transmitter.call(path, input),
+    mutateAsync: (input: unknown) => transmitter.call(path, input),
   };
   return () => mutation;
 }

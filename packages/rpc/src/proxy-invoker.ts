@@ -11,7 +11,7 @@ export function createRPCProxyInvoker<Node extends AnyRPCNode>(
   transmitter: AnyRPCTransmitter,
 ): RPCProxyInvoker<Node> {
   const proxy = createInvocationProxy(
-    (path) => (input) => transmitter.call([path, input]),
+    (path) => (input) => transmitter.call(path, input),
   );
 
   return proxy as RPCProxyInvoker<Node>;

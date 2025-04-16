@@ -1,8 +1,9 @@
 import { err, ok, type Branded, type Result } from "@mp/std";
 
 export class RPCTransmitter<Input, Output, Context = void> {
+  private idCounter: CallId = 0 as CallId;
   private deferredPromises = new Map<
-    ResponseId,
+    CallId,
     {
       resolve: (result: Output) => void;
       reject: (error: unknown) => void;
@@ -17,14 +18,12 @@ export class RPCTransmitter<Input, Output, Context = void> {
     },
   ) {}
 
-  async call(rpc: Call<Input>): Promise<Output> {
-    this.sendCall(rpc);
-    const accId = rpc[2];
-    if (accId === undefined) {
-      return void 0 as Output;
-    }
+  async call(path: string[], input: Input): Promise<Output> {
+    const id = this.nextId();
+    const call: Call<Input> = [path, input, id];
+    this.sendCall(call);
     return new Promise<Output>((resolve, reject) =>
-      this.deferredPromises.set(accId, { resolve, reject }),
+      this.deferredPromises.set(id, { resolve, reject }),
     );
   }
 
@@ -32,15 +31,13 @@ export class RPCTransmitter<Input, Output, Context = void> {
     call: Call<Input>,
     context: Context,
   ): Promise<CallHandlerResult<Output>> {
-    const responseId = call[2];
+    const id = call[2];
     const result = await this.invoke(call, context);
 
-    if (responseId !== undefined) {
-      this.sendResponse([
-        responseId,
-        result.isErr() ? { error: result.error } : { output: result.value },
-      ]);
-    }
+    this.sendResponse([
+      id,
+      result.isErr() ? { error: result.error } : { output: result.value },
+    ]);
 
     return ok(result);
   }
@@ -66,17 +63,21 @@ export class RPCTransmitter<Input, Output, Context = void> {
       return err(new Error("Error resolving RPC response", { cause: error }));
     }
   }
+
+  private nextId(): CallId {
+    return this.idCounter++ as CallId;
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRPCTransmitter = RPCTransmitter<any, any, any>;
 
-export type ResponseId = Branded<number, "ResponseId">;
+export type CallId = Branded<number, "CallId">;
 
-export type Call<Input> = [path: string[], input: Input, id?: ResponseId];
+export type Call<Input> = [path: string[], input: Input, id: CallId];
 
 export type Response<Output> = [
-  id: ResponseId,
+  id: CallId,
   { output: Output } | { error: ResponseError },
 ];
 
