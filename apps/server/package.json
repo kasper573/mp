@@ -23,8 +23,6 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
-    "@mp/math": "workspace:*",
-    "@mp/encoding": "workspace:*",
     "@mp/keycloak-provision": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/ioc": "workspace:*",

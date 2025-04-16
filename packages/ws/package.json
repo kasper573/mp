@@ -17,7 +17,6 @@
     }
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
     "ws": "8.18.1",
     "partysocket": "1.1.3"
   },
