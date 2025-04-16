@@ -196,6 +196,9 @@ importers:
 
   apps/loadtest:
     dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger

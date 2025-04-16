@@ -2,6 +2,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type RootRouter } from "@mp/server";
 import { BinaryRPCTransmitter, createRPCProxyInvoker } from "@mp/rpc";
 import { EnhancedWebSocket } from "@mp/ws/client";
+import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -63,7 +64,6 @@ async function testSocketWithRPC(n: number) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const token = process.env.MP_SERVER_AUTH__BYPASS_USER!;
   const url = new URL(wsUrl);
   const socket = new EnhancedWebSocket();
   const transmitter = new BinaryRPCTransmitter(socket.send);
@@ -75,6 +75,9 @@ async function testSocketWithRPC(n: number) {
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
+    await rpc.character.authenticate(
+      process.env.MP_SERVER_AUTH__BYPASS_USER as AuthToken,
+    );
     const characterId = await rpc.character.join();
     if (verbose) {
       logger.info(`Socket ${n} joined as character ${characterId}`);

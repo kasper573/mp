@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@mp/ws": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/rpc": "workspace:*"

@@ -1,6 +1,7 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
 import { RPCError } from "@mp/rpc";
+import type { AuthToken } from "@mp/auth";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
 import { rpc } from "../rpc";
@@ -19,6 +20,9 @@ export const characterRoles = defineRoles("character", [
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = rpc.router({
+  authenticate: rpc.procedure.input<AuthToken>().mutation(({ input, ctx }) => {
+    throw new Error("Not implemented");
+  }),
   move: rpc.procedure
     .input<{ characterId: CharacterId; to: VectorLike<Tile> }>()
     .use(roles([characterRoles.move]))
