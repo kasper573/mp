@@ -4,12 +4,17 @@ import type {
   AnyRPCNode,
   ProcedureHandler,
 } from "./builder";
+import { createInvocationProxy } from "./invocation-proxy";
 import type { AnyRPCTransmitter } from "./transmitter";
 
 export function createRPCProxyInvoker<Node extends AnyRPCNode>(
   transmitter: AnyRPCTransmitter,
 ): RPCProxyInvoker<Node> {
-  throw new Error("Not implemented");
+  const proxy = createInvocationProxy(
+    (path) => (input) => transmitter.call([path, input]),
+  );
+
+  return proxy as RPCProxyInvoker<Node>;
 }
 
 export type RPCProxyInvoker<Node extends AnyRPCNode> =

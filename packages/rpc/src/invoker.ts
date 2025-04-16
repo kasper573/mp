@@ -7,7 +7,7 @@ export function createRPCInvoker<Input, Output, Context>(
 ): Invoker<Input, Output, Context> {
   return async function invokeRPC(call, ctx) {
     const [path, input] = call;
-    const node = resolveProcedureNode<Context>(root, path);
+    const node = resolveRPCNode<Context>(root, path);
     if (!node || node.type === "router") {
       return err({ type: "invalid-path" });
     }
@@ -22,7 +22,7 @@ export function createRPCInvoker<Input, Output, Context>(
   };
 }
 
-function resolveProcedureNode<Context>(
+function resolveRPCNode<Context>(
   start: AnyRPCNode,
   path: string[],
 ): AnyRPCNode<Context> | undefined {

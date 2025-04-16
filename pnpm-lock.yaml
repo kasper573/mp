@@ -510,6 +510,9 @@ importers:
       '@mp/ws':
         specifier: workspace:*
         version: link:../ws
+      solid-js:
+        specifier: 1.9.5
+        version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

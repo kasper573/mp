@@ -1,17 +1,80 @@
+import { createMemo, createResource } from "solid-js";
 import type {
   AnyMutationNode,
   AnyQueryNode,
   AnyRouterNode,
   AnyRPCNode,
-  RPCError,
 } from "./builder";
+import type { AnyFunction } from "./invocation-proxy";
+import { createInvocationProxy } from "./invocation-proxy";
 import type { inferOutput, inferInput } from "./proxy-invoker";
 import type { AnyRPCTransmitter } from "./transmitter";
 
 export function createSolidRPCInvoker<Node extends AnyRPCNode>(
   transmitter: AnyRPCTransmitter,
 ): SolidRPCInvoker<Node> {
-  throw new Error("Not implemented");
+  const proxy = createInvocationProxy((path) => {
+    const last = path.at(-1);
+    switch (last) {
+      case useQueryProperty:
+        return createUseQuery(transmitter, path.slice(0, -1)) as AnyFunction;
+      case useMutationProperty:
+        return createUseMutation(transmitter, path.slice(0, -1)) as AnyFunction;
+    }
+    throw new Error("Cannot invoke: " + path.join("."));
+  });
+
+  return proxy as SolidRPCInvoker<Node>;
+}
+
+function createUseQuery(
+  transmitter: AnyRPCTransmitter,
+  path: string[],
+): UseQuery<AnyQueryNode> {
+  function useQuery<MappedOutput>(
+    options?: () => SolidRPCQueryOptions<unknown, unknown, MappedOutput>,
+  ): UseQueryReturn<unknown> {
+    const input = createMemo(() => options?.()?.input);
+    const [resource, { refetch }] = createResource(input, async (input) => {
+      if (input === skipToken) {
+        return;
+      }
+      const result = (await transmitter.call([path, input])) as unknown;
+      const { map } = options?.() ?? {};
+      if (map) {
+        return map(result, input);
+      }
+      return result;
+    });
+
+    const query: UseQueryReturn<unknown> = {
+      get isLoading() {
+        return resource.loading;
+      },
+      get data() {
+        return resource();
+      },
+      get error() {
+        return resource.error as unknown;
+      },
+      refetch,
+    };
+
+    return query;
+  }
+
+  return useQuery as UseQuery<AnyQueryNode>;
+}
+
+function createUseMutation(
+  transmitter: AnyRPCTransmitter,
+  path: string[],
+): UseMutation<AnyMutationNode> {
+  const mutation = {
+    mutate: (input: unknown) => void transmitter.call([path, input]),
+    mutateAsync: (input: unknown) => transmitter.call([path, input]),
+  };
+  return () => mutation;
 }
 
 export type SolidRPCInvoker<Node extends AnyRPCNode> =
@@ -33,33 +96,37 @@ export interface SolidRPCQueryOptions<Input, Output, MappedOutput> {
 }
 
 export interface SolidRPCQueryInvoker<Node extends AnyQueryNode> {
-  createQuery: <MappedOutput = inferOutput<Node["handler"]>>(
+  [useQueryProperty]: UseQuery<Node>;
+}
+
+export interface UseQuery<Node extends AnyQueryNode> {
+  <MappedOutput = inferOutput<Node["handler"]>>(
     options?: () => SolidRPCQueryOptions<
       inferInput<Node["handler"]>,
       inferOutput<Node["handler"]>,
       MappedOutput
     >,
-  ) => UseQueryReturn<MappedOutput>;
-  query: (
-    input: inferInput<Node["handler"]>,
-  ) => Promise<inferOutput<Node["handler"]>>;
+  ): UseQueryReturn<MappedOutput>;
 }
 
 export interface UseQueryReturn<Output> {
   data?: Output;
-  error?: RPCError;
+  error?: unknown;
   isLoading: boolean;
   refetch: () => void;
 }
 
-export interface SolidRPCMutationInvoker<Node extends AnyMutationNode> {
-  createMutation: () => UseMutationReturn<
+const useQueryProperty = "createQuery";
+const useMutationProperty = "createMutation";
+
+export interface UseMutation<Node extends AnyMutationNode> {
+  (): UseMutationReturn<
     inferInput<Node["handler"]>,
     inferOutput<Node["handler"]>
   >;
-  mutate: (
-    input: inferInput<Node["handler"]>,
-  ) => Promise<inferOutput<Node["handler"]>>;
+}
+export interface SolidRPCMutationInvoker<Node extends AnyMutationNode> {
+  [useMutationProperty]: UseMutation<Node>;
 }
 
 export interface UseMutationReturn<Input, Output> {
