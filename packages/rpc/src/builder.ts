@@ -8,7 +8,7 @@ export class RPCBuilder<Context> {
   build(): RPCFactories<Context> {
     return {
       router: (routes) => ({ type: "router", routes }),
-      procedure: new ProcedureBuilder(),
+      procedure: ProcedureBuilder.create<Context>(),
       middleware: createMiddleware,
     };
   }
@@ -102,16 +102,22 @@ export type AnyRPCNode<Context = any> =
 export type AnyRouteRecord<Context = any> = Record<string, AnyRPCNode<Context>>;
 
 export class ProcedureBuilder<Input, Output, Context, MWContext> {
+  private constructor(
+    private middleware: RPCMiddleware<Context, MWContext, unknown>,
+  ) {}
+
   use<NewMWContext, PipedMWContext>(
     middleware: RPCMiddleware<Context, NewMWContext, PipedMWContext>,
   ): ProcedureBuilder<Input, Output, Context, NewMWContext> {
-    throw new Error("Not implemented");
+    return new ProcedureBuilder(
+      this.middleware.pipe(middleware as never) as never,
+    );
   }
   input<NewInput>(): ProcedureBuilder<NewInput, Output, Context, MWContext> {
-    throw new Error("Not implemented");
+    return new ProcedureBuilder(this.middleware);
   }
   output<NewOutput>(): ProcedureBuilder<Input, NewOutput, Context, MWContext> {
-    throw new Error("Not implemented");
+    return new ProcedureBuilder(this.middleware);
   }
 
   query(
@@ -124,6 +130,12 @@ export class ProcedureBuilder<Input, Output, Context, MWContext> {
     handler: ProcedureHandler<Input, Output, Context, MWContext>,
   ): MutationNode<Input, Output, Context, MWContext> {
     return { type: "mutation", handler };
+  }
+
+  static create<Context>(): ProcedureBuilder<void, void, Context, unknown> {
+    return new ProcedureBuilder(
+      createMiddleware<Context, unknown, unknown>(() => {}),
+    );
   }
 }
 
