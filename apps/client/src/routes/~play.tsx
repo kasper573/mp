@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { clientViewDistance } from "@mp/server";
+import { clientViewDistance } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import {

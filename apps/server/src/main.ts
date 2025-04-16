@@ -33,6 +33,8 @@ import {
   NPCService,
   GameService,
 } from "@mp/game/server";
+import { registerEncoderExtensions } from "@mp/game/server";
+import { clientViewDistance } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -44,14 +46,13 @@ import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import { clientViewDistance, registerSyncExtensions } from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
 import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { flushGameState } from "./etc/flush-game-state";
 
-registerSyncExtensions();
+registerEncoderExtensions();
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));

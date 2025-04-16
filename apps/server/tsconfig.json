@@ -1,6 +1,6 @@
 {
   "extends": "@mp/tsconfig/vite.json",
-  "include": ["src", "*.ts"],
+  "include": ["src", "*.ts", "../game/shared/encoder-extensions.ts"],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017"

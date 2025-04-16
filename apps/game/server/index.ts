@@ -19,6 +19,8 @@ export * from "./traits/appearance";
 export * from "./traits/actor";
 export * from "./client-registry";
 export * from "../shared/client-view-distance-rect";
+export * from "../shared/encoder-extensions";
+export * from "../shared/client-view-distance-settings";
 export * from "../shared/area/area-id";
 export * from "../shared/area/area-resource";
 export * from "../shared/area/tiled-resource";

@@ -2,15 +2,15 @@ import type { RootRouter } from "@mp/server";
 import type { SolidRPCInvoker } from "@mp/rpc";
 import { BinaryRPCTransmitter, createSolidRPCInvoker } from "@mp/rpc";
 import { createContext, onCleanup, useContext } from "solid-js";
+import type { Logger } from "@mp/logger";
 
 export type RPCClient = SolidRPCInvoker<RootRouter>;
 
-export function createRPCClient(socket: WebSocket): RPCClient {
+export function createRPCClient(socket: WebSocket, logger: Logger): RPCClient {
   const transmitter = new BinaryRPCTransmitter((data) => socket.send(data));
-  socket.addEventListener("message", transmitter.handleMessageEvent);
-  onCleanup(() =>
-    socket.removeEventListener("message", transmitter.handleMessageEvent),
-  );
+  const handleMessage = transmitter.messageEventHandler(logger.error);
+  socket.addEventListener("message", handleMessage);
+  onCleanup(() => socket.removeEventListener("message", handleMessage));
   return createSolidRPCInvoker<RootRouter>(transmitter);
 }
 

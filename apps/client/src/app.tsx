@@ -3,7 +3,7 @@ import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
-import { registerSyncExtensions } from "@mp/server";
+import { registerEncoderExtensions } from "@mp/game/client";
 import { GameRPCSliceApiContext } from "@mp/game/client";
 import { WebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
@@ -21,16 +21,17 @@ import { LoggerContext } from "./logger";
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
 
-registerSyncExtensions();
+registerEncoderExtensions();
+
+const logger = new Logger();
+logger.subscribe(consoleLoggerHandler(console));
 
 const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
-const rpc = createRPCClient(socket);
+const rpc = createRPCClient(socket, logger);
 const router = createClientRouter();
-const logger = new Logger();
 
-logger.subscribe(consoleLoggerHandler(console));
-socket.addEventListener("error", logger.error);
+socket.addEventListener("error", (e) => logger.error("Socket error", e));
 void auth.refresh();
 
 // eslint-disable-next-line unicorn/prefer-top-level-await
@@ -42,7 +43,11 @@ export default function App() {
   return (
     <>
       <LoggerContext.Provider value={logger}>
-        <ErrorFallbackContext.Provider value={{ handleError: logger.error }}>
+        <ErrorFallbackContext.Provider
+          value={{
+            handleError: (e) => logger.error("SolidJS error", e),
+          }}
+        >
           <AuthContext.Provider value={auth}>
             <SocketContext.Provider value={socket}>
               <RPCClientContext.Provider value={rpc}>

@@ -9,7 +9,7 @@ export function createRPCInvoker<Input, Output, Context>(
     const [path, input] = call;
     const node = resolveRPCNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err({ type: "invalid-path" });
+      return err("RPC path not found: " + path.join("."));
     }
 
     try {
@@ -17,7 +17,7 @@ export function createRPCInvoker<Input, Output, Context>(
       const output = (await node.handler({ ctx, input, mwc })) as Output;
       return ok(output);
     } catch (error) {
-      return err({ type: "exception", error });
+      return err(error);
     }
   };
 }

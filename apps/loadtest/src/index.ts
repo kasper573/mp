@@ -67,7 +67,8 @@ async function testSocketWithRPC(n: number) {
   const socket = new WebSocket(wsUrl);
   const transmitter = new BinaryRPCTransmitter(socket.send.bind(socket));
   const rpc = createRPCProxyInvoker<RootRouter>(transmitter);
-  socket.addEventListener("message", transmitter.handleMessageEvent);
+  const handleMessage = transmitter.messageEventHandler(logger.error);
+  socket.addEventListener("message", handleMessage);
 
   try {
     await waitForOpen(socket);
@@ -89,7 +90,7 @@ async function testSocketWithRPC(n: number) {
     }
   } finally {
     socket.close();
-    socket.removeEventListener("message", transmitter.handleMessageEvent);
+    socket.removeEventListener("message", handleMessage);
   }
 }
 

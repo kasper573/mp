@@ -3,37 +3,43 @@ import {
   BinaryRPCTransmitter,
   createRPCInvoker,
   type AnyRouterNode,
-  type RPCError,
 } from "@mp/rpc";
 import type { WebSocketServer } from "@mp/ws/server";
+import { opt } from "../options";
 
-export function acceptRpcViaWebSockets<Context>(opt: {
+export function acceptRpcViaWebSockets<Context>({
+  wss,
+  onError,
+  router,
+  createContext,
+}: {
   wss: WebSocketServer;
-  onError?: (error: RPCError) => void;
+  onError?: (error: unknown) => void;
   router: AnyRouterNode<Context>;
   createContext: (socket: WebSocket) => Context;
 }) {
-  opt.wss.on("connection", (socket) => {
+  wss.on("connection", (socket) => {
     socket.binaryType = "arraybuffer";
-    const invokeRPC = createRPCInvoker(opt.router);
+    const invokeRPC = createRPCInvoker(router);
     const transmitter = new BinaryRPCTransmitter(
       socket.send.bind(socket),
       invokeRPC,
+      (error) => (opt.exposeErrorDetails ? error : "Internal server error"),
     );
 
     socket.addEventListener("error", (error) =>
-      opt.onError?.(new Error("Socket error", { cause: error })),
+      onError?.(new Error("Socket error", { cause: error })),
     );
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     socket.addEventListener("message", async (msg) => {
-      const context = opt.createContext(socket);
+      const context = createContext(socket);
       const result = await transmitter.handleMessage(
         msg.data as ArrayBuffer,
         context,
       );
       if (result?.isErr()) {
-        opt.onError?.(result.error);
+        onError?.(result.error);
       }
     });
   });

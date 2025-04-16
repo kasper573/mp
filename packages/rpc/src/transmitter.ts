@@ -16,6 +16,7 @@ export class RPCTransmitter<Input, Output, Context = void> {
     private invoke: Invoker<Input, Output, Context> = () => {
       throw new Error("Invoke not supported");
     },
+    private formatResponseError: (error: unknown) => unknown = (error) => error,
   ) {}
 
   async call(path: string[], input: Input): Promise<Output> {
@@ -36,7 +37,9 @@ export class RPCTransmitter<Input, Output, Context = void> {
 
     this.sendResponse([
       id,
-      result.isErr() ? { error: result.error } : { output: result.value },
+      result.isErr()
+        ? { error: this.formatResponseError(result.error) }
+        : { output: result.value },
     ]);
 
     return ok(result);
@@ -53,7 +56,7 @@ export class RPCTransmitter<Input, Output, Context = void> {
       this.deferredPromises.delete(accId);
 
       if ("error" in result) {
-        promise.reject(result.error);
+        return err(result.error);
       } else {
         promise.resolve(result.output);
       }
@@ -78,22 +81,16 @@ export type Call<Input> = [path: string[], input: Input, id: CallId];
 
 export type Response<Output> = [
   id: CallId,
-  { output: Output } | { error: ResponseError },
+  { output: Output } | { error: unknown },
 ];
-
-export type ResponseError = unknown;
 
 export type CallHandlerResult<Output> = Result<InvokerResult<Output>, Error>;
 
-export type ResponseHandlerResult = Result<void, Error>;
+export type ResponseHandlerResult = Result<void, unknown>;
 
 export type Invoker<Input, Output, Context = void> = (
   call: Call<Input>,
   context: Context,
 ) => Promise<InvokerResult<Output>>;
 
-export type InvokerResult<Output> = Result<Output, InvokerError>;
-
-export type InvokerError =
-  | { type: "invalid-path" }
-  | { type: "exception"; error: unknown };
+export type InvokerResult<Output> = Result<Output, unknown>;

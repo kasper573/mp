@@ -163,8 +163,8 @@ export type RPCErrorFormatter<Context> = (opt: {
 }) => RPCError;
 
 export class RPCError extends Error {
-  constructor(opt: { code: string; message: string }) {
-    super(`${opt.code}: ${opt.message}`);
+  constructor(...args: ConstructorParameters<typeof Error>) {
+    super(...args);
     this.name = "RPCError";
   }
 }

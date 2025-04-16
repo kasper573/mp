@@ -13,11 +13,13 @@ export class BinaryRPCTransmitter<
   constructor(
     send: (messageBuffer: ArrayBufferLike) => void,
     invoke?: Invoker<Input, Output, Context>,
+    formatResponseError?: (error: unknown) => unknown,
   ) {
     super(
       (call) => send(this.callEncoding.encode(call)),
       (response) => send(this.responseEncoding.encode(response)),
       invoke,
+      formatResponseError,
     );
   }
 
@@ -35,11 +37,19 @@ export class BinaryRPCTransmitter<
 
   /**
    * Convenience method to easily bind event based message handlers
-   * (Common for sockets and other transports)
+   * The returned event handler will pipe all errors to the given event handler.
+   * This is because most event expect a void return.
+   * If you need to handle the promise, use the handleMessage method directly.
    */
-  handleMessageEvent = (event: { data: ArrayBufferLike }, context: Context) => {
-    // Promise is voided because most event emitters expect a void return.
-    // If you need to handle the promise, use the handleMessage method directly.
-    void this.handleMessage(event.data, context);
+  messageEventHandler = (errorHandler: (error: unknown) => void) => {
+    return (event: { data: ArrayBufferLike }, context: Context): void => {
+      void this.handleMessage(event.data, context)
+        .then((result) => {
+          if (result?.isErr()) {
+            errorHandler(result.error);
+          }
+        })
+        .catch(errorHandler);
+    };
   };
 }

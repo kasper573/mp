@@ -31,24 +31,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "Character not found",
-        });
+        throw new RPCError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError({
-          code: "FORBIDDEN",
-          message: "You don't have access to this character",
-        });
+        throw new RPCError("You don't have access to this character");
       }
 
       if (!char.health) {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot move a dead character",
-        });
+        throw new RPCError("Cannot move a dead character");
       }
 
       state.actors.update(char.id, {
@@ -65,24 +56,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "Character not found",
-        });
+        throw new RPCError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError({
-          code: "FORBIDDEN",
-          message: "You don't have access to this character",
-        });
+        throw new RPCError("You don't have access to this character");
       }
 
       if (targetId === characterId) {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "You can't attack yourself",
-        });
+        throw new RPCError("You can't attack yourself");
       }
 
       state.actors.update(characterId, {
@@ -126,24 +108,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "Character not found",
-        });
+        throw new RPCError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError({
-          code: "FORBIDDEN",
-          message: "You don't have access to this character",
-        });
+        throw new RPCError("You don't have access to this character");
       }
 
       if (char.health > 0) {
-        throw new RPCError({
-          code: "BAD_REQUEST",
-          message: "Character is not dead",
-        });
+        throw new RPCError("Character is not dead");
       }
 
       const characterService = ctx.get(ctxCharacterService);

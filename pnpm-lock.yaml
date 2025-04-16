@@ -135,6 +135,9 @@ importers:
       '@mp/db':
         specifier: workspace:*
         version: link:../../packages/db
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../../packages/encoding
       '@mp/engine':
         specifier: workspace:*
         version: link:../../packages/engine
