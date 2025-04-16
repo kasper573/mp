@@ -1,4 +1,4 @@
-import type { ClientId } from "@mp/sync";
+import type { ClientId } from "@mp/game/server";
 import type { WebSocket } from "@mp/ws/server";
 import { nanoid } from "nanoid";
 

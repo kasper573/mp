@@ -1,5 +1,4 @@
 import type { ReadonlyDeep } from "type-fest";
-import type { ClientId } from "./shared";
 import type { Patch, PatchPath } from "./patch";
 
 /**
@@ -225,3 +224,11 @@ export type PatchableEntities = {
 };
 
 export type PatchableState = { [entityName: string]: PatchableEntities };
+
+type ClientId = Registry extends { clientId: infer T } ? T : string;
+
+/**
+ * Designed to be augmented by the consumer package to conveniently override the type of ClientId.
+ * This avoids the need to pollute the generic parameters in all places where ClientId is used.
+ */
+export interface Registry {}

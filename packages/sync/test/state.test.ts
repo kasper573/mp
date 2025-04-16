@@ -1,6 +1,5 @@
 import { expect, it } from "vitest";
 import { createPatchStateMachine } from "../src/patch-state-machine";
-import type { ClientId } from "../src/shared";
 import { applyPatch } from "../src/patch";
 
 it("can access initial state", () => {
@@ -66,8 +65,8 @@ it("can update entity partially", () => {
 });
 
 it("can produce client state patches for object changes", () => {
-  const john = { id: "john" as ClientId, cash: 0 };
-  const jane = { id: "jane" as ClientId, cash: 0 };
+  const john = { id: "john", cash: 0 };
+  const jane = { id: "jane", cash: 0 };
   const actorList = [john, jane];
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
@@ -98,7 +97,7 @@ it("can produce client state patches for object changes", () => {
 });
 
 it("can produce client state patches for array properties", () => {
-  const entity = { id: "0" as ClientId, list: [0] };
+  const entity = { id: "0", list: [0] };
   const initialState = { entity: { [entity.id]: entity } };
 
   const state = createPatchStateMachine({
@@ -120,8 +119,8 @@ it("can produce client state patches for array properties", () => {
 });
 
 it("can produce client state patches for additions to record due to changes in visibility", () => {
-  const john = { id: "john" as ClientId, visibleToOthers: false };
-  const jane = { id: "jane" as ClientId, visibleToOthers: false };
+  const john = { id: "john", visibleToOthers: false };
+  const jane = { id: "jane", visibleToOthers: false };
   const actorList = [john, jane];
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
@@ -160,8 +159,8 @@ it("can produce client state patches for additions to record due to changes in v
 });
 
 it("can produce client state patches for removals in record due to changes in visibility", () => {
-  const john = { id: "john" as ClientId, visibleToOthers: true };
-  const jane = { id: "jane" as ClientId, visibleToOthers: true };
+  const john = { id: "john", visibleToOthers: true };
+  const jane = { id: "jane", visibleToOthers: true };
   const actorList = [john, jane];
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
 
@@ -198,7 +197,7 @@ it("can produce client state patches for removals in record due to changes in vi
 });
 
 it("can produce client state patches for additions to record due to changes in state", () => {
-  const john = { id: "john" as ClientId };
+  const john = { id: "john" };
   const initialState = { actors: { [john.id]: john } };
   const state = createPatchStateMachine({
     initialState,
@@ -209,7 +208,7 @@ it("can produce client state patches for additions to record due to changes in s
   });
 
   const johnsClientState = {} as typeof initialState;
-  const jane = { id: "jane" as ClientId };
+  const jane = { id: "jane" };
 
   state.actors.set(jane.id, jane);
 
@@ -223,8 +222,8 @@ it("can produce client state patches for additions to record due to changes in s
 });
 
 it("can produce client state patches for removals in record due to changes in state", () => {
-  const john = { id: "john" as ClientId };
-  const jane = { id: "jane" as ClientId };
+  const john = { id: "john" };
+  const jane = { id: "jane" };
   const initialState = { actors: { [john.id]: john, [jane.id]: jane } };
   const state = createPatchStateMachine({
     initialState,

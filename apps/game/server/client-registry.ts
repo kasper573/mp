@@ -1,5 +1,5 @@
 import type { UserId } from "@mp/auth";
-import type { ClientId } from "@mp/sync";
+import type { Branded } from "@mp/std";
 
 export class ClientRegistry {
   private map = new Map<ClientId, UserId>();
@@ -57,3 +57,13 @@ export interface ClientRegistryEvent {
 export type ClientRegistryEventHandler = (
   event: ClientRegistryEvent,
 ) => unknown;
+
+export type ClientId = Branded<string, "ClientId">;
+
+// Register the ClientId type with the sync module to assert
+// that the sync module only accepts client ids of the correct type.
+declare module "@mp/sync" {
+  interface Registry {
+    clientId: ClientId;
+  }
+}
