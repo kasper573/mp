@@ -1,6 +1,6 @@
 import { err, ok, type Branded, type Result } from "@mp/std";
 
-export class RPCTransmitter<Input, Output> {
+export class RPCTransmitter<Input, Output, Context = void> {
   private deferredPromises = new Map<
     ResponseId,
     {
@@ -12,7 +12,7 @@ export class RPCTransmitter<Input, Output> {
   constructor(
     private sendCall: (rpc: Call<Input>) => void,
     private sendResponse: (response: Response<Output>) => void,
-    private invoke: Invoker<Input, Output> = () => {
+    private invoke: Invoker<Input, Output, Context> = () => {
       throw new Error("Invoke not supported");
     },
   ) {}
@@ -28,9 +28,12 @@ export class RPCTransmitter<Input, Output> {
     );
   }
 
-  async handleCall(call: Call<Input>): Promise<CallHandlerResult<Output>> {
+  async handleCall(
+    call: Call<Input>,
+    context: Context,
+  ): Promise<CallHandlerResult<Output>> {
     const responseId = call[2];
-    const result = await this.invoke(call);
+    const result = await this.invoke(call, context);
 
     if (responseId !== undefined) {
       this.sendResponse([
@@ -65,7 +68,8 @@ export class RPCTransmitter<Input, Output> {
   }
 }
 
-export type AnyRPCTransmitter = RPCTransmitter<unknown, unknown>;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type AnyRPCTransmitter = RPCTransmitter<any, any, any>;
 
 export type ResponseId = Branded<number, "ResponseId">;
 
@@ -82,8 +86,9 @@ export type CallHandlerResult<Output> = Result<InvokerResult<Output>, Error>;
 
 export type ResponseHandlerResult = Result<void, Error>;
 
-export type Invoker<Input, Output> = (
+export type Invoker<Input, Output, Context = void> = (
   call: Call<Input>,
+  context: Context,
 ) => Promise<InvokerResult<Output>>;
 
 export type InvokerResult<Output> = Result<Output, InvokerError>;

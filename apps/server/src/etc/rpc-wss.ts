@@ -22,7 +22,11 @@ export function acceptRpcViaWebSockets<Context>(opt: {
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     socket.addEventListener("message", async (msg) => {
-      const result = await transmitter.handleMessage(msg.data as ArrayBuffer);
+      const context = opt.createContext(socket);
+      const result = await transmitter.handleMessage(
+        msg.data as ArrayBuffer,
+        context,
+      );
       if (result?.isErr()) {
         opt.onError?.(result.error);
       }

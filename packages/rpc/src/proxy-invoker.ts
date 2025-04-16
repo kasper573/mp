@@ -33,7 +33,7 @@ export interface RPCProcedureInvoker<Node extends AnyProcedureNode> {
 }
 
 export type inferInput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer C, infer I, infer O, infer MW> ? I : never;
+  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? I : never;
 
 export type inferOutput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer C, infer I, infer O, infer MW> ? O : never;
+  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? O : never;

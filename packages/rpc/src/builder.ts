@@ -34,7 +34,7 @@ function createMiddleware<Context, MWContext, PipedMWContext>(
 
 export interface RPCFactories<Context> {
   router: RouterBuilder;
-  procedure: ProcedureBuilder<Context, void, void, unknown>;
+  procedure: ProcedureBuilder<void, void, Context, unknown>;
   middleware: MiddlewareBuilder<Context, unknown>;
 }
 
@@ -52,13 +52,13 @@ interface RPCNode<Type extends string> {
   type: Type;
 }
 
-export type ProcedureHandler<Context, Input, Output, MWContext> = (
-  opt: ProcedureHandlerOptions<Context, Input, MWContext>,
+export type ProcedureHandler<Input, Output, Context, MWContext> = (
+  opt: ProcedureHandlerOptions<Input, Context, MWContext>,
 ) => ProcedureResult<Output>;
 
 type ProcedureResult<Output> = Output | Promise<Output>;
 
-interface ProcedureHandlerOptions<Context, Input, MWContext> {
+interface ProcedureHandlerOptions<Input, Context, MWContext> {
   /**
    * The global rpc context
    */
@@ -70,14 +70,14 @@ interface ProcedureHandlerOptions<Context, Input, MWContext> {
   input: Input;
 }
 
-interface QueryNode<Context, Input, Output, MWContext>
+export interface QueryNode<Input, Output, Context, MWContext>
   extends RPCNode<"query"> {
-  handler: ProcedureHandler<Context, Input, Output, MWContext>;
+  handler: ProcedureHandler<Input, Output, Context, MWContext>;
 }
 
-interface MutationNode<Context, Input, Output, MWContext>
+export interface MutationNode<Input, Output, Context, MWContext>
   extends RPCNode<"mutation"> {
-  handler: ProcedureHandler<Context, Input, Output, MWContext>;
+  handler: ProcedureHandler<Input, Output, Context, MWContext>;
 }
 
 export interface RouterNode<Routes extends AnyRouteRecord>
@@ -86,12 +86,12 @@ export interface RouterNode<Routes extends AnyRouteRecord>
 }
 
 export type AnyMutationNode<Context = any> = MutationNode<
+  any,
+  any,
   Context,
-  any,
-  any,
   any
 >;
-export type AnyQueryNode<Context = any> = QueryNode<Context, any, any, any>;
+export type AnyQueryNode<Context = any> = QueryNode<any, any, Context, any>;
 export type AnyProcedureNode<Context = any> =
   | AnyMutationNode<Context>
   | AnyQueryNode<Context>;
@@ -101,28 +101,28 @@ export type AnyRPCNode<Context = any> =
   | AnyRouterNode<Context>;
 export type AnyRouteRecord<Context = any> = Record<string, AnyRPCNode<Context>>;
 
-export class ProcedureBuilder<Context, Input, Output, MWContext> {
+export class ProcedureBuilder<Input, Output, Context, MWContext> {
   use<NewMWContext, PipedMWContext>(
     middleware: RPCMiddleware<Context, NewMWContext, PipedMWContext>,
-  ): ProcedureBuilder<Context, Input, Output, NewMWContext> {
+  ): ProcedureBuilder<Input, Output, Context, NewMWContext> {
     throw new Error("Not implemented");
   }
-  input<NewInput>(): ProcedureBuilder<Context, NewInput, Output, MWContext> {
+  input<NewInput>(): ProcedureBuilder<NewInput, Output, Context, MWContext> {
     throw new Error("Not implemented");
   }
-  output<NewOutput>(): ProcedureBuilder<Context, Input, NewOutput, MWContext> {
+  output<NewOutput>(): ProcedureBuilder<Input, NewOutput, Context, MWContext> {
     throw new Error("Not implemented");
   }
 
   query(
-    handler: ProcedureHandler<Context, Input, Output, MWContext>,
-  ): QueryNode<Context, Input, Output, MWContext> {
+    handler: ProcedureHandler<Input, Output, Context, MWContext>,
+  ): QueryNode<Input, Output, Context, MWContext> {
     return { type: "query", handler };
   }
 
   mutation(
-    handler: ProcedureHandler<Context, Input, Output, MWContext>,
-  ): MutationNode<Context, Input, Output, MWContext> {
+    handler: ProcedureHandler<Input, Output, Context, MWContext>,
+  ): MutationNode<Input, Output, Context, MWContext> {
     return { type: "mutation", handler };
   }
 }
