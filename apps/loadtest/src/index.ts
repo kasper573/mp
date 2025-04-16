@@ -1,5 +1,5 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import { webSocketTokenParam, type RootRouter } from "@mp/server";
+import { type RootRouter } from "@mp/server";
 import { BinaryRPCTransmitter, createRPCProxyInvoker } from "@mp/rpc";
 import { EnhancedWebSocket } from "@mp/ws/client";
 import { readCliOptions } from "./cli";
@@ -65,7 +65,6 @@ async function testSocketWithRPC(n: number) {
 
   const token = process.env.MP_SERVER_AUTH__BYPASS_USER!;
   const url = new URL(wsUrl);
-  url.searchParams.set(webSocketTokenParam, token);
   const socket = new EnhancedWebSocket();
   const transmitter = new BinaryRPCTransmitter(socket.send);
   const rpc = createRPCProxyInvoker<RootRouter>(transmitter);
