@@ -3,9 +3,9 @@ import { recordValues, type Tile } from "@mp/std";
 import { RPCError } from "@mp/rpc";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
-import { defineRoles } from "../../user/define-roles";
 import { rpc } from "../rpc";
-import { roles } from "../../user/auth";
+import { roles } from "../user/auth";
+import { defineRoles } from "../user/define-roles";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./schema";
 
