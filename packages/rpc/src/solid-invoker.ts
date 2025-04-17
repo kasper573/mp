@@ -73,6 +73,7 @@ function createUseMutation(
   path: string[],
 ): UseMutation<AnyMutationNode> {
   const mutation = {
+    isLoading: false,
     mutate: (input: unknown) => void transmitter.call(path, input),
     mutateAsync: (input: unknown) => transmitter.call(path, input),
   };
@@ -103,6 +104,9 @@ export interface SolidRpcQueryInvoker<Node extends AnyQueryNode>
 }
 
 export interface UseQuery<Node extends AnyQueryNode> {
+  /**
+   * SolidJS hook to use the query in a reactive way.
+   */
   <MappedOutput = inferOutput<Node["handler"]>>(
     options?: () => SolidRpcQueryOptions<
       inferInput<Node["handler"]>,
@@ -130,11 +134,35 @@ export interface UseMutation<Node extends AnyMutationNode> {
 }
 export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>
   extends RpcProcedureInvoker<Node> {
+  /**
+   * SolidJS hook to use the mutation in a reactive way.
+   */
   [useMutationProperty]: UseMutation<Node>;
 }
 
 export interface UseMutationReturn<Input, Output> {
+  /**
+   * Not implemented yet.
+   * @deprecated
+   */
+  data?: Output;
+  /**
+   * Not implemented yet.
+   * @deprecated
+   */
+  error?: unknown;
+  /**
+   * Not implemented yet.
+   * @deprecated
+   */
+  isLoading: boolean;
+  /**
+   * "Fire and forget"- style mutation. Useful when you don't care about the result.
+   */
   mutate: (input: Input) => void;
+  /**
+   * Async mutation. Useful when you want to wait for the result.
+   */
   mutateAsync: (input: Input) => Promise<Output>;
 }
 
