@@ -1,6 +1,6 @@
 # mp
 
-A retro, point and click, hack and slash online rpg built in [TypeScript](https://www.typescriptlang.org/).
+An online rpg built in [TypeScript](https://www.typescriptlang.org/).
 
 This is a pet project that I'm working on over the weekends over at
 https://www.twitch.tv/kasper_573.
