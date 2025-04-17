@@ -13,7 +13,6 @@ export function createRpcInvoker<Input, Output, Context>(
     }
 
     try {
-      const mwc = undefined; // The first handler never has a middleware context
       const output = (await node.handler({ ctx, input, mwc })) as Output;
       return ok(output);
     } catch (error) {
@@ -55,3 +54,10 @@ export type RpcInvokerResult<Input, Output> = Result<
 export type RpcCallId = Branded<number, "RpcCallId">;
 
 export type RpcCall<Input> = [path: string[], input: Input, id: RpcCallId];
+
+// The first handler never has a middleware context,
+// but we provide an empty object to make debugging easier,
+// since many rpc handlers will try to destructure the mwc in the function signature,
+// which can make breakpoints hard to set if it's undefined.
+// Defaulting to an empty object slightly improves dx at no cost.
+const mwc = Object.freeze({});

@@ -123,13 +123,28 @@ export class ProcedureBuilder<Input, Output, Context, MWContext> {
   query(
     handler: ProcedureHandler<Input, Output, Context, MWContext>,
   ): QueryNode<Input, Output, Context, MWContext> {
-    return { type: "query", handler };
+    return {
+      type: "query",
+      handler: this.pipeMiddlewareIntoHandler(handler),
+    };
   }
 
   mutation(
     handler: ProcedureHandler<Input, Output, Context, MWContext>,
   ): MutationNode<Input, Output, Context, MWContext> {
-    return { type: "mutation", handler };
+    return {
+      type: "mutation",
+      handler: this.pipeMiddlewareIntoHandler(handler),
+    };
+  }
+
+  private pipeMiddlewareIntoHandler(
+    handler: ProcedureHandler<Input, Output, Context, MWContext>,
+  ): ProcedureHandler<Input, Output, Context, MWContext> {
+    return async (opt) => {
+      const mwc = await this.middleware(opt);
+      return handler({ ...opt, mwc });
+    };
   }
 
   static create<Context>(): ProcedureBuilder<void, void, Context, unknown> {
