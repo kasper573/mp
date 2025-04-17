@@ -49,7 +49,6 @@ export class AreaResource {
     );
   }
 
-  // TODO replace this with an idiomatic monkeypatch based otel instrumentation. That will also allow tracing
   static findPathMiddleware = (
     args: Parameters<VectorPathFinder<Tile>>,
     next: VectorPathFinder<Tile>,
