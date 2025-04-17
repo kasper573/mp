@@ -14,6 +14,7 @@ import { env } from "../env";
 export function init(logger: Logger, identity: () => UserIdentity | undefined) {
   const faro = initializeFaro({
     url: env.faro.receiverUrl,
+    isolate: true,
     app: {
       name: "mp_client",
       version: env.buildVersion,
