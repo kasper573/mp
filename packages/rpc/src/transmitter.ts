@@ -31,7 +31,7 @@ export class RPCTransmitter<Input, Output, Context = void> {
   async handleCall(
     call: Call<Input>,
     context: Context,
-  ): Promise<CallHandlerResult<Output>> {
+  ): Promise<CallHandlerResult<Input, Output>> {
     const id = call[2];
     const result = await this.invoke(call, context);
 
@@ -42,7 +42,11 @@ export class RPCTransmitter<Input, Output, Context = void> {
         : { output: result.value },
     ]);
 
-    return ok(result);
+    if (result.isErr()) {
+      return err(result.error);
+    }
+
+    return ok({ call, output: result.value });
   }
 
   handleResponse(response: Response<Output>): ResponseHandlerResult {
@@ -84,7 +88,10 @@ export type Response<Output> = [
   { output: Output } | { error: unknown },
 ];
 
-export type CallHandlerResult<Output> = Result<InvokerResult<Output>, Error>;
+export type CallHandlerResult<Input, Output> = Result<
+  { call: Call<Input>; output: Output },
+  unknown
+>;
 
 export type ResponseHandlerResult = Result<void, unknown>;
 
