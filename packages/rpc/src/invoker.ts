@@ -9,7 +9,7 @@ export function createRpcInvoker<Input, Output, Context>(
     const [path, input] = call;
     const node = resolveRpcNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err("Rpc path not found: " + path.join("."));
+      return err(new RpcInvokerError(call, "path not found"));
     }
 
     try {
@@ -17,7 +17,7 @@ export function createRpcInvoker<Input, Output, Context>(
       const output = (await node.handler({ ctx, input, mwc })) as Output;
       return ok(output);
     } catch (error) {
-      return err(error);
+      return err(new RpcInvokerError<Input>(call, error));
     }
   };
 }
@@ -37,7 +37,7 @@ function resolveRpcNode<Context>(
 
 export class RpcInvokerError<Input> extends Error {
   constructor(call: RpcCall<Input>, cause: unknown) {
-    super(`Rpc handler "${call[0].join(".")}" had an error`, { cause });
+    super(`error in rpc handler "${call[0].join(".")}"`, { cause });
     this.name = "InvokerError";
   }
 }
@@ -45,9 +45,12 @@ export class RpcInvokerError<Input> extends Error {
 export type RpcInvoker<Input, Output, Context = void> = (
   call: RpcCall<Input>,
   context: Context,
-) => Promise<RpcInvokerResult<Output>>;
+) => Promise<RpcInvokerResult<Input, Output>>;
 
-export type RpcInvokerResult<Output> = Result<Output, unknown>;
+export type RpcInvokerResult<Input, Output> = Result<
+  Output,
+  RpcInvokerError<Input>
+>;
 
 export type RpcCallId = Branded<number, "RpcCallId">;
 
