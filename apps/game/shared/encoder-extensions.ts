@@ -4,20 +4,21 @@ import { Rect, Vector } from "@mp/math";
 
 export function registerEncoderExtensions(): void {
   // All tags below this are reserved by @mp/encoding
-  const startTag = 40_501;
+  let startTag = 40_501;
+  const nextTag = () => ++startTag;
 
-  // Claiming the range 40_500 - 40_999 for the game protocol
+  // Claiming the range 40_501 - 40_999 for the game protocol
 
   addEncoderExtension<Vector<number>, [number, number]>({
     Class: Vector<number>,
-    tag: startTag,
+    tag: nextTag(),
     encode: (v, encode) => encode([v.x, v.y]),
     decode: (v) => new Vector(v[0], v[1]),
   });
 
   addEncoderExtension<Rect<number>, RectComponents<number>>({
     Class: Rect<number>,
-    tag: startTag + 1,
+    tag: nextTag(),
     encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),
     decode: (v) => Rect.fromComponents(...v),
   });
@@ -25,7 +26,7 @@ export function registerEncoderExtensions(): void {
   addEncoderExtension<Error, { name: string; stack?: string; message: string }>(
     {
       Class: Error,
-      tag: startTag + 3,
+      tag: nextTag(),
       encode: (error, encode) =>
         encode({
           message: error.message,
