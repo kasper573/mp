@@ -27,13 +27,13 @@ export class BinaryRpcTransmitter<
 
   handleMessage = async (data: ArrayBufferLike, context: Context) => {
     const call = this.callEncoding.decode(data);
-    if (call) {
-      return this.handleCall(call, context);
+    if (call.isOk()) {
+      return this.handleCall(call.value, context);
     }
 
     const response = this.responseEncoding.decode(data);
-    if (response) {
-      return this.handleResponse(response);
+    if (response.isOk()) {
+      return this.handleResponse(response.value);
     }
   };
 

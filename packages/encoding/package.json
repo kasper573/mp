@@ -11,6 +11,7 @@
     }
   },
   "dependencies": {
+    "@mp/std": "workspace:*",
     "cbor-x": "1.6.0"
   },
   "devDependencies": {

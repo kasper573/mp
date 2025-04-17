@@ -341,6 +341,9 @@ importers:
 
   packages/encoding:
     dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       cbor-x:
         specifier: 1.6.0
         version: 1.6.0

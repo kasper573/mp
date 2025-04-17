@@ -30,9 +30,9 @@ export function createGameStateClient(socket: WebSocket) {
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
-    const patch = syncPatchEncoding.decode(e.data);
-    if (patch) {
-      applyPatch(gameState, patch);
+    const result = syncPatchEncoding.decode(e.data);
+    if (result.isOk()) {
+      applyPatch(gameState, result.value);
     }
   };
 

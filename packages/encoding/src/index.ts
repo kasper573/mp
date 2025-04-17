@@ -1,3 +1,5 @@
+import type { Result } from "@mp/std";
+import { err, ok } from "@mp/std";
 import * as cbor from "cbor-x";
 
 export { addExtension as addEncoderExtension } from "cbor-x";
@@ -8,12 +10,22 @@ export function createEncoding<T>(header: number) {
   }
 
   return {
-    decode(data: ArrayBufferLike): T | undefined {
+    decode(data: ArrayBufferLike): Result<T, Error | "skipped"> {
       const view = new DataView(data);
       if (view.getUint16(0) !== header) {
-        return;
+        return err("skipped");
       }
-      return cbor.decode(new Uint8Array(data, 2)) as T;
+
+      try {
+        const decoded = cbor.decode(new Uint8Array(data, 2)) as T;
+        return ok(decoded);
+      } catch (error) {
+        return err(
+          error instanceof Error
+            ? error
+            : new Error(`Failed to decode`, { cause: error }),
+        );
+      }
     },
     encode(value: T): ArrayBufferLike {
       const encodedValue = cbor.encode(value) as Uint8Array;
