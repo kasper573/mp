@@ -4,6 +4,7 @@ import type { JSX } from "solid-js";
 import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
 import { clsx } from "@mp/style";
 import { LoadingSpinner } from "@mp/ui";
+import { AuthContext } from "@mp/auth/client";
 import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
@@ -11,12 +12,14 @@ import { useAreaResource } from "./area/use-area-resource";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);
+  const auth = useContext(AuthContext);
   const actions = useGameActions();
   const area = useAreaResource(state.areaId);
 
   createEffect(() => {
-    if (state.readyState() === WebSocket.OPEN) {
-      void actions.join();
+    const user = auth.identity();
+    if (state.readyState() === WebSocket.OPEN && user) {
+      void actions.join(user.token);
     }
   });
 

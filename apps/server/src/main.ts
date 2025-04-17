@@ -10,7 +10,11 @@ import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxClientId, ctxTokenVerifier } from "@mp/game/server";
+import {
+  ctxClientId,
+  ctxClientRegistry,
+  ctxTokenVerifier,
+} from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db/server";
 import { type LocalFile } from "@mp/std";
@@ -138,6 +142,7 @@ const ioc = new InjectionContainer()
   .provide(ctxGameStateMachine, gameState)
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenVerifier, tokenVerifier)
+  .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
   );

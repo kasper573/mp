@@ -5,13 +5,14 @@ import type { AuthToken } from "@mp/auth";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
 import { rpc } from "../rpc";
-import { roles } from "../user/auth";
+import { ctxTokenVerifier, roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
+import { ctxClientRegistry } from "../user/client-registry";
+import { ctxClientId } from "../user/client-id";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./schema";
 
 export const characterRoles = defineRoles("character", [
-  "join",
   "move",
   "attack",
   "kill",
@@ -20,9 +21,6 @@ export const characterRoles = defineRoles("character", [
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = rpc.router({
-  authenticate: rpc.procedure.input<AuthToken>().mutation(({ input, ctx }) => {
-    throw new Error("Not implemented");
-  }),
   move: rpc.procedure
     .input<{ characterId: CharacterId; to: VectorLike<Tile> }>()
     .use(roles([characterRoles.move]))
@@ -73,9 +71,20 @@ export const characterRouter = rpc.router({
     }),
 
   join: rpc.procedure
+    .input<AuthToken>()
     .output<CharacterId>()
-    .use(roles([characterRoles.join]))
-    .mutation(async ({ ctx, mwc: { user } }) => {
+    .mutation(async ({ input: token, ctx }) => {
+      const clientId = ctx.get(ctxClientId);
+      const clients = ctx.get(ctxClientRegistry);
+      const tokenVerifier = ctx.get(ctxTokenVerifier);
+      const result = await tokenVerifier(token);
+      if (result.isErr()) {
+        throw new RpcError("Invalid token", { cause: result.error });
+      }
+
+      const user = result.value;
+      clients.add(clientId, user);
+
       const state = ctx.get(ctxGameStateMachine);
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors())

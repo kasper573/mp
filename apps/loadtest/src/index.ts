@@ -75,10 +75,9 @@ async function testSocketWithRpc(n: number) {
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
-    await rpc.character.authenticate(
+    const characterId = await rpc.character.join(
       process.env.MP_SERVER_AUTH__BYPASS_USER as AuthToken,
     );
-    const characterId = await rpc.character.join();
     if (verbose) {
       logger.info(`Socket ${n} joined as character ${characterId}`);
     }

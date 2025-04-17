@@ -10,6 +10,7 @@ import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { applyPatch, syncPatchEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
+import type { AuthToken } from "@mp/auth";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
@@ -72,7 +73,8 @@ export function useGameActions() {
 
   const respawn = () => respawnMutation.mutate(state.characterId()!);
 
-  const join = () => joinMutation.mutateAsync().then(state.setCharacterId);
+  const join = (token: AuthToken) =>
+    joinMutation.mutateAsync(token).then(state.setCharacterId);
 
   return {
     respawn,
