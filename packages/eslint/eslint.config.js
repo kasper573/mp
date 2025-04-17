@@ -93,14 +93,24 @@ export default tseslint.config(
           rules: [
             {
               from: ["app"],
-              allow: ["app", "package"],
+              allow: [
+                "app",
+                "package",
+                "game_client_module",
+                "game_server_module",
+                "game_shared_module",
+              ],
             },
             {
-              from: ["client_app"],
-              allow: ["app", "package"],
+              from: ["game_client_module"],
+              allow: ["game_server_module", "game_shared_module", "package"],
             },
             {
-              from: ["package"],
+              from: ["game_server_module"],
+              allow: ["game_shared_module", "package"],
+            },
+            {
+              from: ["game_shared_module", "package"],
               allow: ["package"],
             },
           ],
@@ -109,7 +119,9 @@ export default tseslint.config(
     },
     settings: {
       "boundaries/elements": [
-        { type: "client_app", pattern: "apps/client/**" },
+        { type: "game_server_module", pattern: "apps/game/server/**" },
+        { type: "game_client_module", pattern: "apps/game/client/**" },
+        { type: "game_shared_module", pattern: "apps/game/shared/**" },
         { type: "app", pattern: "apps/*" },
         { type: "package", pattern: "packages/*" },
       ],
