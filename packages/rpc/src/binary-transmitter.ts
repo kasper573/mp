@@ -45,13 +45,18 @@ export class BinaryRpcTransmitter<
    */
   messageEventHandler = (errorHandler: (error: unknown) => void) => {
     return (event: { data: ArrayBufferLike }, context: Context): void => {
-      void this.handleMessage(event.data, context)
-        .then((result) => {
-          if (result?.isErr()) {
-            errorHandler(result.error);
+      const handle = async () => {
+        try {
+          const res = await this.handleMessage(event.data, context);
+          if (res?.isErr()) {
+            errorHandler(res.error);
           }
-        })
-        .catch(errorHandler);
+        } catch (error) {
+          errorHandler(error);
+        }
+      };
+
+      void handle();
     };
   };
 }
