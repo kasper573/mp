@@ -99,6 +99,21 @@ const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7, // default level
+      level: 6, // default is 3, max is 9
+    },
+    zlibInflateOptions: {
+      chunkSize: 10 * 1024,
+    },
+    clientNoContextTakeover: true, // defaults to negotiated value.
+    serverNoContextTakeover: true, // defaults to negotiated value.
+    serverMaxWindowBits: 10, // defaults to negotiated value.
+    concurrencyLimit: 10, // limits zlib concurrency for perf.
+    threshold: 1024, // messages under this size won't be compressed.
+  },
 });
 
 wss.on("connection", (socket) => {
