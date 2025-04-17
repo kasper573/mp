@@ -16,7 +16,6 @@
     "test:inspect": "vitest --inspect-brk --no-file-parallelism"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
     "@mp/encoding": "workspace:*"
   },
   "devDependencies": {

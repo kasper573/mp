@@ -590,9 +590,6 @@ importers:
       '@mp/encoding':
         specifier: workspace:*
         version: link:../encoding
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
