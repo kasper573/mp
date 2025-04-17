@@ -1,8 +1,8 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
 import { recordValues } from "@mp/std";
-import type { PatchStateMachine } from "@mp/sync/server";
-import type { ClientRegistry, GameState } from "@mp-modules/game/server";
+import type { PatchStateMachine } from "@mp/sync";
+import type { ClientRegistry, GameState } from "@mp/game/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,

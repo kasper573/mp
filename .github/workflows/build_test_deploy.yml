@@ -18,9 +18,9 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: ./.github/workflows/composites/install_node_things/
-      - run: pnpm knip
       - run: pnpm lint
       - run: pnpm format
+      - run: pnpm knip
 
   test-unit:
     runs-on: ubuntu-latest

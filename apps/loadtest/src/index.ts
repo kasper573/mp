@@ -1,34 +1,25 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
-import type { AreaId } from "@mp-modules/game";
-import { webSocketTokenParam, type RootRouter } from "@mp/server";
-import { transformer } from "@mp-modules/trpc";
-import { createTRPCClient, httpBatchLink } from "@trpc/client";
-import { EnhancedWebSocket } from "@mp/ws/client";
+import { type RootRouter } from "@mp/server";
+import { BinaryRpcTransceiver, createRpcProxyInvoker } from "@mp/rpc";
+import { WebSocket } from "@mp/ws/client";
+import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
-const {
-  wsUrl,
-  httpServerUrl,
-  apiServerUrl,
-  httpRequests,
-  rpcRequests,
-  gameClients,
-  timeout,
-  verbose,
-} = readCliOptions();
+const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
+  readCliOptions();
 
 const start = performance.now();
 
-await Promise.all([loadTestHTTP(), loadTestRPC(), loadTestGameClients()]);
+await Promise.all([loadTestHttp(), loadTestSocketsWithRpc()]);
 
 const end = performance.now();
 
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-async function loadTestHTTP() {
+async function loadTestHttp() {
   logger.info("Testing", httpRequests, "HTTP requests");
   const results = await Promise.allSettled(
     range(httpRequests).map(async () => {
@@ -53,99 +44,61 @@ async function loadTestHTTP() {
   }
 }
 
-async function loadTestRPC() {
-  logger.info("Testing", rpcRequests, "RPC requests");
-  const trpc = createRPCClient();
+async function loadTestSocketsWithRpc() {
+  logger.info("Testing", gameClients, "sockets with Rpc");
 
   const results = await Promise.allSettled(
-    range(rpcRequests).map(() =>
-      trpc.area.areaFileUrl.query("forest" as AreaId),
-    ),
+    range(gameClients).map(testSocketWithRpc),
   );
 
   const successes = results.filter((r) => r.status === "fulfilled");
   const failures = results.filter((r) => r.status === "rejected");
 
   logger.info(
-    `RPC test finished: ${successes.length} successes, ${failures.length} failures`,
-  );
-
-  if (verbose) {
-    for (const result of failures) {
-      logger.error(result.reason);
-    }
-  }
-}
-
-async function loadTestGameClients() {
-  logger.info("Testing", gameClients, "game clients");
-
-  const results = await Promise.allSettled(
-    range(gameClients).map(testGameClient),
-  );
-
-  const successes = results.filter((r) => r.status === "fulfilled");
-  const failures = results.filter((r) => r.status === "rejected");
-
-  logger.info(
-    `Game client test finished: ${successes.length} successes, ${failures.length} failures`,
+    `Socket test finished: ${successes.length} successes, ${failures.length} failures`,
   );
 }
 
-async function testGameClient(n: number) {
+async function testSocketWithRpc(n: number) {
   if (verbose) {
-    logger.info(`Starting game client ${n}`);
+    logger.info(`Creating socket ${n}`);
   }
 
-  const token = process.env.MP_SERVER_AUTH__BYPASS_USER;
-  const url = new URL(wsUrl);
-  url.searchParams.set(webSocketTokenParam, token!);
-  const socket = new EnhancedWebSocket(url.toString());
-  const rpc = createRPCClient(token);
+  const socket = new WebSocket(wsUrl);
+  const transceiver = new BinaryRpcTransceiver(socket.send.bind(socket));
+  const rpc = createRpcProxyInvoker<RootRouter>(transceiver);
+  const handleMessage = transceiver.messageEventHandler(logger.error);
+  socket.addEventListener("message", handleMessage);
 
   try {
-    await connect(socket);
+    await waitForOpen(socket);
     if (verbose) {
-      logger.info(`Game client ${n} connected`);
+      logger.info(`Socket ${n} connected`);
     }
-    const characterId = await rpc.character.join.mutate();
+    const characterId = await rpc.character.join(
+      process.env.MP_SERVER_AUTH__BYPASS_USER as AuthToken,
+    );
     if (verbose) {
-      logger.info(`Game client ${n} joined as character ${characterId}`);
+      logger.info(`Socket ${n} joined as character ${characterId}`);
     }
     await wait(timeout);
-    logger.info(`Game client ${n} test finished`);
+    logger.info(`Socket ${n} test finished`);
   } catch (error) {
     if (verbose) {
-      logger.error(`Game client ${n} error:`, error);
+      logger.error(`Socket ${n} error:`, error);
     }
   } finally {
-    socket.stop();
+    socket.close();
+    socket.removeEventListener("message", handleMessage);
   }
 }
 
-function createRPCClient(token?: string) {
-  return createTRPCClient<RootRouter>({
-    links: [
-      httpBatchLink({
-        url: apiServerUrl,
-        transformer,
-        headers: () => ({
-          Authorization: token ? `Bearer ${token}` : undefined,
-        }),
-      }),
-    ],
-  });
-}
-
-async function connect(socket: EnhancedWebSocket) {
-  await new Promise<void>((resolve, reject) => {
-    socket.subscribeToErrors((e) => reject(new Error(e.message)));
-    socket.subscribeToReadyState((readyState) => {
-      if (readyState === "open") {
-        resolve();
-      }
-    });
-    socket.start();
+async function waitForOpen(socket: WebSocket) {
+  await new Promise<Event>((resolve, reject) => {
+    socket.addEventListener("error", (cause) =>
+      reject(new Error("Socket error", { cause })),
+    );
+    socket.addEventListener("open", resolve);
   });
 }
 

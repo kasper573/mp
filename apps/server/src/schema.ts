@@ -1,5 +1,1 @@
-export {
-  npcTable,
-  npcSpawnTable,
-  characterTable,
-} from "@mp-modules/game/server";
+export { npcTable, npcSpawnTable, characterTable } from "@mp/game/server";

@@ -4,26 +4,25 @@ import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import { createAuthServer } from "@mp/auth/server";
-import { SyncServer, createPatchStateMachine } from "@mp/sync/server";
+import { createTokenVerifier } from "@mp/auth/server";
+import { createPatchStateMachine } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import type { AuthToken, UserIdentity } from "@mp/auth";
-import { createWSSWithHandshake } from "@mp/ws/server";
+import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxAuthServer, ctxRequest } from "@mp-modules/user";
-import { RateLimiter } from "@mp/rate-limiter";
 import {
-  ctxGlobalMiddleware,
-  ctxTrpcErrorFormatter,
-  trpcExpress,
-} from "@mp-modules/trpc/server";
-import { createDBClient } from "@mp-modules/db";
-import type { GameState, GameStateServer } from "@mp-modules/game/server";
+  ctxClientId,
+  ctxClientRegistry,
+  ctxTokenVerifier,
+} from "@mp/game/server";
+import { RateLimiter } from "@mp/rate-limiter";
+import { createDbClient } from "@mp/db/server";
+import { type LocalFile } from "@mp/std";
+import { ctxGlobalMiddleware } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
-  loadAreas,
   ClientRegistry,
   movementBehavior,
   npcSpawnBehavior,
@@ -31,15 +30,15 @@ import {
   characterRemoveBehavior,
   CharacterService,
   ctxCharacterService,
-  npcAIBehavior,
+  npcAiBehavior,
   ctxNpcService,
   ctxGameStateMachine,
   deriveClientVisibility,
-  NPCService,
+  NpcService,
   GameService,
-} from "@mp-modules/game/server";
-import { uuid, type LocalFile } from "@mp/std";
-import type { ClientId } from "@mp/sync";
+} from "@mp/game/server";
+import { registerEncoderExtensions } from "@mp/game/server";
+import { clientViewDistance } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -47,18 +46,16 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
 import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
-import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
-import {
-  clientViewDistance,
-  registerSyncExtensions,
-  webSocketTokenParam,
-} from "./shared";
 import { customFileTypes } from "./etc/custom-filetypes";
+import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
+import { loadAreas } from "./etc/load-areas";
+import { getSocketId } from "./etc/get-socket-id";
+import { flushGameState } from "./etc/flush-game-state";
 
-registerSyncExtensions();
+registerEncoderExtensions();
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -68,8 +65,8 @@ RateLimiter.enabled = opt.rateLimit;
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const auth = createAuthServer(opt.auth);
-const db = createDBClient(opt.databaseUrl);
+const tokenVerifier = createTokenVerifier(opt.auth);
+const db = createDbClient(opt.databaseUrl);
 
 db.$client.on("error", logger.error);
 
@@ -97,42 +94,23 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const wsHandshakeLimiter = new RateLimiter({
-  points: 10,
-  duration: 30,
-});
-
 const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
 
-const webSockets = new Map<ClientId, WebSocket>();
-
-const wss = createWSSWithHandshake<UserIdentity, ClientId>({
-  httpServer,
+const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
-  onConnection: (socket, handshake) => {
-    clients.add(handshake.id, handshake.payload.id);
-    webSockets.set(handshake.id, socket);
-    socket.addEventListener("close", () => {
-      clients.remove(handshake.id);
-      webSockets.delete(handshake.id);
-    });
-  },
-  createSocketId: () => uuid() as ClientId,
-  onError: (...args) => logger.error("[WSS]", ...args),
-  async handshake(clientId, req) {
-    // .url is in fact a path, so baseUrl does not matter
-    const url = req.url ? new URL(req.url, "http://localhost") : undefined;
-    const token = url?.searchParams.get(webSocketTokenParam);
-    const result = await auth.verifyToken(token as AuthToken);
-    return result.asyncAndThrough((user) =>
-      wsHandshakeLimiter.consume(user.id),
-    );
-  },
+  server: httpServer,
+});
+
+acceptRpcViaWebSockets({
+  wss,
+  logger,
+  router: rootRouter,
+  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  clientIds: () => webSockets.keys(),
+  clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -140,17 +118,7 @@ const gameState = createPatchStateMachine<GameState>({
   ),
 });
 
-const syncServer: GameStateServer = new SyncServer({
-  encoder: opt.syncPatchEncoder,
-  state: gameState,
-  onError: (...args) => logger.error("[SyncServer]", ...args),
-  getSender: (clientId) => {
-    const socket = webSockets.get(clientId);
-    return socket?.send.bind(socket);
-  },
-});
-
-const npcService = new NPCService(db);
+const npcService = new NpcService(db);
 const gameService = new GameService(db);
 
 const persistTicker = new Ticker({
@@ -168,42 +136,31 @@ const updateTicker = new Ticker({
 const characterService = new CharacterService(db, areas);
 
 const ioc = new InjectionContainer()
-  .provide(ctxAuthServer, auth)
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
-  .provide(ctxTrpcErrorFormatter, errorFormatter)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameStateMachine, gameState)
   .provide(ctxAreaLookup, areas)
+  .provide(ctxTokenVerifier, tokenVerifier)
+  .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
   );
-
-webServer.use(
-  opt.apiEndpointPath,
-  trpcExpress.createExpressMiddleware({
-    onError: ({ path, error }) => logger.error(error),
-    router: rootRouter,
-    createContext: ({ req }: { req: express.Request }) => ({
-      ioc: ioc.provide(ctxRequest, req),
-    }),
-  }),
-);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAIBehavior(gameState, areas));
+updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
 updateTicker.subscribe(combatBehavior(gameState));
-updateTicker.subscribe(syncServer.flush);
+updateTicker.subscribe(() => flushGameState(gameState, wss.clients));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
-clients.on(({ type, clientId, userId }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
+clients.on(({ type, clientId, user }) =>
+  logger.info(`[ClientRegistry][${type}]`, { clientId, userId: user.id }),
 );
 
 httpServer.listen(opt.port, opt.hostname, () => {
@@ -212,4 +169,3 @@ httpServer.listen(opt.port, opt.hostname, () => {
 
 persistTicker.start();
 updateTicker.start();
-syncServer.start();

@@ -1,0 +1,3 @@
+{
+  "extends": "@mp/tsconfig/vite.json"
+}

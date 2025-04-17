@@ -1,16 +1,12 @@
-import { type AnyMiddleware, TRPCError } from "@mp-modules/trpc/server";
-import { ctxSessionId } from "@mp-modules/user";
+import { RpcError } from "@mp/rpc";
+import { ctxClientId, rpc } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 
 const globalRequestLimit = new RateLimiter({ points: 20, duration: 1 });
 
-export const rateLimiterMiddleware: AnyMiddleware = async ({ ctx, next }) => {
-  const result = await globalRequestLimit.consume(ctx.ioc.get(ctxSessionId));
+export const rateLimiterMiddleware = rpc.middleware(async ({ ctx }) => {
+  const result = await globalRequestLimit.consume(ctx.get(ctxClientId));
   if (result.isErr()) {
-    throw new TRPCError({
-      code: "TOO_MANY_REQUESTS",
-      message: "Rate limit exceeded",
-    });
+    throw new RpcError("Rate limit exceeded");
   }
-  return next({ ctx });
-};
+});

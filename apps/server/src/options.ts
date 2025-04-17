@@ -15,7 +15,6 @@ import {
   transform,
 } from "@mp/env";
 import type { AuthToken, UserId, UserIdentity } from "@mp/auth";
-import { InjectionContext } from "@mp/ioc";
 import { playerRoles } from "./roles";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
@@ -55,10 +54,6 @@ export const serverOptionsSchema = object({
    * Used for generating publicly accessible URLs to the HTTP server
    */
   httpBaseUrl: string(),
-  /**
-   * The relative path to expose the API endpoint on
-   */
-  apiEndpointPath: string(),
   /**
    * The relative path to expose the WS endpoint on
    */
@@ -138,12 +133,6 @@ export const serverOptionsSchema = object({
    * Whether to enable rate limiting
    */
   rateLimit: boolish(),
-  /**
-   * The type of encoder to use for syncing patches to clients
-   */
-  syncPatchEncoder: picklist(["sync", "worker"]),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
-
-export const serverOptionsContext = InjectionContext.new<ServerOptions>();

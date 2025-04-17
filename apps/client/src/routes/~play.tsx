@@ -1,15 +1,15 @@
 import { createFileRoute } from "@tanstack/solid-router";
+import { clientViewDistance } from "@mp/game/client";
+import { Suspense, useContext } from "solid-js";
+import { LoadingSpinner } from "@mp/ui";
 import {
   BuildVersionContext,
   AreaSceneContext,
   createGameStateClient,
   Game,
   GameStateClientContext,
-} from "@mp-modules/game/client";
-import { clientViewDistance, webSocketTokenParam } from "@mp/server";
-import { Suspense } from "solid-js";
-import { LoadingSpinner } from "@mp/ui";
-import { useTRPC } from "../integrations/trpc";
+} from "@mp/game/client";
+import { SocketContext, useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";
 
@@ -26,13 +26,10 @@ function RouteComponent() {
 }
 
 function PlayPage() {
-  const trpc = useTRPC();
-  const serverVersion = trpc.system.buildVersion.createQuery();
-  const sync = createGameStateClient((token) => {
-    const url = new URL(env.wsUrl);
-    url.searchParams.set(webSocketTokenParam, token);
-    return url.toString();
-  });
+  const socket = useContext(SocketContext);
+  const rpc = useRpc();
+  const serverVersion = rpc.system.buildVersion.useQuery();
+  const sync = createGameStateClient(socket);
 
   return (
     <BuildVersionContext.Provider

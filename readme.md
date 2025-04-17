@@ -1,6 +1,6 @@
 # mp
 
-A retro, point and click, hack and slash online rpg built in [TypeScript](https://www.typescriptlang.org/).
+An online rpg built in [TypeScript](https://www.typescriptlang.org/).
 
 This is a pet project that I'm working on over the weekends over at
 https://www.twitch.tv/kasper_573.
@@ -11,11 +11,11 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 - 2d graphics: [Pixi](https://pixijs.com/)
 - maps: [Tiled](https://www.mapeditor.org/) (+custom
-  [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
+  [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
 - ui: [SolidJS](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle orm](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws) + [trpc](https://trpc.io/)
+- network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
 
@@ -115,17 +115,9 @@ These are the workspaces, in order:
 
 ## apps
 
-Deployable artifacts. Composes all other packages.
+Compositions of packages. Often has deployable artifacts, but is not required to. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
-## modules
-
-Concrete game mechanics and business logic.
-
-Should be highly configurable and may not contain hard coded configuration. May do so either by composition, or dependency injection.
-
-Dependencies on other modules must be done via dependency injection (See [@mp/ioc](libraries/ioc/)).
-
-## libraries
+## packages
 
 Generic and low level systems.
 
