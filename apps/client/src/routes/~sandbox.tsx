@@ -8,7 +8,7 @@ import {
 } from "solid-js";
 import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
-import { ErrorToString } from "@mp/ui";
+import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc";
 import { useRpc } from "../integrations/rpc";
 
@@ -56,7 +56,7 @@ function ErrorTester() {
       </div>
       <Show when={!errorBoundary() && query.error}>
         <pre>
-          <ErrorToString error={query.error} />
+          <ErrorFallback error={query.error} />
         </pre>
       </Show>
       {uiError() && <ForcedError />}
