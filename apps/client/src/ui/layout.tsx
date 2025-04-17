@@ -8,7 +8,9 @@ export default function Layout(props: ParentProps) {
     <>
       <AppBar />
       <ErrorBoundary fallback={ErrorFallbackFn}>
-        <Suspense fallback={<LoadingSpinner />}>{props.children}</Suspense>
+        <Suspense fallback={<LoadingSpinner debugId="Layout" />}>
+          {props.children}
+        </Suspense>
       </ErrorBoundary>
     </>
   );

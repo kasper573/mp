@@ -31,7 +31,7 @@ function Root() {
         this serves as a final bastion of hope to display our error message! 
         */}
       <ErrorBoundary fallback={handleError}>
-        <Suspense fallback={<LoadingSpinner />}>
+        <Suspense fallback={<LoadingSpinner debugId="main" />}>
           <App />
         </Suspense>
       </ErrorBoundary>
