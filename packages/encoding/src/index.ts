@@ -11,12 +11,12 @@ export function createEncoding<T>(header: number) {
 
   return {
     decode(data: ArrayBufferLike): Result<T, Error | "skipped"> {
-      const view = new DataView(data);
-      if (view.getUint16(0) !== header) {
-        return err("skipped");
-      }
-
       try {
+        const view = new DataView(data);
+        if (view.getUint16(0) !== header) {
+          return err("skipped");
+        }
+
         const decoded = cbor.decode(new Uint8Array(data, 2)) as T;
         return ok(decoded);
       } catch (error) {
