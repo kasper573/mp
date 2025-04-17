@@ -1,10 +1,10 @@
 import { createContext, createEffect, Show, useContext } from "solid-js";
 
-export function ErrorFallbackFn(error: unknown, reset: () => void) {
+export function ErrorFallbackFn(error: unknown, reset?: () => void) {
   return <ErrorFallback error={error} reset={reset} />;
 }
 
-export function ErrorFallback(props: { error: unknown; reset: () => void }) {
+export function ErrorFallback(props: { error: unknown; reset?: () => void }) {
   const context = useContext(ErrorFallbackContext);
 
   createEffect(() => context.handleError(props.error));

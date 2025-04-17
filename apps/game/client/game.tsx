@@ -3,7 +3,7 @@ import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
 import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
 import { clsx } from "@mp/style";
-import { LoadingSpinner } from "@mp/ui";
+import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { AuthContext } from "@mp/auth/client";
 import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
@@ -51,6 +51,9 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
       </Match>
       <Match when={area.isLoading}>
         <LoadingSpinner>Loading area</LoadingSpinner>
+      </Match>
+      <Match when={!area.data}>
+        <ErrorFallback error="Could not load area data" />
       </Match>
     </Switch>
   );

@@ -1,5 +1,3 @@
-import { composeError } from "./compose-error";
-
 export class Logger {
   private subscriptions = new Set<LoggerEventHandler>();
 
@@ -12,7 +10,7 @@ export class Logger {
   };
 
   error = (...args: unknown[]) => {
-    this.emit({ type: "error", error: composeError(args) });
+    this.emit({ type: "error", args });
   };
 
   subscribe = (handler: LoggerEventHandler): Unsubscribe => {
@@ -33,8 +31,9 @@ export type LogLevel = LoggerEvent["type"];
 
 export type LoggerEventHandler = (event: LoggerEvent) => unknown;
 
-export type LoggerEvent =
-  | { type: "error"; error: Error }
-  | { type: "info" | "warn"; args: unknown[] };
+export interface LoggerEvent {
+  type: "error" | "info" | "warn";
+  args: unknown[];
+}
 
 export type Unsubscribe = () => void;
