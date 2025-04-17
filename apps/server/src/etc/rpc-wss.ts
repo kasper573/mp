@@ -18,9 +18,11 @@ export function acceptRpcViaWebSockets<Context>({
   router: AnyRouterNode<Context>;
   createContext: (socket: WebSocket) => Context;
 }) {
+  const invokeRpc = createRpcInvoker(router);
+
   wss.on("connection", (socket) => {
     socket.binaryType = "arraybuffer";
-    const invokeRpc = createRpcInvoker(router);
+
     const transmitter = new BinaryRpcTransmitter(
       socket.send.bind(socket),
       invokeRpc,
