@@ -1,2 +1,2 @@
-export * from "./WebSocket";
-export * from "./readyState";
+export * from "./web-socket";
+export * from "./ready-state";
