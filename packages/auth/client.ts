@@ -9,7 +9,7 @@ import {
   onCleanup,
 } from "solid-js";
 import {
-  isOurJWTPayload,
+  isOurJwtPayload,
   type AuthToken,
   type JWTPayload,
   type UserId,
@@ -42,7 +42,9 @@ export interface AuthClientOptions {
 export function createAuthClient(settings: AuthClientOptions): AuthClient {
   const userManager = new UserManager({
     authority: settings.authority,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     client_id: settings.audience,
+    // eslint-disable-next-line @typescript-eslint/naming-convention
     redirect_uri: settings.redirectUri,
     scope: "openid profile email roles", // A bit hacky to hardcode scope, but i don't need generic scope right now. This allows us to have built in support for ie. roles and profiles.
     loadUserInfo: true,
@@ -92,8 +94,8 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
     return;
   }
 
-  const payload = parseJWTPayload(user.access_token);
-  if (!isOurJWTPayload(payload)) {
+  const payload = parseJwtPayload(user.access_token);
+  if (!isOurJwtPayload(payload)) {
     throw new Error("Invalid JWT payload");
   }
 
@@ -105,7 +107,7 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
   };
 }
 
-function parseJWTPayload(jwtString: string): JWTPayload {
+function parseJwtPayload(jwtString: string): JWTPayload {
   const [, payload] = jwtString.split(".");
   return JSON.parse(atob(payload)) as JWTPayload;
 }

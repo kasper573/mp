@@ -82,7 +82,28 @@ export default tseslint.config(
 
       "@typescript-eslint/naming-convention": [
         "error",
-        { selector: "variableLike", format: ["camelCase", "PascalCase"] },
+        {
+          selector: "default",
+          format: ["strictCamelCase", "StrictPascalCase"],
+        },
+        // {
+        //   selector: "objectLiteralProperty",
+        //   format: ["camelCase", "PascalCase"],
+        // },
+        {
+          selector: [
+            "classProperty",
+            "objectLiteralProperty",
+            "typeProperty",
+            "classMethod",
+            "objectLiteralMethod",
+            "typeMethod",
+            "accessor",
+            "enumMember",
+          ],
+          format: null,
+          modifiers: ["requiresQuotes"],
+        },
       ],
 
       "boundaries/element-types": [

@@ -49,17 +49,17 @@ export interface GlobalIdFlags {
 }
 
 export function localToGlobalId(
-  tilesetFirstGID: GlobalTileId,
+  tilesetFirstGid: GlobalTileId,
   localId: LocalTileId,
 ): GlobalTileId {
-  return (tilesetFirstGID + localId) as GlobalTileId;
+  return (tilesetFirstGid + localId) as GlobalTileId;
 }
 
 export function globalToLocalId(
-  tilesetFirstGID: GlobalTileId,
+  tilesetFirstGid: GlobalTileId,
   globalId: GlobalTileId,
 ): LocalTileId {
-  return (globalId - tilesetFirstGID) as LocalTileId;
+  return (globalId - tilesetFirstGid) as LocalTileId;
 }
 
 const flippedHorizontallyFlag = 0x80_00_00_00;

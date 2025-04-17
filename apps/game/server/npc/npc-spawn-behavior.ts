@@ -14,15 +14,15 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
-import type { NPCService } from "./service";
-import type { NPC, NPCInstance, NPCInstanceId, NPCSpawn } from "./schema";
+import type { NpcService } from "./service";
+import type { Npc, NpcInstance, NpcInstanceId, NpcSpawn } from "./schema";
 
 export function npcSpawnBehavior(
   state: PatchStateMachine<GameState>,
-  npcService: NPCService,
+  npcService: NpcService,
   areas: AreaLookup,
 ): TickEventHandler {
-  let spawns: Awaited<ReturnType<NPCService["getAllSpawnsAndTheirNpcs"]>> = [];
+  let spawns: Awaited<ReturnType<NpcService["getAllSpawnsAndTheirNpcs"]>> = [];
   void npcService.getAllSpawnsAndTheirNpcs().then((list) => {
     spawns = list;
   });
@@ -67,10 +67,10 @@ const randomAndCustomNames = [
 ];
 
 export function spawnNpcInstance(
-  npc: NPC,
-  spawn: NPCSpawn,
+  npc: Npc,
+  spawn: NpcSpawn,
   area: AreaResource,
-): NPCInstance {
+): NpcInstance {
   return createNpcInstance(
     npc,
     spawn.areaId,
@@ -79,11 +79,11 @@ export function spawnNpcInstance(
 }
 
 export function createNpcInstance(
-  npc: NPC,
+  npc: Npc,
   areaId: AreaId,
   coords: Vector<Tile>,
-): NPCInstance {
-  const id = uuid() as NPCInstanceId;
+): NpcInstance {
+  const id = uuid() as NpcInstanceId;
   const name = uniqueNamesGenerator({
     dictionaries: [adjectives, animals, randomAndCustomNames],
     separator: " ",
@@ -108,7 +108,7 @@ export function createNpcInstance(
 }
 
 function determineSpawnCoords(
-  spawn: NPCSpawn,
+  spawn: NpcSpawn,
   area: AreaResource,
 ): Vector<Tile> {
   if (spawn.coords) {

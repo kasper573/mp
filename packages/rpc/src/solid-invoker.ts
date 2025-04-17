@@ -10,8 +10,8 @@ import type {
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
 import type {
-  inferOutput,
-  inferInput,
+  InferOutput,
+  InferInput,
   RpcProcedureInvoker,
 } from "./proxy-invoker";
 import type { AnyRpcTransmitter as AnyRpcTransmitter } from "./transmitter";
@@ -102,10 +102,10 @@ export interface UseQuery<Node extends AnyQueryNode> {
   /**
    * Returns a @tanstack/solid-query query wrapper of the rpc procedure.
    */
-  <MappedOutput = inferOutput<Node["handler"]>>(
+  <MappedOutput = InferOutput<Node["handler"]>>(
     options?: () => SolidRpcQueryOptions<
-      inferInput<Node["handler"]>,
-      inferOutput<Node["handler"]>,
+      InferInput<Node["handler"]>,
+      InferOutput<Node["handler"]>,
       MappedOutput
     >,
   ): UseQueryResult<MappedOutput, unknown>;
@@ -119,9 +119,9 @@ export interface UseMutation<Node extends AnyMutationNode> {
    * Returns a @tanstack/solid-query mutation wrapper of the rpc procedure.
    */
   (): UseMutationResult<
-    inferInput<Node["handler"]>,
+    InferInput<Node["handler"]>,
     unknown,
-    inferOutput<Node["handler"]>
+    InferOutput<Node["handler"]>
   >;
 }
 export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>

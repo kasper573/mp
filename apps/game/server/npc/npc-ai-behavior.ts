@@ -5,13 +5,13 @@ import { randomItem, recordValues } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import { isTargetable } from "../traits/combat";
-import type { NPCInstanceId } from "./schema";
+import type { NpcInstanceId } from "./schema";
 
-export function npcAIBehavior(
+export function npcAiBehavior(
   state: PatchStateMachine<GameState>,
   areas: AreaLookup,
 ): TickEventHandler {
-  const tasks = new Map<NPCInstanceId, Task>();
+  const tasks = new Map<NpcInstanceId, Task>();
   return ({ totalTimeElapsed }) => {
     for (const subject of recordValues(state.actors())) {
       if (subject.type !== "npc") {

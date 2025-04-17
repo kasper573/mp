@@ -1,8 +1,8 @@
 import pg from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
-import type { DBClient } from "./client";
+import type { DbClient } from "./client";
 
-export function createDBClient(connectionString: string): DBClient {
+export function createDbClient(connectionString: string): DbClient {
   const pool = new pg.Pool({ connectionString });
   return drizzle({ client: pool });
 }

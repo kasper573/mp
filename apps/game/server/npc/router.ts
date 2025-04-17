@@ -8,9 +8,9 @@ import { spawnNpcInstance } from "./npc-spawn-behavior";
 
 export const npcRoles = defineRoles("npc", ["spawnRandom"]);
 
-export type NPCRouter = typeof npcRouter;
+export type NpcRouter = typeof npcRouter;
 export const npcRouter = rpc.router({
-  spawnRandomNPC: rpc.procedure
+  spawnRandomNpc: rpc.procedure
     .use(roles([npcRoles.spawnRandom]))
     .mutation(async ({ ctx }) => {
       const npcService = ctx.get(ctxNpcService);

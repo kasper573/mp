@@ -12,18 +12,19 @@ export interface UserIdentity {
   roles: ReadonlySetLike<UserRole>;
 }
 
-export interface OurJWTPayload extends JWTPayload {
+export interface OurJwtPayload extends JWTPayload {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
   realm_access: {
     roles: string[];
   };
 }
 
-export function isOurJWTPayload(payload: JWTPayload): payload is OurJWTPayload {
-  return (payload as OurJWTPayload).realm_access !== undefined;
+export function isOurJwtPayload(payload: JWTPayload): payload is OurJwtPayload {
+  return (payload as OurJwtPayload).realm_access !== undefined;
 }
 
-export function extractRolesFromJWTPayload(
-  payload: OurJWTPayload,
+export function extractRolesFromJwtPayload(
+  payload: OurJwtPayload,
 ): ReadonlySetLike<UserRole> {
   return new Set(payload.realm_access.roles);
 }

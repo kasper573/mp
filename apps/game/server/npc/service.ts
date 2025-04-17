@@ -1,10 +1,10 @@
 import { eq } from "@mp/db";
 import { InjectionContext } from "@mp/ioc";
-import type { DBClient } from "@mp/db";
+import type { DbClient } from "@mp/db";
 import { npcSpawnTable, npcTable } from "./schema";
 
-export class NPCService {
-  constructor(private db: DBClient) {}
+export class NpcService {
+  constructor(private db: DbClient) {}
 
   async getAllSpawnsAndTheirNpcs() {
     const result = await this.db
@@ -21,4 +21,4 @@ export class NPCService {
   }
 }
 
-export const ctxNpcService = InjectionContext.new<NPCService>("NpcService");
+export const ctxNpcService = InjectionContext.new<NpcService>("NpcService");

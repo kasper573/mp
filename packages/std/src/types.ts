@@ -1,4 +1,4 @@
-export type Branded<T, Name extends string> = T & { __brand__: Name };
+export type Branded<T, Name extends string> = T & { brand: Name };
 
 /**
  * Unit of measurement in 2D screen space.

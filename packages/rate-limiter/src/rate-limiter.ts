@@ -30,6 +30,6 @@ export class RateLimiter {
   static enabled: boolean = true;
 }
 
-export type RateLimiterOK = "skipped-due-to-disabled" | "accepted";
+export type RateLimiterOk = "skipped-due-to-disabled" | "accepted";
 
-export type RateLimiterResult = ResultAsync<RateLimiterOK, string>;
+export type RateLimiterResult = ResultAsync<RateLimiterOk, string>;

@@ -1,7 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
 import {
-  isOurJWTPayload,
+  isOurJwtPayload,
   type AuthToken,
   type UserId,
   type UserIdentity,
@@ -51,7 +51,7 @@ export function createTokenVerifier({
       return err(String(error));
     }
 
-    if (!isOurJWTPayload(jwtPayload)) {
+    if (!isOurJwtPayload(jwtPayload)) {
       return err("Token payload is not valid");
     }
 

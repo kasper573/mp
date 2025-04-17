@@ -27,7 +27,7 @@ function RouteComponent() {
 
 function ErrorTester() {
   const rpc = useRpc();
-  const [uiError, setUIError] = createSignal(false);
+  const [uiError, setUiError] = createSignal(false);
   const [rpcError, setRpcError] = createSignal(false);
   const [errorBoundary, setErrorBoundary] = createSignal(false);
 
@@ -39,7 +39,7 @@ function ErrorTester() {
   return (
     <div>
       <h1>Error Tester</h1>
-      <button onClick={() => setUIError(true)}>Trigger UI error</button>
+      <button onClick={() => setUiError(true)}>Trigger UI error</button>
       <div>
         <button disabled={rpcError()} onClick={() => setRpcError(true)}>
           Trigger RPC error

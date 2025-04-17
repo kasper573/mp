@@ -23,10 +23,10 @@ export const characterTable = pgTable("character", {
   attackRange: real().$type<Tile>().notNull(),
 });
 
-type DBCharacter = typeof characterTable.$inferSelect;
+type DbCharacter = typeof characterTable.$inferSelect;
 
 export interface Character
-  extends DBCharacter,
+  extends DbCharacter,
     AppearanceTrait,
     MovementTrait,
     CombatTrait {}

@@ -4,7 +4,7 @@ import type {
   LocalTileId,
   ObjectAlignment,
   Coord,
-  RGB,
+  Rgb,
   TiledClass,
   TileRenderSize,
   FilePath,
@@ -74,7 +74,7 @@ export interface Tileset {
    */
   transformations?: Transformations;
 
-  transparentcolor?: RGB;
+  transparentcolor?: Rgb;
 
   /**
    * The JSON format version

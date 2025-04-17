@@ -33,7 +33,7 @@ import { AreaSceneContext } from "./area-scene";
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
-export function AreaDebugUI(props: {
+export function AreaDebugUi(props: {
   area: AreaResource;
   drawPathsForActors: Actor[];
   playerCoords?: Vector<Tile>;
@@ -69,7 +69,7 @@ export function AreaDebugUI(props: {
             />
           </div>
           <div>
-            <Button on:click={() => void rpc.npc.spawnRandomNPC()}>
+            <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
               Spawn random NPC
             </Button>
             <Button

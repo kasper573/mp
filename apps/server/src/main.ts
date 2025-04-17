@@ -16,7 +16,7 @@ import {
   ctxTokenVerifier,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createDBClient } from "@mp/db/server";
+import { createDbClient } from "@mp/db/server";
 import { type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameState } from "@mp/game/server";
@@ -30,11 +30,11 @@ import {
   characterRemoveBehavior,
   CharacterService,
   ctxCharacterService,
-  npcAIBehavior,
+  npcAiBehavior,
   ctxNpcService,
   ctxGameStateMachine,
   deriveClientVisibility,
-  NPCService,
+  NpcService,
   GameService,
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
@@ -66,7 +66,7 @@ RateLimiter.enabled = opt.rateLimit;
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const tokenVerifier = createTokenVerifier(opt.auth);
-const db = createDBClient(opt.databaseUrl);
+const db = createDbClient(opt.databaseUrl);
 
 db.$client.on("error", logger.error);
 
@@ -118,7 +118,7 @@ const gameState = createPatchStateMachine<GameState>({
   ),
 });
 
-const npcService = new NPCService(db);
+const npcService = new NpcService(db);
 const gameService = new GameService(db);
 
 const persistTicker = new Ticker({
@@ -152,7 +152,7 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAIBehavior(gameState, areas));
+updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
 updateTicker.subscribe(combatBehavior(gameState));

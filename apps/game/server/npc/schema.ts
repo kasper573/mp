@@ -5,8 +5,8 @@ import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import { areaId } from "../area/schema";
 
-export type NPCId = Branded<string, "NPCId">;
-export const npcId = () => uuid().$type<NPCId>();
+export type NpcId = Branded<string, "NPCId">;
+export const npcId = () => uuid().$type<NpcId>();
 
 /**
  * Static information about an NPC.
@@ -16,14 +16,14 @@ export const npcTable = pgTable("npc", {
   speed: integer().$type<Tile>().notNull(),
 });
 
-export type NPC = typeof npcTable.$inferSelect;
+export type Npc = typeof npcTable.$inferSelect;
 
 export const npcRelations = relations(npcTable, ({ many }) => ({
   posts: many(npcSpawnTable),
 }));
 
-export type NPCSpawnId = Branded<string, "NPCSpawnId">;
-export const npcSpawnId = () => uuid().$type<NPCSpawnId>();
+export type NpcSpawnId = Branded<string, "NPCSpawnId">;
+export const npcSpawnId = () => uuid().$type<NpcSpawnId>();
 
 /**
  * Information about how npc instances should be spawned
@@ -39,19 +39,19 @@ export const npcSpawnTable = pgTable("npc_spawn", {
   randomRadius: integer(),
 });
 
-export type NPCSpawn = typeof npcSpawnTable.$inferSelect;
+export type NpcSpawn = typeof npcSpawnTable.$inferSelect;
 
 /**
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-export interface NPCInstance
-  extends Omit<NPC, "id">,
+export interface NpcInstance
+  extends Omit<Npc, "id">,
     MovementTrait,
     AppearanceTrait,
     CombatTrait {
-  id: NPCInstanceId;
-  npcId: NPCId;
+  id: NpcInstanceId;
+  npcId: NpcId;
 }
 
-export type NPCInstanceId = Branded<string, "NPCInstanceId">;
+export type NpcInstanceId = Branded<string, "NPCInstanceId">;

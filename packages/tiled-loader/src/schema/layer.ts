@@ -4,7 +4,7 @@ import type {
   Color,
   LayerId,
   Ratio,
-  RGB,
+  Rgb,
   TiledClass,
   LayerDrawOrder,
   FilePath,
@@ -83,7 +83,7 @@ export interface ImageLayer extends SharedLayerProperties {
   image: FilePath;
   repeatx: boolean;
   repeaty: boolean;
-  transparentcolor?: RGB;
+  transparentcolor?: Rgb;
 }
 
 export interface ObjectGroupLayer extends SharedLayerProperties {

@@ -16,7 +16,7 @@ export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
     async map(url, input) {
       const loadTiled = createTiledLoader({
         loadJson,
-        relativePath: (path, base) => relativeURL(path, base, serverVersion()),
+        relativePath: (path, base) => relativeUrl(path, base, serverVersion()),
       });
       const result = await loadTiled(url);
       if (result.isErr()) {
@@ -38,7 +38,7 @@ async function loadJson(url: string) {
   return json as Record<string, unknown>;
 }
 
-function relativeURL(path: string, base: string, version: string) {
+function relativeUrl(path: string, base: string, version: string) {
   base = base.startsWith("//") ? window.location.protocol + base : base;
   const url = new URL(path, base);
 

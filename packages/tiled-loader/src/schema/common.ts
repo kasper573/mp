@@ -1,11 +1,11 @@
 import type { Branded, Pixel } from "@mp/std";
 
 // Primitives
-export type RGB = Branded<string, "RGB">;
+export type Rgb = Branded<string, "RGB">;
 
-export type ARGB = Branded<string, "ARGB">;
+export type Argb = Branded<string, "ARGB">;
 
-export type Color = RGB | ARGB;
+export type Color = Rgb | Argb;
 
 /**
  * 0-1

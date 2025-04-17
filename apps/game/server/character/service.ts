@@ -1,4 +1,4 @@
-import type { DBClient } from "@mp/db";
+import type { DbClient } from "@mp/db";
 import { eq } from "@mp/db";
 import type { UserId, UserIdentity } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
@@ -15,7 +15,7 @@ export class CharacterService {
   private defaultAreaId: AreaId;
 
   constructor(
-    private db: DBClient,
+    private db: DbClient,
     private readonly areas: AreaLookup,
   ) {
     if (areas.size === 0) {

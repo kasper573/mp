@@ -34,11 +34,11 @@ export interface RpcQueryOptions<Input, Output, MappedOutput> {
 }
 
 export interface RpcProcedureInvoker<Node extends AnyProcedureNode> {
-  (input: inferInput<Node["handler"]>): Promise<inferOutput<Node["handler"]>>;
+  (input: InferInput<Node["handler"]>): Promise<InferOutput<Node["handler"]>>;
 }
 
-export type inferInput<T extends AnyProcedureNode["handler"]> =
+export type InferInput<T extends AnyProcedureNode["handler"]> =
   T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? I : never;
 
-export type inferOutput<T extends AnyProcedureNode["handler"]> =
+export type InferOutput<T extends AnyProcedureNode["handler"]> =
   T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? O : never;

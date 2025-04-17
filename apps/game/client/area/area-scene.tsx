@@ -23,7 +23,7 @@ import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { useAnimatedCoords } from "./use-animated-coords";
 import { RespawnDialog } from "./respawn-dialog";
-import { AreaDebugUI } from "./area-debug-ui";
+import { AreaDebugUi } from "./area-debug-ui";
 import { toggleSignal } from "./toggle-signal";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
@@ -146,7 +146,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         {props.children}
         <TileHighlight area={props.area} target={highlightTarget()} />
         <Show when={debug()}>
-          <AreaDebugUI
+          <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
             drawPathsForActors={state.actorsInArea()}

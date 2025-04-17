@@ -13,13 +13,13 @@ const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
 
 const start = performance.now();
 
-await Promise.all([loadTestHTTP(), loadTestSocketsWithRpc()]);
+await Promise.all([loadTestHttp(), loadTestSocketsWithRpc()]);
 
 const end = performance.now();
 
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-async function loadTestHTTP() {
+async function loadTestHttp() {
   logger.info("Testing", httpRequests, "HTTP requests");
   const results = await Promise.allSettled(
     range(httpRequests).map(async () => {
