@@ -28,7 +28,7 @@ const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
 const query = new QueryClient({
-  defaultOptions: { queries: { retry: false } },
+  defaultOptions: { queries: { retry: env.retryRpcQueries } },
 });
 const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
