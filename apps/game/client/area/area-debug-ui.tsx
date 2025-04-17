@@ -41,8 +41,6 @@ export function AreaDebugUI(props: {
   const [showViewbox, setShowViewbox] = createSignal(false);
   const rpc = useRpc();
   const state = useContext(GameStateClientContext);
-  const spawnNPC = rpc.npc.spawnRandomNPC.useMutation();
-  const kill = rpc.character.kill.useMutation();
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
 
@@ -71,9 +69,13 @@ export function AreaDebugUI(props: {
             />
           </div>
           <div>
-            <Button on:click={() => spawnNPC.mutate()}>Spawn random NPC</Button>
+            <Button on:click={() => void rpc.npc.spawnRandomNPC()}>
+              Spawn random NPC
+            </Button>
             <Button
-              on:click={() => kill.mutate({ targetId: state.characterId()! })}
+              on:click={() =>
+                void rpc.character.kill({ targetId: state.characterId()! })
+              }
             >
               Die
             </Button>

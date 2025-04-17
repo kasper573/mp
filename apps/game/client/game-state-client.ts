@@ -59,29 +59,25 @@ export function createGameStateClient(socket: WebSocket) {
 }
 
 export function useGameActions() {
-  const state = useContext(GameStateClientContext);
-
   const rpc = useRpc();
-  const moveMutation = rpc.character.move.useMutation();
-  const joinMutation = rpc.character.join.useMutation();
-  const attackMutation = rpc.character.attack.useMutation();
-  const respawnMutation = rpc.character.respawn.useMutation();
+  const state = useContext(GameStateClientContext);
 
   const move = dedupe(
     throttle(
       (to: Vector<Tile>) =>
-        moveMutation.mutate({ characterId: state.characterId()!, to }),
+        rpc.character.move({ characterId: state.characterId()!, to }),
       100,
     ),
     (a, b) => a.equals(b),
   );
-  const attack = (targetId: ActorId) =>
-    attackMutation.mutate({ characterId: state.characterId()!, targetId });
 
-  const respawn = () => respawnMutation.mutate(state.characterId()!);
+  const attack = (targetId: ActorId) =>
+    rpc.character.attack({ characterId: state.characterId()!, targetId });
+
+  const respawn = () => rpc.character.respawn(state.characterId()!);
 
   const join = (token: AuthToken) =>
-    joinMutation.mutateAsync(token).then(state.setCharacterId);
+    rpc.character.join(token).then(state.setCharacterId);
 
   return {
     respawn,
