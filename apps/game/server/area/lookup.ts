@@ -4,4 +4,4 @@ import type { AreaResource } from "../../shared/area/area-resource";
 
 export type AreaLookup = ReadonlyMap<AreaId, AreaResource>;
 
-export const ctxAreaLookup = InjectionContext.new<AreaLookup>();
+export const ctxAreaLookup = InjectionContext.new<AreaLookup>("AreaLookup");

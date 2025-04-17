@@ -1,14 +1,21 @@
 import { RpcError } from "@mp/rpc";
 import { InjectionContext } from "@mp/ioc";
 import type { UserIdentity } from "@mp/auth";
+import type { TokenVerifier } from "@mp/auth/server";
 import { rpc } from "../rpc";
+import { ctxClientRegistry } from "./client-registry";
 import type { RoleDefinition } from "./define-roles";
+import { ctxClientId } from "./client-id";
 
-export const ctxUserIdentity = InjectionContext.new<UserIdentity | undefined>();
+export const ctxTokenVerifier =
+  InjectionContext.new<TokenVerifier>("TokenVerifier");
 
 export function auth() {
-  return rpc.middleware(({ ctx }) => {
-    const user = ctx.get(ctxUserIdentity);
+  return rpc.middleware(({ ctx }): AuthContext => {
+    const clients = ctx.get(ctxClientRegistry);
+    const clientId = ctx.get(ctxClientId);
+    const user = clients.getUser(clientId);
+
     if (!user) {
       throw new RpcError("User is not authenticated");
     }
@@ -27,8 +34,15 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return rpc.middleware(({ ctx }) => {
-    const user = ctx.get(ctxUserIdentity);
+  return rpc.middleware(({ ctx }): Partial<AuthContext> => {
+    const clients = ctx.get(ctxClientRegistry);
+    const clientId = ctx.get(ctxClientId);
+    const user = clients.getUser(clientId);
+
     return { user };
   });
+}
+
+export interface AuthContext {
+  user: UserIdentity;
 }

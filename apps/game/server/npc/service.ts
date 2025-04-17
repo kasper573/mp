@@ -21,4 +21,4 @@ export class NPCService {
   }
 }
 
-export const ctxNpcService = InjectionContext.new<NPCService>();
+export const ctxNpcService = InjectionContext.new<NPCService>("NpcService");

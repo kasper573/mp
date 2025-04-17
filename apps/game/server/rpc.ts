@@ -1,17 +1,13 @@
 import { InjectionContext, type InjectionContainer } from "@mp/ioc";
 import type { RpcFactories, RpcMiddleware } from "@mp/rpc";
-import { RpcBuilder, type RpcErrorFormatter } from "@mp/rpc";
+import { RpcBuilder } from "@mp/rpc";
 
-export const ctxGlobalMiddleware = InjectionContext.new<GameRpcMiddleware>();
-
-export const ctxRpcErrorFormatter =
-  InjectionContext.new<GameRpcErrorFormatter>();
+export const ctxGlobalMiddleware =
+  InjectionContext.new<GameRpcMiddleware>("GlobalMiddleware");
 
 export const rpc = buildRpc();
 
 export type GameRpcContext = InjectionContainer;
-
-export type GameRpcErrorFormatter = RpcErrorFormatter<GameRpcContext>;
 
 export type GameRpcMiddleware = RpcMiddleware<GameRpcContext, unknown, unknown>;
 

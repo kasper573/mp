@@ -107,4 +107,5 @@ function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
   return { color: 0x00_ff_00 };
 }
 
-export const ctxCharacterService = InjectionContext.new<CharacterService>();
+export const ctxCharacterService =
+  InjectionContext.new<CharacterService>("CharacterService");

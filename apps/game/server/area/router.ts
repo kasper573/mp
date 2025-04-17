@@ -16,5 +16,6 @@ export const areaRouter = rpc.router({
 
 export const areaRouterSlice = { area: areaRouter };
 
-export const ctxAreaFileUrlResolver =
-  InjectionContext.new<(areaId: AreaId) => PublicUrl>();
+export const ctxAreaFileUrlResolver = InjectionContext.new<
+  (areaId: AreaId) => PublicUrl
+>("AreaFileUrlResolver");

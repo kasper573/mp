@@ -15,7 +15,6 @@ import {
   transform,
 } from "@mp/env";
 import type { AuthToken, UserId, UserIdentity } from "@mp/auth";
-import { InjectionContext } from "@mp/ioc";
 import { playerRoles } from "./roles";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
@@ -137,5 +136,3 @@ export const serverOptionsSchema = object({
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
-
-export const serverOptionsContext = InjectionContext.new<ServerOptions>();

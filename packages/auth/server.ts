@@ -7,7 +7,7 @@ import {
   type UserIdentity,
 } from "./shared";
 
-export interface AuthServerOptions {
+export interface TokenVerifierOption {
   jwksUri: string;
   issuer: string;
   audience: string;
@@ -18,67 +18,65 @@ export interface AuthServerOptions {
   bypassUser?: UserIdentity;
 }
 
-export interface AuthServer {
-  verifyToken(token?: AuthToken): Promise<VerifyTokenResult>;
+export interface TokenVerifier {
+  (token?: AuthToken): Promise<TokenVerifierResult>;
 }
 
-export function createAuthServer({
+export function createTokenVerifier({
   jwksUri,
   issuer,
   audience,
   algorithms,
   bypassUser,
-}: AuthServerOptions): AuthServer {
+}: TokenVerifierOption): TokenVerifier {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
-  return {
-    async verifyToken(token) {
-      if (token === undefined) {
-        return err("A token must be provided");
-      }
+  return async function verifyToken(token) {
+    if (token === undefined) {
+      return err("A token must be provided");
+    }
 
-      if (token === bypassUser?.token) {
-        return ok(bypassUser);
-      }
+    if (token === bypassUser?.token) {
+      return ok(bypassUser);
+    }
 
-      let jwtPayload;
-      try {
-        const { payload } = await jwtVerify(token, jwks, {
-          issuer,
-          algorithms,
-        });
-        jwtPayload = payload;
-      } catch (error) {
-        return err(String(error));
-      }
+    let jwtPayload;
+    try {
+      const { payload } = await jwtVerify(token, jwks, {
+        issuer,
+        algorithms,
+      });
+      jwtPayload = payload;
+    } catch (error) {
+      return err(String(error));
+    }
 
-      if (!isOurJWTPayload(jwtPayload)) {
-        return err("Token payload is not valid");
-      }
+    if (!isOurJWTPayload(jwtPayload)) {
+      return err("Token payload is not valid");
+    }
 
-      if (jwtPayload.azp !== audience) {
-        return err(`Token azp "${String(jwtPayload.azp)}" is invalid`);
-      }
+    if (jwtPayload.azp !== audience) {
+      return err(`Token azp "${String(jwtPayload.azp)}" is invalid`);
+    }
 
-      if (!jwtPayload.sub) {
-        return err(`Token payload is missing 'sub' claim`);
-      }
+    if (!jwtPayload.sub) {
+      return err(`Token payload is missing 'sub' claim`);
+    }
 
-      const user: UserIdentity = {
-        id: jwtPayload.sub as UserId,
-        token,
-        roles: new Set(jwtPayload.realm_access.roles),
-        name: jwtPayload.preferred_username
-          ? String(jwtPayload.preferred_username)
-          : undefined,
-      };
+    const user: UserIdentity = {
+      id: jwtPayload.sub as UserId,
+      token,
+      roles: new Set(jwtPayload.realm_access.roles),
+      name: jwtPayload.preferred_username
+        ? String(jwtPayload.preferred_username)
+        : undefined,
+    };
 
-      return ok(user);
-    },
+    return ok(user);
   };
 }
 
-export type VerifyTokenResult = Result<UserIdentity, string>;
+export type TokenVerifierResult = Result<UserIdentity, string>;
 
 // Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [

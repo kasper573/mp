@@ -2,7 +2,7 @@ import type { UserId } from "@mp/auth";
 import type { PatchStateMachine } from "@mp/sync";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
-import type { ClientRegistry } from "../client-registry";
+import type { ClientRegistry } from "../user/client-registry";
 import type { GameState } from "../game-state";
 
 export function characterRemoveBehavior(
@@ -13,26 +13,26 @@ export function characterRemoveBehavior(
 ) {
   const removeTimeouts = new Map<UserId, NodeJS.Timeout>();
 
-  const stop = clients.on(({ type, userId }) => {
+  const stop = clients.on(({ type, user }) => {
     switch (type) {
       case "remove": {
-        if (clients.hasClient(userId)) {
+        if (clients.hasClient(user.id)) {
           // User is still connected with another client, no need to remove character
           break;
         }
 
-        logger.info("Scheduling character removal for user", userId);
-        const timeoutId = setTimeout(() => removeCharacter(userId), timeout);
-        removeTimeouts.set(userId, timeoutId);
+        logger.info("Scheduling character removal for user", user.id);
+        const timeoutId = setTimeout(() => removeCharacter(user.id), timeout);
+        removeTimeouts.set(user.id, timeoutId);
         break;
       }
 
       case "add": {
-        const timeoutId = removeTimeouts.get(userId);
+        const timeoutId = removeTimeouts.get(user.id);
         if (timeoutId) {
           logger.info("User reconnected, cancelling removal timeout");
           clearTimeout(timeoutId);
-          removeTimeouts.delete(userId);
+          removeTimeouts.delete(user.id);
         }
         break;
       }

@@ -22,17 +22,11 @@ export class InjectionContainer {
 const readSymbol = Symbol("read");
 
 export class InjectionContext<Value> {
-  private constructor(private read: InjectionReaderFn<Value>) {
+  private constructor(read: InjectionReaderFn<Value>) {
     this[readSymbol] = read;
   }
 
   readonly [readSymbol]: InjectionReaderFn<Value>;
-
-  derive<DerivedValue>(
-    deriveFn: (value: Value) => DerivedValue,
-  ): InjectionContext<DerivedValue> {
-    return new InjectionContext((map) => deriveFn(this.read(map)));
-  }
 
   static withDefault<Value>(defaultValue: Value): InjectionContext<Value> {
     return new InjectionContext<Value>(function (map) {
@@ -43,12 +37,12 @@ export class InjectionContext<Value> {
     });
   }
 
-  static new<Value>(): InjectionContext<Value> {
+  static new<Value>(name: string): InjectionContext<Value> {
     return new InjectionContext<Value>(function (map) {
       if (map.has(this as InjectionContext<unknown>)) {
         return map.get(this as InjectionContext<unknown>) as Value;
       }
-      throw new Error("Context not available");
+      throw new Error(`"${name}" context is missing in IOC container`);
     });
   }
 }

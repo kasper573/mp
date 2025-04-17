@@ -7,4 +7,4 @@ export type GameState = {
 };
 
 export const ctxGameStateMachine =
-  InjectionContext.new<PatchStateMachine<GameState>>();
+  InjectionContext.new<PatchStateMachine<GameState>>("GameStateMachine");

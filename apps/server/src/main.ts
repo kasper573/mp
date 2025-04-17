@@ -4,18 +4,18 @@ import path from "node:path";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import { createAuthServer } from "@mp/auth/server";
+import { createTokenVerifier } from "@mp/auth/server";
 import { createPatchStateMachine } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
-import { ctxSessionId } from "@mp/game/server";
+import { ctxClientId, ctxTokenVerifier } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDBClient } from "@mp/db/server";
 import { type LocalFile } from "@mp/std";
-import { ctxGlobalMiddleware, ctxRpcErrorFormatter } from "@mp/game/server";
-import type { GameState, SessionId } from "@mp/game/server";
+import { ctxGlobalMiddleware } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -42,7 +42,6 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
 import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
-import { errorFormatter } from "./etc/error-formatter";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
@@ -62,7 +61,7 @@ RateLimiter.enabled = opt.rateLimit;
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const auth = createAuthServer(opt.auth);
+const tokenVerifier = createTokenVerifier(opt.auth);
 const db = createDBClient(opt.databaseUrl);
 
 db.$client.on("error", logger.error);
@@ -102,12 +101,7 @@ acceptRpcViaWebSockets({
   wss,
   onError: logger.error,
   router: rootRouter,
-  createContext: (socket) => {
-    return ioc.provide(
-      ctxSessionId,
-      getSocketId(socket) as unknown as SessionId,
-    );
-  },
+  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
 const gameState = createPatchStateMachine<GameState>({
@@ -139,11 +133,11 @@ const characterService = new CharacterService(db, areas);
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
-  .provide(ctxRpcErrorFormatter, errorFormatter)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameStateMachine, gameState)
   .provide(ctxAreaLookup, areas)
+  .provide(ctxTokenVerifier, tokenVerifier)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
   );
@@ -160,8 +154,8 @@ updateTicker.subscribe(combatBehavior(gameState));
 updateTicker.subscribe(() => flushGameState(gameState, wss.clients));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
-clients.on(({ type, clientId, userId }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId }),
+clients.on(({ type, clientId, user }) =>
+  logger.info(`[ClientRegistry][${type}]`, { clientId, userId: user.id }),
 );
 
 httpServer.listen(opt.port, opt.hostname, () => {
