@@ -38,8 +38,9 @@ function createUseQuery(
   function useQuery<MappedOutput>(
     options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryReturn<unknown> {
-    const [resource, { refetch }] = createResource(async () => {
-      const { input, map } = options?.() ?? {};
+    const input = () => options?.()?.input;
+    const [resource, { refetch }] = createResource(input, async (input) => {
+      const { map } = options?.() ?? {};
       if (input === skipToken) {
         return;
       }
@@ -55,7 +56,9 @@ function createUseQuery(
       get isLoading() {
         return resource.loading;
       },
-      data: resource(),
+      get data() {
+        return resource();
+      },
       get error() {
         return resource.error as unknown;
       },
