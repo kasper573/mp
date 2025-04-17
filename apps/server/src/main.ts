@@ -101,6 +101,10 @@ const wss = new WebSocketServer({
   server: httpServer,
 });
 
+wss.on("connection", (socket) => {
+  socket.on("close", () => clients.remove(getSocketId(socket)));
+});
+
 acceptRpcViaWebSockets({
   wss,
   logger,
