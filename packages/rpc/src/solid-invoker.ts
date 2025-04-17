@@ -1,4 +1,6 @@
-import { createResource } from "solid-js";
+import * as tanstack from "@tanstack/solid-query";
+import type { UseMutationResult, UseQueryResult } from "@tanstack/solid-query";
+import { skipToken, type SkipToken } from "@tanstack/solid-query";
 import type {
   AnyMutationNode,
   AnyQueryNode,
@@ -37,35 +39,23 @@ function createUseQuery(
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
     options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
-  ): UseQueryReturn<unknown> {
-    const input = () => options?.()?.input;
-    const [resource, { refetch }] = createResource(input, async (input) => {
-      const { map } = options?.() ?? {};
-      if (input === skipToken) {
-        return;
-      }
-      const result = (await transmitter.call(path, input)) as unknown;
+  ): UseQueryResult {
+    return tanstack.useQuery(() => {
+      const { input } = options?.() ?? {};
+      return {
+        queryKey: [path, input],
+        queryFn: input === skipToken ? skipToken : queryFn,
+      };
+    });
 
+    async function queryFn() {
+      const { input, map } = options?.() ?? {};
+      const result = (await transmitter.call(path, input)) as unknown;
       if (map) {
         return map(result, input);
       }
       return result;
-    });
-
-    const query: UseQueryReturn<unknown> = {
-      get isLoading() {
-        return resource.loading;
-      },
-      get data() {
-        return resource();
-      },
-      get error() {
-        return resource.error as unknown;
-      },
-      refetch,
-    };
-
-    return query;
+    }
   }
 
   return useQuery as UseQuery<AnyQueryNode>;
@@ -75,12 +65,12 @@ function createUseMutation(
   transmitter: AnyRpcTransmitter,
   path: string[],
 ): UseMutation<AnyMutationNode> {
-  const mutation = {
-    isLoading: false,
-    mutate: (input: unknown) => void transmitter.call(path, input),
-    mutateAsync: (input: unknown) => transmitter.call(path, input),
+  return () => {
+    return tanstack.useMutation(() => ({
+      mutationKey: path,
+      mutationFn: (input: unknown) => transmitter.call(path, input),
+    }));
   };
-  return () => mutation;
 }
 
 export type SolidRpcInvoker<Node extends AnyRpcNode> =
@@ -97,7 +87,7 @@ export type SolidRpcRouterInvoker<Router extends AnyRouterNode> = {
 };
 
 export interface SolidRpcQueryOptions<Input, Output, MappedOutput> {
-  input: Input | SkipToken;
+  input: Input | tanstack.SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
@@ -116,22 +106,16 @@ export interface UseQuery<Node extends AnyQueryNode> {
       inferOutput<Node["handler"]>,
       MappedOutput
     >,
-  ): UseQueryReturn<MappedOutput>;
-}
-
-export interface UseQueryReturn<Output> {
-  data?: Output;
-  error?: unknown;
-  isLoading: boolean;
-  refetch: () => void;
+  ): UseQueryResult<MappedOutput, unknown>;
 }
 
 const useQueryProperty = "useQuery";
 const useMutationProperty = "useMutation";
 
 export interface UseMutation<Node extends AnyMutationNode> {
-  (): UseMutationReturn<
+  (): UseMutationResult<
     inferInput<Node["handler"]>,
+    unknown,
     inferOutput<Node["handler"]>
   >;
 }
@@ -143,31 +127,5 @@ export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>
   [useMutationProperty]: UseMutation<Node>;
 }
 
-export interface UseMutationReturn<Input, Output> {
-  /**
-   * Not implemented yet.
-   * @deprecated
-   */
-  data?: Output;
-  /**
-   * Not implemented yet.
-   * @deprecated
-   */
-  error?: unknown;
-  /**
-   * Not implemented yet.
-   * @deprecated
-   */
-  isLoading: boolean;
-  /**
-   * "Fire and forget"- style mutation. Useful when you don't care about the result.
-   */
-  mutate: (input: Input) => void;
-  /**
-   * Async mutation. Useful when you want to wait for the result.
-   */
-  mutateAsync: (input: Input) => Promise<Output>;
-}
-
-export type SkipToken = typeof skipToken;
-export const skipToken = Symbol("skipToken");
+export { skipToken, type SkipToken };
+export { QueryClient, QueryClientProvider } from "@tanstack/solid-query";

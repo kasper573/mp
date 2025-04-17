@@ -6,6 +6,7 @@ import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerEncoderExtensions } from "@mp/game/client";
 import { GameRpcSliceApiContext } from "@mp/game/client";
 import { WebSocket } from "@mp/ws/client";
+import { QueryClient, QueryClientProvider } from "@mp/rpc";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -26,6 +27,7 @@ registerEncoderExtensions();
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
+const query = new QueryClient();
 const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
 const rpc = createRpcClient(socket, logger);
@@ -42,24 +44,26 @@ void import("./integrations/faro").then((faro) =>
 export default function App() {
   return (
     <>
-      <LoggerContext.Provider value={logger}>
-        <ErrorFallbackContext.Provider
-          value={{
-            handleError: (e) => logger.error("SolidJS error", e),
-          }}
-        >
-          <AuthContext.Provider value={auth}>
-            <SocketContext.Provider value={socket}>
-              <RpcClientContext.Provider value={rpc}>
-                <GameRpcSliceApiContext.Provider value={rpc}>
-                  <RouterProvider router={router} />
-                  <TanStackRouterDevtools router={router} />
-                </GameRpcSliceApiContext.Provider>
-              </RpcClientContext.Provider>
-            </SocketContext.Provider>
-          </AuthContext.Provider>
-        </ErrorFallbackContext.Provider>
-      </LoggerContext.Provider>
+      <QueryClientProvider client={query}>
+        <LoggerContext.Provider value={logger}>
+          <ErrorFallbackContext.Provider
+            value={{
+              handleError: (e) => logger.error("SolidJS error", e),
+            }}
+          >
+            <AuthContext.Provider value={auth}>
+              <SocketContext.Provider value={socket}>
+                <RpcClientContext.Provider value={rpc}>
+                  <GameRpcSliceApiContext.Provider value={rpc}>
+                    <RouterProvider router={router} />
+                    <TanStackRouterDevtools router={router} />
+                  </GameRpcSliceApiContext.Provider>
+                </RpcClientContext.Provider>
+              </SocketContext.Provider>
+            </AuthContext.Provider>
+          </ErrorFallbackContext.Provider>
+        </LoggerContext.Provider>
+      </QueryClientProvider>
     </>
   );
 }
