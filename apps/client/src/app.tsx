@@ -27,7 +27,9 @@ registerEncoderExtensions();
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 
-const query = new QueryClient();
+const query = new QueryClient({
+  defaultOptions: { queries: { retry: false } },
+});
 const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
 const rpc = createRpcClient(socket, logger);
