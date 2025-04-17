@@ -103,7 +103,7 @@ const wss = new WebSocketServer({
 
 acceptRpcViaWebSockets({
   wss,
-  onError: logger.error,
+  logger,
   router: rootRouter,
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
