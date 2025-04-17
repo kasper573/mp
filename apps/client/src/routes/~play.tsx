@@ -28,7 +28,7 @@ function RouteComponent() {
 function PlayPage() {
   const socket = useContext(SocketContext);
   const rpc = useRpc();
-  const serverVersion = rpc.system.buildVersion.createQuery();
+  const serverVersion = rpc.system.buildVersion.useQuery();
   const sync = createGameStateClient(socket);
 
   return (

@@ -62,10 +62,10 @@ export function useGameActions() {
   const state = useContext(GameStateClientContext);
 
   const rpc = useRpc();
-  const moveMutation = rpc.character.move.createMutation();
-  const joinMutation = rpc.character.join.createMutation();
-  const attackMutation = rpc.character.attack.createMutation();
-  const respawnMutation = rpc.character.respawn.createMutation();
+  const moveMutation = rpc.character.move.useMutation();
+  const joinMutation = rpc.character.join.useMutation();
+  const attackMutation = rpc.character.attack.useMutation();
+  const respawnMutation = rpc.character.respawn.useMutation();
 
   const move = dedupe(
     throttle(

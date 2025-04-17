@@ -24,7 +24,7 @@ function ErrorTester() {
   const [uiError, setUIError] = createSignal(false);
   const [rpcError, setRpcError] = createSignal(false);
 
-  const query = rpc.system.testError.createQuery(() => ({
+  const query = rpc.system.testError.useQuery(() => ({
     input: rpcError() ? void 0 : skipToken,
   }));
 

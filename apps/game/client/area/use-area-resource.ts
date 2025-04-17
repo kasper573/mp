@@ -11,7 +11,7 @@ export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
   const rpc = useRpc();
   const { server: serverVersion } = useContext(BuildVersionContext);
 
-  return rpc.area.areaFileUrl.createQuery(() => ({
+  return rpc.area.areaFileUrl.useQuery(() => ({
     input: areaId?.() ?? skipToken,
     async map(url, input) {
       const loadTiled = createTiledLoader({

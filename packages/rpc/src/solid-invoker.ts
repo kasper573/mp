@@ -119,8 +119,8 @@ export interface UseQueryReturn<Output> {
   refetch: () => void;
 }
 
-const useQueryProperty = "createQuery";
-const useMutationProperty = "createMutation";
+const useQueryProperty = "useQuery";
+const useMutationProperty = "useMutation";
 
 export interface UseMutation<Node extends AnyMutationNode> {
   (): UseMutationReturn<
