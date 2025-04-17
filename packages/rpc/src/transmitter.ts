@@ -20,7 +20,7 @@ export class RpcTransmitter<Input, Output, Context = void> {
     private formatResponseError: (error: unknown) => unknown = (error) => error,
   ) {}
 
-  async call(path: string[], input: Input): Promise<Output> {
+  call(path: string[], input: Input): Promise<Output> {
     const id = this.nextId();
     const call: RpcCall<Input> = [path, input, id];
     this.sendCall(call);
