@@ -55,7 +55,7 @@ export function acceptRpcViaWebSockets<Context>({
       if (out?.result.isErr()) {
         info.error = out.result.error;
       }
-      logger.error(`[RPC]`, info);
+      logger.error(`[rpc]`, info);
     });
   });
 }
