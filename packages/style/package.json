@@ -14,11 +14,6 @@
       "import": "./themes/*.ts",
       "require": "./themes/*.ts",
       "types": "./themes/*.ts"
-    },
-    "./fonts.css": {
-      "import": "./src/fonts/fonts.css.ts",
-      "require": "./src/fonts/fonts.css.ts",
-      "types": "./src/fonts/fonts.css.ts"
     }
   },
   "dependencies": {
