@@ -47,7 +47,7 @@ function createFlushFunction<State extends PatchableState>(
   const hasBeenGivenFullState = new Set<ClientId>();
   const visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
 
-  return function flush() {
+  function flush() {
     const clientIds = Array.from(getClientIds());
     const prevVisibilities: Record<
       ClientId,
@@ -110,7 +110,15 @@ function createFlushFunction<State extends PatchableState>(
     serverPatch.splice(0, serverPatch.length);
 
     return clientPatches;
+  }
+
+  flush.markToResendFullState = (...clientIds: ClientId[]) => {
+    for (const clientId of clientIds) {
+      hasBeenGivenFullState.delete(clientId);
+    }
   };
+
+  return flush;
 }
 
 function deriveClientState<State extends PatchableState>(
@@ -178,13 +186,16 @@ function createFullStatePatch<State extends PatchableState>(
   return patch;
 }
 
-const flushFunctionName = "flush";
+const flushFunctionName = "$flush"; // $ to avoid collision with user defined properties
 
 export type EntityRepositoryRecord<State extends PatchableState> = {
   [EntityName in keyof State]: EntityRepository<State[EntityName]>;
 };
 
-type FlushFn = () => ClientPatches;
+interface FlushFn {
+  (): ClientPatches;
+  markToResendFullState(...clientIds: ClientId[]): void;
+}
 
 export type { ReadonlyDeep };
 

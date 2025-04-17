@@ -8,7 +8,7 @@ export function flushGameState(
   state: PatchStateMachine<GameState>,
   clients: Iterable<WebSocket>,
 ) {
-  const patches = state.flush();
+  const patches = state.$flush();
   for (const socket of clients) {
     const clientId = getSocketId(socket);
     const patch = patches.get(clientId);

@@ -86,6 +86,8 @@ export const characterRouter = rpc.router({
       clients.add(clientId, user);
 
       const state = ctx.get(ctxGameStateMachine);
+      state.$flush.markToResendFullState(clientId);
+
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors())
         .filter((actor) => actor.type === "character")

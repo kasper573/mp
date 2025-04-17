@@ -80,7 +80,7 @@ it("can produce client state patches for object changes", () => {
   state.actors.update(john.id, { cash: 50 });
   state.actors.update(jane.id, { cash: 100 });
 
-  const patches = state.flush();
+  const patches = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
@@ -108,7 +108,7 @@ it("can produce client state patches for array properties", () => {
 
   state.entity.update(entity.id, { list: [1, 2, 3] });
 
-  const patches = state.flush();
+  const patches = state.$flush();
 
   const clientState = {} as typeof initialState;
 
@@ -140,7 +140,7 @@ it("can produce client state patches for additions to record due to changes in v
   state.actors.update(john.id, { visibleToOthers: true });
   state.actors.update(jane.id, { visibleToOthers: true });
 
-  const patches = state.flush();
+  const patches = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
@@ -180,7 +180,7 @@ it("can produce client state patches for removals in record due to changes in vi
   state.actors.update(john.id, { visibleToOthers: false });
   state.actors.update(jane.id, { visibleToOthers: false });
 
-  const patches = state.flush();
+  const patches = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
@@ -212,7 +212,7 @@ it("can produce client state patches for additions to record due to changes in s
 
   state.actors.set(jane.id, jane);
 
-  const patches = state.flush();
+  const patches = state.$flush();
 
   applyPatch(johnsClientState, patches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
@@ -236,7 +236,7 @@ it("can produce client state patches for removals in record due to changes in st
   const johnsClientState = {} as typeof initialState;
 
   state.actors.remove(jane.id);
-  const patches = state.flush();
+  const patches = state.$flush();
 
   applyPatch(johnsClientState, patches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
