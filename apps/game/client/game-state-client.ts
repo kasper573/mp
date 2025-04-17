@@ -36,9 +36,16 @@ export function createGameStateClient(socket: WebSocket) {
     }
   };
 
+  const rpc = useRpc();
   socket.addEventListener("message", handleMessage);
   onCleanup(() => socket.removeEventListener("message", handleMessage));
   onCleanup(subscribeToReadyState(socket, setReadyState));
+  onCleanup(() => {
+    const id = characterId();
+    if (id !== undefined) {
+      void rpc.character.leave(id);
+    }
+  });
 
   return {
     actorsInArea,

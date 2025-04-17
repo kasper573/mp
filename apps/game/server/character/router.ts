@@ -102,6 +102,15 @@ export const characterRouter = rpc.router({
       return char.id;
     }),
 
+  leave: rpc.procedure
+    .input<CharacterId>()
+    .use(roles([characterRoles.attack]))
+    .mutation(({ input: characterId, ctx }) => {
+      const clientId = ctx.get(ctxClientId);
+      const clients = ctx.get(ctxClientRegistry);
+      clients.remove(clientId);
+    }),
+
   kill: rpc.procedure
     .input<{ targetId: ActorId }>()
     .use(roles([characterRoles.kill]))
