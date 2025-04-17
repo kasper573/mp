@@ -7,7 +7,11 @@ import type {
 } from "./builder";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
-import type { inferOutput, inferInput } from "./proxy-invoker";
+import type {
+  inferOutput,
+  inferInput,
+  RpcProcedureInvoker,
+} from "./proxy-invoker";
 import type { AnyRpcTransmitter as AnyRpcTransmitter } from "./transmitter";
 
 export function createSolidRpcInvoker<Node extends AnyRpcNode>(
@@ -21,7 +25,7 @@ export function createSolidRpcInvoker<Node extends AnyRpcNode>(
       case useMutationProperty:
         return createUseMutation(transmitter, path.slice(0, -1)) as AnyFunction;
     }
-    throw new Error("Cannot invoke: " + path.join("."));
+    return (input) => transmitter.call(path, input);
   });
 
   return proxy as SolidRpcInvoker<Node>;
@@ -93,7 +97,8 @@ export interface SolidRpcQueryOptions<Input, Output, MappedOutput> {
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface SolidRpcQueryInvoker<Node extends AnyQueryNode> {
+export interface SolidRpcQueryInvoker<Node extends AnyQueryNode>
+  extends RpcProcedureInvoker<Node> {
   [useQueryProperty]: UseQuery<Node>;
 }
 
@@ -123,7 +128,8 @@ export interface UseMutation<Node extends AnyMutationNode> {
     inferOutput<Node["handler"]>
   >;
 }
-export interface SolidRpcMutationInvoker<Node extends AnyMutationNode> {
+export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>
+  extends RpcProcedureInvoker<Node> {
   [useMutationProperty]: UseMutation<Node>;
 }
 
