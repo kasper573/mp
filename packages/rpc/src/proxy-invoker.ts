@@ -5,13 +5,13 @@ import type {
   ProcedureHandler,
 } from "./builder";
 import { createInvocationProxy } from "./invocation-proxy";
-import type { AnyRpcTransmitter } from "./transmitter";
+import type { AnyRpcTransceiver } from "./transceiver";
 
 export function createRpcProxyInvoker<Node extends AnyRpcNode>(
-  transmitter: AnyRpcTransmitter,
+  transceiver: AnyRpcTransceiver,
 ): RpcProxyInvoker<Node> {
   const proxy = createInvocationProxy(
-    (path) => (input) => transmitter.call(path, input),
+    (path) => (input) => transceiver.call(path, input),
   );
 
   return proxy as RpcProxyInvoker<Node>;

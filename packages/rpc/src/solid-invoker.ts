@@ -14,27 +14,27 @@ import type {
   InferInput,
   RpcProcedureInvoker,
 } from "./proxy-invoker";
-import type { AnyRpcTransmitter as AnyRpcTransmitter } from "./transmitter";
+import type { AnyRpcTransceiver as AnyRpcTransceiver } from "./transceiver";
 
 export function createSolidRpcInvoker<Node extends AnyRpcNode>(
-  transmitter: AnyRpcTransmitter,
+  transceiver: AnyRpcTransceiver,
 ): SolidRpcInvoker<Node> {
   const proxy = createInvocationProxy((path) => {
     const last = path.at(-1);
     switch (last) {
       case useQueryProperty:
-        return createUseQuery(transmitter, path.slice(0, -1)) as AnyFunction;
+        return createUseQuery(transceiver, path.slice(0, -1)) as AnyFunction;
       case useMutationProperty:
-        return createUseMutation(transmitter, path.slice(0, -1)) as AnyFunction;
+        return createUseMutation(transceiver, path.slice(0, -1)) as AnyFunction;
     }
-    return (input) => transmitter.call(path, input);
+    return (input) => transceiver.call(path, input);
   });
 
   return proxy as SolidRpcInvoker<Node>;
 }
 
 function createUseQuery(
-  transmitter: AnyRpcTransmitter,
+  transceiver: AnyRpcTransceiver,
   path: string[],
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
@@ -51,7 +51,7 @@ function createUseQuery(
 
     async function queryFn() {
       const { input, map } = options?.() ?? {};
-      const result = (await transmitter.call(path, input)) as unknown;
+      const result = (await transceiver.call(path, input)) as unknown;
       if (map) {
         return map(result, input);
       }
@@ -63,13 +63,13 @@ function createUseQuery(
 }
 
 function createUseMutation(
-  transmitter: AnyRpcTransmitter,
+  transceiver: AnyRpcTransceiver,
   path: string[],
 ): UseMutation<AnyMutationNode> {
   return () => {
     return tanstack.useMutation(() => ({
       mutationKey: path,
-      mutationFn: (input: unknown) => transmitter.call(path, input),
+      mutationFn: (input: unknown) => transceiver.call(path, input),
     }));
   };
 }

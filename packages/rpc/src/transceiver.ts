@@ -7,7 +7,7 @@ import {
   type RpcInvoker,
 } from "./invoker";
 
-export class RpcTransmitter<Input, Output, Context = void> {
+export class RpcTransceiver<Input, Output, Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
     RpcCallId,
@@ -77,7 +77,7 @@ export class RpcTransmitter<Input, Output, Context = void> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyRpcTransmitter = RpcTransmitter<any, any, any>;
+export type AnyRpcTransceiver = RpcTransceiver<any, any, any>;
 
 export type Response<Output> = [
   id: RpcCallId,

@@ -1,6 +1,6 @@
 import { type WebSocket } from "@mp/ws/server";
 import {
-  BinaryRpcTransmitter,
+  BinaryRpcTransceiver,
   createRpcInvoker,
   type AnyRouterNode,
 } from "@mp/rpc";
@@ -27,7 +27,7 @@ export function acceptRpcViaWebSockets<Context>({
 
     const socketId = getSocketId(socket);
 
-    const transmitter = new BinaryRpcTransmitter(
+    const transceiver = new BinaryRpcTransceiver(
       socket.send.bind(socket),
       invokeRpc,
       (error) => (opt.exposeErrorDetails ? error : "Internal server error"),
@@ -37,7 +37,7 @@ export function acceptRpcViaWebSockets<Context>({
     socket.addEventListener("message", async (msg) => {
       const context = createContext(socket);
       const buffer = msg.data as ArrayBuffer;
-      const out = await transmitter.handleMessage(buffer, context);
+      const out = await transceiver.handleMessage(buffer, context);
 
       const info: Record<string, unknown> = { socketId };
       if (out?.call) {
