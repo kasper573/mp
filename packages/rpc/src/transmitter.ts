@@ -1,4 +1,5 @@
 import { err, ok, type Result } from "@mp/std";
+import type { RpcInvokerResult } from "./invoker";
 import {
   RpcInvokerError,
   type RpcCall,
@@ -8,12 +9,9 @@ import {
 
 export class RpcTransmitter<Input, Output, Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
-  private deferredPromises = new Map<
+  private resolvers = new Map<
     RpcCallId,
-    {
-      resolve: (result: Output) => void;
-      reject: (error: unknown) => void;
-    }
+    (response: Response<Output>) => void
   >();
 
   constructor(
@@ -28,15 +26,22 @@ export class RpcTransmitter<Input, Output, Context = void> {
     const id = this.nextId();
     const call: RpcCall<Input> = [path, input, id];
     this.sendCall(call);
-    return new Promise<Output>((resolve, reject) =>
-      this.deferredPromises.set(id, { resolve, reject }),
+
+    const [, result] = await new Promise<Response<Output>>((resolve) =>
+      this.resolvers.set(id, resolve),
     );
+
+    if ("error" in result) {
+      throw result.error;
+    }
+
+    return result.output;
   }
 
   async handleCall(
     call: RpcCall<Input>,
     context: Context,
-  ): Promise<CallHandlerResult<Input, Output>> {
+  ): Promise<RpcInvokerResult<Input, Output>> {
     const id = call[2];
     const result = await this.invoke(call, context);
 
@@ -47,30 +52,19 @@ export class RpcTransmitter<Input, Output, Context = void> {
         : { output: result.value },
     ]);
 
-    if (result.isErr()) {
-      return err(result.error);
-    }
-
-    return ok({ call, output: result.value });
+    return result;
   }
 
   handleResponse(response: Response<Output>): ResponseHandlerResult {
-    const [accId, result] = response;
-    const promise = this.deferredPromises.get(accId);
-    if (!promise) {
-      return err(new Error("Unknown accId: " + accId));
+    const [callId] = response;
+    const resolve = this.resolvers.get(callId);
+    if (!resolve) {
+      return err(new Error("Unknown callId: " + callId));
     }
 
     try {
-      this.deferredPromises.delete(accId);
-
-      if ("error" in result) {
-        promise.reject(result.error);
-        return err(result.error);
-      } else {
-        promise.resolve(result.output);
-      }
-
+      this.resolvers.delete(callId);
+      resolve(response);
       return ok(void 0);
     } catch (error) {
       return err(new Error("Error resolving Rpc response", { cause: error }));
@@ -89,10 +83,5 @@ export type Response<Output> = [
   id: RpcCallId,
   { output: Output } | { error: unknown },
 ];
-
-export type CallHandlerResult<Input, Output> = Result<
-  { call: RpcCall<Input>; output: Output },
-  unknown
->;
 
 export type ResponseHandlerResult = Result<void, unknown>;

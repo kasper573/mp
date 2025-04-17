@@ -28,12 +28,14 @@ export class BinaryRpcTransmitter<
   handleMessage = async (data: ArrayBufferLike, context: Context) => {
     const call = this.callEncoding.decode(data);
     if (call.isOk()) {
-      return this.handleCall(call.value, context);
+      const result = await this.handleCall(call.value, context);
+      return { call: call.value, result };
     }
 
     const response = this.responseEncoding.decode(data);
     if (response.isOk()) {
-      return this.handleResponse(response.value);
+      const result = this.handleResponse(response.value);
+      return { response: response.value, result };
     }
   };
 
@@ -47,9 +49,9 @@ export class BinaryRpcTransmitter<
     return (event: { data: ArrayBufferLike }, context: Context): void => {
       const handle = async () => {
         try {
-          const res = await this.handleMessage(event.data, context);
-          if (res?.isErr()) {
-            errorHandler(res.error);
+          const out = await this.handleMessage(event.data, context);
+          if (out?.result?.isErr()) {
+            errorHandler(out.result.error);
           }
         } catch (error) {
           errorHandler(error);

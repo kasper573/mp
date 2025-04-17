@@ -37,18 +37,25 @@ export function acceptRpcViaWebSockets<Context>({
     socket.addEventListener("message", async (msg) => {
       const context = createContext(socket);
       const buffer = msg.data as ArrayBuffer;
-      const result = await transmitter.handleMessage(buffer, context);
-      if (result?.isOk() && result.value) {
-        const [path, input, callId] = result.value.call;
-        logger.info(`[RPC]`, {
+      const out = await transmitter.handleMessage(buffer, context);
+
+      const info: Record<string, unknown> = { socketId };
+      if (out?.call) {
+        const [path, input, callId] = out.call;
+        info.call = {
           path: path.join("."),
-          socketId,
           messageByteLength: buffer.byteLength,
           callId,
-        });
-      } else if (result?.isErr()) {
-        logger.error(`[RPC]`, { socketId }, result.error);
+        };
       }
+      if (out?.response) {
+        const [callId] = out.response;
+        info.response = { callId };
+      }
+      if (out?.result.isErr()) {
+        info.error = out.result.error;
+      }
+      logger.error(`[RPC]`, info);
     });
   });
 }
