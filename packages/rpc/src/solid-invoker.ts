@@ -41,11 +41,11 @@ function createUseQuery(
     options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryResult {
     return tanstack.useQuery(() => {
-      const { input, ...rest } = options?.() ?? {};
+      const { input, throwOnError } = options?.() ?? {};
       return {
         queryKey: [path, input],
         queryFn: input === skipToken ? skipToken : queryFn,
-        ...rest,
+        throwOnError,
       };
     });
 
