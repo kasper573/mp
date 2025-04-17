@@ -41,10 +41,11 @@ function createUseQuery(
     options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryResult {
     return tanstack.useQuery(() => {
-      const { input } = options?.() ?? {};
+      const { input, ...rest } = options?.() ?? {};
       return {
         queryKey: [path, input],
         queryFn: input === skipToken ? skipToken : queryFn,
+        ...rest,
       };
     });
 
@@ -89,6 +90,7 @@ export type SolidRpcRouterInvoker<Router extends AnyRouterNode> = {
 export interface SolidRpcQueryOptions<Input, Output, MappedOutput> {
   input: Input | tanstack.SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
+  throwOnError?: boolean;
 }
 
 export interface SolidRpcQueryInvoker<Node extends AnyQueryNode>
