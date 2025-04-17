@@ -20,7 +20,7 @@ export class RpcTransmitter<Input, Output, Context = void> {
     private formatResponseError: (error: unknown) => unknown = (error) => error,
   ) {}
 
-  call(path: string[], input: Input): Promise<Output> {
+  async call(path: string[], input: Input): Promise<Output> {
     const id = this.nextId();
     const call: RpcCall<Input> = [path, input, id];
     this.sendCall(call);
@@ -61,6 +61,7 @@ export class RpcTransmitter<Input, Output, Context = void> {
       this.deferredPromises.delete(accId);
 
       if ("error" in result) {
+        promise.reject(result.error);
         return err(result.error);
       } else {
         promise.resolve(result.output);
