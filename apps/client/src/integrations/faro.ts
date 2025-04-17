@@ -7,7 +7,6 @@ import {
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
 import type { Logger } from "@mp/logger";
-import { consoleLoggerHandler } from "@mp/logger";
 import { onCleanup, createEffect } from "solid-js";
 import { env } from "../env";
 
@@ -25,7 +24,6 @@ export function init(logger: Logger, identity: () => UserIdentity | undefined) {
     ],
   });
 
-  logger.subscribe(consoleLoggerHandler(console));
   onCleanup(logger.subscribe(faroLoggerHandler(faro)));
   createEffect(() => faro.api.setUser(deriveFaroUser(identity())));
 }
