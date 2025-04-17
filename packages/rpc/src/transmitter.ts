@@ -1,5 +1,10 @@
 import { err, ok, type Result } from "@mp/std";
-import type { RpcCall, RpcCallId, RpcInvoker } from "./invoker";
+import {
+  RpcInvokerError,
+  type RpcCall,
+  type RpcCallId,
+  type RpcInvoker,
+} from "./invoker";
 
 export class RpcTransmitter<Input, Output, Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
@@ -14,9 +19,8 @@ export class RpcTransmitter<Input, Output, Context = void> {
   constructor(
     private sendCall: (rpc: RpcCall<Input>) => void,
     private sendResponse: (response: Response<Output>) => void,
-    private invoke: RpcInvoker<Input, Output, Context> = () => {
-      throw new Error("Invoke not supported");
-    },
+    private invoke: RpcInvoker<Input, Output, Context> = (call) =>
+      Promise.resolve(err(new RpcInvokerError(call, "Invoke not supported"))),
     private formatResponseError: (error: unknown) => unknown = (error) => error,
   ) {}
 
