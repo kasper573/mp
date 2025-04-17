@@ -98,7 +98,7 @@ export interface SolidRpcQueryInvoker<Node extends AnyQueryNode>
 
 export interface UseQuery<Node extends AnyQueryNode> {
   /**
-   * SolidJS hook to use the query in a reactive way.
+   * Returns a @tanstack/solid-query query wrapper of the rpc procedure.
    */
   <MappedOutput = inferOutput<Node["handler"]>>(
     options?: () => SolidRpcQueryOptions<
@@ -113,6 +113,9 @@ const useQueryProperty = "useQuery";
 const useMutationProperty = "useMutation";
 
 export interface UseMutation<Node extends AnyMutationNode> {
+  /**
+   * Returns a @tanstack/solid-query mutation wrapper of the rpc procedure.
+   */
   (): UseMutationResult<
     inferInput<Node["handler"]>,
     unknown,
@@ -121,9 +124,6 @@ export interface UseMutation<Node extends AnyMutationNode> {
 }
 export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>
   extends RpcProcedureInvoker<Node> {
-  /**
-   * SolidJS hook to use the mutation in a reactive way.
-   */
   [useMutationProperty]: UseMutation<Node>;
 }
 
