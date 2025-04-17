@@ -1,27 +1,27 @@
 import type { RootRouter } from "@mp/server";
-import type { SolidRPCInvoker } from "@mp/rpc";
-import { BinaryRPCTransmitter, createSolidRPCInvoker } from "@mp/rpc";
+import type { SolidRpcInvoker } from "@mp/rpc";
+import { BinaryRpcTransmitter, createSolidRpcInvoker } from "@mp/rpc";
 import { createContext, onCleanup, useContext } from "solid-js";
 import type { Logger } from "@mp/logger";
 
-export type RPCClient = SolidRPCInvoker<RootRouter>;
+export type RpcClient = SolidRpcInvoker<RootRouter>;
 
-export function createRPCClient(socket: WebSocket, logger: Logger): RPCClient {
-  const transmitter = new BinaryRPCTransmitter((data) => socket.send(data));
+export function createRpcClient(socket: WebSocket, logger: Logger): RpcClient {
+  const transmitter = new BinaryRpcTransmitter((data) => socket.send(data));
   const handleMessage = transmitter.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
   onCleanup(() => socket.removeEventListener("message", handleMessage));
-  return createSolidRPCInvoker<RootRouter>(transmitter);
+  return createSolidRpcInvoker<RootRouter>(transmitter);
 }
 
-export function useRPC() {
-  return useContext(RPCClientContext);
+export function useRpc() {
+  return useContext(RpcClientContext);
 }
 
-export const RPCClientContext = createContext<RPCClient>(
-  new Proxy({} as RPCClient, {
+export const RpcClientContext = createContext<RpcClient>(
+  new Proxy({} as RpcClient, {
     get: () => {
-      throw new Error("RPCClientContext must be provided");
+      throw new Error("RpcClientContext must be provided");
     },
   }),
 );

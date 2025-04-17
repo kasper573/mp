@@ -1,11 +1,11 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export class RPCBuilder<Context> {
+export class RpcBuilder<Context> {
   context<Context>() {
-    return new RPCBuilder<Context>();
+    return new RpcBuilder<Context>();
   }
 
-  build(): RPCFactories<Context> {
+  build(): RpcFactories<Context> {
     return {
       router: (routes) => ({ type: "router", routes }),
       procedure: ProcedureBuilder.create<Context>(),
@@ -15,8 +15,8 @@ export class RPCBuilder<Context> {
 }
 
 function createMiddleware<Context, MWContext, PipedMWContext>(
-  handler: RPCMiddlewareHandler<Context, MWContext, PipedMWContext>,
-): RPCMiddleware<Context, MWContext, PipedMWContext> {
+  handler: RpcMiddlewareHandler<Context, MWContext, PipedMWContext>,
+): RpcMiddleware<Context, MWContext, PipedMWContext> {
   function middleware(...args: Parameters<typeof handler>) {
     return handler(...args);
   }
@@ -32,7 +32,7 @@ function createMiddleware<Context, MWContext, PipedMWContext>(
   return middleware;
 }
 
-export interface RPCFactories<Context> {
+export interface RpcFactories<Context> {
   router: RouterBuilder;
   procedure: ProcedureBuilder<void, void, Context, unknown>;
   middleware: MiddlewareBuilder<Context, unknown>;
@@ -44,11 +44,11 @@ export interface RouterBuilder {
 
 export interface MiddlewareBuilder<Context, PipedMWContext> {
   <MWContext>(
-    middlewareFn: RPCMiddlewareHandler<Context, MWContext, PipedMWContext>,
-  ): RPCMiddleware<Context, MWContext, PipedMWContext>;
+    middlewareFn: RpcMiddlewareHandler<Context, MWContext, PipedMWContext>,
+  ): RpcMiddleware<Context, MWContext, PipedMWContext>;
 }
 
-interface RPCNode<Type extends string> {
+interface RpcNode<Type extends string> {
   type: Type;
 }
 
@@ -71,17 +71,17 @@ interface ProcedureHandlerOptions<Input, Context, MWContext> {
 }
 
 export interface QueryNode<Input, Output, Context, MWContext>
-  extends RPCNode<"query"> {
+  extends RpcNode<"query"> {
   handler: ProcedureHandler<Input, Output, Context, MWContext>;
 }
 
 export interface MutationNode<Input, Output, Context, MWContext>
-  extends RPCNode<"mutation"> {
+  extends RpcNode<"mutation"> {
   handler: ProcedureHandler<Input, Output, Context, MWContext>;
 }
 
 export interface RouterNode<Routes extends AnyRouteRecord>
-  extends RPCNode<"router"> {
+  extends RpcNode<"router"> {
   routes: Routes;
 }
 
@@ -96,18 +96,18 @@ export type AnyProcedureNode<Context = any> =
   | AnyMutationNode<Context>
   | AnyQueryNode<Context>;
 export type AnyRouterNode<Context = any> = RouterNode<AnyRouteRecord<Context>>;
-export type AnyRPCNode<Context = any> =
+export type AnyRpcNode<Context = any> =
   | AnyProcedureNode<Context>
   | AnyRouterNode<Context>;
-export type AnyRouteRecord<Context = any> = Record<string, AnyRPCNode<Context>>;
+export type AnyRouteRecord<Context = any> = Record<string, AnyRpcNode<Context>>;
 
 export class ProcedureBuilder<Input, Output, Context, MWContext> {
   private constructor(
-    private middleware: RPCMiddleware<Context, MWContext, unknown>,
+    private middleware: RpcMiddleware<Context, MWContext, unknown>,
   ) {}
 
   use<NewMWContext, PipedMWContext>(
-    middleware: RPCMiddleware<Context, NewMWContext, PipedMWContext>,
+    middleware: RpcMiddleware<Context, NewMWContext, PipedMWContext>,
   ): ProcedureBuilder<Input, Output, Context, NewMWContext> {
     return new ProcedureBuilder(
       this.middleware.pipe(middleware as never) as never,
@@ -139,7 +139,7 @@ export class ProcedureBuilder<Input, Output, Context, MWContext> {
   }
 }
 
-export interface RPCMiddlewareHandler<Context, MWContext, PipedMWContext> {
+export interface RpcMiddlewareHandler<Context, MWContext, PipedMWContext> {
   (opt: {
     /**
      * The global rpc context
@@ -152,19 +152,19 @@ export interface RPCMiddlewareHandler<Context, MWContext, PipedMWContext> {
   }): ProcedureResult<MWContext>;
 }
 
-export interface RPCMiddleware<Context, MWContext, PipedMWContext>
-  extends RPCMiddlewareHandler<Context, MWContext, PipedMWContext> {
+export interface RpcMiddleware<Context, MWContext, PipedMWContext>
+  extends RpcMiddlewareHandler<Context, MWContext, PipedMWContext> {
   pipe: MiddlewareBuilder<Context, MWContext>;
 }
 
-export type RPCErrorFormatter<Context> = (opt: {
+export type RpcErrorFormatter<Context> = (opt: {
   ctx: Context;
-  error: RPCError;
-}) => RPCError;
+  error: RpcError;
+}) => RpcError;
 
-export class RPCError extends Error {
+export class RpcError extends Error {
   constructor(...args: ConstructorParameters<typeof Error>) {
     super(...args);
-    this.name = "RPCError";
+    this.name = "RpcError";
   }
 }

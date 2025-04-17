@@ -1,9 +1,9 @@
 import { createMemo } from "solid-js";
-import { useRPC } from "../integrations/rpc";
+import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 
 export const useVersionCompatibility = () => {
-  const rpc = useRPC();
+  const rpc = useRpc();
   const serverVersion = rpc.system.buildVersion.createQuery();
   const compatibility = createMemo(() => {
     if (serverVersion.data) {

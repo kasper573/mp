@@ -1,9 +1,10 @@
-import { err, ok, type Branded, type Result } from "@mp/std";
+import { err, ok, type Result } from "@mp/std";
+import type { RpcCall, RpcCallId, RpcInvoker } from "./invoker";
 
-export class RPCTransmitter<Input, Output, Context = void> {
-  private idCounter: CallId = 0 as CallId;
+export class RpcTransmitter<Input, Output, Context = void> {
+  private idCounter: RpcCallId = 0 as RpcCallId;
   private deferredPromises = new Map<
-    CallId,
+    RpcCallId,
     {
       resolve: (result: Output) => void;
       reject: (error: unknown) => void;
@@ -11,9 +12,9 @@ export class RPCTransmitter<Input, Output, Context = void> {
   >();
 
   constructor(
-    private sendCall: (rpc: Call<Input>) => void,
+    private sendCall: (rpc: RpcCall<Input>) => void,
     private sendResponse: (response: Response<Output>) => void,
-    private invoke: Invoker<Input, Output, Context> = () => {
+    private invoke: RpcInvoker<Input, Output, Context> = () => {
       throw new Error("Invoke not supported");
     },
     private formatResponseError: (error: unknown) => unknown = (error) => error,
@@ -21,7 +22,7 @@ export class RPCTransmitter<Input, Output, Context = void> {
 
   async call(path: string[], input: Input): Promise<Output> {
     const id = this.nextId();
-    const call: Call<Input> = [path, input, id];
+    const call: RpcCall<Input> = [path, input, id];
     this.sendCall(call);
     return new Promise<Output>((resolve, reject) =>
       this.deferredPromises.set(id, { resolve, reject }),
@@ -29,7 +30,7 @@ export class RPCTransmitter<Input, Output, Context = void> {
   }
 
   async handleCall(
-    call: Call<Input>,
+    call: RpcCall<Input>,
     context: Context,
   ): Promise<CallHandlerResult<Input, Output>> {
     const id = call[2];
@@ -67,37 +68,26 @@ export class RPCTransmitter<Input, Output, Context = void> {
 
       return ok(void 0);
     } catch (error) {
-      return err(new Error("Error resolving RPC response", { cause: error }));
+      return err(new Error("Error resolving Rpc response", { cause: error }));
     }
   }
 
-  private nextId(): CallId {
-    return this.idCounter++ as CallId;
+  private nextId(): RpcCallId {
+    return this.idCounter++ as RpcCallId;
   }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyRPCTransmitter = RPCTransmitter<any, any, any>;
-
-export type CallId = Branded<number, "CallId">;
-
-export type Call<Input> = [path: string[], input: Input, id: CallId];
+export type AnyRpcTransmitter = RpcTransmitter<any, any, any>;
 
 export type Response<Output> = [
-  id: CallId,
+  id: RpcCallId,
   { output: Output } | { error: unknown },
 ];
 
 export type CallHandlerResult<Input, Output> = Result<
-  { call: Call<Input>; output: Output },
+  { call: RpcCall<Input>; output: Output },
   unknown
 >;
 
 export type ResponseHandlerResult = Result<void, unknown>;
-
-export type Invoker<Input, Output, Context = void> = (
-  call: Call<Input>,
-  context: Context,
-) => Promise<InvokerResult<Output>>;
-
-export type InvokerResult<Output> = Result<Output, unknown>;

@@ -1,39 +1,39 @@
 import type {
   AnyProcedureNode,
   AnyRouterNode,
-  AnyRPCNode,
+  AnyRpcNode,
   ProcedureHandler,
 } from "./builder";
 import { createInvocationProxy } from "./invocation-proxy";
-import type { AnyRPCTransmitter } from "./transmitter";
+import type { AnyRpcTransmitter } from "./transmitter";
 
-export function createRPCProxyInvoker<Node extends AnyRPCNode>(
-  transmitter: AnyRPCTransmitter,
-): RPCProxyInvoker<Node> {
+export function createRpcProxyInvoker<Node extends AnyRpcNode>(
+  transmitter: AnyRpcTransmitter,
+): RpcProxyInvoker<Node> {
   const proxy = createInvocationProxy(
     (path) => (input) => transmitter.call(path, input),
   );
 
-  return proxy as RPCProxyInvoker<Node>;
+  return proxy as RpcProxyInvoker<Node>;
 }
 
-export type RPCProxyInvoker<Node extends AnyRPCNode> =
+export type RpcProxyInvoker<Node extends AnyRpcNode> =
   Node extends AnyRouterNode
-    ? RPCRouterInvoker<Node>
+    ? RpcRouterInvoker<Node>
     : Node extends AnyProcedureNode
-      ? RPCProcedureInvoker<Node>
+      ? RpcProcedureInvoker<Node>
       : never;
 
-export type RPCRouterInvoker<Router extends AnyRouterNode> = {
-  [K in keyof Router["routes"]]: RPCProxyInvoker<Router["routes"][K]>;
+export type RpcRouterInvoker<Router extends AnyRouterNode> = {
+  [K in keyof Router["routes"]]: RpcProxyInvoker<Router["routes"][K]>;
 };
 
-export interface RPCQueryOptions<Input, Output, MappedOutput> {
+export interface RpcQueryOptions<Input, Output, MappedOutput> {
   input: Input;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface RPCProcedureInvoker<Node extends AnyProcedureNode> {
+export interface RpcProcedureInvoker<Node extends AnyProcedureNode> {
   (input: inferInput<Node["handler"]>): Promise<inferOutput<Node["handler"]>>;
 }
 

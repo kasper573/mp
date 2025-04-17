@@ -3,16 +3,16 @@ import type {
   AnyMutationNode,
   AnyQueryNode,
   AnyRouterNode,
-  AnyRPCNode,
+  AnyRpcNode as AnyRpcNode,
 } from "./builder";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
 import type { inferOutput, inferInput } from "./proxy-invoker";
-import type { AnyRPCTransmitter } from "./transmitter";
+import type { AnyRpcTransmitter as AnyRpcTransmitter } from "./transmitter";
 
-export function createSolidRPCInvoker<Node extends AnyRPCNode>(
-  transmitter: AnyRPCTransmitter,
-): SolidRPCInvoker<Node> {
+export function createSolidRpcInvoker<Node extends AnyRpcNode>(
+  transmitter: AnyRpcTransmitter,
+): SolidRpcInvoker<Node> {
   const proxy = createInvocationProxy((path) => {
     const last = path.at(-1);
     switch (last) {
@@ -24,15 +24,15 @@ export function createSolidRPCInvoker<Node extends AnyRPCNode>(
     throw new Error("Cannot invoke: " + path.join("."));
   });
 
-  return proxy as SolidRPCInvoker<Node>;
+  return proxy as SolidRpcInvoker<Node>;
 }
 
 function createUseQuery(
-  transmitter: AnyRPCTransmitter,
+  transmitter: AnyRpcTransmitter,
   path: string[],
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
-    options?: () => SolidRPCQueryOptions<unknown, unknown, MappedOutput>,
+    options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryReturn<unknown> {
     const [resource, { refetch }] = createResource(async () => {
       const { input, map } = options?.() ?? {};
@@ -65,7 +65,7 @@ function createUseQuery(
 }
 
 function createUseMutation(
-  transmitter: AnyRPCTransmitter,
+  transmitter: AnyRpcTransmitter,
   path: string[],
 ): UseMutation<AnyMutationNode> {
   const mutation = {
@@ -75,31 +75,31 @@ function createUseMutation(
   return () => mutation;
 }
 
-export type SolidRPCInvoker<Node extends AnyRPCNode> =
+export type SolidRpcInvoker<Node extends AnyRpcNode> =
   Node extends AnyRouterNode
-    ? SolidRPCRouterInvoker<Node>
+    ? SolidRpcRouterInvoker<Node>
     : Node extends AnyQueryNode
-      ? SolidRPCQueryInvoker<Node>
+      ? SolidRpcQueryInvoker<Node>
       : Node extends AnyMutationNode
-        ? SolidRPCMutationInvoker<Node>
+        ? SolidRpcMutationInvoker<Node>
         : never;
 
-export type SolidRPCRouterInvoker<Router extends AnyRouterNode> = {
-  [K in keyof Router["routes"]]: SolidRPCInvoker<Router["routes"][K]>;
+export type SolidRpcRouterInvoker<Router extends AnyRouterNode> = {
+  [K in keyof Router["routes"]]: SolidRpcInvoker<Router["routes"][K]>;
 };
 
-export interface SolidRPCQueryOptions<Input, Output, MappedOutput> {
+export interface SolidRpcQueryOptions<Input, Output, MappedOutput> {
   input: Input | SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface SolidRPCQueryInvoker<Node extends AnyQueryNode> {
+export interface SolidRpcQueryInvoker<Node extends AnyQueryNode> {
   [useQueryProperty]: UseQuery<Node>;
 }
 
 export interface UseQuery<Node extends AnyQueryNode> {
   <MappedOutput = inferOutput<Node["handler"]>>(
-    options?: () => SolidRPCQueryOptions<
+    options?: () => SolidRpcQueryOptions<
       inferInput<Node["handler"]>,
       inferOutput<Node["handler"]>,
       MappedOutput
@@ -123,7 +123,7 @@ export interface UseMutation<Node extends AnyMutationNode> {
     inferOutput<Node["handler"]>
   >;
 }
-export interface SolidRPCMutationInvoker<Node extends AnyMutationNode> {
+export interface SolidRpcMutationInvoker<Node extends AnyMutationNode> {
   [useMutationProperty]: UseMutation<Node>;
 }
 

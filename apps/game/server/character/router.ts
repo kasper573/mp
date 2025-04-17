@@ -1,6 +1,6 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
-import { RPCError } from "@mp/rpc";
+import { RpcError } from "@mp/rpc";
 import type { AuthToken } from "@mp/auth";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
@@ -31,15 +31,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError("Character not found");
+        throw new RpcError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError("You don't have access to this character");
+        throw new RpcError("You don't have access to this character");
       }
 
       if (!char.health) {
-        throw new RPCError("Cannot move a dead character");
+        throw new RpcError("Cannot move a dead character");
       }
 
       state.actors.update(char.id, {
@@ -56,15 +56,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError("Character not found");
+        throw new RpcError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError("You don't have access to this character");
+        throw new RpcError("You don't have access to this character");
       }
 
       if (targetId === characterId) {
-        throw new RPCError("You can't attack yourself");
+        throw new RpcError("You can't attack yourself");
       }
 
       state.actors.update(characterId, {
@@ -108,15 +108,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RPCError("Character not found");
+        throw new RpcError("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RPCError("You don't have access to this character");
+        throw new RpcError("You don't have access to this character");
       }
 
       if (char.health > 0) {
-        throw new RPCError("Character is not dead");
+        throw new RpcError("Character is not dead");
       }
 
       const characterService = ctx.get(ctxCharacterService);

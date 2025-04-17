@@ -22,7 +22,7 @@ import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
 import type { Actor, Character } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
-import { useRPC } from "../useRPC";
+import { useRpc } from "../use-rpc";
 import { GameStateClientContext } from "../game-state-client";
 import { BuildVersionContext } from "../build-version-context";
 import type { AreaResource } from "../../shared/area/area-resource";
@@ -39,7 +39,7 @@ export function AreaDebugUI(props: {
   playerCoords?: Vector<Tile>;
 }) {
   const [showViewbox, setShowViewbox] = createSignal(false);
-  const rpc = useRPC();
+  const rpc = useRpc();
   const state = useContext(GameStateClientContext);
   const spawnNPC = rpc.npc.spawnRandomNPC.createMutation();
   const kill = rpc.character.kill.createMutation();

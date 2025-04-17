@@ -4,7 +4,7 @@ import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorToString } from "@mp/ui";
 import { skipToken } from "@mp/rpc";
-import { useRPC } from "../integrations/rpc";
+import { useRpc } from "../integrations/rpc";
 
 export const Route = createFileRoute("/sandbox")({
   component: RouteComponent,
@@ -20,9 +20,9 @@ function RouteComponent() {
 }
 
 function ErrorTester() {
-  const rpc = useRPC();
+  const rpc = useRpc();
   const [uiError, setUIError] = createSignal(false);
-  const [rpcError, setRPCError] = createSignal(false);
+  const [rpcError, setRpcError] = createSignal(false);
 
   const query = rpc.system.testError.createQuery(() => ({
     input: rpcError() ? void 0 : skipToken,
@@ -32,8 +32,8 @@ function ErrorTester() {
     <div>
       <h1>Error Tester</h1>
       <button onClick={() => setUIError(true)}>Trigger UI error</button>
-      <button onClick={() => setRPCError(true)} disabled={query.isLoading}>
-        Trigger RPC error
+      <button onClick={() => setRpcError(true)} disabled={query.isLoading}>
+        Trigger Rpc error
       </button>
       {query.error ? (
         <pre>

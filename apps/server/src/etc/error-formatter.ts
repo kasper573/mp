@@ -1,6 +1,6 @@
-import { RPCError, type RPCErrorFormatter } from "@mp/rpc";
+import { RpcError, type RpcErrorFormatter } from "@mp/rpc";
 import { opt } from "../options";
 
-export const errorFormatter: RPCErrorFormatter<unknown> = ({ error }) => {
-  return opt.exposeErrorDetails ? error : new RPCError("Internal server error");
+export const errorFormatter: RpcErrorFormatter<unknown> = ({ error }) => {
+  return opt.exposeErrorDetails ? error : new RpcError("Internal server error");
 };

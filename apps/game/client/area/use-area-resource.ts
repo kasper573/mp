@@ -3,12 +3,12 @@ import { skipToken } from "@mp/rpc";
 import { useContext, type Accessor } from "solid-js";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
-import { useRPC } from "../useRPC";
+import { useRpc } from "../use-rpc";
 import { BuildVersionContext } from "../build-version-context";
 import { AreaResource } from "../../shared/area/area-resource";
 
 export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
-  const rpc = useRPC();
+  const rpc = useRpc();
   const { server: serverVersion } = useContext(BuildVersionContext);
 
   return rpc.area.areaFileUrl.createQuery(() => ({

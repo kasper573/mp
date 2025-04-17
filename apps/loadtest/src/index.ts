@@ -1,6 +1,6 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type RootRouter } from "@mp/server";
-import { BinaryRPCTransmitter, createRPCProxyInvoker } from "@mp/rpc";
+import { BinaryRpcTransmitter, createRpcProxyInvoker } from "@mp/rpc";
 import { WebSocket } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
@@ -13,7 +13,7 @@ const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
 
 const start = performance.now();
 
-await Promise.all([loadTestHTTP(), loadTestSocketsWithRPC()]);
+await Promise.all([loadTestHTTP(), loadTestSocketsWithRpc()]);
 
 const end = performance.now();
 
@@ -44,11 +44,11 @@ async function loadTestHTTP() {
   }
 }
 
-async function loadTestSocketsWithRPC() {
-  logger.info("Testing", gameClients, "sockets with RPC");
+async function loadTestSocketsWithRpc() {
+  logger.info("Testing", gameClients, "sockets with Rpc");
 
   const results = await Promise.allSettled(
-    range(gameClients).map(testSocketWithRPC),
+    range(gameClients).map(testSocketWithRpc),
   );
 
   const successes = results.filter((r) => r.status === "fulfilled");
@@ -59,14 +59,14 @@ async function loadTestSocketsWithRPC() {
   );
 }
 
-async function testSocketWithRPC(n: number) {
+async function testSocketWithRpc(n: number) {
   if (verbose) {
     logger.info(`Creating socket ${n}`);
   }
 
   const socket = new WebSocket(wsUrl);
-  const transmitter = new BinaryRPCTransmitter(socket.send.bind(socket));
-  const rpc = createRPCProxyInvoker<RootRouter>(transmitter);
+  const transmitter = new BinaryRpcTransmitter(socket.send.bind(socket));
+  const rpc = createRpcProxyInvoker<RootRouter>(transmitter);
   const handleMessage = transmitter.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 

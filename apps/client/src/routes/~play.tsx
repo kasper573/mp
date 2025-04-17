@@ -9,7 +9,7 @@ import {
   Game,
   GameStateClientContext,
 } from "@mp/game/client";
-import { SocketContext, useRPC } from "../integrations/rpc";
+import { SocketContext, useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";
 
@@ -27,7 +27,7 @@ function RouteComponent() {
 
 function PlayPage() {
   const socket = useContext(SocketContext);
-  const rpc = useRPC();
+  const rpc = useRpc();
   const serverVersion = rpc.system.buildVersion.createQuery();
   const sync = createGameStateClient(socket);
 

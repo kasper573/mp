@@ -4,13 +4,13 @@ import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerEncoderExtensions } from "@mp/game/client";
-import { GameRPCSliceApiContext } from "@mp/game/client";
+import { GameRpcSliceApiContext } from "@mp/game/client";
 import { WebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
-  createRPCClient,
-  RPCClientContext,
+  createRpcClient,
+  RpcClientContext,
   SocketContext,
 } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
@@ -28,7 +28,7 @@ logger.subscribe(consoleLoggerHandler(console));
 
 const socket = new WebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
-const rpc = createRPCClient(socket, logger);
+const rpc = createRpcClient(socket, logger);
 const router = createClientRouter();
 
 socket.addEventListener("error", (e) => logger.error("Socket error", e));
@@ -50,12 +50,12 @@ export default function App() {
         >
           <AuthContext.Provider value={auth}>
             <SocketContext.Provider value={socket}>
-              <RPCClientContext.Provider value={rpc}>
-                <GameRPCSliceApiContext.Provider value={rpc}>
+              <RpcClientContext.Provider value={rpc}>
+                <GameRpcSliceApiContext.Provider value={rpc}>
                   <RouterProvider router={router} />
                   <TanStackRouterDevtools router={router} />
-                </GameRPCSliceApiContext.Provider>
-              </RPCClientContext.Provider>
+                </GameRpcSliceApiContext.Provider>
+              </RpcClientContext.Provider>
             </SocketContext.Provider>
           </AuthContext.Provider>
         </ErrorFallbackContext.Provider>

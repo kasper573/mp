@@ -1,15 +1,15 @@
+import type { Branded, Result } from "@mp/std";
 import { err, ok } from "@mp/std";
-import type { AnyRouteRecord, AnyRPCNode, RouterNode } from "./builder";
-import type { Invoker } from "./transmitter";
+import type { AnyRouteRecord, AnyRpcNode, RouterNode } from "./builder";
 
-export function createRPCInvoker<Input, Output, Context>(
+export function createRpcInvoker<Input, Output, Context>(
   root: RouterNode<AnyRouteRecord<Context>>,
-): Invoker<Input, Output, Context> {
-  return async function invokeRPC(call, ctx) {
+): RpcInvoker<Input, Output, Context> {
+  return async function invokeRpc(call, ctx) {
     const [path, input] = call;
-    const node = resolveRPCNode<Context>(root, path);
+    const node = resolveRpcNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err("RPC path not found: " + path.join("."));
+      return err("Rpc path not found: " + path.join("."));
     }
 
     try {
@@ -22,11 +22,11 @@ export function createRPCInvoker<Input, Output, Context>(
   };
 }
 
-function resolveRPCNode<Context>(
-  start: AnyRPCNode,
+function resolveRpcNode<Context>(
+  start: AnyRpcNode,
   path: string[],
-): AnyRPCNode<Context> | undefined {
-  let node: AnyRPCNode | undefined = start;
+): AnyRpcNode<Context> | undefined {
+  let node: AnyRpcNode | undefined = start;
   for (const key of path) {
     if (node.type === "router") {
       node = node.routes[key];
@@ -34,3 +34,21 @@ function resolveRPCNode<Context>(
   }
   return node;
 }
+
+export class RpcInvokerError<Input> extends Error {
+  constructor(call: RpcCall<Input>, cause: unknown) {
+    super(`Rpc handler "${call[0].join(".")}" had an error`, { cause });
+    this.name = "InvokerError";
+  }
+}
+
+export type RpcInvoker<Input, Output, Context = void> = (
+  call: RpcCall<Input>,
+  context: Context,
+) => Promise<RpcInvokerResult<Output>>;
+
+export type RpcInvokerResult<Output> = Result<Output, unknown>;
+
+export type RpcCallId = Branded<number, "RpcCallId">;
+
+export type RpcCall<Input> = [path: string[], input: Input, id: RpcCallId];

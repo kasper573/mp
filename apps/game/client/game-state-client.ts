@@ -13,7 +13,7 @@ import { subscribeToReadyState } from "@mp/ws/client";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
-import { useRPC } from "./useRPC";
+import { useRpc } from "./use-rpc";
 
 export function createGameStateClient(socket: WebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });
@@ -53,7 +53,7 @@ export function createGameStateClient(socket: WebSocket) {
 export function useGameActions() {
   const state = useContext(GameStateClientContext);
 
-  const rpc = useRPC();
+  const rpc = useRpc();
   const moveMutation = rpc.character.move.createMutation();
   const joinMutation = rpc.character.join.createMutation();
   const attackMutation = rpc.character.attack.createMutation();
