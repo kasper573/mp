@@ -1,4 +1,4 @@
-import { createMemo, Show, useContext } from "solid-js";
+import { createMemo, Show, Suspense, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
@@ -12,7 +12,6 @@ export default function AppBar() {
   const isNavigating = createMemo(() => state().status === "pending");
 
   const auth = useContext(AuthContext);
-  const versionCompatibility = useVersionCompatibility();
 
   return (
     <nav class={styles.nav}>
@@ -26,10 +25,13 @@ export default function AppBar() {
         active={isNavigating()}
       />
       <div class={styles.right}>
-        <Show when={versionCompatibility() === "incompatible"}>
-          There is a new version available{" "}
-          <Button onClick={() => window.location.reload()}>Reload</Button>
-        </Show>
+        {/* 
+          Suspending into nothing is okay since a pending 
+          version notice isn't very interesting to the user
+          */}
+        <Suspense>
+          <VersionNotice />
+        </Suspense>
 
         {auth.isSignedIn() ? (
           <Button role="link" onClick={() => void auth.signOut()}>
@@ -45,4 +47,12 @@ export default function AppBar() {
   );
 }
 
-const isRouting = () => false;
+function VersionNotice() {
+  const versionCompatibility = useVersionCompatibility();
+  return (
+    <Show when={versionCompatibility() === "incompatible"}>
+      There is a new version available{" "}
+      <Button onClick={() => window.location.reload()}>Reload</Button>
+    </Show>
+  );
+}
