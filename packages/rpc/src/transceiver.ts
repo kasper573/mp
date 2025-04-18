@@ -20,6 +20,7 @@ export class RpcTransceiver<Context = void> {
     private invoke: RpcInvoker<Context> = (call) =>
       Promise.resolve(err(new RpcInvokerError(call, "Invoke not supported"))),
     private formatResponseError: (error: unknown) => unknown = (error) => error,
+    private timeout: number | undefined = 5000,
   ) {}
 
   async call(path: string[], input: unknown): Promise<unknown> {
@@ -27,15 +28,30 @@ export class RpcTransceiver<Context = void> {
     const call: RpcCall<unknown> = [path, input, id];
     this.sendCall(call);
 
-    const [, result] = await new Promise<Response<unknown>>((resolve) =>
-      this.resolvers.set(id, resolve),
-    );
-
-    if ("error" in result) {
-      throw result.error;
+    let timeoutId: number | undefined;
+    if (this.timeout !== undefined) {
+      timeoutId = setTimeout(() => {
+        const timeoutError = new RpcInvokerError(call, `Timeout`);
+        this.resolvers.get(id)?.([id, { error: timeoutError }]);
+      }, this.timeout);
     }
 
-    return result.output;
+    try {
+      const [, result] = await new Promise<Response<unknown>>((resolve) =>
+        this.resolvers.set(id, resolve),
+      );
+
+      if (timeoutId !== undefined) {
+        clearTimeout(timeoutId);
+      }
+
+      if ("error" in result) {
+        throw result.error;
+      }
+      return result.output;
+    } finally {
+      this.resolvers.delete(id);
+    }
   }
 
   async handleCall(
@@ -63,7 +79,6 @@ export class RpcTransceiver<Context = void> {
     }
 
     try {
-      this.resolvers.delete(callId);
       resolve(response);
       return ok(void 0);
     } catch (error) {
@@ -85,3 +100,6 @@ export type Response<Output> = [
 ];
 
 export type ResponseHandlerResult = Result<void, unknown>;
+
+declare function setTimeout(callback: () => void, ms: number): number;
+declare function clearTimeout(timeoutId: number): void;
