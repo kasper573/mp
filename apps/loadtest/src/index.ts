@@ -1,7 +1,7 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type RootRouter } from "@mp/server";
 import { BinaryRpcTransceiver, createTranceivingRpcInvoker } from "@mp/rpc";
-import { createReconnectingWebSocket } from "@mp/ws/client";
+import { createWebSocket } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
 
@@ -64,7 +64,7 @@ async function testSocketWithRpc(n: number) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const socket = createReconnectingWebSocket(wsUrl);
+  const socket = createWebSocket(wsUrl);
   const transceiver = new BinaryRpcTransceiver({
     send: socket.send.bind(socket),
   });

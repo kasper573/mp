@@ -6,7 +6,8 @@ import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerEncoderExtensions } from "@mp/game/client";
 import { GameRpcSliceApiContext } from "@mp/game/client";
 import { QueryClient, QueryClientProvider } from "@mp/rpc/solid";
-import { createReconnectingWebSocket } from "@mp/ws/client";
+import { createWebSocket } from "@mp/ws/client";
+import { onCleanup } from "solid-js";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -16,6 +17,9 @@ import {
 } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 
+// Lazy loaded for better code splitting, faro is a big library.
+const { createFaroClient } = await import("./integrations/faro");
+
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
 // They should be passed down to the solidjs tree via context.
@@ -24,26 +28,23 @@ import { LoggerContext } from "./logger";
 
 registerEncoderExtensions();
 
-const logger = new Logger();
-logger.subscribe(consoleLoggerHandler(console));
-
-const query = new QueryClient({
-  defaultOptions: { queries: { retry: env.retryRpcQueries } },
-});
-const socket = createReconnectingWebSocket(env.wsUrl);
-const auth = createAuthClient(env.auth);
-const rpc = createRpcClient(socket, logger);
-const router = createClientRouter();
-
-socket.addEventListener("error", (e) => logger.error("Socket error", e));
-void auth.refresh();
-
-// eslint-disable-next-line unicorn/prefer-top-level-await
-void import("./integrations/faro").then((faro) =>
-  faro.init(logger, auth.identity),
-);
-
 export default function App() {
+  const logger = new Logger();
+  const socket = createWebSocket(env.wsUrl);
+  const rpc = createRpcClient(socket, logger);
+  const auth = createAuthClient(env.auth);
+  const router = createClientRouter();
+  const faro = createFaroClient(logger, auth.identity);
+  const query = new QueryClient({
+    defaultOptions: { queries: { retry: env.retryRpcQueries } },
+  });
+
+  void auth.refresh();
+
+  socket.addEventListener("error", (e) => logger.error("Socket error", e));
+  onCleanup(logger.subscribe(consoleLoggerHandler(console)));
+  onCleanup(() => socket.close());
+
   return (
     <>
       <QueryClientProvider client={query}>

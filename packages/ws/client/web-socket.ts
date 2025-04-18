@@ -1,6 +1,6 @@
 import PartySocket from "partysocket/ws";
 
-export function createReconnectingWebSocket(
+export function createWebSocket(
   ...params: ConstructorParameters<typeof PartySocket>
 ): WebSocket {
   const socket = new PartySocket(...params);

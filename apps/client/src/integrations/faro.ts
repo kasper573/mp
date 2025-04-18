@@ -10,7 +10,10 @@ import type { Logger } from "@mp/logger";
 import { onCleanup, createEffect } from "solid-js";
 import { env } from "../env";
 
-export function init(logger: Logger, identity: () => UserIdentity | undefined) {
+export function createFaroClient(
+  logger: Logger,
+  identity: () => UserIdentity | undefined,
+) {
   const faro = initializeFaro({
     url: env.faro.receiverUrl,
     isolate: true,
@@ -26,6 +29,7 @@ export function init(logger: Logger, identity: () => UserIdentity | undefined) {
 
   onCleanup(logger.subscribe(faroLoggerHandler(faro)));
   createEffect(() => faro.api.setUser(deriveFaroUser(identity())));
+  return faro;
 }
 
 function deriveFaroUser(user?: UserIdentity): FaroUser {
