@@ -29,5 +29,9 @@ export function moveAlongPath<T extends number>(
       break;
     }
   }
-  return [newCoords, newPath];
+  if (newPath.length === path.length) {
+    return [newCoords, path];
+  } else {
+    return [newCoords, newPath];
+  }
 }

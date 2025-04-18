@@ -161,11 +161,15 @@ function createEntityRepository<
   };
 
   entity.update = function updateEntity(id: Id, value: Partial<Entity>) {
+    const entityInstance = state[entityName][id] as Entity;
     for (const prop in value) {
       const key = prop as keyof Entity;
-      serverPatch.push([[entityName, id, prop] as PatchPath, value[key]]);
+      const newValue = value[key];
+      if (newValue !== entityInstance[key]) {
+        serverPatch.push([[entityName, id, prop] as PatchPath, newValue]);
+        entityInstance[key] = value[key] as Entity[keyof Entity];
+      }
     }
-    Object.assign(state[entityName][id] as object, value);
   };
 
   entity.remove = function removeEntity(id: Id) {
