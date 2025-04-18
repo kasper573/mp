@@ -3,10 +3,10 @@ import { describe, it, expect } from "vitest";
 import type { RpcCall, RpcCallId } from "../src";
 import { RpcBuilder, createRpcInvoker, RpcInvokerError } from "../src";
 
-describe("createRpcInvoker", () => {
+describe("builder and invoker", () => {
   it("invokes a query procedure and returns Ok with output", async () => {
-    const { procedure } = new RpcBuilder<void>().build();
-    const node = procedure
+    const rpc = new RpcBuilder<void>().build();
+    const node = rpc.procedure
       .input<number>()
       .output<number>()
       .query(({ input }) => input * 2);
@@ -21,8 +21,8 @@ describe("createRpcInvoker", () => {
   });
 
   it("invokes a mutation procedure and returns Ok with output", async () => {
-    const { procedure } = new RpcBuilder<void>().build();
-    const node = procedure
+    const rpc = new RpcBuilder<void>().build();
+    const node = rpc.procedure
       .input<string>()
       .output<string>()
       .mutation(({ input }) => `mutated: ${input}`);
@@ -38,9 +38,11 @@ describe("createRpcInvoker", () => {
 
   it("passes the context to the handler", async () => {
     type Ctx = { value: number };
-    const rpcFactory = new RpcBuilder<Ctx>().build();
-    const { procedure } = rpcFactory;
-    const node = procedure.output<number>().query(({ ctx }) => ctx.value * 3);
+    const rpc = new RpcBuilder<Ctx>().build();
+
+    const node = rpc.procedure
+      .output<number>()
+      .query(({ ctx }) => ctx.value * 3);
 
     const invoker = createRpcInvoker(node);
     const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
@@ -52,14 +54,14 @@ describe("createRpcInvoker", () => {
   });
 
   it("resolves nested router paths correctly", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { router, procedure } = rpcFactory;
-    const greet = procedure
+    const rpc = new RpcBuilder<void>().build();
+
+    const greet = rpc.procedure
       .input<string>()
       .output<string>()
       .query(({ input }) => `Hello, ${input}!`);
 
-    const root = router({ greet });
+    const root = rpc.router({ greet });
     const invoker = createRpcInvoker(root);
     const call: RpcCall<string> = [["greet"], "Test", 1 as RpcCallId];
     const result = await invoker(call, undefined);
@@ -70,8 +72,8 @@ describe("createRpcInvoker", () => {
   });
 
   it("returns Err when path not found", async () => {
-    const { router } = new RpcBuilder<void>().build();
-    const root = router({});
+    const rpc = new RpcBuilder<void>().build();
+    const root = rpc.router({});
     const invoker = createRpcInvoker(root);
     const call: RpcCall<unknown> = [["unknown"], {}, 1 as RpcCallId];
     const result = await invoker(call, undefined);
@@ -84,12 +86,12 @@ describe("createRpcInvoker", () => {
   });
 
   it("returns Err when path points to a router endpoint", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { router, procedure } = rpcFactory;
-    const nestedRouter = router({
-      child: procedure.output<string>().query(() => "x"),
+    const rpc = new RpcBuilder<void>().build();
+
+    const nestedRouter = rpc.router({
+      child: rpc.procedure.output<string>().query(() => "x"),
     });
-    const root = router({ nested: nestedRouter });
+    const root = rpc.router({ nested: nestedRouter });
     const invoker = createRpcInvoker(root);
     const call: RpcCall<unknown> = [["nested"], {}, 1 as RpcCallId];
     const result = await invoker(call, undefined);
@@ -102,13 +104,13 @@ describe("createRpcInvoker", () => {
   });
 
   it("catches handler exceptions and returns Err with cause", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { router, procedure } = rpcFactory;
-    const brokenProc = procedure.query(() => {
+    const rpc = new RpcBuilder<void>().build();
+
+    const brokenProc = rpc.procedure.query(() => {
       throw new Error("Unexpected");
     });
 
-    const root = router({ broken: brokenProc });
+    const root = rpc.router({ broken: brokenProc });
     const invoker = createRpcInvoker(root);
     const call: RpcCall<unknown> = [["broken"], {}, 1 as RpcCallId];
     const result = await invoker(call, undefined);
@@ -124,10 +126,10 @@ describe("createRpcInvoker", () => {
 
   it("allows middleware to provide a custom context to the handler", async () => {
     type Ctx = { userId: number };
-    const rpcFactory = new RpcBuilder<Ctx>().build();
-    const { procedure, middleware } = rpcFactory;
-    const pb = procedure.use(middleware(() => ({ role: "admin" })));
-    const node = pb
+    const rpc = new RpcBuilder<Ctx>().build();
+
+    const node = rpc.procedure
+      .use(rpc.middleware(() => ({ role: "admin" })))
       .output<{ userId: number; role: string }>()
       .query(({ ctx, mwc }) => ({
         userId: ctx.userId,
@@ -145,12 +147,13 @@ describe("createRpcInvoker", () => {
 
   it("can use two middlewares and pass combined contexts", async () => {
     type Ctx = { userId: number };
-    const rpcFactory = new RpcBuilder<Ctx>().build();
-    const { procedure, middleware } = rpcFactory;
+    const rpc = new RpcBuilder<Ctx>().build();
 
-    const node = procedure
-      .use(middleware(() => ({ role: "user" })))
-      .use(middleware(({ mwc }) => ({ ...(mwc as object), level: "admin" })))
+    const node = rpc.procedure
+      .use(rpc.middleware(() => ({ role: "user" })))
+      .use(
+        rpc.middleware(({ mwc }) => ({ ...(mwc as object), level: "admin" })),
+      )
       .output<object>()
       .query(({ ctx, mwc }) => ({ userId: ctx.userId, ...mwc }));
 
@@ -164,12 +167,13 @@ describe("createRpcInvoker", () => {
   });
 
   it("can use a piped middleware", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { procedure, middleware } = rpcFactory;
-    const base = middleware(() => ({ count: 1 }));
-    const piped = base.pipe(({ mwc }) => ({ count: mwc.count + 1 }));
-    const node = procedure
-      .use(piped)
+    const rpc = new RpcBuilder<void>().build();
+
+    const baseMw = rpc.middleware(() => ({ count: 1 }));
+    const pipedMw = baseMw.pipe(({ mwc }) => ({ count: mwc.count + 1 }));
+
+    const node = rpc.procedure
+      .use(pipedMw)
       .output<number>()
       .query(({ mwc }) => mwc.count);
 
@@ -183,9 +187,9 @@ describe("createRpcInvoker", () => {
   });
 
   it("supports chaining multiple .input/.output steps in any order", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { procedure } = rpcFactory;
-    const node = procedure
+    const rpc = new RpcBuilder<void>().build();
+
+    const node = rpc.procedure
       .output<number>()
       .input<boolean>()
       .input<string>()
