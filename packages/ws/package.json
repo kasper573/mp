@@ -14,6 +14,11 @@
       "types": "./server/index.ts",
       "import": "./server/index.ts",
       "require": "./server/index.ts"
+    },
+    "./type-overrides": {
+      "types": "./type-overrides.ts",
+      "import": "./type-overrides.ts",
+      "require": "./type-overrides.ts"
     }
   },
   "dependencies": {
