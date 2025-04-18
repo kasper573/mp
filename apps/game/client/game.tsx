@@ -53,7 +53,10 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
         <LoadingSpinner>Loading area</LoadingSpinner>
       </Match>
       <Match when={!area.data}>
-        <ErrorFallback error="Could not load area data" />
+        <ErrorFallback
+          error="Could not load area data"
+          reset={() => void area.refetch()}
+        />
       </Match>
     </Switch>
   );
