@@ -127,7 +127,6 @@ describe("createRpcInvoker", () => {
     const rpcFactory = new RpcBuilder<Ctx>().build();
     const { procedure, middleware } = rpcFactory;
     const pb = procedure.use(middleware(() => ({ role: "admin" })));
-    // pipe middleware then chain .output<...>() before query
     const node = pb
       .output<{ userId: number; role: string }>()
       .query(({ ctx, mwc }) => ({
@@ -144,59 +143,46 @@ describe("createRpcInvoker", () => {
     expect(result.value).toEqual({ userId: 7, role: "admin" });
   });
 
-  it("supports chaining .input<T>() and .output<T>() before .query", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { procedure } = rpcFactory;
+  it("can use two middlewares and pass combined contexts", async () => {
+    type Ctx = { userId: number };
+    const rpcFactory = new RpcBuilder<Ctx>().build();
+    const { procedure, middleware } = rpcFactory;
+
     const node = procedure
-      .input<string>()
-      .output<string>()
-      .query(({ input }) => input.toUpperCase());
+      .use(middleware(() => ({ role: "user" })))
+      .use(middleware(({ mwc }) => ({ ...(mwc as object), level: "admin" })))
+      .output<object>()
+      .query(({ ctx, mwc }) => ({ userId: ctx.userId, ...mwc }));
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<string> = [[], "abc", 1 as RpcCallId];
-    const result = await invoker(call, undefined);
+    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
+    const result = await invoker(call, { userId: 42 });
 
     expect(result.isOk()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.value).toBe("ABC");
+    expect(result.value).toEqual({ userId: 42, role: "user", level: "admin" });
   });
 
-  it("supports chaining .output<U>() before .query", async () => {
+  it("can use a piped middleware", async () => {
     const rpcFactory = new RpcBuilder<void>().build();
-    const { procedure } = rpcFactory;
-    const node = procedure.output<number>().query(() => 42);
-
-    const invoker = createRpcInvoker(node);
-    const call: RpcCall<unknown> = [[], null, 1 as RpcCallId];
-    const result = await invoker(call, undefined);
-
-    expect(result.isOk()).toBe(true);
-    // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.value).toBe(42);
-  });
-
-  it("supports chaining both .input<T>() and .output<U>() before .mutation", async () => {
-    const rpcFactory = new RpcBuilder<void>().build();
-    const { procedure } = rpcFactory;
+    const { procedure, middleware } = rpcFactory;
+    const base = middleware(() => ({ count: 1 }));
+    const piped = base.pipe(({ mwc }) => ({ count: mwc.count + 1 }));
     const node = procedure
-      .input<{ a: number; b: number }>()
-      .output<string>()
-      .mutation(({ input }) => `sum:${input.a + input.b}`);
+      .use(piped)
+      .output<number>()
+      .query(({ mwc }) => mwc.count);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<{ a: number; b: number }> = [
-      [],
-      { a: 2, b: 3 },
-      1 as RpcCallId,
-    ];
+    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.value).toBe("sum:5");
+    expect(result.value).toBe(2);
   });
 
-  it("allows chaining multiple .input/.output steps in any order", async () => {
+  it("supports chaining multiple .input/.output steps in any order", async () => {
     const rpcFactory = new RpcBuilder<void>().build();
     const { procedure } = rpcFactory;
     const node = procedure
