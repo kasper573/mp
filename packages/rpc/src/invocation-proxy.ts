@@ -1,15 +1,19 @@
 export function createInvocationProxy(
   resolveFn: FunctionResolver,
   path: string[] = [],
-) {
-  return new Proxy(empty as object, {
+): InvocationProxy {
+  return new Proxy(empty as unknown as InvocationProxy, {
     get: (target, prop) =>
       createInvocationProxy(resolveFn, [...path, String(prop)]),
     apply: (target, thisArg, args: unknown[]) => resolveFn(path)(...args),
   });
 }
 
-type FunctionResolver = (path: string[]) => AnyFunction;
+export type InvocationProxy = AnyFunction & {
+  [key: string]: InvocationProxy;
+};
+
+export type FunctionResolver = (path: string[]) => AnyFunction;
 
 export type AnyFunction = (...args: unknown[]) => unknown;
 
