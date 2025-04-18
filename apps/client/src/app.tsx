@@ -16,9 +16,7 @@ import {
   SocketContext,
 } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
-
-// Lazy loaded for better code splitting, faro is a big library.
-const { createFaroClient } = await import("./integrations/faro");
+import { createFaroClient } from "./integrations/faro";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
