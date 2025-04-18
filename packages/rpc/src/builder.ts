@@ -183,3 +183,12 @@ export class RpcError extends Error {
     this.name = "RpcError";
   }
 }
+
+export type InferInput<T extends AnyProcedureNode["handler"]> =
+  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? I : never;
+
+export type InferOutput<T extends AnyProcedureNode["handler"]> =
+  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? O : never;
+
+export type InferContext<T extends AnyRpcNode> =
+  T extends AnyRpcNode<infer C> ? C : never;

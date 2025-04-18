@@ -6,14 +6,12 @@ import type {
   AnyQueryNode,
   AnyRouterNode,
   AnyRpcNode as AnyRpcNode,
+  InferInput,
+  InferOutput,
 } from "./builder";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
-import type {
-  InferOutput,
-  InferInput,
-  RpcProcedureInvoker,
-} from "./proxy-invoker";
+import type { RpcProcedureInvoker } from "./proxy-invoker";
 import type { AnyRpcTransceiver as AnyRpcTransceiver } from "./transceiver";
 
 export function createTransceivingSolidRpcInvoker<Node extends AnyRpcNode>(
