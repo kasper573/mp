@@ -7,6 +7,14 @@ import {
   type RpcInvoker,
 } from "./invoker";
 
+export interface RpcTransceiverOptions<Context> {
+  sendCall: (rpc: RpcCall<unknown>) => void;
+  sendResponse: (response: Response<unknown>) => void;
+  invoke?: RpcInvoker<Context>;
+  formatResponseError?: (error: unknown) => unknown;
+  timeout?: number;
+}
+
 export class RpcTransceiver<Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
@@ -14,26 +22,29 @@ export class RpcTransceiver<Context = void> {
     (response: Response<unknown>) => void
   >();
 
-  constructor(
-    private sendCall: (rpc: RpcCall<unknown>) => void,
-    private sendResponse: (response: Response<unknown>) => void,
-    private invoke: RpcInvoker<Context> = (call) =>
-      Promise.resolve(err(new RpcInvokerError(call, "Invoke not supported"))),
-    private formatResponseError: (error: unknown) => unknown = (error) => error,
-    private timeout: number | undefined = 5000,
-  ) {}
+  constructor(private options: RpcTransceiverOptions<Context>) {}
+
+  private requiresResponse(call: RpcCall<unknown>): boolean {
+    return true;
+  }
 
   async call(path: string[], input: unknown): Promise<unknown> {
+    const { sendCall, timeout } = this.options;
+
     const id = this.nextId();
     const call: RpcCall<unknown> = [path, input, id];
-    this.sendCall(call);
+    sendCall(call);
+
+    if (!this.requiresResponse(call)) {
+      return;
+    }
 
     let timeoutId: number | undefined;
-    if (this.timeout !== undefined) {
+    if (timeout !== undefined) {
       timeoutId = setTimeout(() => {
         const timeoutError = new RpcInvokerError(call, `Timeout`);
         this.resolvers.get(id)?.([id, { error: timeoutError }]);
-      }, this.timeout);
+      }, timeout);
     }
 
     try {
@@ -58,15 +69,27 @@ export class RpcTransceiver<Context = void> {
     call: RpcCall<unknown>,
     context: Context,
   ): Promise<RpcInvokerResult<unknown, unknown>> {
-    const id = call[2];
-    const result = await this.invoke(call, context);
+    const {
+      invoke,
+      formatResponseError = passThrough,
+      sendResponse,
+    } = this.options;
 
-    this.sendResponse([
-      id,
-      result.isErr()
-        ? { error: this.formatResponseError(result.error) }
-        : { output: result.value },
-    ]);
+    if (!invoke) {
+      return err(new RpcInvokerError(call, "No invoke function provided"));
+    }
+
+    const id = call[2];
+    const result = await invoke(call, context);
+
+    if (this.requiresResponse(call)) {
+      sendResponse([
+        id,
+        result.isErr()
+          ? { error: formatResponseError(result.error) }
+          : { output: result.value },
+      ]);
+    }
 
     return result;
   }
@@ -103,3 +126,5 @@ export type ResponseHandlerResult = Result<void, unknown>;
 
 declare function setTimeout(callback: () => void, ms: number): number;
 declare function clearTimeout(timeoutId: number): void;
+
+const passThrough = <T>(value: T): T => value;

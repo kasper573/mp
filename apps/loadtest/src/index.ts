@@ -65,7 +65,9 @@ async function testSocketWithRpc(n: number) {
   }
 
   const socket = createReconnectingWebSocket(wsUrl);
-  const transceiver = new BinaryRpcTransceiver(socket.send.bind(socket));
+  const transceiver = new BinaryRpcTransceiver({
+    send: socket.send.bind(socket),
+  });
   const rpc = createTranceivingRpcInvoker<RootRouter>(transceiver);
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);

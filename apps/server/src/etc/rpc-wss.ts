@@ -21,7 +21,7 @@ export function setupRpcTransceivers<Context>({
   router: AnyRouterNode<Context>;
   createContext: (socket: WebSocket) => Context;
 }): ReadonlyMap<ClientId, BinaryRpcTransceiver<Context>> {
-  const invokeRpc = createRpcInvoker(router);
+  const invoke = createRpcInvoker(router);
   const transceivers = new Map<ClientId, BinaryRpcTransceiver<Context>>();
 
   wss.on("connection", (socket) => {
@@ -29,11 +29,12 @@ export function setupRpcTransceivers<Context>({
 
     const socketId = getSocketId(socket);
 
-    const transceiver = new BinaryRpcTransceiver(
-      socket.send.bind(socket),
-      invokeRpc,
-      (error) => (opt.exposeErrorDetails ? error : "Internal server error"),
-    );
+    const transceiver = new BinaryRpcTransceiver({
+      invoke,
+      send: socket.send.bind(socket),
+      formatResponseError: (error) =>
+        opt.exposeErrorDetails ? error : "Internal server error",
+    });
 
     transceivers.set(socketId, transceiver);
     socket.addEventListener("close", () => transceivers.delete(socketId));

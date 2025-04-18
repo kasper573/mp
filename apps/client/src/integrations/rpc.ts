@@ -9,10 +9,10 @@ import { clientRpcRouter } from "@mp/game/client";
 export type RpcClient = SolidRpcInvoker<RootRouter>;
 
 export function createRpcClient(socket: WebSocket, logger: Logger): RpcClient {
-  const transceiver = new BinaryRpcTransceiver(
-    (data) => socket.send(data),
-    createRpcInvoker(clientRpcRouter),
-  );
+  const transceiver = new BinaryRpcTransceiver({
+    send: (data) => socket.send(data),
+    invoke: createRpcInvoker(clientRpcRouter),
+  });
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
   onCleanup(() => socket.removeEventListener("message", handleMessage));
