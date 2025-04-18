@@ -1,9 +1,9 @@
 import type { Branded, Result } from "@mp/std";
 import { err, ok } from "@mp/std";
-import type { AnyRouteRecord, AnyRpcNode, RouterNode } from "./builder";
+import type { AnyRpcNode } from "./builder";
 
 export function createRpcInvoker<Input, Output, Context>(
-  root: RouterNode<AnyRouteRecord<Context>>,
+  root: AnyRpcNode<Context>,
 ): RpcInvoker<Input, Output, Context> {
   return async function invokeRpc(call, ctx) {
     const [path, input] = call;

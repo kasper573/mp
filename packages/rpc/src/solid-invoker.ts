@@ -16,7 +16,7 @@ import type {
 } from "./proxy-invoker";
 import type { AnyRpcTransceiver as AnyRpcTransceiver } from "./transceiver";
 
-export function createSolidRpcInvoker<Node extends AnyRpcNode>(
+export function createTransceivingSolidRpcInvoker<Node extends AnyRpcNode>(
   transceiver: AnyRpcTransceiver,
 ): SolidRpcInvoker<Node> {
   const proxy = createInvocationProxy((path) => {
