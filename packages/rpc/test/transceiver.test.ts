@@ -1,9 +1,9 @@
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ok, err } from "@mp/std";
-import { type RpcCallId, type RpcCall, RpcInvokerError } from "../src/invoker";
 import type { RcpResponse } from "../src/transceiver";
 import { RpcTransceiver } from "../src/transceiver";
+import type { RpcCall, RpcCallId } from "../src/invoker";
+import { RpcInvokerError } from "../src/invoker";
 
 describe("RpcTransceiver", () => {
   let sendCall: ReturnType<typeof vi.fn>;
@@ -17,15 +17,29 @@ describe("RpcTransceiver", () => {
   });
 
   describe("call()", () => {
-    it("sends the call and resolves with output", async () => {
-      const promise = transceiver.call(["method"], { foo: "bar" });
-      expect(sendCall).toHaveBeenCalledTimes(1);
+    it("resolves immediately without waiting when requiresResponse returns false", async () => {
+      const noRespTransceiver = new RpcTransceiver({
+        sendCall,
+        sendResponse,
+        requiresResponse: () => false,
+      });
 
+      const result = await noRespTransceiver.call(["nr"], 42);
+      expect(sendCall).toHaveBeenCalledOnce();
+      // No need to call handleResponse; promise should resolve to undefined
+      expect(result).toBeUndefined();
+    });
+
+    it("sends the call and resolves with output when requiresResponse returns true", async () => {
+      const promise = transceiver.call(["method"], { foo: "bar" });
+      expect(sendCall).toHaveBeenCalledOnce();
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const [[path, input, id]] = sendCall.mock.calls[0];
       expect(path).toEqual(["method"]);
       expect(input).toEqual({ foo: "bar" });
       expect(id).toBe(0);
 
+      // simulate response
       const response: RcpResponse<number> = [0 as RpcCallId, { output: 123 }];
       transceiver.handleResponse(response);
 
@@ -47,10 +61,10 @@ describe("RpcTransceiver", () => {
         sendCall,
         sendResponse,
         timeout: 1000,
+        requiresResponse: () => true,
       });
 
       const promise = t.call(["path"], null);
-      // move past timeout
       vi.advanceTimersByTime(1000);
 
       await expect(promise).rejects.toBeInstanceOf(RpcInvokerError);
@@ -106,9 +120,29 @@ describe("RpcTransceiver", () => {
       expect(sendResponse).not.toHaveBeenCalled();
     });
 
-    it("invokes and sends output on success", async () => {
+    it("skips sendResponse when requiresResponse returns false", async () => {
+      const invoke = vi.fn(() => Promise.resolve(ok("X")));
+      const t = new RpcTransceiver({
+        sendCall,
+        sendResponse,
+        invoke,
+        requiresResponse: () => false,
+      });
+
+      const result = await t.handleCall(dummyCall, dummyCtx);
+      expect(invoke).toHaveBeenCalledWith(dummyCall, dummyCtx);
+      expect(result.isOk()).toBe(true);
+      expect(sendResponse).not.toHaveBeenCalled();
+    });
+
+    it("invokes and sends output on success when requiresResponse returns true", async () => {
       const invoke = vi.fn(() => Promise.resolve(ok("VALUE")));
-      const t = new RpcTransceiver({ sendCall, sendResponse, invoke });
+      const t = new RpcTransceiver({
+        sendCall,
+        sendResponse,
+        invoke,
+        requiresResponse: () => true,
+      });
       const call: RpcCall<unknown> = [["do"], 42, 7 as RpcCallId];
 
       const result = await t.handleCall(call, dummyCtx);
@@ -123,7 +157,7 @@ describe("RpcTransceiver", () => {
       ]);
     });
 
-    it("invokes and sends formatted error on failure", async () => {
+    it("invokes and sends formatted error on failure when requiresResponse returns true", async () => {
       const originalError = new Error("fail");
       const invoke = vi.fn(() => Promise.resolve(err(originalError)));
       const formatError = vi.fn(
@@ -134,6 +168,7 @@ describe("RpcTransceiver", () => {
         sendResponse,
         invoke,
         formatResponseError: formatError,
+        requiresResponse: () => true,
       });
       const call: RpcCall<unknown> = [["do"], null, 5 as RpcCallId];
 

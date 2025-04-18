@@ -13,6 +13,7 @@ export interface RpcTransceiverOptions<Context> {
   invoke?: RpcInvoker<Context>;
   formatResponseError?: (error: unknown) => unknown;
   timeout?: number;
+  requiresResponse?: (call: RpcCall<unknown>) => boolean;
 }
 
 export class RpcTransceiver<Context = void> {
@@ -25,7 +26,7 @@ export class RpcTransceiver<Context = void> {
   constructor(private options: RpcTransceiverOptions<Context>) {}
 
   private requiresResponse(call: RpcCall<unknown>): boolean {
-    return true;
+    return this.options.requiresResponse?.(call) ?? true;
   }
 
   async call(path: string[], input: unknown): Promise<unknown> {
