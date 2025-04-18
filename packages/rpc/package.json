@@ -16,6 +16,10 @@
       "require": "./src/solid-invoker.ts"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@mp/std": "workspace:*",
     "@mp/encoding": "workspace:*",
@@ -23,6 +27,7 @@
     "@tanstack/solid-query": "5.74.3"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "vitest": "2.0.3"
   }
 }

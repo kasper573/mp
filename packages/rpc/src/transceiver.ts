@@ -9,7 +9,7 @@ import {
 
 export interface RpcTransceiverOptions<Context> {
   sendCall: (rpc: RpcCall<unknown>) => void;
-  sendResponse: (response: Response<unknown>) => void;
+  sendResponse: (response: RcpResponse<unknown>) => void;
   invoke?: RpcInvoker<Context>;
   formatResponseError?: (error: unknown) => unknown;
   timeout?: number;
@@ -19,7 +19,7 @@ export class RpcTransceiver<Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
     RpcCallId,
-    (response: Response<unknown>) => void
+    (response: RcpResponse<unknown>) => void
   >();
 
   constructor(private options: RpcTransceiverOptions<Context>) {}
@@ -48,7 +48,7 @@ export class RpcTransceiver<Context = void> {
     }
 
     try {
-      const [, result] = await new Promise<Response<unknown>>((resolve) =>
+      const [, result] = await new Promise<RcpResponse<unknown>>((resolve) =>
         this.resolvers.set(id, resolve),
       );
 
@@ -94,7 +94,7 @@ export class RpcTransceiver<Context = void> {
     return result;
   }
 
-  handleResponse(response: Response<unknown>): ResponseHandlerResult {
+  handleResponse(response: RcpResponse<unknown>): HandleResponseResult {
     const [callId] = response;
     const resolve = this.resolvers.get(callId);
     if (!resolve) {
@@ -117,12 +117,12 @@ export class RpcTransceiver<Context = void> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRpcTransceiver = RpcTransceiver<any>;
 
-export type Response<Output> = [
+export type RcpResponse<Output> = [
   id: RpcCallId,
   { output: Output } | { error: unknown },
 ];
 
-export type ResponseHandlerResult = Result<void, unknown>;
+export type HandleResponseResult = Result<void, unknown>;
 
 declare function setTimeout(callback: () => void, ms: number): number;
 declare function clearTimeout(timeoutId: number): void;
