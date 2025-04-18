@@ -6,10 +6,11 @@ import {
 } from "@mp/rpc";
 import type { WebSocketServer } from "@mp/ws/server";
 import type { Logger } from "@mp/logger";
+import type { ClientId } from "@mp/game/server";
 import { opt } from "../options";
 import { getSocketId } from "./get-socket-id";
 
-export function acceptRpcViaWebSockets<Context>({
+export function setupRpcTransceivers<Context>({
   wss,
   logger,
   router,
@@ -19,8 +20,9 @@ export function acceptRpcViaWebSockets<Context>({
   logger: Logger;
   router: AnyRouterNode<Context>;
   createContext: (socket: WebSocket) => Context;
-}) {
+}): ReadonlyMap<ClientId, BinaryRpcTransceiver<Context>> {
   const invokeRpc = createRpcInvoker(router);
+  const transceivers = new Map<ClientId, BinaryRpcTransceiver<Context>>();
 
   wss.on("connection", (socket) => {
     socket.binaryType = "arraybuffer";
@@ -32,6 +34,9 @@ export function acceptRpcViaWebSockets<Context>({
       invokeRpc,
       (error) => (opt.exposeErrorDetails ? error : "Internal server error"),
     );
+
+    transceivers.set(socketId, transceiver);
+    socket.addEventListener("close", () => transceivers.delete(socketId));
 
     // eslint-disable-next-line @typescript-eslint/no-misused-promises
     socket.addEventListener("message", async (msg) => {
@@ -58,4 +63,6 @@ export function acceptRpcViaWebSockets<Context>({
       logger.error(`[rpc]`, info);
     });
   });
+
+  return transceivers;
 }

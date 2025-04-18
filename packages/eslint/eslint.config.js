@@ -26,6 +26,7 @@ export default tseslint.config(
       "**/docker/**.js",
       "pnpm-lock.yaml",
       "**/apps/server/public/tilesets/**",
+      "**/.playwright/**",
       "**/*.generated.*",
       "**/*.gen.*",
     ],
@@ -113,12 +114,24 @@ export default tseslint.config(
           message: "${file.type} is not allowed to import ${dependency.type}",
           rules: [
             {
-              from: ["app"],
+              from: ["server_app"],
+              allow: ["game_server_module", "game_shared_module", "package"],
+            },
+            {
+              from: ["client_app"],
               allow: [
-                "app",
-                "package",
                 "game_client_module",
-                "game_server_module",
+                "game_shared_module",
+                "server_app",
+                "package",
+              ],
+            },
+            {
+              from: ["other_app"],
+              allow: [
+                "package",
+                "server_app",
+                "game_client_module",
                 "game_shared_module",
               ],
             },
@@ -143,7 +156,9 @@ export default tseslint.config(
         { type: "game_server_module", pattern: "apps/game/server/**" },
         { type: "game_client_module", pattern: "apps/game/client/**" },
         { type: "game_shared_module", pattern: "apps/game/shared/**" },
-        { type: "app", pattern: "apps/*" },
+        { type: "client_app", pattern: "apps/client/**" },
+        { type: "server_app", pattern: "apps/server/**" },
+        { type: "other_app", pattern: "apps/*" },
         { type: "package", pattern: "packages/*" },
       ],
       "import/resolver": {

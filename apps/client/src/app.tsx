@@ -5,8 +5,8 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerEncoderExtensions } from "@mp/game/client";
 import { GameRpcSliceApiContext } from "@mp/game/client";
-import { WebSocket } from "@mp/ws/client";
-import { QueryClient, QueryClientProvider } from "@mp/rpc";
+import { QueryClient, QueryClientProvider } from "@mp/rpc/solid";
+import { createReconnectingWebSocket } from "@mp/ws/client";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -30,7 +30,7 @@ logger.subscribe(consoleLoggerHandler(console));
 const query = new QueryClient({
   defaultOptions: { queries: { retry: env.retryRpcQueries } },
 });
-const socket = new WebSocket(env.wsUrl);
+const socket = createReconnectingWebSocket(env.wsUrl);
 const auth = createAuthClient(env.auth);
 const rpc = createRpcClient(socket, logger);
 const router = createClientRouter();

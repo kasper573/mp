@@ -7,27 +7,27 @@ import {
   type RpcInvoker,
 } from "./invoker";
 
-export class RpcTransceiver<Input, Output, Context = void> {
+export class RpcTransceiver<Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
     RpcCallId,
-    (response: Response<Output>) => void
+    (response: Response<unknown>) => void
   >();
 
   constructor(
-    private sendCall: (rpc: RpcCall<Input>) => void,
-    private sendResponse: (response: Response<Output>) => void,
-    private invoke: RpcInvoker<Input, Output, Context> = (call) =>
+    private sendCall: (rpc: RpcCall<unknown>) => void,
+    private sendResponse: (response: Response<unknown>) => void,
+    private invoke: RpcInvoker<Context> = (call) =>
       Promise.resolve(err(new RpcInvokerError(call, "Invoke not supported"))),
     private formatResponseError: (error: unknown) => unknown = (error) => error,
   ) {}
 
-  async call(path: string[], input: Input): Promise<Output> {
+  async call(path: string[], input: unknown): Promise<unknown> {
     const id = this.nextId();
-    const call: RpcCall<Input> = [path, input, id];
+    const call: RpcCall<unknown> = [path, input, id];
     this.sendCall(call);
 
-    const [, result] = await new Promise<Response<Output>>((resolve) =>
+    const [, result] = await new Promise<Response<unknown>>((resolve) =>
       this.resolvers.set(id, resolve),
     );
 
@@ -39,9 +39,9 @@ export class RpcTransceiver<Input, Output, Context = void> {
   }
 
   async handleCall(
-    call: RpcCall<Input>,
+    call: RpcCall<unknown>,
     context: Context,
-  ): Promise<RpcInvokerResult<Input, Output>> {
+  ): Promise<RpcInvokerResult<unknown, unknown>> {
     const id = call[2];
     const result = await this.invoke(call, context);
 
@@ -55,7 +55,7 @@ export class RpcTransceiver<Input, Output, Context = void> {
     return result;
   }
 
-  handleResponse(response: Response<Output>): ResponseHandlerResult {
+  handleResponse(response: Response<unknown>): ResponseHandlerResult {
     const [callId] = response;
     const resolve = this.resolvers.get(callId);
     if (!resolve) {
@@ -77,7 +77,7 @@ export class RpcTransceiver<Input, Output, Context = void> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyRpcTransceiver = RpcTransceiver<any, any, any>;
+export type AnyRpcTransceiver = RpcTransceiver<any>;
 
 export type Response<Output> = [
   id: RpcCallId,

@@ -1,5 +1,5 @@
 import { rpc } from "@mp/game/server";
-import { gameRpcSlice } from "@mp/game/server";
+import { gameServerRpcSlice } from "@mp/game/server";
 import { opt } from "./options";
 
 export type RootRouter = typeof rootRouter;
@@ -11,5 +11,5 @@ export const rootRouter = rpc.router({
       throw new Error("This is a test error that was thrown in the server");
     }),
   }),
-  ...gameRpcSlice,
+  ...gameServerRpcSlice,
 });

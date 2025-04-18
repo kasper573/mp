@@ -2,9 +2,9 @@ import type { Branded, Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 import type { AnyRpcNode } from "./builder";
 
-export function createRpcInvoker<Input, Output, Context>(
+export function createRpcInvoker<Context>(
   root: AnyRpcNode<Context>,
-): RpcInvoker<Input, Output, Context> {
+): RpcInvoker<Context> {
   return async function invokeRpc(call, ctx) {
     const [path, input] = call;
     const node = resolveRpcNode<Context>(root, path);
@@ -13,10 +13,10 @@ export function createRpcInvoker<Input, Output, Context>(
     }
 
     try {
-      const output = (await node.handler({ ctx, input, mwc })) as Output;
+      const output = (await node.handler({ ctx, input, mwc })) as unknown;
       return ok(output);
     } catch (error) {
-      return err(new RpcInvokerError<Input>(call, error));
+      return err(new RpcInvokerError(call, error));
     }
   };
 }
@@ -41,10 +41,10 @@ export class RpcInvokerError<Input> extends Error {
   }
 }
 
-export type RpcInvoker<Input, Output, Context = void> = (
-  call: RpcCall<Input>,
+export type RpcInvoker<Context = void> = (
+  call: RpcCall<unknown>,
   context: Context,
-) => Promise<RpcInvokerResult<Input, Output>>;
+) => Promise<RpcInvokerResult<unknown, unknown>>;
 
 export type RpcInvokerResult<Input, Output> = Result<
   Output,

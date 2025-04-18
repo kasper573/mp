@@ -5,4 +5,5 @@ export * from "./area/area-debug-ui";
 export * from "./area/area-scene";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
+export * from "../shared/client-rpc-router";
 export * from "./use-rpc";

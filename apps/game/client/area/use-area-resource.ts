@@ -1,5 +1,5 @@
 import { createTiledLoader } from "@mp/tiled-loader";
-import { skipToken } from "@mp/rpc";
+import { skipToken } from "@mp/rpc/solid";
 import { useContext, type Accessor } from "solid-js";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";

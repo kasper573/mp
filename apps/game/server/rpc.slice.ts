@@ -1,6 +1,6 @@
 import { areaRouterSlice, npcRouterSlice, characterRouterSlice } from ".";
 
-export const gameRpcSlice = {
+export const gameServerRpcSlice = {
   ...characterRouterSlice,
   ...areaRouterSlice,
   ...npcRouterSlice,

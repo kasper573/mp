@@ -1,4 +1,3 @@
-import "@mp/ws/type-overrides";
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
@@ -51,7 +50,7 @@ import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { rootRouter } from "./router";
 import { customFileTypes } from "./etc/custom-filetypes";
-import { acceptRpcViaWebSockets } from "./etc/rpc-wss";
+import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { flushGameState } from "./etc/flush-game-state";
@@ -121,7 +120,7 @@ wss.on("connection", (socket) => {
   socket.on("close", () => clients.remove(getSocketId(socket)));
 });
 
-acceptRpcViaWebSockets({
+const rpcTransceivers = setupRpcTransceivers({
   wss,
   logger,
   router: rootRouter,

@@ -51,7 +51,7 @@ function createUseQuery(
 
     async function queryFn() {
       const { input, map } = options?.() ?? {};
-      const result = (await transceiver.call(path, input)) as unknown;
+      const result = await transceiver.call(path, input);
       if (map) {
         return map(result, input);
       }

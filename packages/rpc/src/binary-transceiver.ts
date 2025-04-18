@@ -4,17 +4,15 @@ import { RpcTransceiver } from "./transceiver";
 import type { RpcCall, RpcInvoker } from "./invoker";
 
 export class BinaryRpcTransceiver<
-  Input,
-  Output,
   Context = void,
-> extends RpcTransceiver<Input, Output, Context> {
+> extends RpcTransceiver<Context> {
   // Claiming the range 41_000 - 41_999 for the binary Rpc protocol
-  private callEncoding = createEncoding<RpcCall<Input>>(41_000);
-  private responseEncoding = createEncoding<Response<Output>>(41_001);
+  private callEncoding = createEncoding<RpcCall<unknown>>(41_000);
+  private responseEncoding = createEncoding<Response<unknown>>(41_001);
 
   constructor(
     send: (messageBuffer: ArrayBufferLike) => void,
-    invoke?: RpcInvoker<Input, Output, Context>,
+    invoke?: RpcInvoker<Context>,
     formatResponseError?: (error: unknown) => unknown,
   ) {
     super(
@@ -45,8 +43,11 @@ export class BinaryRpcTransceiver<
    * This is because most event expect a void return.
    * If you need to handle the promise, use the handleMessage method directly.
    */
-  messageEventHandler = (errorHandler: (error: unknown) => void) => {
-    return (event: { data: ArrayBufferLike }, context: Context): void => {
+  messageEventHandler = (
+    errorHandler: (error: unknown) => void,
+    context: Context,
+  ) => {
+    return (event: { data: ArrayBufferLike }): void => {
       const handle = async () => {
         try {
           const out = await this.handleMessage(event.data, context);
