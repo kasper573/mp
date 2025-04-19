@@ -248,6 +248,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../packages/rate-limiter

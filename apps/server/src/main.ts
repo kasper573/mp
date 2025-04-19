@@ -135,6 +135,17 @@ const gameState = createPatchStateMachine<GameState>({
     clientViewDistance.networkFogOfWarTileCount,
     areas,
   ),
+  updatePatchFilters: {
+    actors: (update) => {
+      switch (update.key) {
+        case "coords": {
+          // Only send coord patches when integer value of coords have changed
+          return !update.newValue.round().equals(update.oldValue.round());
+        }
+      }
+      return update.newValue !== update.oldValue;
+    },
+  },
 });
 
 const npcService = new NpcService(db);

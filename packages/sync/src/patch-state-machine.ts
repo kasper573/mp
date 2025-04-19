@@ -33,6 +33,7 @@ export function createPatchStateMachine<State extends PatchableState>(
         state,
         serverPatch,
         entityName,
+        opt.updatePatchFilters,
       ));
     },
   });
@@ -145,10 +146,15 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
+  updatePatchFilters?: UpdatePatchFilterRecord<State>,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
   type Entity = Entities[Id];
+
+  const shouldAddUpdateToPatch: UpdatePatchFilter<Entity> = updatePatchFilters
+    ? updatePatchFilters[entityName]
+    : ({ newValue, oldValue }) => newValue !== oldValue;
 
   function entity() {
     // Type level immutability is enough, we don't need to check at runtime as it will impact performance
@@ -164,11 +170,12 @@ function createEntityRepository<
     const entityInstance = state[entityName][id] as Entity;
     for (const prop in value) {
       const key = prop as keyof Entity;
-      const newValue = value[key];
-      if (newValue !== entityInstance[key]) {
+      const newValue = value[key] as Entity[keyof Entity];
+      const oldValue = entityInstance[key];
+      if (shouldAddUpdateToPatch({ key, newValue, oldValue })) {
         serverPatch.push([[entityName, id, prop] as PatchPath, newValue]);
-        entityInstance[key] = value[key] as Entity[keyof Entity];
       }
+      entityInstance[key] = value[key] as Entity[keyof Entity];
     }
   };
 
@@ -179,6 +186,24 @@ function createEntityRepository<
 
   return entity;
 }
+
+export type UpdatePatchFilterRecord<State extends PatchableState> = {
+  [EntityName in keyof State]: UpdatePatchFilter<
+    State[EntityName][keyof State[EntityName]]
+  >;
+};
+
+export type UpdatePatchFilter<Entity> = (
+  update: EntityUpdate<Entity>,
+) => boolean;
+
+export type EntityUpdate<Entity> = {
+  [K in keyof Entity]-?: {
+    key: K;
+    newValue: Entity[K];
+    oldValue: Entity[K];
+  };
+}[keyof Entity];
 
 function createFullStatePatch<State extends PatchableState>(
   state: State,
@@ -217,6 +242,7 @@ export interface PatchStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
+  updatePatchFilters?: UpdatePatchFilterRecord<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (
