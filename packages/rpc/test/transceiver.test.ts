@@ -2,8 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ok, err } from "@mp/std";
 import type { RcpResponse } from "../src/transceiver";
 import { RpcTransceiver } from "../src/transceiver";
-import type { RpcCall, RpcCallId } from "../src/invoker";
-import { RpcInvokerError } from "../src/invoker";
+import type { RpcCall, RpcCallId } from "../src/rpc-invoker";
+import { RpcInvokerError } from "../src/rpc-invoker";
 
 describe("RpcTransceiver", () => {
   let sendCall: ReturnType<typeof vi.fn>;

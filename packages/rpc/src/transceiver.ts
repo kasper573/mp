@@ -1,11 +1,12 @@
 import { err, ok, type Result } from "@mp/std";
-import type { RpcInvokerResult } from "./invoker";
+import type { RpcInvokerResult } from "./rpc-invoker";
 import {
   RpcInvokerError,
   type RpcCall,
   type RpcCallId,
   type RpcInvoker,
-} from "./invoker";
+} from "./rpc-invoker";
+import type { RpcCaller } from "./proxy-invoker";
 
 export interface RpcTransceiverOptions<Context> {
   sendCall: (rpc: RpcCall<unknown>) => void;
@@ -29,7 +30,7 @@ export class RpcTransceiver<Context = void> {
     return this.options.requiresResponse?.(call) ?? true;
   }
 
-  async call(path: string[], input: unknown): Promise<unknown> {
+  call: RpcCaller = async (path, input) => {
     const { sendCall, timeout } = this.options;
 
     const id = this.nextId();
@@ -67,12 +68,12 @@ export class RpcTransceiver<Context = void> {
     } finally {
       this.resolvers.delete(id);
     }
-  }
+  };
 
-  async handleCall(
+  handleCall = async (
     call: RpcCall<unknown>,
     context: Context,
-  ): Promise<RpcInvokerResult<unknown, unknown>> {
+  ): Promise<RpcInvokerResult<unknown, unknown>> => {
     const {
       invoke,
       formatResponseError = passThrough,
@@ -96,9 +97,9 @@ export class RpcTransceiver<Context = void> {
     }
 
     return result;
-  }
+  };
 
-  handleResponse(response: RcpResponse<unknown>): HandleResponseResult {
+  handleResponse = (response: RcpResponse<unknown>): HandleResponseResult => {
     const [callId] = response;
     const resolve = this.resolvers.get(callId);
     if (!resolve) {
@@ -111,7 +112,7 @@ export class RpcTransceiver<Context = void> {
     } catch (error) {
       return err(new Error("Error resolving Rpc response", { cause: error }));
     }
-  }
+  };
 
   private nextId(): RpcCallId {
     return this.idCounter++ as RpcCallId;

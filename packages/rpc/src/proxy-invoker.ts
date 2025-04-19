@@ -7,20 +7,17 @@ import type {
   InferOutput,
 } from "./builder";
 import { createInvocationProxy } from "./invocation-proxy";
-import { createRpcInvoker, type RpcCallId } from "./invoker";
-import type { AnyRpcTransceiver } from "./transceiver";
+import { createRpcInvoker, type RpcCallId } from "./rpc-invoker";
 
-export function createTranceivingRpcInvoker<Node extends AnyRpcNode>(
-  transceiver: AnyRpcTransceiver,
+export function createRpcProxyInvoker<Node extends AnyRpcNode>(
+  call: RpcCaller,
 ): RpcProxyInvoker<Node> {
-  const proxy = createInvocationProxy(
-    (path) => (input) => transceiver.call(path, input),
-  );
+  const proxy = createInvocationProxy((path) => (input) => call(path, input));
 
   return proxy as RpcProxyInvoker<Node>;
 }
 
-export function createProxiedRpcInvoker<Node extends AnyRpcNode>(
+export function createRpcProxyInvokerForNode<Node extends AnyRpcNode>(
   node: Node,
   context: InferContext<Node>,
 ): RpcProxyInvoker<Node> {
@@ -34,6 +31,11 @@ export function createProxiedRpcInvoker<Node extends AnyRpcNode>(
 
   return proxy as RpcProxyInvoker<Node>;
 }
+
+export type RpcCaller<Input = unknown, Output = unknown> = (
+  path: string[],
+  input: Input,
+) => Promise<Output>;
 
 export type RpcProxyInvoker<Node extends AnyRpcNode> =
   Node extends AnyRouterNode

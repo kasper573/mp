@@ -1,7 +1,7 @@
 import { createEncoding } from "@mp/encoding";
 import type { RcpResponse, RpcTransceiverOptions } from "./transceiver";
 import { RpcTransceiver } from "./transceiver";
-import type { RpcCall } from "./invoker";
+import type { RpcCall } from "./rpc-invoker";
 
 export interface BinaryRpcTransceiverOptions<Context>
   extends Omit<RpcTransceiverOptions<Context>, "sendCall" | "sendResponse"> {

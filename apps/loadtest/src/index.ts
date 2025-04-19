@@ -1,6 +1,6 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type RootRouter } from "@mp/server";
-import { BinaryRpcTransceiver, createTranceivingRpcInvoker } from "@mp/rpc";
+import { BinaryRpcTransceiver, createRpcProxyInvoker } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { readCliOptions } from "./cli";
@@ -68,7 +68,7 @@ async function testSocketWithRpc(n: number) {
   const transceiver = new BinaryRpcTransceiver({
     send: socket.send.bind(socket),
   });
-  const rpc = createTranceivingRpcInvoker<RootRouter>(transceiver);
+  const rpc = createRpcProxyInvoker<RootRouter>(transceiver.call);
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 

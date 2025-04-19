@@ -11,28 +11,27 @@ import type {
 } from "./builder";
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
-import type { RpcProcedureInvoker } from "./proxy-invoker";
-import type { AnyRpcTransceiver as AnyRpcTransceiver } from "./transceiver";
+import type { RpcCaller, RpcProcedureInvoker } from "./proxy-invoker";
 
-export function createTransceivingSolidRpcInvoker<Node extends AnyRpcNode>(
-  transceiver: AnyRpcTransceiver,
+export function createSolidRpcInvoker<Node extends AnyRpcNode>(
+  call: RpcCaller,
 ): SolidRpcInvoker<Node> {
   const proxy = createInvocationProxy((path) => {
     const last = path.at(-1);
     switch (last) {
       case useQueryProperty:
-        return createUseQuery(transceiver, path.slice(0, -1)) as AnyFunction;
+        return createUseQuery(call, path.slice(0, -1)) as AnyFunction;
       case useMutationProperty:
-        return createUseMutation(transceiver, path.slice(0, -1)) as AnyFunction;
+        return createUseMutation(call, path.slice(0, -1)) as AnyFunction;
     }
-    return (input) => transceiver.call(path, input);
+    return (input) => call(path, input);
   });
 
   return proxy as SolidRpcInvoker<Node>;
 }
 
 function createUseQuery(
-  transceiver: AnyRpcTransceiver,
+  call: RpcCaller,
   path: string[],
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
@@ -49,7 +48,7 @@ function createUseQuery(
 
     async function queryFn() {
       const { input, map } = options?.() ?? {};
-      const result = await transceiver.call(path, input);
+      const result = await call(path, input);
       if (map) {
         return map(result, input);
       }
@@ -61,13 +60,13 @@ function createUseQuery(
 }
 
 function createUseMutation(
-  transceiver: AnyRpcTransceiver,
+  call: RpcCaller,
   path: string[],
 ): UseMutation<AnyMutationNode> {
   return () => {
     return tanstack.useMutation(() => ({
       mutationKey: path,
-      mutationFn: (input: unknown) => transceiver.call(path, input),
+      mutationFn: (input: unknown) => call(path, input),
     }));
   };
 }
