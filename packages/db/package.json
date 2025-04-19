@@ -19,7 +19,8 @@
   "dependencies": {
     "drizzle-orm": "0.38.3",
     "pg": "8.13.1",
-    "@mp/math": "workspace:*"
+    "@mp/math": "workspace:*",
+    "@mp/std": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

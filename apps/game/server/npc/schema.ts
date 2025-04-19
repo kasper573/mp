@@ -1,4 +1,4 @@
-import { integer, pgTable, uuid, relations, vector } from "@mp/db";
+import { integer, pgTable, relations, vector, shortId } from "@mp/db";
 import type { Branded, Tile } from "@mp/std";
 import type { MovementTrait } from "../traits/movement";
 import type { AppearanceTrait } from "../traits/appearance";
@@ -6,13 +6,13 @@ import type { CombatTrait } from "../traits/combat";
 import { areaId } from "../area/schema";
 
 export type NpcId = Branded<string, "NPCId">;
-export const npcId = () => uuid().$type<NpcId>();
+export const npcId = () => shortId().$type<NpcId>();
 
 /**
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
-  id: npcId().primaryKey().defaultRandom(),
+  id: npcId().primaryKey(),
   speed: integer().$type<Tile>().notNull(),
 });
 
@@ -23,13 +23,13 @@ export const npcRelations = relations(npcTable, ({ many }) => ({
 }));
 
 export type NpcSpawnId = Branded<string, "NPCSpawnId">;
-export const npcSpawnId = () => uuid().$type<NpcSpawnId>();
+export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
 
 /**
  * Information about how npc instances should be spawned
  */
 export const npcSpawnTable = pgTable("npc_spawn", {
-  id: npcSpawnId().primaryKey().defaultRandom(),
+  id: npcSpawnId().primaryKey(),
   count: integer().notNull(),
   areaId: areaId().notNull(),
   npcId: npcId()

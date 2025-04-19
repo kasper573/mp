@@ -1,4 +1,4 @@
-import { pgTable, uuid, real, vector } from "@mp/db";
+import { pgTable, uuid, real, vector, shortId } from "@mp/db";
 import type { UserId } from "@mp/auth";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { MovementTrait } from "../traits/movement";
@@ -8,10 +8,10 @@ import { areaId } from "../area/schema";
 
 export const userId = () => uuid().$type<UserId>();
 
-export const characterId = () => uuid().$type<CharacterId>();
+export const characterId = () => shortId().$type<CharacterId>();
 
 export const characterTable = pgTable("character", {
-  id: characterId().primaryKey().defaultRandom(),
+  id: characterId().primaryKey(),
   coords: vector<Tile>().notNull(),
   areaId: areaId().notNull(),
   speed: real().$type<Tile>().notNull(),
