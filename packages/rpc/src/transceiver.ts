@@ -58,7 +58,10 @@ export class RpcTransceiver<Context = void> {
       }
 
       if ("error" in result) {
-        throw result.error;
+        throw new RpcRemoteError(
+          "Remote responded with an error",
+          result.error,
+        );
       }
       return result.output;
     } finally {
@@ -112,6 +115,13 @@ export class RpcTransceiver<Context = void> {
 
   private nextId(): RpcCallId {
     return this.idCounter++ as RpcCallId;
+  }
+}
+
+export class RpcRemoteError extends Error {
+  constructor(message: string, cause?: unknown) {
+    super(message, { cause });
+    this.name = "RpcRemoteError";
   }
 }
 

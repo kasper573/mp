@@ -37,7 +37,7 @@ function resolveRpcNode<Context>(
 export class RpcInvokerError<Input> extends Error {
   constructor(call: RpcCall<Input>, cause?: unknown) {
     super(`error in rpc handler "${call[0].join(".")}"`, { cause });
-    this.name = "InvokerError";
+    this.name = "RpcInvokerError";
   }
 }
 
