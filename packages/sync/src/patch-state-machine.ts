@@ -172,14 +172,14 @@ function createEntityRepository<
       const newValue = value[key] as Entity[keyof Entity];
       const oldValue = entityInstance[key];
 
-      const [accepted, outputValue] = optimizePatchOperationValue(
+      const patch = optimizePatchOperationValue(
         entityPatchOptimizer?.[key],
         newValue,
         oldValue,
       );
 
-      if (accepted) {
-        serverPatch.push([[entityName, id, prop] as PatchPath, outputValue]);
+      if (patch) {
+        serverPatch.push([[entityName, id, prop] as PatchPath, patch.value]);
       }
 
       entityInstance[key] = newValue;
@@ -216,19 +216,15 @@ function optimizePatchOperationValue<Entity, Key extends keyof Entity>(
   optimizer: PropertyPatchOptimizer<Entity, Key> | undefined,
   newValue: Entity[Key],
   oldValue: Entity[Key],
-): [boolean, Entity[Key]] {
-  let accepted = true;
-  let outputValue: Entity[Key] = newValue;
+): { value: Entity[Key] } | undefined {
   if (optimizer?.transform) {
-    outputValue = optimizer.transform(newValue);
+    newValue = optimizer.transform(newValue);
+    oldValue = optimizer.transform(oldValue);
   }
-  if (optimizer?.filter) {
-    const transformedOldValue = optimizer.transform
-      ? optimizer.transform(oldValue)
-      : oldValue;
-    accepted = optimizer.filter(outputValue, transformedOldValue);
+  if (optimizer?.filter && !optimizer.filter(newValue, oldValue)) {
+    return;
   }
-  return [accepted, outputValue];
+  return { value: newValue };
 }
 
 function createFullStatePatch<State extends PatchableState>(
