@@ -34,6 +34,7 @@ export function Application(props: ApplicationProps) {
 
       const initPromise = app.init({
         antialias: true,
+        eventMode: "none",
         resizeTo: viewport,
         roundPixels: true,
         canvas,
