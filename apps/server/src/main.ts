@@ -14,6 +14,7 @@ import {
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
+  gameStatePatchOptimizer,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
@@ -129,23 +130,13 @@ const rpcTransceivers = setupRpcTransceivers({
 
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
+  updatePatchFilters: gameStatePatchOptimizer,
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
     areas,
   ),
-  updatePatchFilters: {
-    actors: (update) => {
-      switch (update.key) {
-        case "coords": {
-          // Only send coord patches when integer value of coords have changed
-          return !update.newValue.round().equals(update.oldValue.round());
-        }
-      }
-      return update.newValue !== update.oldValue;
-    },
-  },
 });
 
 const npcService = new NpcService(db);
