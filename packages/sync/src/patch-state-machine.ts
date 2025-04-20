@@ -146,7 +146,7 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
-  allPatchOptimizers?: EntityPatchOptimizerRecord<State>,
+  allPatchOptimizers: EntityPatchOptimizerRecord<State> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
@@ -164,26 +164,21 @@ function createEntityRepository<
     state[entityName][id] = entity;
   };
 
-  entity.update = function updateEntity(id: Id, value: Partial<Entity>) {
-    const entityInstance = state[entityName][id] as Entity;
-
-    for (const prop in value) {
-      const key = prop as keyof Entity;
-      const newValue = value[key] as Entity[keyof Entity];
-      const oldValue = entityInstance[key];
-
-      const patch = optimizePatchOperationValue(
+  entity.update = function updateEntity(id: Id) {
+    return new EntityUpdateBuilder<Entity>((key, newValue) => {
+      const entity = state[entityName][id];
+      const accepted = optimizePatchOperationValue(
         entityPatchOptimizer?.[key],
         newValue,
-        oldValue,
+        entity[key],
       );
 
-      if (patch) {
-        serverPatch.push([[entityName, id, prop] as PatchPath, patch.value]);
+      if (accepted) {
+        serverPatch.push([[entityName, id, key] as PatchPath, accepted.value]);
       }
 
-      entityInstance[key] = newValue;
-    }
+      entity[key] = newValue;
+    });
   };
 
   entity.remove = function removeEntity(id: Id) {
@@ -253,11 +248,26 @@ export type { ReadonlyDeep };
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;
-  update: (
-    id: keyof Entities,
-    entity: Partial<Entities[keyof Entities]> & object,
-  ) => void;
+  update: (id: keyof Entities) => EntityUpdateBuilder<Entities[keyof Entities]>;
   remove: (id: keyof Entities) => void;
+}
+
+/**
+ * This may seem excessive but it exists because typescript does not support Subset<T> (and no, Partial<T> doesn't work, or any other hack).
+ * We want to be able to update any subset of an entity but we do not want to allow padding in undefined, which is what Partial<T> would allow.
+ */
+class EntityUpdateBuilder<Entity> {
+  constructor(
+    private handleNewValue: <K extends keyof Entity>(
+      key: K,
+      newValue: Entity[K],
+    ) => void,
+  ) {}
+
+  set<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
+    this.handleNewValue(key, newValue);
+    return this;
+  }
 }
 
 export interface PatchStateMachineOptions<State extends PatchableState> {

@@ -25,12 +25,12 @@ export function combatBehavior(
 
       // Dying should stop all actions
       if (!actor.health) {
-        state.actors.update(actor.id, {
-          health: 0, // Clamp
-          path: undefined,
-          moveTarget: undefined,
-          attackTargetId: undefined,
-        });
+        state.actors
+          .update(actor.id)
+          .set("health", 0) // Clamp
+          .set("path", undefined)
+          .set("moveTarget", undefined)
+          .set("attackTargetId", undefined);
         continue;
       }
     }
@@ -43,16 +43,14 @@ export function combatBehavior(
 
     const target = state.actors()[actor.attackTargetId];
     if (!target || !isTargetable(actor, target)) {
-      state.actors.update(actor.id, { attackTargetId: undefined });
+      state.actors.update(actor.id).set("attackTargetId", undefined);
       return;
     }
 
     const distance = actor.coords.distance(target.coords);
     if (distance > actor.attackRange + tileMargin) {
       // target too far away, move closer, but don't attack yet
-      state.actors.update(actor.id, {
-        moveTarget: target.coords,
-      });
+      state.actors.update(actor.id).set("moveTarget", target.coords);
       return;
     }
 
@@ -65,14 +63,14 @@ export function combatBehavior(
       }
     }
 
-    state.actors.update(target.id, {
-      health: target.health - actor.attackDamage,
-    });
+    state.actors
+      .update(target.id)
+      .set("health", target.health - actor.attackDamage);
 
-    state.actors.update(actor.id, {
-      path: undefined, // stop moving when attacking
-      lastAttack: currentTime,
-    });
+    state.actors
+      .update(actor.id)
+      .set("path", undefined) // stop moving when attacking
+      .set("lastAttack", currentTime);
   }
 }
 

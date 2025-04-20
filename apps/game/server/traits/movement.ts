@@ -32,10 +32,10 @@ export function movementBehavior(
   return ({ timeSinceLastTick }) => {
     for (const subject of recordValues(state.actors())) {
       if (subject.moveTarget) {
-        state.actors.update(subject.id, {
-          path: findPathForSubject(subject, areas, subject.moveTarget),
-          moveTarget: undefined,
-        });
+        state.actors
+          .update(subject.id)
+          .set("path", findPathForSubject(subject, areas, subject.moveTarget))
+          .set("moveTarget", undefined);
       }
 
       if (subject.path) {
@@ -45,10 +45,10 @@ export function movementBehavior(
           subject.speed,
           timeSinceLastTick,
         );
-        state.actors.update(subject.id, {
-          coords: newCoords,
-          path: newPath.length > 0 ? newPath : undefined,
-        });
+        state.actors
+          .update(subject.id)
+          .set("coords", newCoords)
+          .set("path", newPath.length > 0 ? newPath : undefined);
       }
 
       const area = areas.get(subject.areaId);
@@ -58,11 +58,11 @@ export function movementBehavior(
             hit.object.properties.get("goto")?.value as AreaId,
           );
           if (targetArea) {
-            state.actors.update(subject.id, {
-              path: undefined,
-              areaId: targetArea.id,
-              coords: targetArea.start,
-            });
+            state.actors
+              .update(subject.id)
+              .set("path", undefined)
+              .set("areaId", targetArea.id)
+              .set("coords", targetArea.start);
           }
         }
       }

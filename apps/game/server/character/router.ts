@@ -40,10 +40,10 @@ export const characterRouter = rpc.router({
         throw new RpcError("Cannot move a dead character");
       }
 
-      state.actors.update(char.id, {
-        attackTargetId: undefined,
-        moveTarget: Vector.from(to),
-      });
+      state.actors
+        .update(char.id)
+        .set("attackTargetId", undefined)
+        .set("moveTarget", Vector.from(to));
     }),
 
   attack: rpc.procedure
@@ -65,9 +65,7 @@ export const characterRouter = rpc.router({
         throw new RpcError("You can't attack yourself");
       }
 
-      state.actors.update(characterId, {
-        attackTargetId: targetId,
-      });
+      state.actors.update(characterId).set("attackTargetId", targetId);
     }),
 
   join: rpc.procedure
@@ -117,7 +115,7 @@ export const characterRouter = rpc.router({
     .mutation(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameStateMachine);
       const target = state.actors()[targetId];
-      state.actors.update(target.id, { health: 0 });
+      state.actors.update(target.id).set("health", 0);
     }),
 
   respawn: rpc.procedure
@@ -140,10 +138,12 @@ export const characterRouter = rpc.router({
       }
 
       const characterService = ctx.get(ctxCharacterService);
-      state.actors.update(char.id, {
-        health: char.maxHealth,
-        ...characterService.getDefaultSpawnPoint(),
-      });
+      const spawnPoint = characterService.getDefaultSpawnPoint();
+      state.actors
+        .update(char.id)
+        .set("health", char.maxHealth)
+        .set("coords", spawnPoint.coords)
+        .set("areaId", spawnPoint.areaId);
     }),
 });
 

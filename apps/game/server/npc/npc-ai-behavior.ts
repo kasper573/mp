@@ -36,9 +36,9 @@ export function npcAiBehavior(
                   other.id !== subject.id && isTargetable(subject, other),
               )
               .map((other) => other.id);
-            state.actors.update(subject.id, {
-              attackTargetId: randomItem(others),
-            });
+            state.actors
+              .update(subject.id)
+              .set("attackTargetId", randomItem(others));
           }
           break;
         case "move": {
@@ -50,10 +50,10 @@ export function npcAiBehavior(
 
             const toNode = randomItem(Array.from(area.graph.getNodes()));
             if (toNode) {
-              state.actors.update(subject.id, {
-                moveTarget: toNode.data.vector,
-                attackTargetId: undefined,
-              });
+              state.actors
+                .update(subject.id)
+                .set("moveTarget", toNode.data.vector)
+                .set("attackTargetId", undefined);
             }
           }
           break;
