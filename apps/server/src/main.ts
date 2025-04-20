@@ -14,7 +14,7 @@ import {
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
-  gameStatePatchOptimizer,
+  gameStatePatchOptimizers,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
@@ -130,7 +130,7 @@ const rpcTransceivers = setupRpcTransceivers({
 
 const gameState = createPatchStateMachine<GameState>({
   initialState: { actors: {} },
-  updatePatchFilters: gameStatePatchOptimizer,
+  patchOptimizers: gameStatePatchOptimizers,
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,

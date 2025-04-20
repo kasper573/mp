@@ -43,6 +43,20 @@ const vecZeroConst = new Vector(0, 0);
 
 export type Path<T extends number> = readonly Vector<T>[];
 
+export function isPathEqual<P extends Path<number>>(a?: P, b?: P): boolean {
+  if (a === b) {
+    return true;
+  }
+  if (!a || !b) {
+    return false;
+  }
+  if (a.length !== b.length) {
+    return false;
+  }
+
+  return a.every((v1, i) => b[i].equals(v1));
+}
+
 export function pathCopy<P extends Path<number> | undefined>(path: P): P {
   return path ? (Object.freeze([...path]) as P) : (undefined as P);
 }
