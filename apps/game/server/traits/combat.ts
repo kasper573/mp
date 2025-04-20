@@ -6,6 +6,9 @@ import type { GameState } from "../game-state";
 import type { ActorId, Actor } from "./actor";
 
 export interface CombatTrait {
+  /**
+   * Relative to the actor's position.
+   */
   hitBox: Rect<Tile>;
   health: number;
   maxHealth: number;

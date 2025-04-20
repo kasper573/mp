@@ -1,6 +1,6 @@
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import { Rect, Vector } from "@mp/math";
-
+import type { Vector } from "@mp/math";
+import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import type { Tile, Pixel } from "@mp/std";
 import type { ParentProps } from "solid-js";
@@ -21,7 +21,6 @@ import type { AreaResource } from "../../shared/area/area-resource";
 import { Actor } from "./actor";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
-import { useAnimatedCoords } from "./use-animated-coords";
 import { RespawnDialog } from "./respawn-dialog";
 import { AreaDebugUi } from "./area-debug-ui";
 import { toggleSignal } from "./toggle-signal";
@@ -38,18 +37,14 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     loadTiledMapSpritesheets,
   );
 
-  const myCoords = useAnimatedCoords(
-    () => state.character()?.coords ?? Vector.zero<Tile>(),
-    () => state.character()?.path,
-    () => state.character()?.speed ?? (0 as Tile),
-  );
+  const myCoords = () => state.character()!.coords;
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),
   );
 
   const cameraPos = useSpring(
-    new VectorSpring(myWorldPos, () => ({
+    new VectorSpring<Pixel>(myWorldPos, () => ({
       stiffness: 80,
       damping: 40,
       mass: 1,
@@ -71,7 +66,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
 
   const entityAtPointer = createMemo(() =>
     state
-      .actorsInArea()
+      .actorList()
       .find((actor) =>
         actor.hitBox.offset(actor.coords).contains(pointerTile()),
       ),
@@ -131,7 +126,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
             >
               {{
                 [props.area.characterLayer.name]: () => (
-                  <For each={state.actorsInArea()}>
+                  <For each={state.actorList()}>
                     {(actor) => (
                       <Actor tiled={props.area.tiled} actor={actor} />
                     )}
@@ -147,7 +142,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
           <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
-            drawPathsForActors={state.actorsInArea()}
+            drawPathsForActors={state.actorList()}
           />
         </Show>
       </Pixi>

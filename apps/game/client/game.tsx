@@ -1,4 +1,4 @@
-import { EngineProvider } from "@mp/engine";
+import { EngineContext, EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
 import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
@@ -37,6 +37,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
               {({ viewport }) => (
                 <EngineProvider viewport={viewport}>
                   <AreaScene area={data} />
+                  <GameStateClientAnimations />
                 </EngineProvider>
               )}
             </Application>
@@ -60,4 +61,13 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
       </Match>
     </Switch>
   );
+}
+
+// TODO refactor. This is a hack to workaround the problematic Application/EngineProvider pattern.
+// It would be better if we could instantiate the engine higher up the tree so we can do this without a component.
+function GameStateClientAnimations() {
+  const state = useContext(GameStateClientContext);
+  const engine = useContext(EngineContext);
+  engine.addFrameCallback(state.frameCallback);
+  return null;
 }

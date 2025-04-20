@@ -48,7 +48,7 @@ export function movementBehavior(
         state.actors
           .update(subject.id)
           .set("coords", newCoords)
-          .set("path", newPath.length > 0 ? newPath : undefined);
+          .set("path", newPath);
       }
 
       const area = areas.get(subject.areaId);

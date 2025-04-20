@@ -15,24 +15,28 @@ import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
+import { createAnimatedActors } from "./area/animated-actors";
 
 export function createGameStateClient(socket: WebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-  const character = createMemo(
-    () => gameState.actors[characterId()!] as Character | undefined,
-  );
+
   const [readyState, setReadyState] = createSignal(socket.readyState);
-  const areaId = createMemo(() => character()?.areaId);
-  const actors = createMemo(() => Object.values(gameState.actors));
-  const actorsInArea = createMemo(() =>
-    actors().filter((actor) => actor.areaId === areaId()),
+  const areaId = createMemo(() => gameState.actors[characterId()!]?.areaId);
+
+  const animated = createAnimatedActors();
+
+  const actorList = createMemo(() => Object.values(animated.actors));
+
+  const character = createMemo(
+    () => animated.actors[characterId()!] as Character | undefined,
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncPatchEncoding.decode(e.data);
     if (result.isOk()) {
       applyPatch(gameState, result.value);
+      animated.update(gameState.actors);
     }
   };
 
@@ -48,13 +52,14 @@ export function createGameStateClient(socket: WebSocket) {
   });
 
   return {
-    actorsInArea,
-    gameState,
     readyState,
+    actorRecord: animated.actors,
+    actorList,
     setCharacterId,
     areaId,
     characterId,
     character,
+    frameCallback: animated.frameCallback,
   };
 }
 

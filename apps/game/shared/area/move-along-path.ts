@@ -7,7 +7,7 @@ export function moveAlongPath<T extends number>(
   path: Path<T>,
   speed: NoInfer<T>,
   delta: TimeSpan,
-): [Vector<T>, Path<T>] {
+): [Vector<T>, Path<T> | undefined] {
   let distanceToMove = speed * delta.totalSeconds;
   let newCoords = coords;
   const newPath = [...path];
@@ -29,7 +29,9 @@ export function moveAlongPath<T extends number>(
       break;
     }
   }
-  if (newPath.length === path.length) {
+  if (newPath.length === 0) {
+    return [newCoords, undefined];
+  } else if (newPath.length === path.length) {
     return [newCoords, path];
   } else {
     return [newCoords, newPath];
