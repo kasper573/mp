@@ -1,5 +1,6 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { Patch, PatchPath } from "./patch";
+import { dedupePatch } from "./patch-deduper";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -104,7 +105,7 @@ function createFlushFunction<State extends PatchableState>(
       );
 
       if (clientPatch.length > 0) {
-        clientPatches.set(clientId, clientPatch);
+        clientPatches.set(clientId, dedupePatch(clientPatch));
       }
     }
 
