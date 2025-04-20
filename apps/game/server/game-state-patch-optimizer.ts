@@ -18,11 +18,15 @@ export const gameStatePatchOptimizers: EntityPatchOptimizerRecord<GameState> = {
       transform: (value) => value?.slice(0, 2),
       filter: isPathEqual,
     },
-    moveTarget: {
-      // Clients never use moveTarget for anything, so we don't need to sent this.
-      // HACK typescript will still allow you to use moveTarget in the client, and those values will always be stale.
-      // If we do this for more properties we should consider creating a client/server model separation instead.
-      filter: () => false,
-    },
+
+    // Clients never use these properties for anything, so we don't need to send them.
+    // HACK typescript will still allow you to use these in the client, and those values will always be stale.
+    // TODO we should consider creating a client/server model separation instead and make it impossible for the client to rely on these.
+    moveTarget: { filter: noop },
+    lastAttack: { filter: noop },
   },
 };
+
+function noop() {
+  return false;
+}
