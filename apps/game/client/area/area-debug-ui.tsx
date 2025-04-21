@@ -59,6 +59,8 @@ export function AreaDebugUi(props: {
         }
       </For>
       <div class={styles.debugMenu}>
+        {/* Intentionally only stop propagation for the controls and not the debug info since 
+        the debug info takes up so much space it would interfere with testing the game.*/}
         <div on:pointerdown={(e) => e.stopPropagation()}>
           <div>
             Visible Graph lines:{" "}
@@ -91,7 +93,7 @@ export function AreaDebugUi(props: {
             </label>
           </div>
         </div>
-        <DebugText tiled={props.area.tiled} />
+        <DebugInfo tiled={props.area.tiled} />
         <Show when={showViewbox() && props.playerCoords}>
           {(coords) => (
             <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
@@ -157,7 +159,7 @@ function DebugPath(props: {
   return <Pixi label="PathDebugUI" as={gfx} />;
 }
 
-function DebugText(props: { tiled: TiledResource }) {
+function DebugInfo(props: { tiled: TiledResource }) {
   const versions = useContext(BuildVersionContext);
   const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
@@ -167,33 +169,34 @@ function DebugText(props: { tiled: TiledResource }) {
 
   onMount(() =>
     onCleanup(
-      engine.addFrameCallback((interval, duration) =>
+      engine.addFrameCallback(({ timeSinceLastFrame, previousFrameDuration }) =>
         batch(() => {
-          setFrameInterval(interval);
-          setFrameDuration(duration);
+          setFrameInterval(timeSinceLastFrame);
+          setFrameDuration(previousFrameDuration);
         }),
       ),
     ),
   );
 
-  const text = createMemo(() => {
+  const info = createMemo(() => {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
-    return [
-      `build: (client: ${versions.client()}, server: ${versions.server()})`,
-      `viewport: ${viewportPosition.toString()}`,
-      `world: ${worldPosition.toString()}`,
-      `tile: ${tilePos.toString()}`,
-      `tile (snapped): ${tilePos.round().toString()}`,
-      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(state.character()), null, 2)}`,
-      `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
-      `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
-      `frame callbacks: ${engine.frameCallbackCount}`,
-    ].join("\n");
+    return {
+      viewport: viewportPosition,
+      world: worldPosition,
+      tile: tilePos,
+      tileSnapped: tilePos.round(),
+      client: versions.client(),
+      server: versions.server(),
+      cameraTransform: engine.camera.transform.data,
+      frameInterval: frameInterval(),
+      frameDuration: frameDuration(),
+      frameCallbacks: engine.frameCallbackCount,
+      character: trimCharacterInfo(state.character()),
+    };
   });
 
-  return <p>{text()}</p>;
+  return <pre class={styles.debugText}>{JSON.stringify(info(), null, 2)}</pre>;
 }
 
 function DebugNetworkFogOfWar(props: {

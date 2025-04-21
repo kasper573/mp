@@ -7,3 +7,4 @@ docker/grafana/dashboards
 docker/keycloak/import
 **/*.generated.*
 **/*.gen.*
+.playwright

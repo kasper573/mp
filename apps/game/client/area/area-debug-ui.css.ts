@@ -7,6 +7,7 @@ export const debugMenu = style([
     padding: "l",
     borderRadius: "m",
     userSelect: "none",
+    pointerEvents: "all",
   }),
   {
     top: 8,
@@ -15,4 +16,9 @@ export const debugMenu = style([
     background: "rgba(0, 0, 0, 0.5)",
     color: "white",
   },
+]);
+
+export const debugText = style([
+  atoms({ overflow: "auto" }),
+  { maxHeight: "70vh" },
 ]);

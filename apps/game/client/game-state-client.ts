@@ -8,31 +8,46 @@ import {
 import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
-import { applyPatch, syncPatchEncoding } from "@mp/sync";
+import { applyPatch, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
+import { TimeSpan } from "@mp/time";
+import type { Logger } from "@mp/logger";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
+import { createSynchronizedActors } from "./area/synchronized-actors";
 
-export function createGameStateClient(socket: WebSocket) {
+const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
+
+export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-  const character = createMemo(
-    () => gameState.actors[characterId()!] as Character | undefined,
-  );
+
   const [readyState, setReadyState] = createSignal(socket.readyState);
-  const areaId = createMemo(() => character()?.areaId);
-  const actors = createMemo(() => Object.values(gameState.actors));
-  const actorsInArea = createMemo(() =>
-    actors().filter((actor) => actor.areaId === areaId()),
+  const areaId = createMemo(() => gameState.actors[characterId()!]?.areaId);
+
+  const actors = createSynchronizedActors(
+    () => Object.keys(gameState.actors) as ActorId[],
+    (id) => gameState.actors[id],
+  );
+
+  const character = createMemo(
+    () => actors.get(characterId()!) as Character | undefined,
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
-    const result = syncPatchEncoding.decode(e.data);
+    const result = syncMessageEncoding.decode(e.data);
     if (result.isOk()) {
-      applyPatch(gameState, result.value);
+      const [patch, remoteTime] = result.value;
+
+      const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
+      if (lag.compareTo(stalePatchThreshold) > 0) {
+        logger.warn(`Stale patch detected (lag: ${lag.totalMilliseconds}ms)`);
+      }
+
+      applyPatch(gameState, patch);
     }
   };
 
@@ -48,13 +63,13 @@ export function createGameStateClient(socket: WebSocket) {
   });
 
   return {
-    actorsInArea,
-    gameState,
     readyState,
+    actorList: actors.list,
     setCharacterId,
     areaId,
     characterId,
     character,
+    frameCallback: actors.frameCallback,
   };
 }
 

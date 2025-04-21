@@ -7,7 +7,7 @@ import {
 import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { randomItem, recordValues, uuid } from "@mp/std";
+import { createShortId, randomItem, recordValues } from "@mp/std";
 import { clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameState } from "../game-state";
@@ -83,7 +83,7 @@ export function createNpcInstance(
   areaId: AreaId,
   coords: Vector<Tile>,
 ): NpcInstance {
-  const id = uuid() as NpcInstanceId;
+  const id = createShortId() as NpcInstanceId;
   const name = uniqueNamesGenerator({
     dictionaries: [adjectives, animals, randomAndCustomNames],
     separator: " ",

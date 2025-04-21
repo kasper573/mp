@@ -1,6 +1,7 @@
 import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
-import * as cbor from "cbor-x";
+import type { Options } from "cbor-x";
+import { Encoder, Decoder, FLOAT32_OPTIONS } from "cbor-x";
 
 export { addExtension as addEncoderExtension } from "cbor-x";
 
@@ -8,6 +9,9 @@ export function createEncoding<T>(header: number) {
   if (header > encodingHeaderMaxLength) {
     throw new Error(`Header must be a 16-bit unsigned integer`);
   }
+
+  const encoder = new Encoder(options);
+  const decoder = new Decoder(options);
 
   return {
     decode(data: ArrayBufferLike): Result<T, Error | "skipped"> {
@@ -17,7 +21,7 @@ export function createEncoding<T>(header: number) {
           return err("skipped");
         }
 
-        const decoded = cbor.decode(new Uint8Array(data, 2)) as T;
+        const decoded = decoder.decode(new Uint8Array(data, 2)) as T;
         return ok(decoded);
       } catch (error) {
         return err(
@@ -28,7 +32,7 @@ export function createEncoding<T>(header: number) {
       }
     },
     encode(value: T): ArrayBufferLike {
-      const encodedValue = cbor.encode(value) as Uint8Array;
+      const encodedValue = encoder.encode(value) as Uint8Array;
       const buffer = new ArrayBuffer(encodedValue.byteLength + 2);
 
       new DataView(buffer).setUint16(0, header);
@@ -38,5 +42,9 @@ export function createEncoding<T>(header: number) {
     },
   };
 }
+
+const options: Options = {
+  useFloat32: FLOAT32_OPTIONS.ALWAYS,
+};
 
 const encodingHeaderMaxLength = 0xff_ff;

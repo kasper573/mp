@@ -284,9 +284,6 @@ importers:
       import-in-the-middle:
         specifier: 1.12.0
         version: 1.12.0
-      nanoid:
-        specifier: 5.1.5
-        version: 5.1.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -325,6 +322,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       drizzle-orm:
         specifier: 0.38.3
         version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(pg@8.13.1)
@@ -552,6 +552,9 @@ importers:
 
   packages/std:
     dependencies:
+      nanoid:
+        specifier: 5.1.5
+        version: 5.1.5
       neverthrow:
         specifier: 8.1.1
         version: 8.1.1

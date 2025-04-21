@@ -1,5 +1,6 @@
 import type { ReadonlyDeep } from "type-fest";
 import type { Patch, PatchPath } from "./patch";
+import { dedupePatch } from "./patch-deduper";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -33,6 +34,7 @@ export function createPatchStateMachine<State extends PatchableState>(
         state,
         serverPatch,
         entityName,
+        opt.patchOptimizers,
       ));
     },
   });
@@ -103,7 +105,7 @@ function createFlushFunction<State extends PatchableState>(
       );
 
       if (clientPatch.length > 0) {
-        clientPatches.set(clientId, clientPatch);
+        clientPatches.set(clientId, dedupePatch(clientPatch));
       }
     }
 
@@ -145,10 +147,13 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
+  allPatchOptimizers: EntityPatchOptimizerRecord<State> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
   type Entity = Entities[Id];
+
+  const entityPatchOptimizer = allPatchOptimizers?.[entityName];
 
   function entity() {
     // Type level immutability is enough, we don't need to check at runtime as it will impact performance
@@ -160,16 +165,21 @@ function createEntityRepository<
     state[entityName][id] = entity;
   };
 
-  entity.update = function updateEntity(id: Id, value: Partial<Entity>) {
-    const entityInstance = state[entityName][id] as Entity;
-    for (const prop in value) {
-      const key = prop as keyof Entity;
-      const newValue = value[key];
-      if (newValue !== entityInstance[key]) {
-        serverPatch.push([[entityName, id, prop] as PatchPath, newValue]);
-        entityInstance[key] = value[key] as Entity[keyof Entity];
+  entity.update = function updateEntity(id: Id) {
+    return new EntityUpdateBuilder<Entity>((key, newValue) => {
+      const entity = state[entityName][id];
+      const accepted = optimizePatchOperationValue(
+        entityPatchOptimizer?.[key],
+        newValue,
+        entity[key],
+      );
+
+      if (accepted) {
+        serverPatch.push([[entityName, id, key] as PatchPath, accepted.value]);
       }
-    }
+
+      entity[key] = newValue;
+    });
   };
 
   entity.remove = function removeEntity(id: Id) {
@@ -179,6 +189,54 @@ function createEntityRepository<
 
   return entity;
 }
+
+export type EntityPatchOptimizerRecord<State extends PatchableState> = {
+  [EntityName in keyof State]?: EntityPatchOptimizer<
+    State[EntityName][keyof State[EntityName]]
+  >;
+};
+
+export type EntityPatchOptimizer<Entity> = {
+  [K in keyof Entity]?: PropertyPatchOptimizer<Entity, K>;
+};
+
+export interface PropertyPatchOptimizer<
+  Entity,
+  Key extends keyof Entity = keyof Entity,
+> {
+  filter?: PropertyPatchOptimizerFilter<Entity[Key]>;
+  transform?: (value: Entity[Key]) => Entity[Key];
+}
+
+export type PropertyPatchOptimizerFilter<Value> = (
+  newValue: Value,
+  oldValue: Value,
+) => boolean;
+
+function optimizePatchOperationValue<Entity, Key extends keyof Entity>(
+  {
+    transform,
+    filter = defaultOptimizerFilter,
+  }: PropertyPatchOptimizer<Entity, Key> | undefined = empty,
+  newValue: Entity[Key],
+  oldValue: Entity[Key],
+): { value: Entity[Key] } | undefined {
+  if (transform) {
+    newValue = transform(newValue);
+    oldValue = transform(oldValue);
+  }
+  if (!filter(newValue, oldValue)) {
+    return;
+  }
+  return { value: newValue };
+}
+
+const empty = Object.freeze({});
+
+const defaultOptimizerFilter: PropertyPatchOptimizerFilter<unknown> = (
+  newValue,
+  oldValue,
+) => newValue !== oldValue;
 
 function createFullStatePatch<State extends PatchableState>(
   state: State,
@@ -206,17 +264,33 @@ export type { ReadonlyDeep };
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;
-  update: (
-    id: keyof Entities,
-    entity: Partial<Entities[keyof Entities]> & object,
-  ) => void;
+  update: (id: keyof Entities) => EntityUpdateBuilder<Entities[keyof Entities]>;
   remove: (id: keyof Entities) => void;
+}
+
+/**
+ * This may seem excessive but it exists because typescript does not support Subset<T> (and no, Partial<T> doesn't work, or any other hack).
+ * We want to be able to update any subset of an entity but we do not want to allow padding in undefined, which is what Partial<T> would allow.
+ */
+class EntityUpdateBuilder<Entity> {
+  constructor(
+    private handleNewValue: <K extends keyof Entity>(
+      key: K,
+      newValue: Entity[K],
+    ) => void,
+  ) {}
+
+  set<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
+    this.handleNewValue(key, newValue);
+    return this;
+  }
 }
 
 export interface PatchStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
+  patchOptimizers?: EntityPatchOptimizerRecord<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

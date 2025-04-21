@@ -2,20 +2,13 @@ import { Container, Graphics, Text } from "@mp/pixi";
 import { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";
-import type { Tile } from "@mp/std";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
-import { useAnimatedCoords } from "./use-animated-coords";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
-  const coords = useAnimatedCoords(
-    () => props.actor.coords,
-    () => props.actor.path,
-    () => props.actor.speed,
-    () => 2 as Tile, // Magic number, no reason other than it seems to work well
+  const position = createMemo(() =>
+    props.tiled.tileCoordToWorld(props.actor.coords),
   );
-
-  const position = createMemo(() => props.tiled.tileCoordToWorld(coords()));
 
   const container = new Container();
   const gfx = new Graphics();

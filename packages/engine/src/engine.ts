@@ -58,9 +58,15 @@ export class Engine {
       thisFrameTime - this.#previousFrameTime,
     );
     this.#previousFrameTime = thisFrameTime;
+    const currentTime = new Date(thisFrameTime);
+    const opt: FrameCallbackOptions = {
+      timeSinceLastFrame,
+      currentTime,
+      previousFrameDuration: this.#previousFrameDuration,
+    };
 
     for (const callback of this.#frameCallbacks) {
-      callback(timeSinceLastFrame, this.#previousFrameDuration);
+      callback(opt);
     }
 
     this.#previousFrameDuration = TimeSpan.fromMilliseconds(
@@ -84,7 +90,10 @@ function elementSize(element: HTMLElement): Vector<Pixel> {
   );
 }
 
-export type FrameCallback = (
-  deltaTime: TimeSpan,
-  previousFrameDuration: TimeSpan,
-) => unknown;
+export type FrameCallback = (opt: FrameCallbackOptions) => unknown;
+
+export interface FrameCallbackOptions {
+  timeSinceLastFrame: TimeSpan;
+  previousFrameDuration: TimeSpan;
+  currentTime: Date;
+}

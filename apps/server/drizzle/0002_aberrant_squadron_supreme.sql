@@ -1,1 +1,0 @@
-ALTER TABLE "character" ADD COLUMN "attackSpeed" numeric NOT NULL;
