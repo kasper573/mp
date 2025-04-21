@@ -42,19 +42,17 @@ export const worldRouter = rpc.router({
       return char.id;
     }),
 
-  requestFullState: rpc.procedure.query(({ input: characterId, ctx }) => {
+  requestFullState: rpc.procedure.query(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const state = ctx.get(ctxGameStateMachine);
     state.$flush.markToResendFullState(clientId);
   }),
 
-  leave: rpc.procedure
-    .input<CharacterId>()
-    .mutation(({ input: characterId, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      clients.remove(clientId);
-    }),
+  leave: rpc.procedure.input<CharacterId>().mutation(({ ctx }) => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    clients.remove(clientId);
+  }),
 });
 
 export const worldRouterSlice = { world: worldRouter };
