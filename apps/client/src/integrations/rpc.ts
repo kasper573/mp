@@ -1,4 +1,4 @@
-import type { RootRouter } from "@mp/server";
+import type { ServerRpcRouter } from "@mp/server";
 import type { SolidRpcInvoker } from "@mp/rpc/solid";
 import { createSolidRpcInvoker } from "@mp/rpc/solid";
 import { createContext, onCleanup, useContext } from "solid-js";
@@ -6,7 +6,7 @@ import type { Logger } from "@mp/logger";
 import { BinaryRpcTransceiver, createRpcInvoker } from "@mp/rpc";
 import { clientRpcRouter } from "@mp/game/client";
 
-export type RpcClient = SolidRpcInvoker<RootRouter>;
+export type RpcClient = SolidRpcInvoker<ServerRpcRouter>;
 
 export function createRpcClient(socket: WebSocket, logger: Logger): RpcClient {
   const transceiver = new BinaryRpcTransceiver({
@@ -16,7 +16,7 @@ export function createRpcClient(socket: WebSocket, logger: Logger): RpcClient {
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
   onCleanup(() => socket.removeEventListener("message", handleMessage));
-  return createSolidRpcInvoker<RootRouter>(transceiver.call);
+  return createSolidRpcInvoker<ServerRpcRouter>(transceiver.call);
 }
 
 export function useRpc() {

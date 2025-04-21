@@ -2,9 +2,9 @@ import { rpc } from "@mp/game/server";
 import { gameServerRpcSlice } from "@mp/game/server";
 import { opt } from "./options";
 
-export type RootRouter = typeof rootRouter;
+export type ServerRpcRouter = typeof serverRpcRouter;
 
-export const rootRouter = rpc.router({
+export const serverRpcRouter = rpc.router({
   system: rpc.router({
     buildVersion: rpc.procedure.output<string>().query(() => opt.buildVersion),
     testError: rpc.procedure.output<string>().query(() => {

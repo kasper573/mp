@@ -1,13 +1,10 @@
 import { Vector, type VectorLike } from "@mp/math";
-import { recordValues, type Tile } from "@mp/std";
-import type { AuthToken } from "@mp/auth";
+import { type Tile } from "@mp/std";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
 import { rpc } from "../rpc";
-import { ctxTokenVerifier, roles } from "../user/auth";
+import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
-import { ctxClientRegistry } from "../user/client-registry";
-import { ctxClientId } from "../user/client-id";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./schema";
 
@@ -65,47 +62,6 @@ export const characterRouter = rpc.router({
       }
 
       state.actors.update(characterId).set("attackTargetId", targetId);
-    }),
-
-  join: rpc.procedure
-    .input<AuthToken>()
-    .output<CharacterId>()
-    .mutation(async ({ input: token, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      const tokenVerifier = ctx.get(ctxTokenVerifier);
-      const result = await tokenVerifier(token);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-
-      const user = result.value;
-      clients.add(clientId, user);
-
-      const state = ctx.get(ctxGameStateMachine);
-      state.$flush.markToResendFullState(clientId);
-
-      const characterService = ctx.get(ctxCharacterService);
-      const existingCharacter = recordValues(state.actors())
-        .filter((actor) => actor.type === "character")
-        .find((actor) => actor.userId === user.id);
-
-      if (existingCharacter) {
-        return existingCharacter.id;
-      }
-
-      const char = await characterService.getOrCreateCharacterForUser(user);
-      state.actors.set(char.id, { type: "character", ...char });
-      return char.id;
-    }),
-
-  leave: rpc.procedure
-    .input<CharacterId>()
-    .use(roles([characterRoles.attack]))
-    .mutation(({ input: characterId, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      clients.remove(clientId);
     }),
 
   kill: rpc.procedure

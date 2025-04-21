@@ -58,7 +58,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   onCleanup(() => {
     const id = characterId();
     if (id !== undefined) {
-      void rpc.character.leave(id);
+      void rpc.world.leave(id);
     }
   });
 
@@ -92,7 +92,7 @@ export function useGameActions() {
   const respawn = () => rpc.character.respawn(state.characterId()!);
 
   const join = (token: AuthToken) =>
-    rpc.character.join(token).then(state.setCharacterId);
+    rpc.world.join(token).then(state.setCharacterId);
 
   return {
     respawn,

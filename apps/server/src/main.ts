@@ -49,7 +49,7 @@ import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
-import { rootRouter } from "./router";
+import { serverRpcRouter } from "./rpc";
 import { customFileTypes } from "./etc/custom-filetypes";
 import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
@@ -124,7 +124,7 @@ wss.on("connection", (socket) => {
 const rpcTransceivers = setupRpcTransceivers({
   wss,
   logger,
-  router: rootRouter,
+  router: serverRpcRouter,
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
