@@ -204,24 +204,39 @@ export interface PropertyPatchOptimizer<
   Entity,
   Key extends keyof Entity = keyof Entity,
 > {
-  filter?: (newValue: Entity[Key], oldValue: Entity[Key]) => boolean;
+  filter?: PropertyPatchOptimizerFilter<Entity[Key]>;
   transform?: (value: Entity[Key]) => Entity[Key];
 }
 
+export type PropertyPatchOptimizerFilter<Value> = (
+  newValue: Value,
+  oldValue: Value,
+) => boolean;
+
 function optimizePatchOperationValue<Entity, Key extends keyof Entity>(
-  optimizer: PropertyPatchOptimizer<Entity, Key> | undefined,
+  {
+    transform,
+    filter = defaultOptimizerFilter,
+  }: PropertyPatchOptimizer<Entity, Key> | undefined = empty,
   newValue: Entity[Key],
   oldValue: Entity[Key],
 ): { value: Entity[Key] } | undefined {
-  if (optimizer?.transform) {
-    newValue = optimizer.transform(newValue);
-    oldValue = optimizer.transform(oldValue);
+  if (transform) {
+    newValue = transform(newValue);
+    oldValue = transform(oldValue);
   }
-  if (optimizer?.filter && !optimizer.filter(newValue, oldValue)) {
+  if (!filter(newValue, oldValue)) {
     return;
   }
   return { value: newValue };
 }
+
+const empty = Object.freeze({});
+
+const defaultOptimizerFilter: PropertyPatchOptimizerFilter<unknown> = (
+  newValue,
+  oldValue,
+) => newValue !== oldValue;
 
 function createFullStatePatch<State extends PatchableState>(
   state: State,
