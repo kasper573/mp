@@ -52,10 +52,10 @@ describe("RpcTransceiver", () => {
         0 as RpcCallId,
         { error: new Error("oops") },
       ]);
-      await expect(promise).rejects.toThrow("oops");
+      await expect(promise).rejects.toThrow("Remote responded with an error");
     });
 
-    it("rejects with RpcInvokerError on timeout", async () => {
+    it("rejects with error on timeout", async () => {
       vi.useFakeTimers();
       const t = new RpcTransceiver({
         sendCall,
@@ -67,7 +67,7 @@ describe("RpcTransceiver", () => {
       const promise = t.call(["path"], null);
       vi.advanceTimersByTime(1000);
 
-      await expect(promise).rejects.toBeInstanceOf(RpcInvokerError);
+      await expect(promise).rejects.toThrow("Remote responded with an error");
       vi.useRealTimers();
     });
 

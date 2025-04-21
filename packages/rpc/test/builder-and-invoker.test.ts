@@ -82,7 +82,9 @@ describe("builder and invoker", () => {
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error).toBeInstanceOf(RpcInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error.message).toBe('error in rpc handler "unknown"');
+    expect(result.error.message).toBe(
+      'error in rpc handler "unknown" (callId: 1)',
+    );
   });
 
   it("returns Err when path points to a router endpoint", async () => {
@@ -100,7 +102,9 @@ describe("builder and invoker", () => {
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error).toBeInstanceOf(RpcInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error.message).toBe('error in rpc handler "nested"');
+    expect(result.error.message).toBe(
+      'error in rpc handler "nested" (callId: 1)',
+    );
   });
 
   it("catches handler exceptions and returns Err with cause", async () => {
