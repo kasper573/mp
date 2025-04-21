@@ -44,7 +44,10 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
 
       const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
       if (lag.compareTo(stalePatchThreshold) > 0) {
-        logger.warn(`Stale patch detected (lag: ${lag.totalMilliseconds}ms)`);
+        logger.warn(
+          `Stale patch detected, requesting full state refresh (lag: ${lag.totalMilliseconds}ms)`,
+        );
+        void refreshState();
       }
 
       applyPatch(gameState, patch);
@@ -52,6 +55,11 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   };
 
   const rpc = useRpc();
+
+  // We throttle because when stale patches are detected, they usually come in batches,
+  // and we only want to send one request for full state.
+  const refreshState = throttle(rpc.world.requestFullState, 5000);
+
   socket.addEventListener("message", handleMessage);
   onCleanup(() => socket.removeEventListener("message", handleMessage));
   onCleanup(subscribeToReadyState(socket, setReadyState));
