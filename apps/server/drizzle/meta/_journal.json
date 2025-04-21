@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1739725229746,
-      "tag": "0000_flaky_cyclops",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1740874743043,
-      "tag": "0001_oval_moondragon",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1740876709798,
-      "tag": "0002_aberrant_squadron_supreme",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1740877462077,
-      "tag": "0003_silky_red_hulk",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1745099270084,
-      "tag": "0004_damp_clint_barton",
+      "when": 1745240111958,
+      "tag": "0000_flat_shinko_yamashiro",
       "breakpoints": true
     }
   ]

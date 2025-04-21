@@ -1,5 +1,5 @@
 {
-  "id": "6791956d-522f-4e7b-b1c6-85d2c38063ca",
+  "id": "8f61057d-a894-4cc6-9bb5-e322f9f99c0e",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -10,10 +10,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "varchar(10)",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "coords": {
           "name": "coords",
@@ -29,13 +28,43 @@
         },
         "speed": {
           "name": "speed",
-          "type": "integer",
+          "type": "real",
           "primaryKey": false,
           "notNull": true
         },
         "userId": {
           "name": "userId",
           "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "health": {
+          "name": "health",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxHealth": {
+          "name": "maxHealth",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackDamage": {
+          "name": "attackDamage",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackSpeed": {
+          "name": "attackSpeed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackRange": {
+          "name": "attackRange",
+          "type": "real",
           "primaryKey": false,
           "notNull": true
         }
@@ -54,10 +83,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "varchar(10)",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "count": {
           "name": "count",
@@ -73,7 +101,7 @@
         },
         "npcId": {
           "name": "npcId",
-          "type": "uuid",
+          "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
         },
@@ -118,10 +146,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "varchar(10)",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "speed": {
           "name": "speed",

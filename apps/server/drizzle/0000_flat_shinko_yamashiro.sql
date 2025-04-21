@@ -1,22 +1,27 @@
 CREATE TABLE "character" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" varchar(10) PRIMARY KEY NOT NULL,
 	"coords" "point" NOT NULL,
 	"areaId" varchar(60) NOT NULL,
-	"speed" integer NOT NULL,
-	"userId" uuid NOT NULL
+	"speed" real NOT NULL,
+	"userId" uuid NOT NULL,
+	"health" real NOT NULL,
+	"maxHealth" real NOT NULL,
+	"attackDamage" real NOT NULL,
+	"attackSpeed" real NOT NULL,
+	"attackRange" real NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "npc_spawn" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" varchar(10) PRIMARY KEY NOT NULL,
 	"count" integer NOT NULL,
 	"areaId" varchar(60) NOT NULL,
-	"npcId" uuid NOT NULL,
+	"npcId" varchar(10) NOT NULL,
 	"coords" "point",
 	"randomRadius" integer
 );
 --> statement-breakpoint
 CREATE TABLE "npc" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" varchar(10) PRIMARY KEY NOT NULL,
 	"speed" integer NOT NULL
 );
 --> statement-breakpoint
