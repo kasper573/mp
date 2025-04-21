@@ -11,7 +11,7 @@ const loaderOptions: CreateTiledLoaderOptions = {
   relativePath: (p, b) => path.resolve(path.dirname(b), p),
 };
 
-const tmjPath = path.resolve(__dirname, "./fixtures/map.tmj");
+const tmjPath = path.resolve(__dirname, "./fixtures/map.json");
 
 it("can parse without error", async () => {
   const load = createTiledLoader(loaderOptions);

@@ -50,7 +50,6 @@ import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { serverRpcRouter } from "./rpc";
-import { customFileTypes } from "./etc/custom-filetypes";
 import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
@@ -82,14 +81,6 @@ const webServer = express()
     opt.publicPath,
     express.static(opt.publicDir, {
       maxAge: opt.publicMaxAge * 1000,
-      setHeaders: (res, filePath) => {
-        for (const fileType of customFileTypes) {
-          if (filePath.endsWith(fileType.extension)) {
-            res.setHeader("Content-Type", fileType.contentType);
-            break;
-          }
-        }
-      },
     }),
   );
 
@@ -165,7 +156,7 @@ const ioc = new InjectionContainer()
   .provide(ctxTokenVerifier, tokenVerifier)
   .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
-    serverFileToPublicUrl(`areas/${id}.tmj` as LocalFile),
+    serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   );
 
 collectDefaultMetrics({ register: metrics });
