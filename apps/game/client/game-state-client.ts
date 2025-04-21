@@ -8,14 +8,14 @@ import {
 import type { Vector } from "@mp/math";
 import { dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
-import { applyPatch, syncPatchEncoding } from "@mp/sync";
+import { applyPatch, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
-import { createAnimatedActors } from "./area/animated-actors";
+import { createSynchronizedActors } from "./area/synchronized-actors";
 
 export function createGameStateClient(socket: WebSocket) {
   const gameState = createMutable<GameState>({ actors: {} });
@@ -24,19 +24,20 @@ export function createGameStateClient(socket: WebSocket) {
   const [readyState, setReadyState] = createSignal(socket.readyState);
   const areaId = createMemo(() => gameState.actors[characterId()!]?.areaId);
 
-  const animated = createAnimatedActors();
+  const actors = createSynchronizedActors();
 
-  const actorList = createMemo(() => Object.values(animated.actors));
+  const actorList = createMemo(() => Object.values(actors.record));
 
   const character = createMemo(
-    () => animated.actors[characterId()!] as Character | undefined,
+    () => actors.record[characterId()!] as Character | undefined,
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
-    const result = syncPatchEncoding.decode(e.data);
+    const result = syncMessageEncoding.decode(e.data);
     if (result.isOk()) {
-      applyPatch(gameState, result.value);
-      animated.update(gameState.actors);
+      const [patch, remoteTime] = result.value;
+      applyPatch(gameState, patch);
+      actors.receiveRemoteUpdate(gameState.actors, remoteTime);
     }
   };
 
@@ -53,13 +54,13 @@ export function createGameStateClient(socket: WebSocket) {
 
   return {
     readyState,
-    actorRecord: animated.actors,
+    actorRecord: actors.record,
     actorList,
     setCharacterId,
     areaId,
     characterId,
     character,
-    frameCallback: animated.frameCallback,
+    frameCallback: actors.advanceLocalUpdate,
   };
 }
 
