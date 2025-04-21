@@ -12,6 +12,7 @@ import {
 import { SocketContext, useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";
+import { LoggerContext } from "../logger";
 
 export const Route = createFileRoute("/play")({
   component: RouteComponent,
@@ -26,10 +27,11 @@ function RouteComponent() {
 }
 
 function PlayPage() {
+  const logger = useContext(LoggerContext);
   const socket = useContext(SocketContext);
   const rpc = useRpc();
   const serverVersion = rpc.system.buildVersion.useQuery();
-  const sync = createGameStateClient(socket);
+  const sync = createGameStateClient(socket, logger);
 
   return (
     <BuildVersionContext.Provider

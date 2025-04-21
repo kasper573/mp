@@ -11,13 +11,17 @@ import { createMutable } from "solid-js/store";
 import { applyPatch, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
+import { TimeSpan } from "@mp/time";
+import type { Logger } from "@mp/logger";
 import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
 import { createSynchronizedActors } from "./area/synchronized-actors";
 
-export function createGameStateClient(socket: WebSocket) {
+const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
+
+export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const gameState = createMutable<GameState>({ actors: {} });
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
@@ -36,8 +40,14 @@ export function createGameStateClient(socket: WebSocket) {
     const result = syncMessageEncoding.decode(e.data);
     if (result.isOk()) {
       const [patch, remoteTime] = result.value;
+
+      const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
+      if (lag.compareTo(stalePatchThreshold) > 0) {
+        logger.warn(`Stale patch detected (lag: ${lag.totalMilliseconds}ms)`);
+      }
+
       applyPatch(gameState, patch);
-      actors.receiveRemoteUpdate(gameState.actors, remoteTime);
+      actors.receiveRemoteUpdate(gameState.actors);
     }
   };
 
