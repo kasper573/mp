@@ -11,7 +11,10 @@ export const gameStatePatchOptimizers: EntityPatchOptimizerRecord<GameState> = {
         // the new value when it's a new integer value is a good enough frequency.
         // It's a bit unsafe since we rely on coords always converging on a whole number,
         // but the movement system should always ensure that, so it's fine.
-        !newValue.round().equals(oldValue.round()),
+        !newValue.round().equals(oldValue.round()) ||
+        // If we go from fraction to whole number that means we may have stopped at a location,
+        // in which case the clients will need the new exact tile coordinate.
+        (!newValue.isFraction(0.01) && oldValue.isFraction(0.01)),
     },
     path: {
       // The client never need to see the whole path, just enough to do lerping
