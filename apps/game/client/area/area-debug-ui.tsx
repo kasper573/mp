@@ -192,7 +192,7 @@ function DebugInfo(props: { tiled: TiledResource }) {
       frameInterval: frameInterval(),
       frameDuration: frameDuration(),
       frameCallbacks: engine.frameCallbackCount,
-      character: state.character(),
+      character: trimCharacterInfo(state.character()),
     };
   });
 
