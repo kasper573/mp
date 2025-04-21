@@ -28,12 +28,13 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const [readyState, setReadyState] = createSignal(socket.readyState);
   const areaId = createMemo(() => gameState.actors[characterId()!]?.areaId);
 
-  const actors = createSynchronizedActors();
-
-  const actorList = createMemo(() => Object.values(actors.record));
+  const actors = createSynchronizedActors(
+    () => Object.keys(gameState.actors) as ActorId[],
+    (id) => gameState.actors[id],
+  );
 
   const character = createMemo(
-    () => actors.record[characterId()!] as Character | undefined,
+    () => actors.get(characterId()!) as Character | undefined,
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
@@ -47,7 +48,6 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
       }
 
       applyPatch(gameState, patch);
-      actors.receiveRemoteUpdate(gameState.actors);
     }
   };
 
@@ -64,13 +64,12 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
 
   return {
     readyState,
-    actorRecord: actors.record,
-    actorList,
+    actorList: actors.list,
     setCharacterId,
     areaId,
     characterId,
     character,
-    frameCallback: actors.advanceLocalUpdate,
+    frameCallback: actors.frameCallback,
   };
 }
 
