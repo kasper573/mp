@@ -16,7 +16,7 @@ export const gameStatePatchOptimizers: EntityPatchOptimizerRecord<GameState> = {
     path: {
       // The client never need to see the whole path, just enough to do lerping
       transform: (value) => value?.slice(0, 2),
-      filter: isPathEqual,
+      filter: (a, b) => !isPathEqual(a, b),
     },
 
     // Clients never use these properties for anything, so we don't need to send them.
