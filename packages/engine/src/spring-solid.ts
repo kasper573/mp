@@ -7,7 +7,9 @@ export function useSpring<T>(spring: SpringLike<T>) {
 
   createEffect(() => {
     if (spring.state() === "moving") {
-      onCleanup(engine.addFrameCallback(spring.update));
+      onCleanup(
+        engine.addFrameCallback((opt) => spring.update(opt.timeSinceLastFrame)),
+      );
     }
   });
 
