@@ -58,8 +58,10 @@ export function AreaDebugUi(props: {
           ) : null
         }
       </For>
-      <div class={styles.debugMenu} on:pointerdown={(e) => e.stopPropagation()}>
-        <div>
+      <div class={styles.debugMenu}>
+        {/* Intentionally only stop propagation for the controls and not the debug info since 
+        the debug info takes up so much space it would interfere with testing the game.*/}
+        <div on:pointerdown={(e) => e.stopPropagation()}>
           <div>
             Visible Graph lines:{" "}
             <Select
@@ -91,7 +93,7 @@ export function AreaDebugUi(props: {
             </label>
           </div>
         </div>
-        <DebugText tiled={props.area.tiled} />
+        <DebugInfo tiled={props.area.tiled} />
         <Show when={showViewbox() && props.playerCoords}>
           {(coords) => (
             <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
@@ -157,7 +159,7 @@ function DebugPath(props: {
   return <Pixi label="PathDebugUI" as={gfx} />;
 }
 
-function DebugText(props: { tiled: TiledResource }) {
+function DebugInfo(props: { tiled: TiledResource }) {
   const versions = useContext(BuildVersionContext);
   const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
@@ -176,7 +178,7 @@ function DebugText(props: { tiled: TiledResource }) {
     ),
   );
 
-  const debugInfo = createMemo(() => {
+  const info = createMemo(() => {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
     return {
@@ -194,9 +196,7 @@ function DebugText(props: { tiled: TiledResource }) {
     };
   });
 
-  return (
-    <pre class={styles.debugText}>{JSON.stringify(debugInfo(), null, 2)}</pre>
-  );
+  return <pre class={styles.debugText}>{JSON.stringify(info(), null, 2)}</pre>;
 }
 
 function DebugNetworkFogOfWar(props: {
