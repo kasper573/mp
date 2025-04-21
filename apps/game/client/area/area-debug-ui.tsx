@@ -58,8 +58,8 @@ export function AreaDebugUi(props: {
           ) : null
         }
       </For>
-      <div class={styles.debugMenu}>
-        <div on:pointerdown={(e) => e.stopPropagation()}>
+      <div class={styles.debugMenu} on:pointerdown={(e) => e.stopPropagation()}>
+        <div>
           <div>
             Visible Graph lines:{" "}
             <Select
@@ -167,33 +167,36 @@ function DebugText(props: { tiled: TiledResource }) {
 
   onMount(() =>
     onCleanup(
-      engine.addFrameCallback((interval, duration) =>
+      engine.addFrameCallback(({ timeSinceLastFrame, previousFrameDuration }) =>
         batch(() => {
-          setFrameInterval(interval);
-          setFrameDuration(duration);
+          setFrameInterval(timeSinceLastFrame);
+          setFrameDuration(previousFrameDuration);
         }),
       ),
     ),
   );
 
-  const text = createMemo(() => {
+  const debugInfo = createMemo(() => {
     const { worldPosition, position: viewportPosition } = engine.pointer;
     const tilePos = props.tiled.worldCoordToTile(worldPosition);
-    return [
-      `build: (client: ${versions.client()}, server: ${versions.server()})`,
-      `viewport: ${viewportPosition.toString()}`,
-      `world: ${worldPosition.toString()}`,
-      `tile: ${tilePos.toString()}`,
-      `tile (snapped): ${tilePos.round().toString()}`,
-      `camera transform: ${JSON.stringify(engine.camera.transform.data, null, 2)}`,
-      `character: ${JSON.stringify(trimCharacterInfo(state.character()), null, 2)}`,
-      `frame interval: ${frameInterval()?.totalMilliseconds.toFixed(2)}ms`,
-      `frame duration: ${frameDuration()?.totalMilliseconds.toFixed(2)}ms`,
-      `frame callbacks: ${engine.frameCallbackCount}`,
-    ].join("\n");
+    return {
+      viewport: viewportPosition,
+      world: worldPosition,
+      tile: tilePos,
+      tileSnapped: tilePos.round(),
+      client: versions.client(),
+      server: versions.server(),
+      cameraTransform: engine.camera.transform.data,
+      frameInterval: frameInterval(),
+      frameDuration: frameDuration(),
+      frameCallbacks: engine.frameCallbackCount,
+      character: state.character(),
+    };
   });
 
-  return <p>{text()}</p>;
+  return (
+    <pre class={styles.debugText}>{JSON.stringify(debugInfo(), null, 2)}</pre>
+  );
 }
 
 function DebugNetworkFogOfWar(props: {
