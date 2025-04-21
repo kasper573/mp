@@ -172,18 +172,6 @@ export interface RpcMiddleware<Context, MwContext, PipedMwContext>
   pipe: MiddlewareBuilder<Context, MwContext>;
 }
 
-export type RpcErrorFormatter<Context> = (opt: {
-  ctx: Context;
-  error: RpcError;
-}) => RpcError;
-
-export class RpcError extends Error {
-  constructor(...args: ConstructorParameters<typeof Error>) {
-    super(...args);
-    this.name = "RpcError";
-  }
-}
-
 export type InferInput<T extends AnyProcedureNode["handler"]> =
   T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? I : never;
 

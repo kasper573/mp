@@ -1,4 +1,3 @@
-import { RpcError } from "@mp/rpc";
 import { InjectionContext } from "@mp/ioc";
 import type { UserIdentity } from "@mp/auth";
 import type { TokenVerifier } from "@mp/auth/server";
@@ -17,7 +16,7 @@ export function auth() {
     const user = clients.getUser(clientId);
 
     if (!user) {
-      throw new RpcError("User is not authenticated");
+      throw new Error("User is not authenticated");
     }
     return { user };
   });
@@ -26,7 +25,7 @@ export function auth() {
 export function roles(requiredRoles: RoleDefinition[]) {
   return auth().pipe(({ mwc }) => {
     if (!new Set(requiredRoles).isSubsetOf(mwc.user.roles)) {
-      throw new RpcError("Insufficient permissions");
+      throw new Error("Insufficient permissions");
     }
 
     return mwc;

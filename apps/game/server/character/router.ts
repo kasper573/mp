@@ -1,6 +1,5 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { recordValues, type Tile } from "@mp/std";
-import { RpcError } from "@mp/rpc";
 import type { AuthToken } from "@mp/auth";
 import type { ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
@@ -29,15 +28,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RpcError("Character not found");
+        throw new Error("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RpcError("You don't have access to this character");
+        throw new Error("You don't have access to this character");
       }
 
       if (!char.health) {
-        throw new RpcError("Cannot move a dead character");
+        throw new Error("Cannot move a dead character");
       }
 
       state.actors
@@ -54,15 +53,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RpcError("Character not found");
+        throw new Error("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RpcError("You don't have access to this character");
+        throw new Error("You don't have access to this character");
       }
 
       if (targetId === characterId) {
-        throw new RpcError("You can't attack yourself");
+        throw new Error("You can't attack yourself");
       }
 
       state.actors.update(characterId).set("attackTargetId", targetId);
@@ -77,7 +76,7 @@ export const characterRouter = rpc.router({
       const tokenVerifier = ctx.get(ctxTokenVerifier);
       const result = await tokenVerifier(token);
       if (result.isErr()) {
-        throw new RpcError("Invalid token", { cause: result.error });
+        throw new Error("Invalid token", { cause: result.error });
       }
 
       const user = result.value;
@@ -126,15 +125,15 @@ export const characterRouter = rpc.router({
       const char = state.actors()[characterId];
 
       if (!char || char.type !== "character") {
-        throw new RpcError("Character not found");
+        throw new Error("Character not found");
       }
 
       if (char.userId !== user.id) {
-        throw new RpcError("You don't have access to this character");
+        throw new Error("You don't have access to this character");
       }
 
       if (char.health > 0) {
-        throw new RpcError("Character is not dead");
+        throw new Error("Character is not dead");
       }
 
       const characterService = ctx.get(ctxCharacterService);
