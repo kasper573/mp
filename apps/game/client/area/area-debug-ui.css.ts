@@ -12,7 +12,7 @@ export const debugMenu = style([
   {
     top: 8,
     left: 8,
-    minWidth: "min(300px, 90vw)",
+    width: "min(300px, 90vw)",
     background: "rgba(0, 0, 0, 0.5)",
     color: "white",
   },
