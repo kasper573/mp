@@ -26,6 +26,13 @@ export class Vector<T extends number> implements VectorLike<T> {
     return new Vector<T>(Math.round(this.x) as T, Math.round(this.y) as T);
   }
 
+  isFraction(precision: number): boolean {
+    return (
+      Math.abs(this.x - Math.round(this.x)) > precision ||
+      Math.abs(this.y - Math.round(this.y)) > precision
+    );
+  }
+
   toString(): string {
     return `${this.x.toFixed(1)}, ${this.y.toFixed(1)}`;
   }
