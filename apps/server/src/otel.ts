@@ -56,7 +56,10 @@ registerInstrumentations({
       "@opentelemetry/instrumentation-pg": { enhancedDatabaseReporting: true },
     }),
     new FsInstrumentation(),
-    new WSInstrumentation(),
+    new WSInstrumentation({
+      sendSpans: true,
+      messageEvents: true,
+    }),
   ],
 });
 
