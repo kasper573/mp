@@ -77,7 +77,9 @@ export function combatBehavior(
   }
 }
 
-const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
+// sqrt(2) is the diagonal distance between two tiles, which is slightly more than 1 tile,
+// and in case someone has an attack range of 1, we need some error margin to allow diagonal attack.
+const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
   actor: ReadonlyDeep<Actor>,
