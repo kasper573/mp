@@ -53,7 +53,7 @@ import { serverRpcRouter } from "./rpc";
 import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
-import { flushGameState } from "./etc/flush-game-state";
+import { createGameStateFlusher } from "./etc/flush-game-state";
 
 registerEncoderExtensions();
 
@@ -168,7 +168,7 @@ updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
 updateTicker.subscribe(combatBehavior(gameState));
-updateTicker.subscribe(() => flushGameState(gameState, wss.clients));
+updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, user }) =>

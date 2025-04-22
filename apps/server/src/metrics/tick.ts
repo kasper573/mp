@@ -2,7 +2,7 @@ import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
 import type { TickMiddleware } from "@mp/time";
 import { beginMeasuringTimeSpan } from "@mp/time";
-import { tickBuckets } from "./shared";
+import { msBuckets } from "./shared";
 
 export function createTickMetricsObserver(
   metrics: MetricsRegistry,
@@ -11,14 +11,14 @@ export function createTickMetricsObserver(
     name: "server_tick_interval",
     help: "Time between each server tick in milliseconds",
     registers: [metrics],
-    buckets: tickBuckets,
+    buckets: msBuckets,
   });
 
   const duration = new MetricsHistogram({
     name: "server_tick_duration",
     help: "Time taken to process each server tick in milliseconds",
     registers: [metrics],
-    buckets: tickBuckets,
+    buckets: msBuckets,
   });
 
   return async ({ next, ...event }) => {
