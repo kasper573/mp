@@ -6,5 +6,6 @@ export const inter = fontFace(
     src: `url(${url}) format("${format}")`,
     fontStyle,
     fontWeight,
+    fontDisplay: "swap",
   })),
 );
