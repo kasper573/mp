@@ -34,9 +34,9 @@ services:
     profiles: ["prod", "test"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
-      interval: 3s
-      timeout: 5s
-      retries: 5
+      interval: 2s
+      timeout: 3s
+      retries: 4
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
@@ -154,7 +154,7 @@ services:
   grafana:
     env_file: *env_files
     logging: *logging
-    image: grafana/grafana:10.4.12
+    image: grafana/grafana:12.0.0
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
@@ -180,8 +180,18 @@ services:
       - caddy-data:/data
       - caddy-config:/config
 
+  pyroscope:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/pyroscope:main-b667f4f
+    command: ["-config.file=/etc/pyroscope.yml"]
+    volumes:
+      - ./grafana/pyroscope.yaml:/etc/pyroscope.yml
+      - pyroscope-data:/data
+
 volumes:
   grafana-data:
+  pyroscope-data:
   loki-data:
   mimir-data:
   caddy-data:

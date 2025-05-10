@@ -17,13 +17,11 @@ import {
   FsInstrumentation,
 } from "@mp/telemetry/otel";
 import { createAddHookMessageChannel } from "import-in-the-middle";
+
 const { registerOptions, waitForAllMessagesAcknowledged } =
   createAddHookMessageChannel();
 
 register("import-in-the-middle/hook.mjs", import.meta.url, registerOptions);
-
-// NOTE: due to the nature of opentelemetry being built around
-// monkey patching this file must be imported before anything else in the codebase.
 
 diag.setLogger(new DiagConsoleLogger(), DiagLogLevel.ERROR);
 
