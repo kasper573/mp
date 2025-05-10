@@ -14,8 +14,8 @@
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
-    "ngraph.path": "1.5.0",
-    "ngraph.graph": "20.0.1"
+    "ngraph.graph": "20.0.1",
+    "ngraph.path": "1.5.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

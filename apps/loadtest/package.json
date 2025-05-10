@@ -8,11 +8,11 @@
     "start": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts"
   },
   "dependencies": {
-    "@mp/ws": "workspace:*",
     "@mp/auth": "workspace:*",
-    "@mp/server": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/rpc": "workspace:*"
+    "@mp/rpc": "workspace:*",
+    "@mp/server": "workspace:*",
+    "@mp/ws": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

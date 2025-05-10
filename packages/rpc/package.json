@@ -21,10 +21,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
     "@mp/encoding": "workspace:*",
-    "solid-js": "catalog:",
-    "@tanstack/solid-query": "5.74.3"
+    "@mp/std": "workspace:*",
+    "@tanstack/solid-query": "5.74.3",
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

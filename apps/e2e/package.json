@@ -9,7 +9,7 @@
   "license": "MIT",
   "devDependencies": {
     "@faker-js/faker": "9.2.0",
-    "@playwright/test": "1.50.0",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@playwright/test": "1.50.0"
   }
 }

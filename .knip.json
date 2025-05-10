@@ -3,6 +3,7 @@
   "ignoreDependencies": [
     "eslint-import-resolver-typescript",
     "@mp/tsconfig",
-    "@mp/eslint"
+    "@mp/eslint",
+    "tsx"
   ]
 }

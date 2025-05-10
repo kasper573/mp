@@ -17,8 +17,8 @@
     }
   },
   "dependencies": {
-    "ws": "8.18.1",
-    "partysocket": "1.1.3"
+    "partysocket": "1.1.3",
+    "ws": "8.18.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

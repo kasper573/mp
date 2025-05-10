@@ -17,10 +17,10 @@
     }
   },
   "dependencies": {
-    "drizzle-orm": "0.38.3",
-    "pg": "8.13.1",
     "@mp/math": "workspace:*",
-    "@mp/std": "workspace:*"
+    "@mp/std": "workspace:*",
+    "drizzle-orm": "0.38.3",
+    "pg": "8.13.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
