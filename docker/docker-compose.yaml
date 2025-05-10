@@ -38,8 +38,6 @@ services:
       timeout: 3s
       retries: 4
     depends_on:
-      pyroscope-healthcheck:
-        condition: service_healthy
       keycloak-healthcheck:
         condition: service_healthy
 
@@ -189,18 +187,6 @@ services:
     volumes:
       - ./grafana/pyroscope.yaml:/etc/pyroscope.yml
       - pyroscope-data:/data
-
-  # the pyroscope image dosen't have curl so we healthcheck it externally
-  pyroscope-healthcheck:
-    env_file: *env_files
-    logging: *logging
-    image: curlimages/curl
-    command: ["sh", "-c", "sleep infinity"]
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://pyroscope:4040/ready"]
-      interval: 2s
-      timeout: 3s
-      retries: 4
 
 volumes:
   grafana-data:
