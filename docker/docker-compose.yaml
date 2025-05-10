@@ -187,11 +187,6 @@ services:
     logging: *logging
     image: grafana/pyroscope:main-b667f4f
     command: ["-config.file=/etc/pyroscope.yml"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:4040/ready"]
-      interval: 2s
-      timeout: 3s
-      retries: 4
     volumes:
       - ./grafana/pyroscope.yaml:/etc/pyroscope.yml
       - pyroscope-data:/data
