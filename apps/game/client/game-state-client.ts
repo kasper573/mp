@@ -6,7 +6,7 @@ import {
   useContext,
 } from "solid-js";
 import type { Vector } from "@mp/math";
-import { dedupe, throttle, type Tile } from "@mp/std";
+import { assert, dedupe, throttle, type Tile } from "@mp/std";
 import { createMutable } from "solid-js/store";
 import { applyPatch, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
@@ -26,7 +26,9 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
   const [readyState, setReadyState] = createSignal(socket.readyState);
-  const areaId = createMemo(() => gameState.actors[characterId()!]?.areaId);
+  const areaId = createMemo(
+    () => gameState.actors[assert(characterId())].areaId,
+  );
 
   const actors = createSynchronizedActors(
     () => Object.keys(gameState.actors) as ActorId[],
@@ -34,7 +36,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   );
 
   const character = createMemo(
-    () => actors.get(characterId()!) as Character | undefined,
+    () => actors.get(assert(characterId())) as Character | undefined,
   );
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
@@ -47,7 +49,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
         logger.warn(
           `Stale patch detected, requesting full state refresh (lag: ${lag.totalMilliseconds}ms)`,
         );
-        void refreshState();
+        refreshState();
       }
 
       applyPatch(gameState, patch);
@@ -88,16 +90,19 @@ export function useGameActions() {
   const move = dedupe(
     throttle(
       (to: Vector<Tile>) =>
-        rpc.character.move({ characterId: state.characterId()!, to }),
+        rpc.character.move({ characterId: assert(state.characterId()), to }),
       100,
     ),
     (a, b) => a.equals(b),
   );
 
   const attack = (targetId: ActorId) =>
-    rpc.character.attack({ characterId: state.characterId()!, targetId });
+    rpc.character.attack({
+      characterId: assert(state.characterId()),
+      targetId,
+    });
 
-  const respawn = () => rpc.character.respawn(state.characterId()!);
+  const respawn = () => rpc.character.respawn(assert(state.characterId()));
 
   const join = (token: AuthToken) =>
     rpc.world.join(token).then(state.setCharacterId);

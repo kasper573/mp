@@ -51,7 +51,7 @@ export class TiledResource {
           pos: new Vector(layerTile.x, layerTile.y),
           propertyValue: getValue(layerTile),
         })),
-      ({ pos: { x, y } }) => `${x}|${y}`,
+      ({ pos: { x, y } }) => `${String(x)}|${String(y)}`,
     );
 
     const coordinates: Vector<Tile>[] = [];

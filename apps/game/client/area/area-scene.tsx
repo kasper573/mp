@@ -2,7 +2,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import type { Tile, Pixel } from "@mp/std";
+import { type Tile, type Pixel, assert } from "@mp/std";
 import type { ParentProps } from "solid-js";
 import {
   useContext,
@@ -37,7 +37,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
     loadTiledMapSpritesheets,
   );
 
-  const myCoords = () => state.character()!.coords;
+  const myCoords = () => assert(state.character()).coords;
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),

@@ -1,5 +1,6 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { assert } from "@mp/std";
 import { groupedRoles, playerGroup } from "./src/roles";
 
 const logger = new Logger();
@@ -50,17 +51,19 @@ async function upsertRolesAndGroups(groupedRoles: Record<string, string[]>) {
       group = await client.groups.create({ realm, name: groupName });
     }
 
-    const roles = existingRoles.filter((r) => roleNames.includes(r.name!));
+    const roles = existingRoles.filter((r) =>
+      roleNames.includes(assert(r.name)),
+    );
     log(
       `Adding roles to group "${groupName}":`,
       roles.map((r) => r.name),
     );
     await client.groups.addRealmRoleMappings({
       realm,
-      id: group.id!,
+      id: assert(group.id),
       roles: roles.map((role) => ({
-        id: role.id!,
-        name: role.name!,
+        id: assert(role.id),
+        name: assert(role.name),
       })),
     });
   }

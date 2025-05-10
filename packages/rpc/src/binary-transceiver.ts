@@ -18,8 +18,12 @@ export class BinaryRpcTransceiver<
   constructor({ send, ...options }: BinaryRpcTransceiverOptions<Context>) {
     super({
       ...options,
-      sendCall: (call) => send(this.callEncoding.encode(call)),
-      sendResponse: (response) => send(this.responseEncoding.encode(response)),
+      sendCall: (call) => {
+        send(this.callEncoding.encode(call));
+      },
+      sendResponse: (response) => {
+        send(this.responseEncoding.encode(response));
+      },
     });
   }
 
@@ -51,7 +55,7 @@ export class BinaryRpcTransceiver<
       const handle = async () => {
         try {
           const out = await this.handleMessage(event.data, context);
-          if (out?.result?.isErr()) {
+          if (out?.result.isErr()) {
             errorHandler(out.result.error);
           }
         } catch (error) {

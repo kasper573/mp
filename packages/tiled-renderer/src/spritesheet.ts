@@ -43,7 +43,7 @@ async function loadTilesetSpritesheet(
       .filter((tile) => tile.animation)
       .map((tile) => [
         localToGlobalId(tileset.firstgid, tile.id),
-        tile.animation!.map((frame) => ({
+        (tile.animation ?? []).map((frame) => ({
           duration: frame.duration,
           id: localToGlobalId(tileset.firstgid, frame.tileid),
         })),

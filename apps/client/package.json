@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/game": "workspace:*",

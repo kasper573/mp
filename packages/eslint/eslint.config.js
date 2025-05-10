@@ -32,7 +32,7 @@ export default tseslint.config(
     ],
   },
   eslint.configs.recommended,
-  ...tseslint.configs.recommendedTypeChecked,
+  ...tseslint.configs.strictTypeChecked,
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
   monorepoCopPlugin.configs.recommended,
   {
@@ -66,6 +66,21 @@ export default tseslint.config(
     rules: {
       // Consistent order of imports makes a modules dependencies easier to grasp mentally for humans
       "import/order": ["error"],
+
+      // Too strict, can't interpolate branded types into strings
+      "@typescript-eslint/restrict-template-expressions": "off",
+
+      // I disagree that it's confusing to implicitly return void in arrow functions. It's not.
+      "@typescript-eslint/no-confusing-void-expression": "off",
+
+      // Can give false positives when using NoInfer.
+      "@typescript-eslint/no-unnecessary-type-parameters": "off",
+
+      // Too strict, but can be turned on when you're cleaning up deprecations
+      "@typescript-eslint/no-deprecated": "off",
+
+      // Too strict
+      "@typescript-eslint/no-dynamic-delete": "off",
 
       // Automatically removes unused imports. Reduces need for tree shaking in builds.
       "unused-imports/no-unused-imports": "error",
@@ -173,6 +188,13 @@ export default tseslint.config(
     ...solid,
     languageOptions: {
       parser: tsParser,
+    },
+  },
+  {
+    files: ["**/*.test.{ts,tsx}"],
+    rules: {
+      // It's fine to use non null assertions in tests
+      "@typescript-eslint/no-non-null-assertion": "off",
     },
   },
   eslintPluginUnicorn.configs["flat/recommended"],

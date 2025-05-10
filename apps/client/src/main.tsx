@@ -2,6 +2,7 @@ import { dark } from "@mp/style/themes/dark.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
 import { LoadingSpinner } from "@mp/ui";
+import { assert } from "@mp/std";
 import * as styles from "./main.css";
 
 // Note that main.tsx is not the composition root of the application,
@@ -11,7 +12,7 @@ const App = lazy(() => import("./app"));
 
 document.documentElement.classList.add(dark);
 
-const rootElement = document.querySelector("div#root")!;
+const rootElement = assert(document.querySelector("div#root"));
 rootElement.classList.add(styles.root);
 
 render(Root, rootElement);

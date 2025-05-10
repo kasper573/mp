@@ -8,7 +8,7 @@ import { RpcInvokerError } from "../src/rpc-invoker";
 describe("RpcTransceiver", () => {
   let sendCall: ReturnType<typeof vi.fn>;
   let sendResponse: ReturnType<typeof vi.fn>;
-  let transceiver: RpcTransceiver<void>;
+  let transceiver: RpcTransceiver;
 
   beforeEach(() => {
     sendCall = vi.fn();

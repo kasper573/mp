@@ -1,4 +1,5 @@
 import type { BaseIssue, BaseSchema } from "valibot";
+import { assert } from "@mp/std";
 import {
   boolean,
   number,
@@ -31,7 +32,7 @@ export function numericString() {
   return pipe(
     string(),
     custom((value) => parseNumericString(String(value)) !== undefined),
-    transform((value) => parseNumericString(value)!),
+    transform((value) => assert(parseNumericString(value))),
   );
 }
 

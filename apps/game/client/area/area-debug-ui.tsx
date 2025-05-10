@@ -16,7 +16,7 @@ import {
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import type { Tile, Pixel } from "@mp/std";
+import { type Tile, type Pixel, assert } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
 import { Select, Button } from "@mp/ui";
 import uniqolor from "uniqolor";
@@ -76,7 +76,9 @@ export function AreaDebugUi(props: {
             </Button>
             <Button
               on:click={() =>
-                void rpc.character.kill({ targetId: state.characterId()! })
+                void rpc.character.kill({
+                  targetId: assert(state.characterId()),
+                })
               }
             >
               Die
