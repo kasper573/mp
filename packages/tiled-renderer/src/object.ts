@@ -1,6 +1,6 @@
-import type { FillStyle, StrokeStyle, ViewContainer } from "@mp/pixi";
-import { TextStyle } from "@mp/pixi";
-import { Graphics, Text } from "@mp/pixi";
+import type { FillStyle, StrokeStyle, ViewContainer } from "pixi.js";
+import { TextStyle } from "pixi.js";
+import { Graphics, Text } from "pixi.js";
 import type {
   EllipseObject,
   PointObject,

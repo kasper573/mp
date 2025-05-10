@@ -11,7 +11,7 @@
     }
   },
   "dependencies": {
-    "@mp/pixi": "workspace:*",
+    "pixi.js": "catalog:",
     "solid-js": "catalog:"
   },
   "devDependencies": {

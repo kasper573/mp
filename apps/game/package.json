@@ -26,7 +26,7 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
-    "@mp/pixi": "workspace:*",
+    "pixi.js": "catalog:",
     "@mp/solid-pixi": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/std": "workspace:*",

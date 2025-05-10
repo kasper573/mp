@@ -4,8 +4,8 @@ import type {
   SpritesheetData,
   SpritesheetFrameData,
   Texture,
-} from "@mp/pixi";
-import { Assets, Spritesheet } from "@mp/pixi";
+} from "pixi.js";
+import { Assets, Spritesheet } from "pixi.js";
 import type { FilePath, LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
   localToGlobalId,

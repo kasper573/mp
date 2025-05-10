@@ -1,7 +1,7 @@
 import { type Path, type Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
-import { Graphics } from "@mp/pixi";
+import { Graphics } from "pixi.js";
 import type { Accessor } from "solid-js";
 import {
   batch,

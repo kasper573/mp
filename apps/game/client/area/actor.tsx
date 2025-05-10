@@ -1,4 +1,4 @@
-import { Container, Graphics, Text } from "@mp/pixi";
+import { Container, Graphics, Text } from "pixi.js";
 import { Vector } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";

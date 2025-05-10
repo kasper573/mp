@@ -1,4 +1,4 @@
-import { AnimatedSprite, Matrix, Sprite } from "@mp/pixi";
+import { AnimatedSprite, Matrix, Sprite } from "pixi.js";
 import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
 import type { TextureLookup } from "./spritesheet";
 

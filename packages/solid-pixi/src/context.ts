@@ -1,4 +1,4 @@
-import type { Container } from "@mp/pixi";
+import type { Container } from "pixi.js";
 import { createContext } from "solid-js";
 
 export const ParentContext = createContext<Container>(

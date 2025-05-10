@@ -7,7 +7,7 @@ import type {
   TiledObject,
   TileLayer,
 } from "@mp/tiled-loader";
-import { Container } from "@mp/pixi";
+import { Container } from "pixi.js";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TextureLookup } from "./spritesheet";

@@ -11,7 +11,7 @@
     }
   },
   "dependencies": {
-    "@mp/pixi": "workspace:*",
+    "pixi.js": "catalog:",
     "@mp/solid-pixi": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "solid-js": "catalog:"

@@ -159,9 +159,6 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../packages/path-finding
-      '@mp/pixi':
-        specifier: workspace:*
-        version: link:../../packages/pixi
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
@@ -192,6 +189,9 @@ importers:
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
+      pixi.js:
+        specifier: 'catalog:'
+        version: 8.3.3
       solid-js:
         specifier: 'catalog:'
         version: 1.9.5
@@ -491,16 +491,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/pixi:
-    dependencies:
-      pixi.js:
-        specifier: 'catalog:'
-        version: 8.3.3
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   packages/rate-limiter:
     dependencies:
       '@mp/std':
@@ -538,9 +528,9 @@ importers:
 
   packages/solid-pixi:
     dependencies:
-      '@mp/pixi':
-        specifier: workspace:*
-        version: link:../pixi
+      pixi.js:
+        specifier: 'catalog:'
+        version: 8.3.3
       solid-js:
         specifier: 'catalog:'
         version: 1.9.5
@@ -689,15 +679,15 @@ importers:
 
   packages/tiled-renderer:
     dependencies:
-      '@mp/pixi':
-        specifier: workspace:*
-        version: link:../pixi
       '@mp/solid-pixi':
         specifier: workspace:*
         version: link:../solid-pixi
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
+      pixi.js:
+        specifier: 'catalog:'
+        version: 8.3.3
       solid-js:
         specifier: 'catalog:'
         version: 1.9.5

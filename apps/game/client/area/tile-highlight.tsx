@@ -1,5 +1,5 @@
-import type { FillStyle } from "@mp/pixi";
-import { Graphics } from "@mp/pixi";
+import type { FillStyle } from "pixi.js";
+import { Graphics } from "pixi.js";
 import { createEffect } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { type Rect } from "@mp/math";

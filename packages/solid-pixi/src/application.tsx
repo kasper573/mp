@@ -1,4 +1,4 @@
-import { Application as PixiApplication } from "@mp/pixi";
+import { Application as PixiApplication } from "pixi.js";
 import type { JSX } from "solid-js";
 import {
   createEffect,
