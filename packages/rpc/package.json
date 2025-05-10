@@ -23,7 +23,7 @@
   "dependencies": {
     "@mp/std": "workspace:*",
     "@mp/encoding": "workspace:*",
-    "solid-js": "1.9.5",
+    "solid-js": "catalog:",
     "@tanstack/solid-query": "5.74.3"
   },
   "devDependencies": {

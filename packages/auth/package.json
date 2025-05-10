@@ -24,7 +24,7 @@
     "@mp/std": "workspace:*",
     "jose": "5.9.6",
     "oidc-client-ts": "3.1.0",
-    "solid-js": "1.9.5"
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

@@ -11,7 +11,7 @@
     }
   },
   "dependencies": {
-    "pixi.js": "8.3.3"
+    "pixi.js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

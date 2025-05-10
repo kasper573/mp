@@ -4,6 +4,15 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+catalogs:
+  default:
+    pixi.js:
+      specifier: 8.3.3
+      version: 8.3.3
+    solid-js:
+      specifier: 1.9.5
+      version: 1.9.5
+
 importers:
 
   .:
@@ -87,7 +96,7 @@ importers:
         specifier: 1.115.3
         version: 1.115.3(@tanstack/router-core@1.115.3)(@tanstack/solid-router@1.115.3(solid-js@1.9.5))(csstype@3.1.3)(solid-js@1.9.5)(tiny-invariant@1.3.3)
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -184,7 +193,7 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ws
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
       uniqolor:
         specifier: 1.1.1
@@ -310,7 +319,7 @@ importers:
         specifier: 3.1.0
         version: 3.1.0
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -367,7 +376,7 @@ importers:
         specifier: workspace:*
         version: link:../time
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -485,7 +494,7 @@ importers:
   packages/pixi:
     dependencies:
       pixi.js:
-        specifier: 8.3.3
+        specifier: 'catalog:'
         version: 8.3.3
     devDependencies:
       '@mp/tsconfig':
@@ -517,7 +526,7 @@ importers:
         specifier: 5.74.3
         version: 5.74.3(solid-js@1.9.5)
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -533,7 +542,7 @@ importers:
         specifier: workspace:*
         version: link:../pixi
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -543,7 +552,7 @@ importers:
   packages/state:
     dependencies:
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -581,7 +590,7 @@ importers:
         specifier: 2.1.1
         version: 2.1.1
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -690,7 +699,7 @@ importers:
         specifier: workspace:*
         version: link:../tiled-loader
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
@@ -725,7 +734,7 @@ importers:
         specifier: workspace:*
         version: link:../style
       solid-js:
-        specifier: 1.9.5
+        specifier: 'catalog:'
         version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
