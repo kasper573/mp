@@ -34,9 +34,9 @@ services:
     profiles: ["prod", "test"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
-      interval: 2s
-      timeout: 3s
-      retries: 4
+      interval: 3s
+      timeout: 5s
+      retries: 5
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
@@ -74,8 +74,8 @@ services:
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://keycloak:9000/health/live"]
       interval: 3s
-      timeout: 4s
-      retries: 5
+      timeout: 5s
+      retries: 9
 
   postgres:
     env_file: *env_files
