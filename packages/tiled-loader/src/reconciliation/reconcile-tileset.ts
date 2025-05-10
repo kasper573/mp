@@ -57,7 +57,7 @@ export async function reconcileTileset(
 }
 
 type UnresolvedTileset = Omit<Tileset, "tiles"> & {
-  tiles: TilesetTile[];
+  tiles?: TilesetTile[];
 };
 
 interface TilesetFile {

@@ -1,6 +1,6 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { type Tile } from "@mp/std";
-import type { ActorId } from "../traits/actor";
+import type { Actor, ActorId } from "../traits/actor";
 import { ctxGameStateMachine } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
@@ -22,7 +22,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.move]))
     .mutation(({ input: { characterId, to }, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameStateMachine);
-      const char = state.actors()[characterId];
+      const char = state.actors()[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");
@@ -47,7 +47,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.attack]))
     .mutation(({ input: { characterId, targetId }, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameStateMachine);
-      const char = state.actors()[characterId];
+      const char = state.actors()[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");
@@ -78,7 +78,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.respawn]))
     .mutation(({ input: characterId, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameStateMachine);
-      const char = state.actors()[characterId];
+      const char = state.actors()[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");

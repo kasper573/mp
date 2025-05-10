@@ -1,5 +1,6 @@
 import type { Path } from "@mp/math";
 import { Vector } from "@mp/math";
+import { assert } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
 
 export function moveAlongPath<T extends number>(
@@ -18,7 +19,7 @@ export function moveAlongPath<T extends number>(
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;
-      newCoords = newPath.shift()!;
+      newCoords = assert(newPath.shift());
     } else {
       const percentage = distanceToMove / distanceToDestination;
       newCoords = new Vector(

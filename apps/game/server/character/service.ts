@@ -28,11 +28,13 @@ export class CharacterService {
   private async getCharacterForUser(
     user: UserIdentity,
   ): Promise<Character | undefined> {
-    const [char] = await this.db
+    const result = await this.db
       .select()
       .from(characterTable)
       .where(eq(characterTable.userId, user.id))
       .limit(1);
+
+    const char = result.length > 0 ? result[0] : undefined;
 
     return char
       ? {
@@ -80,11 +82,12 @@ export class CharacterService {
       ...characterAppearance(user.id),
     };
 
-    const [returned] = await this.db
+    const result = await this.db
       .insert(characterTable)
       .values(input)
       .returning({ id: characterTable.id });
 
+    const returned = result.length > 0 ? result[0] : undefined;
     if (!returned) {
       throw new Error("Failed to insert character");
     }

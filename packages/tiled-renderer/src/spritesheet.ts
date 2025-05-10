@@ -43,7 +43,7 @@ async function loadTilesetSpritesheet(
       .filter((tile) => tile.animation)
       .map((tile) => [
         localToGlobalId(tileset.firstgid, tile.id),
-        tile.animation!.map((frame) => ({
+        (tile.animation ?? []).map((frame) => ({
           duration: frame.duration,
           id: localToGlobalId(tileset.firstgid, frame.tileid),
         })),
@@ -106,8 +106,7 @@ export function createTextureLookup(
   return {
     texture(id) {
       for (const ss of Object.values(spritesheets)) {
-        const texture = ss.textures[id];
-
+        const texture = ss.textures[id] as Texture | undefined;
         if (texture) {
           return texture;
         }

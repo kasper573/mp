@@ -17,16 +17,15 @@ import * as tokens from "./tokens";
  *   transition: createTransition(["opacity", "standard.enter"])
  * })
  */
-export function cssForTransition<const Transitions extends Transition[]>(
-  ...transitions: Transitions
-) {
+export function cssForTransition(...transitions: Transition[]) {
   return transitions
     .flatMap(([propertyNameOrNames, preset]) => {
       const propertyNames = Array.isArray(propertyNameOrNames)
         ? propertyNameOrNames
         : [propertyNameOrNames];
       return propertyNames.map(
-        (property) => `${property} ${String(transitionPresetValues[preset])}`,
+        (property) =>
+          `${String(property)} ${String(transitionPresetValues[preset])}`,
       );
     })
     .join(", ");
@@ -43,9 +42,7 @@ export function cssForTransition<const Transitions extends Transition[]>(
  *   animation: createAnimation([enter, "long1", "emphasized", { count: 1 }]),
  * })
  */
-export function cssForAnimation<Animations extends Animation[]>(
-  ...animations: Animations
-) {
+export function cssForAnimation(...animations: Animation[]) {
   return animations
     .map(
       ([

@@ -5,7 +5,7 @@ import { RpcBuilder, createRpcInvoker, RpcInvokerError } from "../src";
 
 describe("builder and invoker", () => {
   it("invokes a query procedure and returns Ok with output", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
     const node = rpc.procedure
       .input<number>()
       .output<number>()
@@ -21,7 +21,7 @@ describe("builder and invoker", () => {
   });
 
   it("invokes a mutation procedure and returns Ok with output", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
     const node = rpc.procedure
       .input<string>()
       .output<string>()
@@ -54,7 +54,7 @@ describe("builder and invoker", () => {
   });
 
   it("resolves nested router paths correctly", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
 
     const greet = rpc.procedure
       .input<string>()
@@ -72,7 +72,7 @@ describe("builder and invoker", () => {
   });
 
   it("returns Err when path not found", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
     const root = rpc.router({});
     const invoker = createRpcInvoker(root);
     const call: RpcCall<unknown> = [["unknown"], {}, 1 as RpcCallId];
@@ -88,7 +88,7 @@ describe("builder and invoker", () => {
   });
 
   it("returns Err when path points to a router endpoint", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
 
     const nestedRouter = rpc.router({
       child: rpc.procedure.output<string>().query(() => "x"),
@@ -108,7 +108,7 @@ describe("builder and invoker", () => {
   });
 
   it("catches handler exceptions and returns Err with cause", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
 
     const brokenProc = rpc.procedure.query(() => {
       throw new Error("Unexpected");
@@ -171,7 +171,7 @@ describe("builder and invoker", () => {
   });
 
   it("can use a piped middleware", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
 
     const baseMw = rpc.middleware(() => ({ count: 1 }));
     const pipedMw = baseMw.pipe(({ mwc }) => ({ count: mwc.count + 1 }));
@@ -191,7 +191,7 @@ describe("builder and invoker", () => {
   });
 
   it("supports chaining multiple .input/.output steps in any order", async () => {
-    const rpc = new RpcBuilder<void>().build();
+    const rpc = new RpcBuilder().build();
 
     const node = rpc.procedure
       .output<number>()

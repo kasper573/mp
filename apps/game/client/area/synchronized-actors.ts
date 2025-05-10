@@ -4,7 +4,7 @@ import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import type { Path } from "@mp/math";
 import { pathCopy, Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import { moveAlongPath } from "../../shared/area/move-along-path";
 import type { Actor, ActorId } from "../../server";
 
@@ -20,9 +20,11 @@ type LocalActorChange = Pick<Actor, "coords" | "path"> & {
  */
 export function createSynchronizedActors(
   getRemoteActorIds: () => ActorId[],
-  getRemoteActor: (id: ActorId) => Actor,
+  getRemoteActor: (id: ActorId) => Actor | undefined,
 ) {
-  const localChanges = createMutable<Record<ActorId, LocalActorChange>>({});
+  const localChanges = createMutable<
+    Record<ActorId, LocalActorChange | undefined>
+  >({});
   function getLocalActor(id: ActorId) {
     return new Proxy<Actor>({} as Actor, {
       get(target, prop) {
@@ -42,7 +44,7 @@ export function createSynchronizedActors(
   function getOrCreateLocalChange(id: ActorId): LocalActorChange {
     let change = localChanges[id];
     if (!change) {
-      const actor = getRemoteActor(id);
+      const actor = assert(getRemoteActor(id));
       change = deriveLocalChange(actor);
       Object.assign(localChanges, { [id]: change });
     }
@@ -53,7 +55,7 @@ export function createSynchronizedActors(
     batch(() => {
       for (const actorId of getRemoteActorIds()) {
         const local = getOrCreateLocalChange(actorId);
-        const remote = getRemoteActor(actorId);
+        const remote = assert(getRemoteActor(actorId));
 
         if (local.pathChange) {
           switch (local.pathChange.type) {
@@ -117,7 +119,7 @@ export function createSynchronizedActors(
 
   createEffect(() => {
     for (const actorId of getRemoteActorIds()) {
-      const { path } = getRemoteActor(actorId);
+      const { path } = assert(getRemoteActor(actorId));
 
       untrack(() => {
         const change = getOrCreateLocalChange(actorId);

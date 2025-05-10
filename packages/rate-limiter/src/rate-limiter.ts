@@ -13,7 +13,7 @@ export class RateLimiter {
   }
 
   consume(key: string): RateLimiterResult {
-    if (RateLimiter.enabled === false) {
+    if (!RateLimiter.enabled) {
       return okAsync("skipped-due-to-disabled");
     }
 

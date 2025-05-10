@@ -17,6 +17,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "17.0.33",
+    "tsx": "catalog:",
     "yargs": "17.7.2"
   }
 }

@@ -44,7 +44,7 @@ export function combatBehavior(
       return; // Not attacking
     }
 
-    const target = state.actors()[actor.attackTargetId];
+    const target = state.actors()[actor.attackTargetId] as Actor | undefined;
     if (!target || !isTargetable(actor, target)) {
       state.actors.update(actor.id).set("attackTargetId", undefined);
       return;

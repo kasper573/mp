@@ -20,7 +20,7 @@ export interface OurJwtPayload extends JWTPayload {
 }
 
 export function isOurJwtPayload(payload: JWTPayload): payload is OurJwtPayload {
-  return (payload as OurJwtPayload).realm_access !== undefined;
+  return (payload as Partial<OurJwtPayload>).realm_access !== undefined;
 }
 
 export function extractRolesFromJwtPayload(
