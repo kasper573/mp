@@ -67,8 +67,7 @@ services:
       postgres:
         condition: service_healthy
 
-  # the keycloak image itself is so bare bones for security reasons that it doesn't have curl,
-  # so we use a separate container to run healthchecks on keycloak externally.
+  # the keycloak image dosen't have curl so we healthcheck it externally
   keycloak-healthcheck:
     env_file: *env_files
     logging: *logging
@@ -191,8 +190,7 @@ services:
       - ./grafana/pyroscope.yaml:/etc/pyroscope.yml
       - pyroscope-data:/data
 
-  # the pyroscope image itself is so bare bones for security reasons that it doesn't have curl,
-  # so we use a separate container to run healthchecks on keycloak externally.
+  # the pyroscope image dosen't have curl so we healthcheck it externally
   pyroscope-healthcheck:
     env_file: *env_files
     logging: *logging
