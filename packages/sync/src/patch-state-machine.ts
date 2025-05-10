@@ -23,7 +23,7 @@ export function createPatchStateMachine<State extends PatchableState>(
     opt.clientIds,
     opt.clientVisibility,
   );
-  const repositories = {} as EntityRepositoryRecord<State>;
+  const repositories = {} as Partial<EntityRepositoryRecord<State>>;
   return new Proxy({} as PatchStateMachine<State>, {
     get(target, prop) {
       if (prop === flushFunctionName) {

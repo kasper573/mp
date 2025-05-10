@@ -106,8 +106,7 @@ export function createTextureLookup(
   return {
     texture(id) {
       for (const ss of Object.values(spritesheets)) {
-        const texture = ss.textures[id];
-
+        const texture = ss.textures[id] as Texture | undefined;
         if (texture) {
           return texture;
         }

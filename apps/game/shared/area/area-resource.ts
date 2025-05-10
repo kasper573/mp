@@ -1,6 +1,6 @@
 import { Vector } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import type { Pixel, Tile } from "@mp/std";
+import { assert, type Pixel, type Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./tiled-resource";
 import { graphFromTiled } from "./graph-from-tiled";
@@ -19,20 +19,21 @@ export class AreaResource {
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
-    this.characterLayer = this.tiled.getTileLayers(characterLayerName)[0];
-
-    if (!this.characterLayer) {
-      throw new Error(`Map must have a '${characterLayerName}' layer`);
-    }
+    this.characterLayer = assert(
+      this.tiled.getTileLayers(characterLayerName)[0] as Layer | undefined,
+      `Map must have a '${characterLayerName}' layer`,
+    );
 
     this.objects = this.tiled.getObjects();
     this.graph = graphFromTiled(tiled);
     this.#findPath = this.graph.createPathFinder();
 
-    const [startObj] = tiled.getObjectsByClassName(TiledFixture.start);
-    if (!startObj) {
-      throw new Error("Invalid area data: must have a start location");
-    }
+    const startObj = assert(
+      tiled.getObjectsByClassName(TiledFixture.start)[0] as
+        | TiledObject
+        | undefined,
+      "Invalid area data: must have a start location",
+    );
 
     this.start = tiled.worldCoordToTile(Vector.from(startObj)).round();
   }

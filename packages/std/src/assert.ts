@@ -1,6 +1,9 @@
-export function assert<Value>(value: Value | null | undefined): Value {
+export function assert<Value>(
+  value: Value | null | undefined,
+  errorMessage = "Value is null or undefined",
+): Value {
   if (value === null || value === undefined) {
-    throw new Error("Value is null or undefined");
+    throw new Error(errorMessage);
   }
   return value;
 }

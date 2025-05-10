@@ -6,3 +6,4 @@ export * from "./iterators";
 export * from "./function-composition";
 export * from "./assert";
 export * from "neverthrow";
+export * from "./assert";

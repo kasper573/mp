@@ -26,18 +26,22 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
   const [readyState, setReadyState] = createSignal(socket.readyState);
-  const areaId = createMemo(
-    () => gameState.actors[assert(characterId())].areaId,
-  );
+  const areaId = createMemo(() => {
+    const id = characterId();
+    const actor = id ? gameState.actors[id] : undefined;
+    return actor?.areaId;
+  });
 
   const actors = createSynchronizedActors(
     () => Object.keys(gameState.actors) as ActorId[],
     (id) => gameState.actors[id],
   );
 
-  const character = createMemo(
-    () => actors.get(assert(characterId())) as Character | undefined,
-  );
+  const character = createMemo(() => {
+    const id = characterId();
+    const actor = id ? actors.get(id) : undefined;
+    return actor ? (actor as Character) : undefined;
+  });
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);
