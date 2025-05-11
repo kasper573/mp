@@ -1,11 +1,16 @@
 import { Container, Text } from "pixi.js";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";
+import { assert } from "@mp/std";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
-import { createCharacterSprite } from "../character/character-sprite";
 import { createTintFilter } from "../tint-filter";
-import { loadCharacterSpritesheetForState } from "../character/character-sprite-state";
+import { createCharacterSprite } from "./character-sprite";
+import {
+  loadAllCharacterSpritesheets,
+  loopedCharacterSpriteStates,
+} from "./character-sprite-state";
+import { deriveCharacterSpriteState } from "./character-sprite-state-for-actor";
 
 export function Actor(props: {
   tiled: TiledResource;
@@ -18,10 +23,16 @@ export function Actor(props: {
 
   const container = new Container();
 
+  const state = createMemo(() => deriveCharacterSpriteState(props.actor));
+
   const sprite = createCharacterSprite(
     () => props.actor.facingAngle,
-    () => walk,
+    () => assert(adventurerSpritesheets.get(state())),
   );
+
+  createEffect(() => {
+    sprite.loop = loopedCharacterSpriteStates.includes(state());
+  });
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);
@@ -47,7 +58,4 @@ export function Actor(props: {
   );
 }
 
-const walk = await loadCharacterSpritesheetForState(
-  "adventurer",
-  "walk-normal",
-);
+const adventurerSpritesheets = await loadAllCharacterSpritesheets("adventurer");

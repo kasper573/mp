@@ -40,6 +40,10 @@ export const characterSpriteStates = Object.freeze([
   "walk-spear",
 ] as const);
 
+export const loopedCharacterSpriteStates = characterSpriteStates.filter(
+  (state) => !state.startsWith("death-"),
+);
+
 export async function loadCharacterSpritesheetForState(
   character: string,
   state: CharacterSpriteState,
@@ -50,4 +54,19 @@ export async function loadCharacterSpritesheetForState(
   const texture = await Assets.load<Texture>(spritesheetUrl);
   texture.source.scaleMode = "nearest";
   return createCharacterSpritesheet(texture, { width: 48, height: 64 });
+}
+
+export async function loadAllCharacterSpritesheets(
+  character: string,
+): Promise<ReadonlyMap<CharacterSpriteState, Spritesheet>> {
+  return new Map(
+    await Promise.all(
+      characterSpriteStates.map(
+        async (state): Promise<[CharacterSpriteState, Spritesheet]> => [
+          state,
+          await loadCharacterSpritesheetForState(character, state),
+        ],
+      ),
+    ),
+  );
 }

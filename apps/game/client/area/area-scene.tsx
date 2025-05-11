@@ -18,7 +18,7 @@ import {
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
 import type { AreaResource } from "../../shared/area/area-resource";
-import { Actor } from "./actor";
+import { Actor } from "../actor/actor";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { RespawnDialog } from "./respawn-dialog";
