@@ -1,9 +1,6 @@
 name: Test, Build, Deploy
 on:
   push:
-    paths-ignore:
-      - "*.md"
-
 env:
   DOCKER_REGISTRY: ghcr.io
   DOCKER_USERNAME: ${{ github.actor }}

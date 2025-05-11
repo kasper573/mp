@@ -2,7 +2,6 @@ import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import solid from "vite-plugin-solid";
-import topLevelAwait from "vite-plugin-top-level-await";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 
 import type { Plugin } from "vite";
@@ -19,7 +18,6 @@ export default defineConfig({
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     solid(),
-    topLevelAwait(),
     checker({ typescript: true }),
     ...(process.env.MP_CLIENT_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

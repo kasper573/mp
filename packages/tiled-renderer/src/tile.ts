@@ -1,10 +1,10 @@
 import { AnimatedSprite, Matrix, Sprite } from "pixi.js";
 import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
-import type { TextureLookup } from "./spritesheet";
+import type { TiledTextureLookup } from "./spritesheet";
 
 export function createTileSprite(
   { id, flags, x, y, width, height, tile }: TileLayerTile,
-  lookup: TextureLookup,
+  lookup: TiledTextureLookup,
 ): Sprite {
   let sprite: Sprite;
   if (tile.animation) {

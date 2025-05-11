@@ -41,6 +41,7 @@ export class CharacterService {
           ...char,
           ...characterAppearance(user.id),
           hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
+          facingAngle: Math.random() * Math.PI * 2,
           name:
             user.name ??
             uniqueNamesGenerator({
@@ -96,6 +97,7 @@ export class CharacterService {
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
+      facingAngle: Math.random() * Math.PI * 2,
       name:
         user.name ??
         uniqueNamesGenerator({
@@ -107,7 +109,7 @@ export class CharacterService {
 }
 
 function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
-  return { color: 0x00_ff_00 };
+  return { color: undefined };
 }
 
 export const ctxCharacterService =

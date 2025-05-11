@@ -17,7 +17,7 @@ import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
-import { createSynchronizedActors } from "./area/synchronized-actors";
+import { createSynchronizedActors } from "./actor/synchronized-actors";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 

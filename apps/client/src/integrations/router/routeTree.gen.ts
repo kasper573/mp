@@ -14,6 +14,7 @@ import { Route as rootRoute } from './../../routes/~__root'
 import { Route as SandboxImport } from './../../routes/~sandbox'
 import { Route as PlayImport } from './../../routes/~play'
 import { Route as ContactImport } from './../../routes/~contact'
+import { Route as CharacterTesterImport } from './../../routes/~character-tester'
 import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
 import { Route as IndexImport } from './../../routes/~index'
 
@@ -34,6 +35,12 @@ const PlayRoute = PlayImport.update({
 const ContactRoute = ContactImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const CharacterTesterRoute = CharacterTesterImport.update({
+  id: '/character-tester',
+  path: '/character-tester',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -67,6 +74,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof AuthCallbackImport
       parentRoute: typeof rootRoute
     }
+    '/character-tester': {
+      id: '/character-tester'
+      path: '/character-tester'
+      fullPath: '/character-tester'
+      preLoaderRoute: typeof CharacterTesterImport
+      parentRoute: typeof rootRoute
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -96,6 +110,7 @@ declare module '@tanstack/solid-router' {
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
+  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -104,6 +119,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
+  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -113,6 +129,7 @@ export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
   '/auth-callback': typeof AuthCallbackRoute
+  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -120,16 +137,36 @@ export interface FileRoutesById {
 
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth-callback' | '/contact' | '/play' | '/sandbox'
+  fullPaths:
+    | '/'
+    | '/auth-callback'
+    | '/character-tester'
+    | '/contact'
+    | '/play'
+    | '/sandbox'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth-callback' | '/contact' | '/play' | '/sandbox'
-  id: '__root__' | '/' | '/auth-callback' | '/contact' | '/play' | '/sandbox'
+  to:
+    | '/'
+    | '/auth-callback'
+    | '/character-tester'
+    | '/contact'
+    | '/play'
+    | '/sandbox'
+  id:
+    | '__root__'
+    | '/'
+    | '/auth-callback'
+    | '/character-tester'
+    | '/contact'
+    | '/play'
+    | '/sandbox'
   fileRoutesById: FileRoutesById
 }
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
+  CharacterTesterRoute: typeof CharacterTesterRoute
   ContactRoute: typeof ContactRoute
   PlayRoute: typeof PlayRoute
   SandboxRoute: typeof SandboxRoute
@@ -138,6 +175,7 @@ export interface RootRouteChildren {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthCallbackRoute: AuthCallbackRoute,
+  CharacterTesterRoute: CharacterTesterRoute,
   ContactRoute: ContactRoute,
   PlayRoute: PlayRoute,
   SandboxRoute: SandboxRoute,
@@ -155,6 +193,7 @@ export const routeTree = rootRoute
       "children": [
         "/",
         "/auth-callback",
+        "/character-tester",
         "/contact",
         "/play",
         "/sandbox"
@@ -165,6 +204,9 @@ export const routeTree = rootRoute
     },
     "/auth-callback": {
       "filePath": "~auth-callback.tsx"
+    },
+    "/character-tester": {
+      "filePath": "~character-tester.tsx"
     },
     "/contact": {
       "filePath": "~contact.tsx"
