@@ -124,3 +124,7 @@ Generic and low level systems.
 Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
 
 Dependencies must instead be provided as arguments.
+
+# Credits
+
+[Adventurer character model by @sscary](https://sscary.itch.io/the-adventurer-male)
