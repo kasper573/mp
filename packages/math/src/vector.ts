@@ -26,6 +26,12 @@ export class Vector<T extends number> implements VectorLike<T> {
     return new Vector<T>(Math.round(this.x) as T, Math.round(this.y) as T);
   }
 
+  angle(other: Vector<T>): number {
+    const dx = other.x - this.x;
+    const dy = other.y - this.y;
+    return Math.atan2(dy, dx);
+  }
+
   isFraction(precision: number): boolean {
     return (
       Math.abs(this.x - Math.round(this.x)) > precision ||

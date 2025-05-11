@@ -5,13 +5,29 @@ import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
 import { createCharacterSprite } from "./character-sprite";
 
-export function Actor(props: { tiled: TiledResource; actor: Actor }) {
+export function Actor(props: {
+  tiled: TiledResource;
+  actor: Actor;
+  showAngle?: boolean;
+}) {
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),
   );
 
+  const facingAngle = createMemo(() => {
+    const target = props.actor.path?.[0];
+    return target ? props.actor.coords.angle(target) : Math.PI / 2;
+  });
+
+  const angle = createMemo(() => {
+    const target = props.actor.path?.[0];
+    return target ? props.actor.coords.angle(target) : "still";
+  });
+
   const container = new Container();
-  const sprite = createCharacterSprite();
+  // eslint-disable-next-line solid/reactivity
+  const sprite = createCharacterSprite(facingAngle);
+
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);
   container.addChild(text);
@@ -19,12 +35,17 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   createEffect(() => {
     const { opacity, color } = props.actor;
     container.alpha = opacity ?? 1;
-    container.filters = [createTintFilter(color)];
+    if (color !== undefined) {
+      sprite.filters = [createTintFilter(color)];
+    }
   });
 
   createEffect(() => {
     const { name, health, maxHealth } = props.actor;
     text.text = name + `\n${health}/${maxHealth}`;
+    if (props.showAngle) {
+      text.text += `\n${angle()}`;
+    }
   });
 
   return (

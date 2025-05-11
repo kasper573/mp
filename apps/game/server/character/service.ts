@@ -107,7 +107,7 @@ export class CharacterService {
 }
 
 function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
-  return { color: 0x00_ff_00 };
+  return { color: undefined };
 }
 
 export const ctxCharacterService =

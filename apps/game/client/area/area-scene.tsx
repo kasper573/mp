@@ -128,7 +128,11 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
                 [props.area.characterLayer.name]: () => (
                   <For each={state.actorList()}>
                     {(actor) => (
-                      <Actor tiled={props.area.tiled} actor={actor} />
+                      <Actor
+                        tiled={props.area.tiled}
+                        actor={actor}
+                        showAngle={actor.id === state.characterId()}
+                      />
                     )}
                   </For>
                 ),

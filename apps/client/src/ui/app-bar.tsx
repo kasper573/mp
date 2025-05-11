@@ -19,6 +19,7 @@ export default function AppBar() {
       <Link to="/play">Play</Link>
       <Link to="/sandbox">Dev Tools</Link>
       <Link to="/contact">Contact</Link>
+      <Link to="/character-tester">Character Tester</Link>
 
       <LinearProgress
         class={dock({ position: "top" })}

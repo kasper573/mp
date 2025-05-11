@@ -1,17 +1,38 @@
-import type { FrameObject, Size, SpritesheetFrameData, Texture } from "pixi.js";
+import type {
+  AnimatedSpriteFrames,
+  Size,
+  SpritesheetFrameData,
+  Texture,
+} from "pixi.js";
 import { AnimatedSprite, Assets, Spritesheet } from "pixi.js";
+import type { Accessor } from "solid-js";
 import { createEffect, createMemo } from "solid-js";
-import spritesheetUrl from "../../../server/public/characters/sscary-the-male-adventurer/Walk/Normal/walk.png";
+import spritesheetUrl from "../../../server/public/characters/sscary-the-male-adventurer/Run/Normal/run.png";
+import missingUrl from "./missing.jpg";
 
 const frameSize: Size = { width: 48, height: 64 };
 
-export function createCharacterSprite() {
-  const textures = createMemo((): FrameObject[] =>
-    (walk.animations["down"] ?? []).map((texture) => ({
+const missingTexture = await Assets.load<Texture>(missingUrl);
+
+export function createCharacterSprite(facingAngle: Accessor<number>) {
+  const direction = createMemo(() => {
+    const availableDirections = allDirections.filter(
+      (direction) => spritesheet.animations[direction].length,
+    );
+    return determineDirection(facingAngle(), availableDirections);
+  });
+  const textures = createMemo((): AnimatedSpriteFrames => {
+    const textures = spritesheet.animations[direction()] as
+      | Texture[]
+      | undefined;
+    if (!textures?.length) {
+      return [missingTexture];
+    }
+    return textures.map((texture) => ({
       texture,
       time: 100,
-    })),
-  );
+    }));
+  });
 
   const sprite = new AnimatedSprite({
     ...frameSize,
@@ -38,7 +59,7 @@ async function loadCharacterSpritesheet(
   const rows = Math.ceil(texture.height / frameSize.height);
   const frames = Object.fromEntries(
     Array.from(generateFrames(rows, columns, frameSize)).map(
-      (frame, frameIndex) => [frameIndex, frame],
+      (frame, frameId) => [frameId, frame],
     ),
   );
   const animations = Object.fromEntries(
@@ -46,7 +67,7 @@ async function loadCharacterSpritesheet(
       name,
       Array.from({ length: columns }, (v, columnIndex) =>
         String(rowIndex * columns + columnIndex),
-      ),
+      ).filter((frameId) => frameId in frames),
     ]),
   );
   const ss = new Spritesheet(texture, {
@@ -82,7 +103,54 @@ function* generateFrames(
   }
 }
 
-const directionLayerIndexes = {
+function determineDirection(
+  angle: number,
+  availableDirections: Direction[],
+): Direction {
+  const normalizedAngle = normalizeAngle(angle);
+  const nearestDirections = availableDirections.toSorted(
+    (directionA, directionB) => {
+      const daAngle = normalizeAngle(directionAngles[directionA]);
+      const dbAngle = normalizeAngle(directionAngles[directionB]);
+      return (
+        Math.abs(normalizedAngle - daAngle) -
+        Math.abs(normalizedAngle - dbAngle)
+      );
+    },
+  );
+
+  return nearestDirections[0];
+}
+
+export type Direction = keyof typeof directionAngles;
+
+/**
+ * The exact angle that each direction represents.
+ */
+export const directionAngles = {
+  right: Math.atan2(0, 1),
+  "down-right": Math.atan2(1, 1),
+  down: Math.atan2(1, 0),
+  "down-left": Math.atan2(1, -1),
+  left: Math.atan2(0, -1),
+  "up-left": Math.atan2(-1, -1),
+  up: Math.atan2(-1, 0),
+  "up-right": Math.atan2(-1, 1),
+};
+
+function normalizeAngle(angle: number) {
+  if (angle < 0) {
+    return angle + 2 * Math.PI;
+  }
+  return angle;
+}
+
+const allDirections = Object.keys(directionAngles) as Direction[];
+
+/**
+ * The layer index inside the spritesheet each direction is located at.
+ */
+const directionLayerIndexes: Record<Direction, number> = {
   down: 0,
   "down-left": 1,
   "up-left": 2,
@@ -93,4 +161,4 @@ const directionLayerIndexes = {
   left: 7,
 };
 
-const walk = await loadCharacterSpritesheet(spritesheetUrl, frameSize);
+const spritesheet = await loadCharacterSpritesheet(spritesheetUrl, frameSize);
