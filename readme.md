@@ -9,15 +9,15 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 ## Stack
 
-- 2d graphics: [Pixi](https://pixijs.com/)
-- maps: [Tiled](https://www.mapeditor.org/) (+custom
+- 2d graphics: [pixi.js](https://pixijs.com/)
+- maps: [tiled](https://www.mapeditor.org/) (+custom
   [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
-- ui: [SolidJS](https://www.solidjs.com/)
+- ui: [solid-js](https://www.solidjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
-  [drizzle orm](https://orm.drizzle.team/)
+  [drizzle](https://orm.drizzle.team/)
 - network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))
 - auth: [keycloak](https://www.keycloak.org/)
-- observability: [Grafana LGTM + Faro](https://grafana.com/oss/faro/)
+- observability: [grafana](https://grafana.com)
 
 ## Design goals
 
