@@ -1,5 +1,6 @@
 import type { Texture } from "pixi.js";
 import { Assets, type Spritesheet } from "pixi.js";
+import type { Branded } from "@mp/std";
 import { createCharacterSpritesheet } from "./character-spritesheet";
 
 export type CharacterSpriteState = (typeof characterSpriteStates)[number];
@@ -56,7 +57,7 @@ export async function loadCharacterSpritesheetForState(
   return createCharacterSpritesheet(texture, { width: 48, height: 64 });
 }
 
-export async function loadAllCharacterSpritesheets(
+export async function loadCharacterSpritesheets(
   character: string,
 ): Promise<ReadonlyMap<CharacterSpriteState, Spritesheet>> {
   return new Map(
@@ -70,3 +71,17 @@ export async function loadAllCharacterSpritesheets(
     ),
   );
 }
+
+export async function loadAllCharacterSpritesheets(): Promise<
+  ReadonlyMap<CharacterModelId, ReadonlyMap<CharacterSpriteState, Spritesheet>>
+> {
+  return new Map([
+    // TODO look up character model list from server
+    [
+      "adventurer" as CharacterModelId,
+      await loadCharacterSpritesheets("adventurer"),
+    ],
+  ]);
+}
+
+export type CharacterModelId = Branded<string, "CharacterModelId">;

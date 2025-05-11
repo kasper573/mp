@@ -1,15 +1,23 @@
+import type { Spritesheet } from "pixi.js";
 import { Container, Text } from "pixi.js";
 import { Pixi } from "@mp/solid-pixi";
-import { createEffect, createMemo, Show } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  Show,
+  useContext,
+} from "solid-js";
 import { assert } from "@mp/std";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
 import { createTintFilter } from "../tint-filter";
 import { createCharacterSprite } from "./character-sprite";
-import {
-  loadAllCharacterSpritesheets,
-  loopedCharacterSpriteStates,
+import type {
+  CharacterModelId,
+  CharacterSpriteState,
 } from "./character-sprite-state";
+import { loopedCharacterSpriteStates } from "./character-sprite-state";
 import { deriveCharacterSpriteState } from "./character-sprite-state-for-actor";
 
 export function Actor(props: {
@@ -22,12 +30,16 @@ export function Actor(props: {
   );
 
   const container = new Container();
+  const allSpriteshets = useContext(CharacterSpritesheetContext);
 
   const state = createMemo(() => deriveCharacterSpriteState(props.actor));
 
   const sprite = createCharacterSprite(
     () => props.actor.facingAngle,
-    () => assert(adventurerSpritesheets.get(state())),
+    () =>
+      assert(
+        allSpriteshets.get("adventurer" as CharacterModelId)?.get(state()),
+      ),
   );
 
   createEffect(() => {
@@ -58,4 +70,16 @@ export function Actor(props: {
   );
 }
 
-const adventurerSpritesheets = await loadAllCharacterSpritesheets("adventurer");
+export const CharacterSpritesheetContext = createContext(
+  new Proxy(
+    {} as ReadonlyMap<
+      CharacterModelId,
+      ReadonlyMap<CharacterSpriteState, Spritesheet>
+    >,
+    {
+      get() {
+        throw new Error("CharacterSpritesheetContext is not initialized");
+      },
+    },
+  ),
+);

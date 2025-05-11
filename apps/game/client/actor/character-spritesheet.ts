@@ -1,6 +1,8 @@
 import type { Size, Texture, SpritesheetFrameData } from "pixi.js";
 import { Spritesheet } from "pixi.js";
 
+// TODO strict spritesheet types for character spritesheets
+
 // export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
 
 // export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
