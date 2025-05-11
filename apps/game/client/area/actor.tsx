@@ -21,11 +21,6 @@ export function Actor(props: {
     return target ? props.actor.coords.angle(target) : Math.PI / 2;
   });
 
-  const angle = createMemo(() => {
-    const target = props.actor.path?.[0];
-    return target ? props.actor.coords.angle(target) : "still";
-  });
-
   const container = new Container();
   // eslint-disable-next-line solid/reactivity
   const sprite = createCharacterSprite(facingAngle, () => walk);
@@ -45,9 +40,6 @@ export function Actor(props: {
   createEffect(() => {
     const { name, health, maxHealth } = props.actor;
     text.text = name + `\n${health}/${maxHealth}`;
-    if (props.showAngle) {
-      text.text += `\n${angle()}`;
-    }
   });
 
   return (
