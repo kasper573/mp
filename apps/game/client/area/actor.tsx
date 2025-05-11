@@ -1,9 +1,11 @@
-import { Container, Text, ColorMatrixFilter } from "pixi.js";
+import { Container, Text } from "pixi.js";
 import { Pixi } from "@mp/solid-pixi";
 import { createEffect, createMemo, Show } from "solid-js";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
-import { createCharacterSprite } from "./character-sprite";
+import { createCharacterSprite } from "../character/character-sprite";
+import { createTintFilter } from "../tint-filter";
+import { loadCharacterSpritesheetForState } from "../character/character-sprite-state";
 
 export function Actor(props: {
   tiled: TiledResource;
@@ -26,7 +28,7 @@ export function Actor(props: {
 
   const container = new Container();
   // eslint-disable-next-line solid/reactivity
-  const sprite = createCharacterSprite(facingAngle);
+  const sprite = createCharacterSprite(facingAngle, walk);
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);
@@ -55,45 +57,4 @@ export function Actor(props: {
   );
 }
 
-/**
- * Creates a ColorMatrixFilter that tints toward a given color.
- * @param color - 0xRRGGBB integer
- * @param strength - 0 (no effect) to 1 (full tint)
- */
-function createTintFilter(
-  color: number,
-  strength: number = 0.25,
-): ColorMatrixFilter {
-  const r = ((color >> 16) & 0xff) / 255;
-  const g = ((color >> 8) & 0xff) / 255;
-  const b = (color & 0xff) / 255;
-
-  const inv = 1 - strength;
-
-  const matrix: ColorMatrixFilter["matrix"] = [
-    inv,
-    0,
-    0,
-    0,
-    r * strength,
-    0,
-    inv,
-    0,
-    0,
-    g * strength,
-    0,
-    0,
-    inv,
-    0,
-    b * strength,
-    0,
-    0,
-    0,
-    1,
-    0,
-  ];
-
-  const filter = new ColorMatrixFilter();
-  filter.matrix = matrix;
-  return filter;
-}
+const walk = await loadCharacterSpritesheetForState("walk-normal");
