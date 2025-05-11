@@ -7,16 +7,16 @@ import { characterSpriteDirections } from "./character-spritesheet";
 
 export function createCharacterSprite(
   facingAngle: Accessor<number>,
-  spritesheet: Spritesheet,
+  spritesheet: Accessor<Spritesheet>,
 ): AnimatedSprite {
   const direction = createMemo(() => {
     const availableDirections = characterSpriteDirections.filter(
-      (direction) => spritesheet.animations[direction].length,
+      (direction) => spritesheet().animations[direction].length,
     );
     return determineDirection(facingAngle(), availableDirections);
   });
   const textures = createMemo((): AnimatedSpriteFrames => {
-    const textures = spritesheet.animations[direction()];
+    const textures = spritesheet().animations[direction()];
     return textures.map((texture) => ({
       texture,
       time: 100,

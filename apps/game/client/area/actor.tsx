@@ -28,7 +28,7 @@ export function Actor(props: {
 
   const container = new Container();
   // eslint-disable-next-line solid/reactivity
-  const sprite = createCharacterSprite(facingAngle, walk);
+  const sprite = createCharacterSprite(facingAngle, () => walk);
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);
