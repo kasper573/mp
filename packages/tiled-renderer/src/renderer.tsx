@@ -5,7 +5,7 @@ import { ParentContext, Pixi } from "@mp/solid-pixi";
 import { type JSX } from "solid-js";
 import { recallLayer, LayerViewFactory } from "./layer";
 import type { TiledSpritesheetRecord } from "./spritesheet";
-import { createTextureLookup } from "./spritesheet";
+import { createTiledTextureLookup } from "./spritesheet";
 
 export interface TileRendererProps {
   layers: Layer[];
@@ -16,7 +16,7 @@ export interface TileRendererProps {
 
 export function TiledRenderer(props: TileRendererProps) {
   const container = createMemo(() => {
-    const lookup = createTextureLookup(props.spritesheets);
+    const lookup = createTiledTextureLookup(props.spritesheets);
     const factory = new LayerViewFactory(lookup);
     return factory.createLayerContainer(props.layers);
   });

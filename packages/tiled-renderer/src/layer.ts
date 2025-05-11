@@ -10,12 +10,12 @@ import type {
 import { Container } from "pixi.js";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
-import type { TextureLookup } from "./spritesheet";
+import type { TiledTextureLookup } from "./spritesheet";
 
 export type LayerView = Container;
 
 export class LayerViewFactory {
-  constructor(private readonly textureLookup: TextureLookup) {}
+  constructor(private readonly textureLookup: TiledTextureLookup) {}
 
   createLayerContainer(layers: Layer[]): LayerView {
     const container = new TileRendererContainer({

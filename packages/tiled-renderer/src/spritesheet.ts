@@ -100,9 +100,9 @@ function createTileFrameData(
   ];
 }
 
-export function createTextureLookup(
+export function createTiledTextureLookup(
   spritesheets: TiledSpritesheetRecord,
-): TextureLookup {
+): TiledTextureLookup {
   return {
     texture(id) {
       for (const ss of Object.values(spritesheets)) {
@@ -132,7 +132,7 @@ export function createTextureLookup(
   };
 }
 
-export interface TextureLookup {
+export interface TiledTextureLookup {
   texture: (gid: GlobalTileId) => Texture;
   animation: (gid: GlobalTileId) => AnimatedSpriteFrames;
 }
