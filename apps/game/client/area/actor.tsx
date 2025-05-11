@@ -47,4 +47,7 @@ export function Actor(props: {
   );
 }
 
-const walk = await loadCharacterSpritesheetForState("walk-normal");
+const walk = await loadCharacterSpritesheetForState(
+  "adventurer",
+  "walk-normal",
+);

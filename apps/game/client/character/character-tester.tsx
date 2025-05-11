@@ -41,7 +41,7 @@ export function CharacterTester() {
 function Characters(props: { state: CharacterSpriteState }) {
   const [spritesheet] = createResource(
     () => props.state,
-    loadCharacterSpritesheetForState,
+    (state) => loadCharacterSpritesheetForState("adventurer", state),
   );
   return (
     <Show when={spritesheet()} keyed>

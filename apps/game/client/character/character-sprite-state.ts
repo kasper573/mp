@@ -41,10 +41,11 @@ export const characterSpriteStates = Object.freeze([
 ] as const);
 
 export async function loadCharacterSpritesheetForState(
+  character: string,
   state: CharacterSpriteState,
 ): Promise<Spritesheet> {
   const { default: spritesheetUrl } = (await import(
-    `../../../server/public/characters/adventurer/${state}.png`
+    `../../../server/public/characters/${character}/${state}.png`
   )) as { default: string };
   const texture = await Assets.load<Texture>(spritesheetUrl);
   texture.source.scaleMode = "nearest";
