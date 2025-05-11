@@ -26,7 +26,7 @@ export function createCharacterSprite(
   const sprite = new AnimatedSprite({
     width: 48,
     height: 64,
-    anchor: { x: 0.5, y: 0.5 },
+    anchor: { x: 0.5, y: 2 / 3 }, // 2/3 seems to be a consistent anchor point specifically for the adventurer sprite pack
     // eslint-disable-next-line solid/reactivity
     textures: textures(),
   });
