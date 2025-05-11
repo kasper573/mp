@@ -25,7 +25,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - Highly replicable: Containerized development, test and production environments.
 - (near) Zero config: Just clone and run.
 - [Modularity](#monorepo-package-convention)
-- Authorative server, dead simple client
+- Authoritative server, dead simple client
   - little to no optimistic operations (maybe some lerping)
   - subscribe to state changes, render them.
 - Dynamically loaded and served game content
