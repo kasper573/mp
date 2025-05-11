@@ -23,6 +23,10 @@ export interface MovementTrait {
    * The current path the subject is following.
    */
   path?: Path<Tile>;
+  /**
+   * The radian angle that the subject is facing.
+   */
+  facingAngle: number;
 }
 
 export function movementBehavior(
@@ -45,10 +49,18 @@ export function movementBehavior(
           subject.speed,
           timeSinceLastTick,
         );
-        state.actors
+
+        const update = state.actors
           .update(subject.id)
           .set("coords", newCoords)
           .set("path", newPath);
+
+        if (newPath?.length) {
+          const newFacingAngle = newCoords.angle(newPath[0]);
+          if (newFacingAngle !== subject.facingAngle) {
+            update.set("facingAngle", newFacingAngle);
+          }
+        }
       }
 
       const area = areas.get(subject.areaId);

@@ -16,14 +16,12 @@ export function Actor(props: {
     props.tiled.tileCoordToWorld(props.actor.coords),
   );
 
-  const facingAngle = createMemo(() => {
-    const target = props.actor.path?.[0];
-    return target ? props.actor.coords.angle(target) : Math.PI / 2;
-  });
-
   const container = new Container();
-  // eslint-disable-next-line solid/reactivity
-  const sprite = createCharacterSprite(facingAngle, () => walk);
+
+  const sprite = createCharacterSprite(
+    () => props.actor.facingAngle,
+    () => walk,
+  );
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);

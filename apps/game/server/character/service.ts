@@ -41,6 +41,7 @@ export class CharacterService {
           ...char,
           ...characterAppearance(user.id),
           hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
+          facingAngle: Math.random() * Math.PI * 2,
           name:
             user.name ??
             uniqueNamesGenerator({
@@ -96,6 +97,7 @@ export class CharacterService {
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
+      facingAngle: Math.random() * Math.PI * 2,
       name:
         user.name ??
         uniqueNamesGenerator({

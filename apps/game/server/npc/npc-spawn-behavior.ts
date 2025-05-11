@@ -104,6 +104,7 @@ export function createNpcInstance(
     attackDamage: 5,
     attackRange: 1 as Tile,
     attackSpeed: 1 as TimesPerSecond,
+    facingAngle: Math.random() * Math.PI * 2,
   };
 }
 
