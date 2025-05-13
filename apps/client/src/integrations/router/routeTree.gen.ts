@@ -14,8 +14,8 @@ import { Route as rootRoute } from './../../routes/~__root'
 import { Route as SandboxImport } from './../../routes/~sandbox'
 import { Route as PlayImport } from './../../routes/~play'
 import { Route as ContactImport } from './../../routes/~contact'
-import { Route as CharacterTesterImport } from './../../routes/~character-tester'
 import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
+import { Route as ActorTesterImport } from './../../routes/~actor-tester'
 import { Route as IndexImport } from './../../routes/~index'
 
 // Create/Update Routes
@@ -38,15 +38,15 @@ const ContactRoute = ContactImport.update({
   getParentRoute: () => rootRoute,
 } as any)
 
-const CharacterTesterRoute = CharacterTesterImport.update({
-  id: '/character-tester',
-  path: '/character-tester',
-  getParentRoute: () => rootRoute,
-} as any)
-
 const AuthCallbackRoute = AuthCallbackImport.update({
   id: '/auth-callback',
   path: '/auth-callback',
+  getParentRoute: () => rootRoute,
+} as any)
+
+const ActorTesterRoute = ActorTesterImport.update({
+  id: '/actor-tester',
+  path: '/actor-tester',
   getParentRoute: () => rootRoute,
 } as any)
 
@@ -67,18 +67,18 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof IndexImport
       parentRoute: typeof rootRoute
     }
+    '/actor-tester': {
+      id: '/actor-tester'
+      path: '/actor-tester'
+      fullPath: '/actor-tester'
+      preLoaderRoute: typeof ActorTesterImport
+      parentRoute: typeof rootRoute
+    }
     '/auth-callback': {
       id: '/auth-callback'
       path: '/auth-callback'
       fullPath: '/auth-callback'
       preLoaderRoute: typeof AuthCallbackImport
-      parentRoute: typeof rootRoute
-    }
-    '/character-tester': {
-      id: '/character-tester'
-      path: '/character-tester'
-      fullPath: '/character-tester'
-      preLoaderRoute: typeof CharacterTesterImport
       parentRoute: typeof rootRoute
     }
     '/contact': {
@@ -109,8 +109,8 @@ declare module '@tanstack/solid-router' {
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -118,8 +118,8 @@ export interface FileRoutesByFullPath {
 
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -128,8 +128,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRoute
   '/': typeof IndexRoute
+  '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/character-tester': typeof CharacterTesterRoute
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
@@ -139,24 +139,24 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/actor-tester'
     | '/auth-callback'
-    | '/character-tester'
     | '/contact'
     | '/play'
     | '/sandbox'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/actor-tester'
     | '/auth-callback'
-    | '/character-tester'
     | '/contact'
     | '/play'
     | '/sandbox'
   id:
     | '__root__'
     | '/'
+    | '/actor-tester'
     | '/auth-callback'
-    | '/character-tester'
     | '/contact'
     | '/play'
     | '/sandbox'
@@ -165,8 +165,8 @@ export interface FileRouteTypes {
 
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  ActorTesterRoute: typeof ActorTesterRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
-  CharacterTesterRoute: typeof CharacterTesterRoute
   ContactRoute: typeof ContactRoute
   PlayRoute: typeof PlayRoute
   SandboxRoute: typeof SandboxRoute
@@ -174,8 +174,8 @@ export interface RootRouteChildren {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  ActorTesterRoute: ActorTesterRoute,
   AuthCallbackRoute: AuthCallbackRoute,
-  CharacterTesterRoute: CharacterTesterRoute,
   ContactRoute: ContactRoute,
   PlayRoute: PlayRoute,
   SandboxRoute: SandboxRoute,
@@ -192,8 +192,8 @@ export const routeTree = rootRoute
       "filePath": "~__root.tsx",
       "children": [
         "/",
+        "/actor-tester",
         "/auth-callback",
-        "/character-tester",
         "/contact",
         "/play",
         "/sandbox"
@@ -202,11 +202,11 @@ export const routeTree = rootRoute
     "/": {
       "filePath": "~index.tsx"
     },
+    "/actor-tester": {
+      "filePath": "~actor-tester.tsx"
+    },
     "/auth-callback": {
       "filePath": "~auth-callback.tsx"
-    },
-    "/character-tester": {
-      "filePath": "~character-tester.tsx"
     },
     "/contact": {
       "filePath": "~contact.tsx"

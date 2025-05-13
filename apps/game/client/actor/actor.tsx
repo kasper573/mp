@@ -4,8 +4,8 @@ import { createEffect, createMemo, Show } from "solid-js";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
 import { createTintFilter } from "../tint-filter";
-import { createCharacterSprite } from "./character-sprite";
-import { deriveCharacterSpriteState } from "./character-sprite-state-for-actor";
+import { deriveActorSpriteState } from "./derive-actor-sprite-state";
+import { createActorSprite } from "./actor-sprite";
 
 export function Actor(props: {
   tiled: TiledResource;
@@ -18,9 +18,10 @@ export function Actor(props: {
 
   const container = new Container();
 
-  const state = createMemo(() => deriveCharacterSpriteState(props.actor));
+  const state = createMemo(() => deriveActorSpriteState(props.actor));
 
-  const sprite = createCharacterSprite(
+  const sprite = createActorSprite(
+    () => props.actor.modelId,
     () => state(),
     () => props.actor.dir,
   );

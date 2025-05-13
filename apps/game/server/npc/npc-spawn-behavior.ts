@@ -14,6 +14,7 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
+import type { ActorModelId } from "../traits/appearance";
 import type { NpcService } from "./service";
 import type { Npc, NpcInstance, NpcInstanceId, NpcSpawn } from "./schema";
 
@@ -104,6 +105,7 @@ export function createNpcInstance(
     attackDamage: 5,
     attackRange: 1 as Tile,
     attackSpeed: 1 as TimesPerSecond,
+    modelId: "adventurer" as ActorModelId,
     dir: assert(randomItem(cardinalDirections)),
   };
 }

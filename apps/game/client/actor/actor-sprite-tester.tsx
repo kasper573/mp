@@ -2,12 +2,9 @@ import { Application, Pixi } from "@mp/solid-pixi";
 import {
   createEffect,
   createMemo,
-  createResource,
   createSignal,
   For,
   onCleanup,
-  Show,
-  Suspense,
   useContext,
 } from "solid-js";
 import { Container, Text } from "pixi.js";
@@ -17,83 +14,79 @@ import {
   Vector,
 } from "@mp/math";
 import { EngineContext, EngineProvider } from "@mp/engine";
-import { LoadingSpinner, Select } from "@mp/ui";
-import {
-  CharacterSpritesheetContext,
-  createCharacterSprite,
-} from "./character-sprite";
-import type { CharacterSpriteState } from "./character-sprite-state";
-import {
-  characterSpriteStates,
-  loadAllCharacterSpritesheets,
-} from "./character-sprite-state";
+import { Select } from "@mp/ui";
 
-export function CharacterTester() {
-  const [state, setState] = createSignal<CharacterSpriteState>("walk-normal");
+import type { ActorModelId } from "../../server/traits/appearance";
+import { ActorSpritesheetContext, createActorSprite } from "./actor-sprite";
+import type { ActorSpriteState } from "./actor-sprite-state";
+import {
+  ActorSpritesheetProvider,
+  actorSpriteStates,
+} from "./actor-sprite-state";
+
+export function ActorSpriteTester() {
   return (
     <Application style={{ display: "flex", flex: 1 }}>
       {({ viewport }) => (
         <EngineProvider viewport={viewport}>
-          <Suspense fallback={<LoadingSpinner debugId="Loading spritesheet" />}>
-            <Characters state={state()} />
-          </Suspense>
-          <DebugUi state={state()} setState={setState} />
+          <ActorSpritesheetProvider>
+            <ActorSpriteList />
+          </ActorSpritesheetProvider>
         </EngineProvider>
       )}
     </Application>
   );
 }
 
-function Characters(props: { state: CharacterSpriteState }) {
-  const [spritesheets] = createResource(loadAllCharacterSpritesheets);
+function ActorSpriteList() {
+  const allModelIds = useContext(ActorSpritesheetContext).keys().toArray();
+  const [state, setState] = createSignal<ActorSpriteState>("walk-normal");
+  const [modelId, setModelId] = createSignal(allModelIds[0]);
   return (
-    <Show when={spritesheets()} keyed>
-      {(loadedSpritesheets) => (
-        <CharacterSpritesheetContext.Provider value={loadedSpritesheets}>
-          <For each={Object.entries(cardinalDirectionAngles)}>
-            {([name, angle], index) => (
-              <SpecificCharacterAngle
-                angle={angle}
-                name={name}
-                pos={new Vector(0, index() * 64)}
-                state={props.state}
-              />
-            )}
-          </For>
-          <DynamicCharacterAngle state={props.state} />
-        </CharacterSpritesheetContext.Provider>
-      )}
-    </Show>
+    <>
+      <For each={Object.entries(cardinalDirectionAngles)}>
+        {([name, angle], index) => (
+          <SpecificActorAngle
+            modelId={modelId()}
+            state={state()}
+            angle={angle}
+            name={name}
+            pos={new Vector(0, index() * 64)}
+          />
+        )}
+      </For>
+      <DynamicActorAngle modelId={modelId()} state={state()} />
+      <div
+        style={{
+          position: "absolute",
+          top: "16px",
+          right: "16px",
+          background: "black",
+          color: "white",
+        }}
+      >
+        <Select
+          value={state()}
+          onChange={setState}
+          options={actorSpriteStates}
+        />
+        <Select value={modelId()} onChange={setModelId} options={allModelIds} />
+      </div>
+    </>
   );
 }
 
-function DebugUi(props: {
-  state: CharacterSpriteState;
-  setState: (state: CharacterSpriteState) => void;
+function DynamicActorAngle(props: {
+  modelId: ActorModelId;
+  state: ActorSpriteState;
 }) {
-  return (
-    <Select
-      value={props.state}
-      onChange={props.setState}
-      options={characterSpriteStates}
-      style={{
-        position: "absolute",
-        top: "16px",
-        right: "16px",
-        background: "black",
-        color: "white",
-      }}
-    />
-  );
-}
-
-function DynamicCharacterAngle(props: { state: CharacterSpriteState }) {
   const center = useScreenCenter();
   const engine = useContext(EngineContext);
   const angle = createMemo(() => center().angle(engine.pointer.position));
   return (
     <>
-      <SpecificCharacterAngle
+      <SpecificActorAngle
+        modelId={props.modelId}
         angle={angle()}
         pos={center()}
         anchor={new Vector(0.5, 0.5)}
@@ -116,16 +109,18 @@ function useScreenCenter() {
   return center;
 }
 
-function SpecificCharacterAngle(props: {
+function SpecificActorAngle(props: {
+  modelId: ActorModelId;
   angle: number;
   name?: string;
   pos: Vector<number>;
   anchor?: Vector<number>;
   showFrameNumber?: boolean;
-  state: CharacterSpriteState;
+  state: ActorSpriteState;
 }) {
   const engine = useContext(EngineContext);
-  const sprite = createCharacterSprite(
+  const sprite = createActorSprite(
+    () => props.modelId,
     () => props.state,
     () => nearestCardinalDirection(props.angle),
   );

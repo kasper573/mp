@@ -5,7 +5,7 @@ import { assert, randomItem, type Tile, type TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { cardinalDirections, Rect, Vector } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
-import type { AppearanceTrait } from "../traits/appearance";
+import type { ActorModelId, AppearanceTrait } from "../traits/appearance";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { characterTable } from "./schema";
@@ -109,7 +109,7 @@ export class CharacterService {
 }
 
 function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
-  return { color: undefined };
+  return { color: undefined, modelId: "adventurer" as ActorModelId };
 }
 
 export const ctxCharacterService =

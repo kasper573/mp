@@ -1,7 +1,7 @@
 import type { Actor } from "../../server";
-import type { CharacterSpriteState } from "./character-sprite-state";
+import type { ActorSpriteState } from "./actor-sprite-state";
 
-export function deriveCharacterSpriteState(actor: Actor): CharacterSpriteState {
+export function deriveActorSpriteState(actor: Actor): ActorSpriteState {
   if (actor.health <= 0) {
     return "death-gun";
   }

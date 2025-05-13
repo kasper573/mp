@@ -9,22 +9,17 @@ import {
   type CardinalDirection,
 } from "@mp/math";
 import { assert } from "@mp/std";
-import {
-  characterSpriteStates,
-  type CharacterModelId,
-  type CharacterSpriteState,
-} from "./character-sprite-state";
+import type { ActorModelId } from "../../server";
+import { actorSpriteStates, type ActorSpriteState } from "./actor-sprite-state";
 
-export function createCharacterSprite(
-  state: Accessor<CharacterSpriteState>,
+export function createActorSprite(
+  modelId: Accessor<ActorModelId>,
+  state: Accessor<ActorSpriteState>,
   desiredDirection: Accessor<CardinalDirection>,
 ): AnimatedSprite {
-  const allSpriteshets = useContext(CharacterSpritesheetContext);
-  const spritesheet = createMemo(
-    (): Spritesheet =>
-      assert(
-        allSpriteshets.get("adventurer" as CharacterModelId)?.get(state()),
-      ),
+  const allSpriteshets = useContext(ActorSpritesheetContext);
+  const spritesheet = createMemo(() =>
+    assert(allSpriteshets.get(modelId())?.get(state())),
   );
   const direction = createMemo(() =>
     spritesheetCompatibleDirection(desiredDirection(), spritesheet()),
@@ -48,7 +43,9 @@ export function createCharacterSprite(
   createEffect(() => {
     const previousFrame = sprite.currentFrame;
     sprite.textures = textures();
-    sprite.gotoAndPlay(previousFrame);
+    if (previousFrame <= sprite.textures.length) {
+      sprite.gotoAndPlay(previousFrame);
+    }
   });
 
   createEffect(() => {
@@ -59,7 +56,7 @@ export function createCharacterSprite(
 }
 
 const loopedCharacterSpriteStates = new Set(
-  characterSpriteStates.filter((state) => !state.startsWith("death-")),
+  actorSpriteStates.filter((state) => !state.startsWith("death-")),
 );
 
 /**
@@ -81,12 +78,9 @@ function spritesheetCompatibleDirection(
   return nearestCardinalDirection(desiredAngle, availableDirections);
 }
 
-export const CharacterSpritesheetContext = createContext(
+export const ActorSpritesheetContext = createContext(
   new Proxy(
-    {} as ReadonlyMap<
-      CharacterModelId,
-      ReadonlyMap<CharacterSpriteState, Spritesheet>
-    >,
+    {} as ReadonlyMap<ActorModelId, ReadonlyMap<ActorSpriteState, Spritesheet>>,
     {
       get() {
         throw new Error("CharacterSpritesheetContext is not initialized");
