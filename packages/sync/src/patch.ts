@@ -7,7 +7,10 @@ export type SyncMessage = [Patch, serverTime: Date];
 
 export type Patch = Operation[];
 
-export type PatchPath = Array<string | number>;
+export type PatchPathStep = string | number;
+export type PatchPath =
+  | [entityName: PatchPathStep]
+  | [entityName: PatchPathStep, entityId: PatchPathStep];
 
 export type Operation = SetOperation | UpdateOperation | RemoveOperation;
 
@@ -66,9 +69,9 @@ function removeValue(root: object, path: PatchPath): void {
   delete target[lastKey];
 }
 
-function getValue(target: object, path: PatchPath): unknown {
-  for (const element of path) {
-    target = target[element as keyof typeof target];
+function getValue(target: object, path: unknown[]): unknown {
+  for (const key of path) {
+    target = target[key as keyof typeof target];
   }
   return target;
 }

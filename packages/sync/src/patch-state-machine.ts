@@ -106,7 +106,9 @@ function createFlushFunction<State extends PatchableState>(
 
       clientPatch.push(
         ...serverPatch.filter(([type, [entityName, entityId]]) => {
-          return nextVisibility[entityName].has(entityId);
+          return entityId === undefined
+            ? false
+            : nextVisibility[entityName].has(entityId);
         }),
       );
 

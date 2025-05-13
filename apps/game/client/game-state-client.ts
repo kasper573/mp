@@ -7,41 +7,36 @@ import {
 } from "solid-js";
 import type { Vector } from "@mp/math";
 import { assert, dedupe, throttle, type Tile } from "@mp/std";
-import { createMutable } from "solid-js/store";
-import { applyPatch, syncMessageEncoding } from "@mp/sync";
+import { syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { GameState } from "../server/game-state";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import { useRpc } from "./use-rpc";
-import { createSynchronizedActors } from "./actor/synchronized-actors";
+import { createOptimisticGameState } from "./create-optimistic-game-state";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export function createGameStateClient(socket: WebSocket, logger: Logger) {
-  const gameState = createMutable<GameState>({ actors: {} });
+  const gameState = createOptimisticGameState();
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
   const [readyState, setReadyState] = createSignal(socket.readyState);
   const areaId = createMemo(() => {
     const id = characterId();
-    const actor = id ? gameState.actors[id] : undefined;
+    const actor = id ? gameState().actors[id] : undefined;
     return actor?.areaId;
   });
 
-  const actors = createSynchronizedActors(
-    () => Object.keys(gameState.actors) as ActorId[],
-    (id) => gameState.actors[id],
-  );
-
   const character = createMemo(() => {
     const id = characterId();
-    const actor = id ? actors.get(id) : undefined;
+    const actor = id ? gameState().actors[id] : undefined;
     return actor ? (actor as Character) : undefined;
   });
+
+  const actorList = createMemo(() => Object.values(gameState().actors));
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);
@@ -56,7 +51,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
         refreshState();
       }
 
-      applyPatch(gameState, patch);
+      gameState.applyPatch(patch);
     }
   };
 
@@ -78,12 +73,12 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
 
   return {
     readyState,
-    actorList: actors.list,
+    actorList,
     setCharacterId,
     areaId,
     characterId,
     character,
-    frameCallback: actors.frameCallback,
+    frameCallback: gameState.frameCallback,
   };
 }
 
