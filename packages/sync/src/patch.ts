@@ -12,9 +12,9 @@ export type PatchPath = Array<string | number>;
 export type Operation = SetOperation | UpdateOperation | RemoveOperation;
 
 export enum PatchType {
-  Set = "set",
-  Update = "update",
-  Remove = "remove",
+  Set,
+  Update,
+  Remove,
 }
 
 export type SetOperation = [PatchType.Set, path: PatchPath, value: unknown];
