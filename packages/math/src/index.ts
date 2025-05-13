@@ -5,3 +5,4 @@ export * from "./matrix";
 export * from "./polygon";
 export * from "./polyline";
 export * from "./ellipse";
+export * from "./cardinal-direction";

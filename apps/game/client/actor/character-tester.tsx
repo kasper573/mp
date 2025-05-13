@@ -12,10 +12,10 @@ import {
 } from "solid-js";
 import type { Spritesheet } from "pixi.js";
 import { Container, Text } from "pixi.js";
-import { Vector } from "@mp/math";
+import { cardinalDirectionAngles, Vector } from "@mp/math";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { LoadingSpinner, Select } from "@mp/ui";
-import { createCharacterSprite, directionAngles } from "./character-sprite";
+import { createCharacterSprite } from "./character-sprite";
 import type { CharacterSpriteState } from "./character-sprite-state";
 import {
   characterSpriteStates,
@@ -47,7 +47,7 @@ function Characters(props: { state: CharacterSpriteState }) {
     <Show when={spritesheet()} keyed>
       {(loadedSpritesheet) => (
         <>
-          <For each={Object.entries(directionAngles)}>
+          <For each={Object.entries(cardinalDirectionAngles)}>
             {([name, angle], index) => (
               <SpecificCharacterAngle
                 angle={angle}
@@ -127,10 +127,12 @@ function SpecificCharacterAngle(props: {
     () => props.spritesheet,
   );
   const container = new Container();
-  const text = new Text({ style: { fill: "white", fontSize: "7px" } });
+  const text = new Text({ style: { fill: "white", fontSize: "14px" } });
+  text.scale.set(0.5);
   const frameNumberText = new Text({
-    style: { fill: "white", fontSize: "7px" },
+    style: { fill: "white", fontSize: "14px" },
   });
+  frameNumberText.scale.set(0.5);
   frameNumberText.position.set(-10, 16);
 
   container.addChild(sprite);

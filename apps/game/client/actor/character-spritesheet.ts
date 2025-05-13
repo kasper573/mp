@@ -1,3 +1,4 @@
+import type { CardinalDirection } from "@mp/math";
 import type { Size, Texture, SpritesheetFrameData } from "pixi.js";
 import { Spritesheet } from "pixi.js";
 
@@ -46,20 +47,20 @@ export async function createCharacterSpritesheet(
   return ss;
 }
 
-export type CharacterSpriteDirection = keyof typeof directionLayerIndexes;
+export type CharacterSpriteDirection = CardinalDirection;
 
 /**
  * The layer index inside the spritesheet each direction is located at.
  */
-const directionLayerIndexes = {
-  down: 0,
-  "down-left": 1,
-  "up-left": 2,
-  up: 3,
-  "up-right": 4,
-  "down-right": 5,
-  right: 6,
-  left: 7,
+const directionLayerIndexes: Record<CharacterSpriteDirection, number> = {
+  s: 0,
+  sw: 1,
+  nw: 2,
+  n: 3,
+  ne: 4,
+  se: 5,
+  e: 6,
+  w: 7,
 };
 
 export const characterSpriteDirections = Object.freeze(
