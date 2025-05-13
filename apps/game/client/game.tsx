@@ -17,8 +17,8 @@ import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
-import { CharacterSpritesheetContext } from "./actor/actor";
 import { loadAllCharacterSpritesheets } from "./actor/character-sprite-state";
+import { CharacterSpritesheetContext } from "./actor/character-sprite";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);

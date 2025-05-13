@@ -10,7 +10,6 @@ import {
   Suspense,
   useContext,
 } from "solid-js";
-import type { Spritesheet } from "pixi.js";
 import { Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
@@ -19,11 +18,14 @@ import {
 } from "@mp/math";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { LoadingSpinner, Select } from "@mp/ui";
-import { createCharacterSprite } from "./character-sprite";
+import {
+  CharacterSpritesheetContext,
+  createCharacterSprite,
+} from "./character-sprite";
 import type { CharacterSpriteState } from "./character-sprite-state";
 import {
   characterSpriteStates,
-  loadCharacterSpritesheetForState,
+  loadAllCharacterSpritesheets,
 } from "./character-sprite-state";
 
 export function CharacterTester() {
@@ -43,26 +45,23 @@ export function CharacterTester() {
 }
 
 function Characters(props: { state: CharacterSpriteState }) {
-  const [spritesheet] = createResource(
-    () => props.state,
-    (state) => loadCharacterSpritesheetForState("adventurer", state),
-  );
+  const [spritesheets] = createResource(loadAllCharacterSpritesheets);
   return (
-    <Show when={spritesheet()} keyed>
-      {(loadedSpritesheet) => (
-        <>
+    <Show when={spritesheets()} keyed>
+      {(loadedSpritesheets) => (
+        <CharacterSpritesheetContext.Provider value={loadedSpritesheets}>
           <For each={Object.entries(cardinalDirectionAngles)}>
             {([name, angle], index) => (
               <SpecificCharacterAngle
                 angle={angle}
                 name={name}
                 pos={new Vector(0, index() * 64)}
-                spritesheet={loadedSpritesheet}
+                state={props.state}
               />
             )}
           </For>
-          <DynamicCharacterAngle spritesheet={loadedSpritesheet} />
-        </>
+          <DynamicCharacterAngle state={props.state} />
+        </CharacterSpritesheetContext.Provider>
       )}
     </Show>
   );
@@ -88,7 +87,7 @@ function DebugUi(props: {
   );
 }
 
-function DynamicCharacterAngle(props: { spritesheet: Spritesheet }) {
+function DynamicCharacterAngle(props: { state: CharacterSpriteState }) {
   const center = useScreenCenter();
   const engine = useContext(EngineContext);
   const angle = createMemo(() => center().angle(engine.pointer.position));
@@ -99,7 +98,7 @@ function DynamicCharacterAngle(props: { spritesheet: Spritesheet }) {
         pos={center()}
         anchor={new Vector(0.5, 0.5)}
         showFrameNumber
-        spritesheet={props.spritesheet}
+        state={props.state}
       />
     </>
   );
@@ -123,12 +122,12 @@ function SpecificCharacterAngle(props: {
   pos: Vector<number>;
   anchor?: Vector<number>;
   showFrameNumber?: boolean;
-  spritesheet: Spritesheet;
+  state: CharacterSpriteState;
 }) {
   const engine = useContext(EngineContext);
   const sprite = createCharacterSprite(
+    () => props.state,
     () => nearestCardinalDirection(props.angle),
-    () => props.spritesheet,
   );
   const container = new Container();
   const text = new Text({ style: { fill: "white", fontSize: "14px" } });
