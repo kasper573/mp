@@ -47,12 +47,10 @@ export async function createCharacterSpritesheet(
   return ss;
 }
 
-export type CharacterSpriteDirection = CardinalDirection;
-
 /**
  * The layer index inside the spritesheet each direction is located at.
  */
-const directionLayerIndexes: Record<CharacterSpriteDirection, number> = {
+const directionLayerIndexes: Record<CardinalDirection, number> = {
   s: 0,
   sw: 1,
   nw: 2,
@@ -65,7 +63,7 @@ const directionLayerIndexes: Record<CharacterSpriteDirection, number> = {
 
 export const characterSpriteDirections = Object.freeze(
   Object.keys(directionLayerIndexes),
-) as ReadonlyArray<CharacterSpriteDirection>;
+) as ReadonlyArray<CardinalDirection>;
 
 function* generateFrames(
   rows: number,
