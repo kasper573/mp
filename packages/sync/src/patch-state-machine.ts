@@ -1,8 +1,8 @@
 import type { ReadonlyDeep } from "type-fest";
-import type { Patch, PatchPath } from "./patch";
+import { PatchType, type Patch, type PatchPath } from "./patch";
 import { dedupePatch } from "./patch-deduper";
 import type { EntityPatchOptimizerRecord } from "./patch-optimizer";
-import { optimizePatchOperationValue } from "./patch-optimizer";
+import { optimizeUpdate } from "./patch-optimizer";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -88,20 +88,24 @@ function createFlushFunction<State extends PatchableState>(
 
         for (const addedId of nextIds.difference(prevIds)) {
           clientPatch.push([
+            PatchType.Set,
             [entityName, addedId] as PatchPath,
             state[entityName][addedId],
           ]);
         }
 
         for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push([[entityName, removedId] as PatchPath]);
+          clientPatch.push([
+            PatchType.Remove,
+            [entityName, removedId] as PatchPath,
+          ]);
         }
       }
 
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(([[entityName, entityId]]) => {
+        ...serverPatch.filter(([type, [entityName, entityId]]) => {
           return nextVisibility[entityName].has(entityId);
         }),
       );
@@ -163,29 +167,40 @@ function createEntityRepository<
   }
 
   entity.set = function setEntity(id: Id, entity: Entity) {
-    serverPatch.push([[entityName, id] as PatchPath, entity]);
+    serverPatch.push([PatchType.Set, [entityName, id] as PatchPath, entity]);
     state[entityName][id] = entity;
   };
 
-  entity.update = function updateEntity(id: Id) {
-    return new EntityUpdateBuilder<Entity>((key, newValue) => {
-      const entity = state[entityName][id];
-      const accepted = optimizePatchOperationValue(
-        entityPatchOptimizer?.[key],
-        newValue,
-        entity[key],
-      );
+  const update: EntityRepository<State[EntityName]>["update"] = (
+    id,
+    addUpdates,
+  ) => {
+    const updateBuilder = new EntityUpdateBuilder<Entity>();
+    addUpdates(updateBuilder);
+    const updates = updateBuilder.build();
 
-      if (accepted) {
-        serverPatch.push([[entityName, id, key] as PatchPath, accepted.value]);
-      }
+    const entity = state[entityName][id];
+    const optimizedUpdates = optimizeUpdate(
+      entityPatchOptimizer,
+      entity,
+      updates,
+    );
 
-      entity[key] = newValue;
-    });
+    Object.assign(entity as object, updates);
+
+    if (optimizedUpdates) {
+      serverPatch.push([
+        PatchType.Update,
+        [entityName, id] as PatchPath,
+        optimizedUpdates,
+      ]);
+    }
   };
 
+  entity.update = update;
+
   entity.remove = function removeEntity(id: Id) {
-    serverPatch.push([[entityName, id] as PatchPath]);
+    serverPatch.push([PatchType.Remove, [entityName, id] as PatchPath]);
     delete state[entityName][id];
   };
 
@@ -197,7 +212,7 @@ function createFullStatePatch<State extends PatchableState>(
 ): Patch {
   const patch: Patch = [];
   for (const key in state) {
-    patch.push([[key], state[key as keyof typeof state]]);
+    patch.push([PatchType.Set, [key], state[key as keyof typeof state]]);
   }
   return patch;
 }
@@ -218,7 +233,12 @@ export type { ReadonlyDeep };
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;
-  update: (id: keyof Entities) => EntityUpdateBuilder<Entities[keyof Entities]>;
+  update: (
+    id: keyof Entities,
+    addUpdates: (
+      builder: Omit<EntityUpdateBuilder<Entities[keyof Entities]>, "build">,
+    ) => void,
+  ) => void;
   remove: (id: keyof Entities) => void;
 }
 
@@ -227,16 +247,15 @@ export interface EntityRepository<Entities extends PatchableEntities> {
  * We want to be able to update any subset of an entity but we do not want to allow padding in undefined, which is what Partial<T> would allow.
  */
 class EntityUpdateBuilder<Entity> {
-  constructor(
-    private handleNewValue: <K extends keyof Entity>(
-      key: K,
-      newValue: Entity[K],
-    ) => void,
-  ) {}
+  private update: Partial<Entity> = {};
 
-  set<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
-    this.handleNewValue(key, newValue);
+  add<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
+    this.update[key] = newValue;
     return this;
+  }
+
+  build(): Partial<Entity> {
+    return this.update;
   }
 }
 

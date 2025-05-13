@@ -35,11 +35,13 @@ export function movementBehavior(
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
     for (const subject of recordValues(state.actors())) {
-      if (subject.moveTarget) {
-        state.actors
-          .update(subject.id)
-          .set("path", findPathForSubject(subject, areas, subject.moveTarget))
-          .set("moveTarget", undefined);
+      const { moveTarget } = subject;
+      if (moveTarget) {
+        state.actors.update(subject.id, (update) =>
+          update
+            .add("path", findPathForSubject(subject, areas, moveTarget))
+            .add("moveTarget", undefined),
+        );
       }
 
       if (subject.path) {
@@ -50,17 +52,15 @@ export function movementBehavior(
           timeSinceLastTick,
         );
 
-        const update = state.actors
-          .update(subject.id)
-          .set("coords", newCoords)
-          .set("path", newPath);
-
-        if (newPath?.length) {
-          const newFacingAngle = newCoords.angle(newPath[0]);
-          if (newFacingAngle !== subject.facingAngle) {
-            update.set("facingAngle", newFacingAngle);
+        state.actors.update(subject.id, (update) => {
+          update.add("coords", newCoords).add("path", newPath);
+          if (newPath?.length) {
+            const newFacingAngle = newCoords.angle(newPath[0]);
+            if (newFacingAngle !== subject.facingAngle) {
+              update.add("facingAngle", newFacingAngle);
+            }
           }
-        }
+        });
       }
 
       const area = areas.get(subject.areaId);
@@ -70,11 +70,12 @@ export function movementBehavior(
             hit.object.properties.get("goto")?.value as AreaId,
           );
           if (targetArea) {
-            state.actors
-              .update(subject.id)
-              .set("path", undefined)
-              .set("areaId", targetArea.id)
-              .set("coords", targetArea.start);
+            state.actors.update(subject.id, (update) =>
+              update
+                .add("path", undefined)
+                .add("areaId", targetArea.id)
+                .add("coords", targetArea.start),
+            );
           }
         }
       }

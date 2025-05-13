@@ -23,7 +23,7 @@ import { deriveCharacterSpriteState } from "./character-sprite-state-for-actor";
 export function Actor(props: {
   tiled: TiledResource;
   actor: Actor;
-  showAngle?: boolean;
+  isPlayer?: boolean;
 }) {
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),

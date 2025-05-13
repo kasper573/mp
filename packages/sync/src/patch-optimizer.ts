@@ -21,27 +21,32 @@ export type PropertyPatchOptimizerFilter<Value> = (
   oldValue: Value,
 ) => boolean;
 
-export function optimizePatchOperationValue<Entity, Key extends keyof Entity>(
-  {
-    transform,
-    filter = defaultOptimizerFilter,
-  }: PropertyPatchOptimizer<Entity, Key> | undefined = empty,
-  newValue: Entity[Key],
-  oldValue: Entity[Key],
-): { value: Entity[Key] } | undefined {
-  if (transform) {
-    newValue = transform(newValue);
-    oldValue = transform(oldValue);
+export function optimizeUpdate<Entity>(
+  entityOptimizer: EntityPatchOptimizer<Entity> | undefined,
+  entity: Entity,
+  updates: Partial<Entity>,
+): Partial<Entity> | undefined {
+  const optimizedUpdates: Partial<Entity> = {};
+  let hasUpdates = false;
+  for (const key in updates) {
+    const prop = key as keyof Entity;
+    let newValue = updates[prop] as Entity[typeof prop];
+    let oldValue = entity[prop];
+
+    const optimizer = entityOptimizer?.[prop];
+    if (optimizer?.transform) {
+      newValue = optimizer.transform(newValue);
+      oldValue = optimizer.transform(oldValue);
+    }
+    const filter = optimizer?.filter ?? refDiff;
+    if (filter(newValue, oldValue)) {
+      hasUpdates = true;
+      optimizedUpdates[prop] = newValue;
+    }
   }
-  if (!filter(newValue, oldValue)) {
-    return;
+  if (hasUpdates) {
+    return optimizedUpdates;
   }
-  return { value: newValue };
 }
 
-const empty = Object.freeze({});
-
-const defaultOptimizerFilter: PropertyPatchOptimizerFilter<unknown> = (
-  newValue,
-  oldValue,
-) => newValue !== oldValue;
+const refDiff = <T>(a: T, b: T) => a !== b;
