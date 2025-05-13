@@ -61,10 +61,6 @@ const directionLayerIndexes: Record<CardinalDirection, number> = {
   w: 7,
 };
 
-export const characterSpriteDirections = Object.freeze(
-  Object.keys(directionLayerIndexes),
-) as ReadonlyArray<CardinalDirection>;
-
 function* generateFrames(
   rows: number,
   columns: number,

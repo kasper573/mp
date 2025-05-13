@@ -1,4 +1,9 @@
-import type { Path, Vector } from "@mp/math";
+import {
+  nearestCardinalDirection,
+  type CardinalDirection,
+  type Path,
+  type Vector,
+} from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
@@ -24,9 +29,9 @@ export interface MovementTrait {
    */
   path?: Path<Tile>;
   /**
-   * The radian angle that the subject is facing.
+   * The direction the subject is facing.
    */
-  facingAngle: number;
+  dir: CardinalDirection;
 }
 
 export function movementBehavior(
@@ -55,9 +60,11 @@ export function movementBehavior(
         state.actors.update(subject.id, (update) => {
           update.add("coords", newCoords).add("path", newPath);
           if (newPath?.length) {
-            const newFacingAngle = newCoords.angle(newPath[0]);
-            if (newFacingAngle !== subject.facingAngle) {
-              update.add("facingAngle", newFacingAngle);
+            const newDir = nearestCardinalDirection(
+              newCoords.angle(newPath[0]),
+            );
+            if (newDir !== subject.dir) {
+              update.add("dir", newDir);
             }
           }
         });

@@ -35,7 +35,7 @@ export function Actor(props: {
   const state = createMemo(() => deriveCharacterSpriteState(props.actor));
 
   const sprite = createCharacterSprite(
-    () => props.actor.facingAngle,
+    () => props.actor.dir,
     () =>
       assert(
         allSpriteshets.get("adventurer" as CharacterModelId)?.get(state()),

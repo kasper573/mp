@@ -1,6 +1,6 @@
 export function nearestCardinalDirection(
   angle: number,
-  availableDirections: CardinalDirection[],
+  availableDirections = cardinalDirections,
 ): CardinalDirection {
   const normalizedAngle = normalizeAngle(angle);
   const nearestDirections = availableDirections.toSorted(
@@ -32,6 +32,10 @@ export const cardinalDirectionAngles = {
   n: Math.atan2(-1, 0),
   ne: Math.atan2(-1, 1),
 };
+
+export const cardinalDirections = Object.freeze(
+  Object.keys(cardinalDirectionAngles),
+) as ReadonlyArray<CardinalDirection>;
 
 function normalizeAngle(angle: number) {
   if (angle < 0) {

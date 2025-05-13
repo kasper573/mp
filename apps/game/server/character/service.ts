@@ -1,9 +1,9 @@
 import type { DbClient } from "@mp/db";
 import { eq } from "@mp/db";
 import type { UserId, UserIdentity } from "@mp/auth";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import { assert, randomItem, type Tile, type TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
-import { Rect, Vector } from "@mp/math";
+import { cardinalDirections, Rect, Vector } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
 import type { AppearanceTrait } from "../traits/appearance";
 import type { AreaLookup } from "../area/lookup";
@@ -41,7 +41,7 @@ export class CharacterService {
           ...char,
           ...characterAppearance(user.id),
           hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-          facingAngle: Math.random() * Math.PI * 2,
+          dir: assert(randomItem(cardinalDirections)),
           name:
             user.name ??
             uniqueNamesGenerator({
@@ -97,7 +97,7 @@ export class CharacterService {
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-      facingAngle: Math.random() * Math.PI * 2,
+      dir: assert(randomItem(cardinalDirections)),
       name:
         user.name ??
         uniqueNamesGenerator({

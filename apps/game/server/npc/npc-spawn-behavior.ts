@@ -7,8 +7,8 @@ import {
 import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { createShortId, randomItem, recordValues } from "@mp/std";
-import { clamp, Rect, Vector } from "@mp/math";
+import { assert, createShortId, randomItem, recordValues } from "@mp/std";
+import { cardinalDirections, clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -104,7 +104,7 @@ export function createNpcInstance(
     attackDamage: 5,
     attackRange: 1 as Tile,
     attackSpeed: 1 as TimesPerSecond,
-    facingAngle: Math.random() * Math.PI * 2,
+    dir: assert(randomItem(cardinalDirections)),
   };
 }
 

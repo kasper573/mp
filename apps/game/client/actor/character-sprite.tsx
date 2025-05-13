@@ -2,19 +2,20 @@ import type { AnimatedSpriteFrames, Spritesheet } from "pixi.js";
 import { AnimatedSprite } from "pixi.js";
 import type { Accessor } from "solid-js";
 import { createEffect, createMemo } from "solid-js";
-import { nearestCardinalDirection } from "@mp/math";
-import { characterSpriteDirections } from "./character-spritesheet";
+import {
+  cardinalDirectionAngles,
+  cardinalDirections,
+  nearestCardinalDirection,
+  type CardinalDirection,
+} from "@mp/math";
 
 export function createCharacterSprite(
-  facingAngle: Accessor<number>,
+  desiredDirection: Accessor<CardinalDirection>,
   spritesheet: Accessor<Spritesheet>,
 ): AnimatedSprite {
-  const direction = createMemo(() => {
-    const availableDirections = characterSpriteDirections.filter(
-      (direction) => spritesheet().animations[direction].length,
-    );
-    return nearestCardinalDirection(facingAngle(), availableDirections);
-  });
+  const direction = createMemo(() =>
+    spritesheetCompatibleDirection(desiredDirection(), spritesheet()),
+  );
   const textures = createMemo((): AnimatedSpriteFrames => {
     const textures = spritesheet().animations[direction()];
     return textures.map((texture) => ({
@@ -38,4 +39,23 @@ export function createCharacterSprite(
   });
 
   return sprite;
+}
+
+/**
+ * Since a spritesheet may not contain animations for every direction,
+ * we need to provide a fallback direction in case the desired direction
+ * is not available.
+ */
+function spritesheetCompatibleDirection(
+  desiredDirection: CardinalDirection,
+  spritesheet: Spritesheet,
+): CardinalDirection {
+  const availableDirections = cardinalDirections.filter(
+    (direction) => spritesheet.animations[direction].length,
+  );
+  if (availableDirections.includes(desiredDirection)) {
+    return desiredDirection;
+  }
+  const desiredAngle = cardinalDirectionAngles[desiredDirection];
+  return nearestCardinalDirection(desiredAngle, availableDirections);
 }

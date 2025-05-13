@@ -12,7 +12,11 @@ import {
 } from "solid-js";
 import type { Spritesheet } from "pixi.js";
 import { Container, Text } from "pixi.js";
-import { cardinalDirectionAngles, Vector } from "@mp/math";
+import {
+  cardinalDirectionAngles,
+  nearestCardinalDirection,
+  Vector,
+} from "@mp/math";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { LoadingSpinner, Select } from "@mp/ui";
 import { createCharacterSprite } from "./character-sprite";
@@ -123,7 +127,7 @@ function SpecificCharacterAngle(props: {
 }) {
   const engine = useContext(EngineContext);
   const sprite = createCharacterSprite(
-    () => props.angle,
+    () => nearestCardinalDirection(props.angle),
     () => props.spritesheet,
   );
   const container = new Container();
