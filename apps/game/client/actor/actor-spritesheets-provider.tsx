@@ -1,5 +1,5 @@
 import type { Texture } from "pixi.js";
-import { Assets, type Spritesheet } from "pixi.js";
+import { Assets } from "pixi.js";
 import type { ParentProps } from "solid-js";
 import { Show } from "solid-js";
 import {
@@ -9,12 +9,13 @@ import {
 import { useRpc } from "../use-rpc";
 import type { ActorSpritesheetUrls } from "../../server";
 import { ActorSpritesheetContext } from "./actor-sprite";
-import { createCharacterSpritesheet } from "./actor-spritesheet";
+import type { ActorSpritesheet } from "./actor-spritesheet";
+import { createActorSpritesheet } from "./actor-spritesheet";
 
 export async function loadActorSpritesheets(
   urls: ActorSpritesheetUrls,
 ): Promise<
-  ReadonlyMap<ActorModelId, ReadonlyMap<ActorModelState, Spritesheet>>
+  ReadonlyMap<ActorModelId, ReadonlyMap<ActorModelState, ActorSpritesheet>>
 > {
   return new Map(
     await Promise.all(
@@ -26,7 +27,7 @@ export async function loadActorSpritesheets(
               Array.from(states.entries()).map(async ([state, ssUrl]) => {
                 const texture = await Assets.load<Texture>(ssUrl);
                 texture.source.scaleMode = "nearest";
-                const ss = createCharacterSpritesheet(texture, {
+                const ss = createActorSpritesheet(texture, {
                   // TODO should come as metadata from the spritesheet
                   width: 48,
                   height: 64,

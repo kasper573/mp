@@ -1,23 +1,26 @@
 import type { CardinalDirection } from "@mp/math";
-import type { Size, Texture, SpritesheetFrameData } from "pixi.js";
+import type { TiledSpritesheetData } from "@mp/tiled-renderer";
+import type {
+  Size,
+  Texture,
+  SpritesheetFrameData,
+  SpritesheetData,
+} from "pixi.js";
 import { Spritesheet } from "pixi.js";
+import type { ActorModelState } from "../../server";
 
-// TODO strict spritesheet types for character spritesheets
+export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;
 
-// export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
+export type ActorSpritesheetData = Omit<SpritesheetData, "animations"> & {
+  animations?: {
+    [K in ActorModelState]: string[];
+  };
+};
 
-// export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
-//   frames: Record<GlobalTileId, SpritesheetFrameData>;
-//   animationsWithDuration?: Map<
-//     GlobalTileId,
-//     Array<{ duration: Milliseconds; id: GlobalTileId }>
-//   >;
-// };
-
-export function createCharacterSpritesheet(
+export function createActorSpritesheet(
   texture: Texture,
   frameSize: Size,
-): Spritesheet {
+): ActorSpritesheet {
   const columns = Math.ceil(texture.width / frameSize.width);
   const rows = Math.ceil(texture.height / frameSize.height);
   const frames = Object.fromEntries(
@@ -32,7 +35,8 @@ export function createCharacterSpritesheet(
         String(rowIndex * columns + columnIndex),
       ).filter((frameId) => frameId in frames),
     ]),
-  );
+  ) as ActorSpritesheetData["animations"];
+
   return new Spritesheet(texture, {
     frames,
     meta: {

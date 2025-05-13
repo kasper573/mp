@@ -1,4 +1,4 @@
-import type { AnimatedSpriteFrames, Spritesheet } from "pixi.js";
+import type { AnimatedSpriteFrames } from "pixi.js";
 import { AnimatedSprite } from "pixi.js";
 import type { Accessor } from "solid-js";
 import { createContext, createEffect, createMemo, useContext } from "solid-js";
@@ -14,6 +14,7 @@ import {
   type ActorModelId,
   type ActorModelState,
 } from "../../server";
+import type { ActorSpritesheet } from "./actor-spritesheet";
 
 export function createActorSprite(
   modelId: Accessor<ActorModelId>,
@@ -69,7 +70,7 @@ const loopedCharacterSpriteStates = new Set(
  */
 function spritesheetCompatibleDirection(
   desiredDirection: CardinalDirection,
-  spritesheet: Spritesheet,
+  spritesheet: ActorSpritesheet,
 ): CardinalDirection {
   const availableDirections = cardinalDirections.filter(
     (direction) => spritesheet.animations[direction].length,
@@ -83,7 +84,10 @@ function spritesheetCompatibleDirection(
 
 export const ActorSpritesheetContext = createContext(
   new Proxy(
-    {} as ReadonlyMap<ActorModelId, ReadonlyMap<ActorModelState, Spritesheet>>,
+    {} as ReadonlyMap<
+      ActorModelId,
+      ReadonlyMap<ActorModelState, ActorSpritesheet>
+    >,
     {
       get() {
         throw new Error("CharacterSpritesheetContext is not initialized");
