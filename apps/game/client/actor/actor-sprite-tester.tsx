@@ -16,13 +16,14 @@ import {
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 
-import type { ActorModelId } from "../../server/traits/appearance";
-import { ActorSpritesheetContext, createActorSprite } from "./actor-sprite";
-import type { ActorSpriteState } from "./actor-sprite-state";
 import {
-  ActorSpritesheetProvider,
-  actorSpriteStates,
-} from "./actor-sprite-state";
+  actorModelStates,
+  type ActorModelId,
+  type ActorModelState,
+} from "../../server/traits/appearance";
+import { ActorSpritesheetContext, createActorSprite } from "./actor-sprite";
+
+import { ActorSpritesheetProvider } from "./actor-spritesheets-provider";
 
 export function ActorSpriteTester() {
   return (
@@ -40,7 +41,7 @@ export function ActorSpriteTester() {
 
 function ActorSpriteList() {
   const allModelIds = useContext(ActorSpritesheetContext).keys().toArray();
-  const [state, setState] = createSignal<ActorSpriteState>("walk-normal");
+  const [state, setState] = createSignal<ActorModelState>("walk-normal");
   const [modelId, setModelId] = createSignal(allModelIds[0]);
   return (
     <>
@@ -68,7 +69,7 @@ function ActorSpriteList() {
         <Select
           value={state()}
           onChange={setState}
-          options={actorSpriteStates}
+          options={actorModelStates}
         />
         <Select value={modelId()} onChange={setModelId} options={allModelIds} />
       </div>
@@ -78,7 +79,7 @@ function ActorSpriteList() {
 
 function DynamicActorAngle(props: {
   modelId: ActorModelId;
-  state: ActorSpriteState;
+  state: ActorModelState;
 }) {
   const center = useScreenCenter();
   const engine = useContext(EngineContext);
@@ -116,7 +117,7 @@ function SpecificActorAngle(props: {
   pos: Vector<number>;
   anchor?: Vector<number>;
   showFrameNumber?: boolean;
-  state: ActorSpriteState;
+  state: ActorModelState;
 }) {
   const engine = useContext(EngineContext);
   const sprite = createActorSprite(

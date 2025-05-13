@@ -9,7 +9,7 @@ import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
-import { ActorSpritesheetProvider } from "./actor/actor-sprite-state";
+import { ActorSpritesheetProvider } from "./actor/actor-spritesheets-provider";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);

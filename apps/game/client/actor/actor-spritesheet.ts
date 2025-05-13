@@ -14,10 +14,10 @@ import { Spritesheet } from "pixi.js";
 //   >;
 // };
 
-export async function createCharacterSpritesheet(
+export function createCharacterSpritesheet(
   texture: Texture,
   frameSize: Size,
-): Promise<Spritesheet> {
+): Spritesheet {
   const columns = Math.ceil(texture.width / frameSize.width);
   const rows = Math.ceil(texture.height / frameSize.height);
   const frames = Object.fromEntries(
@@ -33,7 +33,7 @@ export async function createCharacterSpritesheet(
       ).filter((frameId) => frameId in frames),
     ]),
   );
-  const ss = new Spritesheet(texture, {
+  return new Spritesheet(texture, {
     frames,
     meta: {
       size: { w: texture.width, h: texture.height },
@@ -41,10 +41,6 @@ export async function createCharacterSpritesheet(
     },
     animations,
   });
-
-  await ss.parse();
-
-  return ss;
 }
 
 /**

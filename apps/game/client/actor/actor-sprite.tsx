@@ -9,12 +9,15 @@ import {
   type CardinalDirection,
 } from "@mp/math";
 import { assert } from "@mp/std";
-import type { ActorModelId } from "../../server";
-import { actorSpriteStates, type ActorSpriteState } from "./actor-sprite-state";
+import {
+  actorModelStates,
+  type ActorModelId,
+  type ActorModelState,
+} from "../../server";
 
 export function createActorSprite(
   modelId: Accessor<ActorModelId>,
-  state: Accessor<ActorSpriteState>,
+  state: Accessor<ActorModelState>,
   desiredDirection: Accessor<CardinalDirection>,
 ): AnimatedSprite {
   const allSpriteshets = useContext(ActorSpritesheetContext);
@@ -56,7 +59,7 @@ export function createActorSprite(
 }
 
 const loopedCharacterSpriteStates = new Set(
-  actorSpriteStates.filter((state) => !state.startsWith("death-")),
+  actorModelStates.filter((state) => !state.startsWith("death-")),
 );
 
 /**
@@ -80,7 +83,7 @@ function spritesheetCompatibleDirection(
 
 export const ActorSpritesheetContext = createContext(
   new Proxy(
-    {} as ReadonlyMap<ActorModelId, ReadonlyMap<ActorSpriteState, Spritesheet>>,
+    {} as ReadonlyMap<ActorModelId, ReadonlyMap<ActorModelState, Spritesheet>>,
     {
       get() {
         throw new Error("CharacterSpritesheetContext is not initialized");
