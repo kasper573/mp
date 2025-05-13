@@ -5,7 +5,6 @@ import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
 import { createTintFilter } from "../tint-filter";
 import { createCharacterSprite } from "./character-sprite";
-import { loopedCharacterSpriteStates } from "./character-sprite-state";
 import { deriveCharacterSpriteState } from "./character-sprite-state-for-actor";
 
 export function Actor(props: {
@@ -25,10 +24,6 @@ export function Actor(props: {
     () => state(),
     () => props.actor.dir,
   );
-
-  createEffect(() => {
-    sprite.loop = loopedCharacterSpriteStates.includes(state());
-  });
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   container.addChild(sprite);

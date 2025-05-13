@@ -9,9 +9,10 @@ import {
   type CardinalDirection,
 } from "@mp/math";
 import { assert } from "@mp/std";
-import type {
-  CharacterModelId,
-  CharacterSpriteState,
+import {
+  characterSpriteStates,
+  type CharacterModelId,
+  type CharacterSpriteState,
 } from "./character-sprite-state";
 
 export function createCharacterSprite(
@@ -50,8 +51,16 @@ export function createCharacterSprite(
     sprite.gotoAndPlay(previousFrame);
   });
 
+  createEffect(() => {
+    sprite.loop = loopedCharacterSpriteStates.has(state());
+  });
+
   return sprite;
 }
+
+const loopedCharacterSpriteStates = new Set(
+  characterSpriteStates.filter((state) => !state.startsWith("death-")),
+);
 
 /**
  * Since a spritesheet may not contain animations for every direction,

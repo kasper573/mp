@@ -41,10 +41,6 @@ export const characterSpriteStates = Object.freeze([
   "walk-spear",
 ] as const);
 
-export const loopedCharacterSpriteStates = characterSpriteStates.filter(
-  (state) => !state.startsWith("death-"),
-);
-
 export async function loadCharacterSpritesheetForState(
   character: string,
   state: CharacterSpriteState,
