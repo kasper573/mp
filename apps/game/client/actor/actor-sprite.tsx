@@ -1,7 +1,13 @@
 import type { AnimatedSpriteFrames } from "pixi.js";
 import { AnimatedSprite } from "pixi.js";
 import type { Accessor } from "solid-js";
-import { createContext, createEffect, createMemo, useContext } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  untrack,
+  useContext,
+} from "solid-js";
 import {
   cardinalDirectionAngles,
   cardinalDirections,
@@ -36,6 +42,8 @@ export function createActorSprite(
     }));
   });
 
+  const spriteFlags = createMemo(() => actorSpriteFlags[state()]);
+
   const sprite = new AnimatedSprite({
     width: 48,
     height: 64,
@@ -47,21 +55,48 @@ export function createActorSprite(
   createEffect(() => {
     const previousFrame = sprite.currentFrame;
     sprite.textures = textures();
-    if (previousFrame <= sprite.textures.length) {
+    const { retainFrameNumber } = untrack(spriteFlags);
+    if (retainFrameNumber && previousFrame <= sprite.textures.length) {
       sprite.gotoAndPlay(previousFrame);
+    } else {
+      sprite.gotoAndPlay(0);
     }
   });
 
   createEffect(() => {
-    sprite.loop = loopedCharacterSpriteStates.has(state());
+    sprite.loop = spriteFlags().loop;
   });
 
   return sprite;
 }
 
-const loopedCharacterSpriteStates = new Set(
-  actorModelStates.filter((state) => !state.startsWith("death-")),
-);
+interface ActorSpriteStateFlag {
+  /**
+   * If true, the animation will loop.
+   */
+  loop: boolean;
+  /**
+   * When the animation is switched to, the previous frame number is retained.
+   * This is useful for animations that are designed to line up with each other,
+   */
+  retainFrameNumber: boolean;
+}
+
+const actorSpriteFlags = {} as Record<ActorModelState, ActorSpriteStateFlag>;
+
+for (const state of actorModelStates) {
+  if (state.startsWith("death-")) {
+    actorSpriteFlags[state] = {
+      loop: false,
+      retainFrameNumber: false,
+    };
+  } else {
+    actorSpriteFlags[state] = {
+      loop: true,
+      retainFrameNumber: true,
+    };
+  }
+}
 
 /**
  * Since a spritesheet may not contain animations for every direction,
