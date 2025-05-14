@@ -139,7 +139,7 @@ jobs:
                 name=$(docker inspect --format='{{.Name}}' "$id" | sed 's#^/##')
                 docker logs "$id" &> "logs/${name}.log" || true
               done
-              tar czf docker-logs.tar.gz logs/
+              tar czf deploy-failure-logs.tar.gz logs/
               exit 1
             fi
 
