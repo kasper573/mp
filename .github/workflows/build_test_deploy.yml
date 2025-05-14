@@ -106,6 +106,7 @@ jobs:
       - name: Deploy via SSH action
         id: deploy
         uses: appleboy/ssh-action@v1.2.2
+        continue-on-error: true
         with:
           host: ${{ secrets.PROD_SSH_HOST }}
           username: ${{ secrets.PROD_SSH_USERNAME }}
