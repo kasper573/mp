@@ -2,21 +2,38 @@ import type { Patch, UpdateOperation } from "./patch";
 import { PatchType } from "./patch";
 import type { PatchableState } from "./patch-state-machine";
 
+/**
+ * A patch optimizer is a set of rules that can be applied to a patch to
+ * transform it into a more efficient form. It can be used to filter out
+ * unnecessary operations or to transform operation values.
+ */
 export type PatchOptimizer<State extends PatchableState> = {
   [EntityName in keyof State]?: EntityPatchOptimizer<
     State[EntityName][keyof State[EntityName]]
   >;
 };
 
+/**
+ * An entity specific optimizer
+ */
 export type EntityPatchOptimizer<Entity> = {
   [Field in keyof Entity]?: PropertyPatchOptimizer<Entity[Field], Entity>;
 };
 
+/**
+ * A property specific optimizer
+ */
 export interface PropertyPatchOptimizer<Value, Entity> {
   filter?: PropertyPatchOptimizerFilter<Value, Entity>;
+  /**
+   * Transforms the value of the property before applying the patch.
+   */
   transform?: (value: Value) => Value;
 }
 
+/**
+ * Determines whether the patch for a given property should be applied or not.
+ */
 export type PropertyPatchOptimizerFilter<Value, Entity> = (
   newValue: Value,
   oldValue: Value,
