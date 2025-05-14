@@ -85,6 +85,7 @@ jobs:
           include-hidden-files: true
 
   deploy:
+    needs: [build]
     # needs: [conventions, build, test-unit, test-e2e]
     # if: github.ref_name == 'main'
     runs-on: ubuntu-latest
