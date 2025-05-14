@@ -163,3 +163,9 @@ jobs:
         with:
           name: deploy-failure-logs
           path: ./deploy-failure-logs.tar.gz
+
+      - name: 💥 Fail workflow on deploy error
+        if: ${{ steps.deploy.conclusion == 'failure' }}
+        run: |
+          echo "🚨 Deployment failed — see the docker-logs artifact for details."
+          exit 1
