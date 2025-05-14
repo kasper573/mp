@@ -2,7 +2,7 @@ import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { Patch } from "@mp/sync";
-import { applyPatch, filterPatchUpdates } from "@mp/sync";
+import { applyPatch, filterPatch } from "@mp/sync";
 import { batch } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
@@ -39,7 +39,7 @@ export function createOptimisticGameState() {
       // We need to ignore some updates to let the interpolator complete its work.
       // If we receive updates that we trust the interpolator to already be working on,
       // we simply ignore those patch operations.
-      const filteredPatch = filterPatchUpdates(gameState, patch, {
+      const filteredPatch = filterPatch(gameState, patch, {
         actors: {
           coords(newValue, oldValue, actor, update) {
             if (update.areaId && update.areaId !== actor.areaId) {

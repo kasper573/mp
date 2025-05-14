@@ -5,10 +5,10 @@ import type { PatchableState } from "./patch-state-machine";
 /**
  * Returns a new patch that transforms update operations according to the provided filter.
  */
-export function filterPatchUpdates<State extends PatchableState>(
+export function filterPatch<State extends PatchableState>(
   state: State,
   patch: Patch,
-  filter: StateFilter<State>,
+  filter: PatchFilter<State>,
 ): Patch {
   return patch.map((op) =>
     op[0] === PatchType.Update ? filterUpdateOperation(state, filter, op) : op,
@@ -20,7 +20,7 @@ export function filterPatchUpdates<State extends PatchableState>(
  */
 function filterUpdateOperation<State extends PatchableState>(
   state: State,
-  filter: StateFilter<State>,
+  filter: PatchFilter<State>,
   op: UpdateOperation,
 ): UpdateOperation {
   const [, path, update] = op;
@@ -69,7 +69,7 @@ function filterUpdateOperation<State extends PatchableState>(
   return [PatchType.Update, path, filteredUpdate];
 }
 
-type StateFilter<State extends PatchableState> = {
+export type PatchFilter<State extends PatchableState> = {
   [Entity in keyof State]?: EntityFilter<State[Entity][keyof State[Entity]]>;
 };
 
