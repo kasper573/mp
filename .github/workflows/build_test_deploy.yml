@@ -156,7 +156,7 @@ jobs:
 
       - name: Save deployment logs
         if: steps.deploy.outcome == 'failure'
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: deploy-failure-logs
           path: ./deploy-failure-logs.tar.gz
