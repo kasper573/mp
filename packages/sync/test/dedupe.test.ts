@@ -89,15 +89,15 @@ describe("dedupePatch", () => {
 
   it("should handle numeric path segments", () => {
     const patch: Patch = [
-      [PatchType.Set, ["list", 0, "val"], 10],
-      [PatchType.Set, ["list", 1, "val"], 20],
-      [PatchType.Set, ["list", 0, "val"], 30],
+      [PatchType.Set, ["list", 0], { val: 10 }],
+      [PatchType.Set, ["list", 1], { val: 20 }],
+      [PatchType.Set, ["list", 0], { val: 30 }],
     ];
     const deduped = dedupePatch(patch);
 
     expect(deduped).toEqual([
-      [PatchType.Set, ["list", 1, "val"], 20],
-      [PatchType.Set, ["list", 0, "val"], 30],
+      [PatchType.Set, ["list", 1], { val: 20 }],
+      [PatchType.Set, ["list", 0], { val: 30 }],
     ]);
   });
 });
