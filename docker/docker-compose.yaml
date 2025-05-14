@@ -36,7 +36,7 @@ services:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
       interval: 3s
       timeout: 5s
-      retries: 5
+      retries: 10
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
