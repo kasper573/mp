@@ -11,6 +11,7 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
+  ctxActorSpritesheetUrls,
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
@@ -54,6 +55,7 @@ import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
+import { loadActorSpritesheets } from "./etc/load-actor-spritesheets";
 
 registerEncoderExtensions();
 
@@ -157,7 +159,8 @@ const ioc = new InjectionContainer()
   .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
-  );
+  )
+  .provide(ctxActorSpritesheetUrls, await loadActorSpritesheets(opt.publicDir));
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);

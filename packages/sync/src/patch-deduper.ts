@@ -1,17 +1,23 @@
-import type { Patch, Operation } from "./patch";
+import type { Patch } from "./patch";
+import { PatchType } from "./patch";
 
 export function dedupePatch(patch: Patch): Patch {
-  const current = new Map<string, Operation>();
-  const finalPatch = new Set<Operation>(patch);
+  const seen = new Set<string>();
+  const deduped: Patch = [];
 
   for (let i = patch.length - 1; i >= 0; i--) {
     const op = patch[i];
-    const key = op[0].join(".");
-    if (current.has(key)) {
-      finalPatch.delete(op);
+    const key = op[1].join(".");
+
+    if (op[0] === PatchType.Set || op[0] === PatchType.Remove) {
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(op);
+      }
+    } else if (!seen.has(key)) {
+      deduped.push(op);
     }
-    current.set(key, op);
   }
 
-  return Array.from(finalPatch);
+  return deduped.reverse();
 }

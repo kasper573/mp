@@ -1,9 +1,9 @@
 import { worldRouterSlice } from "./world/rpc";
-import { areaRouterSlice, npcRouterSlice, characterRouterSlice } from ".";
+import { assetsRouterSlice, npcRouterSlice, characterRouterSlice } from ".";
 
 export const gameServerRpcSlice = {
   ...characterRouterSlice,
   ...worldRouterSlice,
-  ...areaRouterSlice,
+  ...assetsRouterSlice,
   ...npcRouterSlice,
 };

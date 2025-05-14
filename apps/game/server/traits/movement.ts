@@ -1,4 +1,9 @@
-import type { Path, Vector } from "@mp/math";
+import {
+  nearestCardinalDirection,
+  type CardinalDirection,
+  type Path,
+  type Vector,
+} from "@mp/math";
 import type { PatchStateMachine } from "@mp/sync";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
@@ -24,9 +29,9 @@ export interface MovementTrait {
    */
   path?: Path<Tile>;
   /**
-   * The radian angle that the subject is facing.
+   * The direction the subject is facing.
    */
-  facingAngle: number;
+  dir: CardinalDirection;
 }
 
 export function movementBehavior(
@@ -35,11 +40,22 @@ export function movementBehavior(
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
     for (const subject of recordValues(state.actors())) {
-      if (subject.moveTarget) {
-        state.actors
-          .update(subject.id)
-          .set("path", findPathForSubject(subject, areas, subject.moveTarget))
-          .set("moveTarget", undefined);
+      // The dead don't move
+      if (subject.health <= 0) {
+        state.actors.update(subject.id, (update) => {
+          update.add("path", undefined);
+          update.add("moveTarget", undefined);
+        });
+        continue;
+      }
+
+      const { moveTarget } = subject;
+      if (moveTarget) {
+        state.actors.update(subject.id, (update) =>
+          update
+            .add("path", findPathForSubject(subject, areas, moveTarget))
+            .add("moveTarget", undefined),
+        );
       }
 
       if (subject.path) {
@@ -50,17 +66,17 @@ export function movementBehavior(
           timeSinceLastTick,
         );
 
-        const update = state.actors
-          .update(subject.id)
-          .set("coords", newCoords)
-          .set("path", newPath);
-
-        if (newPath?.length) {
-          const newFacingAngle = newCoords.angle(newPath[0]);
-          if (newFacingAngle !== subject.facingAngle) {
-            update.set("facingAngle", newFacingAngle);
+        state.actors.update(subject.id, (update) => {
+          update.add("coords", newCoords).add("path", newPath);
+          if (newPath?.length) {
+            const newDir = nearestCardinalDirection(
+              newCoords.angle(newPath[0]),
+            );
+            if (newDir !== subject.dir) {
+              update.add("dir", newDir);
+            }
           }
-        }
+        });
       }
 
       const area = areas.get(subject.areaId);
@@ -70,11 +86,12 @@ export function movementBehavior(
             hit.object.properties.get("goto")?.value as AreaId,
           );
           if (targetArea) {
-            state.actors
-              .update(subject.id)
-              .set("path", undefined)
-              .set("areaId", targetArea.id)
-              .set("coords", targetArea.start);
+            state.actors.update(subject.id, (update) =>
+              update
+                .add("path", undefined)
+                .add("areaId", targetArea.id)
+                .add("coords", targetArea.start),
+            );
           }
         }
       }

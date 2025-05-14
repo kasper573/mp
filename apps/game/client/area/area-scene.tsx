@@ -131,7 +131,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
                       <Actor
                         tiled={props.area.tiled}
                         actor={actor}
-                        showAngle={actor.id === state.characterId()}
+                        isPlayer={actor.id === state.characterId()}
                       />
                     )}
                   </For>

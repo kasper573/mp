@@ -57,7 +57,7 @@ it("can update entity partially", () => {
     clientIds: () => [],
   });
 
-  state.entity.update("john").set("cash", 50);
+  state.entity.update("john", (b) => b.add("cash", 50));
   expect(state.entity()).toEqual({
     john: { cash: 50, name: "john" },
     jane: { cash: 0, name: "jane" },
@@ -77,8 +77,8 @@ it("can produce client state patches for object changes", () => {
     clientVisibility: (clientId) => ({ actors: new Set([clientId]) }),
   });
 
-  state.actors.update(john.id).set("cash", 50);
-  state.actors.update(jane.id).set("cash", 100);
+  state.actors.update(john.id, (b) => b.add("cash", 50));
+  state.actors.update(jane.id, (b) => b.add("cash", 100));
 
   const patches = state.$flush();
 
@@ -106,7 +106,7 @@ it("can produce client state patches for array properties", () => {
     clientVisibility: (clientId) => ({ entity: new Set([clientId]) }),
   });
 
-  state.entity.update(entity.id).set("list", [1, 2, 3]);
+  state.entity.update(entity.id, (b) => b.add("list", [1, 2, 3]));
 
   const patches = state.$flush();
 
@@ -137,8 +137,8 @@ it("can produce client state patches for additions to record due to changes in v
     }),
   });
 
-  state.actors.update(john.id).set("visibleToOthers", true);
-  state.actors.update(jane.id).set("visibleToOthers", true);
+  state.actors.update(john.id, (b) => b.add("visibleToOthers", true));
+  state.actors.update(jane.id, (b) => b.add("visibleToOthers", true));
 
   const patches = state.$flush();
 
@@ -177,8 +177,8 @@ it("can produce client state patches for removals in record due to changes in vi
     }),
   });
 
-  state.actors.update(john.id).set("visibleToOthers", false);
-  state.actors.update(jane.id).set("visibleToOthers", false);
+  state.actors.update(john.id, (b) => b.add("visibleToOthers", false));
+  state.actors.update(jane.id, (b) => b.add("visibleToOthers", false));
 
   const patches = state.$flush();
 

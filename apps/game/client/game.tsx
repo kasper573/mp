@@ -1,15 +1,7 @@
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import {
-  useContext,
-  createEffect,
-  Switch,
-  Match,
-  Suspense,
-  createResource,
-  createMemo,
-} from "solid-js";
+import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
 import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { AuthContext } from "@mp/auth/client";
@@ -17,22 +9,13 @@ import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
-import { CharacterSpritesheetContext } from "./actor/actor";
-import { loadAllCharacterSpritesheets } from "./actor/character-sprite-state";
+import { ActorSpritesheetProvider } from "./actor/actor-spritesheets-provider";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
   const state = useContext(GameStateClientContext);
   const auth = useContext(AuthContext);
   const actions = useGameActions();
   const area = useAreaResource(state.areaId);
-  const [characterSpritesheets] = createResource(loadAllCharacterSpritesheets);
-
-  const gameData = createMemo(() => {
-    const spritesheets = characterSpritesheets();
-    if (area.data && spritesheets) {
-      return { area: area.data, spritesheets };
-    }
-  });
 
   createEffect(() => {
     const user = auth.identity();
@@ -43,24 +26,24 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
 
   return (
     <Switch>
-      <Match when={gameData()} keyed>
-        {(gameData) => (
+      <Match when={area.data} keyed>
+        {(area) => (
           <Suspense
             fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
           >
-            <CharacterSpritesheetContext.Provider value={gameData.spritesheets}>
+            <ActorSpritesheetProvider>
               <Application
                 class={clsx(styles.container, props.class)}
                 style={props.style}
               >
                 {({ viewport }) => (
                   <EngineProvider viewport={viewport}>
-                    <AreaScene area={gameData.area} />
+                    <AreaScene area={area} />
                     <GameStateClientAnimations />
                   </EngineProvider>
                 )}
               </Application>
-            </CharacterSpritesheetContext.Provider>
+            </ActorSpritesheetProvider>
           </Suspense>
         )}
       </Match>

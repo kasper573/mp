@@ -6,14 +6,16 @@ import {
 } from "unique-names-generator";
 import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
+import { TimeSpan } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { createShortId, randomItem, recordValues } from "@mp/std";
-import { clamp, Rect, Vector } from "@mp/math";
+import { assert, createShortId, randomItem, recordValues } from "@mp/std";
+import { cardinalDirections, clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
+import type { ActorModelId } from "../traits/appearance";
 import type { NpcService } from "./service";
 import type { Npc, NpcInstance, NpcInstanceId, NpcSpawn } from "./schema";
 
@@ -27,11 +29,22 @@ export function npcSpawnBehavior(
     spawns = list;
   });
 
-  return () => {
+  const corpseDuration = TimeSpan.fromSeconds(5);
+  const corpseCleanupTimers = new Map<NpcInstanceId, TimeSpan>();
+
+  return ({ totalTimeElapsed }) => {
     // Clean up dead NPCs
     for (const actor of recordValues(state.actors())) {
       if (actor.type === "npc" && actor.health <= 0) {
-        state.actors.remove(actor.id);
+        let cleanupTime = corpseCleanupTimers.get(actor.id);
+        if (!cleanupTime) {
+          cleanupTime = totalTimeElapsed.add(corpseDuration);
+          corpseCleanupTimers.set(actor.id, cleanupTime);
+        }
+        if (cleanupTime <= totalTimeElapsed) {
+          state.actors.remove(actor.id);
+          corpseCleanupTimers.delete(actor.id);
+        }
       }
     }
 
@@ -104,7 +117,8 @@ export function createNpcInstance(
     attackDamage: 5,
     attackRange: 1 as Tile,
     attackSpeed: 1 as TimesPerSecond,
-    facingAngle: Math.random() * Math.PI * 2,
+    modelId: "adventurer" as ActorModelId,
+    dir: assert(randomItem(cardinalDirections)),
   };
 }
 

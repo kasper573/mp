@@ -191,8 +191,8 @@ function DebugInfo(props: { tiled: TiledResource }) {
       client: versions.client(),
       server: versions.server(),
       cameraTransform: engine.camera.transform.data,
-      frameInterval: frameInterval(),
-      frameDuration: frameDuration(),
+      frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
+      frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameCallbackCount,
       character: trimCharacterInfo(state.character()),
     };
@@ -283,7 +283,7 @@ function trimCharacterInfo(char?: Character) {
     char && {
       ...char,
       coords: char.coords.toString(),
-      path: char.path?.map((v) => v.toString()).join(" -> "),
+      path: char.path,
     }
   );
 }

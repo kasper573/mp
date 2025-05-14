@@ -1,22 +1,26 @@
-import type { Size, Texture, SpritesheetFrameData } from "pixi.js";
+import type { CardinalDirection } from "@mp/math";
+import type { TiledSpritesheetData } from "@mp/tiled-renderer";
+import type {
+  Size,
+  Texture,
+  SpritesheetFrameData,
+  SpritesheetData,
+} from "pixi.js";
 import { Spritesheet } from "pixi.js";
+import type { ActorModelState } from "../../server";
 
-// TODO strict spritesheet types for character spritesheets
+export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;
 
-// export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
+export type ActorSpritesheetData = Omit<SpritesheetData, "animations"> & {
+  animations?: {
+    [K in ActorModelState]: string[];
+  };
+};
 
-// export type TiledSpritesheetData = Omit<SpritesheetData, "frames"> & {
-//   frames: Record<GlobalTileId, SpritesheetFrameData>;
-//   animationsWithDuration?: Map<
-//     GlobalTileId,
-//     Array<{ duration: Milliseconds; id: GlobalTileId }>
-//   >;
-// };
-
-export async function createCharacterSpritesheet(
+export function createActorSpritesheet(
   texture: Texture,
   frameSize: Size,
-): Promise<Spritesheet> {
+): ActorSpritesheet {
   const columns = Math.ceil(texture.width / frameSize.width);
   const rows = Math.ceil(texture.height / frameSize.height);
   const frames = Object.fromEntries(
@@ -31,8 +35,9 @@ export async function createCharacterSpritesheet(
         String(rowIndex * columns + columnIndex),
       ).filter((frameId) => frameId in frames),
     ]),
-  );
-  const ss = new Spritesheet(texture, {
+  ) as ActorSpritesheetData["animations"];
+
+  return new Spritesheet(texture, {
     frames,
     meta: {
       size: { w: texture.width, h: texture.height },
@@ -40,31 +45,21 @@ export async function createCharacterSpritesheet(
     },
     animations,
   });
-
-  await ss.parse();
-
-  return ss;
 }
-
-export type CharacterSpriteDirection = keyof typeof directionLayerIndexes;
 
 /**
  * The layer index inside the spritesheet each direction is located at.
  */
-const directionLayerIndexes = {
-  down: 0,
-  "down-left": 1,
-  "up-left": 2,
-  up: 3,
-  "up-right": 4,
-  "down-right": 5,
-  right: 6,
-  left: 7,
+const directionLayerIndexes: Record<CardinalDirection, number> = {
+  s: 0,
+  sw: 1,
+  nw: 2,
+  n: 3,
+  ne: 4,
+  se: 5,
+  e: 6,
+  w: 7,
 };
-
-export const characterSpriteDirections = Object.freeze(
-  Object.keys(directionLayerIndexes),
-) as ReadonlyArray<CharacterSpriteDirection>;
 
 function* generateFrames(
   rows: number,

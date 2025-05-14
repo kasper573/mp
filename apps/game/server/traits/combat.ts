@@ -1,4 +1,4 @@
-import { type Rect } from "@mp/math";
+import { nearestCardinalDirection, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync";
@@ -28,12 +28,14 @@ export function combatBehavior(
 
       // Dying should stop all actions
       if (!actor.health) {
-        state.actors
-          .update(actor.id)
-          .set("health", 0) // Clamp
-          .set("path", undefined)
-          .set("moveTarget", undefined)
-          .set("attackTargetId", undefined);
+        state.actors.update(actor.id, (update) =>
+          update
+            .add("health", 0) // Clamp
+            .add("path", undefined)
+            .add("moveTarget", undefined)
+            .add("attackTargetId", undefined),
+        );
+
         continue;
       }
     }
@@ -46,15 +48,23 @@ export function combatBehavior(
 
     const target = state.actors()[actor.attackTargetId] as Actor | undefined;
     if (!target || !isTargetable(actor, target)) {
-      state.actors.update(actor.id).set("attackTargetId", undefined);
+      state.actors.update(actor.id, (u) => u.add("attackTargetId", undefined));
       return;
     }
 
     const distance = actor.coords.distance(target.coords);
     if (distance > actor.attackRange + tileMargin) {
       // target too far away, move closer, but don't attack yet
-      state.actors.update(actor.id).set("moveTarget", target.coords);
+      state.actors.update(actor.id, (u) => u.add("moveTarget", target.coords));
       return;
+    }
+
+    // Correct direction if we're not facing the target
+    const direction = nearestCardinalDirection(
+      actor.coords.angle(target.coords),
+    );
+    if (direction !== actor.dir) {
+      state.actors.update(actor.id, (u) => u.add("dir", direction));
     }
 
     if (actor.lastAttack) {
@@ -66,14 +76,15 @@ export function combatBehavior(
       }
     }
 
-    state.actors
-      .update(target.id)
-      .set("health", target.health - actor.attackDamage);
+    state.actors.update(target.id, (u) =>
+      u.add("health", target.health - actor.attackDamage),
+    );
 
-    state.actors
-      .update(actor.id)
-      .set("path", undefined) // stop moving when attacking
-      .set("lastAttack", currentTime);
+    state.actors.update(actor.id, (update) =>
+      update
+        .add("path", undefined) // stop moving when attacking
+        .add("lastAttack", currentTime),
+    );
   }
 }
 

@@ -1,6 +1,8 @@
 import type { ReadonlyDeep } from "type-fest";
-import type { Patch, PatchPath } from "./patch";
+import { PatchType, type Patch, type PatchPath } from "./patch";
 import { dedupePatch } from "./patch-deduper";
+import type { PatchOptimizer } from "./patch-optimizer";
+import { optimizeUpdate } from "./patch-optimizer";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -86,21 +88,27 @@ function createFlushFunction<State extends PatchableState>(
 
         for (const addedId of nextIds.difference(prevIds)) {
           clientPatch.push([
+            PatchType.Set,
             [entityName, addedId] as PatchPath,
             state[entityName][addedId],
           ]);
         }
 
         for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push([[entityName, removedId] as PatchPath]);
+          clientPatch.push([
+            PatchType.Remove,
+            [entityName, removedId] as PatchPath,
+          ]);
         }
       }
 
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(([[entityName, entityId]]) => {
-          return nextVisibility[entityName].has(entityId);
+        ...serverPatch.filter(([type, [entityName, entityId]]) => {
+          return entityId === undefined
+            ? false
+            : nextVisibility[entityName].has(entityId);
         }),
       );
 
@@ -147,7 +155,7 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
-  allPatchOptimizers: EntityPatchOptimizerRecord<State> | undefined,
+  allPatchOptimizers: PatchOptimizer<State> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
@@ -161,89 +169,52 @@ function createEntityRepository<
   }
 
   entity.set = function setEntity(id: Id, entity: Entity) {
-    serverPatch.push([[entityName, id] as PatchPath, entity]);
+    serverPatch.push([PatchType.Set, [entityName, id] as PatchPath, entity]);
     state[entityName][id] = entity;
   };
 
-  entity.update = function updateEntity(id: Id) {
-    return new EntityUpdateBuilder<Entity>((key, newValue) => {
-      const entity = state[entityName][id];
-      const accepted = optimizePatchOperationValue(
-        entityPatchOptimizer?.[key],
-        newValue,
-        entity[key],
-      );
+  const update: EntityRepository<State[EntityName]>["update"] = (
+    id,
+    addUpdates,
+  ) => {
+    const updateBuilder = new EntityUpdateBuilder<Entity>();
+    addUpdates(updateBuilder);
+    const updates = updateBuilder.build();
 
-      if (accepted) {
-        serverPatch.push([[entityName, id, key] as PatchPath, accepted.value]);
-      }
+    const entity = state[entityName][id];
+    const optimizedUpdates = optimizeUpdate(
+      entityPatchOptimizer,
+      entity,
+      updates,
+    );
 
-      entity[key] = newValue;
-    });
+    Object.assign(entity as object, updates);
+
+    if (optimizedUpdates) {
+      serverPatch.push([
+        PatchType.Update,
+        [entityName, id] as PatchPath,
+        optimizedUpdates,
+      ]);
+    }
   };
 
+  entity.update = update;
+
   entity.remove = function removeEntity(id: Id) {
-    serverPatch.push([[entityName, id] as PatchPath]);
+    serverPatch.push([PatchType.Remove, [entityName, id] as PatchPath]);
     delete state[entityName][id];
   };
 
   return entity;
 }
 
-export type EntityPatchOptimizerRecord<State extends PatchableState> = {
-  [EntityName in keyof State]?: EntityPatchOptimizer<
-    State[EntityName][keyof State[EntityName]]
-  >;
-};
-
-export type EntityPatchOptimizer<Entity> = {
-  [K in keyof Entity]?: PropertyPatchOptimizer<Entity, K>;
-};
-
-export interface PropertyPatchOptimizer<
-  Entity,
-  Key extends keyof Entity = keyof Entity,
-> {
-  filter?: PropertyPatchOptimizerFilter<Entity[Key]>;
-  transform?: (value: Entity[Key]) => Entity[Key];
-}
-
-export type PropertyPatchOptimizerFilter<Value> = (
-  newValue: Value,
-  oldValue: Value,
-) => boolean;
-
-function optimizePatchOperationValue<Entity, Key extends keyof Entity>(
-  {
-    transform,
-    filter = defaultOptimizerFilter,
-  }: PropertyPatchOptimizer<Entity, Key> | undefined = empty,
-  newValue: Entity[Key],
-  oldValue: Entity[Key],
-): { value: Entity[Key] } | undefined {
-  if (transform) {
-    newValue = transform(newValue);
-    oldValue = transform(oldValue);
-  }
-  if (!filter(newValue, oldValue)) {
-    return;
-  }
-  return { value: newValue };
-}
-
-const empty = Object.freeze({});
-
-const defaultOptimizerFilter: PropertyPatchOptimizerFilter<unknown> = (
-  newValue,
-  oldValue,
-) => newValue !== oldValue;
-
 function createFullStatePatch<State extends PatchableState>(
   state: State,
 ): Patch {
   const patch: Patch = [];
   for (const key in state) {
-    patch.push([[key], state[key as keyof typeof state]]);
+    patch.push([PatchType.Set, [key], state[key as keyof typeof state]]);
   }
   return patch;
 }
@@ -264,7 +235,12 @@ export type { ReadonlyDeep };
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;
-  update: (id: keyof Entities) => EntityUpdateBuilder<Entities[keyof Entities]>;
+  update: (
+    id: keyof Entities,
+    addUpdates: (
+      builder: Omit<EntityUpdateBuilder<Entities[keyof Entities]>, "build">,
+    ) => void,
+  ) => void;
   remove: (id: keyof Entities) => void;
 }
 
@@ -273,16 +249,15 @@ export interface EntityRepository<Entities extends PatchableEntities> {
  * We want to be able to update any subset of an entity but we do not want to allow padding in undefined, which is what Partial<T> would allow.
  */
 class EntityUpdateBuilder<Entity> {
-  constructor(
-    private handleNewValue: <K extends keyof Entity>(
-      key: K,
-      newValue: Entity[K],
-    ) => void,
-  ) {}
+  private update: Partial<Entity> = {};
 
-  set<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
-    this.handleNewValue(key, newValue);
+  add<K extends keyof Entity>(key: K, newValue: Entity[K]): this {
+    this.update[key] = newValue;
     return this;
+  }
+
+  build(): Partial<Entity> {
+    return this.update;
   }
 }
 
@@ -290,7 +265,7 @@ export interface PatchStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizers?: EntityPatchOptimizerRecord<State>;
+  patchOptimizers?: PatchOptimizer<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

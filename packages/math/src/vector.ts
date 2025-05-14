@@ -70,10 +70,6 @@ export function isPathEqual<P extends Path<number>>(a?: P, b?: P): boolean {
   return a.every((v1, i) => b[i].equals(v1));
 }
 
-export function pathCopy<P extends Path<number> | undefined>(path: P): P {
-  return path ? (Object.freeze([...path]) as P) : (undefined as P);
-}
-
 export interface VectorLike<T extends number> {
   x: T;
   y: T;
