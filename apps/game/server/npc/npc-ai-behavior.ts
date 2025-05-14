@@ -17,6 +17,9 @@ export function npcAiBehavior(
       if (subject.type !== "npc") {
         continue;
       }
+      if (subject.health <= 0) {
+        continue;
+      }
 
       let task = tasks.get(subject.id);
       if (

@@ -6,6 +6,7 @@ import {
 } from "unique-names-generator";
 import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
+import { TimeSpan } from "@mp/time";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { assert, createShortId, randomItem, recordValues } from "@mp/std";
 import { cardinalDirections, clamp, Rect, Vector } from "@mp/math";
@@ -28,11 +29,22 @@ export function npcSpawnBehavior(
     spawns = list;
   });
 
-  return () => {
+  const corpseDuration = TimeSpan.fromSeconds(5);
+  const corpseCleanupTimers = new Map<NpcInstanceId, TimeSpan>();
+
+  return ({ totalTimeElapsed }) => {
     // Clean up dead NPCs
     for (const actor of recordValues(state.actors())) {
       if (actor.type === "npc" && actor.health <= 0) {
-        state.actors.remove(actor.id);
+        let cleanupTime = corpseCleanupTimers.get(actor.id);
+        if (!cleanupTime) {
+          cleanupTime = totalTimeElapsed.add(corpseDuration);
+          corpseCleanupTimers.set(actor.id, cleanupTime);
+        }
+        if (cleanupTime <= totalTimeElapsed) {
+          state.actors.remove(actor.id);
+          corpseCleanupTimers.delete(actor.id);
+        }
       }
     }
 

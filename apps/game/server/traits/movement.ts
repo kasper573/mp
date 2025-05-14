@@ -40,6 +40,15 @@ export function movementBehavior(
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
     for (const subject of recordValues(state.actors())) {
+      // The dead don't move
+      if (subject.health <= 0) {
+        state.actors.update(subject.id, (update) => {
+          update.add("path", undefined);
+          update.add("moveTarget", undefined);
+        });
+        continue;
+      }
+
       const { moveTarget } = subject;
       if (moveTarget) {
         state.actors.update(subject.id, (update) =>

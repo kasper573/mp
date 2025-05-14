@@ -20,7 +20,7 @@ export function createOptimisticGameState() {
   // eslint-disable-next-line solid/reactivity
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
     for (const actor of Object.values(gameState.actors)) {
-      if (actor.path) {
+      if (actor.path && actor.health > 0) {
         const [newCoords, newPath] = moveAlongPath(
           actor.coords,
           actor.path,
