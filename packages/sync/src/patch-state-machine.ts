@@ -1,7 +1,7 @@
 import type { ReadonlyDeep } from "type-fest";
 import { PatchType, type Patch, type PatchPath } from "./patch";
 import { dedupePatch } from "./patch-deduper";
-import type { EntityPatchOptimizerRecord } from "./patch-optimizer";
+import type { PatchOptimizer } from "./patch-optimizer";
 import { optimizeUpdate } from "./patch-optimizer";
 
 /**
@@ -155,7 +155,7 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
-  allPatchOptimizers: EntityPatchOptimizerRecord<State> | undefined,
+  allPatchOptimizers: PatchOptimizer<State> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
@@ -265,7 +265,7 @@ export interface PatchStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizers?: EntityPatchOptimizerRecord<State>;
+  patchOptimizers?: PatchOptimizer<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

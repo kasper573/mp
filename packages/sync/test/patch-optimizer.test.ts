@@ -1,8 +1,7 @@
 import { describe, it, expect } from "vitest";
 import type { Patch } from "../src/patch";
 import { PatchType } from "../src/patch";
-import type { PatchFilter } from "../src/filter-patch";
-import { filterPatch } from "../src/filter-patch";
+import { optimizePatch, PatchOptimizerBuilder } from "../src/patch-optimizer";
 
 interface User {
   name: string;
@@ -11,23 +10,22 @@ interface User {
 }
 
 type State = {
-  users: { [id: string]: User };
-  posts: { [id: string]: { title: string; published: boolean } };
+  users: Record<string, User>;
+  posts: Record<string, { title: string; published: boolean }>;
 };
 
 type CommentsState = {
-  comments: { [id: string]: { text: string } };
+  comments: Record<string, { text: string }>;
 };
 
-const filtersForState: PatchFilter<State> = {
-  users: {
-    name: (newVal, oldVal) => newVal === oldVal,
-    age: (newVal) => newVal > 18,
-  },
-  posts: {
-    published: () => true,
-  },
-};
+const filtersForState = new PatchOptimizerBuilder<State>()
+  .entity("users", (b) =>
+    b
+      .property("name", (b) => b.filter((a, b) => a === b))
+      .property("age", (b) => b.filter((a) => a > 18)),
+  )
+  .entity("posts", (b) => b.property("published", (b) => b.filter(() => true)))
+  .build();
 
 const baseState: State = {
   users: {
@@ -45,7 +43,7 @@ describe("filterPatchUpdates", () => {
       [PatchType.Remove, ["users", "1"]],
     ];
 
-    const result = filterPatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState);
     expect(result).toEqual(patch);
   });
 
@@ -59,7 +57,7 @@ describe("filterPatchUpdates", () => {
       comments: { "42": { text: "Original" } },
     };
 
-    const result = filterPatch<State & CommentsState>(
+    const result = optimizePatch<State & CommentsState>(
       stateWithComments,
       patch,
       filtersForState,
@@ -70,7 +68,7 @@ describe("filterPatchUpdates", () => {
   it("leaves updates for entities not in state untouched", () => {
     const patch: Patch = [[PatchType.Update, ["users", "2"], { name: "Eve" }]];
 
-    const result = filterPatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState);
     expect(result).toEqual(patch);
   });
 
@@ -84,7 +82,7 @@ describe("filterPatchUpdates", () => {
       [PatchType.Update, ["posts", "a"], { title: "New", published: true }],
     ];
 
-    const result = filterPatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState);
     expect(result).toEqual([
       [PatchType.Update, ["users", "1"], { active: false }],
       [PatchType.Update, ["posts", "a"], { title: "New", published: true }],
@@ -96,7 +94,7 @@ describe("filterPatchUpdates", () => {
     const patch: Patch = [[PatchType.Update, ["users", "1"], originalUpdate]];
     const copyOfPatch = structuredClone(patch);
 
-    const result = filterPatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState);
 
     expect(patch).toEqual(copyOfPatch);
     expect(result[0][2]).not.toBe(originalUpdate);
