@@ -155,6 +155,7 @@ jobs:
           key: ${{ secrets.PROD_SSH_KEY }}
           source: ~/docker/deploy-failure-logs.tar.gz
           target: ./deploy-failure-logs.tar.gz
+          insecure_ignore_fingerprint: true
 
       - name: Save deployment logs
         if: steps.deploy.outcome == 'failure'
