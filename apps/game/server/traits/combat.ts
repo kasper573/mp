@@ -1,4 +1,4 @@
-import { type Rect } from "@mp/math";
+import { nearestCardinalDirection, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync";
@@ -57,6 +57,14 @@ export function combatBehavior(
       // target too far away, move closer, but don't attack yet
       state.actors.update(actor.id, (u) => u.add("moveTarget", target.coords));
       return;
+    }
+
+    // Correct direction if we're not facing the target
+    const direction = nearestCardinalDirection(
+      actor.coords.angle(target.coords),
+    );
+    if (direction !== actor.dir) {
+      state.actors.update(actor.id, (u) => u.add("dir", direction));
     }
 
     if (actor.lastAttack) {
