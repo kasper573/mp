@@ -97,16 +97,16 @@ jobs:
           switches: -avz --delete
           path: docker/
           remote_path: ~/docker
-          remote_host: ${{ vars.DEPLOY_SSH_HOST }}
-          remote_user: ${{ vars.DEPLOY_SSH_USERNAME }}
-          remote_key: ${{ secrets.DEPLOY_SSH_KEY }}
+          remote_host: ${{ secrets.PROD_SSH_HOST }}
+          remote_user: ${{ secrets.PROD_SSH_USERNAME }}
+          remote_key: ${{ secrets.PROD_SSH_KEY }}
 
       - name: Deploy via SSH action
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ vars.DEPLOY_SSH_HOST }}
-          username: ${{ vars.DEPLOY_SSH_USERNAME }}
-          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          host: ${{ secrets.PROD_SSH_HOST }}
+          username: ${{ secrets.PROD_SSH_USERNAME }}
+          key: ${{ secrets.PROD_SSH_KEY }}
           script_stop: true
           script: |
             cd ~/docker
