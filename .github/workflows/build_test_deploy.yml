@@ -164,7 +164,7 @@ jobs:
           path: ./deploy-failure-logs.tar.gz
 
       - name: Fail workflow on deploy error
-        if: ${{ steps.deploy.conclusion == 'failure' }}
+        if: steps.deploy.outcome == 'failure'
         run: |
           echo "🚨 Deployment failed — see deploy-failure-logs artifact for details."
           exit 1
