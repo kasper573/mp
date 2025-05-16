@@ -27,6 +27,10 @@ import { GameStateClientContext } from "../game-state-client";
 import { BuildVersionContext } from "../build-version-context";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
+import {
+  setUseClientSidePatchOptimizer,
+  useClientSidePatchOptimizer,
+} from "../create-optimistic-game-state";
 import * as styles from "./area-debug-ui.css";
 import { AreaSceneContext } from "./area-scene";
 
@@ -68,6 +72,16 @@ export function AreaDebugUi(props: {
               options={visibleGraphTypes}
               value={visibleGraphType()}
               onChange={setVisibleGraphType}
+            />
+          </div>
+          <div>
+            Use client side patch optimizer:{" "}
+            <input
+              type="checkbox"
+              checked={useClientSidePatchOptimizer()}
+              on:change={(e) =>
+                setUseClientSidePatchOptimizer(e.currentTarget.checked)
+              }
             />
           </div>
           <div>

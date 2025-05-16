@@ -3,7 +3,7 @@ import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
-import { batch } from "solid-js";
+import { batch, createSignal } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 
@@ -36,13 +36,18 @@ export function createOptimisticGameState() {
 
   optimisticGameState.applyPatch = (patch: Patch) => {
     batch(() => {
-      const filteredPatch = optimizePatch(gameState, patch, patchOptimizer);
+      const filteredPatch = useClientSidePatchOptimizer()
+        ? optimizePatch(gameState, patch, patchOptimizer)
+        : patch;
       applyPatch(gameState, filteredPatch);
     });
   };
 
   return optimisticGameState;
 }
+
+export const [useClientSidePatchOptimizer, setUseClientSidePatchOptimizer] =
+  createSignal(true);
 
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
