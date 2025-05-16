@@ -1,10 +1,10 @@
 import { Matrix } from "@mp/math";
 import { Vector } from "@mp/math";
-import { atom } from "@mp/state";
+import { atom, batch } from "@mp/state";
 import type { Pixel } from "@mp/std";
 
 export class Camera {
-  private position = new Vector(0 as Pixel, 0 as Pixel);
+  private position = atom(new Vector(0 as Pixel, 0 as Pixel));
   private zoom = 1;
   readonly #transform = atom(new Matrix());
   readonly #cameraSize = atom(new Vector(0 as Pixel, 0 as Pixel));
@@ -44,38 +44,39 @@ export class Camera {
       Math.min(worldSize.y - halfCameraHeight, position.y),
     );
 
-    this.position = new Vector(clampedX as Pixel, clampedY as Pixel);
+    batch(() => {
+      const newPos = new Vector(clampedX as Pixel, clampedY as Pixel);
+      this.position.set(newPos);
 
-    const offsetX = this.position.x - halfCameraWidth;
-    const offsetY = this.position.y - halfCameraHeight;
+      const offsetX = newPos.x - halfCameraWidth;
+      const offsetY = newPos.y - halfCameraHeight;
 
-    this.#transform.set(
-      new Matrix([
-        this.zoom,
-        0,
-        0,
-        this.zoom,
-        -offsetX * this.zoom,
-        -offsetY * this.zoom,
-      ]),
-    );
+      this.#transform.set(
+        new Matrix([
+          this.zoom,
+          0,
+          0,
+          this.zoom,
+          -offsetX * this.zoom,
+          -offsetY * this.zoom,
+        ]),
+      );
+    });
   }
 
   viewportToWorld(screenPos: Vector<Pixel>): Vector<Pixel> {
+    const { x, y } = this.position.get();
     return new Vector(
-      ((screenPos.x - this.cameraSize.x / 2) / this.zoom +
-        this.position.x) as Pixel,
-      ((screenPos.y - this.cameraSize.y / 2) / this.zoom +
-        this.position.y) as Pixel,
+      ((screenPos.x - this.cameraSize.x / 2) / this.zoom + x) as Pixel,
+      ((screenPos.y - this.cameraSize.y / 2) / this.zoom + y) as Pixel,
     );
   }
 
   worldToViewport(worldPos: Vector<Pixel>): Vector<Pixel> {
+    const { x, y } = this.position.get();
     return new Vector(
-      ((worldPos.x - this.position.x) * this.zoom +
-        this.cameraSize.x / 2) as Pixel,
-      ((worldPos.y - this.position.y) * this.zoom +
-        this.cameraSize.y / 2) as Pixel,
+      ((worldPos.x - x) * this.zoom + this.cameraSize.x / 2) as Pixel,
+      ((worldPos.y - y) * this.zoom + this.cameraSize.y / 2) as Pixel,
     );
   }
 }
