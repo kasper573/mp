@@ -110,7 +110,7 @@ services:
   tempo:
     env_file: *env_files
     logging: *logging
-    image: grafana/tempo:2.7.2
+    image: grafana/tempo:2.6.1
     volumes:
       - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
     command:
