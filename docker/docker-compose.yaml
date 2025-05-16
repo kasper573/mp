@@ -179,18 +179,8 @@ services:
       - caddy-data:/data
       - caddy-config:/config
 
-  pyroscope:
-    env_file: *env_files
-    logging: *logging
-    image: grafana/pyroscope:main-2b8e08a
-    command: ["-config.file=/etc/pyroscope.yml"]
-    volumes:
-      - ./grafana/pyroscope.yaml:/etc/pyroscope.yml
-      - pyroscope-data:/data
-
 volumes:
   grafana-data:
-  pyroscope-data:
   loki-data:
   mimir-data:
   caddy-data:
