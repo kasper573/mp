@@ -1,6 +1,4 @@
-import type { ReadonlyDeep } from "@mp/sync";
-import type { Actor, ActorId } from "../../traits/actor";
-import type { NpcInstance } from "../schema";
+import type { ActorId } from "../../traits/actor";
 import type { Task, TaskInput } from "./Task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
@@ -34,35 +32,39 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
 export type HuntFilter = (input: TaskInput) => ActorId | undefined;
 
 export const defensiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
-  return gameState.actors
+  const target = gameState.actors
     .values()
     .find(
-      (actor) =>
-        actor.coords.distance(npc.coords) <= npc.aggroRange &&
-        npc.hasBeenAttackedBy.includes(actor.id),
-    )?.id;
+      (candidate) =>
+        candidate.coords.distance(npc.coords) <= npc.aggroRange &&
+        npc.hasBeenAttackedBy.includes(candidate.id),
+    );
+  return target?.id;
 };
 
 export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
-  return gameState.actors
+  const target = gameState.actors
     .values()
     .find(
-      (actor) =>
-        isEnemy(npc, actor) &&
-        actor.coords.distance(npc.coords) <= npc.aggroRange,
-    )?.id;
+      (candidate) =>
+        candidate.type === "character" &&
+        candidate.coords.distance(npc.coords) <= npc.aggroRange,
+    );
+  return target?.id;
 };
 
-export const protectiveHuntFilter: HuntFilter = (input) => {
-  return undefined;
-};
+export const protectiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+  const target = gameState.actors.values().find((candidate) => {
+    if (candidate.coords.distance(npc.coords) > npc.aggroRange) {
+      return false;
+    }
 
-function isEnemy(
-  npc: ReadonlyDeep<NpcInstance>,
-  target: ReadonlyDeep<Actor>,
-): boolean {
-  if (target.type === "character") {
-    return true;
-  }
-  return false;
-}
+    if (npc.hasBeenAttackedBy.includes(candidate.id)) {
+      return true;
+    }
+
+    return false;
+  });
+
+  return target?.id;
+};
