@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
-import { createPatchStateMachine } from "../src/patch-state-machine";
+import { createSyncStateMachine } from "../src/sync-state-machine";
 import { applyPatch } from "../src/patch";
 
 it("can access initial state", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { record: { foo: "bar" } },
     clientVisibility: () => ({ record: new Set(["foo"] as const) }),
     clientIds: () => [],
@@ -13,7 +13,7 @@ it("can access initial state", () => {
 });
 
 it("can add entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { ["a" as string]: 0 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -24,7 +24,7 @@ it("can add entity", () => {
 });
 
 it("can remove entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { a: 0, b: 50 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -35,7 +35,7 @@ it("can remove entity", () => {
 });
 
 it("can update entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { a: 0, b: 50 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -46,7 +46,7 @@ it("can update entity", () => {
 });
 
 it("can update entity partially", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: {
       entity: {
         john: { cash: 0, name: "john" },
@@ -71,7 +71,7 @@ it("can produce client state patches for object changes", () => {
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId) => ({ actors: new Set([clientId]) }),
@@ -80,17 +80,17 @@ it("can produce client state patches for object changes", () => {
   state.actors.update(john.id, (b) => b.add("cash", 50));
   state.actors.update(jane.id, (b) => b.add("cash", 100));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, cash: 50 },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [jane.id]: { id: jane.id, cash: 100 },
   });
@@ -100,7 +100,7 @@ it("can produce client state patches for array properties", () => {
   const entity = { id: "0", list: [0] };
   const initialState = { entity: { [entity.id]: entity } };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [entity.id],
     clientVisibility: (clientId) => ({ entity: new Set([clientId]) }),
@@ -108,11 +108,11 @@ it("can produce client state patches for array properties", () => {
 
   state.entity.update(entity.id, (b) => b.add("list", [1, 2, 3]));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const clientState = {} as typeof initialState;
 
-  applyPatch(clientState, patches.get(entity.id)!);
+  applyPatch(clientState, clientPatches.get(entity.id)!);
   expect(clientState.entity).toEqual({
     [entity.id]: { ...entity, list: [1, 2, 3] },
   });
@@ -125,7 +125,7 @@ it("can produce client state patches for additions to record due to changes in v
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId, state) => ({
@@ -140,18 +140,18 @@ it("can produce client state patches for additions to record due to changes in v
   state.actors.update(john.id, (b) => b.add("visibleToOthers", true));
   state.actors.update(jane.id, (b) => b.add("visibleToOthers", true));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: true },
     [jane.id]: { id: jane.id, visibleToOthers: true },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: true },
     [jane.id]: { id: jane.id, visibleToOthers: true },
@@ -165,7 +165,7 @@ it("can produce client state patches for removals in record due to changes in vi
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
 
   const initialState = { actors: actorRecord };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId, state) => ({
@@ -180,17 +180,17 @@ it("can produce client state patches for removals in record due to changes in vi
   state.actors.update(john.id, (b) => b.add("visibleToOthers", false));
   state.actors.update(jane.id, (b) => b.add("visibleToOthers", false));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: false },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [jane.id]: { id: jane.id, visibleToOthers: false },
   });
@@ -199,7 +199,7 @@ it("can produce client state patches for removals in record due to changes in vi
 it("can produce client state patches for additions to record due to changes in state", () => {
   const john = { id: "john" };
   const initialState = { actors: { [john.id]: john } };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [john.id],
     clientVisibility: (clientId, state) => ({
@@ -212,9 +212,9 @@ it("can produce client state patches for additions to record due to changes in s
 
   state.actors.set(jane.id, jane);
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: john,
     [jane.id]: jane,
@@ -225,7 +225,7 @@ it("can produce client state patches for removals in record due to changes in st
   const john = { id: "john" };
   const jane = { id: "jane" };
   const initialState = { actors: { [john.id]: john, [jane.id]: jane } };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [john.id],
     clientVisibility: (clientId, state) => ({
@@ -236,10 +236,100 @@ it("can produce client state patches for removals in record due to changes in st
   const johnsClientState = {} as typeof initialState;
 
   state.actors.remove(jane.id);
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: john,
   });
+});
+
+it("flush emits no events if no events have been added", () => {
+  const state = createSyncStateMachine({
+    initialState: {},
+    clientIds: () => [],
+    clientVisibility: () => ({}),
+  });
+
+  const { clientEvents } = state.$flush();
+  expect(clientEvents.size).toBe(0);
+});
+
+it("flush can emit events to all clients", () => {
+  type EventMap = { foo: string; bar: number };
+
+  const state = createSyncStateMachine<{}, EventMap>({
+    initialState: {},
+    clientIds: () => ["1", "2"],
+    clientVisibility: () => ({}),
+  });
+
+  state.$event("foo", "hello world");
+  state.$event("bar", 123);
+
+  const { clientEvents } = state.$flush();
+
+  expect(clientEvents).toEqual(
+    new Map([
+      [
+        "1",
+        [
+          ["foo", "hello world"],
+          ["bar", 123],
+        ],
+      ],
+      [
+        "2",
+        [
+          ["foo", "hello world"],
+          ["bar", 123],
+        ],
+      ],
+    ]),
+  );
+});
+
+it("flush can emit events only to the clients for a given repository visibility", () => {
+  type EventMap = { message: string };
+  const state = createSyncStateMachine<
+    { clients: Record<string, number> },
+    EventMap
+  >({
+    initialState: { clients: {} },
+    clientIds: () => ["1", "2"],
+    clientVisibility: (clientId) => ({ clients: new Set([clientId]) }),
+  });
+
+  state.$event("message", "to those that can see 1", {
+    clients: new Set(["1"]),
+  });
+  state.$event("message", "to those that can see 2", {
+    clients: new Set(["2"]),
+  });
+
+  const { clientEvents } = state.$flush();
+
+  expect(clientEvents).toEqual(
+    new Map([
+      ["1", [["message", "to those that can see 1"]]],
+      ["2", [["message", "to those that can see 2"]]],
+    ]),
+  );
+});
+
+it("flushing removes events from state machine", () => {
+  const state = createSyncStateMachine({
+    initialState: {},
+    clientIds: () => ["1"],
+    clientVisibility: () => ({}),
+  });
+
+  state.$event("foo", 1);
+  state.$event("bar", 2);
+
+  const first = state.$flush();
+  expect(first.clientEvents.get("1")?.length).toBe(2);
+
+  const second = state.$flush();
+  expect(second.clientEvents.size).toBe(0);
 });
