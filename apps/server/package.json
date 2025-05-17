@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/game": "workspace:*",

@@ -1,5 +1,7 @@
 import { varchar } from "@mp/db";
-import type { Branded } from "@mp/std";
+import { InjectionContext } from "@mp/ioc";
+import type { Rect } from "@mp/math";
+import type { Branded, PublicUrl, Tile } from "@mp/std";
 
 export interface AppearanceTrait {
   color?: number; // HEX
@@ -11,6 +13,17 @@ export interface AppearanceTrait {
 export function actorModelId() {
   return varchar({ length: 64 }).$type<ActorModelId>();
 }
+
+export interface ActorModel {
+  id: ActorModelId;
+  spritesheets: ReadonlyMap<ActorModelState, PublicUrl>;
+  hitBox: Rect<Tile>;
+}
+
+export type ActorModleLookup = ReadonlyMap<ActorModelId, ActorModel>;
+
+export const ctxActorModels =
+  InjectionContext.new<ActorModleLookup>("ActorModels");
 
 export type ActorModelId = Branded<string, "ActorModelId">;
 

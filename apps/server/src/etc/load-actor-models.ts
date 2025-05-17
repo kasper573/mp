@@ -1,16 +1,18 @@
 import path from "node:path";
 import fs from "node:fs/promises";
 import type {
+  ActorModel,
   ActorModelId,
   ActorModelState,
-  ActorSpritesheetUrls,
+  ActorModleLookup,
 } from "@mp/game/server";
-import type { LocalFile, PublicUrl } from "@mp/std";
+import type { LocalFile, PublicUrl, Tile } from "@mp/std";
+import { Rect, Vector } from "@mp/math";
 import { serverFileToPublicUrl } from "./server-file-to-public-url";
 
-export async function loadActorSpritesheets(
+export async function loadActorModels(
   publicDir: string,
-): Promise<ActorSpritesheetUrls> {
+): Promise<ActorModleLookup> {
   const modelFolders = await fs.readdir(path.resolve(publicDir, "actors"));
   return new Map(
     await Promise.all(
@@ -19,7 +21,7 @@ export async function loadActorSpritesheets(
         const spritesheetFiles = await fs.readdir(
           path.resolve(publicDir, "actors", modelFolder),
         );
-        const urls: ReadonlyMap<ActorModelState, PublicUrl> = new Map(
+        const spritesheets: ReadonlyMap<ActorModelState, PublicUrl> = new Map(
           await Promise.all(
             spritesheetFiles.map(
               (spritesheet): [ActorModelState, PublicUrl] => {
@@ -35,7 +37,12 @@ export async function loadActorSpritesheets(
             ),
           ),
         );
-        return [modelId, urls] as const;
+        const model: ActorModel = {
+          id: modelId,
+          hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
+          spritesheets,
+        };
+        return [modelId, model] as const;
       }),
     ),
   );
