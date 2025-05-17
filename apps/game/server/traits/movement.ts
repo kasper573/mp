@@ -4,11 +4,10 @@ import {
   type Path,
   type Vector,
 } from "@mp/math";
-import type { PatchStateMachine } from "@mp/sync";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
-import type { GameState } from "../game-state";
+import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
@@ -35,7 +34,7 @@ export interface MovementTrait {
 }
 
 export function movementBehavior(
-  state: PatchStateMachine<GameState>,
+  state: GameStateMachine,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {

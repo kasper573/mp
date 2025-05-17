@@ -21,7 +21,7 @@ import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
 import { type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
-import type { GameState } from "@mp/game/server";
+import type { GameStateMachine } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -41,6 +41,7 @@ import {
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
+
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -121,7 +122,7 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const gameState = createPatchStateMachine<GameState>({
+const gameState: GameStateMachine = createPatchStateMachine({
   initialState: { actors: {} },
   patchOptimizers: gameStatePatchOptimizers,
   clientIds: () => wss.clients.values().map(getSocketId),

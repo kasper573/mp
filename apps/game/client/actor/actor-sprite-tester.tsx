@@ -120,9 +120,8 @@ function SpecificActorAngle(props: {
   state: ActorModelState;
 }) {
   const engine = useContext(EngineContext);
-  const sprite = createActorSprite(
+  const [sprite, spriteCommands] = createActorSprite(
     () => props.modelId,
-    () => props.state,
     () => nearestCardinalDirection(props.angle),
   );
   const container = new Container();
@@ -142,6 +141,10 @@ function SpecificActorAngle(props: {
   function updateFrameText() {
     frameNumberText.text = `Frame: ${sprite.currentFrame}`;
   }
+
+  createEffect(() => {
+    spriteCommands.setState(props.state);
+  });
 
   onCleanup(engine.addFrameCallback(updateFrameText));
 

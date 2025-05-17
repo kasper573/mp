@@ -1,14 +1,13 @@
-import type { PatchStateMachine } from "@mp/sync";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { randomItem, recordValues } from "@mp/std";
-import type { GameState } from "../game-state";
+import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import { isTargetable } from "../traits/combat";
 import type { NpcInstanceId } from "./schema";
 
 export function npcAiBehavior(
-  state: PatchStateMachine<GameState>,
+  state: GameStateMachine,
   areas: AreaLookup,
 ): TickEventHandler {
   const tasks = new Map<NpcInstanceId, Task>();

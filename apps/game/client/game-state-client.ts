@@ -7,19 +7,21 @@ import {
 } from "solid-js";
 import type { Vector } from "@mp/math";
 import { assert, dedupe, throttle, type Tile } from "@mp/std";
-import { syncMessageEncoding } from "@mp/sync";
+import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
+import type { GameStateEvents } from "../server/game-state-events";
 import { useRpc } from "./use-rpc";
 import { createOptimisticGameState } from "./create-optimistic-game-state";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export function createGameStateClient(socket: WebSocket, logger: Logger) {
+  const eventBus = new SyncEventBus<GameStateEvents>();
   const gameState = createOptimisticGameState();
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
@@ -41,7 +43,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);
     if (result.isOk()) {
-      const [patch, remoteTime] = result.value;
+      const [patch, remoteTime, events] = result.value;
 
       const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
       if (lag.compareTo(stalePatchThreshold) > 0) {
@@ -52,6 +54,12 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
       }
 
       gameState.applyPatch(patch);
+
+      if (events) {
+        for (const event of events) {
+          eventBus.dispatch(event);
+        }
+      }
     }
   };
 
@@ -79,6 +87,7 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
     characterId,
     character,
     frameCallback: gameState.frameCallback,
+    eventBus,
   };
 }
 

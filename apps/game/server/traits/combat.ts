@@ -1,8 +1,8 @@
 import { nearestCardinalDirection, type Rect } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
-import type { PatchStateMachine, ReadonlyDeep } from "@mp/sync";
-import type { GameState } from "../game-state";
+import type { ReadonlyDeep } from "@mp/sync";
+import type { GameStateMachine } from "../game-state";
 import type { ActorId, Actor } from "./actor";
 
 export interface CombatTrait {
@@ -19,9 +19,7 @@ export interface CombatTrait {
   lastAttack?: TimeSpan;
 }
 
-export function combatBehavior(
-  state: PatchStateMachine<GameState>,
-): TickEventHandler {
+export function combatBehavior(state: GameStateMachine): TickEventHandler {
   return ({ totalTimeElapsed }) => {
     for (const actor of recordValues(state.actors())) {
       attemptAttack(actor, totalTimeElapsed);
@@ -85,6 +83,11 @@ export function combatBehavior(
         .add("path", undefined) // stop moving when attacking
         .add("lastAttack", currentTime),
     );
+
+    state.$event("combat.attack", {
+      actorId: actor.id,
+      targetId: target.id,
+    });
   }
 }
 

@@ -80,17 +80,17 @@ it("can produce client state patches for object changes", () => {
   state.actors.update(john.id, (b) => b.add("cash", 50));
   state.actors.update(jane.id, (b) => b.add("cash", 100));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, cash: 50 },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [jane.id]: { id: jane.id, cash: 100 },
   });
@@ -108,11 +108,11 @@ it("can produce client state patches for array properties", () => {
 
   state.entity.update(entity.id, (b) => b.add("list", [1, 2, 3]));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const clientState = {} as typeof initialState;
 
-  applyPatch(clientState, patches.get(entity.id)!);
+  applyPatch(clientState, clientPatches.get(entity.id)!);
   expect(clientState.entity).toEqual({
     [entity.id]: { ...entity, list: [1, 2, 3] },
   });
@@ -140,18 +140,18 @@ it("can produce client state patches for additions to record due to changes in v
   state.actors.update(john.id, (b) => b.add("visibleToOthers", true));
   state.actors.update(jane.id, (b) => b.add("visibleToOthers", true));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: true },
     [jane.id]: { id: jane.id, visibleToOthers: true },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: true },
     [jane.id]: { id: jane.id, visibleToOthers: true },
@@ -180,17 +180,17 @@ it("can produce client state patches for removals in record due to changes in vi
   state.actors.update(john.id, (b) => b.add("visibleToOthers", false));
   state.actors.update(jane.id, (b) => b.add("visibleToOthers", false));
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
   const johnsClientState = {} as typeof initialState;
   const janesClientState = {} as typeof initialState;
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: { id: john.id, visibleToOthers: false },
   });
 
-  applyPatch(janesClientState, patches.get(jane.id)!);
+  applyPatch(janesClientState, clientPatches.get(jane.id)!);
   expect(janesClientState.actors).toEqual({
     [jane.id]: { id: jane.id, visibleToOthers: false },
   });
@@ -212,9 +212,9 @@ it("can produce client state patches for additions to record due to changes in s
 
   state.actors.set(jane.id, jane);
 
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: john,
     [jane.id]: jane,
@@ -236,10 +236,48 @@ it("can produce client state patches for removals in record due to changes in st
   const johnsClientState = {} as typeof initialState;
 
   state.actors.remove(jane.id);
-  const patches = state.$flush();
+  const { clientPatches } = state.$flush();
 
-  applyPatch(johnsClientState, patches.get(john.id)!);
+  applyPatch(johnsClientState, clientPatches.get(john.id)!);
   expect(johnsClientState.actors).toEqual({
     [john.id]: john,
   });
+});
+
+it("flush emits no events if no events have been added", () => {
+  const state = createPatchStateMachine({
+    initialState: {},
+    clientIds: () => [],
+    clientVisibility: () => ({}),
+  });
+
+  const { clientEvents } = state.$flush();
+  expect(clientEvents.size).toBe(0);
+});
+
+it("flush can emit events", () => {
+  type EventMap = { foo: string; bar: number };
+  const clientId = "1";
+  const state = createPatchStateMachine<{}, EventMap>({
+    initialState: {},
+    clientIds: () => [clientId],
+    clientVisibility: () => ({}),
+  });
+
+  state.$event("foo", "hello world");
+  state.$event("bar", 123);
+
+  const { clientEvents } = state.$flush();
+
+  expect(clientEvents).toEqual(
+    new Map([
+      [
+        clientId,
+        [
+          ["foo", "hello world"],
+          ["bar", 123],
+        ],
+      ],
+    ]),
+  );
 });

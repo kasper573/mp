@@ -3,7 +3,9 @@
 // - Path is an array instead of a json pointer string. This makes patch filtering much faster since no string parsing is needed.
 // - Only the operations the sync server and client needs is supported.
 
-export type SyncMessage = [Patch, serverTime: Date];
+import type { SyncEvent } from "./sync-event";
+
+export type SyncMessage = [Patch, serverTime: Date, events?: SyncEvent[]];
 
 export type Patch = Operation[];
 

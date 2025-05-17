@@ -3,33 +3,44 @@ import { PatchType, type Patch, type PatchPath } from "./patch";
 import { dedupePatch } from "./patch-deduper";
 import type { PatchOptimizer } from "./patch-optimizer";
 import { optimizeUpdate } from "./patch-optimizer";
+import type { SyncEvent, SyncEventMap } from "./sync-event";
 
 /**
  * A state machine that records all state changes made as atomic patches,
  * is aware of which patches should be visible per client,
  * and allows flushing the collected patches at any given time.
  */
-export type PatchStateMachine<State extends PatchableState> =
-  EntityRepositoryRecord<State> & {
-    [flushFunctionName]: FlushFn;
-  };
+export type PatchStateMachine<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+> = EntityRepositoryRecord<State> & {
+  [flushFunctionName]: FlushFn;
+  [eventFunctionName]: EventFn<EventMap>;
+};
 
-export function createPatchStateMachine<State extends PatchableState>(
-  opt: PatchStateMachineOptions<State>,
-): PatchStateMachine<State> {
+export function createPatchStateMachine<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+>(opt: PatchStateMachineOptions<State>): PatchStateMachine<State, EventMap> {
   const state = structuredClone(opt.initialState);
   const serverPatch: Patch = [];
-  const flush = createFlushFunction(
+  const serverEvents: SyncEvent[] = [];
+  const flushFn = createFlushFunction(
     state,
     serverPatch,
+    serverEvents,
     opt.clientIds,
     opt.clientVisibility,
   );
+  const eventFn = createEventFunction(serverEvents);
   const repositories = {} as Partial<EntityRepositoryRecord<State>>;
-  return new Proxy({} as PatchStateMachine<State>, {
+  return new Proxy({} as PatchStateMachine<State, EventMap>, {
     get(target, prop) {
-      if (prop === flushFunctionName) {
-        return flush;
+      switch (prop) {
+        case flushFunctionName:
+          return flushFn;
+        case eventFunctionName:
+          return eventFn;
       }
       const entityName = prop as keyof State;
       return (repositories[entityName] ??= createEntityRepository(
@@ -45,6 +56,7 @@ export function createPatchStateMachine<State extends PatchableState>(
 function createFlushFunction<State extends PatchableState>(
   state: State,
   serverPatch: Patch,
+  serverEvents: SyncEvent[],
   getClientIds: () => Iterable<ClientId>,
   getClientVisibility: ClientVisibilityFactory<State>,
 ): FlushFn {
@@ -65,6 +77,7 @@ function createFlushFunction<State extends PatchableState>(
     );
 
     const clientPatches: ClientPatches = new Map();
+    const clientEvents: ClientEvents = new Map();
 
     for (const clientId of clientIds) {
       const prevVisibility = prevVisibilities[clientId];
@@ -115,11 +128,15 @@ function createFlushFunction<State extends PatchableState>(
       if (clientPatch.length > 0) {
         clientPatches.set(clientId, dedupePatch(clientPatch));
       }
+      if (serverEvents.length > 0) {
+        clientEvents.set(clientId, serverEvents.slice());
+      }
     }
 
     serverPatch.splice(0, serverPatch.length);
+    serverEvents.splice(0, serverEvents.length);
 
-    return clientPatches;
+    return { clientPatches, clientEvents };
   }
 
   flush.markToResendFullState = (...clientIds: ClientId[]) => {
@@ -219,15 +236,40 @@ function createFullStatePatch<State extends PatchableState>(
   return patch;
 }
 
-const flushFunctionName = "$flush"; // $ to avoid collision with user defined properties
+// $ to avoid collision with user defined properties
+const eventFunctionName = "$event";
+const flushFunctionName = "$flush";
 
 export type EntityRepositoryRecord<State extends PatchableState> = {
   [EntityName in keyof State]: EntityRepository<State[EntityName]>;
 };
 
+interface FlushResult {
+  clientPatches: ClientPatches;
+  clientEvents: ClientEvents;
+}
+
 interface FlushFn {
-  (): ClientPatches;
+  (): FlushResult;
   markToResendFullState(...clientIds: ClientId[]): void;
+}
+
+interface EventFn<EventMap extends SyncEventMap> {
+  /**
+   * Adds an event to the current sync message that is being built and will be sent to clients on the next flush.
+   */
+  <EventName extends keyof EventMap>(
+    name: EventName,
+    payload: EventMap[EventName],
+  ): void;
+}
+
+function createEventFunction<EventMap extends SyncEventMap>(
+  serverEvents: SyncEvent[],
+): EventFn<EventMap> {
+  return (eventName, payload) => {
+    serverEvents.push([String(eventName), payload]);
+  };
 }
 
 export type { ReadonlyDeep };
@@ -274,6 +316,8 @@ export type ClientVisibilityFactory<State extends PatchableState> = (
 ) => ClientVisibility<State>;
 
 export type ClientPatches = Map<ClientId, Patch>;
+
+export type ClientEvents = Map<ClientId, SyncEvent[]>;
 
 export type ClientVisibility<State extends PatchableState> = {
   [EntityName in keyof State]: ReadonlySet<keyof State[EntityName]>;
