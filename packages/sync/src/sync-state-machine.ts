@@ -244,6 +244,13 @@ function createEntityRepository<
     delete state[entityName][id];
   };
 
+  entity.values = function* () {
+    const entities = state[entityName];
+    for (const entityId in entities) {
+      yield entities[entityId] as ReadonlyDeep<Entity>;
+    }
+  };
+
   return entity;
 }
 
@@ -318,6 +325,7 @@ export type { ReadonlyDeep };
 
 export interface EntityRepository<Entities extends PatchableEntities> {
   (): ReadonlyDeep<Entities>;
+  values: () => Generator<ReadonlyDeep<Entities[keyof Entities]>>;
   set: (id: keyof Entities, entity: Entities[keyof Entities]) => void;
   update: (
     id: keyof Entities,
