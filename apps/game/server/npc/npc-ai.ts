@@ -7,7 +7,12 @@ import type { NpcAggroType, NpcInstanceId } from "./schema";
 import type { Task, TaskInput } from "./ai-tasks/Task";
 import { createIdleTask } from "./ai-tasks/idle";
 import { createWanderTask } from "./ai-tasks/wander";
-import { createHuntTask } from "./ai-tasks/hunt";
+import {
+  aggressiveHuntFilter,
+  createHuntTask,
+  defensiveHuntFilter,
+  protectiveHuntFilter,
+} from "./ai-tasks/hunt";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task[]>();
@@ -42,11 +47,11 @@ function deriveTasks(aggroType: NpcAggroType, tick: TickEvent): Task[] {
     case "pacifist":
       return [idleOrWander(tick)];
     case "aggressive":
-      return [idleOrWander(tick), createHuntTask()];
+      return [idleOrWander(tick), createHuntTask(aggressiveHuntFilter)];
     case "defensive":
-      return [idleOrWander(tick)];
+      return [idleOrWander(tick), createHuntTask(defensiveHuntFilter)];
     case "protective":
-      return [idleOrWander(tick)];
+      return [idleOrWander(tick), createHuntTask(protectiveHuntFilter)];
   }
 }
 

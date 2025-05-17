@@ -1,9 +1,9 @@
 import type { ReadonlyDeep } from "@mp/sync";
-import type { Actor } from "../../traits/actor";
+import type { Actor, ActorId } from "../../traits/actor";
 import type { NpcInstance } from "../schema";
-import type { Task } from "./Task";
+import type { Task, TaskInput } from "./Task";
 
-export function createHuntTask(): Task {
+export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
     const { npc, gameState } = input;
 
@@ -19,19 +19,10 @@ export function createHuntTask(): Task {
         );
       }
     } else {
-      // Npc has no target, hunt for a new enemy
-      const firstEnemyInRange = gameState.actors
-        .values()
-        .find(
-          (actor) =>
-            isEnemy(npc, actor) &&
-            actor.coords.distance(npc.coords) <= npc.aggroRange,
-        );
-
-      if (firstEnemyInRange) {
-        // New target found
+      const newEnemyId = findNewEnemy(input);
+      if (newEnemyId !== undefined) {
         gameState.actors.update(npc.id, (update) =>
-          update.add("attackTargetId", firstEnemyInRange.id),
+          update.add("attackTargetId", newEnemyId),
         );
       }
     }
@@ -39,6 +30,32 @@ export function createHuntTask(): Task {
     return hunt;
   };
 }
+
+export type HuntFilter = (input: TaskInput) => ActorId | undefined;
+
+export const defensiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+  return gameState.actors
+    .values()
+    .find(
+      (actor) =>
+        actor.coords.distance(npc.coords) <= npc.aggroRange &&
+        npc.hasBeenAttackedBy.includes(actor.id),
+    )?.id;
+};
+
+export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+  return gameState.actors
+    .values()
+    .find(
+      (actor) =>
+        isEnemy(npc, actor) &&
+        actor.coords.distance(npc.coords) <= npc.aggroRange,
+    )?.id;
+};
+
+export const protectiveHuntFilter: HuntFilter = (input) => {
+  return undefined;
+};
 
 function isEnemy(
   npc: ReadonlyDeep<NpcInstance>,

@@ -90,14 +90,15 @@ export class NpcSpawner {
       hitBox: model.hitBox,
       dir: assert(randomItem(cardinalDirections)),
       health: npc.maxHealth,
+      hasBeenAttackedBy: [],
     };
   }
 }
 
 const aggroTypeColorIndication: Record<NpcAggroType, number> = {
   aggressive: 0xff_00_00,
-  protective: 0x00_ff_00,
-  defensive: 0x00_00_ff,
+  defensive: 0x00_ff_00,
+  protective: 0x00_00_ff,
   pacifist: 0xff_ff_ff,
 };
 

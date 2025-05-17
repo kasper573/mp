@@ -54,6 +54,7 @@ export class CharacterService {
           dictionaries: [names],
           seed: char.id,
         }),
+      hasBeenAttackedBy: [],
     };
   }
 
@@ -109,6 +110,7 @@ export class CharacterService {
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
       dir: assert(randomItem(cardinalDirections)),
+      hasBeenAttackedBy: [],
     };
   }
 }
