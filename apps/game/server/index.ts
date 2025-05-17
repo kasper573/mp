@@ -1,5 +1,5 @@
 export * from "./npc/npc-ai-behavior";
-export * from "./npc/npc-spawn-behavior";
+export * from "./npc/npc-spawner";
 export * from "./npc/rpc";
 export * from "./npc/service";
 export * from "./npc/schema";

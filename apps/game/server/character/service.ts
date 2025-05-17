@@ -5,7 +5,11 @@ import { assert, randomItem, type Tile, type TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { cardinalDirections, Rect, Vector } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
-import type { ActorModelId, AppearanceTrait } from "../traits/appearance";
+import type {
+  ActorModelId,
+  ActorModelLookup,
+  AppearanceTrait,
+} from "../traits/appearance";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { characterTable } from "./schema";
@@ -17,6 +21,7 @@ export class CharacterService {
   constructor(
     private db: DbClient,
     private readonly areas: AreaLookup,
+    private readonly models: ActorModelLookup,
   ) {
     if (areas.size === 0) {
       throw new Error("CharacterService cannot be created without areas");
@@ -35,21 +40,21 @@ export class CharacterService {
       .limit(1);
 
     const char = result.length > 0 ? result[0] : undefined;
-
-    return char
-      ? {
-          ...char,
-          ...characterAppearance(user.id),
-          hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-          dir: assert(randomItem(cardinalDirections)),
-          name:
-            user.name ??
-            uniqueNamesGenerator({
-              dictionaries: [names],
-              seed: char.id,
-            }),
-        }
-      : undefined;
+    if (!char) {
+      return;
+    }
+    const model = assert(this.models.get(char.modelId));
+    return {
+      ...char,
+      hitBox: model.hitBox,
+      dir: assert(randomItem(cardinalDirections)),
+      name:
+        user.name ??
+        uniqueNamesGenerator({
+          dictionaries: [names],
+          seed: char.id,
+        }),
+    };
   }
 
   getDefaultSpawnPoint() {

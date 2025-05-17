@@ -11,11 +11,12 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
-  ctxActorModels,
+  ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
   gameStatePatchOptimizers,
+  NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
@@ -27,7 +28,6 @@ import {
   ctxAreaLookup,
   ClientRegistry,
   movementBehavior,
-  npcSpawnBehavior,
   combatBehavior,
   characterRemoveBehavior,
   CharacterService,
@@ -89,7 +89,10 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
+const [areas, actorModels] = await Promise.all([
+  loadAreas(path.resolve(opt.publicDir, "areas")),
+  loadActorModels(opt.publicDir),
+]);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
@@ -148,7 +151,7 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
-const characterService = new CharacterService(db, areas);
+const characterService = new CharacterService(db, areas, actorModels);
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
@@ -161,16 +164,18 @@ const ioc = new InjectionContainer()
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
-  .provide(ctxActorModels, await loadActorModels(opt.publicDir));
+  .provide(ctxActorModelLookup, actorModels);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
+const npcSpawner = new NpcSpawner(areas, actorModels);
+
 updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
-updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
+updateTicker.subscribe(npcSpawner.createSpawnBehavior(gameState, npcService));
 updateTicker.subscribe(combatBehavior(gameState, areas));
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);

@@ -4,7 +4,7 @@ import type {
   ActorModel,
   ActorModelId,
   ActorModelState,
-  ActorModleLookup,
+  ActorModelLookup,
 } from "@mp/game/server";
 import type { LocalFile, PublicUrl, Tile } from "@mp/std";
 import { Rect, Vector } from "@mp/math";
@@ -12,7 +12,7 @@ import { serverFileToPublicUrl } from "./server-file-to-public-url";
 
 export async function loadActorModels(
   publicDir: string,
-): Promise<ActorModleLookup> {
+): Promise<ActorModelLookup> {
   const modelFolders = await fs.readdir(path.resolve(publicDir, "actors"));
   return new Map(
     await Promise.all(

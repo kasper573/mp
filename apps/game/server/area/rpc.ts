@@ -3,7 +3,7 @@ import type { PublicUrl } from "@mp/std";
 import type { AreaId } from "../../shared/area/area-id";
 import { rpc } from "../rpc";
 import {
-  ctxActorModels,
+  ctxActorModelLookup,
   type ActorModelId,
   type ActorModelState,
 } from "../traits/appearance";
@@ -21,7 +21,7 @@ export const assetsRouter = rpc.router({
     ({ ctx }) =>
       new Map(
         ctx
-          .get(ctxActorModels)
+          .get(ctxActorModelLookup)
           .entries()
           .map(([modelId, { spritesheets }]) => [modelId, spritesheets]),
       ),

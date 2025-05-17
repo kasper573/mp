@@ -20,10 +20,10 @@ export interface ActorModel {
   hitBox: Rect<Tile>;
 }
 
-export type ActorModleLookup = ReadonlyMap<ActorModelId, ActorModel>;
+export type ActorModelLookup = ReadonlyMap<ActorModelId, ActorModel>;
 
-export const ctxActorModels =
-  InjectionContext.new<ActorModleLookup>("ActorModels");
+export const ctxActorModelLookup =
+  InjectionContext.new<ActorModelLookup>("ActorModelLookup");
 
 export type ActorModelId = Branded<string, "ActorModelId">;
 
