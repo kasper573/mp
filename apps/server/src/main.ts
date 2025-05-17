@@ -171,7 +171,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
-updateTicker.subscribe(combatBehavior(gameState));
+updateTicker.subscribe(combatBehavior(gameState, areas));
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 

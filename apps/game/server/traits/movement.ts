@@ -98,7 +98,7 @@ export function movementBehavior(
   };
 }
 
-function findPathForSubject(
+export function findPathForSubject(
   subject: MovementTrait & { id: unknown },
   areas: AreaLookup,
   dest: Vector<Tile>,

@@ -1,9 +1,12 @@
-import { nearestCardinalDirection, type Rect } from "@mp/math";
+import type { Vector, Rect } from "@mp/math";
+import { nearestCardinalDirection } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
+import type { AreaLookup } from "../area/lookup";
 import type { ActorId, Actor } from "./actor";
+import { findPathForSubject } from "./movement";
 
 export interface CombatTrait {
   /**
@@ -19,7 +22,10 @@ export interface CombatTrait {
   lastAttack?: TimeSpan;
 }
 
-export function combatBehavior(state: GameStateMachine): TickEventHandler {
+export function combatBehavior(
+  state: GameStateMachine,
+  areas: AreaLookup,
+): TickEventHandler {
   return ({ totalTimeElapsed }) => {
     for (const actor of recordValues(state.actors())) {
       attemptAttack(actor, totalTimeElapsed);
@@ -50,10 +56,14 @@ export function combatBehavior(state: GameStateMachine): TickEventHandler {
       return;
     }
 
-    const distance = actor.coords.distance(target.coords);
-    if (distance > actor.attackRange + tileMargin) {
-      // target too far away, move closer, but don't attack yet
-      state.actors.update(actor.id, (u) => u.add("moveTarget", target.coords));
+    // move closer to target if we're not in range to attack
+    if (!canAttackFrom(actor.coords, target.coords, actor.attackRange)) {
+      if (!seemsToBeMovingTowards(actor, target.coords)) {
+        const attackFromTile = bestTileToAttackFrom(actor, target);
+        state.actors.update(actor.id, (u) =>
+          u.add("moveTarget", attackFromTile),
+        );
+      }
       return;
     }
 
@@ -89,6 +99,34 @@ export function combatBehavior(state: GameStateMachine): TickEventHandler {
       targetId: target.id,
     });
   }
+
+  function bestTileToAttackFrom(
+    actor: ReadonlyDeep<Actor>,
+    target: ReadonlyDeep<Actor>,
+  ): Vector<Tile> {
+    const adjacentTile = findPathForSubject(actor, areas, target.coords)?.find(
+      (tile) => canAttackFrom(tile, target.coords, actor.attackRange),
+    );
+    return adjacentTile ?? actor.coords;
+  }
+}
+
+function seemsToBeMovingTowards(
+  actor: ReadonlyDeep<Actor>,
+  target: Vector<Tile>,
+): boolean {
+  return !!actor.path?.findLast((tile) =>
+    canAttackFrom(tile, target, actor.attackRange),
+  );
+}
+
+function canAttackFrom(
+  fromTile: Vector<Tile>,
+  targetTile: Vector<Tile>,
+  attackRange: Tile,
+) {
+  const distance = fromTile.distance(targetTile);
+  return distance <= attackRange + tileMargin;
 }
 
 // sqrt(2) is the diagonal distance between two tiles, which is slightly more than 1 tile,
