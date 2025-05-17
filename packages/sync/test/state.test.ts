@@ -1,9 +1,9 @@
 import { expect, it } from "vitest";
-import { createPatchStateMachine } from "../src/patch-state-machine";
+import { createSyncStateMachine } from "../src/sync-state-machine";
 import { applyPatch } from "../src/patch";
 
 it("can access initial state", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { record: { foo: "bar" } },
     clientVisibility: () => ({ record: new Set(["foo"] as const) }),
     clientIds: () => [],
@@ -13,7 +13,7 @@ it("can access initial state", () => {
 });
 
 it("can add entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { ["a" as string]: 0 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -24,7 +24,7 @@ it("can add entity", () => {
 });
 
 it("can remove entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { a: 0, b: 50 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -35,7 +35,7 @@ it("can remove entity", () => {
 });
 
 it("can update entity", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: { entity: { a: 0, b: 50 } },
     clientVisibility: () => ({ entity: new Set([]) }),
     clientIds: () => [],
@@ -46,7 +46,7 @@ it("can update entity", () => {
 });
 
 it("can update entity partially", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: {
       entity: {
         john: { cash: 0, name: "john" },
@@ -71,7 +71,7 @@ it("can produce client state patches for object changes", () => {
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId) => ({ actors: new Set([clientId]) }),
@@ -100,7 +100,7 @@ it("can produce client state patches for array properties", () => {
   const entity = { id: "0", list: [0] };
   const initialState = { entity: { [entity.id]: entity } };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [entity.id],
     clientVisibility: (clientId) => ({ entity: new Set([clientId]) }),
@@ -125,7 +125,7 @@ it("can produce client state patches for additions to record due to changes in v
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
   const initialState = { actors: actorRecord };
 
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId, state) => ({
@@ -165,7 +165,7 @@ it("can produce client state patches for removals in record due to changes in vi
   const actorRecord = Object.fromEntries(actorList.map((a) => [a.id, a]));
 
   const initialState = { actors: actorRecord };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => actorList.map((a) => a.id),
     clientVisibility: (clientId, state) => ({
@@ -199,7 +199,7 @@ it("can produce client state patches for removals in record due to changes in vi
 it("can produce client state patches for additions to record due to changes in state", () => {
   const john = { id: "john" };
   const initialState = { actors: { [john.id]: john } };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [john.id],
     clientVisibility: (clientId, state) => ({
@@ -225,7 +225,7 @@ it("can produce client state patches for removals in record due to changes in st
   const john = { id: "john" };
   const jane = { id: "jane" };
   const initialState = { actors: { [john.id]: john, [jane.id]: jane } };
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState,
     clientIds: () => [john.id],
     clientVisibility: (clientId, state) => ({
@@ -245,7 +245,7 @@ it("can produce client state patches for removals in record due to changes in st
 });
 
 it("flush emits no events if no events have been added", () => {
-  const state = createPatchStateMachine({
+  const state = createSyncStateMachine({
     initialState: {},
     clientIds: () => [],
     clientVisibility: () => ({}),
@@ -258,7 +258,7 @@ it("flush emits no events if no events have been added", () => {
 it("flush can emit events", () => {
   type EventMap = { foo: string; bar: number };
   const clientId = "1";
-  const state = createPatchStateMachine<{}, EventMap>({
+  const state = createSyncStateMachine<{}, EventMap>({
     initialState: {},
     clientIds: () => [clientId],
     clientVisibility: () => ({}),

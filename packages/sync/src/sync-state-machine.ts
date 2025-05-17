@@ -10,7 +10,7 @@ import type { SyncEvent, SyncEventMap } from "./sync-event";
  * is aware of which patches should be visible per client,
  * and allows flushing the collected patches at any given time.
  */
-export type PatchStateMachine<
+export type SyncStateMachine<
   State extends PatchableState,
   EventMap extends SyncEventMap,
 > = EntityRepositoryRecord<State> & {
@@ -18,10 +18,10 @@ export type PatchStateMachine<
   [eventFunctionName]: EventFn<EventMap>;
 };
 
-export function createPatchStateMachine<
+export function createSyncStateMachine<
   State extends PatchableState,
   EventMap extends SyncEventMap,
->(opt: PatchStateMachineOptions<State>): PatchStateMachine<State, EventMap> {
+>(opt: SyncStateMachineOptions<State>): SyncStateMachine<State, EventMap> {
   const state = structuredClone(opt.initialState);
   const serverPatch: Patch = [];
   const serverEvents: SyncEvent[] = [];
@@ -34,7 +34,7 @@ export function createPatchStateMachine<
   );
   const eventFn = createEventFunction(serverEvents);
   const repositories = {} as Partial<EntityRepositoryRecord<State>>;
-  return new Proxy({} as PatchStateMachine<State, EventMap>, {
+  return new Proxy({} as SyncStateMachine<State, EventMap>, {
     get(target, prop) {
       switch (prop) {
         case flushFunctionName:
@@ -303,7 +303,7 @@ class EntityUpdateBuilder<Entity> {
   }
 }
 
-export interface PatchStateMachineOptions<State extends PatchableState> {
+export interface SyncStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;

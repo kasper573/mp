@@ -5,7 +5,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import { createPatchStateMachine } from "@mp/sync";
+import { createSyncStateMachine } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -122,7 +122,7 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const gameState: GameStateMachine = createPatchStateMachine({
+const gameState: GameStateMachine = createSyncStateMachine({
   initialState: { actors: {} },
   patchOptimizers: gameStatePatchOptimizers,
   clientIds: () => wss.clients.values().map(getSocketId),
