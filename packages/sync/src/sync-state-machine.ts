@@ -282,7 +282,9 @@ interface EventFn<EventMap extends SyncEventMap, State extends PatchableState> {
   <EventName extends keyof EventMap>(
     name: EventName,
     payload: EventMap[EventName],
-    visibilities?: ClientVisibility<State>,
+    visibility?: {
+      [EntityName in keyof State]: Iterable<keyof State[EntityName]>;
+    },
   ): void;
 }
 
@@ -298,11 +300,17 @@ function createEventFunction<
   EventMap extends SyncEventMap,
   State extends PatchableState,
 >(serverEvents: ServerSyncEvent<State>[]): EventFn<EventMap, State> {
-  return (eventName, payload, visibilities) => {
-    serverEvents.push({
+  return function addEvent(eventName, payload, visibility) {
+    const newEvent: ServerSyncEvent<State> = {
       event: [String(eventName), payload],
-      visibility: visibilities,
-    });
+    };
+    if (visibility) {
+      newEvent.visibility = {} as ClientVisibility<State>;
+      for (const entityName in visibility) {
+        newEvent.visibility[entityName] = new Set(visibility[entityName]);
+      }
+    }
+    serverEvents.push(newEvent);
   };
 }
 

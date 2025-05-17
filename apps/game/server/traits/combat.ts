@@ -97,7 +97,7 @@ export function combatBehavior(
     state.$event(
       "combat.attack",
       { actorId: actor.id, targetId: target.id },
-      { actors: new Set([actor.id, target.id]) },
+      { actors: [actor.id, target.id] },
     );
   }
 
