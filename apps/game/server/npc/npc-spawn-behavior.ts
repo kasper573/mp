@@ -1,12 +1,6 @@
-import {
-  names,
-  uniqueNamesGenerator,
-  adjectives,
-  animals,
-} from "unique-names-generator";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { assert, createShortId, randomItem, recordValues } from "@mp/std";
 import { cardinalDirections, clamp, Rect, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
@@ -14,7 +8,6 @@ import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
-import type { ActorModelId } from "../traits/appearance";
 import type { NpcService } from "./service";
 import type { Npc, NpcInstance, NpcInstanceId, NpcSpawn } from "./schema";
 
@@ -69,15 +62,6 @@ export function npcSpawnBehavior(
   };
 }
 
-const randomAndCustomNames = [
-  "Chombs",
-  "Chomps",
-  "Bill",
-  "normal Jeff",
-  "Max Power",
-  ...names,
-];
-
 export function spawnNpcInstance(
   npc: Npc,
   spawn: NpcSpawn,
@@ -91,33 +75,21 @@ export function spawnNpcInstance(
 }
 
 export function createNpcInstance(
-  npc: Npc,
+  { id: npcId, ...inheritedProps }: Npc,
   areaId: AreaId,
   coords: Vector<Tile>,
 ): NpcInstance {
   const id = createShortId() as NpcInstanceId;
-  const name = uniqueNamesGenerator({
-    dictionaries: [adjectives, animals, randomAndCustomNames],
-    separator: " ",
-    style: "capital",
-    seed: id,
-  });
   return {
     id,
-    npcId: npc.id,
+    npcId,
     areaId,
     coords,
-    speed: npc.speed,
     color: 0xff_00_00, // Hard coded to enemy color for now
-    name,
     hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-    health: 25,
-    maxHealth: 25,
-    attackDamage: 5,
-    attackRange: 1 as Tile,
-    attackSpeed: 1 as TimesPerSecond,
-    modelId: "adventurer" as ActorModelId,
     dir: assert(randomItem(cardinalDirections)),
+    health: inheritedProps.maxHealth,
+    ...inheritedProps,
   };
 }
 

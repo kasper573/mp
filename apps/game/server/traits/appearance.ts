@@ -1,3 +1,4 @@
+import { varchar } from "@mp/db";
 import type { Branded } from "@mp/std";
 
 export interface AppearanceTrait {
@@ -5,6 +6,10 @@ export interface AppearanceTrait {
   opacity?: number; // 0-1
   modelId: ActorModelId;
   name: string;
+}
+
+export function actorModelId() {
+  return varchar({ length: 64 }).$type<ActorModelId>();
 }
 
 export type ActorModelId = Branded<string, "ActorModelId">;

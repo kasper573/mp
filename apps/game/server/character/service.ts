@@ -80,6 +80,12 @@ export class CharacterService {
       attackSpeed: 1 as TimesPerSecond,
       attackRange: 1 as Tile,
       userId: user.id,
+      name:
+        user.name ??
+        uniqueNamesGenerator({
+          dictionaries: [names],
+          seed: user.id,
+        }),
       ...characterAppearance(user.id),
     };
 
@@ -98,12 +104,6 @@ export class CharacterService {
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
       dir: assert(randomItem(cardinalDirections)),
-      name:
-        user.name ??
-        uniqueNamesGenerator({
-          dictionaries: [names],
-          seed: returned.id,
-        }),
     };
   }
 }

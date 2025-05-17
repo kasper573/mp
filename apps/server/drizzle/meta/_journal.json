@@ -8,6 +8,27 @@
       "when": 1745240111958,
       "tag": "0000_flat_shinko_yamashiro",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1747509524348,
+      "tag": "0001_goofy_nocturne",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1747509602781,
+      "tag": "0002_spooky_hammerhead",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1747509840052,
+      "tag": "0003_daffy_photon",
+      "breakpoints": true
     }
   ]
 }

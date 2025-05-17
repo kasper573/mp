@@ -1,7 +1,15 @@
-import { integer, pgTable, relations, vector, shortId } from "@mp/db";
-import type { Branded, Tile } from "@mp/std";
+import {
+  integer,
+  pgTable,
+  relations,
+  vector,
+  shortId,
+  real,
+  varchar,
+} from "@mp/db";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { MovementTrait } from "../traits/movement";
-import type { AppearanceTrait } from "../traits/appearance";
+import { actorModelId, type AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import { areaId } from "../area/schema";
 
@@ -14,6 +22,12 @@ export const npcId = () => shortId().$type<NpcId>();
 export const npcTable = pgTable("npc", {
   id: npcId().primaryKey(),
   speed: integer().$type<Tile>().notNull(),
+  maxHealth: real().notNull(),
+  attackDamage: real().notNull(),
+  attackSpeed: real().$type<TimesPerSecond>().notNull(),
+  attackRange: real().$type<Tile>().notNull(),
+  modelId: actorModelId().notNull(),
+  name: varchar({ length: 64 }).notNull(),
 });
 
 export type Npc = typeof npcTable.$inferSelect;
