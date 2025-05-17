@@ -15,7 +15,7 @@ export type SyncStateMachine<
   EventMap extends SyncEventMap,
 > = EntityRepositoryRecord<State> & {
   [flushFunctionName]: FlushFn;
-  [eventFunctionName]: EventFn<EventMap>;
+  [eventFunctionName]: EventFn<EventMap, State>;
 };
 
 export function createSyncStateMachine<
@@ -24,7 +24,7 @@ export function createSyncStateMachine<
 >(opt: SyncStateMachineOptions<State>): SyncStateMachine<State, EventMap> {
   const state = structuredClone(opt.initialState);
   const serverPatch: Patch = [];
-  const serverEvents: SyncEvent[] = [];
+  const serverEvents: ServerSyncEvent<State>[] = [];
   const flushFn = createFlushFunction(
     state,
     serverPatch,
@@ -56,7 +56,7 @@ export function createSyncStateMachine<
 function createFlushFunction<State extends PatchableState>(
   state: State,
   serverPatch: Patch,
-  serverEvents: SyncEvent[],
+  serverEvents: ServerSyncEvent<State>[],
   getClientIds: () => Iterable<ClientId>,
   getClientVisibility: ClientVisibilityFactory<State>,
 ): FlushFn {
@@ -129,7 +129,12 @@ function createFlushFunction<State extends PatchableState>(
         clientPatches.set(clientId, dedupePatch(clientPatch));
       }
       if (serverEvents.length > 0) {
-        clientEvents.set(clientId, serverEvents.slice());
+        clientEvents.set(
+          clientId,
+          serverEvents
+            .filter(({ visibility }) => isVisible(nextVisibility, visibility))
+            .map(({ event }) => event),
+        );
       }
     }
 
@@ -163,6 +168,22 @@ function deriveClientState<State extends PatchableState>(
       },
     ),
   ) as State;
+}
+
+function isVisible<State extends PatchableState>(
+  subject: ClientVisibility<State>,
+  required?: ClientVisibility<State>,
+): boolean {
+  if (required) {
+    for (const entityName in required) {
+      const requiredIds = required[entityName];
+      const subjectIds = subject[entityName];
+      if (!requiredIds.isSubsetOf(subjectIds)) {
+        return false;
+      }
+    }
+  }
+  return true;
 }
 
 function createEntityRepository<
@@ -254,21 +275,34 @@ interface FlushFn {
   markToResendFullState(...clientIds: ClientId[]): void;
 }
 
-interface EventFn<EventMap extends SyncEventMap> {
+interface EventFn<EventMap extends SyncEventMap, State extends PatchableState> {
   /**
    * Adds an event to the current sync message that is being built and will be sent to clients on the next flush.
    */
   <EventName extends keyof EventMap>(
     name: EventName,
     payload: EventMap[EventName],
+    visibilities?: ClientVisibility<State>,
   ): void;
 }
 
-function createEventFunction<EventMap extends SyncEventMap>(
-  serverEvents: SyncEvent[],
-): EventFn<EventMap> {
-  return (eventName, payload) => {
-    serverEvents.push([String(eventName), payload]);
+interface ServerSyncEvent<State extends PatchableState> {
+  event: SyncEvent;
+  /**
+   * If specified, this event will only be sent to clients that have the specified visibility.
+   */
+  visibility?: ClientVisibility<State>;
+}
+
+function createEventFunction<
+  EventMap extends SyncEventMap,
+  State extends PatchableState,
+>(serverEvents: ServerSyncEvent<State>[]): EventFn<EventMap, State> {
+  return (eventName, payload, visibilities) => {
+    serverEvents.push({
+      event: [String(eventName), payload],
+      visibility: visibilities,
+    });
   };
 }
 

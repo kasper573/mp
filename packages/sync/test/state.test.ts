@@ -255,12 +255,12 @@ it("flush emits no events if no events have been added", () => {
   expect(clientEvents.size).toBe(0);
 });
 
-it("flush can emit events", () => {
+it("flush can emit events to all clients", () => {
   type EventMap = { foo: string; bar: number };
-  const clientId = "1";
+
   const state = createSyncStateMachine<{}, EventMap>({
     initialState: {},
-    clientIds: () => [clientId],
+    clientIds: () => ["1", "2"],
     clientVisibility: () => ({}),
   });
 
@@ -272,7 +272,14 @@ it("flush can emit events", () => {
   expect(clientEvents).toEqual(
     new Map([
       [
-        clientId,
+        "1",
+        [
+          ["foo", "hello world"],
+          ["bar", 123],
+        ],
+      ],
+      [
+        "2",
         [
           ["foo", "hello world"],
           ["bar", 123],
@@ -280,4 +287,49 @@ it("flush can emit events", () => {
       ],
     ]),
   );
+});
+
+it("flush can emit events only to the clients for a given repository visibility", () => {
+  type EventMap = { message: string };
+  const state = createSyncStateMachine<
+    { clients: Record<string, number> },
+    EventMap
+  >({
+    initialState: { clients: {} },
+    clientIds: () => ["1", "2"],
+    clientVisibility: (clientId) => ({ clients: new Set([clientId]) }),
+  });
+
+  state.$event("message", "to those that can see 1", {
+    clients: new Set(["1"]),
+  });
+  state.$event("message", "to those that can see 2", {
+    clients: new Set(["2"]),
+  });
+
+  const { clientEvents } = state.$flush();
+
+  expect(clientEvents).toEqual(
+    new Map([
+      ["1", [["message", "to those that can see 1"]]],
+      ["2", [["message", "to those that can see 2"]]],
+    ]),
+  );
+});
+
+it("flushing removes events from state machine", () => {
+  const state = createSyncStateMachine({
+    initialState: {},
+    clientIds: () => ["1"],
+    clientVisibility: () => ({}),
+  });
+
+  state.$event("foo", 1);
+  state.$event("bar", 2);
+
+  const first = state.$flush();
+  expect(first.clientEvents.get("1")?.length).toBe(2);
+
+  const second = state.$flush();
+  expect(second.clientEvents.size).toBe(0);
 });
