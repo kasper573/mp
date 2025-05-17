@@ -20,7 +20,6 @@ export interface CombatTrait {
   attackRange: Tile;
   attackTargetId?: ActorId;
   lastAttack?: TimeSpan;
-  hasBeenAttackedBy: ActorId[];
 }
 
 export function combatBehavior(
@@ -85,16 +84,9 @@ export function combatBehavior(
       }
     }
 
-    state.actors.update(target.id, (update) => {
-      update.add("health", target.health - actor.attackDamage);
-
-      // TODO this might be unwise, should actors remember who attacked them forever?
-      if (!target.hasBeenAttackedBy.includes(actor.id)) {
-        update.add("hasBeenAttackedBy", [
-          ...new Set(target.hasBeenAttackedBy).add(actor.id),
-        ]);
-      }
-    });
+    state.actors.update(target.id, (update) =>
+      update.add("health", target.health - actor.attackDamage),
+    );
 
     state.actors.update(actor.id, (update) =>
       update

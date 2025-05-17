@@ -29,8 +29,7 @@ export const gameStatePatchOptimizers = new PatchOptimizerBuilder<GameState>()
       // HACK typescript will still allow you to use these in the client, and those values will always be stale.
       // TODO we should consider creating a client/server model separation instead and make it impossible for the client to rely on these.
       .property("moveTarget", (b) => b.filter(noop))
-      .property("lastAttack", (b) => b.filter(noop))
-      .property("hasBeenAttackedBy", (b) => b.filter(noop)),
+      .property("lastAttack", (b) => b.filter(noop)),
   )
   .build();
 

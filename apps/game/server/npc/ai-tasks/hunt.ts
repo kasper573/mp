@@ -31,13 +31,17 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
 
 export type HuntFilter = (input: TaskInput) => ActorId | undefined;
 
-export const defensiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+export const defensiveHuntFilter: HuntFilter = ({
+  gameState,
+  npc,
+  combatMemory,
+}) => {
   const target = gameState.actors
     .values()
     .find(
       (candidate) =>
         candidate.coords.distance(npc.coords) <= npc.aggroRange &&
-        npc.hasBeenAttackedBy.includes(candidate.id),
+        combatMemory.hasAttackedEachOther(candidate.id, npc.id),
     );
   return target?.id;
 };
@@ -53,13 +57,17 @@ export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
   return target?.id;
 };
 
-export const protectiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+export const protectiveHuntFilter: HuntFilter = ({
+  gameState,
+  npc,
+  combatMemory,
+}) => {
   const target = gameState.actors.values().find((candidate) => {
     if (candidate.coords.distance(npc.coords) > npc.aggroRange) {
       return false;
     }
 
-    if (npc.hasBeenAttackedBy.includes(candidate.id)) {
+    if (combatMemory.hasAttackedEachOther(candidate.id, npc.id)) {
       return true;
     }
 

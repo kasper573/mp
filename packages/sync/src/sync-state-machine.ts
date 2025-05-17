@@ -293,6 +293,14 @@ interface EventFn<EventMap extends SyncEventMap, State extends PatchableState> {
       [EntityName in keyof State]: Iterable<keyof State[EntityName]>;
     },
   ): void;
+
+  /**
+   * Peek into the current event list and select all the events of the given type.
+   * Useful if you want to react to events that have occurred since the last flush without performing a flush.
+   */
+  peek<EventName extends keyof EventMap>(
+    name: EventName,
+  ): Array<EventMap[EventName]>;
 }
 
 interface ServerSyncEvent<State extends PatchableState> {
@@ -307,7 +315,11 @@ function createEventFunction<
   EventMap extends SyncEventMap,
   State extends PatchableState,
 >(serverEvents: ServerSyncEvent<State>[]): EventFn<EventMap, State> {
-  return function addEvent(eventName, payload, visibility) {
+  const addEvent: EventFn<EventMap, State> = function addEvent(
+    eventName,
+    payload,
+    visibility,
+  ) {
     const newEvent: ServerSyncEvent<State> = {
       event: [String(eventName), payload],
     };
@@ -318,7 +330,14 @@ function createEventFunction<
       }
     }
     serverEvents.push(newEvent);
-  };
+  } as EventFn<EventMap, State>;
+
+  addEvent.peek = (name) =>
+    serverEvents
+      .filter(({ event: [candidateName] }) => candidateName === name)
+      .map(({ event: [, payload] }) => payload as never);
+
+  return addEvent;
 }
 
 export type { ReadonlyDeep };

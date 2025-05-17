@@ -174,10 +174,10 @@ collectPathFindingMetrics(metrics);
 const npcSpawner = new NpcSpawner(areas, actorModels);
 const npcAi = new NpcAi(gameState, areas);
 
-updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState, npcService));
 updateTicker.subscribe(combatBehavior(gameState, areas));
+updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 

@@ -90,7 +90,6 @@ export class NpcSpawner {
       hitBox: model.hitBox,
       dir: assert(randomItem(cardinalDirections)),
       health: npc.maxHealth,
-      hasBeenAttackedBy: [],
     };
   }
 }

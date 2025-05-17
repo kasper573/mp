@@ -4,7 +4,8 @@ import { assert, randomItem, recordValues } from "@mp/std";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { NpcAggroType, NpcInstanceId } from "./schema";
-import type { Task, TaskInput } from "./ai-tasks/Task";
+import { type Task, type TaskInput } from "./ai-tasks/Task";
+import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 import { createIdleTask } from "./ai-tasks/idle";
 import { createWanderTask } from "./ai-tasks/wander";
 import {
@@ -16,6 +17,7 @@ import {
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task[]>();
+  private combatMemory = new NpcAiCombatMemory();
   constructor(
     private gameState: GameStateMachine,
     private areas: AreaLookup,
@@ -27,9 +29,15 @@ export class NpcAi {
         if (subject.type !== "npc") {
           continue;
         }
+
+        for (const attack of this.gameState.$event.peek("combat.attack")) {
+          this.combatMemory.observeAttack(attack.actorId, attack.targetId);
+        }
+
         const taskInput: TaskInput = {
           areas: this.areas,
           gameState: this.gameState,
+          combatMemory: this.combatMemory,
           npc: subject,
           tick,
         };
