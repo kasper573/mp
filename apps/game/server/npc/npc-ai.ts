@@ -1,10 +1,10 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import { randomItem, recordValues } from "@mp/std";
+import { assert, randomItem, recordValues } from "@mp/std";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
-import { isTargetable } from "../traits/combat";
+import type { ActorId } from "../traits/actor";
 import type { NpcInstance, NpcInstanceId } from "./schema";
 
 export class NpcAi {
@@ -20,82 +20,146 @@ export class NpcAi {
         if (subject.type !== "npc") {
           continue;
         }
-        let aiState = this.aiStateLookup.get(subject.id);
-        if (!aiState) {
-          aiState = { task: newTask(totalTimeElapsed) };
-          this.aiStateLookup.set(subject.id, aiState);
-        }
-        this.progressNpcAiState(subject, aiState, totalTimeElapsed);
+        const nextState = this.nextNpcAiState(subject, totalTimeElapsed);
+        this.aiStateLookup.set(subject.id, nextState);
       }
     };
   }
 
-  private progressNpcAiState(
-    subject: ReadonlyDeep<NpcInstance>,
-    npcAiState: NpcAiState,
+  private nextNpcAiState(
+    npc: ReadonlyDeep<NpcInstance>,
     totalTimeElapsed: TimeSpan,
-  ): void {
-    if (
-      totalTimeElapsed.totalMilliseconds >=
-      npcAiState.task.endTime.totalMilliseconds
-    ) {
-      npcAiState.task = newTask(totalTimeElapsed);
+  ): NpcAiState {
+    const aiState =
+      this.aiStateLookup.get(npc.id) ?? initialAiState(npc, totalTimeElapsed);
+
+    switch (aiState.type) {
+      case "pacifist":
+        switch (aiState.task.type) {
+          case "wander":
+            if (totalTimeElapsed.compareTo(aiState.task.endTime) > 0) {
+              return initialAiState(npc, totalTimeElapsed);
+            }
+            this.wander(npc);
+            break;
+          case "idle":
+            if (totalTimeElapsed.compareTo(aiState.task.endTime) > 0) {
+              return initialAiState(npc, totalTimeElapsed);
+            }
+            break;
+          case "escape":
+            // TODO implement
+            break;
+        }
     }
 
-    const { task } = npcAiState;
+    return aiState;
 
-    switch (task.id) {
-      case "fight":
-        if (!subject.attackTargetId) {
-          const others = Object.values(this.gameState.actors())
-            .filter(
-              (other) =>
-                other.id !== subject.id && isTargetable(subject, other),
-            )
-            .map((other) => other.id);
-          this.gameState.actors.update(subject.id, (u) =>
-            u.add("attackTargetId", randomItem(others)),
-          );
-        }
-        break;
-      case "move": {
-        if (!subject.path) {
-          const area = this.areas.get(subject.areaId);
-          if (!area) {
-            throw new Error(`Area not found: ${subject.areaId}`);
-          }
+    // if (
+    //   totalTimeElapsed.totalMilliseconds >=
+    //   npcAiState.task.endTime.totalMilliseconds
+    // ) {
+    //   npcAiState.task = newTask(totalTimeElapsed);
+    // }
 
-          const toNode = randomItem(Array.from(area.graph.getNodes()));
-          if (toNode) {
-            this.gameState.actors.update(subject.id, (update) =>
-              update
-                .add("moveTarget", toNode.data.vector)
-                .add("attackTargetId", undefined),
-            );
-          }
-        }
-        break;
+    // const { task } = npcAiState;
+
+    // switch (task.id) {
+    //   case "fight":
+    //     if (!npc.attackTargetId) {
+    //       const others = Object.values(this.gameState.actors())
+    //         .filter(
+    //           (other) =>
+    //             other.id !== npc.id && isTargetable(npc, other),
+    //         )
+    //         .map((other) => other.id);
+    //       this.gameState.actors.update(npc.id, (u) =>
+    //         u.add("attackTargetId", randomItem(others)),
+    //       );
+    //     }
+    //     break;
+    //   case "move": {
+    //     if (!npc.path) {
+    //       const area = this.areas.get(npc.areaId);
+    //       if (!area) {
+    //         throw new Error(`Area not found: ${npc.areaId}`);
+    //       }
+
+    //       const toNode = randomItem(Array.from(area.graph.getNodes()));
+    //       if (toNode) {
+    //         this.gameState.actors.update(npc.id, (update) =>
+    //           update
+    //             .add("moveTarget", toNode.data.vector)
+    //             .add("attackTargetId", undefined),
+    //         );
+    //       }
+    //     }
+    //     break;
+    //   }
+    // }
+  }
+
+  private wander(npc: ReadonlyDeep<NpcInstance>) {
+    if (!npc.path) {
+      const area = this.areas.get(npc.areaId);
+      if (!area) {
+        throw new Error(`Area not found: ${npc.areaId}`);
+      }
+
+      const toNode = randomItem(Array.from(area.graph.getNodes()));
+      if (toNode) {
+        this.gameState.actors.update(npc.id, (update) =>
+          update
+            .add("moveTarget", toNode.data.vector)
+            .add("attackTargetId", undefined),
+        );
       }
     }
   }
 }
 
-function newTask(currentTime: TimeSpan): Task {
-  return {
-    id: randomItem(taskIds) as TaskId,
-    endTime: currentTime.add(TimeSpan.fromSeconds(15)),
-  };
+function initialAiState(
+  npc: ReadonlyDeep<NpcInstance>,
+  totalTimeElapsed: TimeSpan,
+): NpcAiState {
+  switch (npc.aggroType) {
+    case "pacifist": {
+      const endTime = totalTimeElapsed.add(TimeSpan.fromSeconds(5));
+      const potentialInitialTasks: Array<PacifistAiState["task"]> = [
+        { type: "wander", endTime },
+        { type: "idle", endTime },
+      ];
+      return {
+        type: "pacifist",
+        task: assert(randomItem(potentialInitialTasks)),
+      };
+    }
+  }
+  return { type: npc.aggroType };
 }
 
-const taskIds = ["fight", "move"] as const;
+type NpcAiState =
+  | PacifistAiState
+  | ProtectiveAiState
+  | DefensiveAiState
+  | AggressiveAiState;
 
-type TaskId = (typeof taskIds)[number];
-
-interface Task {
-  id: TaskId;
-  endTime: TimeSpan;
+interface PacifistAiState {
+  type: "pacifist";
+  task:
+    | { type: "idle"; endTime: TimeSpan }
+    | { type: "wander"; endTime: TimeSpan }
+    | { type: "escape"; from: ActorId };
 }
 
-interface NpcAiState {
-  task: Task;
+interface ProtectiveAiState {
+  type: "protective";
+}
+
+interface DefensiveAiState {
+  type: "defensive";
+}
+
+interface AggressiveAiState {
+  type: "aggressive";
 }
