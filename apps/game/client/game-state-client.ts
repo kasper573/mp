@@ -53,7 +53,9 @@ export function createGameStateClient(socket: WebSocket, logger: Logger) {
         refreshState();
       }
 
-      gameState.applyPatch(patch);
+      if (patch) {
+        gameState.applyPatch(patch);
+      }
 
       if (events) {
         for (const event of events) {

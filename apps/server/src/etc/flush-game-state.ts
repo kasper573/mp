@@ -26,11 +26,7 @@ export function createGameStateFlusher(
       const patch = clientPatches.get(clientId);
       const events = clientEvents.get(clientId);
       if (patch || events) {
-        const encodedPatch = syncMessageEncoding.encode([
-          patch ?? [],
-          time,
-          events,
-        ]);
+        const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
         histogram.observe(encodedPatch.byteLength);
         socket.send(encodedPatch);
       }
