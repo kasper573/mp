@@ -1,6 +1,6 @@
 import type { Patch, UpdateOperation } from "./patch";
 import { PatchType } from "./patch";
-import type { PatchableState } from "./patch-state-machine";
+import type { PatchableState } from "./sync-state-machine";
 
 /**
  * A patch optimizer is a set of rules that can be applied to a patch to

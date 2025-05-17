@@ -1,13 +1,12 @@
 import type { UserId } from "@mp/auth";
-import type { PatchStateMachine } from "@mp/sync";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
 import type { ClientRegistry } from "../user/client-registry";
-import type { GameState } from "../game-state";
+import type { GameStateMachine } from "../game-state";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,
-  state: PatchStateMachine<GameState>,
+  state: GameStateMachine,
   logger: Logger,
   timeout: number,
 ) {

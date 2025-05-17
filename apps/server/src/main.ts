@@ -5,7 +5,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import { createPatchStateMachine } from "@mp/sync";
+import { createSyncStateMachine } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -21,7 +21,7 @@ import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
 import { type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
-import type { GameState } from "@mp/game/server";
+import type { GameStateMachine } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
@@ -41,6 +41,7 @@ import {
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
+
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -121,7 +122,7 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const gameState = createPatchStateMachine<GameState>({
+const gameState: GameStateMachine = createSyncStateMachine({
   initialState: { actors: {} },
   patchOptimizers: gameStatePatchOptimizers,
   clientIds: () => wss.clients.values().map(getSocketId),
@@ -170,7 +171,7 @@ collectPathFindingMetrics(metrics);
 updateTicker.subscribe(npcAiBehavior(gameState, areas));
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
-updateTicker.subscribe(combatBehavior(gameState));
+updateTicker.subscribe(combatBehavior(gameState, areas));
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 

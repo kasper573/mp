@@ -1,10 +1,11 @@
-import type { AnimatedSpriteFrames } from "pixi.js";
+import type { FrameObject } from "pixi.js";
 import { AnimatedSprite } from "pixi.js";
 import type { Accessor } from "solid-js";
 import {
   createContext,
   createEffect,
   createMemo,
+  createSignal,
   untrack,
   useContext,
 } from "solid-js";
@@ -24,23 +25,30 @@ import type { ActorSpritesheet } from "./actor-spritesheet";
 
 export function createActorSprite(
   modelId: Accessor<ActorModelId>,
-  state: Accessor<ActorModelState>,
   desiredDirection: Accessor<CardinalDirection>,
-): AnimatedSprite {
+): [AnimatedSprite, ActorSpriteCommands] {
+  const [desiredState, setDesiredState] =
+    createSignal<ActorModelState>("idle-normal");
+  const [isAttacking, setIsAttacking] = createSignal(false);
   const allSpriteshets = useContext(ActorSpritesheetContext);
+  const state = createMemo(() =>
+    isAttacking() ? deriveAttackState(desiredState()) : desiredState(),
+  );
   const spritesheet = createMemo(() =>
     assert(allSpriteshets.get(modelId())?.get(state())),
   );
   const direction = createMemo(() =>
     spritesheetCompatibleDirection(desiredDirection(), spritesheet()),
   );
-  const textures = createMemo((): AnimatedSpriteFrames => {
+  const textures = createMemo((): FrameObject[] => {
     const textures = spritesheet().animations[direction()];
     return textures.map((texture) => ({
       texture,
       time: 100, // TODO should come as metadata from the spritesheet
     }));
   });
+
+  const duration = createMemo(() => textures().reduce((a, b) => a + b.time, 0));
 
   const spriteFlags = createMemo(() => actorSpriteFlags[state()]);
 
@@ -67,7 +75,21 @@ export function createActorSprite(
     sprite.loop = spriteFlags().loop;
   });
 
-  return sprite;
+  let lastTimeoutId: NodeJS.Timeout | undefined;
+
+  function attack() {
+    setIsAttacking(true);
+    sprite.currentFrame = 0;
+    clearTimeout(lastTimeoutId);
+    lastTimeoutId = setTimeout(() => setIsAttacking(false), duration());
+  }
+
+  return [sprite, { setState: setDesiredState, attack }];
+}
+
+interface ActorSpriteCommands {
+  setState: (state: ActorModelState) => void;
+  attack: () => void;
 }
 
 interface ActorSpriteStateFlag {
@@ -130,3 +152,28 @@ export const ActorSpritesheetContext = createContext(
     },
   ),
 );
+
+function deriveAttackState(state: ActorModelState): ActorModelState {
+  switch (state) {
+    case "idle-gun":
+    case "attack-shooting":
+      return "attack-shooting";
+    case "walk-gun":
+    case "walk-reloading":
+    case "walk-shooting":
+      return "walk-shooting";
+    case "jump-gun":
+    case "dash-gun":
+    case "run-gun":
+    case "run-shooting":
+      return "run-shooting";
+    case "run-spear":
+    case "dash-spear":
+    case "jump-spear":
+    case "walk-spear":
+    case "attack-spear":
+    case "idle-spear":
+      return "attack-spear";
+  }
+  return state;
+}

@@ -1,13 +1,12 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
 import { recordValues } from "@mp/std";
-import type { PatchStateMachine } from "@mp/sync";
-import type { ClientRegistry, GameState } from "@mp/game/server";
+import type { ClientRegistry, GameStateMachine } from "@mp/game/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  state: PatchStateMachine<GameState>,
+  state: GameStateMachine,
 ) {
   new MetricsGague({
     name: "active_user_count",

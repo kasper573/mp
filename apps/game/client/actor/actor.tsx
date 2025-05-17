@@ -1,9 +1,17 @@
 import { Container, Text } from "pixi.js";
 import { Pixi } from "@mp/solid-pixi";
-import { createEffect, createMemo, Show } from "solid-js";
+import {
+  createEffect,
+  createMemo,
+  onCleanup,
+  Show,
+  untrack,
+  useContext,
+} from "solid-js";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/traits/actor";
 import { createTintFilter } from "../tint-filter";
+import { GameStateClientContext } from "../game-state-client";
 import { deriveActorSpriteState } from "./derive-actor-sprite-state";
 import { createActorSprite } from "./actor-sprite";
 
@@ -12,6 +20,7 @@ export function Actor(props: {
   actor: Actor;
   isPlayer?: boolean;
 }) {
+  const { eventBus } = useContext(GameStateClientContext);
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),
   );
@@ -20,9 +29,8 @@ export function Actor(props: {
 
   const state = createMemo(() => deriveActorSpriteState(props.actor));
 
-  const sprite = createActorSprite(
+  const [sprite, spriteCommands] = createActorSprite(
     () => props.actor.modelId,
-    () => state(),
     () => props.actor.dir,
   );
 
@@ -42,6 +50,16 @@ export function Actor(props: {
     const { name, health, maxHealth } = props.actor;
     text.text = name + `\n${health}/${maxHealth}`;
   });
+
+  createEffect(() => spriteCommands.setState(state()));
+
+  onCleanup(
+    eventBus.subscribe("combat.attack", (attack) => {
+      if (attack.actorId === untrack(() => props.actor.id)) {
+        spriteCommands.attack();
+      }
+    }),
+  );
 
   return (
     <Show when={position()}>
