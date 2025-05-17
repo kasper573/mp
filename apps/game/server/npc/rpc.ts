@@ -21,7 +21,7 @@ export const npcRouter = rpc.router({
         ctx.get(ctxAreaLookup),
         ctx.get(ctxActorModelLookup),
       );
-      const instance = spawner.spawnInstance(npc, spawn);
+      const instance = spawner.createInstance(npc, spawn);
       state.actors.set(instance.id, { type: "npc", ...instance });
     }),
 });

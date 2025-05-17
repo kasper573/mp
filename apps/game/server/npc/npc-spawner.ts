@@ -6,11 +6,16 @@ import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
-import type { AreaId } from "../../shared/area/area-id";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
 import type { NpcService } from "./service";
-import type { Npc, NpcInstance, NpcInstanceId, NpcSpawn } from "./schema";
+import type {
+  Npc,
+  NpcAggroType,
+  NpcInstance,
+  NpcInstanceId,
+  NpcSpawn,
+} from "./schema";
 
 export class NpcSpawner {
   constructor(
@@ -18,7 +23,7 @@ export class NpcSpawner {
     private readonly models: ActorModelLookup,
   ) {}
 
-  createSpawnBehavior(
+  createTickHandler(
     state: GameStateMachine,
     npcService: NpcService,
   ): TickEventHandler {
@@ -48,54 +53,53 @@ export class NpcSpawner {
       }
 
       for (const { spawn, npc } of spawns) {
-        const existingNpcs = recordValues(state.actors())
+        const currentSpawnCount = recordValues(state.actors())
           .filter(
-            (a) =>
-              a.type === "npc" &&
-              a.npcId === npc.id &&
-              a.areaId === spawn.areaId,
+            (actor) =>
+              actor.type === "npc" &&
+              actor.areaId === spawn.areaId &&
+              actor.spawnId === spawn.id,
           )
           .toArray().length;
 
-        const amountToSpawn = spawn.count - existingNpcs;
+        const amountToSpawn = spawn.count - currentSpawnCount;
 
         for (let i = 0; i < amountToSpawn; i++) {
-          const instance = this.spawnInstance(npc, spawn);
+          const instance = this.createInstance(npc, spawn);
           state.actors.set(instance.id, { type: "npc", ...instance });
         }
       }
     };
   }
 
-  spawnInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
-    const area = assert(this.areas.get(spawn.areaId));
-    return this.createInstance(
-      npc,
-      spawn.areaId,
-      determineSpawnCoords(spawn, area),
-    );
-  }
-
-  createInstance(
-    { id: npcId, ...inheritedProps }: Npc,
-    areaId: AreaId,
-    coords: Vector<Tile>,
-  ): NpcInstance {
+  createInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
     const id = createShortId() as NpcInstanceId;
-    const model = assert(this.models.get(inheritedProps.modelId));
+    const model = assert(this.models.get(npc.modelId));
+    const area = assert(this.areas.get(spawn.areaId));
+    const coords = determineSpawnCoords(spawn, area);
+    const aggroType = spawn.aggroType ?? npc.aggroType;
     return {
+      ...npc,
       id,
-      npcId,
-      areaId,
+      npcId: npc.id,
+      spawnId: spawn.id,
+      areaId: spawn.areaId,
       coords,
-      color: 0xff_00_00, // Hard coded to enemy color for now
+      aggroType,
+      color: aggroTypeColorIndication[aggroType], // Hard coded to enemy color for now
       hitBox: model.hitBox,
       dir: assert(randomItem(cardinalDirections)),
-      health: inheritedProps.maxHealth,
-      ...inheritedProps,
+      health: npc.maxHealth,
     };
   }
 }
+
+const aggroTypeColorIndication: Record<NpcAggroType, number> = {
+  aggressive: 0xff_00_00,
+  protective: 0x00_ff_00,
+  defensive: 0x00_00_ff,
+  pacifist: 0xff_ff_ff,
+};
 
 function determineSpawnCoords(
   spawn: NpcSpawn,

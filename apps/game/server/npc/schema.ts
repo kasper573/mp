@@ -16,6 +16,29 @@ import { areaId } from "../area/schema";
 export type NpcId = Branded<string, "NPCId">;
 export const npcId = () => shortId().$type<NpcId>();
 
+// TODO would like to use pgEnum but it's bugged: https://github.com/drizzle-team/drizzle-orm/issues/3514
+export type NpcAggroType = Npc["aggroType"];
+export const npcAggroType = varchar({
+  enum: [
+    /**
+     * Will never aggro.
+     */
+    "pacifist",
+    /**
+     * Will aggro if attacked.
+     */
+    "defensive",
+    /**
+     * Will aggro if an actor considered an enemy is present.
+     */
+    "aggressive",
+    /**
+     * Will aggro if attacked or if an actor considered an ally is attacked.
+     */
+    "protective",
+  ],
+});
+
 /**
  * Static information about an NPC.
  */
@@ -28,6 +51,8 @@ export const npcTable = pgTable("npc", {
   attackRange: real().$type<Tile>().notNull(),
   modelId: actorModelId().notNull(),
   name: varchar({ length: 64 }).notNull(),
+  aggroType: npcAggroType.notNull(),
+  aggroRange: real().$type<Tile>().notNull(),
 });
 
 export type Npc = typeof npcTable.$inferSelect;
@@ -51,6 +76,11 @@ export const npcSpawnTable = pgTable("npc_spawn", {
     .references(() => npcTable.id, { onDelete: "cascade" }),
   coords: vector<Tile>(),
   randomRadius: integer(),
+  /**
+   * Takes precedence over the aggro type of the NPC.
+   * If not set, the NPC's aggro type will be used.
+   */
+  aggroType: npcAggroType,
 });
 
 export type NpcSpawn = typeof npcSpawnTable.$inferSelect;
@@ -66,6 +96,7 @@ export interface NpcInstance
     CombatTrait {
   id: NpcInstanceId;
   npcId: NpcId;
+  spawnId: NpcSpawnId;
 }
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

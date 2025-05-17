@@ -16,6 +16,7 @@ import {
   ctxClientRegistry,
   ctxTokenVerifier,
   gameStatePatchOptimizers,
+  NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -32,7 +33,6 @@ import {
   characterRemoveBehavior,
   CharacterService,
   ctxCharacterService,
-  npcAiBehavior,
   ctxNpcService,
   ctxGameStateMachine,
   deriveClientVisibility,
@@ -172,10 +172,11 @@ collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
 const npcSpawner = new NpcSpawner(areas, actorModels);
+const npcAi = new NpcAi(gameState, areas);
 
-updateTicker.subscribe(npcAiBehavior(gameState, areas));
+updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(movementBehavior(gameState, areas));
-updateTicker.subscribe(npcSpawner.createSpawnBehavior(gameState, npcService));
+updateTicker.subscribe(npcSpawner.createTickHandler(gameState, npcService));
 updateTicker.subscribe(combatBehavior(gameState, areas));
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);

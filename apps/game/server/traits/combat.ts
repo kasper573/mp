@@ -135,8 +135,8 @@ function canAttackFrom(
 const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
-  actor: ReadonlyDeep<Actor>,
-  target: ReadonlyDeep<Actor>,
+  actor: ReadonlyDeep<Pick<Actor, "areaId">>,
+  target: ReadonlyDeep<Pick<Actor, "areaId" | "health">>,
 ): boolean {
   return target.areaId === actor.areaId && target.health > 0;
 }
