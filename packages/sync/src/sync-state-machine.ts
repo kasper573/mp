@@ -128,13 +128,13 @@ function createFlushFunction<State extends PatchableState>(
       if (clientPatch.length > 0) {
         clientPatches.set(clientId, dedupePatch(clientPatch));
       }
-      if (serverEvents.length > 0) {
-        clientEvents.set(
-          clientId,
-          serverEvents
-            .filter(({ visibility }) => isVisible(nextVisibility, visibility))
-            .map(({ event }) => event),
-        );
+
+      const visibleClientEvents = serverEvents
+        .filter(({ visibility }) => isVisible(nextVisibility, visibility))
+        .map(({ event }) => event);
+
+      if (visibleClientEvents.length > 0) {
+        clientEvents.set(clientId, visibleClientEvents);
       }
     }
 
