@@ -94,10 +94,11 @@ export function combatBehavior(
         .add("lastAttack", currentTime),
     );
 
-    state.$event("combat.attack", {
-      actorId: actor.id,
-      targetId: target.id,
-    });
+    state.$event(
+      "combat.attack",
+      { actorId: actor.id, targetId: target.id },
+      { actors: new Set([actor.id, target.id]) },
+    );
   }
 
   function bestTileToAttackFrom(
