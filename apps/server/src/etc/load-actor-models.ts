@@ -7,7 +7,7 @@ import type {
   ActorModelLookup,
 } from "@mp/game/server";
 import type { LocalFile, PublicUrl, Tile } from "@mp/std";
-import { Rect, Vector } from "@mp/math";
+import { Rect } from "@mp/math";
 import { serverFileToPublicUrl } from "./server-file-to-public-url";
 
 export async function loadActorModels(
@@ -39,8 +39,10 @@ export async function loadActorModels(
         );
         const model: ActorModel = {
           id: modelId,
-          hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
           spritesheets,
+          // TODO should be read from some meta data on file
+          // These values are based on the adventurer model
+          hitBox: Rect.fromComponents(-0.5, -1.5, 1, 2) as Rect<Tile>,
         };
         return [modelId, model] as const;
       }),
