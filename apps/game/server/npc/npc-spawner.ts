@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { Tile } from "@mp/std";
-import { assert, createShortId, randomItem, recordValues } from "@mp/std";
+import { assert, createShortId, randomItem } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
@@ -38,7 +38,7 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of recordValues(state.actors())) {
+      for (const actor of state.actors.values()) {
         if (actor.type === "npc" && actor.health <= 0) {
           let cleanupTime = corpseCleanupTimers.get(actor.id);
           if (!cleanupTime) {
@@ -53,7 +53,8 @@ export class NpcSpawner {
       }
 
       for (const { spawn, npc } of spawns) {
-        const currentSpawnCount = recordValues(state.actors())
+        const currentSpawnCount = state.actors
+          .values()
           .filter(
             (actor) =>
               actor.type === "npc" &&

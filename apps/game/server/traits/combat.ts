@@ -1,6 +1,6 @@
 import type { Vector, Rect } from "@mp/math";
 import { nearestCardinalDirection } from "@mp/math";
-import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
+import { type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
@@ -27,7 +27,7 @@ export function combatBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
-    for (const actor of recordValues(state.actors())) {
+    for (const actor of state.actors.values()) {
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
