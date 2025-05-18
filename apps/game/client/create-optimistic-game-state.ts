@@ -3,7 +3,7 @@ import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
-import { batch, createSignal } from "solid-js";
+import { batch, createSignal, untrack } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 
@@ -17,19 +17,25 @@ export function createOptimisticGameState() {
     return gameState;
   }
 
-  // eslint-disable-next-line solid/reactivity
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
-    for (const actor of Object.values(gameState.actors)) {
-      if (actor.path && actor.health > 0) {
-        const [newCoords, newPath] = moveAlongPath(
-          actor.coords,
-          actor.path,
-          actor.speed,
-          opt.timeSinceLastFrame,
-        );
+    const { enabled, actors } = untrack(() => ({
+      enabled: useOptimisticGameState(),
+      actors: Object.values(gameState.actors),
+    }));
 
-        actor.coords = newCoords;
-        actor.path = newPath;
+    if (enabled) {
+      for (const actor of actors) {
+        if (actor.path && actor.health > 0) {
+          const [newCoords, newPath] = moveAlongPath(
+            actor.coords,
+            actor.path,
+            actor.speed,
+            opt.timeSinceLastFrame,
+          );
+
+          actor.coords = newCoords;
+          actor.path = newPath;
+        }
       }
     }
   };
@@ -45,6 +51,9 @@ export function createOptimisticGameState() {
 
   return optimisticGameState;
 }
+
+export const [useOptimisticGameState, setUseOptimisticGameState] =
+  createSignal(true);
 
 export const [useClientSidePatchOptimizer, setUseClientSidePatchOptimizer] =
   createSignal(true);
