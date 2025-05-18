@@ -1,8 +1,7 @@
 import { defineRoles, roles, rpc } from "@mp/game/server";
-import { TimeSpan } from "@mp/time";
+import type { Ticker, TimeSpan } from "@mp/time";
+import { InjectionContext } from "@mp/ioc";
 import { opt } from "../options";
-
-let fakeTickInterval = TimeSpan.fromMilliseconds(0);
 
 export const systemRoles = defineRoles("sys", ["admin"]);
 
@@ -14,11 +13,13 @@ export const systemRouter = rpc.router({
   serverTickInterval: rpc.procedure
     .use(roles([systemRoles.admin]))
     .output<TimeSpan>()
-    .query(() => fakeTickInterval),
+    .query(({ ctx }) => ctx.get(ctxUpdateTicker).options.interval),
   setServerTickInterval: rpc.procedure
     .use(roles([systemRoles.admin]))
     .input<TimeSpan>()
-    .mutation(({ input }) => {
-      fakeTickInterval = input;
+    .mutation(({ input, ctx }) => {
+      ctx.get(ctxUpdateTicker).setOptions({ interval: input });
     }),
 });
+
+export const ctxUpdateTicker = InjectionContext.new<Ticker>("UpdateTicker");

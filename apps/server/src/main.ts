@@ -60,6 +60,7 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
+import { ctxUpdateTicker } from "./etc/system-rpc";
 
 registerEncoderExtensions();
 
@@ -174,7 +175,8 @@ const ioc = new InjectionContainer()
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
-  .provide(ctxActorModelLookup, actorModels);
+  .provide(ctxActorModelLookup, actorModels)
+  .provide(ctxUpdateTicker, updateTicker);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
