@@ -85,7 +85,7 @@ export function combatBehavior(
     }
 
     state.actors.update(target.id, (update) =>
-      update.add("health", target.health - actor.attackDamage),
+      update.add("health", Math.max(0, target.health - actor.attackDamage)),
     );
 
     state.actors.update(actor.id, (update) =>
