@@ -1,4 +1,5 @@
 import { characterRoles, npcRoles } from "@mp/game/server";
+import { systemRoles } from "./etc/system-rpc";
 
 export const playerGroup = "player";
 
@@ -13,6 +14,11 @@ export const playerRoles = [
  * Changing this will provision updates in keycloak when pushed to production.
  */
 export const groupedRoles = {
-  admin: [...playerRoles, characterRoles.kill, npcRoles.spawnRandom],
+  admin: [
+    ...playerRoles,
+    characterRoles.kill,
+    npcRoles.spawnRandom,
+    systemRoles.admin,
+  ],
   [playerGroup]: playerRoles,
-};
+} satisfies Record<string, string[]>;
