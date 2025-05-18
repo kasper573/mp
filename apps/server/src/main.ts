@@ -11,11 +11,13 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
-  ctxActorSpritesheetUrls,
+  ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
   gameStatePatchOptimizers,
+  NpcAi,
+  NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
@@ -27,12 +29,10 @@ import {
   ctxAreaLookup,
   ClientRegistry,
   movementBehavior,
-  npcSpawnBehavior,
   combatBehavior,
   characterRemoveBehavior,
   CharacterService,
   ctxCharacterService,
-  npcAiBehavior,
   ctxNpcService,
   ctxGameStateMachine,
   deriveClientVisibility,
@@ -42,6 +42,7 @@ import {
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 
+import { seed } from "../seed";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -56,7 +57,7 @@ import { setupRpcTransceivers } from "./etc/rpc-wss";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
-import { loadActorSpritesheets } from "./etc/load-actor-spritesheets";
+import { loadActorModels } from "./etc/load-actor-models";
 
 registerEncoderExtensions();
 
@@ -89,7 +90,12 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const areas = await loadAreas(path.resolve(opt.publicDir, "areas"));
+const [areas, actorModels] = await Promise.all([
+  loadAreas(path.resolve(opt.publicDir, "areas")),
+  loadActorModels(opt.publicDir),
+]);
+
+await seed(db, areas, actorModels);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
@@ -148,7 +154,7 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
-const characterService = new CharacterService(db, areas);
+const characterService = new CharacterService(db, areas, actorModels);
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
@@ -161,17 +167,20 @@ const ioc = new InjectionContainer()
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
-  .provide(ctxActorSpritesheetUrls, await loadActorSpritesheets(opt.publicDir));
+  .provide(ctxActorModelLookup, actorModels);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-updateTicker.subscribe(npcAiBehavior(gameState, areas));
+const npcSpawner = new NpcSpawner(areas, actorModels);
+const npcAi = new NpcAi(gameState, areas);
+
 updateTicker.subscribe(movementBehavior(gameState, areas));
-updateTicker.subscribe(npcSpawnBehavior(gameState, npcService, areas));
+updateTicker.subscribe(npcSpawner.createTickHandler(gameState, npcService));
 updateTicker.subscribe(combatBehavior(gameState, areas));
+updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
 characterRemoveBehavior(clients, gameState, logger, 5000);
 

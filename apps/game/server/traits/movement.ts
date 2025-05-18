@@ -6,7 +6,6 @@ import {
 } from "@mp/math";
 import { type TickEventHandler } from "@mp/time";
 import type { Tile } from "@mp/std";
-import { recordValues } from "@mp/std";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
@@ -38,7 +37,7 @@ export function movementBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
-    for (const subject of recordValues(state.actors())) {
+    for (const subject of state.actors.values()) {
       // The dead don't move
       if (subject.health <= 0) {
         state.actors.update(subject.id, (update) => {

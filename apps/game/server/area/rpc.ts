@@ -2,7 +2,11 @@ import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import type { AreaId } from "../../shared/area/area-id";
 import { rpc } from "../rpc";
-import type { ActorModelId, ActorModelState } from "../traits/appearance";
+import {
+  ctxActorModelLookup,
+  type ActorModelId,
+  type ActorModelState,
+} from "../traits/appearance";
 
 export type AssetsRouter = typeof assetsRouter;
 export const assetsRouter = rpc.router({
@@ -13,9 +17,15 @@ export const assetsRouter = rpc.router({
       const resolveUrl = ctx.get(ctxAreaFileUrlResolver);
       return resolveUrl(areaId);
     }),
-  actorSpritesheetUrls: rpc.procedure
-    .output<ActorSpritesheetUrls>()
-    .query(({ ctx }) => ctx.get(ctxActorSpritesheetUrls)),
+  actorSpritesheetUrls: rpc.procedure.output<ActorSpritesheetUrls>().query(
+    ({ ctx }) =>
+      new Map(
+        ctx
+          .get(ctxActorModelLookup)
+          .entries()
+          .map(([modelId, { spritesheets }]) => [modelId, spritesheets]),
+      ),
+  ),
 });
 
 export const assetsRouterSlice = { area: assetsRouter };
@@ -23,9 +33,6 @@ export const assetsRouterSlice = { area: assetsRouter };
 export const ctxAreaFileUrlResolver = InjectionContext.new<
   (areaId: AreaId) => PublicUrl
 >("AreaFileUrlResolver");
-
-export const ctxActorSpritesheetUrls =
-  InjectionContext.new<ActorSpritesheetUrls>("ActorSpritesheetUrls");
 
 export type ActorSpritesheetUrls = ReadonlyMap<
   ActorModelId,

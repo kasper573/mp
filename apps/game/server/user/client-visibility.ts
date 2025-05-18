@@ -1,6 +1,5 @@
 import type { ClientVisibilityFactory } from "@mp/sync";
 import type { Tile } from "@mp/std";
-import { recordValues } from "@mp/std";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import type { MovementTrait } from "../traits/movement";
 import type { Actor, ActorId } from "../traits/actor";
@@ -20,7 +19,7 @@ export function deriveClientVisibility(
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
-    const clientCharacter = recordValues(state.actors).find(
+    const clientCharacter = Object.values(state.actors).find(
       (actor) => actor.type === "character" && actor.userId === userId,
     );
     return { actors: visibleActors(state, clientCharacter) };
@@ -32,10 +31,10 @@ export function deriveClientVisibility(
   ): ReadonlySet<ActorId> {
     const visible = new Set<ActorId>();
     if (observer) {
-      for (const other of recordValues(state.actors).filter((other) =>
-        canSeeSubject(observer, other),
-      )) {
-        visible.add(other.id);
+      for (const other of Object.values(state.actors)) {
+        if (canSeeSubject(observer, other)) {
+          visible.add(other.id);
+        }
       }
     }
     return visible;

@@ -1,6 +1,6 @@
 import type { Vector, Rect } from "@mp/math";
 import { nearestCardinalDirection } from "@mp/math";
-import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
+import { type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
@@ -27,7 +27,7 @@ export function combatBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
-    for (const actor of recordValues(state.actors())) {
+    for (const actor of state.actors.values()) {
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
@@ -84,8 +84,8 @@ export function combatBehavior(
       }
     }
 
-    state.actors.update(target.id, (u) =>
-      u.add("health", target.health - actor.attackDamage),
+    state.actors.update(target.id, (update) =>
+      update.add("health", Math.max(0, target.health - actor.attackDamage)),
     );
 
     state.actors.update(actor.id, (update) =>
@@ -135,8 +135,8 @@ function canAttackFrom(
 const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
-  actor: ReadonlyDeep<Actor>,
-  target: ReadonlyDeep<Actor>,
+  actor: ReadonlyDeep<Pick<Actor, "areaId">>,
+  target: ReadonlyDeep<Pick<Actor, "areaId" | "health">>,
 ): boolean {
   return target.areaId === actor.areaId && target.health > 0;
 }

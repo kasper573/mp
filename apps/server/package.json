@@ -29,6 +29,7 @@
     "@mp/ioc": "workspace:*",
     "@mp/keycloak-provision": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/std": "workspace:*",

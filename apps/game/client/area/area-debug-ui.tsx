@@ -29,7 +29,9 @@ import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import {
   setUseClientSidePatchOptimizer,
+  setUseOptimisticGameState,
   useClientSidePatchOptimizer,
+  useOptimisticGameState,
 } from "../create-optimistic-game-state";
 import * as styles from "./area-debug-ui.css";
 import { AreaSceneContext } from "./area-scene";
@@ -85,6 +87,26 @@ export function AreaDebugUi(props: {
             />
           </div>
           <div>
+            Use optimistic game state:{" "}
+            <input
+              type="checkbox"
+              checked={useOptimisticGameState()}
+              on:change={(e) =>
+                setUseOptimisticGameState(e.currentTarget.checked)
+              }
+            />
+          </div>
+          <div>
+            <label>
+              <input
+                type="checkbox"
+                checked={showViewbox()}
+                on:change={() => setShowViewbox(!showViewbox())}
+              />
+              Visualize network fog of war
+            </label>
+          </div>
+          <div>
             <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
               Spawn random NPC
             </Button>
@@ -97,16 +119,6 @@ export function AreaDebugUi(props: {
             >
               Die
             </Button>
-          </div>
-          <div>
-            <label>
-              <input
-                type="checkbox"
-                checked={showViewbox()}
-                on:change={() => setShowViewbox(!showViewbox())}
-              />
-              Visualize network fog of war
-            </label>
           </div>
         </div>
         <DebugInfo tiled={props.area.tiled} />

@@ -151,7 +151,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         </Show>
       </Pixi>
 
-      <RespawnDialog open={!state.character()?.health} />
+      <RespawnDialog open={(state.character()?.health ?? 0) <= 0} />
 
       <Keybindings toggleDebug={toggleDebug} />
     </>

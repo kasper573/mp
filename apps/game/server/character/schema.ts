@@ -1,8 +1,8 @@
-import { pgTable, uuid, real, vector, shortId } from "@mp/db";
+import { pgTable, uuid, real, vector, shortId, varchar } from "@mp/db";
 import type { UserId } from "@mp/auth";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { MovementTrait } from "../traits/movement";
-import type { AppearanceTrait } from "../traits/appearance";
+import { actorModelId, type AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import { areaId } from "../area/schema";
 
@@ -21,6 +21,8 @@ export const characterTable = pgTable("character", {
   attackDamage: real().notNull(),
   attackSpeed: real().$type<TimesPerSecond>().notNull(),
   attackRange: real().$type<Tile>().notNull(),
+  modelId: actorModelId().notNull(),
+  name: varchar({ length: 64 }).notNull(),
 });
 
 type DbCharacter = typeof characterTable.$inferSelect;
