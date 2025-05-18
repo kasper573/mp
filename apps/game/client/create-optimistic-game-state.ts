@@ -3,13 +3,15 @@ import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
-import { batch, createContext, untrack, useContext } from "solid-js";
+import type { Accessor } from "solid-js";
+import { batch, createContext, untrack } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 
-export function createOptimisticGameState() {
+export function createOptimisticGameState(
+  settings: Accessor<OptimisticGameStateSettings>,
+) {
   const gameState = createMutable<GameState>({ actors: {} });
-  const settings = useContext(OptimisticGameStateContext);
 
   /**
    * Returns the current optimistic game state.
@@ -20,7 +22,7 @@ export function createOptimisticGameState() {
 
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
     const { enabled, actors } = untrack(() => ({
-      enabled: settings.useInterpolator,
+      enabled: settings().useInterpolator,
       actors: Object.values(gameState.actors),
     }));
 
@@ -43,7 +45,7 @@ export function createOptimisticGameState() {
 
   optimisticGameState.applyPatch = (patch: Patch) => {
     batch(() => {
-      const filteredPatch = settings.usePatchOptimizer
+      const filteredPatch = settings().usePatchOptimizer
         ? optimizePatch(gameState, patch, patchOptimizer)
         : patch;
       applyPatch(gameState, filteredPatch);
@@ -58,11 +60,13 @@ export interface OptimisticGameStateSettings {
   usePatchOptimizer: boolean;
 }
 
-export const OptimisticGameStateContext =
-  createContext<OptimisticGameStateSettings>({
-    useInterpolator: true,
-    usePatchOptimizer: true,
-  });
+export const OptimisticGameStateContext = createContext(
+  new Proxy({} as OptimisticGameStateSettings, {
+    get() {
+      throw new Error("OptimisticGameStateContext has not been initialized");
+    },
+  }),
+);
 
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles

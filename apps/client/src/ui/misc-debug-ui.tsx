@@ -3,21 +3,19 @@ import {
   GameStateClientContext,
   type OptimisticGameStateSettings,
 } from "@mp/game/client";
+import type { Setter } from "solid-js";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { assert } from "@mp/std";
-import { createStorageSignal } from "@mp/state";
 import { TimeSpan } from "@mp/time";
 import { useRpc } from "../integrations/rpc";
 
-export function MiscDebugUi() {
+export function MiscDebugUi(props: {
+  settings: MiscDebugSettings;
+  setSettings: Setter<MiscDebugSettings>;
+}) {
   const rpc = useRpc();
   const gameState = useContext(GameStateClientContext);
   const [serverTick, setServerTick] = createServerTickSignal();
-  const [settings, setSettings] = createStorageSignal<MiscDebugSettings>(
-    localStorage,
-    "misc-debug-settings",
-    defaultSettings,
-  );
 
   return (
     <>
@@ -42,9 +40,9 @@ export function MiscDebugUi() {
         Use client side patch optimizer:{" "}
         <input
           type="checkbox"
-          checked={settings().usePatchOptimizer}
+          checked={props.settings.usePatchOptimizer}
           on:change={(e) =>
-            setSettings((prev) => ({
+            props.setSettings((prev) => ({
               ...prev,
               usePatchOptimizer: e.currentTarget.checked,
             }))
@@ -55,9 +53,9 @@ export function MiscDebugUi() {
         Use client side game state interpolator:{" "}
         <input
           type="checkbox"
-          checked={settings().useInterpolator}
+          checked={props.settings.useInterpolator}
           on:change={(e) =>
-            setSettings((prev) => ({
+            props.setSettings((prev) => ({
               ...prev,
               useInterpolator: e.currentTarget.checked,
             }))
@@ -102,12 +100,6 @@ function createServerTickSignal() {
   return [serverTick, setServerTick] as const;
 }
 
-const defaultSettings: MiscDebugSettings = {
-  useInterpolator: true,
-  usePatchOptimizer: true,
-  visualizeNetworkFogOfWar: false,
-};
-
-interface MiscDebugSettings extends OptimisticGameStateSettings {
+export interface MiscDebugSettings extends OptimisticGameStateSettings {
   visualizeNetworkFogOfWar: boolean;
 }

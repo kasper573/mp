@@ -1,3 +1,4 @@
+import type { Accessor } from "solid-js";
 import {
   createContext,
   createMemo,
@@ -16,13 +17,18 @@ import type { Character, CharacterId } from "../server/character/schema";
 import type { ActorId } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
 import { useRpc } from "./use-rpc";
+import type { OptimisticGameStateSettings } from "./create-optimistic-game-state";
 import { createOptimisticGameState } from "./create-optimistic-game-state";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
-export function createGameStateClient(socket: WebSocket, logger: Logger) {
+export function createGameStateClient(
+  socket: WebSocket,
+  logger: Logger,
+  settings: Accessor<OptimisticGameStateSettings>,
+) {
   const eventBus = new SyncEventBus<GameStateEvents>();
-  const gameState = createOptimisticGameState();
+  const gameState = createOptimisticGameState(settings);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
 
   const [readyState, setReadyState] = createSignal(socket.readyState);
