@@ -55,16 +55,10 @@ export class NpcSpawner {
       for (const { spawn, npc } of spawns) {
         const currentSpawnCount = state.actors
           .values()
-          .filter(
-            (actor) =>
-              actor.type === "npc" &&
-              actor.areaId === spawn.areaId &&
-              actor.spawnId === spawn.id,
-          )
+          .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
           .toArray().length;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
-
         for (let i = 0; i < amountToSpawn; i++) {
           const instance = this.createInstance(npc, spawn);
           state.actors.set(instance.id, { type: "npc", ...instance });
