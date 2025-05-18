@@ -15,6 +15,7 @@ import {
   aggressiveHuntFilter,
   createHuntTask,
   defensiveHuntFilter,
+  protectiveHuntFilter,
 } from "./ai-tasks/hunt";
 
 export class NpcAi {
@@ -27,7 +28,6 @@ export class NpcAi {
   ) {}
 
   createTickHandler(): TickEventHandler {
-    let nextMemoryCleanupTime = TimeSpan.Zero;
     return (tick) => {
       for (const subject of this.gameState.actors.values()) {
         if (subject.type !== "npc" || subject.health <= 0) {
@@ -49,26 +49,23 @@ export class NpcAi {
         this.npcTasks.set(subject.id, nextTask);
       }
 
-      // Since npc instances come and go frequently and in large quantities we need to clean up this map to avoid memory leaks,
-      // but it's not important that it's always up to date so we can do it on an interval.
-      if (tick.totalTimeElapsed.compareTo(nextMemoryCleanupTime) > 0) {
-        this.removeExpiredCombats();
-        nextMemoryCleanupTime = tick.totalTimeElapsed.add(
-          TimeSpan.fromMinutes(1),
-        );
-      }
+      this.removeExpiredCombats();
     };
   }
 
   private observeAttacksDoneThisTick(observer: ReadonlyDeep<NpcInstance>) {
     for (const attack of this.gameState.$event.peek("combat.attack")) {
-      const canSeeCombatants = [attack.actorId, attack.targetId].some(
-        (combatantId) => {
-          const combatant = this.gameState.actors()[combatantId];
-          const distance = observer.coords.distance(combatant.coords);
-          return distance <= observer.aggroRange;
-        },
-      );
+      const combatantIds = [attack.actorId, attack.targetId];
+      if (combatantIds.includes(observer.id)) {
+        // Combats you participate in doesn't count as observing a combat
+        continue;
+      }
+
+      const canSeeCombatants = combatantIds.some((combatantId) => {
+        const combatant = this.gameState.actors()[combatantId];
+        const distance = observer.coords.distance(combatant.coords);
+        return distance <= observer.aggroRange;
+      });
 
       if (canSeeCombatants) {
         let memory = this.combatMemories.get(observer.id);
@@ -100,7 +97,7 @@ function deriveTask(aggroType: NpcAggroType, tick: TickEvent): Task {
     case "defensive":
       return createHuntTask(defensiveHuntFilter);
     case "protective":
-      return createHuntTask(defensiveHuntFilter);
+      return createHuntTask(protectiveHuntFilter);
   }
 }
 
