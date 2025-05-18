@@ -1,5 +1,5 @@
 import type { ActorId } from "../../traits/actor";
-import type { Task, TaskInput } from "./Task";
+import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {

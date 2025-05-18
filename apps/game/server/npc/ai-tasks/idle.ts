@@ -1,5 +1,5 @@
 import type { TimeSpan } from "@mp/time";
-import type { Task, TaskInput } from "./Task";
+import type { Task, TaskInput } from "./task";
 
 export function createIdleTask(
   endTime: TimeSpan,

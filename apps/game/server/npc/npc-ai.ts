@@ -6,7 +6,7 @@ import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
 import type { NpcAggroType, NpcInstance, NpcInstanceId } from "./schema";
-import { type Task, type TaskInput } from "./ai-tasks/Task";
+import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
 import { createIdleTask } from "./ai-tasks/idle";
