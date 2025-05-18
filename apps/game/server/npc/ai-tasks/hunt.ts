@@ -108,7 +108,7 @@ export const protectiveHuntFilter: HuntFilter = ({
 
   const target = gameState.actors.values().find((candidate) => {
     if (
-      candidate.health > 0 ||
+      candidate.health <= 0 ||
       candidate.coords.distance(npc.coords) > npc.aggroRange
     ) {
       return false;
