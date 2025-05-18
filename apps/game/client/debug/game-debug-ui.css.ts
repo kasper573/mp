@@ -17,8 +17,3 @@ export const debugMenu = style([
     color: "white",
   },
 ]);
-
-export const debugText = style([
-  atoms({ overflow: "auto" }),
-  { maxHeight: "70vh" },
-]);

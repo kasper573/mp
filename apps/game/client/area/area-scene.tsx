@@ -12,25 +12,23 @@ import {
   For,
   createContext,
   Show,
-  onCleanup,
   createResource,
 } from "solid-js";
 import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
+import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
+import { AreaDebugUi } from "./area-debug-ui";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { RespawnDialog } from "./respawn-dialog";
-import { AreaDebugUi } from "./area-debug-ui";
-import { toggleSignal } from "./toggle-signal";
 
 export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
   const actions = useGameActions();
   const { renderedTileCount } = useContext(AreaSceneContext);
-  const [debug, toggleDebug] = toggleSignal();
 
   const [spritesheets] = createResource(
     () => props.area.tiled.map,
@@ -142,18 +140,16 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         </Show>
         {props.children}
         <TileHighlight area={props.area} target={highlightTarget()} />
-        <Show when={debug()}>
+        <GameDebugUiPortal>
           <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
             drawPathsForActors={state.actorList()}
           />
-        </Show>
+        </GameDebugUiPortal>
       </Pixi>
 
       <RespawnDialog open={(state.character()?.health ?? 0) <= 0} />
-
-      <Keybindings toggleDebug={toggleDebug} />
     </>
   );
 }
@@ -183,12 +179,4 @@ function createZoomLevelForViewDistance(
       ? cameraSize.x / tileSize.x
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
-}
-
-function Keybindings(props: { toggleDebug: () => void }) {
-  const engine = useContext(EngineContext);
-  createEffect(() => {
-    onCleanup(engine.keyboard.on("keydown", "F2", props.toggleDebug));
-  });
-  return null;
 }

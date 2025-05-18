@@ -27,6 +27,7 @@
     "@mp/path-finding": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/solid-pixi": "workspace:*",
+    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/sync": "workspace:*",

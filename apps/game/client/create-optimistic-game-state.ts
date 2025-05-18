@@ -3,11 +3,14 @@ import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
-import { batch, createSignal, untrack } from "solid-js";
+import type { Accessor } from "solid-js";
+import { batch, createContext, untrack } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 
-export function createOptimisticGameState() {
+export function createOptimisticGameState(
+  settings: Accessor<OptimisticGameStateSettings>,
+) {
   const gameState = createMutable<GameState>({ actors: {} });
 
   /**
@@ -19,7 +22,7 @@ export function createOptimisticGameState() {
 
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
     const { enabled, actors } = untrack(() => ({
-      enabled: useOptimisticGameState(),
+      enabled: settings().useInterpolator,
       actors: Object.values(gameState.actors),
     }));
 
@@ -42,7 +45,7 @@ export function createOptimisticGameState() {
 
   optimisticGameState.applyPatch = (patch: Patch) => {
     batch(() => {
-      const filteredPatch = useClientSidePatchOptimizer()
+      const filteredPatch = settings().usePatchOptimizer
         ? optimizePatch(gameState, patch, patchOptimizer)
         : patch;
       applyPatch(gameState, filteredPatch);
@@ -52,11 +55,18 @@ export function createOptimisticGameState() {
   return optimisticGameState;
 }
 
-export const [useOptimisticGameState, setUseOptimisticGameState] =
-  createSignal(true);
+export interface OptimisticGameStateSettings {
+  useInterpolator: boolean;
+  usePatchOptimizer: boolean;
+}
 
-export const [useClientSidePatchOptimizer, setUseClientSidePatchOptimizer] =
-  createSignal(true);
+export const OptimisticGameStateContext = createContext(
+  new Proxy({} as OptimisticGameStateSettings, {
+    get() {
+      throw new Error("OptimisticGameStateContext has not been initialized");
+    },
+  }),
+);
 
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles

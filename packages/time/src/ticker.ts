@@ -3,7 +3,6 @@ import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
-  private middleware: TickMiddleware;
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
   private stopAsyncInterval?: () => void;
@@ -13,8 +12,13 @@ export class Ticker {
     return this.#isEnabled;
   }
 
-  constructor(private options: TickerOptions) {
-    this.middleware = options.middleware ?? noopMiddleware;
+  #options: TickerOptions;
+  get options(): Readonly<TickerOptions> {
+    return this.#options;
+  }
+
+  constructor(options: TickerOptions) {
+    this.#options = options;
     this.getTimeSinceLastTick = createDeltaFn();
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
   }
@@ -24,11 +28,23 @@ export class Ticker {
     return () => this.subscriptions.delete(fn);
   }
 
+  setOptions(changedOptions?: Partial<TickerOptions>) {
+    this.#options = { ...this.#options, ...changedOptions };
+
+    // Ticker must be restarted if it's enabled since interval might have changed
+    if (this.#isEnabled) {
+      this.start();
+    }
+  }
+
   start() {
     this.stop();
     this.#isEnabled = true;
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.stopAsyncInterval = setAsyncInterval(this.tick, this.options.interval);
+    this.stopAsyncInterval = setAsyncInterval(
+      this.tick,
+      this.#options.interval,
+    );
   }
 
   stop() {
@@ -39,14 +55,15 @@ export class Ticker {
 
   private tick = async () => {
     try {
-      await this.middleware({
+      const middleware = this.#options.middleware ?? noopMiddleware;
+      await middleware({
         timeSinceLastTick: this.getTimeSinceLastTick(),
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
       });
     } catch (error) {
-      if (this.options.onError) {
-        this.options.onError(error);
+      if (this.#options.onError) {
+        this.#options.onError(error);
       } else {
         throw error;
       }

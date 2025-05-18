@@ -1,6 +1,7 @@
 import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
+import { TimeSpan } from "@mp/time";
 
 export function registerEncoderExtensions(): void {
   // All tags below this are reserved by @mp/encoding
@@ -43,4 +44,11 @@ export function registerEncoderExtensions(): void {
       },
     },
   );
+
+  addEncoderExtension<TimeSpan, number>({
+    Class: TimeSpan as never,
+    tag: nextTag(),
+    encode: (v, encode) => encode(v.totalMilliseconds),
+    decode: (v) => TimeSpan.fromMilliseconds(v),
+  });
 }
