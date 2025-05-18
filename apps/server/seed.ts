@@ -31,7 +31,7 @@ export async function seed(
       const oneTile = 1 as Tile;
       const soldier: Npc = {
         id: "1" as NpcId,
-        aggroRange: oneTile,
+        aggroRange: 7 as Tile,
         aggroType: "protective",
         attackDamage: 1,
         attackRange: oneTile,
