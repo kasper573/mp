@@ -1,3 +1,4 @@
+import { randomItem } from "@mp/std";
 import { ctxGameStateMachine } from "../game-state";
 import { ctxAreaLookup } from "../area/lookup";
 import { rpc } from "../rpc";
@@ -16,12 +17,18 @@ export const npcRouter = rpc.router({
     .mutation(async ({ ctx }) => {
       const npcService = ctx.get(ctxNpcService);
       const state = ctx.get(ctxGameStateMachine);
-      const [{ npc, spawn }] = await npcService.getAllSpawnsAndTheirNpcs();
+      const options = await npcService.getAllSpawnsAndTheirNpcs();
       const spawner = new NpcSpawner(
         ctx.get(ctxAreaLookup),
         ctx.get(ctxActorModelLookup),
       );
-      const instance = spawner.createInstance(npc, spawn);
+
+      const selected = randomItem(options);
+      if (!selected) {
+        throw new Error("No npcs or npc spawns available");
+      }
+
+      const instance = spawner.createInstance(selected.npc, selected.spawn);
       state.actors.set(instance.id, { type: "npc", ...instance });
     }),
 });
