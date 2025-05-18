@@ -5,7 +5,7 @@ export function deriveActorSpriteState(actor: Actor): ActorModelState {
     return "death-spear";
   }
   if (actor.path) {
-    if (actor.speed > 2) {
+    if (actor.speed >= 2) {
       return "run-spear";
     }
     return "walk-spear";

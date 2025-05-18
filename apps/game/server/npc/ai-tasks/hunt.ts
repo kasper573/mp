@@ -1,3 +1,4 @@
+import type { Tile } from "@mp/std";
 import { assert, randomItem } from "@mp/std";
 import type { ActorId } from "../../traits/actor";
 import type { Task, TaskInput } from "./task";
@@ -14,7 +15,9 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
           update
             .add("attackTargetId", undefined)
             .add("moveTarget", undefined)
-            .add("path", undefined),
+            .add("path", undefined)
+            // TODO this is temporary until we have a buff/ability system
+            .add("speed", 1 as Tile),
         );
       }
       return hunt;
@@ -23,7 +26,11 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     const newEnemyId = findNewEnemy(input);
     if (newEnemyId !== undefined) {
       gameState.actors.update(npc.id, (update) =>
-        update.add("attackTargetId", newEnemyId),
+        update
+          .add("attackTargetId", newEnemyId)
+          // TODO this is temporary until we have a buff/ability system
+          // The idea is that a hunter should cast a speed buff when detecting a new enemy
+          .add("speed", 2 as Tile),
       );
       return hunt;
     }
@@ -34,7 +41,10 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
       const toNode = randomItem(Array.from(area.graph.getNodes()));
       if (toNode) {
         gameState.actors.update(npc.id, (update) =>
-          update.add("moveTarget", toNode.data.vector),
+          update
+            .add("moveTarget", toNode.data.vector)
+            // TODO this is temporary until we have a buff/ability system
+            .add("speed", 1 as Tile),
         );
       }
     }
