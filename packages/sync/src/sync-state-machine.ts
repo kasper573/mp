@@ -47,7 +47,7 @@ export function createSyncStateMachine<
         state,
         serverPatch,
         entityName,
-        opt.patchOptimizers,
+        opt.patchOptimizer,
       ));
     },
   });
@@ -193,13 +193,11 @@ function createEntityRepository<
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
-  allPatchOptimizers: PatchOptimizer<State> | undefined,
+  patchOptimier?: () => PatchOptimizer<State> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
   type Entity = Entities[Id];
-
-  const entityPatchOptimizer = allPatchOptimizers?.[entityName];
 
   function entity() {
     // Type level immutability is enough, we don't need to check at runtime as it will impact performance
@@ -221,7 +219,7 @@ function createEntityRepository<
 
     const entity = state[entityName][id];
     const optimizedUpdates = optimizeUpdate(
-      entityPatchOptimizer,
+      patchOptimier?.()?.[entityName],
       entity,
       updates,
     );
@@ -384,7 +382,7 @@ export interface SyncStateMachineOptions<State extends PatchableState> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizers?: PatchOptimizer<State>;
+  patchOptimizer?: () => PatchOptimizer<State> | undefined;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

@@ -11,11 +11,11 @@ import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
+  createGameStatePatchOptimizer,
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
   ctxTokenVerifier,
-  gameStatePatchOptimizers,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -60,7 +60,7 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { ctxUpdateTicker } from "./etc/system-rpc";
+import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
 
 registerEncoderExtensions();
 
@@ -136,9 +136,13 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
+const patchOptimizerSettings = { enabled: true };
+const patchOptimizer = createGameStatePatchOptimizer();
+
 const gameState: GameStateMachine = createSyncStateMachine({
   initialState: { actors: {} },
-  patchOptimizers: gameStatePatchOptimizers,
+  patchOptimizer: () =>
+    patchOptimizerSettings.enabled ? patchOptimizer : undefined,
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
@@ -176,7 +180,8 @@ const ioc = new InjectionContainer()
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
   .provide(ctxActorModelLookup, actorModels)
-  .provide(ctxUpdateTicker, updateTicker);
+  .provide(ctxUpdateTicker, updateTicker)
+  .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);

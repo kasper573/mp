@@ -17,6 +17,8 @@ export function MiscDebugUi(props: {
   const rpc = useRpc();
   const gameState = useContext(GameStateClientContext);
   const [serverTick, setServerTick] = createServerTickSignal();
+  const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
+    createServerPatchOptimizerSignal();
 
   return (
     <>
@@ -29,6 +31,16 @@ export function MiscDebugUi(props: {
           isSameValue={(a, b) => a.compareTo(b) === 0}
         />
       </label>
+      <div>
+        Use server side patch optimizer:{" "}
+        <input
+          type="checkbox"
+          checked={isServerPatchOptimizerEnabled()}
+          on:change={(e) =>
+            setServerPatchOptimizerEnabled(e.currentTarget.checked)
+          }
+        />
+      </div>
       <div>
         Use client side patch optimizer:{" "}
         <input
@@ -102,6 +114,24 @@ function createServerTickSignal() {
   });
 
   return [serverTick, setServerTick] as const;
+}
+
+function createServerPatchOptimizerSignal() {
+  const rpc = useRpc();
+  const [enabled, setEnabled] = createSignal(true);
+  const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
+
+  createEffect(() => {
+    void rpc.system.setPatchOptimizerEnabled(enabled());
+  });
+
+  createEffect(() => {
+    if (isRemoteEnabled.data !== undefined) {
+      setEnabled(isRemoteEnabled.data);
+    }
+  });
+
+  return [enabled, setEnabled] as const;
 }
 
 export interface MiscDebugSettings extends OptimisticGameStateSettings {
