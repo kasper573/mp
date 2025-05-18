@@ -33,7 +33,7 @@ export async function seed(
         id: "1" as NpcId,
         aggroRange: 7 as Tile,
         aggroType: "protective",
-        attackDamage: 1,
+        attackDamage: 3,
         attackRange: oneTile,
         attackSpeed: 1 as TimesPerSecond,
         speed: oneTile,
