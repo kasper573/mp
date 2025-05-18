@@ -62,12 +62,13 @@ export const defensiveHuntFilter: HuntFilter = ({
 };
 
 export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
-  const target = gameState.actors.values().find((candidate) => {
-    return (
-      candidate.type === "character" &&
-      candidate.coords.distance(npc.coords) <= npc.aggroRange
+  const target = gameState.actors
+    .values()
+    .find(
+      (candidate) =>
+        candidate.type === "character" &&
+        candidate.coords.distance(npc.coords) <= npc.aggroRange,
     );
-  });
   return target?.id;
 };
 
