@@ -1,5 +1,5 @@
 import { type DbClient } from "@mp/db";
-import type { Npc, NpcId, NpcSpawn, NpcSpawnId } from "@mp/game/server";
+import type { Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import {
   npcSpawnTable,
   npcTable,
@@ -27,6 +27,9 @@ export async function seed(
     return Promise.all(Array.from(generateNpcsAndSpawns()));
 
     function* generateNpcsAndSpawns() {
+      yield tx.delete(npcSpawnTable);
+      yield tx.delete(npcTable);
+
       const modelId = Array.from(actorModelLookup.keys())[0];
       const oneTile = 1 as Tile;
       const soldier: Npc = {
@@ -41,24 +44,17 @@ export async function seed(
         modelId,
         name: "Soldier",
       };
-      yield tx.insert(npcTable).values(soldier).onConflictDoUpdate({
-        target: npcTable.id,
-        set: soldier,
-      });
+
+      yield tx.insert(npcTable).values(soldier);
+
       for (const areaId of areaLookup.keys()) {
         for (const [i, aggroType] of aggroTypes.entries()) {
-          const spawn: NpcSpawn = {
+          yield tx.insert(npcSpawnTable).values({
             aggroType: aggroType,
             areaId,
             count: 10,
             id: String(`${areaId}-${i}`) as NpcSpawnId,
             npcId: soldier.id,
-            coords: null,
-            randomRadius: null,
-          };
-          yield tx.insert(npcSpawnTable).values(spawn).onConflictDoUpdate({
-            target: npcTable.id,
-            set: spawn,
           });
         }
       }
