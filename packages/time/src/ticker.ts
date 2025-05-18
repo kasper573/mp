@@ -3,7 +3,6 @@ import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
-  private middleware: TickMiddleware;
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
   private stopAsyncInterval?: () => void;
@@ -14,7 +13,6 @@ export class Ticker {
   }
 
   constructor(private options: TickerOptions) {
-    this.middleware = options.middleware ?? noopMiddleware;
     this.getTimeSinceLastTick = createDeltaFn();
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
   }
@@ -24,7 +22,8 @@ export class Ticker {
     return () => this.subscriptions.delete(fn);
   }
 
-  start() {
+  start(changedOptions?: Partial<TickerOptions>) {
+    this.options = { ...this.options, ...changedOptions };
     this.stop();
     this.#isEnabled = true;
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
@@ -39,7 +38,8 @@ export class Ticker {
 
   private tick = async () => {
     try {
-      await this.middleware({
+      const middleware = this.options.middleware ?? noopMiddleware;
+      await middleware({
         timeSinceLastTick: this.getTimeSinceLastTick(),
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
