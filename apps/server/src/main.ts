@@ -42,6 +42,7 @@ import {
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 
+import { seed } from "../seed";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -93,6 +94,8 @@ const [areas, actorModels] = await Promise.all([
   loadAreas(path.resolve(opt.publicDir, "areas")),
   loadActorModels(opt.publicDir),
 ]);
+
+await seed(db, areas, actorModels);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
