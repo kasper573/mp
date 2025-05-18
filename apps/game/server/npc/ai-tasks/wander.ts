@@ -6,7 +6,7 @@ export function createWanderTask(
   endTime: TimeSpan,
   nextTask: (input: TaskInput) => Task,
 ): Task {
-  return function wanderTask(input) {
+  return function wander(input) {
     const { areas, gameState, npc, tick } = input;
     if (tick.totalTimeElapsed.compareTo(endTime) > 0) {
       return nextTask(input);
@@ -28,6 +28,6 @@ export function createWanderTask(
       }
     }
 
-    return wanderTask;
+    return wander;
   };
 }

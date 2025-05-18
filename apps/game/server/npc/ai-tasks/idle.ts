@@ -6,8 +6,15 @@ export function createIdleTask(
   nextTask: (input: TaskInput) => Task,
 ): Task {
   return function idle(input) {
-    if (input.tick.totalTimeElapsed.compareTo(endTime) > 0) {
+    const { npc, gameState, tick } = input;
+    if (tick.totalTimeElapsed.compareTo(endTime) > 0) {
       return nextTask(input);
+    }
+    if (npc.path || npc.moveTarget) {
+      gameState.actors.update(npc.id, (update) => {
+        update.add("path", undefined);
+        update.add("moveTarget", undefined);
+      });
     }
     return idle;
   };

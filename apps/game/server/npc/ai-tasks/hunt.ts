@@ -1,9 +1,10 @@
+import { assert, randomItem } from "@mp/std";
 import type { ActorId } from "../../traits/actor";
 import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
-    const { npc, gameState } = input;
+    const { npc, gameState, areas } = input;
 
     if (npc.attackTargetId) {
       const target = gameState.actors()[npc.attackTargetId];
@@ -16,11 +17,24 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
             .add("path", undefined),
         );
       }
-    } else {
-      const newEnemyId = findNewEnemy(input);
-      if (newEnemyId !== undefined) {
+      return hunt;
+    }
+
+    const newEnemyId = findNewEnemy(input);
+    if (newEnemyId !== undefined) {
+      gameState.actors.update(npc.id, (update) =>
+        update.add("attackTargetId", newEnemyId),
+      );
+      return hunt;
+    }
+
+    // If no enemy is in sight, walk to a random location and hope to run into an enemy
+    if (!npc.path) {
+      const area = assert(areas.get(npc.areaId));
+      const toNode = randomItem(Array.from(area.graph.getNodes()));
+      if (toNode) {
         gameState.actors.update(npc.id, (update) =>
-          update.add("attackTargetId", newEnemyId),
+          update.add("moveTarget", toNode.data.vector),
         );
       }
     }
@@ -48,13 +62,12 @@ export const defensiveHuntFilter: HuntFilter = ({
 };
 
 export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
-  const target = gameState.actors
-    .values()
-    .find(
-      (candidate) =>
-        candidate.type === "character" &&
-        candidate.coords.distance(npc.coords) <= npc.aggroRange,
+  const target = gameState.actors.values().find((candidate) => {
+    return (
+      candidate.type === "character" &&
+      candidate.coords.distance(npc.coords) <= npc.aggroRange
     );
+  });
   return target?.id;
 };
 

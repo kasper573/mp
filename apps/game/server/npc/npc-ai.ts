@@ -15,11 +15,10 @@ import {
   aggressiveHuntFilter,
   createHuntTask,
   defensiveHuntFilter,
-  protectiveHuntFilter,
 } from "./ai-tasks/hunt";
 
 export class NpcAi {
-  private npcTasks = new Map<NpcInstanceId, Task[]>();
+  private npcTasks = new Map<NpcInstanceId, Task>();
   private combatMemories = new Map<ActorId, NpcAiCombatMemory>();
 
   constructor(
@@ -31,7 +30,7 @@ export class NpcAi {
     let nextMemoryCleanupTime = TimeSpan.Zero;
     return (tick) => {
       for (const subject of this.gameState.actors.values()) {
-        if (subject.type !== "npc") {
+        if (subject.type !== "npc" || subject.health <= 0) {
           continue;
         }
 
@@ -44,10 +43,10 @@ export class NpcAi {
           npc: subject,
           tick,
         };
-        const tasks =
-          this.npcTasks.get(subject.id) ?? deriveTasks(subject.aggroType, tick);
-        const nextTasks = tasks.map((task) => task(taskInput));
-        this.npcTasks.set(subject.id, nextTasks);
+        const task =
+          this.npcTasks.get(subject.id) ?? deriveTask(subject.aggroType, tick);
+        const nextTask = task(taskInput);
+        this.npcTasks.set(subject.id, nextTask);
       }
 
       // Since npc instances come and go frequently and in large quantities we need to clean up this map to avoid memory leaks,
@@ -92,16 +91,16 @@ export class NpcAi {
   }
 }
 
-function deriveTasks(aggroType: NpcAggroType, tick: TickEvent): Task[] {
+function deriveTask(aggroType: NpcAggroType, tick: TickEvent): Task {
   switch (aggroType) {
     case "pacifist":
-      return [idleOrWander(tick)];
+      return idleOrWander(tick);
     case "aggressive":
-      return [idleOrWander(tick), createHuntTask(aggressiveHuntFilter)];
+      return createHuntTask(aggressiveHuntFilter);
     case "defensive":
-      return [idleOrWander(tick), createHuntTask(defensiveHuntFilter)];
+      return createHuntTask(defensiveHuntFilter);
     case "protective":
-      return [idleOrWander(tick), createHuntTask(protectiveHuntFilter)];
+      return createHuntTask(defensiveHuntFilter);
   }
 }
 
