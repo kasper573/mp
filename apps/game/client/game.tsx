@@ -1,6 +1,6 @@
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
-import type { JSX } from "solid-js";
+import type { JSX, ParentProps } from "solid-js";
 import {
   useContext,
   createEffect,
@@ -22,7 +22,9 @@ import type { GameDebugUiState } from "./debug/game-debug-ui-state";
 import { GameDebugUiContext } from "./debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "./debug/game-state-debug-info";
 
-export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
+export function Game(
+  props: ParentProps<{ class?: string; style?: JSX.CSSProperties }>,
+) {
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const state = useContext(GameStateClientContext);
@@ -61,6 +63,7 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
                     <GameDebugUiContext.Provider value={debugUiState}>
                       <AreaScene area={area} />
                       <GameStateClientAnimations />
+                      {props.children}
                       <GameDebugUi>
                         <GameStateDebugInfo tiled={area.tiled} />
                       </GameDebugUi>
