@@ -3,19 +3,13 @@ import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "pixi.js";
 import type { Accessor } from "solid-js";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  Show,
-  useContext,
-} from "solid-js";
+import { createEffect, createMemo, For, Show, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { Select } from "@mp/ui";
+import { createStorageSignal } from "@mp/state";
 import type { Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
@@ -27,19 +21,32 @@ import { AreaSceneContext } from "./area-scene";
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
+interface AreaDebugSettings {
+  visibleGraphType: VisibleGraphType;
+  showFogOfWar: boolean;
+}
+
 export function AreaDebugUi(props: {
   area: AreaResource;
   drawPathsForActors: Actor[];
   playerCoords?: Vector<Tile>;
   visualizeNetworkFogOfWar?: boolean;
 }) {
-  const [visibleGraphType, setVisibleGraphType] =
-    createSignal<VisibleGraphType>("none");
-  const [showFogOfWar, setShowFogOfWar] = createSignal(false);
+  const [settings, setSettings] = createStorageSignal<AreaDebugSettings>(
+    localStorage,
+    "area-debug-settings",
+    {
+      visibleGraphType: "none",
+      showFogOfWar: false,
+    },
+  );
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
-      <DebugGraph area={props.area} visible={visibleGraphType} />
+      <DebugGraph
+        area={props.area}
+        visible={() => settings().visibleGraphType}
+      />
       <For each={props.drawPathsForActors}>
         {(actor) =>
           actor.path ? (
@@ -56,21 +63,28 @@ export function AreaDebugUi(props: {
           Visible Graph lines:{" "}
           <Select
             options={visibleGraphTypes}
-            value={visibleGraphType()}
-            onChange={setVisibleGraphType}
+            value={settings().visibleGraphType}
+            onChange={(visibleGraphType) =>
+              setSettings((prev) => ({ ...prev, visibleGraphType }))
+            }
           />
         </div>
         <label>
           <input
             type="checkbox"
-            checked={showFogOfWar()}
-            on:change={(e) => setShowFogOfWar(e.currentTarget.checked)}
+            checked={settings().showFogOfWar}
+            on:change={(e) =>
+              setSettings((prev) => ({
+                ...prev,
+                showFogOfWar: e.currentTarget.checked,
+              }))
+            }
           />
           Visualize network fog of war
         </label>
       </GameDebugUiPortal>
 
-      <Show when={showFogOfWar() && props.playerCoords}>
+      <Show when={settings().showFogOfWar && props.playerCoords}>
         {(coords) => (
           <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
         )}

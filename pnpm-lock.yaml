@@ -180,6 +180,9 @@ importers:
       '@mp/solid-pixi':
         specifier: workspace:*
         version: link:../../packages/solid-pixi
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../packages/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
