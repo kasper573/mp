@@ -1,4 +1,5 @@
-import { Button } from "@mp/ui";
+import type { SelectOption } from "@mp/ui";
+import { Button, Select } from "@mp/ui";
 import {
   GameStateClientContext,
   type OptimisticGameStateSettings,
@@ -19,23 +20,15 @@ export function MiscDebugUi(props: {
 
   return (
     <>
-      <div>
-        Server tick: 1ms{" "}
-        <input
-          type="range"
-          min={1}
-          max={1000}
-          value={serverTick().totalMilliseconds}
-          on:change={(e) =>
-            setServerTick(
-              TimeSpan.fromMilliseconds(
-                Number.parseInt(e.currentTarget.value, 10),
-              ),
-            )
-          }
-        />{" "}
-        1000ms
-      </div>
+      <label>
+        Server tick
+        <Select
+          options={serverTickOptions}
+          value={serverTick()}
+          onChange={setServerTick}
+          isSameValue={(a, b) => a.compareTo(b) === 0}
+        />
+      </label>
       <div>
         Use client side patch optimizer:{" "}
         <input
@@ -80,6 +73,10 @@ export function MiscDebugUi(props: {
   );
 }
 
+const serverTickOptions: SelectOption<TimeSpan>[] = [
+  0, 16, 50, 100, 300, 500, 1000, 2000, 5000,
+].map((ms) => ({ value: TimeSpan.fromMilliseconds(ms), label: `${ms}ms` }));
+
 function createServerTickSignal() {
   const rpc = useRpc();
   const [serverTick, setServerTick] = createSignal(
@@ -93,7 +90,14 @@ function createServerTickSignal() {
 
   createEffect(() => {
     if (remoteServerTick.data) {
-      setServerTick(remoteServerTick.data);
+      const matchesAnOption = serverTickOptions.some(
+        (opt) => opt.value.compareTo(remoteServerTick.data) === 0,
+      );
+      if (matchesAnOption) {
+        setServerTick(remoteServerTick.data);
+      } else {
+        setServerTick(serverTickOptions[0].value);
+      }
     }
   });
 
