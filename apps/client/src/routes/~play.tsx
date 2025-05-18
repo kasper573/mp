@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { clientViewDistance } from "@mp/game/client";
+import { clientViewDistance, GameDebugUiPortal } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import {
@@ -13,6 +13,7 @@ import { SocketContext, useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { AuthBoundary } from "../ui/auth-boundary";
 import { LoggerContext } from "../logger";
+import { MiscDebugUi } from "../ui/misc-debug-ui";
 
 export const Route = createFileRoute("/play")({
   component: RouteComponent,
@@ -48,7 +49,11 @@ function PlayPage() {
             which in turn would stop the game client.
             */}
           <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-            <Game />
+            <Game>
+              <GameDebugUiPortal>
+                <MiscDebugUi />
+              </GameDebugUiPortal>
+            </Game>
           </Suspense>
         </GameStateClientContext.Provider>
       </AreaSceneContext.Provider>
