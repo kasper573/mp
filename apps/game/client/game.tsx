@@ -1,7 +1,14 @@
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Application } from "@mp/solid-pixi";
 import type { JSX } from "solid-js";
-import { useContext, createEffect, Switch, Match, Suspense } from "solid-js";
+import {
+  useContext,
+  createEffect,
+  Switch,
+  Match,
+  Suspense,
+  createSignal,
+} from "solid-js";
 import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { AuthContext } from "@mp/auth/client";
@@ -10,12 +17,25 @@ import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
 import { ActorSpritesheetProvider } from "./actor/actor-spritesheets-provider";
+import { GameDebugUi } from "./debug/game-debug-ui";
+import type { GameDebugUiState } from "./debug/game-debug-ui-state";
+import { GameDebugUiContext } from "./debug/game-debug-ui-state";
+import { GameStateDebugInfo } from "./debug/game-state-debug-info";
 
 export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
+  const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
+  const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const state = useContext(GameStateClientContext);
   const auth = useContext(AuthContext);
   const actions = useGameActions();
   const area = useAreaResource(state.areaId);
+
+  const debugUiState: GameDebugUiState = {
+    portalContainer,
+    setPortalContainer,
+    enabled: isDebugUiEnabled,
+    setEnabled: setDebugUiEnabled,
+  };
 
   createEffect(() => {
     const user = auth.identity();
@@ -38,8 +58,13 @@ export function Game(props: { class?: string; style?: JSX.CSSProperties }) {
               >
                 {({ viewport }) => (
                   <EngineProvider viewport={viewport}>
-                    <AreaScene area={area} />
-                    <GameStateClientAnimations />
+                    <GameDebugUiContext.Provider value={debugUiState}>
+                      <AreaScene area={area} />
+                      <GameStateClientAnimations />
+                      <GameDebugUi>
+                        <GameStateDebugInfo tiled={area.tiled} />
+                      </GameDebugUi>
+                    </GameDebugUiContext.Provider>
                   </EngineProvider>
                 )}
               </Application>

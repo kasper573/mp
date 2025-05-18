@@ -4,36 +4,24 @@ import { type VectorGraph } from "@mp/path-finding";
 import { Graphics } from "pixi.js";
 import type { Accessor } from "solid-js";
 import {
-  batch,
   createEffect,
   createMemo,
   createSignal,
   For,
-  onCleanup,
-  onMount,
   Show,
   useContext,
 } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
 import { EngineContext } from "@mp/engine";
-import { type Tile, type Pixel, assert } from "@mp/std";
-import type { TimeSpan } from "@mp/time";
-import { Select, Button } from "@mp/ui";
+import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import type { Actor, Character } from "../../server";
+import { Select } from "@mp/ui";
+import type { Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
-import { useRpc } from "../use-rpc";
-import { GameStateClientContext } from "../game-state-client";
-import { BuildVersionContext } from "../build-version-context";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
-import {
-  setUseClientSidePatchOptimizer,
-  setUseOptimisticGameState,
-  useClientSidePatchOptimizer,
-  useOptimisticGameState,
-} from "../create-optimistic-game-state";
-import * as styles from "./area-debug-ui.css";
+
+import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { AreaSceneContext } from "./area-scene";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
@@ -43,12 +31,11 @@ export function AreaDebugUi(props: {
   area: AreaResource;
   drawPathsForActors: Actor[];
   playerCoords?: Vector<Tile>;
+  visualizeNetworkFogOfWar?: boolean;
 }) {
-  const [showViewbox, setShowViewbox] = createSignal(false);
-  const rpc = useRpc();
-  const state = useContext(GameStateClientContext);
   const [visibleGraphType, setVisibleGraphType] =
     createSignal<VisibleGraphType>("none");
+  const [showFogOfWar, setShowFogOfWar] = createSignal(false);
 
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
@@ -64,70 +51,30 @@ export function AreaDebugUi(props: {
           ) : null
         }
       </For>
-      <div class={styles.debugMenu}>
-        {/* Intentionally only stop propagation for the controls and not the debug info since 
-        the debug info takes up so much space it would interfere with testing the game.*/}
-        <div on:pointerdown={(e) => e.stopPropagation()}>
-          <div>
-            Visible Graph lines:{" "}
-            <Select
-              options={visibleGraphTypes}
-              value={visibleGraphType()}
-              onChange={setVisibleGraphType}
-            />
-          </div>
-          <div>
-            Use client side patch optimizer:{" "}
-            <input
-              type="checkbox"
-              checked={useClientSidePatchOptimizer()}
-              on:change={(e) =>
-                setUseClientSidePatchOptimizer(e.currentTarget.checked)
-              }
-            />
-          </div>
-          <div>
-            Use optimistic game state:{" "}
-            <input
-              type="checkbox"
-              checked={useOptimisticGameState()}
-              on:change={(e) =>
-                setUseOptimisticGameState(e.currentTarget.checked)
-              }
-            />
-          </div>
-          <div>
-            <label>
-              <input
-                type="checkbox"
-                checked={showViewbox()}
-                on:change={() => setShowViewbox(!showViewbox())}
-              />
-              Visualize network fog of war
-            </label>
-          </div>
-          <div>
-            <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
-              Spawn random NPC
-            </Button>
-            <Button
-              on:click={() =>
-                void rpc.character.kill({
-                  targetId: assert(state.characterId()),
-                })
-              }
-            >
-              Die
-            </Button>
-          </div>
+      <GameDebugUiPortal>
+        <div>
+          Visible Graph lines:{" "}
+          <Select
+            options={visibleGraphTypes}
+            value={visibleGraphType()}
+            onChange={setVisibleGraphType}
+          />
         </div>
-        <DebugInfo tiled={props.area.tiled} />
-        <Show when={showViewbox() && props.playerCoords}>
-          {(coords) => (
-            <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
-          )}
-        </Show>
-      </div>
+        <label>
+          <input
+            type="checkbox"
+            checked={showFogOfWar()}
+            on:change={(e) => setShowFogOfWar(e.currentTarget.checked)}
+          />
+          Visualize network fog of war
+        </label>
+      </GameDebugUiPortal>
+
+      <Show when={showFogOfWar() && props.playerCoords}>
+        {(coords) => (
+          <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
+        )}
+      </Show>
     </Pixi>
   );
 }
@@ -185,46 +132,6 @@ function DebugPath(props: {
   });
 
   return <Pixi label="PathDebugUI" as={gfx} />;
-}
-
-function DebugInfo(props: { tiled: TiledResource }) {
-  const versions = useContext(BuildVersionContext);
-  const state = useContext(GameStateClientContext);
-  const engine = useContext(EngineContext);
-
-  const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
-  const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
-
-  onMount(() =>
-    onCleanup(
-      engine.addFrameCallback(({ timeSinceLastFrame, previousFrameDuration }) =>
-        batch(() => {
-          setFrameInterval(timeSinceLastFrame);
-          setFrameDuration(previousFrameDuration);
-        }),
-      ),
-    ),
-  );
-
-  const info = createMemo(() => {
-    const { worldPosition, position: viewportPosition } = engine.pointer;
-    const tilePos = props.tiled.worldCoordToTile(worldPosition);
-    return {
-      viewport: viewportPosition,
-      world: worldPosition,
-      tile: tilePos,
-      tileSnapped: tilePos.round(),
-      client: versions.client(),
-      server: versions.server(),
-      cameraTransform: engine.camera.transform.data,
-      frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
-      frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
-      frameCallbacks: engine.frameCallbackCount,
-      character: trimCharacterInfo(state.character()),
-    };
-  });
-
-  return <pre class={styles.debugText}>{JSON.stringify(info(), null, 2)}</pre>;
 }
 
 function DebugNetworkFogOfWar(props: {
@@ -302,14 +209,4 @@ function drawStar(
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
-}
-
-function trimCharacterInfo(char?: Character) {
-  return (
-    char && {
-      ...char,
-      coords: char.coords.toString(),
-      path: char.path,
-    }
-  );
 }
