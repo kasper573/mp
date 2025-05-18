@@ -1,3 +1,4 @@
+import type { Branded } from "@mp/std";
 import type { ActorId } from "../traits/actor";
 
 /**
@@ -5,26 +6,27 @@ import type { ActorId } from "../traits/actor";
  */
 
 export class NpcAiCombatMemory {
-  private attacks = new Map<ActorId, Set<ActorId>>();
+  #combats = new Map<CombatId, [ActorId, ActorId]>();
+
+  get combats() {
+    return this.#combats.values();
+  }
 
   hasAttackedEachOther(actor1: ActorId, actor2: ActorId): boolean {
-    const targetsForActor1 = this.attacks.get(actor1);
-    if (targetsForActor1?.has(actor2)) {
-      return true;
-    }
-    const targetsForActor2 = this.attacks.get(actor1);
-    if (targetsForActor2?.has(actor1)) {
-      return true;
-    }
-    return false;
+    return this.#combats.has(createCombatId(actor1, actor2));
   }
 
   observeAttack(attacker: ActorId, target: ActorId) {
-    let targets = this.attacks.get(attacker);
-    if (!targets) {
-      targets = new Set<ActorId>();
-      this.attacks.set(attacker, targets);
+    const combatId = createCombatId(attacker, target);
+    if (!this.#combats.has(combatId)) {
+      this.#combats.set(combatId, [attacker, target]);
     }
-    targets.add(target);
   }
+}
+
+type CombatId = Branded<string, "CombatId">;
+
+function createCombatId(actor1: ActorId, actor2: ActorId): CombatId {
+  // Sorting to ensure order is irrelevant and we only have one combat id per actor pair
+  return [actor1, actor2].toSorted().join("_") as CombatId;
 }

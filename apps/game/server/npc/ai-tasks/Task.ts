@@ -10,8 +10,8 @@ export interface TaskInput {
   gameState: GameStateMachine;
   areas: AreaLookup;
   npc: ReadonlyDeep<NpcInstance>;
+  npcCombatMemories: ReadonlyMap<ActorId, NpcAiCombatMemory>;
   tick: TickEvent;
-  combatMemory: NpcAiCombatMemory;
 }
 
 export type Task = (input: TaskInput) => Task;

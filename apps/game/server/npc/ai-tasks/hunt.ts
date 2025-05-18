@@ -34,14 +34,15 @@ export type HuntFilter = (input: TaskInput) => ActorId | undefined;
 export const defensiveHuntFilter: HuntFilter = ({
   gameState,
   npc,
-  combatMemory,
+  npcCombatMemories,
 }) => {
+  const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors
     .values()
     .find(
       (candidate) =>
         candidate.coords.distance(npc.coords) <= npc.aggroRange &&
-        combatMemory.hasAttackedEachOther(candidate.id, npc.id),
+        combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
     );
   return target?.id;
 };
@@ -60,18 +61,45 @@ export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
 export const protectiveHuntFilter: HuntFilter = ({
   gameState,
   npc,
-  combatMemory,
+  npcCombatMemories,
 }) => {
+  const combatMemory = npcCombatMemories.get(npc.id);
+
+  // Consider other npcs of the same spawn allies
+  const allyIds = new Set(
+    gameState.actors
+      .values()
+      .filter(
+        (actor) =>
+          actor.id !== npc.id &&
+          actor.type === "npc" &&
+          actor.spawnId === npc.spawnId,
+      )
+      .map((actor) => actor.id),
+  );
+
+  // Actors attacking allies are considered enemies
+  const enemyIds = new Set(
+    combatMemory?.combats.flatMap(([actor1, actor2]) => {
+      if (allyIds.has(actor1)) {
+        return [actor2];
+      } else if (allyIds.has(actor2)) {
+        return [actor1];
+      }
+      return [];
+    }),
+  );
+
   const target = gameState.actors.values().find((candidate) => {
     if (candidate.coords.distance(npc.coords) > npc.aggroRange) {
       return false;
     }
 
-    if (combatMemory.hasAttackedEachOther(candidate.id, npc.id)) {
+    if (combatMemory?.hasAttackedEachOther(candidate.id, npc.id)) {
       return true;
     }
 
-    return false;
+    return enemyIds.has(candidate.id);
   });
 
   return target?.id;
