@@ -55,17 +55,13 @@ export class NpcAi {
 
   private observeAttacksDoneThisTick(observer: ReadonlyDeep<NpcInstance>) {
     for (const attack of this.gameState.$event.peek("combat.attack")) {
-      const combatantIds = [attack.actorId, attack.targetId];
-      if (combatantIds.includes(observer.id)) {
-        // Combats you participate in doesn't count as observing a combat
-        continue;
-      }
-
-      const canSeeCombatants = combatantIds.some((combatantId) => {
-        const combatant = this.gameState.actors()[combatantId];
-        const distance = observer.coords.distance(combatant.coords);
-        return distance <= observer.aggroRange;
-      });
+      const canSeeCombatants = [attack.actorId, attack.targetId].some(
+        (combatantId) => {
+          const combatant = this.gameState.actors()[combatantId];
+          const distance = observer.coords.distance(combatant.coords);
+          return distance <= observer.aggroRange;
+        },
+      );
 
       if (canSeeCombatants) {
         let memory = this.combatMemories.get(observer.id);
