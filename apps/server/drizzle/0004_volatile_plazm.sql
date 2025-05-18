@@ -1,1 +1,0 @@
-ALTER TABLE "npc" ADD COLUMN "aggroType" "aggro_type" NOT NULL;

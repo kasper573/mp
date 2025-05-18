@@ -1,1 +1,0 @@
-ALTER TABLE "npc" ALTER COLUMN "aggroType" SET DATA TYPE varchar;

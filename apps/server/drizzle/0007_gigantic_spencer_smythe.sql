@@ -1,1 +1,0 @@
-ALTER TABLE "npc" ADD COLUMN "aggroRange" real NOT NULL;

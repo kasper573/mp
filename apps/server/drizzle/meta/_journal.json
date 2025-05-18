@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1745240111958,
-      "tag": "0000_flat_shinko_yamashiro",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1747509524348,
-      "tag": "0001_goofy_nocturne",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1747509602781,
-      "tag": "0002_spooky_hammerhead",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1747509840052,
-      "tag": "0003_daffy_photon",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1747512393743,
-      "tag": "0004_volatile_plazm",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1747512646410,
-      "tag": "0005_moaning_black_tarantula",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1747512794837,
-      "tag": "0006_colorful_rictor",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1747514226703,
-      "tag": "0007_gigantic_spencer_smythe",
+      "when": 1747529429470,
+      "tag": "0000_nice_ben_grimm",
       "breakpoints": true
     }
   ]
