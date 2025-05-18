@@ -55,6 +55,7 @@ export const defensiveHuntFilter: HuntFilter = ({
     .values()
     .find(
       (candidate) =>
+        candidate.health > 0 &&
         candidate.coords.distance(npc.coords) <= npc.aggroRange &&
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
     );
@@ -66,6 +67,7 @@ export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
     .values()
     .find(
       (candidate) =>
+        candidate.health > 0 &&
         candidate.type === "character" &&
         candidate.coords.distance(npc.coords) <= npc.aggroRange,
     );
@@ -105,15 +107,17 @@ export const protectiveHuntFilter: HuntFilter = ({
   );
 
   const target = gameState.actors.values().find((candidate) => {
-    if (candidate.coords.distance(npc.coords) > npc.aggroRange) {
+    if (
+      candidate.health > 0 ||
+      candidate.coords.distance(npc.coords) > npc.aggroRange
+    ) {
       return false;
     }
 
-    if (combatMemory?.hasAttackedEachOther(candidate.id, npc.id)) {
-      return true;
-    }
-
-    return enemyIds.has(candidate.id);
+    return (
+      combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
+      enemyIds.has(candidate.id)
+    );
   });
 
   return target?.id;
