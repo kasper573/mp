@@ -8,7 +8,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
 
     if (npc.attackTargetId) {
       const target = gameState.actors()[npc.attackTargetId];
-      if (npc.coords.distance(target.coords) >= npc.aggroRange) {
+      if (npc.coords.distance(target.coords) > npc.aggroRange) {
         // Target out of range, lose aggro
         gameState.actors.update(npc.id, (update) =>
           update
