@@ -140,17 +140,5 @@ export function findPathForSubject(
   dest: Vector<Tile>,
 ): Path<Tile> | undefined {
   const area = assert(areas.get(subject.areaId));
-  const destNode = area.graph.getNearestNode(dest);
-  if (!destNode) {
-    return; // Destination not reachable (no closest node available)
-  }
-
-  // Find a new path from the current position
-  const fromNode = assert(area.graph.getNearestNode(subject.coords));
-  const newPath = area.findPath(fromNode.id, destNode.id);
-  if (newPath) {
-    return newPath;
-  }
-
-  // No path available between A and B
+  return area.findPathBetweenTiles(subject.coords, dest);
 }
