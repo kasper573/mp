@@ -38,8 +38,8 @@ export function movementBehavior(
   state: GameStateMachine,
   areas: AreaLookup,
 ): TickEventHandler {
-  const nextForcedPathFinds = new Map<ActorId, TimeSpan>();
-  const forcedPathFindInterval = TimeSpan.fromSeconds(1 / 3);
+  const nextPathFinds = new Map<ActorId, TimeSpan>();
+  const stalePathInterval = TimeSpan.fromSeconds(1 / 3);
   const tileNodeWeights: Map<VectorGraphNodeId, number> = new Map();
 
   for (const area of areas.values()) {
@@ -69,25 +69,23 @@ export function movementBehavior(
         continue;
       }
 
+      // Force refresh the path on an interval to avoid path finding every tick.
+      // This gives us a good balance between correctness and performance.
       let { moveTarget } = actor;
-      const area = assert(areas.get(actor.areaId));
-
-      // We force refresh the path on an interval to avoid path finding every tick.
-      // This gives us path up-to-date to a certain frequency.
-      if (
+      const pathIsStale =
         !moveTarget &&
         actor.path?.length &&
         totalTimeElapsed.compareTo(
-          nextForcedPathFinds.get(actor.id) ?? TimeSpan.Zero,
-        ) > 0
-      ) {
-        nextForcedPathFinds.set(
-          actor.id,
-          totalTimeElapsed.add(forcedPathFindInterval),
-        );
+          nextPathFinds.get(actor.id) ?? TimeSpan.Zero,
+        ) > 0;
+
+      if (pathIsStale) {
+        // Resetting the move target to the destination will effectively refresh the path
         moveTarget = actor.path.at(-1);
+        nextPathFinds.set(actor.id, totalTimeElapsed.add(stalePathInterval));
       }
 
+      // Consume the move target and produce a new path to move along
       if (moveTarget) {
         state.actors.update(actor.id, (update) =>
           update
@@ -118,6 +116,7 @@ export function movementBehavior(
       }
 
       // Process portals
+      const area = assert(areas.get(actor.areaId));
       for (const hit of area.hitTestObjects([actor], (c) => c.coords)) {
         const targetArea = areas.get(
           hit.object.properties.get("goto")?.value as AreaId,
