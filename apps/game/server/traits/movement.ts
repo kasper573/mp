@@ -5,11 +5,13 @@ import {
   type Vector,
 } from "@mp/math";
 import { type TickEventHandler } from "@mp/time";
-import type { Tile } from "@mp/std";
+import { assert, randomizeArray, type Tile } from "@mp/std";
+import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
+import type { ActorId } from "./actor";
 
 export interface MovementTrait {
   /**
@@ -37,6 +39,8 @@ export function movementBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ timeSinceLastTick }) => {
+    const unmovingActors: Map<VectorGraphNode<Tile>, Set<ActorId>> = new Map();
+
     for (const subject of state.actors.values()) {
       // The dead don't move
       if (subject.health <= 0) {
@@ -48,6 +52,8 @@ export function movementBehavior(
       }
 
       const { moveTarget } = subject;
+      const area = assert(areas.get(subject.areaId));
+
       if (moveTarget) {
         state.actors.update(subject.id, (update) =>
           update
@@ -75,23 +81,55 @@ export function movementBehavior(
             }
           }
         });
-      }
-
-      const area = areas.get(subject.areaId);
-      if (area) {
-        for (const hit of area.hitTestObjects([subject], (c) => c.coords)) {
-          const targetArea = areas.get(
-            hit.object.properties.get("goto")?.value as AreaId,
-          );
-          if (targetArea) {
-            state.actors.update(subject.id, (update) =>
-              update
-                .add("path", undefined)
-                .add("areaId", targetArea.id)
-                .add("coords", targetArea.start),
-            );
+      } else {
+        // Actors that are not moving need to be grouped by
+        // their tile so that they can be checked for cluttering
+        const node = area.graph.getNearestNode(subject.coords);
+        if (node) {
+          const group = unmovingActors.get(node);
+          if (group) {
+            group.add(subject.id);
+          } else {
+            unmovingActors.set(node, new Set([subject.id]));
           }
         }
+      }
+
+      // Process portals
+      for (const hit of area.hitTestObjects([subject], (c) => c.coords)) {
+        const targetArea = areas.get(
+          hit.object.properties.get("goto")?.value as AreaId,
+        );
+        if (targetArea) {
+          state.actors.update(subject.id, (update) =>
+            update
+              .add("path", undefined)
+              .add("areaId", targetArea.id)
+              .add("coords", targetArea.start),
+          );
+        }
+      }
+    }
+
+    // When actors stand still we want to avoid occupying the same tile as another actor.
+    for (const [node, groupedActorIds] of unmovingActors.entries()) {
+      if (groupedActorIds.size <= 1) {
+        continue; // Not cluttered
+      }
+      const actors = groupedActorIds
+        .values()
+        .map((id) => state.actors()[id])
+        .toArray();
+      const area = assert(areas.get(actors[0].areaId));
+      const adjacentNodes = randomizeArray(area.graph.getLinkedNodes(node));
+
+      // We only scatter as many actors as there are adjacent nodes in one tick.
+      // If there are more actors than nodes, the rest will stay put this tick.
+      // This will eventually resolve in all actors being scattered.
+      for (const [i, adjustment] of adjacentNodes.entries()) {
+        state.actors.update(actors[i].id, (update) =>
+          update.add("moveTarget", adjustment.data.vector),
+        );
       }
     }
   };

@@ -47,6 +47,14 @@ export class VectorGraph<T extends number> {
       .map(this.getNode);
   }
 
+  getLinkedNodes(v: VectorGraphNode<T>): VectorGraphNode<T>[] {
+    return v.links
+      .values()
+      .map((link) => (link.fromId === v.id ? link.toId : link.fromId))
+      .map(this.getNode)
+      .toArray();
+  }
+
   addNode = (vector: Vector<T>) => {
     const id = nodeIdFromVector(vector);
     this.nodeIds.add(id);

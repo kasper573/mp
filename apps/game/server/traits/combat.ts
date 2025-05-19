@@ -60,9 +60,15 @@ export function combatBehavior(
     if (!canAttackFrom(actor.coords, target.coords, actor.attackRange)) {
       if (!seemsToBeMovingTowards(actor, target.coords)) {
         const attackFromTile = bestTileToAttackFrom(actor, target);
-        state.actors.update(actor.id, (u) =>
-          u.add("moveTarget", attackFromTile),
-        );
+        if (attackFromTile) {
+          state.actors.update(actor.id, (u) =>
+            u.add("moveTarget", attackFromTile),
+          );
+        } else {
+          // Being unable to find a tile to attack from usually means
+          // the combatants are occupying the same tile and is in transit.
+          // It's fine to ignore this state as the movement system will converge on an appropriate tile.
+        }
       }
       return;
     }
@@ -104,11 +110,11 @@ export function combatBehavior(
   function bestTileToAttackFrom(
     actor: ReadonlyDeep<Actor>,
     target: ReadonlyDeep<Actor>,
-  ): Vector<Tile> {
-    const adjacentTile = findPathForSubject(actor, areas, target.coords)?.find(
-      (tile) => canAttackFrom(tile, target.coords, actor.attackRange),
+  ): Vector<Tile> | undefined {
+    // Otherwise find a path to the target and choose the first tile on the path that can be attacked from
+    return findPathForSubject(actor, areas, target.coords)?.find((tile) =>
+      canAttackFrom(tile, target.coords, actor.attackRange),
     );
-    return adjacentTile ?? actor.coords;
   }
 }
 
@@ -127,6 +133,10 @@ function canAttackFrom(
   attackRange: Tile,
 ) {
   const distance = fromTile.distance(targetTile);
+  if (distance < 1) {
+    // disallow attacking from the same tile as the target is standing on
+    return false;
+  }
   return distance <= attackRange + tileMargin;
 }
 
