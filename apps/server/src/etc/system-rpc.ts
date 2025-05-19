@@ -21,7 +21,7 @@ export const systemRouter = rpc.router({
     .use(roles([systemRoles.admin]))
     .input<TimeSpan>()
     .mutation(({ input, ctx }) => {
-      ctx.get(ctxUpdateTicker).setOptions({ interval: input });
+      ctx.get(ctxUpdateTicker).options.interval = input;
     }),
 
   isPatchOptimizerEnabled: rpc.procedure

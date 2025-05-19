@@ -104,11 +104,11 @@ export function combatBehavior(
   function bestTileToAttackFrom(
     actor: ReadonlyDeep<Actor>,
     target: ReadonlyDeep<Actor>,
-  ): Vector<Tile> {
-    const adjacentTile = findPathForSubject(actor, areas, target.coords)?.find(
+  ): Vector<Tile> | undefined {
+    const bestTile = findPathForSubject(actor, areas, target.coords)?.find(
       (tile) => canAttackFrom(tile, target.coords, actor.attackRange),
     );
-    return adjacentTile ?? actor.coords;
+    return bestTile ?? target.coords;
   }
 }
 

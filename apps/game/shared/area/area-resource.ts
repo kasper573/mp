@@ -41,6 +41,18 @@ export class AreaResource {
   findPath: VectorPathFinder<Tile> = (...args) =>
     AreaResource.findPathMiddleware(args, this.#findPath);
 
+  findPathBetweenTiles(
+    start: Vector<Tile>,
+    end: Vector<Tile>,
+  ): Vector<Tile>[] | undefined {
+    const startNode = this.graph.getNearestNode(start);
+    const endNode = this.graph.getNearestNode(end);
+    if (!endNode || !startNode) {
+      return; // Destination not reachable or start not connected to the graph
+    }
+    return this.findPath(startNode.id, endNode.id);
+  }
+
   hitTestObjects<Subject>(
     subjects: Iterable<Subject>,
     getCoordOfSubject: (s: Subject) => Vector<Tile>,

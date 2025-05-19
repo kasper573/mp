@@ -34,7 +34,12 @@ export default function App() {
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
   const query = new QueryClient({
-    defaultOptions: { queries: { retry: env.retryRpcQueries } },
+    defaultOptions: {
+      queries: {
+        retry: env.retryRpcQueries,
+        refetchOnWindowFocus: false,
+      },
+    },
   });
 
   void auth.refresh();

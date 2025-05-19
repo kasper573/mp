@@ -7,7 +7,7 @@ export class VectorGraph<T extends number> {
   private nodeIds = new Set<VectorGraphNodeId>();
   private ng = createGraph<NodeData<T>, LinkData>();
 
-  getNode = (id: VectorGraphNodeId): VectorGraphNode<T> => {
+  readonly getNode = (id: VectorGraphNodeId): VectorGraphNode<T> => {
     const node = this.ng.getNode(id);
 
     if (!node) {
@@ -20,15 +20,29 @@ export class VectorGraph<T extends number> {
     return node as unknown as VectorGraphNode<T>;
   };
 
-  getNodes = (): Iterable<VectorGraphNode<T>> => {
+  readonly getNodes = (): Iterable<VectorGraphNode<T>> => {
     return this.nodeIds.values().map(this.getNode);
   };
 
-  getNearestNode(vector: Vector<T>): VectorGraphNode<T> | undefined {
+  getNearestNode(vector?: Vector<T>): VectorGraphNode<T> | undefined {
+    if (!vector) {
+      return;
+    }
     const [nearestNode] = this.getAdjacentNodes(vector).toSorted(
       (a, b) => a.data.vector.distance(vector) - b.data.vector.distance(vector),
     );
     return nearestNode;
+  }
+
+  private nodeWeight?: (node: VectorGraphNode<T>) => number;
+  bindNodeWeightFn(fn: (node: VectorGraphNode<T>) => number) {
+    if (this.nodeWeight) {
+      throw new Error(
+        "Node weight function has already been bound. You must unbind it before binding another function",
+      );
+    }
+    this.nodeWeight = fn;
+    return (): void => (this.nodeWeight = undefined);
   }
 
   getAdjacentNodes(v: Vector<T>): VectorGraphNode<T>[] {
@@ -47,30 +61,43 @@ export class VectorGraph<T extends number> {
       .map(this.getNode);
   }
 
-  addNode = (vector: Vector<T>) => {
+  getLinkedNodes(v: VectorGraphNode<T>): VectorGraphNode<T>[] {
+    return v.links
+      .values()
+      .map((link) => (link.fromId === v.id ? link.toId : link.fromId))
+      .map(this.getNode)
+      .toArray();
+  }
+
+  readonly addNode = (vector: Vector<T>) => {
     const id = nodeIdFromVector(vector);
     this.nodeIds.add(id);
     this.ng.addNode(id, { vector });
   };
 
-  addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
+  readonly addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
     this.ng.addLink(nodeIdFromVector(fromVector), nodeIdFromVector(toVector), {
       distance: fromVector.distance(toVector),
     });
   };
 
-  hasNode = (id: VectorGraphNodeId): boolean => {
+  readonly hasNode = (id: VectorGraphNodeId): boolean => {
     return this.ng.hasNode(id) !== undefined;
   };
 
-  removeNode = (id: VectorGraphNodeId) => {
+  readonly removeNode = (id: VectorGraphNodeId) => {
     this.nodeIds.delete(id);
     this.ng.removeNode(id);
   };
 
-  createPathFinder = (): VectorPathFinder<T> => {
+  readonly createPathFinder = (): VectorPathFinder<T> => {
     const pathFinder = aStar(this.ng, {
-      distance: (n1, n2, link) => link.data.distance,
+      distance: (fromNode, toNode, link) => {
+        const base = link.data.distance;
+        const w =
+          this.nodeWeight?.(toNode as unknown as VectorGraphNode<T>) ?? 0;
+        return base + w;
+      },
       heuristic: (from, to) => from.data.vector.distance(to.data.vector),
     });
     return (start, end) => {
@@ -92,7 +119,7 @@ export type VectorPathFinder<T extends number> = (
  * Identical to ngraph's node type, but with stricter types.
  */
 export interface VectorGraphNode<T extends number> {
-  readonly data: Readonly<NodeData<T>>;
+  readonly data: NodeData<T>;
   readonly id: VectorGraphNodeId;
   readonly links: ReadonlySet<{
     readonly id: string;
@@ -107,7 +134,7 @@ interface LinkData {
 }
 
 interface NodeData<T extends number> {
-  vector: Vector<T>;
+  readonly vector: Vector<T>;
 }
 
 export type VectorGraphNodeId = Branded<string, "NodeId">;

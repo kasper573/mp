@@ -12,13 +12,7 @@ export class Ticker {
     return this.#isEnabled;
   }
 
-  #options: TickerOptions;
-  get options(): Readonly<TickerOptions> {
-    return this.#options;
-  }
-
-  constructor(options: TickerOptions) {
-    this.#options = options;
+  constructor(public options: TickerOptions) {
     this.getTimeSinceLastTick = createDeltaFn();
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
   }
@@ -28,22 +22,13 @@ export class Ticker {
     return () => this.subscriptions.delete(fn);
   }
 
-  setOptions(changedOptions?: Partial<TickerOptions>) {
-    this.#options = { ...this.#options, ...changedOptions };
-
-    // Ticker must be restarted if it's enabled since interval might have changed
-    if (this.#isEnabled) {
-      this.start();
-    }
-  }
-
   start() {
     this.stop();
     this.#isEnabled = true;
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
     this.stopAsyncInterval = setAsyncInterval(
       this.tick,
-      this.#options.interval,
+      () => this.options.interval,
     );
   }
 
@@ -55,15 +40,15 @@ export class Ticker {
 
   private tick = async () => {
     try {
-      const middleware = this.#options.middleware ?? noopMiddleware;
+      const middleware = this.options.middleware ?? noopMiddleware;
       await middleware({
         timeSinceLastTick: this.getTimeSinceLastTick(),
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
       });
     } catch (error) {
-      if (this.#options.onError) {
-        this.#options.onError(error);
+      if (this.options.onError) {
+        this.options.onError(error);
       } else {
         throw error;
       }
@@ -109,14 +94,17 @@ function createDeltaFn(): () => TimeSpan {
   };
 }
 
-function setAsyncInterval(handler: () => Promise<void>, interval: TimeSpan) {
+function setAsyncInterval(
+  handler: () => Promise<void>,
+  interval: () => TimeSpan,
+) {
   let enabled = true;
   let timeoutId: NodeJS.Timeout;
 
   function enqueue(lastRunTime: TimeSpan) {
     timeoutId = setTimeout(
       run as () => void,
-      interval.subtract(lastRunTime).totalMilliseconds,
+      interval().subtract(lastRunTime).totalMilliseconds,
     );
   }
 
