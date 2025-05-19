@@ -4,9 +4,9 @@ import {
   type Path,
   type Vector,
 } from "@mp/math";
-import { type TickEventHandler } from "@mp/time";
-import { assert, randomizeArray, type Tile } from "@mp/std";
-import type { VectorGraphNode } from "@mp/path-finding";
+import { TimeSpan, type TickEventHandler } from "@mp/time";
+import { assert, type Tile } from "@mp/std";
+import type { VectorGraphNodeId } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
@@ -38,70 +38,92 @@ export function movementBehavior(
   state: GameStateMachine,
   areas: AreaLookup,
 ): TickEventHandler {
-  return ({ timeSinceLastTick }) => {
-    const unmovingActors: Map<VectorGraphNode<Tile>, Set<ActorId>> = new Map();
+  const nextForcedPathFinds = new Map<ActorId, TimeSpan>();
+  const forcedPathFindInterval = TimeSpan.fromSeconds(1 / 3);
+  const tileNodeWeights: Map<VectorGraphNodeId, number> = new Map();
 
-    for (const subject of state.actors.values()) {
+  for (const area of areas.values()) {
+    area.graph.bindNodeWeightFn((node) => tileNodeWeights.get(node.id) ?? 0);
+  }
+
+  return ({ timeSinceLastTick, totalTimeElapsed }) => {
+    // We need to make a first pass to set the weights for the path finding graph.
+    // This helps promote more natural movement in avoiding walking over each other.
+    tileNodeWeights.clear();
+    for (const actor of state.actors.values()) {
+      const area = assert(areas.get(actor.areaId));
+      const node = area.graph.getNearestNode(actor.coords);
+      if (node) {
+        // A node occupied by an actor is weighted higher
+        tileNodeWeights.set(node.id, 3); // 3 is more than walking around the tile (which is two diagonals, ~2.8)
+      }
+    }
+
+    for (const actor of state.actors.values()) {
       // The dead don't move
-      if (subject.health <= 0) {
-        state.actors.update(subject.id, (update) => {
+      if (actor.health <= 0) {
+        state.actors.update(actor.id, (update) => {
           update.add("path", undefined);
           update.add("moveTarget", undefined);
         });
         continue;
       }
 
-      const { moveTarget } = subject;
-      const area = assert(areas.get(subject.areaId));
+      let { moveTarget } = actor;
+      const area = assert(areas.get(actor.areaId));
+
+      // We force refresh the path on an interval to avoid path finding every tick.
+      // This gives us path up-to-date to a certain frequency.
+      if (
+        !moveTarget &&
+        actor.path?.length &&
+        totalTimeElapsed.compareTo(
+          nextForcedPathFinds.get(actor.id) ?? TimeSpan.Zero,
+        ) > 0
+      ) {
+        nextForcedPathFinds.set(
+          actor.id,
+          totalTimeElapsed.add(forcedPathFindInterval),
+        );
+        moveTarget = actor.path.at(-1);
+      }
 
       if (moveTarget) {
-        state.actors.update(subject.id, (update) =>
+        state.actors.update(actor.id, (update) =>
           update
-            .add("path", findPathForSubject(subject, areas, moveTarget))
+            .add("path", findPathForSubject(actor, areas, moveTarget))
             .add("moveTarget", undefined),
         );
       }
 
-      if (subject.path) {
+      if (actor.path) {
         const [newCoords, newPath] = moveAlongPath(
-          subject.coords,
-          subject.path,
-          subject.speed,
+          actor.coords,
+          actor.path,
+          actor.speed,
           timeSinceLastTick,
         );
 
-        state.actors.update(subject.id, (update) => {
+        state.actors.update(actor.id, (update) => {
           update.add("coords", newCoords).add("path", newPath);
           if (newPath?.length) {
             const newDir = nearestCardinalDirection(
               newCoords.angle(newPath[0]),
             );
-            if (newDir !== subject.dir) {
+            if (newDir !== actor.dir) {
               update.add("dir", newDir);
             }
           }
         });
-      } else {
-        // Actors that are not moving need to be grouped by
-        // their tile so that they can be checked for cluttering
-        const node = area.graph.getNearestNode(subject.coords);
-        if (node) {
-          const group = unmovingActors.get(node);
-          if (group) {
-            group.add(subject.id);
-          } else {
-            unmovingActors.set(node, new Set([subject.id]));
-          }
-        }
       }
 
       // Process portals
-      for (const hit of area.hitTestObjects([subject], (c) => c.coords)) {
+      for (const hit of area.hitTestObjects([actor], (c) => c.coords)) {
         const targetArea = areas.get(
           hit.object.properties.get("goto")?.value as AreaId,
         );
         if (targetArea) {
-          state.actors.update(subject.id, (update) =>
+          state.actors.update(actor.id, (update) =>
             update
               .add("path", undefined)
               .add("areaId", targetArea.id)
@@ -111,27 +133,36 @@ export function movementBehavior(
       }
     }
 
-    // When actors stand still we want to avoid occupying the same tile as another actor.
-    for (const [node, groupedActorIds] of unmovingActors.entries()) {
-      if (groupedActorIds.size <= 1) {
-        continue; // Not cluttered
-      }
-      const actors = groupedActorIds
-        .values()
-        .map((id) => state.actors()[id])
-        .toArray();
-      const area = assert(areas.get(actors[0].areaId));
-      const adjacentNodes = randomizeArray(area.graph.getLinkedNodes(node));
+    // Use the til arrangement information to scatter npcs that are standing still on th same tile
+    // for (const [node, groupedActorIds] of tileArrangedActors.entries()) {
+    //   const actors = groupedActorIds
+    //     .values()
+    //     .map((id) => state.actors()[id])
+    //     .filter(
+    //       (actor) =>
+    //         !actor.path && // Standing still
+    //         actor.type === "npc",
+    //     )
+    //     .toArray();
 
-      // We only scatter as many actors as there are adjacent nodes in one tick.
-      // If there are more actors than nodes, the rest will stay put this tick.
-      // This will eventually resolve in all actors being scattered.
-      for (const [i, adjustment] of adjacentNodes.entries()) {
-        state.actors.update(actors[i].id, (update) =>
-          update.add("moveTarget", adjustment.data.vector),
-        );
-      }
-    }
+    //   if (actors.length <= 1) {
+    //     continue; // Not cluttered unless more than one npc is standing still on the same tile
+    //   }
+
+    //   const area = assert(areas.get(actors[0].areaId));
+    //   const adjacentNodes = randomizeArray(area.graph.getLinkedNodes(node));
+
+    //   // We only scatter as many npcs as there are adjacent nodes in one tick.
+    //   // If there are more actors than nodes, the rest will stay put this tick.
+    //   // This will eventually resolve in all actors being scattered.
+    //   const max = Math.min(actors.length, adjacentNodes.length);
+    //   for (let i = 0; i < max; i++) {
+    //     const adjustment = adjacentNodes[i];
+    //     state.actors.update(actors[i].id, (update) =>
+    //       update.add("moveTarget", adjustment.data.vector),
+    //     );
+    //   }
+    // }
   };
 }
 
@@ -140,48 +171,14 @@ export function findPathForSubject(
   areas: AreaLookup,
   dest: Vector<Tile>,
 ): Path<Tile> | undefined {
-  const area = areas.get(subject.areaId);
-  if (!area) {
-    return; // area not found
-  }
-
+  const area = assert(areas.get(subject.areaId));
   const destNode = area.graph.getNearestNode(dest);
   if (!destNode) {
     return; // Destination not reachable (no closest node available)
   }
 
-  // If the subject is already on a path we can reuse that information for better path finding
-  if (subject.path?.length) {
-    // If the path contains the the destination we can simply truncate the path to that point
-    const idx = subject.path.findIndex(
-      (c) => c.x === destNode.data.vector.x && c.y === destNode.data.vector.y,
-    );
-    if (idx !== -1) {
-      return subject.path.slice(0, idx); // Path truncated
-    }
-
-    // If the destination is new, we need to find a new path.
-    // But since the subject is currently on a path, its current position is a good starting point since it's going to be on a fraction,
-    // which doesn't directly resolve to a node in the path finding graph. We could use the nearest node,
-    // but that could result in stuttering movement, so we will forcefully retain the next step in the current path
-    // and find a new path to the next destination from there. This will result in a smoother movement.
-    const nextNode = area.graph.getNearestNode(subject.path[0]);
-    if (nextNode) {
-      const newPath = area.findPath(nextNode.id, destNode.id);
-      if (newPath) {
-        return subject.path.slice(0, 1).concat(newPath); // Path extended
-      }
-    }
-  }
-
   // Find a new path from the current position
-  const fromNode = area.graph.getNearestNode(subject.coords);
-  if (!fromNode) {
-    throw new Error(
-      `Invalid start position: ${subject.coords.x},${subject.coords.y}`,
-    );
-  }
-
+  const fromNode = assert(area.graph.getNearestNode(subject.coords));
   const newPath = area.findPath(fromNode.id, destNode.id);
   if (newPath) {
     return newPath;
