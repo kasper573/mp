@@ -131,37 +131,6 @@ export function movementBehavior(
         }
       }
     }
-
-    // Use the til arrangement information to scatter npcs that are standing still on th same tile
-    // for (const [node, groupedActorIds] of tileArrangedActors.entries()) {
-    //   const actors = groupedActorIds
-    //     .values()
-    //     .map((id) => state.actors()[id])
-    //     .filter(
-    //       (actor) =>
-    //         !actor.path && // Standing still
-    //         actor.type === "npc",
-    //     )
-    //     .toArray();
-
-    //   if (actors.length <= 1) {
-    //     continue; // Not cluttered unless more than one npc is standing still on the same tile
-    //   }
-
-    //   const area = assert(areas.get(actors[0].areaId));
-    //   const adjacentNodes = randomizeArray(area.graph.getLinkedNodes(node));
-
-    //   // We only scatter as many npcs as there are adjacent nodes in one tick.
-    //   // If there are more actors than nodes, the rest will stay put this tick.
-    //   // This will eventually resolve in all actors being scattered.
-    //   const max = Math.min(actors.length, adjacentNodes.length);
-    //   for (let i = 0; i < max; i++) {
-    //     const adjustment = adjacentNodes[i];
-    //     state.actors.update(actors[i].id, (update) =>
-    //       update.add("moveTarget", adjustment.data.vector),
-    //     );
-    //   }
-    // }
   };
 }
 
