@@ -1,8 +1,8 @@
 import type { DbClient } from "@mp/db";
 import { eq } from "@mp/db";
 import type { UserId, UserIdentity } from "@mp/auth";
-import type { RNG } from "@mp/std";
-import { assert, randomItem, type Tile, type TimesPerSecond } from "@mp/std";
+import type { Rng } from "@mp/std";
+import { assert, type Tile, type TimesPerSecond } from "@mp/std";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 import { cardinalDirections, Rect, Vector } from "@mp/math";
 import { InjectionContext } from "@mp/ioc";
@@ -23,7 +23,7 @@ export class CharacterService {
     private db: DbClient,
     private readonly areas: AreaLookup,
     private readonly models: ActorModelLookup,
-    private rng: RNG,
+    private rng: Rng,
   ) {
     if (areas.size === 0) {
       throw new Error("CharacterService cannot be created without areas");
@@ -49,7 +49,7 @@ export class CharacterService {
     return {
       ...char,
       hitBox: model.hitBox,
-      dir: assert(randomItem(cardinalDirections, this.rng)),
+      dir: this.rng.randomItem(cardinalDirections),
       name:
         user.name ??
         uniqueNamesGenerator({
@@ -110,7 +110,7 @@ export class CharacterService {
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-      dir: assert(randomItem(cardinalDirections, this.rng)),
+      dir: this.rng.randomItem(cardinalDirections),
     };
   }
 }

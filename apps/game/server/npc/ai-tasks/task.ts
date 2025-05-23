@@ -1,6 +1,6 @@
 import type { ReadonlyDeep } from "@mp/sync";
 import type { TickEvent } from "@mp/time";
-import type { RNG } from "@mp/std";
+import type { Rng } from "@mp/std";
 import type { AreaLookup } from "../../area/lookup";
 import type { GameStateMachine } from "../../game-state";
 import type { NpcInstance } from "../schema";
@@ -13,7 +13,7 @@ export interface TaskInput {
   npc: ReadonlyDeep<NpcInstance>;
   npcCombatMemories: ReadonlyMap<ActorId, NpcAiCombatMemory>;
   tick: TickEvent;
-  rng: RNG;
+  rng: Rng;
 }
 
 export type Task = (input: TaskInput) => Task;

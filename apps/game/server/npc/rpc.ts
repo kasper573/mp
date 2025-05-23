@@ -1,4 +1,3 @@
-import { randomItem } from "@mp/std";
 import { ctxGameStateMachine } from "../game-state";
 import { ctxAreaLookup } from "../area/lookup";
 import { rpc } from "../rpc";
@@ -26,7 +25,7 @@ export const npcRouter = rpc.router({
         rng,
       );
 
-      const selected = randomItem(options, rng);
+      const selected = rng.randomItemMaybe(options);
       if (!selected) {
         throw new Error("No npcs or npc spawns available");
       }

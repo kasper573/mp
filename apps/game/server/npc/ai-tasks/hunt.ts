@@ -1,5 +1,5 @@
 import type { Tile } from "@mp/std";
-import { assert, randomItem } from "@mp/std";
+import { assert } from "@mp/std";
 import type { ActorId } from "../../traits/actor";
 import type { Task, TaskInput } from "./task";
 
@@ -38,15 +38,13 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
     if (!npc.path) {
       const area = assert(areas.get(npc.areaId));
-      const toNode = randomItem(Array.from(area.graph.getNodes()), rng);
-      if (toNode) {
-        gameState.actors.update(npc.id, (update) =>
-          update
-            .add("moveTarget", toNode.data.vector)
-            // TODO this is temporary until we have a buff/ability system
-            .add("speed", 1 as Tile),
-        );
-      }
+      const toNode = rng.randomItem(area.graph.getNodes());
+      gameState.actors.update(npc.id, (update) =>
+        update
+          .add("moveTarget", toNode.data.vector)
+          // TODO this is temporary until we have a buff/ability system
+          .add("speed", 1 as Tile),
+      );
     }
 
     return hunt;

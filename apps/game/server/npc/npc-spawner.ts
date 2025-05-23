@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import type { RNG, Tile } from "@mp/std";
-import { assert, createShortId, randomItem } from "@mp/std";
+import type { Rng, Tile } from "@mp/std";
+import { assert, createShortId } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
@@ -21,7 +21,7 @@ export class NpcSpawner {
   constructor(
     private readonly areas: AreaLookup,
     private readonly models: ActorModelLookup,
-    private readonly rng: RNG,
+    private readonly rng: Rng,
   ) {}
 
   createTickHandler(
@@ -84,7 +84,7 @@ export class NpcSpawner {
       npcType,
       color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
       hitBox: model.hitBox,
-      dir: assert(randomItem(cardinalDirections, this.rng)),
+      dir: this.rng.randomItem(cardinalDirections),
       health: npc.maxHealth,
     };
   }
@@ -101,7 +101,7 @@ const npcTypeColorIndication: Record<NpcType, number> = {
 function determineSpawnCoords(
   spawn: NpcSpawn,
   area: AreaResource,
-  rng: RNG,
+  rng: Rng,
 ): Vector<Tile> {
   if (spawn.coords) {
     return spawn.coords;
@@ -118,7 +118,7 @@ function determineSpawnCoords(
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {
-    randomNode = randomItem(Array.from(area.graph.getNodes()), rng);
+    randomNode = rng.randomItem(area.graph.getNodes());
   }
 
   if (!randomNode) {

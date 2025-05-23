@@ -1,4 +1,3 @@
-import { randomItem } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
 import type { Task, TaskInput } from "./task";
 
@@ -18,14 +17,12 @@ export function createWanderTask(
         throw new Error(`Area not found: ${npc.areaId}`);
       }
 
-      const toNode = randomItem(Array.from(area.graph.getNodes()), rng);
-      if (toNode) {
-        gameState.actors.update(npc.id, (update) =>
-          update
-            .add("moveTarget", toNode.data.vector)
-            .add("attackTargetId", undefined),
-        );
-      }
+      const toNode = rng.randomItem(area.graph.getNodes());
+      gameState.actors.update(npc.id, (update) =>
+        update
+          .add("moveTarget", toNode.data.vector)
+          .add("attackTargetId", undefined),
+      );
     }
 
     return wander;

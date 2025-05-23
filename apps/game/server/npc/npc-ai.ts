@@ -1,7 +1,6 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import type { RNG } from "@mp/std";
-import { assert, randomItem } from "@mp/std";
+import type { Rng } from "@mp/std";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -26,7 +25,7 @@ export class NpcAi {
   constructor(
     private gameState: GameStateMachine,
     private areas: AreaLookup,
-    private rng: RNG,
+    private rng: Rng,
   ) {}
 
   createTickHandler(): TickEventHandler {
@@ -106,14 +105,9 @@ export class NpcAi {
 
   idleOrWander = (tick: TickEvent): Task => {
     const endTime = tick.totalTimeElapsed.add(TimeSpan.fromSeconds(5));
-    return assert(
-      randomItem(
-        [
-          createIdleTask(endTime, (input) => this.idleOrWander(input.tick)),
-          createWanderTask(endTime, (input) => this.idleOrWander(input.tick)),
-        ],
-        this.rng,
-      ),
-    );
+    return this.rng.randomItem([
+      createIdleTask(endTime, (input) => this.idleOrWander(input.tick)),
+      createWanderTask(endTime, (input) => this.idleOrWander(input.tick)),
+    ]);
   };
 }

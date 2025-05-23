@@ -21,10 +21,11 @@ import {
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
-import { createRNG, type LocalFile } from "@mp/std";
+import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameStateMachine } from "@mp/game/server";
 import {
+  ctxRng,
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
   ClientRegistry,
@@ -64,7 +65,7 @@ import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
 
 registerEncoderExtensions();
 
-const rng = createRNG(opt.rngSeed);
+const rng = new Rng(opt.rngSeed);
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 logger.info(`Server started with options`, opt);
@@ -182,7 +183,8 @@ const ioc = new InjectionContainer()
   )
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxUpdateTicker, updateTicker)
-  .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings);
+  .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings)
+  .provide(ctxRng, rng);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
