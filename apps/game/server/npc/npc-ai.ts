@@ -5,18 +5,18 @@ import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
-import type { NpcAggroType, NpcInstance, NpcInstanceId } from "./schema";
+import type { NpcType, NpcInstance, NpcInstanceId } from "./schema";
 import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
 import { createIdleTask } from "./ai-tasks/idle";
-import { createWanderTask } from "./ai-tasks/wander";
 import {
   aggressiveHuntFilter,
   createHuntTask,
   defensiveHuntFilter,
   protectiveHuntFilter,
 } from "./ai-tasks/hunt";
+import { createWanderTask } from "./ai-tasks/wander";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task>();
@@ -44,7 +44,7 @@ export class NpcAi {
           tick,
         };
         const task =
-          this.npcTasks.get(subject.id) ?? deriveTask(subject.aggroType, tick);
+          this.npcTasks.get(subject.id) ?? deriveTask(subject.npcType, tick);
         const nextTask = task(taskInput);
         this.npcTasks.set(subject.id, nextTask);
       }
@@ -84,8 +84,10 @@ export class NpcAi {
   }
 }
 
-function deriveTask(aggroType: NpcAggroType, tick: TickEvent): Task {
-  switch (aggroType) {
+function deriveTask(type: NpcType, tick: TickEvent): Task {
+  switch (type) {
+    case "static":
+      return createIdleTask();
     case "pacifist":
       return idleOrWander(tick);
     case "aggressive":

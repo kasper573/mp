@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { Tile } from "@mp/std";
-import { assert, createShortId, randomItem } from "@mp/std";
+import { assert, createShortId, defaultRng, randomItem } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
@@ -11,7 +11,7 @@ import type { ActorModelLookup } from "../traits/appearance";
 import type { NpcService } from "./service";
 import type {
   Npc,
-  NpcAggroType,
+  NpcType,
   NpcInstance,
   NpcInstanceId,
   NpcSpawn,
@@ -72,7 +72,7 @@ export class NpcSpawner {
     const model = assert(this.models.get(npc.modelId));
     const area = assert(this.areas.get(spawn.areaId));
     const coords = determineSpawnCoords(spawn, area);
-    const aggroType = spawn.aggroType ?? npc.aggroType;
+    const npcType = spawn.npcType ?? npc.npcType;
     return {
       ...npc,
       id,
@@ -80,8 +80,8 @@ export class NpcSpawner {
       spawnId: spawn.id,
       areaId: spawn.areaId,
       coords,
-      aggroType,
-      color: aggroTypeColorIndication[aggroType], // Hard coded to enemy color for now
+      npcType,
+      color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
       hitBox: model.hitBox,
       dir: assert(randomItem(cardinalDirections)),
       health: npc.maxHealth,
@@ -89,11 +89,12 @@ export class NpcSpawner {
   }
 }
 
-const aggroTypeColorIndication: Record<NpcAggroType, number> = {
+const npcTypeColorIndication: Record<NpcType, number> = {
   aggressive: 0xff_00_00,
   defensive: 0x00_ff_00,
   protective: 0x00_00_ff,
   pacifist: 0xff_ff_ff,
+  static: 0x22_22_22,
 };
 
 function determineSpawnCoords(
@@ -106,8 +107,8 @@ function determineSpawnCoords(
 
   let randomNode: VectorGraphNode<Tile> | undefined;
   if (spawn.randomRadius) {
-    const angle = Math.random() * Math.PI * 2;
-    const radius = Math.random() * spawn.randomRadius;
+    const angle = defaultRng.next() * Math.PI * 2;
+    const radius = defaultRng.next() * spawn.randomRadius;
 
     const randomTile = new Vector(
       clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,

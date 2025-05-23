@@ -1,0 +1,246 @@
+{
+  "id": "1e3f906d-b8d1-4cbf-89b2-ad2e3048fe80",
+  "prevId": "6b2c5461-4ff5-45e3-a194-85b1426ae993",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.character": {
+      "name": "character",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "coords": {
+          "name": "coords",
+          "type": "point",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "areaId": {
+          "name": "areaId",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "speed": {
+          "name": "speed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "userId": {
+          "name": "userId",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "health": {
+          "name": "health",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxHealth": {
+          "name": "maxHealth",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackDamage": {
+          "name": "attackDamage",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackSpeed": {
+          "name": "attackSpeed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackRange": {
+          "name": "attackRange",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "modelId": {
+          "name": "modelId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc_spawn": {
+      "name": "npc_spawn",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "count": {
+          "name": "count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "areaId": {
+          "name": "areaId",
+          "type": "varchar(60)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "npcId": {
+          "name": "npcId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "coords": {
+          "name": "coords",
+          "type": "point",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "randomRadius": {
+          "name": "randomRadius",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "npcType": {
+          "name": "npcType",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "npc_spawn_npcId_npc_id_fk": {
+          "name": "npc_spawn_npcId_npc_id_fk",
+          "tableFrom": "npc_spawn",
+          "tableTo": "npc",
+          "columnsFrom": [
+            "npcId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc": {
+      "name": "npc",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "speed": {
+          "name": "speed",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxHealth": {
+          "name": "maxHealth",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackDamage": {
+          "name": "attackDamage",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackSpeed": {
+          "name": "attackSpeed",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "attackRange": {
+          "name": "attackRange",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "modelId": {
+          "name": "modelId",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "npcType": {
+          "name": "npcType",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "aggroRange": {
+          "name": "aggroRange",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {},
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}
