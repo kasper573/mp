@@ -132,6 +132,11 @@ export const serverOptionsSchema = object({
    * If not provided, a random seed will be used.
    */
   rngSeed: optional(numeric()),
+
+  /**
+   * Set to true to enable the patch optimizer on the server side.
+   */
+  patchOptimizer: boolish(),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

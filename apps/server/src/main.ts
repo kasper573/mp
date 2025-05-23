@@ -138,7 +138,7 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const patchOptimizerSettings = { enabled: true };
+const patchOptimizerSettings = { enabled: opt.patchOptimizer };
 const patchOptimizer = createGameStatePatchOptimizer();
 
 const gameState: GameStateMachine = createSyncStateMachine({
