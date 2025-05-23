@@ -1,5 +1,5 @@
 {
-  "id": "6b2c5461-4ff5-45e3-a194-85b1426ae993",
+  "id": "5b7f0107-106b-488d-989b-9d02e1385e26",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -129,8 +129,8 @@
           "primaryKey": false,
           "notNull": false
         },
-        "aggroType": {
-          "name": "aggroType",
+        "npcType": {
+          "name": "npcType",
           "type": "varchar",
           "primaryKey": false,
           "notNull": true
@@ -210,8 +210,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "aggroType": {
-          "name": "aggroType",
+        "npcType": {
+          "name": "npcType",
           "type": "varchar",
           "primaryKey": false,
           "notNull": true

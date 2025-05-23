@@ -20,7 +20,7 @@ CREATE TABLE "npc_spawn" (
 	"npcId" varchar(10) NOT NULL,
 	"coords" "point",
 	"randomRadius" integer,
-	"type" varchar NOT NULL
+	"npcType" varchar NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "npc" (
@@ -32,7 +32,7 @@ CREATE TABLE "npc" (
 	"attackRange" real NOT NULL,
 	"modelId" varchar(64) NOT NULL,
 	"name" varchar(64) NOT NULL,
-	"type" varchar NOT NULL,
+	"npcType" varchar NOT NULL,
 	"aggroRange" real NOT NULL
 );
 --> statement-breakpoint
