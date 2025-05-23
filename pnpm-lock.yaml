@@ -584,6 +584,9 @@ importers:
       neverthrow:
         specifier: 8.1.1
         version: 8.1.1
+      random:
+        specifier: ^5.4.0
+        version: 5.4.0
       uuid:
         specifier: 11.0.4
         version: 11.0.4
@@ -1848,6 +1851,7 @@ packages:
 
   '@ls-lint/ls-lint@2.3.0':
     resolution: {integrity: sha512-lsT5/7SxtImOIjpefC9wcoXt2lkikKhCjd6U+Q9Z6X5h2HBU/71ggt+XStdodZ0HkJGO333zDUeec7JROMCPFw==}
+    cpu: [x64, arm64, s390x, ppc64le]
     os: [darwin, linux, win32]
     hasBin: true
 
@@ -5196,6 +5200,10 @@ packages:
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
+
+  random@5.4.0:
+    resolution: {integrity: sha512-Y147ufdzRqcQuBpKkoW7N3+B/SW4X6pF3ZfsNy+bF1r3i/I+j2zobnCp+9vN1nIJDjObI/174PCySTa3FECynQ==}
+    engines: {node: '>=18'}
 
   range-parser@1.2.1:
     resolution: {integrity: sha512-Hrgsx+orqoygnmhFbKaHE6c296J+HTAQXoxEF6gNupROmmGJRoyzfG3ccAveqCBrwr/2yxQ5BVd/GTl5agOwSg==}
@@ -10761,6 +10769,8 @@ snapshots:
     optional: true
 
   queue-microtask@1.2.3: {}
+
+  random@5.4.0: {}
 
   range-parser@1.2.1: {}
 
