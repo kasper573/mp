@@ -95,7 +95,7 @@ const npcTypeColorIndication: Record<NpcType, number> = {
   defensive: 0x00_ff_00,
   protective: 0x00_00_ff,
   pacifist: 0xff_ff_ff,
-  static: 0x22_22_22,
+  static: 0xff_88_00,
 };
 
 function determineSpawnCoords(
