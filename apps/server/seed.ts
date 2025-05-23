@@ -3,11 +3,11 @@ import type { Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import {
   npcSpawnTable,
   npcTable,
+  npcTypes,
   type ActorModelLookup,
   type AreaLookup,
-  type NpcAggroType,
 } from "@mp/game/server";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import { type Tile, type TimesPerSecond } from "@mp/std";
 
 /**
  * This is not a long term plan.
@@ -35,12 +35,12 @@ export async function seed(
       const soldier: Npc = {
         id: "1" as NpcId,
         aggroRange: 7 as Tile,
-        aggroType: "protective",
+        npcType: "protective",
         attackDamage: 3,
         attackRange: oneTile,
         attackSpeed: 1 as TimesPerSecond,
         speed: oneTile,
-        maxHealth: 25,
+        maxHealth: 9999,
         modelId,
         name: "Soldier",
       };
@@ -48,9 +48,9 @@ export async function seed(
       yield tx.insert(npcTable).values(soldier);
 
       for (const areaId of areaLookup.keys()) {
-        for (const [i, aggroType] of aggroTypes.entries()) {
+        for (const [i, npcType] of npcTypes.entries()) {
           yield tx.insert(npcSpawnTable).values({
-            aggroType: aggroType,
+            npcType,
             areaId,
             count: 10,
             id: String(`${areaId}-${i}`) as NpcSpawnId,
@@ -61,10 +61,3 @@ export async function seed(
     }
   });
 }
-
-const aggroTypes: NpcAggroType[] = [
-  "aggressive",
-  "defensive",
-  "pacifist",
-  "protective",
-];
