@@ -38,7 +38,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
     if (!npc.path) {
       const area = assert(areas.get(npc.areaId));
-      const toNode = rng.randomItem(area.graph.getNodes());
+      const toNode = rng.oneOf(area.graph.getNodes());
       gameState.actors.update(npc.id, (update) =>
         update
           .add("moveTarget", toNode.data.vector)

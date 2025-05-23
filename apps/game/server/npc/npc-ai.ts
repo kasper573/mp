@@ -105,7 +105,7 @@ export class NpcAi {
 
   idleOrWander = (tick: TickEvent): Task => {
     const endTime = tick.totalTimeElapsed.add(TimeSpan.fromSeconds(5));
-    return this.rng.randomItem([
+    return this.rng.oneOf([
       createIdleTask(endTime, (input) => this.idleOrWander(input.tick)),
       createWanderTask(endTime, (input) => this.idleOrWander(input.tick)),
     ]);

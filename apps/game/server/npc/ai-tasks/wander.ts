@@ -17,7 +17,7 @@ export function createWanderTask(
         throw new Error(`Area not found: ${npc.areaId}`);
       }
 
-      const toNode = rng.randomItem(area.graph.getNodes());
+      const toNode = rng.oneOf(area.graph.getNodes());
       gameState.actors.update(npc.id, (update) =>
         update
           .add("moveTarget", toNode.data.vector)

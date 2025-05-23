@@ -49,7 +49,7 @@ export class CharacterService {
     return {
       ...char,
       hitBox: model.hitBox,
-      dir: this.rng.randomItem(cardinalDirections),
+      dir: this.rng.oneOf(cardinalDirections),
       name:
         user.name ??
         uniqueNamesGenerator({
@@ -110,7 +110,7 @@ export class CharacterService {
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
-      dir: this.rng.randomItem(cardinalDirections),
+      dir: this.rng.oneOf(cardinalDirections),
     };
   }
 }

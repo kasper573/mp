@@ -84,7 +84,7 @@ export class NpcSpawner {
       npcType,
       color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
       hitBox: model.hitBox,
-      dir: this.rng.randomItem(cardinalDirections),
+      dir: this.rng.oneOf(cardinalDirections),
       health: npc.maxHealth,
     };
   }
@@ -118,7 +118,7 @@ function determineSpawnCoords(
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {
-    randomNode = rng.randomItem(area.graph.getNodes());
+    randomNode = rng.oneOf(area.graph.getNodes());
   }
 
   if (!randomNode) {

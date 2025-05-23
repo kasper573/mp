@@ -25,7 +25,7 @@ export const npcRouter = rpc.router({
         rng,
       );
 
-      const selected = rng.randomItemMaybe(options);
+      const selected = rng.oneOfMaybe(options);
       if (!selected) {
         throw new Error("No npcs or npc spawns available");
       }
