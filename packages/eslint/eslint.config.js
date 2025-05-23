@@ -96,6 +96,8 @@ export default tseslint.config(
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
 
+      ...noMathRandom(),
+
       "@typescript-eslint/naming-convention": [
         "error",
         {
@@ -237,3 +239,16 @@ export default tseslint.config(
     },
   },
 );
+
+function noMathRandom() {
+  return {
+    "no-restricted-syntax": [
+      "error",
+      {
+        selector: `MemberExpression[object.name="Math"][property.name="random"]`,
+        message:
+          "Do not use Math.random(). Use a Rng class from @mp/std instead.",
+      },
+    ],
+  };
+}
