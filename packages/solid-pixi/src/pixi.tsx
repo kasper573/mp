@@ -24,11 +24,18 @@ export function Pixi(props: PixiProps) {
   onCleanup(() => parent.removeChild(instance));
 
   createEffect(() => {
-    instance.zIndex = props.zIndex ?? 0;
-    instance.isRenderGroup = props.isRenderGroup ?? false;
-    instance.sortableChildren = props.sortableChildren ?? false;
-    instance.label = props.label ?? "";
+    if (props.zIndex !== undefined) {
+      instance.zIndex = props.zIndex;
+    }
   });
+
+  createEffect(() => (instance.isRenderGroup = props.isRenderGroup ?? false));
+
+  createEffect(
+    () => (instance.sortableChildren = props.sortableChildren ?? false),
+  );
+
+  createEffect(() => (instance.label = props.label ?? ""));
 
   createEffect(() => {
     if (props.position) {

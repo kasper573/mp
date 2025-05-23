@@ -51,6 +51,11 @@ export function Actor(props: {
     text.text = name + `\n${health}/${maxHealth}`;
   });
 
+  createEffect(() => {
+    // Adjust draw order
+    container.zIndex = props.actor.coords.y;
+  });
+
   createEffect(() => spriteCommands.setState(state()));
 
   onCleanup(
@@ -63,7 +68,13 @@ export function Actor(props: {
 
   return (
     <Show when={position()}>
-      {(pos) => <Pixi label="Actor" as={container} position={pos()} />}
+      {(pos) => (
+        <Pixi
+          label={`Actor (${props.actor.name}, ${props.actor.id})`}
+          as={container}
+          position={pos()}
+        />
+      )}
     </Show>
   );
 }
