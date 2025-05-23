@@ -126,6 +126,12 @@ export const serverOptionsSchema = object({
    * Whether to enable rate limiting
    */
   rateLimit: boolish(),
+
+  /**
+   * The seed to use for the random number generator.
+   * If not provided, a random seed will be used.
+   */
+  rngSeed: optional(numeric()),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

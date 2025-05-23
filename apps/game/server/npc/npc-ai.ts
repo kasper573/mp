@@ -1,5 +1,6 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
+import type { RNG } from "@mp/std";
 import { assert, randomItem } from "@mp/std";
 import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
@@ -25,6 +26,7 @@ export class NpcAi {
   constructor(
     private gameState: GameStateMachine,
     private areas: AreaLookup,
+    private rng: RNG,
   ) {}
 
   createTickHandler(): TickEventHandler {
@@ -42,9 +44,13 @@ export class NpcAi {
           npcCombatMemories: this.combatMemories,
           npc: subject,
           tick,
+          rng: this.rng,
         };
+
         const task =
-          this.npcTasks.get(subject.id) ?? deriveTask(subject.npcType, tick);
+          this.npcTasks.get(subject.id) ??
+          this.deriveTask(subject.npcType, tick);
+
         const nextTask = task(taskInput);
         this.npcTasks.set(subject.id, nextTask);
       }
@@ -82,29 +88,32 @@ export class NpcAi {
       this.combatMemories.delete(actorId);
     }
   }
-}
 
-function deriveTask(type: NpcType, tick: TickEvent): Task {
-  switch (type) {
-    case "static":
-      return createIdleTask();
-    case "pacifist":
-      return idleOrWander(tick);
-    case "aggressive":
-      return createHuntTask(aggressiveHuntFilter);
-    case "defensive":
-      return createHuntTask(defensiveHuntFilter);
-    case "protective":
-      return createHuntTask(protectiveHuntFilter);
-  }
-}
+  deriveTask = (type: NpcType, tick: TickEvent): Task => {
+    switch (type) {
+      case "static":
+        return createIdleTask();
+      case "pacifist":
+        return this.idleOrWander(tick);
+      case "aggressive":
+        return createHuntTask(aggressiveHuntFilter);
+      case "defensive":
+        return createHuntTask(defensiveHuntFilter);
+      case "protective":
+        return createHuntTask(protectiveHuntFilter);
+    }
+  };
 
-function idleOrWander(tick: TickEvent): Task {
-  const endTime = tick.totalTimeElapsed.add(TimeSpan.fromSeconds(5));
-  return assert(
-    randomItem([
-      createIdleTask(endTime, (input) => idleOrWander(input.tick)),
-      createWanderTask(endTime, (input) => idleOrWander(input.tick)),
-    ]),
-  );
+  idleOrWander = (tick: TickEvent): Task => {
+    const endTime = tick.totalTimeElapsed.add(TimeSpan.fromSeconds(5));
+    return assert(
+      randomItem(
+        [
+          createIdleTask(endTime, (input) => this.idleOrWander(input.tick)),
+          createWanderTask(endTime, (input) => this.idleOrWander(input.tick)),
+        ],
+        this.rng,
+      ),
+    );
+  };
 }

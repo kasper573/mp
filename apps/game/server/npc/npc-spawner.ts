@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import type { Tile } from "@mp/std";
-import { assert, createShortId, defaultRng, randomItem } from "@mp/std";
+import type { RNG, Tile } from "@mp/std";
+import { assert, createShortId, randomItem } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { GameStateMachine } from "../game-state";
@@ -21,6 +21,7 @@ export class NpcSpawner {
   constructor(
     private readonly areas: AreaLookup,
     private readonly models: ActorModelLookup,
+    private readonly rng: RNG,
   ) {}
 
   createTickHandler(
@@ -71,7 +72,7 @@ export class NpcSpawner {
     const id = createShortId() as NpcInstanceId;
     const model = assert(this.models.get(npc.modelId));
     const area = assert(this.areas.get(spawn.areaId));
-    const coords = determineSpawnCoords(spawn, area);
+    const coords = determineSpawnCoords(spawn, area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
     return {
       ...npc,
@@ -83,7 +84,7 @@ export class NpcSpawner {
       npcType,
       color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
       hitBox: model.hitBox,
-      dir: assert(randomItem(cardinalDirections)),
+      dir: assert(randomItem(cardinalDirections, this.rng)),
       health: npc.maxHealth,
     };
   }
@@ -100,6 +101,7 @@ const npcTypeColorIndication: Record<NpcType, number> = {
 function determineSpawnCoords(
   spawn: NpcSpawn,
   area: AreaResource,
+  rng: RNG,
 ): Vector<Tile> {
   if (spawn.coords) {
     return spawn.coords;
@@ -107,8 +109,8 @@ function determineSpawnCoords(
 
   let randomNode: VectorGraphNode<Tile> | undefined;
   if (spawn.randomRadius) {
-    const angle = defaultRng.next() * Math.PI * 2;
-    const radius = defaultRng.next() * spawn.randomRadius;
+    const angle = rng.next() * Math.PI * 2;
+    const radius = rng.next() * spawn.randomRadius;
 
     const randomTile = new Vector(
       clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,
@@ -116,7 +118,7 @@ function determineSpawnCoords(
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {
-    randomNode = randomItem(Array.from(area.graph.getNodes()));
+    randomNode = randomItem(Array.from(area.graph.getNodes()), rng);
   }
 
   if (!randomNode) {

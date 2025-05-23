@@ -29,5 +29,6 @@ export * from "../shared/client-rpc-router";
 export * from "./user/client-id";
 export * from "./user/auth";
 export * from "./user/define-roles";
+export * from "./rng";
 export * from "./rpc";
 export * from "./rpc.slice";

@@ -5,6 +5,7 @@ import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
 import { ctxActorModelLookup } from "../traits/appearance";
+import { ctxRng } from "../rng";
 import { ctxNpcService } from "./service";
 import { NpcSpawner } from "./npc-spawner";
 
@@ -17,13 +18,15 @@ export const npcRouter = rpc.router({
     .mutation(async ({ ctx }) => {
       const npcService = ctx.get(ctxNpcService);
       const state = ctx.get(ctxGameStateMachine);
+      const rng = ctx.get(ctxRng);
       const options = await npcService.getAllSpawnsAndTheirNpcs();
       const spawner = new NpcSpawner(
         ctx.get(ctxAreaLookup),
         ctx.get(ctxActorModelLookup),
+        rng,
       );
 
-      const selected = randomItem(options);
+      const selected = randomItem(options, rng);
       if (!selected) {
         throw new Error("No npcs or npc spawns available");
       }

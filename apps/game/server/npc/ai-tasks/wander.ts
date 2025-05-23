@@ -7,7 +7,7 @@ export function createWanderTask(
   nextTask: (input: TaskInput) => Task,
 ): Task {
   return function wander(input) {
-    const { areas, gameState, npc, tick } = input;
+    const { areas, gameState, npc, tick, rng } = input;
     if (tick.totalTimeElapsed.compareTo(endTime) > 0) {
       return nextTask(input);
     }
@@ -18,7 +18,7 @@ export function createWanderTask(
         throw new Error(`Area not found: ${npc.areaId}`);
       }
 
-      const toNode = randomItem(Array.from(area.graph.getNodes()));
+      const toNode = randomItem(Array.from(area.graph.getNodes()), rng);
       if (toNode) {
         gameState.actors.update(npc.id, (update) =>
           update

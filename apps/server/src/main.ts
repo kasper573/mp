@@ -21,7 +21,7 @@ import {
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createDbClient } from "@mp/db/server";
-import { type LocalFile } from "@mp/std";
+import { createRNG, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameStateMachine } from "@mp/game/server";
 import {
@@ -64,6 +64,7 @@ import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
 
 registerEncoderExtensions();
 
+const rng = createRNG(opt.rngSeed);
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
 logger.info(`Server started with options`, opt);
@@ -166,7 +167,7 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
-const characterService = new CharacterService(db, areas, actorModels);
+const characterService = new CharacterService(db, areas, actorModels, rng);
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
@@ -188,8 +189,8 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-const npcSpawner = new NpcSpawner(areas, actorModels);
-const npcAi = new NpcAi(gameState, areas);
+const npcSpawner = new NpcSpawner(areas, actorModels, rng);
+const npcAi = new NpcAi(gameState, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState, npcService));

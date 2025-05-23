@@ -5,7 +5,7 @@ import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
-    const { npc, gameState, areas } = input;
+    const { npc, gameState, areas, rng } = input;
 
     if (npc.attackTargetId) {
       const target = gameState.actors()[npc.attackTargetId];
@@ -38,7 +38,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
     if (!npc.path) {
       const area = assert(areas.get(npc.areaId));
-      const toNode = randomItem(Array.from(area.graph.getNodes()));
+      const toNode = randomItem(Array.from(area.graph.getNodes()), rng);
       if (toNode) {
         gameState.actors.update(npc.id, (update) =>
           update
