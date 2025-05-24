@@ -86,6 +86,7 @@ export class NpcSpawner {
       hitBox: model.hitBox,
       dir: this.rng.oneOf(cardinalDirections),
       health: npc.maxHealth,
+      patrol: spawn.patrol ?? undefined,
     };
   }
 }
@@ -96,6 +97,7 @@ const npcTypeColorIndication: Record<NpcType, number> = {
   protective: 0x00_00_ff,
   pacifist: 0xff_ff_ff,
   static: 0xff_88_00,
+  patrol: 0xff_88_00,
 };
 
 function determineSpawnCoords(

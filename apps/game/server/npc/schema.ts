@@ -5,9 +5,11 @@ import {
   vector,
   shortId,
   real,
+  path,
   varchar,
 } from "@mp/db";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import type { Path } from "@mp/math";
 import type { MovementTrait } from "../traits/movement";
 import { actorModelId, type AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
@@ -21,6 +23,10 @@ export const npcTypes = [
    * Just stands still and does nothing.
    */
   "static",
+  /**
+   * Patrols a path.
+   */
+  "patrol",
   /**
    * Will never aggro.
    */
@@ -80,6 +86,7 @@ export const npcSpawnTable = pgTable("npc_spawn", {
     .references(() => npcTable.id, { onDelete: "cascade" }),
   coords: vector<Tile>(),
   randomRadius: integer(),
+  patrol: path<Tile>(),
   /**
    * Takes precedence over the npcType field from the NPC table.
    * If not set, the NPC's tables npcType will be used.
@@ -101,6 +108,7 @@ export interface NpcInstance
   id: NpcInstanceId;
   npcId: NpcId;
   spawnId: NpcSpawnId;
+  patrol?: Path<Tile>;
 }
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

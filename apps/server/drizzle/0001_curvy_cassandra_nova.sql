@@ -1,0 +1,1 @@
+ALTER TABLE "npc_spawn" ADD COLUMN "patrol" jsonb;

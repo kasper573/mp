@@ -5,7 +5,7 @@ import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
-import type { NpcType, NpcInstance, NpcInstanceId } from "./schema";
+import type { NpcInstance, NpcInstanceId } from "./schema";
 import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
@@ -17,6 +17,7 @@ import {
   protectiveHuntFilter,
 } from "./ai-tasks/hunt";
 import { createWanderTask } from "./ai-tasks/wander";
+import { createPatrolTask } from "./ai-tasks/patrol";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task>();
@@ -47,8 +48,7 @@ export class NpcAi {
         };
 
         const task =
-          this.npcTasks.get(subject.id) ??
-          this.deriveTask(subject.npcType, tick);
+          this.npcTasks.get(subject.id) ?? this.deriveTask(subject, tick);
 
         const nextTask = task(taskInput);
         this.npcTasks.set(subject.id, nextTask);
@@ -88,10 +88,17 @@ export class NpcAi {
     }
   }
 
-  deriveTask = (type: NpcType, tick: TickEvent): Task => {
-    switch (type) {
+  deriveTask = (npc: ReadonlyDeep<NpcInstance>, tick: TickEvent): Task => {
+    switch (npc.npcType) {
       case "static":
         return createIdleTask();
+      case "patrol":
+        if (!npc.patrol) {
+          throw new Error(
+            `NPC instance "${npc.id}" of type "patrol" does not have a patrol path defined.`,
+          );
+        }
+        return createPatrolTask(npc.patrol);
       case "pacifist":
         return this.idleOrWander(tick);
       case "aggressive":
