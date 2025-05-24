@@ -123,7 +123,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
               label={props.area.id}
             >
               {{
-                [props.area.characterLayer.name]: () => (
+                [props.area.dynamicLayer.name]: () => (
                   <For each={state.actorList()}>
                     {(actor) => (
                       <Actor

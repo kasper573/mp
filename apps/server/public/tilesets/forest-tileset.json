@@ -182,6 +182,33 @@
                 }]
         }, 
         {
+         "id":19,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":6
+                }]
+        }, 
+        {
+         "id":20,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":5
+                }]
+        }, 
+        {
+         "id":21,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":5
+                }]
+        }, 
+        {
          "id":24,
          "properties":[
                 {
@@ -350,6 +377,11 @@
          "id":43,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":6
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -359,6 +391,11 @@
          "id":44,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":5
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -367,6 +404,11 @@
         {
          "id":45,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":5
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -1263,6 +1305,11 @@
          "id":157,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":7
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -1272,9 +1319,86 @@
          "id":158,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":7
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":159,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":160,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":161,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":162,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":163,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":164,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":165,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":166,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
                 }]
         }, 
         {
@@ -1407,6 +1531,11 @@
          "id":181,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":7
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -1416,9 +1545,86 @@
          "id":182,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":7
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":183,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":184,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":185,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":186,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":187,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":188,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":189,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
+         "id":190,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
                 }]
         }, 
         {
@@ -1566,8 +1772,22 @@
                 }]
         }, 
         {
+         "id":207,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
          "id":208,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -1578,14 +1798,42 @@
          "id":209,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
                 }]
         }, 
         {
+         "id":210,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":211,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
          "id":212,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -1596,9 +1844,23 @@
          "id":213,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":214,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
                 }]
         }, 
         {
@@ -1758,6 +2020,11 @@
          "id":232,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -1767,14 +2034,42 @@
          "id":233,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
                 }]
         }, 
         {
+         "id":234,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":1
+                }]
+        }, 
+        {
+         "id":235,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }]
+        }, 
+        {
          "id":236,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -1785,9 +2080,23 @@
          "id":237,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":238,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":2
                 }]
         }, 
         {
@@ -1941,6 +2250,42 @@
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":259,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":3
+                }]
+        }, 
+        {
+         "id":260,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":3
+                }]
+        }, 
+        {
+         "id":261,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":4
+                }]
+        }, 
+        {
+         "id":262,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":4
                 }]
         }, 
         {
@@ -2127,6 +2472,11 @@
          "id":283,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":3
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -2135,6 +2485,11 @@
         {
          "id":284,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":3
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -2145,6 +2500,11 @@
          "id":285,
          "properties":[
                 {
+                 "name":"Group",
+                 "type":"int",
+                 "value":4
+                }, 
+                {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
@@ -2153,6 +2513,11 @@
         {
          "id":286,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"int",
+                 "value":4
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
