@@ -6,6 +6,7 @@ import type {
   ObjectGroupLayer,
   TiledObject,
   TileLayer,
+  TileLayerTile,
 } from "@mp/tiled-loader";
 import { Container } from "pixi.js";
 import { createObjectView } from "./object";
@@ -39,10 +40,35 @@ export class LayerViewFactory {
   }
 
   private createTileLayerView(layer: TileLayer): LayerView {
-    const container = new TileRendererContainer({ isRenderGroup: true });
-    for (const tile of layer.tiles) {
-      container.addChild(createTileSprite(tile, this.textureLookup));
+    const container = new TileRendererContainer({
+      isRenderGroup: true,
+      sortableChildren: true,
+    });
+
+    const { groups, isolated } = groupTiles(layer);
+
+    // Some tiles are grouped with the intention of being sorted
+    // on the same zIndex. This helps give them the appearance of
+    // being a single object, ie. the crown of a tree.
+    for (const group of groups) {
+      const groupContainer = new Container({ isRenderGroup: true });
+      groupContainer.label = `Automatically grouped (groupId: ${group.id})`;
+
+      for (const tile of group.tiles) {
+        const sprite = createTileSprite(tile, this.textureLookup);
+        groupContainer.addChild(sprite);
+      }
+
+      container.addChild(groupContainer);
+      groupContainer.zIndex = Math.max(...group.tiles.map((t) => t.y));
     }
+
+    for (const tile of isolated) {
+      const sprite = createTileSprite(tile, this.textureLookup);
+      sprite.zIndex = tile.y;
+      container.addChild(sprite);
+    }
+
     return container;
   }
 
@@ -104,4 +130,66 @@ function memorizeLayer(view: Container, layer: Layer) {
 
 export function recallLayer(view: Container): Layer {
   return Reflect.get(view, layerSymbol) as Layer;
+}
+
+/**
+ * Group tiles by their "Group" property and whether they are adjacent to each other.
+ */
+function groupTiles(layer: TileLayer) {
+  const posMap = new Map<string, TileLayerTile>();
+  for (const tile of layer.tiles) {
+    posMap.set(posKey(tile.x, tile.y), tile);
+  }
+
+  const getGroup = (t: TileLayerTile) =>
+    t.tile.properties.get("Group")?.value as number | undefined;
+
+  const visited = new Set<TileLayerTile>();
+  const groups: Array<{ tiles: TileLayerTile[]; id: number }> = [];
+
+  for (const startTile of layer.tiles) {
+    const groupId = getGroup(startTile);
+    if (groupId === undefined || visited.has(startTile)) {
+      continue;
+    }
+
+    const stack = [startTile];
+    const group: TileLayerTile[] = [];
+    visited.add(startTile);
+
+    while (stack.length > 0) {
+      const tile = stack.pop() as TileLayerTile;
+      group.push(tile);
+
+      for (const [dx, dy] of cardinalDeltas) {
+        const key = posKey(tile.x + dx, tile.y + dy);
+        const adjacent = posMap.get(key);
+        if (
+          adjacent &&
+          !visited.has(adjacent) &&
+          getGroup(adjacent) === groupId
+        ) {
+          visited.add(adjacent);
+          stack.push(adjacent);
+        }
+      }
+    }
+
+    groups.push({ id: groupId, tiles: group });
+  }
+
+  const isolated = layer.tiles.filter((tile) => !visited.has(tile));
+
+  return { groups, isolated };
+}
+
+const cardinalDeltas = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+] as const;
+
+function posKey(x: number, y: number) {
+  return `${x},${y}`;
 }
