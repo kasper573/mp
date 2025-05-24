@@ -29,13 +29,23 @@ export function Pixi(props: PixiProps) {
     }
   });
 
-  createEffect(() => (instance.isRenderGroup = props.isRenderGroup ?? false));
+  createEffect(() => {
+    if (props.isRenderGroup !== undefined) {
+      instance.isRenderGroup = props.isRenderGroup;
+    }
+  });
 
-  createEffect(
-    () => (instance.sortableChildren = props.sortableChildren ?? false),
-  );
+  createEffect(() => {
+    if (props.sortableChildren !== undefined) {
+      instance.sortableChildren = props.sortableChildren;
+    }
+  });
 
-  createEffect(() => (instance.label = props.label ?? ""));
+  createEffect(() => {
+    if (props.label !== undefined) {
+      instance.label = props.label;
+    }
+  });
 
   createEffect(() => {
     if (props.position) {
