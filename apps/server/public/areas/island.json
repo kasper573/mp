@@ -8,6 +8,7 @@
          "encoding":"base64",
          "height":47,
          "id":1,
+         "locked":true,
          "name":"Background",
          "opacity":1,
          "properties":[
@@ -24,7 +25,21 @@
         }, 
         {
          "compression":"zlib",
-         "data":"eJztmFdOAlEYRimPti1oIhLlwbILo2hUwLYILFFRLIuwxd62YE\/sbQsW8MnuFtR4SIY4Iih9hvE\/yQmZyb1z\/y\/3ztwZTCZBEARBEAQhl6mwaF1Bdqk3aF47uebM2tbgYnw3ejJcx4HGOX2MP4hDGteRaebJt4CLBs95SL4jPDZ4zjvy3eODwXOGKU\/Ds96bA\/tFizKfiezlAfoE8TaH1kID+RoTnQ\/am9GC67iBmzqe02TXbCn9bFiGl3iF1zrOGUk3tfZgbxw11ypt3vh9xw\/lWM\/vduPUNoGTOIXTEbWecB+e4hme44Xqviy2mkwl2JXFfHVJjrVFv23cwd0o13gk1xM+4wu+avT8cVpS+\/a5oW8Ag3gbcZ0WjvMwHwuwEIuUNg7Ll5nGm8I43\/YH1p7Z+rPNANeuxCqsxhrVWA5VXl1\/Y6r2hxA2JWcTx81x1J3N+UwF9f6gpo\/jfnSjB1uTzNHKOmnDduzATg3fK0L7Q6xn5SDnh9CfZE4\/uYZxBEdxTIfvT64Ess1Q\/2yUDEucW8YVXMU1DXPG2ot8CeTco\/59Hc5VJOHvDafOnyfC7\/z13aj3\/UIwDvZ\/sNZy4X8aQRAEQRDSyyf940aG",
+         "data":"eJzt0ckJwDAMRUGTnu14aT7qIQeDNAO66\/NaAwAAAAAAMnuf2x\/wV4+Go1DHFVt33Cm0OaupIQAAQDkfTHgDVw==",
+         "encoding":"base64",
+         "height":47,
+         "id":11,
+         "name":"Under",
+         "opacity":1,
+         "type":"tilelayer",
+         "visible":true,
+         "width":58,
+         "x":0,
+         "y":0
+        }, 
+        {
+         "compression":"zlib",
+         "data":"eJztmEdOw0AYRhNnSbsCSIQIsqDcAkFAQArlEKFs6ByCJnq7Al2itytQkqzoXAEQL5IjTGRBmmPH\/E96imx5PP+nGc\/YcTgEQRAEQRCEQqZGMbuC\/NJs07weci04za3BT\/8BDBpcx5HJOQfpfwiHTa7DaBbJt4TLNs95TL4TPLV5znvyPeCjzXMmqM7BWh8ugP2iQx3PdPbyCG2iGCugudBCvtZ0x4PrnajgJm7htoXHNNM5W0k7N1bhNd7grYVzJtNHrf04kELNjeo17\/x+4Kd6bOV3u0lqm8JpnMHZpFrPeA7P8QIv8UrzXJa7HI4K7M1jvqYM+9qh3S7u4b7OPZ7I9Ywv+IpvJq0\/PiW7b5872kYwirGk+3RwXITFWIKlWKZe41W+NZpwFv382B+Ye06X\/nW13L8O67FB05dXk9fS35ia\/SGOW83ZxnF7CnXnczyzQbs\/6BHgfBBDGeYIMU86sQu7scfE94r4\/mDUWjlCrlEcw3GcsOD7kz+N7HPUP6+TYYVzq7iG67hhYs5M9yItB9R\/aMGxSibxveGz+Hoi\/M5f341W3y8E++D5B3OtEP6nEQRBEAQht3wB3ANDMA==",
          "encoding":"base64",
          "height":47,
          "id":2,
@@ -39,6 +54,7 @@
         {
          "draworder":"topdown",
          "id":4,
+         "locked":true,
          "name":"Objects",
          "objects":[
                 {
@@ -120,7 +136,7 @@
          "x":0,
          "y":0
         }],
- "nextlayerid":10,
+ "nextlayerid":12,
  "nextobjectid":14,
  "orientation":"orthogonal",
  "renderorder":"right-down",

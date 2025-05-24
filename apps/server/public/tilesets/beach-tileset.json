@@ -1355,7 +1355,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1364,7 +1364,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1373,7 +1373,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1382,7 +1382,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1391,7 +1391,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1427,7 +1427,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1436,7 +1436,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1445,7 +1445,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1490,7 +1490,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1499,7 +1499,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1508,7 +1508,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1517,7 +1517,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1526,7 +1526,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1553,7 +1553,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1562,7 +1562,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1571,7 +1571,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1598,7 +1598,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1607,7 +1607,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1616,7 +1616,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1625,7 +1625,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1634,7 +1634,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"7"
+                 "value":"5"
                 }]
         }, 
         {
@@ -1661,7 +1661,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1670,7 +1670,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1679,7 +1679,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"3"
+                 "value":"1"
                 }]
         }, 
         {
@@ -1710,8 +1710,22 @@
                 }]
         }, 
         {
+         "id":558,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"5"
+                }]
+        }, 
+        {
          "id":559,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"5"
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -1719,12 +1733,35 @@
                 }]
         }, 
         {
+         "id":560,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"5"
+                }]
+        }, 
+        {
          "id":561,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"5"
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":562,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"5"
                 }]
         }, 
         {
@@ -1755,12 +1792,35 @@
                 }]
         }, 
         {
+         "id":583,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"1"
+                }]
+        }, 
+        {
          "id":584,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"1"
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
+                }]
+        }, 
+        {
+         "id":585,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"1"
                 }]
         }, 
         {
@@ -1809,39 +1869,12 @@
                 }]
         }, 
         {
-         "id":619,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
-         "id":620,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
-         "id":621,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
          "id":624,
          "properties":[
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1850,7 +1883,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1859,7 +1892,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1926,39 +1959,12 @@
                 }]
         }, 
         {
-         "id":655,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
-         "id":656,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
-         "id":657,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"4"
-                }]
-        }, 
-        {
          "id":658,
          "properties":[
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1967,7 +1973,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1976,7 +1982,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1985,7 +1991,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -1994,7 +2000,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2003,7 +2009,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2012,7 +2018,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2021,7 +2027,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2030,7 +2036,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2039,7 +2045,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2048,7 +2054,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2057,7 +2063,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2066,7 +2072,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2075,7 +2081,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2084,7 +2090,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2093,7 +2099,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2102,7 +2108,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2111,7 +2117,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2120,7 +2126,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2129,7 +2135,16 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
+                }]
+        }, 
+        {
+         "id":734,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"3"
                 }]
         }, 
         {
@@ -2138,7 +2153,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2147,7 +2162,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
                 }]
         }, 
         {
@@ -2156,7 +2171,16 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"1"
+                 "value":"2"
+                }]
+        }, 
+        {
+         "id":766,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"3"
                 }]
         }, 
         {
@@ -2165,7 +2189,7 @@
                 {
                  "name":"Group",
                  "type":"string",
-                 "value":"2"
+                 "value":"3"
                 }]
         }, 
         {
@@ -2174,30 +2198,26 @@
                 {
                  "name":"Group",
                  "type":"string",
+                 "value":"3"
+                }]
+        }, 
+        {
+         "id":799,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
                  "value":"2"
-                }]
-        }, 
-        {
-         "id":769,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"1"
-                }]
-        }, 
-        {
-         "id":770,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"1"
                 }]
         }, 
         {
          "id":800,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"2"
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -2205,8 +2225,40 @@
                 }]
         }, 
         {
+         "id":801,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"2"
+                }]
+        }, 
+        {
+         "id":802,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"3"
+                }]
+        }, 
+        {
+         "id":803,
+         "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"3"
+                }]
+        }, 
+        {
          "id":804,
          "properties":[
+                {
+                 "name":"Group",
+                 "type":"string",
+                 "value":"3"
+                }, 
                 {
                  "name":"Walkable",
                  "type":"bool",
@@ -2229,132 +2281,6 @@
                  "name":"Walkable",
                  "type":"bool",
                  "value":false
-                }]
-        }, 
-        {
-         "id":835,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"6"
-                }]
-        }, 
-        {
-         "id":836,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"6"
-                }]
-        }, 
-        {
-         "id":837,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":838,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":839,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":840,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":841,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":842,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":873,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":874,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":875,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":876,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":877,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
-                }]
-        }, 
-        {
-         "id":878,
-         "properties":[
-                {
-                 "name":"Group",
-                 "type":"string",
-                 "value":"5"
                 }]
         }],
  "tilewidth":16,
