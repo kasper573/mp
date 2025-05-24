@@ -12,16 +12,23 @@ export class AreaResource {
   readonly start: Vector<Tile>;
   private objects: Iterable<TiledObject>;
   readonly graph: VectorGraph<Tile>;
-  readonly characterLayer: Layer;
+  /**
+   * The dynamic layer is a layer that expects the renderer
+   * to dynamically sort its children based on their y position.
+   * This is where moving entities like players and NPCs should be added,
+   * but also static groups like large trees, houses, etc, anything that
+   * should be grouped by their kind and then sorted by their combined y position.
+   */
+  readonly dynamicLayer: Layer;
   #findPath: VectorPathFinder<Tile>;
 
   constructor(
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
-    this.characterLayer = assert(
-      this.tiled.getTileLayers(characterLayerName)[0] as Layer | undefined,
-      `Map must have a '${characterLayerName}' layer`,
+    this.dynamicLayer = assert(
+      this.tiled.getTileLayers(dynamicLayerName)[0] as Layer | undefined,
+      `Map must have a '${dynamicLayerName}' layer`,
     );
 
     this.objects = this.tiled.getObjects();
@@ -68,7 +75,7 @@ export class AreaResource {
   ): ReturnType<VectorPathFinder<Tile>> => next(...args);
 }
 
-const characterLayerName = "Characters";
+const dynamicLayerName = "Dynamic";
 
 function* hitTestObjects<Subject>(
   objects: Iterable<TiledObject>,
