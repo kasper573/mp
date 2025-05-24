@@ -4,11 +4,11 @@ import type { Rng, Tile } from "@mp/std";
 import { assert, createShortId } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
+import { InjectionContext } from "@mp/ioc";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
-import type { NpcService } from "./service";
 import type {
   Npc,
   NpcType,
@@ -21,19 +21,11 @@ export class NpcSpawner {
   constructor(
     private readonly areas: AreaLookup,
     private readonly models: ActorModelLookup,
+    public readonly options: Array<{ spawn: NpcSpawn; npc: Npc }>,
     private readonly rng: Rng,
   ) {}
 
-  createTickHandler(
-    state: GameStateMachine,
-    npcService: NpcService,
-  ): TickEventHandler {
-    let spawns: Awaited<ReturnType<NpcService["getAllSpawnsAndTheirNpcs"]>> =
-      [];
-    void npcService.getAllSpawnsAndTheirNpcs().then((list) => {
-      spawns = list;
-    });
-
+  createTickHandler(state: GameStateMachine): TickEventHandler {
     const corpseDuration = TimeSpan.fromSeconds(5);
     const corpseCleanupTimers = new Map<NpcInstanceId, TimeSpan>();
 
@@ -53,7 +45,7 @@ export class NpcSpawner {
         }
       }
 
-      for (const { spawn, npc } of spawns) {
+      for (const { spawn, npc } of this.options) {
         const currentSpawnCount = state.actors
           .values()
           .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
@@ -90,6 +82,8 @@ export class NpcSpawner {
     };
   }
 }
+
+export const ctxNpcSpawner = InjectionContext.new<NpcSpawner>("NpcSpawner");
 
 const npcTypeColorIndication: Record<NpcType, number> = {
   aggressive: 0xff_00_00,

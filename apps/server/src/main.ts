@@ -15,6 +15,7 @@ import {
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
+  ctxNpcSpawner,
   ctxTokenVerifier,
   NpcAi,
   NpcSpawner,
@@ -62,6 +63,7 @@ import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
 import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
+import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 
 registerEncoderExtensions();
 
@@ -168,7 +170,21 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
+const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
+const spawnsFromDbAndAreas = [
+  ...allNpcsAndSpawns,
+  ...deriveNpcSpawnsFromAreas(
+    areas,
+    allNpcsAndSpawns.map(({ npc }) => npc),
+  ),
+];
 const characterService = new CharacterService(db, areas, actorModels, rng);
+const npcSpawner = new NpcSpawner(
+  areas,
+  actorModels,
+  spawnsFromDbAndAreas,
+  rng,
+);
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
@@ -184,18 +200,18 @@ const ioc = new InjectionContainer()
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxUpdateTicker, updateTicker)
   .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings)
-  .provide(ctxRng, rng);
+  .provide(ctxRng, rng)
+  .provide(ctxNpcSpawner, npcSpawner);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-const npcSpawner = new NpcSpawner(areas, actorModels, rng);
 const npcAi = new NpcAi(gameState, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
-updateTicker.subscribe(npcSpawner.createTickHandler(gameState, npcService));
+updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, areas));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));

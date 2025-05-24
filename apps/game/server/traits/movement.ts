@@ -72,14 +72,19 @@ export function movementBehavior(
       // Force refresh the path on an interval to avoid path finding every tick.
       // This gives us a good balance between correctness and performance.
       let { moveTarget } = actor;
-      const pathIsStale =
+      let pathIsStale =
         !moveTarget &&
         actor.path?.length &&
         totalTimeElapsed.compareTo(
           nextPathFinds.get(actor.id) ?? TimeSpan.Zero,
         ) > 0;
 
-      if (pathIsStale) {
+      // Patrolling npcs should never re-evaluate their paths since they're patrolling on a predetermined path
+      if (actor.type === "npc" && actor.patrol) {
+        pathIsStale = false;
+      }
+
+      if (pathIsStale && actor.path) {
         // Resetting the move target to the destination will effectively refresh the path
         moveTarget = actor.path.at(-1);
         nextPathFinds.set(actor.id, totalTimeElapsed.add(stalePathInterval));
