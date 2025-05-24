@@ -74,3 +74,5 @@ export interface VectorLike<T extends number> {
   x: T;
   y: T;
 }
+
+export type PathLike<T extends number> = readonly VectorLike<T>[];
