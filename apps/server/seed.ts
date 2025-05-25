@@ -40,7 +40,7 @@ export async function seed(
         attackRange: oneTile,
         attackSpeed: 1 as TimesPerSecond,
         speed: oneTile,
-        maxHealth: 9999,
+        maxHealth: 25,
         modelId,
         name: "Soldier",
       };
