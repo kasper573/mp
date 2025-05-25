@@ -1,9 +1,4 @@
-import {
-  nearestCardinalDirection,
-  type CardinalDirection,
-  type Path,
-  type Vector,
-} from "@mp/math";
+import { type CardinalDirection, type Path, type Vector } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
@@ -109,14 +104,6 @@ export function movementBehavior(
 
         state.actors.update(actor.id, (update) => {
           update.add("coords", newCoords).add("path", newPath);
-          if (newPath?.length) {
-            const newDir = nearestCardinalDirection(
-              newCoords.angle(newPath[0]),
-            );
-            if (newDir !== actor.dir) {
-              update.add("dir", newDir);
-            }
-          }
         });
       }
 

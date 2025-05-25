@@ -1,5 +1,4 @@
 import type { Vector, Rect } from "@mp/math";
-import { nearestCardinalDirection } from "@mp/math";
 import { type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { ReadonlyDeep } from "@mp/sync";
@@ -65,14 +64,6 @@ export function combatBehavior(
         );
       }
       return;
-    }
-
-    // Correct direction if we're not facing the target
-    const direction = nearestCardinalDirection(
-      actor.coords.angle(target.coords),
-    );
-    if (direction !== actor.dir) {
-      state.actors.update(actor.id, (u) => u.add("dir", direction));
     }
 
     if (actor.lastAttack) {

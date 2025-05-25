@@ -140,8 +140,6 @@ const patchOptimizer = new PatchOptimizerBuilder<GameState, GameStateEvents>()
             return true;
           }
         }),
-      )
-      // The interpolator handles facing direction completely
-      .property("dir", (b) => b.filter(() => false)),
+      ),
   )
   .build();
