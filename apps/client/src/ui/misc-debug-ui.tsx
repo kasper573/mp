@@ -22,6 +22,20 @@ export function MiscDebugUi(props: {
 
   return (
     <>
+      <div>
+        <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
+          Spawn random NPC
+        </Button>
+        <Button
+          on:click={() =>
+            void rpc.character.kill({
+              targetId: assert(gameState.characterId()),
+            })
+          }
+        >
+          Die
+        </Button>
+      </div>
       <label>
         Server tick
         <Select
@@ -66,20 +80,6 @@ export function MiscDebugUi(props: {
             }))
           }
         />
-      </div>
-      <div>
-        <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
-          Spawn random NPC
-        </Button>
-        <Button
-          on:click={() =>
-            void rpc.character.kill({
-              targetId: assert(gameState.characterId()),
-            })
-          }
-        >
-          Die
-        </Button>
       </div>
     </>
   );
