@@ -1,12 +1,16 @@
 import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
-import type { Patch } from "@mp/sync";
+import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
+import { nearestCardinalDirection, type Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
+import type { Actor } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
+import type { GameStateEvents } from "../server/game-state-events";
 
 export function createOptimisticGameState(
   settings: Accessor<OptimisticGameStateSettings>,
@@ -23,11 +27,11 @@ export function createOptimisticGameState(
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
     const { enabled, actors } = untrack(() => ({
       enabled: settings().useInterpolator,
-      actors: Object.values(gameState.actors),
+      actors: gameState.actors,
     }));
 
     if (enabled) {
-      for (const actor of actors) {
+      for (const actor of Object.values(actors)) {
         if (actor.path && actor.health > 0) {
           const [newCoords, newPath] = moveAlongPath(
             actor.coords,
@@ -38,15 +42,34 @@ export function createOptimisticGameState(
 
           actor.coords = newCoords;
           actor.path = newPath;
+
+          const facingTarget = getFacingTarget(actor);
+          if (facingTarget) {
+            actor.dir = nearestCardinalDirection(
+              actor.coords.angle(facingTarget),
+            );
+          }
+        }
+      }
+
+      function getFacingTarget(actor: Actor): Vector<Tile> | undefined {
+        if (actor.path?.length) {
+          return actor.path[0];
+        }
+        if (actor.attackTargetId) {
+          return actors[actor.attackTargetId].coords;
         }
       }
     }
   };
 
-  optimisticGameState.applyPatch = (patch: Patch) => {
+  optimisticGameState.applyPatch = (
+    patch: Patch,
+    getEvents: EventAccessFn<GameStateEvents>,
+  ) => {
     batch(() => {
       const filteredPatch = settings().usePatchOptimizer
-        ? optimizePatch(gameState, patch, patchOptimizer)
+        ? optimizePatch(gameState, patch, patchOptimizer, getEvents)
         : patch;
       applyPatch(gameState, filteredPatch);
     });
@@ -74,7 +97,7 @@ const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 // We need to ignore some updates to let the interpolator complete its work.
 // If we receive updates that we trust the interpolator to already be working on,
 // we use a patch optimizer to simply ignore those patch operations.
-const patchOptimizer = new PatchOptimizerBuilder<GameState>()
+const patchOptimizer = new PatchOptimizerBuilder<GameState, GameStateEvents>()
   .entity("actors", (b) =>
     b
       .property("coords", (b) =>
@@ -90,7 +113,10 @@ const patchOptimizer = new PatchOptimizerBuilder<GameState>()
         }),
       )
       .property("path", (b) =>
-        b.filter((newValue, oldValue, actor, update) => {
+        b.filter((newValue, oldValue, actor, update, events) => {
+          if (events("movement.stop").some((id) => id === actor.id)) {
+            return true;
+          }
           if (update.areaId && update.areaId !== actor.areaId) {
             return true; // Always trust new path when area changes
           }

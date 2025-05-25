@@ -1,5 +1,6 @@
 import type { Patch, UpdateOperation } from "./patch";
 import { PatchType } from "./patch";
+import type { EventAccessFn, SyncEventMap } from "./sync-event";
 import type { PatchableState } from "./sync-state-machine";
 
 /**
@@ -7,24 +8,36 @@ import type { PatchableState } from "./sync-state-machine";
  * transform it into a more efficient form. It can be used to filter out
  * unnecessary operations or to transform operation values.
  */
-export type PatchOptimizer<State extends PatchableState> = {
+export type PatchOptimizer<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+> = {
   [EntityName in keyof State]?: EntityPatchOptimizer<
-    State[EntityName][keyof State[EntityName]]
+    State[EntityName][keyof State[EntityName]],
+    EventMap
   >;
 };
 
 /**
  * An entity specific optimizer
  */
-export type EntityPatchOptimizer<Entity> = {
-  [Field in keyof Entity]?: PropertyPatchOptimizer<Entity[Field], Entity>;
+export type EntityPatchOptimizer<Entity, EventMap extends SyncEventMap> = {
+  [Field in keyof Entity]?: PropertyPatchOptimizer<
+    Entity[Field],
+    Entity,
+    EventMap
+  >;
 };
 
 /**
  * A property specific optimizer
  */
-export interface PropertyPatchOptimizer<Value, Entity> {
-  filter?: PropertyPatchOptimizerFilter<Value, Entity>;
+export interface PropertyPatchOptimizer<
+  Value,
+  Entity,
+  EventMap extends SyncEventMap,
+> {
+  filter?: PropertyPatchOptimizerFilter<Value, Entity, EventMap>;
   /**
    * Transforms the value of the property before applying the patch.
    */
@@ -34,61 +47,79 @@ export interface PropertyPatchOptimizer<Value, Entity> {
 /**
  * Determines whether the patch for a given property should be applied or not.
  */
-export type PropertyPatchOptimizerFilter<Value, Entity> = (
+export type PropertyPatchOptimizerFilter<
+  Value,
+  Entity,
+  EventMap extends SyncEventMap,
+> = (
   newValue: Value,
   oldValue: Value,
   entity: Entity,
   update: Partial<Entity>,
+  getEvents: EventAccessFn<EventMap>,
 ) => boolean;
 
-export class PatchOptimizerBuilder<State extends PatchableState> {
-  private optimizer: PatchOptimizer<State> = {};
+export class PatchOptimizerBuilder<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+> {
+  private optimizer: PatchOptimizer<State, EventMap> = {};
 
   entity<EntityName extends keyof State>(
     entityName: EntityName,
     configure: (
       builder: Omit<
-        EntityOptimizerBuilder<State[EntityName][keyof State[EntityName]]>,
+        EntityOptimizerBuilder<
+          State[EntityName][keyof State[EntityName]],
+          EventMap
+        >,
         "build"
       >,
     ) => void,
   ): this {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const builder = new EntityOptimizerBuilder<any>();
+    const builder = new EntityOptimizerBuilder<any, EventMap>();
     configure(builder);
     this.optimizer[entityName] = builder.build();
     return this;
   }
 
-  build(): PatchOptimizer<State> {
+  build(): PatchOptimizer<State, EventMap> {
     return this.optimizer;
   }
 }
 
-export class EntityOptimizerBuilder<Entity> {
-  private optimizer: EntityPatchOptimizer<Entity> = {};
+export class EntityOptimizerBuilder<Entity, EventMap extends SyncEventMap> {
+  private optimizer: EntityPatchOptimizer<Entity, EventMap> = {};
 
   property<K extends keyof Entity>(
     key: K,
     configure: (
-      builder: Omit<PropertyOptimizerBuilder<Entity[K], Entity>, "build">,
+      builder: Omit<
+        PropertyOptimizerBuilder<Entity[K], Entity, EventMap>,
+        "build"
+      >,
     ) => void,
   ): this {
-    const builder = new PropertyOptimizerBuilder<Entity[K], Entity>();
+    const builder = new PropertyOptimizerBuilder<Entity[K], Entity, EventMap>();
     configure(builder);
     this.optimizer[key] = builder.build();
     return this;
   }
 
-  build(): EntityPatchOptimizer<Entity> {
+  build(): EntityPatchOptimizer<Entity, EventMap> {
     return this.optimizer;
   }
 }
 
-export class PropertyOptimizerBuilder<Value, Entity> {
-  private optimizer: PropertyPatchOptimizer<Value, Entity> = {};
+export class PropertyOptimizerBuilder<
+  Value,
+  Entity,
+  EventMap extends SyncEventMap,
+> {
+  private optimizer: PropertyPatchOptimizer<Value, Entity, EventMap> = {};
 
-  filter(filter: PropertyPatchOptimizerFilter<Value, Entity>): this {
+  filter(filter: PropertyPatchOptimizerFilter<Value, Entity, EventMap>): this {
     this.optimizer.filter = filter;
     return this;
   }
@@ -98,15 +129,16 @@ export class PropertyOptimizerBuilder<Value, Entity> {
     return this;
   }
 
-  build(): PropertyPatchOptimizer<Value, Entity> {
+  build(): PropertyPatchOptimizer<Value, Entity, EventMap> {
     return this.optimizer;
   }
 }
 
-export function optimizeUpdate<Entity>(
-  entityOptimizer: EntityPatchOptimizer<Entity> | undefined,
+export function optimizeUpdate<Entity, EventMap extends SyncEventMap>(
+  entityOptimizer: EntityPatchOptimizer<Entity, EventMap> | undefined,
   entity: Entity,
   updates: Partial<Entity>,
+  getEvents: EventAccessFn<EventMap>,
 ): Partial<Entity> | undefined {
   const optimizedUpdates: Partial<Entity> = {};
   let hasUpdates = false;
@@ -121,7 +153,7 @@ export function optimizeUpdate<Entity>(
       oldValue = optimizer.transform(oldValue);
     }
     const filter = optimizer?.filter ?? refDiff;
-    if (filter(newValue, oldValue, entity, updates)) {
+    if (filter(newValue, oldValue, entity, updates, getEvents)) {
       hasUpdates = true;
       optimizedUpdates[prop] = newValue;
     }
@@ -136,14 +168,18 @@ const refDiff = <T>(a: T, b: T) => a !== b;
 /**
  * Returns a new patch that transforms operations according to the provided optimizer.
  */
-export function optimizePatch<State extends PatchableState>(
+export function optimizePatch<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+>(
   state: State,
   patch: Patch,
-  optimizer: PatchOptimizer<State>,
+  optimizer: PatchOptimizer<State, EventMap>,
+  getEvents: EventAccessFn<EventMap>,
 ): Patch {
   return patch.map((op) =>
     op[0] === PatchType.Update
-      ? optimizeUpdateOperation(state, optimizer, op)
+      ? optimizeUpdateOperation(state, optimizer, op, getEvents)
       : op,
   );
 }
@@ -151,10 +187,14 @@ export function optimizePatch<State extends PatchableState>(
 /**
  * Returns a new update operation with some properties filtered out.
  */
-function optimizeUpdateOperation<State extends PatchableState>(
+function optimizeUpdateOperation<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+>(
   state: State,
-  patchOptimizer: PatchOptimizer<State>,
+  patchOptimizer: PatchOptimizer<State, EventMap>,
   op: UpdateOperation,
+  getEvents: EventAccessFn<EventMap>,
 ): UpdateOperation {
   const [, path, update] = op;
 
@@ -185,6 +225,7 @@ function optimizeUpdateOperation<State extends PatchableState>(
     entityOptimizer,
     entity as never,
     update as never,
+    getEvents,
   );
 
   return [PatchType.Update, path, optimized];

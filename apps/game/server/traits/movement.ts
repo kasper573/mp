@@ -1,9 +1,4 @@
-import {
-  nearestCardinalDirection,
-  type CardinalDirection,
-  type Path,
-  type Vector,
-} from "@mp/math";
+import { type CardinalDirection, type Path, type Vector } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
@@ -72,14 +67,19 @@ export function movementBehavior(
       // Force refresh the path on an interval to avoid path finding every tick.
       // This gives us a good balance between correctness and performance.
       let { moveTarget } = actor;
-      const pathIsStale =
+      let pathIsStale =
         !moveTarget &&
         actor.path?.length &&
         totalTimeElapsed.compareTo(
           nextPathFinds.get(actor.id) ?? TimeSpan.Zero,
         ) > 0;
 
-      if (pathIsStale) {
+      // Patrolling npcs should never re-evaluate their paths since they're patrolling on a predetermined path
+      if (actor.type === "npc" && actor.patrol) {
+        pathIsStale = false;
+      }
+
+      if (pathIsStale && actor.path) {
         // Resetting the move target to the destination will effectively refresh the path
         moveTarget = actor.path.at(-1);
         nextPathFinds.set(actor.id, totalTimeElapsed.add(stalePathInterval));
@@ -104,14 +104,6 @@ export function movementBehavior(
 
         state.actors.update(actor.id, (update) => {
           update.add("coords", newCoords).add("path", newPath);
-          if (newPath?.length) {
-            const newDir = nearestCardinalDirection(
-              newCoords.angle(newPath[0]),
-            );
-            if (newDir !== actor.dir) {
-              update.add("dir", newDir);
-            }
-          }
         });
       }
 

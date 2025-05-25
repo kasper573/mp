@@ -1,5 +1,5 @@
 import { type DbClient } from "@mp/db";
-import type { Npc, NpcId, NpcSpawnId } from "@mp/game/server";
+import type { AreaId, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import {
   npcSpawnTable,
   npcTable,
@@ -47,16 +47,19 @@ export async function seed(
 
       yield tx.insert(npcTable).values(soldier);
 
-      for (const areaId of areaLookup.keys()) {
-        for (const [i, npcType] of npcTypes.entries()) {
-          yield tx.insert(npcSpawnTable).values({
-            npcType,
-            areaId,
-            count: 10,
-            id: String(`${areaId}-${i}`) as NpcSpawnId,
-            npcId: soldier.id,
-          });
+      const areaId = "forest" as AreaId;
+      for (const [i, npcType] of npcTypes.entries()) {
+        if (npcType === "patrol" || npcType === "static") {
+          continue;
         }
+
+        yield tx.insert(npcSpawnTable).values({
+          npcType,
+          areaId,
+          count: 10,
+          id: String(`${areaId}-${i}`) as NpcSpawnId,
+          npcId: soldier.id,
+        });
       }
     }
   });

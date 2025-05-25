@@ -7,6 +7,10 @@ export type SyncEvent = [name: string, payload?: unknown];
 
 export type SyncEventHandler<Payload> = (payload: Payload) => unknown;
 
+/**
+ * Key: event name,
+ * Value: payload type
+ */
 export type SyncEventMap = Record<string, unknown>;
 
 export class SyncEventBus<EventMap extends SyncEventMap> {
@@ -36,4 +40,14 @@ export class SyncEventBus<EventMap extends SyncEventMap> {
       }
     }
   }
+}
+
+export interface EventAccessFn<EventMap extends SyncEventMap> {
+  /**
+   * Peek into the current event list and select all the events of the given type.
+   * Useful if you want to react to events that have occurred since the last flush without performing a flush.
+   */
+  <EventName extends keyof EventMap>(
+    name: EventName,
+  ): Array<EventMap[EventName]>;
 }
