@@ -2,9 +2,8 @@ import type { Branded } from "@mp/std";
 import type { ActorId } from "../traits/actor";
 
 /**
- * Details about the combats that npcs has observed
+ * Combats that a single npc has observed
  */
-
 export class NpcAiCombatMemory {
   #combats = new Map<CombatId, [ActorId, ActorId]>();
 
@@ -20,6 +19,19 @@ export class NpcAiCombatMemory {
     const combatId = createCombatId(attacker, target);
     if (!this.#combats.has(combatId)) {
       this.#combats.set(combatId, [attacker, target]);
+    }
+  }
+
+  forgetCombatatants(actorIds: ActorId[]) {
+    const combatIdsToForget = this.#combats
+      .entries()
+      .filter(([, combatants]) =>
+        combatants.some((id) => actorIds.includes(id)),
+      )
+      .map(([combatId]) => combatId);
+
+    for (const id of combatIdsToForget) {
+      this.#combats.delete(id);
     }
   }
 }
