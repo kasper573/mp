@@ -2,9 +2,13 @@ import type { PatchOptimizer } from "@mp/sync";
 import { PatchOptimizerBuilder } from "@mp/sync";
 import { isPathEqual } from "@mp/math";
 import type { GameState } from "./game-state";
+import type { GameStateEvents } from "./game-state-events";
 
-export function createGameStatePatchOptimizer(): PatchOptimizer<GameState> {
-  return new PatchOptimizerBuilder<GameState>()
+export function createGameStatePatchOptimizer(): PatchOptimizer<
+  GameState,
+  GameStateEvents
+> {
+  return new PatchOptimizerBuilder<GameState, GameStateEvents>()
     .entity("actors", (b) =>
       b
         .property("coords", (b) =>

@@ -3,7 +3,8 @@ import { PatchType, type Patch, type PatchPath } from "./patch";
 import { dedupePatch } from "./patch-deduper";
 import type { PatchOptimizer } from "./patch-optimizer";
 import { optimizeUpdate } from "./patch-optimizer";
-import type { SyncEvent, SyncEventMap } from "./sync-event";
+import type { EventAccessFn } from "./sync-event";
+import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -21,7 +22,9 @@ export type SyncStateMachine<
 export function createSyncStateMachine<
   State extends PatchableState,
   EventMap extends SyncEventMap,
->(opt: SyncStateMachineOptions<State>): SyncStateMachine<State, EventMap> {
+>(
+  opt: SyncStateMachineOptions<State, EventMap>,
+): SyncStateMachine<State, EventMap> {
   const state = structuredClone(opt.initialState);
   const serverPatch: Patch = [];
   const serverEvents: ServerSyncEvent<State>[] = [];
@@ -32,7 +35,7 @@ export function createSyncStateMachine<
     opt.clientIds,
     opt.clientVisibility,
   );
-  const eventFn = createEventFunction(serverEvents);
+  const eventFn = createEventFunction<EventMap, State>(serverEvents);
   const repositories = {} as Partial<EntityRepositoryRecord<State>>;
   return new Proxy({} as SyncStateMachine<State, EventMap>, {
     get(target, prop) {
@@ -47,6 +50,7 @@ export function createSyncStateMachine<
         state,
         serverPatch,
         entityName,
+        eventFn,
         opt.patchOptimizer,
       ));
     },
@@ -189,11 +193,13 @@ function isVisible<State extends PatchableState>(
 function createEntityRepository<
   State extends PatchableState,
   EntityName extends keyof State,
+  EventMap extends SyncEventMap,
 >(
   state: State,
   serverPatch: Patch,
   entityName: EntityName,
-  patchOptimier?: () => PatchOptimizer<State> | undefined,
+  eventFn: EventFn<EventMap, State>,
+  patchOptimier?: () => PatchOptimizer<State, EventMap> | undefined,
 ): EntityRepository<State[EntityName]> {
   type Entities = State[EntityName];
   type Id = keyof Entities;
@@ -222,6 +228,7 @@ function createEntityRepository<
       patchOptimier?.()?.[entityName],
       entity,
       updates,
+      eventFn.peek,
     );
 
     Object.assign(entity as object, updates);
@@ -298,14 +305,7 @@ interface EventFn<EventMap extends SyncEventMap, State extends PatchableState> {
       [EntityName in keyof State]: Iterable<keyof State[EntityName]>;
     },
   ): void;
-
-  /**
-   * Peek into the current event list and select all the events of the given type.
-   * Useful if you want to react to events that have occurred since the last flush without performing a flush.
-   */
-  peek<EventName extends keyof EventMap>(
-    name: EventName,
-  ): Array<EventMap[EventName]>;
+  peek: EventAccessFn<EventMap>;
 }
 
 interface ServerSyncEvent<State extends PatchableState> {
@@ -378,11 +378,14 @@ class EntityUpdateBuilder<Entity> {
   }
 }
 
-export interface SyncStateMachineOptions<State extends PatchableState> {
+export interface SyncStateMachineOptions<
+  State extends PatchableState,
+  EventMap extends SyncEventMap,
+> {
   initialState: State;
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizer?: () => PatchOptimizer<State> | undefined;
+  patchOptimizer?: () => PatchOptimizer<State, EventMap> | undefined;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

@@ -1,12 +1,13 @@
 import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
-import type { Patch } from "@mp/sync";
+import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
+import type { GameStateEvents } from "../server/game-state-events";
 
 export function createOptimisticGameState(
   settings: Accessor<OptimisticGameStateSettings>,
@@ -43,10 +44,13 @@ export function createOptimisticGameState(
     }
   };
 
-  optimisticGameState.applyPatch = (patch: Patch) => {
+  optimisticGameState.applyPatch = (
+    patch: Patch,
+    getEvents: EventAccessFn<GameStateEvents>,
+  ) => {
     batch(() => {
       const filteredPatch = settings().usePatchOptimizer
-        ? optimizePatch(gameState, patch, patchOptimizer)
+        ? optimizePatch(gameState, patch, patchOptimizer, getEvents)
         : patch;
       applyPatch(gameState, filteredPatch);
     });
@@ -74,7 +78,7 @@ const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 // We need to ignore some updates to let the interpolator complete its work.
 // If we receive updates that we trust the interpolator to already be working on,
 // we use a patch optimizer to simply ignore those patch operations.
-const patchOptimizer = new PatchOptimizerBuilder<GameState>()
+const patchOptimizer = new PatchOptimizerBuilder<GameState, GameStateEvents>()
   .entity("actors", (b) =>
     b
       .property("coords", (b) =>

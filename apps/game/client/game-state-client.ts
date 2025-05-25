@@ -60,7 +60,11 @@ export function createGameStateClient(
       }
 
       if (patch) {
-        gameState.applyPatch(patch);
+        gameState.applyPatch(patch, (desiredEventName) => {
+          return (events ?? [])
+            .filter(([eventName]) => eventName === desiredEventName)
+            .map(([, payload]) => payload as never);
+        });
       }
 
       if (events) {
