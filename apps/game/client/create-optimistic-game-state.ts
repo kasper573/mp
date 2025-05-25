@@ -5,6 +5,9 @@ import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyPatch, optimizePatch, PatchOptimizerBuilder } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
+import { nearestCardinalDirection, type Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
+import type { Actor } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 import type { GameStateEvents } from "../server/game-state-events";
@@ -24,11 +27,11 @@ export function createOptimisticGameState(
   optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
     const { enabled, actors } = untrack(() => ({
       enabled: settings().useInterpolator,
-      actors: Object.values(gameState.actors),
+      actors: gameState.actors,
     }));
 
     if (enabled) {
-      for (const actor of actors) {
+      for (const actor of Object.values(actors)) {
         if (actor.path && actor.health > 0) {
           const [newCoords, newPath] = moveAlongPath(
             actor.coords,
@@ -39,6 +42,22 @@ export function createOptimisticGameState(
 
           actor.coords = newCoords;
           actor.path = newPath;
+
+          const facingTarget = getFacingTarget(actor);
+          if (facingTarget) {
+            actor.dir = nearestCardinalDirection(
+              actor.coords.angle(facingTarget),
+            );
+          }
+        }
+      }
+
+      function getFacingTarget(actor: Actor): Vector<Tile> | undefined {
+        if (actor.path?.length) {
+          return actor.path[0];
+        }
+        if (actor.attackTargetId) {
+          return actors[actor.attackTargetId].coords;
         }
       }
     }
@@ -94,7 +113,10 @@ const patchOptimizer = new PatchOptimizerBuilder<GameState, GameStateEvents>()
         }),
       )
       .property("path", (b) =>
-        b.filter((newValue, oldValue, actor, update) => {
+        b.filter((newValue, oldValue, actor, update, events) => {
+          if (events("movement.stop").some((id) => id === actor.id)) {
+            return true;
+          }
           if (update.areaId && update.areaId !== actor.areaId) {
             return true; // Always trust new path when area changes
           }
@@ -118,6 +140,8 @@ const patchOptimizer = new PatchOptimizerBuilder<GameState, GameStateEvents>()
             return true;
           }
         }),
-      ),
+      )
+      // The interpolator handles facing direction completely
+      .property("dir", (b) => b.filter(() => false)),
   )
   .build();

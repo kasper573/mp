@@ -94,6 +94,7 @@ export function combatBehavior(
         .add("lastAttack", currentTime),
     );
 
+    state.$event("movement.stop", actor.id);
     state.$event(
       "combat.attack",
       { actorId: actor.id, targetId: target.id },
