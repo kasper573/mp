@@ -24,13 +24,14 @@ type VisibleGraphType = (typeof visibleGraphTypes)[number];
 interface AreaDebugSettings {
   visibleGraphType: VisibleGraphType;
   showFogOfWar: boolean;
+  showAttackRange: boolean;
+  showAggroRange: boolean;
 }
 
 export function AreaDebugUi(props: {
   area: AreaResource;
-  drawPathsForActors: Actor[];
+  actors: Actor[];
   playerCoords?: Vector<Tile>;
-  visualizeNetworkFogOfWar?: boolean;
 }) {
   const [settings, setSettings] = createStorageSignal<AreaDebugSettings>(
     localStorage,
@@ -38,6 +39,8 @@ export function AreaDebugUi(props: {
     {
       visibleGraphType: "none",
       showFogOfWar: false,
+      showAttackRange: false,
+      showAggroRange: false,
     },
   );
 
@@ -47,7 +50,7 @@ export function AreaDebugUi(props: {
         area={props.area}
         visible={() => settings().visibleGraphType}
       />
-      <For each={props.drawPathsForActors}>
+      <For each={props.actors}>
         {(actor) =>
           actor.path ? (
             <DebugPath
@@ -82,12 +85,66 @@ export function AreaDebugUi(props: {
           />
           Visualize network fog of war
         </label>
+        <br />
+        <label>
+          <input
+            type="checkbox"
+            checked={settings().showAttackRange}
+            on:change={(e) =>
+              setSettings((prev) => ({
+                ...prev,
+                showAttackRange: e.currentTarget.checked,
+              }))
+            }
+          />
+          Show actor attack range
+        </label>
+        <br />
+        <label>
+          <input
+            type="checkbox"
+            checked={settings().showAggroRange}
+            on:change={(e) =>
+              setSettings((prev) => ({
+                ...prev,
+                showAggroRange: e.currentTarget.checked,
+              }))
+            }
+          />
+          Show npc aggro range
+        </label>
       </GameDebugUiPortal>
 
       <Show when={settings().showFogOfWar && props.playerCoords}>
         {(coords) => (
           <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
         )}
+      </Show>
+      <Show when={settings().showAttackRange}>
+        <For each={props.actors}>
+          {(actor) => (
+            <DebugCircle
+              tiled={props.area.tiled}
+              pos={actor.coords}
+              radius={actor.attackRange}
+              color={uniqolor(actor.id).color}
+            />
+          )}
+        </For>
+      </Show>
+      <Show when={settings().showAggroRange}>
+        <For each={props.actors.filter((actor) => actor.type === "npc")}>
+          {(npc) => (
+            <DebugCircle
+              tiled={props.area.tiled}
+              pos={npc.coords}
+              radius={npc.aggroRange}
+              color={
+                npc.color ? hexColorFromInt(npc.color) : uniqolor(npc.id).color
+              }
+            />
+          )}
+        </For>
       </Show>
     </Pixi>
   );
@@ -129,6 +186,25 @@ function DebugGraph(props: {
   });
 
   return <Pixi label="GraphDebugUI" as={gfx} />;
+}
+
+function DebugCircle(props: {
+  tiled: TiledResource;
+  pos: Vector<Tile>;
+  radius: Tile;
+  color: string;
+}) {
+  const graphics = new Graphics();
+  graphics.alpha = 0.25;
+  createEffect(() => {
+    const pos = props.tiled.tileCoordToWorld(props.pos);
+    const radius = props.tiled.tileToWorldUnit(props.radius);
+    graphics.clear();
+    graphics.fillStyle = { color: props.color };
+    graphics.circle(pos.x, pos.y, radius);
+    graphics.fill();
+  });
+  return <Pixi as={graphics} />;
 }
 
 function DebugPath(props: {
@@ -223,4 +299,8 @@ function drawStar(
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
+}
+
+function hexColorFromInt(color: number): string {
+  return `#${color.toString(16).padStart(6, "0")}`;
 }

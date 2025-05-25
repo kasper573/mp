@@ -57,7 +57,8 @@ export function createOptimisticGameState(
           return actor.path[0];
         }
         if (actor.attackTargetId) {
-          return actors[actor.attackTargetId].coords;
+          const target = actors[actor.attackTargetId] as Actor | undefined;
+          return target?.coords;
         }
       }
     }

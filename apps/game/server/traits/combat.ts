@@ -38,8 +38,6 @@ export function combatBehavior(
             .add("moveTarget", undefined)
             .add("attackTargetId", undefined),
         );
-
-        continue;
       }
     }
   };
@@ -78,6 +76,10 @@ export function combatBehavior(
     state.actors.update(target.id, (update) =>
       update.add("health", Math.max(0, target.health - actor.attackDamage)),
     );
+
+    if (target.health <= 0) {
+      state.$event("actor.death", target.id);
+    }
 
     state.actors.update(actor.id, (update) =>
       update

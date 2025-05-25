@@ -144,7 +144,7 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
           <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
-            drawPathsForActors={state.actorList()}
+            actors={state.actorList()}
           />
         </GameDebugUiPortal>
       </Pixi>
