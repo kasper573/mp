@@ -45,6 +45,7 @@ export interface Npc {
   name: string;
   npcType: NpcType;
   aggroRange: Tile;
+  xpReward: number;
 }
 
 export type NpcSpawnId = Branded<string, "NpcSpawnId">;

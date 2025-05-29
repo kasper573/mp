@@ -87,6 +87,7 @@ export class CharacterService {
       attackSpeed: 1 as TimesPerSecond,
       attackRange: 1 as Tile,
       userId: user.id,
+      xp: 0,
       name:
         user.name ??
         uniqueNamesGenerator({

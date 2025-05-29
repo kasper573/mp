@@ -20,6 +20,7 @@ export interface Character extends AppearanceTrait, MovementTrait, CombatTrait {
   attackRange: Tile;
   modelId: ActorModelId;
   name: string;
+  xp: number;
 }
 
 export type CharacterId = Branded<string, "CharacterId">;

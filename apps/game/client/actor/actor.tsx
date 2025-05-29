@@ -49,6 +49,9 @@ export function Actor(props: {
   createEffect(() => {
     const { name, health, maxHealth } = props.actor;
     text.text = name + `\n${health}/${maxHealth}`;
+    if (props.actor.type === "character") {
+      text.text += `\n${props.actor.xp}xp`;
+    }
   });
 
   createEffect(() => {

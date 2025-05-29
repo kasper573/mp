@@ -79,6 +79,13 @@ export function combatBehavior(
 
     if (target.health <= 0) {
       state.$event("actor.death", target.id);
+      if (actor.type === "character" && target.type === "npc") {
+        state.actors.update(actor.id, (update) =>
+          // TODO remove this before merge
+          // @ts-expect-error - my typedefs suck and don't support union types
+          update.add("xp", actor.xp + target.xpReward),
+        );
+      }
     }
 
     state.actors.update(actor.id, (update) =>
