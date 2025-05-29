@@ -1,10 +1,17 @@
 import type { ReadonlyDeep } from "type-fest";
 import { PatchType, type Patch, type PatchPath } from "./patch";
-import { dedupePatch } from "./patch-deduper";
 import type { PatchOptimizer } from "./patch-optimizer";
 import { optimizeUpdate } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
-import { type SyncEvent, type SyncEventMap } from "./sync-event";
+import { type SyncEventMap } from "./sync-event";
+import type {
+  ClientId,
+  ClientVisibilityFactory,
+  FlushResult,
+  PatchableEntities,
+  PatchableState,
+} from "./sync-emitter";
+import { SyncEmitter } from "./sync-emitter";
 
 /**
  * A state machine that records all state changes made as atomic patches,
@@ -26,16 +33,19 @@ export function createSyncStateMachine<
   opt: SyncStateMachineOptions<State, EventMap>,
 ): SyncStateMachine<State, EventMap> {
   const state = structuredClone(opt.initialState);
-  const serverPatch: Patch = [];
-  const serverEvents: ServerSyncEvent<State>[] = [];
-  const flushFn = createFlushFunction(
-    state,
-    serverPatch,
-    serverEvents,
-    opt.clientIds,
-    opt.clientVisibility,
-  );
-  const eventFn = createEventFunction<EventMap, State>(serverEvents);
+
+  const emitter = new SyncEmitter<State, EventMap>(opt);
+
+  const eventFn = ((...args) => emitter.addEvent(...args)) as EventFn<
+    EventMap,
+    State
+  >;
+  eventFn.peek = (...args) => emitter.peekEvent(...args);
+
+  const flushFn = (() => emitter.flush(state)) as FlushFn;
+  flushFn.markToResendFullState = (...args) =>
+    emitter.markToResendFullState(...args);
+
   const repositories = {} as Partial<EntityRepositoryRecord<State>>;
   return new Proxy({} as SyncStateMachine<State, EventMap>, {
     get(target, prop) {
@@ -48,146 +58,13 @@ export function createSyncStateMachine<
       const entityName = prop as keyof State;
       return (repositories[entityName] ??= createEntityRepository(
         state,
-        serverPatch,
+        emitter.patch,
         entityName,
         eventFn,
         opt.patchOptimizer,
       ));
     },
   });
-}
-
-function createFlushFunction<State extends PatchableState>(
-  state: State,
-  serverPatch: Patch,
-  serverEvents: ServerSyncEvent<State>[],
-  getClientIds: () => Iterable<ClientId>,
-  getClientVisibility: ClientVisibilityFactory<State>,
-): FlushFn {
-  const hasBeenGivenFullState = new Set<ClientId>();
-  const visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
-
-  function flush() {
-    const clientIds = Array.from(getClientIds());
-    const prevVisibilities: Record<
-      ClientId,
-      ClientVisibility<State>
-    > = Object.fromEntries(
-      clientIds.map((clientId) => [
-        clientId,
-        visibilities.get(clientId) ?? // Reuse last if it exists
-          getClientVisibility(clientId, state), // Derive new if not
-      ]),
-    );
-
-    const clientPatches: ClientPatches = new Map();
-    const clientEvents: ClientEvents = new Map();
-
-    for (const clientId of clientIds) {
-      const prevVisibility = prevVisibilities[clientId];
-      const nextVisibility = getClientVisibility(clientId, state);
-      const clientPatch: Patch = [];
-
-      visibilities.set(clientId, nextVisibility);
-
-      if (!hasBeenGivenFullState.has(clientId)) {
-        clientPatch.push(
-          ...createFullStatePatch(deriveClientState(state, nextVisibility)),
-        );
-        hasBeenGivenFullState.add(clientId);
-      }
-
-      // Emulate adds and removals of entities due to visibility changes
-
-      for (const entityName in state) {
-        const prevIds = prevVisibility[entityName];
-        const nextIds = nextVisibility[entityName];
-
-        for (const addedId of nextIds.difference(prevIds)) {
-          clientPatch.push([
-            PatchType.Set,
-            [entityName, addedId] as PatchPath,
-            state[entityName][addedId],
-          ]);
-        }
-
-        for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push([
-            PatchType.Remove,
-            [entityName, removedId] as PatchPath,
-          ]);
-        }
-      }
-
-      // Select the patches visible to the client
-
-      clientPatch.push(
-        ...serverPatch.filter(([type, [entityName, entityId]]) => {
-          return entityId === undefined
-            ? false
-            : nextVisibility[entityName].has(entityId);
-        }),
-      );
-
-      if (clientPatch.length > 0) {
-        clientPatches.set(clientId, dedupePatch(clientPatch));
-      }
-
-      const visibleClientEvents = serverEvents
-        .filter(({ visibility }) => isVisible(nextVisibility, visibility))
-        .map(({ event }) => event);
-
-      if (visibleClientEvents.length > 0) {
-        clientEvents.set(clientId, visibleClientEvents);
-      }
-    }
-
-    serverPatch.splice(0, serverPatch.length);
-    serverEvents.splice(0, serverEvents.length);
-
-    return { clientPatches, clientEvents };
-  }
-
-  flush.markToResendFullState = (...clientIds: ClientId[]) => {
-    for (const clientId of clientIds) {
-      hasBeenGivenFullState.delete(clientId);
-    }
-  };
-
-  return flush;
-}
-
-function deriveClientState<State extends PatchableState>(
-  state: State,
-  visibilities: ClientVisibility<State>,
-): State {
-  return Object.fromEntries(
-    Object.entries(visibilities).map(
-      ([entityName, entityIds]: [string, ReadonlySet<PatchableEntityId>]) => {
-        const allEntities = state[entityName];
-        const referencedEntities = Object.fromEntries(
-          entityIds.values().map((id) => [id, allEntities[id]]),
-        );
-        return [entityName, referencedEntities];
-      },
-    ),
-  ) as State;
-}
-
-function isVisible<State extends PatchableState>(
-  subject: ClientVisibility<State>,
-  required?: ClientVisibility<State>,
-): boolean {
-  if (required) {
-    for (const entityName in required) {
-      const requiredIds = required[entityName];
-      const subjectIds = subject[entityName];
-      if (!requiredIds.isSubsetOf(subjectIds)) {
-        return false;
-      }
-    }
-  }
-  return true;
 }
 
 function createEntityRepository<
@@ -266,16 +143,6 @@ function createEntityRepository<
   return entity;
 }
 
-function createFullStatePatch<State extends PatchableState>(
-  state: State,
-): Patch {
-  const patch: Patch = [];
-  for (const key in state) {
-    patch.push([PatchType.Set, [key], state[key as keyof typeof state]]);
-  }
-  return patch;
-}
-
 // $ to avoid collision with user defined properties
 const eventFunctionName = "$event";
 const flushFunctionName = "$flush";
@@ -283,11 +150,6 @@ const flushFunctionName = "$flush";
 export type EntityRepositoryRecord<State extends PatchableState> = {
   [EntityName in keyof State]: EntityRepository<State[EntityName]>;
 };
-
-interface FlushResult {
-  clientPatches: ClientPatches;
-  clientEvents: ClientEvents;
-}
 
 interface FlushFn {
   (): FlushResult;
@@ -306,43 +168,6 @@ interface EventFn<EventMap extends SyncEventMap, State extends PatchableState> {
     },
   ): void;
   peek: EventAccessFn<EventMap>;
-}
-
-interface ServerSyncEvent<State extends PatchableState> {
-  event: SyncEvent;
-  /**
-   * If specified, this event will only be sent to clients that have the specified visibility.
-   */
-  visibility?: ClientVisibility<State>;
-}
-
-function createEventFunction<
-  EventMap extends SyncEventMap,
-  State extends PatchableState,
->(serverEvents: ServerSyncEvent<State>[]): EventFn<EventMap, State> {
-  const addEvent: EventFn<EventMap, State> = function addEvent(
-    eventName,
-    payload,
-    visibility,
-  ) {
-    const newEvent: ServerSyncEvent<State> = {
-      event: [String(eventName), payload],
-    };
-    if (visibility) {
-      newEvent.visibility = {} as ClientVisibility<State>;
-      for (const entityName in visibility) {
-        newEvent.visibility[entityName] = new Set(visibility[entityName]);
-      }
-    }
-    serverEvents.push(newEvent);
-  } as EventFn<EventMap, State>;
-
-  addEvent.peek = (name) =>
-    serverEvents
-      .filter(({ event: [candidateName] }) => candidateName === name)
-      .map(({ event: [, payload] }) => payload as never);
-
-  return addEvent;
 }
 
 export type { ReadonlyDeep };
@@ -387,34 +212,3 @@ export interface SyncStateMachineOptions<
   clientIds: () => Iterable<ClientId>;
   patchOptimizer?: () => PatchOptimizer<State, EventMap> | undefined;
 }
-
-export type ClientVisibilityFactory<State extends PatchableState> = (
-  clientId: ClientId,
-  state: State,
-) => ClientVisibility<State>;
-
-export type ClientPatches = Map<ClientId, Patch>;
-
-export type ClientEvents = Map<ClientId, SyncEvent[]>;
-
-export type ClientVisibility<State extends PatchableState> = {
-  [EntityName in keyof State]: ReadonlySet<keyof State[EntityName]>;
-};
-
-export type PatchableEntityId = string;
-
-export type PatchableEntity = unknown;
-
-export type PatchableEntities = {
-  [entityId: PatchableEntityId]: PatchableEntity;
-};
-
-export type PatchableState = { [entityName: string]: PatchableEntities };
-
-type ClientId = Registry extends { clientId: infer T } ? T : string;
-
-/**
- * Designed to be augmented by the consumer package to conveniently override the type of ClientId.
- * This avoids the need to pollute the generic parameters in all places where ClientId is used.
- */
-export interface Registry {}

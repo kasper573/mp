@@ -1,7 +1,7 @@
 import type { Patch, UpdateOperation } from "./patch";
 import { PatchType } from "./patch";
 import type { EventAccessFn, SyncEventMap } from "./sync-event";
-import type { PatchableState } from "./sync-state-machine";
+import type { PatchableState } from "./sync-emitter";
 
 /**
  * A patch optimizer is a set of rules that can be applied to a patch to

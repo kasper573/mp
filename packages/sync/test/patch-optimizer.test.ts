@@ -18,7 +18,7 @@ type CommentsState = {
   comments: Record<string, { text: string }>;
 };
 
-const filtersForState = new PatchOptimizerBuilder<State>()
+const filtersForState = new PatchOptimizerBuilder<State, {}>()
   .entity("users", (b) =>
     b
       .property("name", (b) => b.filter((a, b) => a === b))
@@ -43,7 +43,7 @@ describe("filterPatchUpdates", () => {
       [PatchType.Remove, ["users", "1"]],
     ];
 
-    const result = optimizePatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState, () => []);
     expect(result).toEqual(patch);
   });
 
@@ -57,10 +57,11 @@ describe("filterPatchUpdates", () => {
       comments: { "42": { text: "Original" } },
     };
 
-    const result = optimizePatch<State & CommentsState>(
+    const result = optimizePatch<State & CommentsState, {}>(
       stateWithComments,
       patch,
       filtersForState,
+      () => [],
     );
     expect(result).toEqual(patch);
   });
@@ -68,7 +69,7 @@ describe("filterPatchUpdates", () => {
   it("leaves updates for entities not in state untouched", () => {
     const patch: Patch = [[PatchType.Update, ["users", "2"], { name: "Eve" }]];
 
-    const result = optimizePatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState, () => []);
     expect(result).toEqual(patch);
   });
 
@@ -82,7 +83,7 @@ describe("filterPatchUpdates", () => {
       [PatchType.Update, ["posts", "a"], { title: "New", published: true }],
     ];
 
-    const result = optimizePatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState, () => []);
     expect(result).toEqual([
       [PatchType.Update, ["users", "1"], { active: false }],
       [PatchType.Update, ["posts", "a"], { title: "New", published: true }],
@@ -94,7 +95,7 @@ describe("filterPatchUpdates", () => {
     const patch: Patch = [[PatchType.Update, ["users", "1"], originalUpdate]];
     const copyOfPatch = structuredClone(patch);
 
-    const result = optimizePatch(baseState, patch, filtersForState);
+    const result = optimizePatch(baseState, patch, filtersForState, () => []);
 
     expect(patch).toEqual(copyOfPatch);
     expect(result[0][2]).not.toBe(originalUpdate);
