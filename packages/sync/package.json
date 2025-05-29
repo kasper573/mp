@@ -12,8 +12,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest",
-    "test:inspect": "vitest --inspect-brk --no-file-parallelism"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mp/encoding": "workspace:*"
@@ -21,6 +20,6 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "type-fest": "4.35.0",
-    "vitest": "2.0.3"
+    "vitest": "catalog:"
   }
 }
