@@ -58,7 +58,6 @@ function deriveNpcSpawn(
         patrol,
         coords: patrol[0],
         count: 1,
-        randomRadius: null,
       };
     }
     case "point":
@@ -67,8 +66,6 @@ function deriveNpcSpawn(
         npcType: "static",
         coords: area.tiled.worldCoordToTile(Vector.from(npcObject)).round(),
         count: 1,
-        randomRadius: null,
-        patrol: null,
       };
   }
   throw new Error(`Unsupported npc object type: "${npcObject.objectType}"`);

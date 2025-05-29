@@ -4,7 +4,7 @@ import { rpc } from "../rpc";
 import { ctxTokenVerifier } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
-import type { CharacterId } from "../character/schema";
+import type { CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 
 export type WorldRouter = typeof worldRouter;

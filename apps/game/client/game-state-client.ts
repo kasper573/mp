@@ -13,7 +13,7 @@ import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { Character, CharacterId } from "../server/character/schema";
+import type { Character, CharacterId } from "../server/character/types";
 import type { ActorId } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
 import { useRpc } from "./use-rpc";

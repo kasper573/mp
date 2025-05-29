@@ -1,5 +1,5 @@
-import type { Character, CharacterId } from "../character/schema";
-import type { NpcInstance, NpcInstanceId } from "../npc/schema";
+import type { Character, CharacterId } from "../character/types";
+import type { NpcInstance, NpcInstanceId } from "../npc/types";
 
 export type ActorId = NpcInstanceId | CharacterId;
 

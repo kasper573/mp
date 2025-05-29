@@ -3,7 +3,7 @@ import type { TickEvent } from "@mp/time";
 import type { Rng } from "@mp/std";
 import type { AreaLookup } from "../../area/lookup";
 import type { GameStateMachine } from "../../game-state";
-import type { NpcInstance } from "../schema";
+import type { NpcInstance } from "../types";
 import type { ActorId } from "../../traits/actor";
 import type { NpcAiCombatMemory } from "../npc-ai-combat-memory";
 
