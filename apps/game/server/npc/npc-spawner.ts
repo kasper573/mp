@@ -15,7 +15,7 @@ import type {
   NpcInstance,
   NpcInstanceId,
   NpcSpawn,
-} from "./schema";
+} from "./types";
 
 export class NpcSpawner {
   constructor(

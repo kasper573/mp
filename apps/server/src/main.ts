@@ -21,7 +21,6 @@ import {
   NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createDbClient } from "@mp/db/server";
 import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameStateMachine } from "@mp/game/server";
@@ -33,13 +32,10 @@ import {
   movementBehavior,
   combatBehavior,
   characterRemoveBehavior,
-  CharacterService,
   ctxCharacterService,
   ctxNpcService,
   ctxGameStateMachine,
   deriveClientVisibility,
-  NpcService,
-  GameService,
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
@@ -64,6 +60,10 @@ import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
 import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
 import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
+import { NpcService } from "./db/services/npc-service";
+import { createDbClient } from "./db/client";
+import { CharacterService } from "./db/services/character-service";
+import { GameService } from "./db/services/game-service";
 
 registerEncoderExtensions();
 

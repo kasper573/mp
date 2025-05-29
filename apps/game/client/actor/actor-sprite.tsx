@@ -75,12 +75,14 @@ export function createActorSprite(
     sprite.loop = spriteFlags().loop;
   });
 
-  let lastTimeoutId: NodeJS.Timeout | undefined;
+  // HACK working around strange tsconfig resolution issue in vite where we only get an error during build, but not in LSP:
+  // TS2322: Type 'Timeout' is not assignable to type 'number'.
+  let lastTimeoutId: unknown;
 
   function attack() {
     setIsAttacking(true);
     sprite.currentFrame = 0;
-    clearTimeout(lastTimeoutId);
+    clearTimeout(lastTimeoutId as number);
     lastTimeoutId = setTimeout(() => setIsAttacking(false), duration());
   }
 

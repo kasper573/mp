@@ -1,6 +1,6 @@
-import type { DbClient } from "@mp/db";
-import { characterTable } from "./character/schema";
-import type { GameStateMachine } from "./game-state";
+import type { GameStateMachine } from "@mp/game/server";
+import type { DbClient } from "../client";
+import { characterTable } from "../schema";
 
 export class GameService {
   constructor(private db: DbClient) {}

@@ -5,7 +5,7 @@ import type { ReadonlyDeep } from "@mp/sync";
 import type { GameStateMachine } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
-import type { NpcInstance, NpcInstanceId } from "./schema";
+import type { NpcInstance, NpcInstanceId } from "./types";
 import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 

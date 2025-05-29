@@ -6,7 +6,7 @@ import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
 import { ctxCharacterService } from "./service";
-import { type CharacterId } from "./schema";
+import { type CharacterId } from "./types";
 
 export const characterRoles = defineRoles("character", [
   "move",

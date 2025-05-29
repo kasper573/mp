@@ -1,13 +1,12 @@
-import { type DbClient } from "@mp/db";
 import type { AreaId, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import {
-  npcSpawnTable,
-  npcTable,
   npcTypes,
   type ActorModelLookup,
   type AreaLookup,
 } from "@mp/game/server";
 import { type Tile, type TimesPerSecond } from "@mp/std";
+import type { DbClient } from "./src/db/client";
+import { npcSpawnTable, npcTable } from "./src/db/schema";
 
 /**
  * This is not a long term plan.

@@ -1,4 +1,3 @@
-import { varchar } from "@mp/db";
 import { InjectionContext } from "@mp/ioc";
 import type { Rect } from "@mp/math";
 import type { Branded, PublicUrl, Tile } from "@mp/std";
@@ -8,10 +7,6 @@ export interface AppearanceTrait {
   opacity?: number; // 0-1
   modelId: ActorModelId;
   name: string;
-}
-
-export function actorModelId() {
-  return varchar({ length: 64 }).$type<ActorModelId>();
 }
 
 export interface ActorModel {
