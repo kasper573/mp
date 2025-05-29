@@ -551,6 +551,13 @@ importers:
         version: link:../tsconfig
 
   packages/soma:
+    dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
