@@ -10,5 +10,4 @@ export * from "./actor/actor-spritesheets-provider";
 export * from "./create-optimistic-game-state";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
-export * from "../shared/client-rpc-router";
 export * from "./use-rpc";

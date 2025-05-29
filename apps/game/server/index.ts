@@ -23,7 +23,6 @@ export * from "../shared/client-view-distance-settings";
 export * from "../shared/area/area-id";
 export * from "../shared/area/area-resource";
 export * from "../shared/area/tiled-resource";
-export * from "../shared/client-rpc-router";
 export * from "./user/client-id";
 export * from "./user/auth";
 export * from "./user/define-roles";
