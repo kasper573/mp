@@ -21,13 +21,11 @@ export type EntityPatchOptimizer<Entity> = {
 /**
  * A property specific optimizer
  */
-export interface PropertyPatchOptimizer<Value, Entity> {
-  filter?: PropertyPatchOptimizerFilter<Value, Entity>;
-  /**
-   * Transforms the value of the property before applying the patch.
-   */
-  transform?: (value: Value) => Value;
-}
+export type PropertyPatchOptimizer<Value, Entity> = (
+  newValue: Value,
+  oldValue: Value,
+  entity: Entity,
+) => [accepted: boolean, transformedValue: Value];
 
 /**
  * Determines whether the patch for a given property should be applied or not.
@@ -83,19 +81,28 @@ export class EntityOptimizerBuilder<Entity> {
 }
 
 export class PropertyOptimizerBuilder<Value, Entity> {
-  private optimizer: PropertyPatchOptimizer<Value, Entity> = {};
+  #filter: PropertyPatchOptimizerFilter<Value, Entity> = refDiff;
+  #transform: (value: Value) => Value = passThrough;
 
   filter(filter: PropertyPatchOptimizerFilter<Value, Entity>): this {
-    this.optimizer.filter = filter;
+    this.#filter = filter;
     return this;
   }
 
   transform(transform: (value: Value) => Value): this {
-    this.optimizer.transform = transform;
+    this.#transform = transform;
     return this;
   }
 
   build(): PropertyPatchOptimizer<Value, Entity> {
-    return this.optimizer;
+    return (newValue, prevValue, entity) => {
+      prevValue = this.#transform(prevValue);
+      newValue = this.#transform(newValue);
+      const accepted = this.#filter(newValue, prevValue, entity);
+      return [accepted, newValue];
+    };
   }
 }
+
+const passThrough = <T>(v: T): T => v;
+const refDiff = <T>(a: T, b: T) => a !== b;

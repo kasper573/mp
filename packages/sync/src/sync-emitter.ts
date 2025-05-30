@@ -17,11 +17,10 @@ export class SyncEmitter<
   EventMap extends SyncEventMap,
 > {
   private events: ServerSyncEvent<State>[] = [];
-
-  constructor(private options: SyncEmitterOptions<State>) {}
-
   private hasBeenGivenFullState = new Set<ClientId>();
   private visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
+
+  constructor(private options: SyncEmitterOptions<State>) {}
 
   flush(state: State): FlushResult {
     const clientIds = Array.from(this.options.clientIds());
@@ -109,15 +108,11 @@ export class SyncEmitter<
 
   private *flushPatchCollectors(): Generator<Operation> {
     for (const state of this.patchCollectors) {
-      for (const [entityName, entityRecord] of Object.entries(state)) {
-        if (!isPatchCollectorRecord(entityRecord)) {
-          throw new TypeError(
-            `Entity "${entityName}" is not a PatchCollectorRecord, cannot attach patch observers.`,
-          );
-        }
-
-        for (const operation of entityRecord.$flush()) {
-          yield prefixOperation(entityName, operation);
+      for (const [entityName, entities] of Object.entries(state)) {
+        if (isPatchCollectorRecord(entities)) {
+          for (const operation of entities.$flush()) {
+            yield prefixOperation(entityName, operation);
+          }
         }
       }
     }

@@ -1,14 +1,14 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
-import type {
-  EntityPatchOptimizer,
-  PropertyPatchOptimizer,
-} from "./patch-optimizer";
+import type { EntityPatchOptimizer } from "./patch-optimizer";
 import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
 export class PatchCollectorFactory<Entity extends object> {
   constructor(private optimizer?: EntityPatchOptimizer<Entity>) {}
 
+  /**
+   * Create a PatchCollector instance for this entity type.
+   */
   create(initialState: Entity): PatchCollector<Entity> {
     let changes: Partial<Entity> = {};
     let dirty = false;
@@ -17,21 +17,14 @@ export class PatchCollectorFactory<Entity extends object> {
       set: (target, prop, newValue) => {
         let shouldCollectValue = true;
         let collectedValue = newValue as unknown;
+        const optimizer = this.optimizer?.[prop as keyof Entity];
 
-        if (PatchCollectorFactory.optimize) {
-          let prevValue = Reflect.get(target, prop) as unknown;
-
-          const optimizer = this.optimizer?.[prop as keyof Entity] as
-            | PropertyPatchOptimizer<unknown, object>
-            | undefined;
-
-          if (optimizer?.transform) {
-            prevValue = optimizer.transform(prevValue);
-            collectedValue = optimizer.transform(newValue);
-          }
-
-          const filter = optimizer?.filter ?? refDiff;
-          shouldCollectValue = filter(collectedValue, prevValue, target);
+        if (PatchCollectorFactory.optimize && optimizer) {
+          [shouldCollectValue, collectedValue] = optimizer(
+            newValue as never,
+            Reflect.get(target, prop),
+            target,
+          );
         }
 
         if (shouldCollectValue) {
@@ -67,7 +60,7 @@ export class PatchCollectorFactory<Entity extends object> {
   }
 
   /**
-   * Convenience method to create a PatchCollectorRecord instance for this factory.
+   * Create a PatchCollectorRecord instance for this entity type.
    */
   record<EntityId extends PatchableEntityId>(
     initialEntries?: Iterable<readonly [EntityId, Entity]>,
@@ -79,28 +72,9 @@ export class PatchCollectorFactory<Entity extends object> {
   static restrictDeepMutations = false;
 }
 
-type PatchCollector<Entity> = Entity & {
+export type PatchCollector<Entity> = Entity & {
   [flushFunctionName]: EntityFlushFn;
 };
-
-type EntityFlushFn = (...path: PatchPathStep[]) => Patch;
-
-function deepMutationGuard<T extends object>(
-  target: T,
-  prop: string | symbol,
-  receiver: unknown,
-): unknown {
-  const value = Reflect.get(target, prop, receiver) as unknown;
-  if (typeof value === "object" && value !== null) {
-    return new Proxy(value, {
-      set: () => {
-        throw new Error("Deep mutations are not allowed");
-      },
-      get: deepMutationGuard,
-    });
-  }
-  return value;
-}
 
 export type PatchCollectorRecord<
   EntityId extends PatchableEntityId,
@@ -109,7 +83,7 @@ export type PatchCollectorRecord<
   [flushFunctionName](): Patch;
 };
 
-export function createPatchCollectorRecord<
+function createPatchCollectorRecord<
   EntityId extends PatchableEntityId,
   Entity extends object,
 >(
@@ -165,6 +139,8 @@ export function createPatchCollectorRecord<
   return record;
 }
 
+type EntityFlushFn = (...path: PatchPathStep[]) => Patch;
+
 // $ to try to avoid colliding with keys
 const flushFunctionName = "$flush";
 
@@ -185,4 +161,19 @@ function isPatchCollector<Entity>(
     : false;
 }
 
-const refDiff = <T>(a: T, b: T) => a !== b;
+function deepMutationGuard<T extends object>(
+  target: T,
+  prop: string | symbol,
+  receiver: unknown,
+): unknown {
+  const value = Reflect.get(target, prop, receiver) as unknown;
+  if (typeof value === "object" && value !== null) {
+    return new Proxy(value, {
+      set: () => {
+        throw new Error("Deep mutations are not allowed");
+      },
+      get: deepMutationGuard,
+    });
+  }
+  return value;
+}
