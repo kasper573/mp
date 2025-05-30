@@ -16,6 +16,7 @@ export class PatchCollectorFactory<Entity extends object> {
     const record = new Proxy(initialState, {
       set: (target, prop, newValue) => {
         let shouldCollectValue = true;
+        let collectedValue = newValue as unknown;
 
         if (PatchCollectorFactory.optimize) {
           let prevValue = Reflect.get(target, prop) as unknown;
@@ -25,16 +26,16 @@ export class PatchCollectorFactory<Entity extends object> {
             | undefined;
 
           if (optimizer?.transform) {
-            newValue = optimizer.transform(newValue);
             prevValue = optimizer.transform(prevValue);
+            collectedValue = optimizer.transform(newValue);
           }
 
           const filter = optimizer?.filter ?? refDiff;
-          shouldCollectValue = filter(newValue, prevValue, target);
+          shouldCollectValue = filter(collectedValue, prevValue, target);
         }
 
         if (shouldCollectValue) {
-          Reflect.set(changes, prop, newValue);
+          Reflect.set(changes, prop, collectedValue);
           dirty = true;
         }
 
