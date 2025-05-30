@@ -19,7 +19,7 @@ export class PatchCollectorFactory<Entity extends object> {
         let collectedValue = newValue as unknown;
         const optimizer = this.optimizer?.[prop as keyof Entity];
 
-        if (PatchCollectorFactory.optimize && optimizer) {
+        if (optimizer) {
           [shouldCollectValue, collectedValue] = optimizer(
             newValue as never,
             Reflect.get(target, prop),
@@ -68,7 +68,6 @@ export class PatchCollectorFactory<Entity extends object> {
     return createPatchCollectorRecord<EntityId, Entity>(initialEntries);
   }
 
-  static optimize = true;
   static restrictDeepMutations = false;
 }
 

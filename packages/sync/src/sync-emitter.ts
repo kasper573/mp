@@ -8,6 +8,7 @@ import {
 import { isPatchCollectorRecord } from "./patch-collector";
 
 import { dedupePatch } from "./patch-deduper";
+import type { PatchOptimizer } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
 import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
@@ -48,9 +49,11 @@ export class SyncEmitter<
       this.visibilities.set(clientId, nextVisibility);
 
       if (!this.hasBeenGivenFullState.has(clientId)) {
-        clientPatch.push(
-          ...createFullStatePatch(deriveClientState(state, nextVisibility)),
-        );
+        let clientState = deriveClientState(state, nextVisibility);
+        if (this.options.patchOptimizer) {
+          clientState = this.options.patchOptimizer(clientState);
+        }
+        clientPatch.push(...createFullStatePatch(clientState));
         this.hasBeenGivenFullState.add(clientId);
       }
 
@@ -214,6 +217,7 @@ export interface ServerSyncEvent<State extends PatchableState> {
 export interface SyncEmitterOptions<State extends PatchableState> {
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
+  patchOptimizer?: PatchOptimizer<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

@@ -6,6 +6,11 @@ import type { inferEntityValue, PatchableState } from "./sync-emitter";
  * unnecessary operations or to transform operation values.
  */
 export type PatchOptimizer<State extends PatchableState> = {
+  entityOptimizers?: EntityPatchOptimizerRecord<State>;
+  (state: State): State;
+};
+
+export type EntityPatchOptimizerRecord<State extends PatchableState> = {
   [EntityName in keyof State]?: EntityPatchOptimizer<
     inferEntityValue<State[EntityName]>
   >;
@@ -37,7 +42,7 @@ export type PropertyPatchOptimizerFilter<Value, Entity> = (
 ) => boolean;
 
 export class PatchOptimizerBuilder<State extends PatchableState> {
-  private optimizer: PatchOptimizer<State> = {};
+  private entityOptimizers: EntityPatchOptimizerRecord<State> = {};
 
   entity<EntityName extends keyof State>(
     entityName: EntityName,
@@ -51,12 +56,20 @@ export class PatchOptimizerBuilder<State extends PatchableState> {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const builder = new EntityOptimizerBuilder<any>();
     configure(builder);
-    this.optimizer[entityName] = builder.build();
+    this.entityOptimizers[entityName] = builder.build();
     return this;
   }
 
   build(): PatchOptimizer<State> {
-    return this.optimizer;
+    function patchOptimizer(input: State): State {
+      if (!isPatchOptimizerEnabled()) {
+        return input;
+      }
+      return input;
+    }
+
+    patchOptimizer.entityOptimizers = this.entityOptimizers;
+    return patchOptimizer;
   }
 }
 
@@ -96,12 +109,27 @@ export class PropertyOptimizerBuilder<Value, Entity> {
 
   build(): PropertyPatchOptimizer<Value, Entity> {
     return (newValue, prevValue, entity) => {
+      if (!isPatchOptimizerEnabled()) {
+        return [true, newValue];
+      }
+
       prevValue = this.#transform(prevValue);
       newValue = this.#transform(newValue);
       const accepted = this.#filter(newValue, prevValue, entity);
       return [accepted, newValue];
     };
   }
+}
+
+const globals = {
+  isPatchOptimizerEnabled: true,
+};
+
+export function isPatchOptimizerEnabled(): boolean {
+  return globals.isPatchOptimizerEnabled;
+}
+export function setPatchOptimizerEnabled(enabled: boolean): void {
+  globals.isPatchOptimizerEnabled = enabled;
 }
 
 const passThrough = <T>(v: T): T => v;

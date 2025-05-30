@@ -1,7 +1,7 @@
 import { defineRoles, roles, rpc } from "@mp/game/server";
 import type { Ticker, TimeSpan } from "@mp/time";
 import { InjectionContext } from "@mp/ioc";
-import { PatchCollectorFactory } from "@mp/sync";
+import { isPatchOptimizerEnabled, setPatchOptimizerEnabled } from "@mp/sync";
 import { opt } from "../options";
 
 export const systemRoles = defineRoles("sys", ["admin"]);
@@ -28,14 +28,12 @@ export const systemRouter = rpc.router({
   isPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.admin]))
     .output<boolean>()
-    .query(({ ctx }) => PatchCollectorFactory.optimize),
+    .query(isPatchOptimizerEnabled),
 
   setPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.admin]))
     .input<boolean>()
-    .mutation(({ input, ctx }) => {
-      PatchCollectorFactory.optimize = input;
-    }),
+    .mutation(({ input }) => setPatchOptimizerEnabled(input)),
 });
 
 export const ctxUpdateTicker = InjectionContext.new<Ticker>("UpdateTicker");
