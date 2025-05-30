@@ -1,9 +1,9 @@
 import type { Vector, Rect } from "@mp/math";
 import { type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
-import type { ReadonlyDeep } from "@mp/sync";
-import type { GameStateMachine } from "../game-state";
+import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
+import type { GameStateEmitter } from "../game-state-emitter";
 import type { ActorId, Actor } from "./actor";
 import { findPathForSubject } from "./movement";
 
@@ -22,7 +22,8 @@ export interface CombatTrait {
 }
 
 export function combatBehavior(
-  state: GameStateMachine,
+  state: GameState,
+  emitter: GameStateEmitter,
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
@@ -31,71 +32,54 @@ export function combatBehavior(
 
       // Dying should stop all actions
       if (!actor.health) {
-        state.actors.update(actor.id, (update) =>
-          update
-            .add("health", 0) // Clamp
-            .add("path", undefined)
-            .add("moveTarget", undefined)
-            .add("attackTargetId", undefined),
-        );
+        actor.health = 0;
+        actor.path = undefined;
+        actor.moveTarget = undefined;
+        actor.attackTargetId = undefined;
       }
     }
   };
 
-  function attemptAttack(actor: ReadonlyDeep<Actor>, currentTime: TimeSpan) {
+  function attemptAttack(actor: Actor, currentTime: TimeSpan) {
     if (!actor.attackTargetId) {
       return; // Not attacking
     }
 
-    const target = state.actors()[actor.attackTargetId] as Actor | undefined;
+    const target = state.actors.get(actor.attackTargetId);
     if (!target || !isTargetable(actor, target)) {
-      state.actors.update(actor.id, (u) => u.add("attackTargetId", undefined));
+      actor.attackTargetId = undefined;
       return;
     }
 
     // move closer to target if we're not in range to attack
     if (!canAttackFrom(actor.coords, target.coords, actor.attackRange)) {
       if (!seemsToBeMovingTowards(actor, target.coords)) {
-        const attackFromTile = bestTileToAttackFrom(actor, target);
-        state.actors.update(actor.id, (u) =>
-          u.add("moveTarget", attackFromTile),
-        );
+        actor.moveTarget = bestTileToAttackFrom(actor, target);
       }
       return;
     }
 
     if (actor.lastAttack) {
-      const timeSinceLastAttack = currentTime.subtract(
-        actor.lastAttack as TimeSpan,
-      );
+      const timeSinceLastAttack = currentTime.subtract(actor.lastAttack);
       if (timeSinceLastAttack.totalSeconds < actor.attackSpeed) {
         return; // attack on cooldown
       }
     }
 
-    state.actors.update(target.id, (update) =>
-      update.add("health", Math.max(0, target.health - actor.attackDamage)),
-    );
+    target.health = Math.max(0, target.health - actor.attackDamage);
 
     if (target.health <= 0) {
-      state.$event("actor.death", target.id);
+      emitter.addEvent("actor.death", target.id);
       if (actor.type === "character" && target.type === "npc") {
-        state.actors.update(actor.id, (update) =>
-          // TODO remove this before merge
-          // @ts-expect-error - my typedefs suck and don't support union types
-          update.add("xp", actor.xp + target.xpReward),
-        );
+        actor.xp += target.xpReward;
       }
     }
 
-    state.actors.update(actor.id, (update) =>
-      update
-        .add("path", undefined) // stop moving when attacking
-        .add("lastAttack", currentTime),
-    );
+    actor.path = undefined; // stop moving when attacking
+    actor.lastAttack = currentTime;
 
-    state.$event("movement.stop", actor.id);
-    state.$event(
+    emitter.addEvent("movement.stop", actor.id);
+    emitter.addEvent(
       "combat.attack",
       { actorId: actor.id, targetId: target.id },
       { actors: [actor.id, target.id] },
@@ -103,8 +87,8 @@ export function combatBehavior(
   }
 
   function bestTileToAttackFrom(
-    actor: ReadonlyDeep<Actor>,
-    target: ReadonlyDeep<Actor>,
+    actor: Actor,
+    target: Actor,
   ): Vector<Tile> | undefined {
     const bestTile = findPathForSubject(actor, areas, target.coords)?.find(
       (tile) => canAttackFrom(tile, target.coords, actor.attackRange),
@@ -113,10 +97,7 @@ export function combatBehavior(
   }
 }
 
-function seemsToBeMovingTowards(
-  actor: ReadonlyDeep<Actor>,
-  target: Vector<Tile>,
-): boolean {
+function seemsToBeMovingTowards(actor: Actor, target: Vector<Tile>): boolean {
   return !!actor.path?.findLast((tile) =>
     canAttackFrom(tile, target, actor.attackRange),
   );
@@ -136,8 +117,8 @@ function canAttackFrom(
 const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
-  actor: ReadonlyDeep<Pick<Actor, "areaId">>,
-  target: ReadonlyDeep<Pick<Actor, "areaId" | "health">>,
+  actor: Pick<Actor, "areaId">,
+  target: Pick<Actor, "areaId" | "health">,
 ): boolean {
   return target.areaId === actor.areaId && target.health > 0;
 }

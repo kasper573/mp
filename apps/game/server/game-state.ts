@@ -1,13 +1,8 @@
-import type { SyncStateMachine } from "@mp/sync";
 import { InjectionContext } from "@mp/ioc";
-import type { ActorId, Actor } from "./traits/actor";
-import type { GameStateEvents } from "./game-state-events";
+import type { Actor, ActorId } from "./traits/actor";
 
 export type GameState = {
-  actors: Record<ActorId, Actor>;
+  actors: Map<ActorId, Actor>;
 };
 
-export type GameStateMachine = SyncStateMachine<GameState, GameStateEvents>;
-
-export const ctxGameStateMachine =
-  InjectionContext.new<GameStateMachine>("GameStateMachine");
+export const ctxGameState = InjectionContext.new<GameState>("GameState");

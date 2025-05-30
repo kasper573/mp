@@ -5,16 +5,18 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import { createSyncStateMachine } from "@mp/sync";
+import { SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
+  ActorFactory,
   createGameStatePatchOptimizer,
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
+  ctxGameStateEmitter,
   ctxNpcSpawner,
   ctxTokenVerifier,
   NpcAi,
@@ -23,7 +25,7 @@ import {
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
-import type { GameStateMachine } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import {
   ctxRng,
   ctxAreaFileUrlResolver,
@@ -34,7 +36,7 @@ import {
   characterRemoveBehavior,
   ctxCharacterService,
   ctxNpcService,
-  ctxGameStateMachine,
+  ctxGameState,
   deriveClientVisibility,
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
@@ -42,6 +44,7 @@ import { clientViewDistance } from "@mp/game/server";
 
 import type { AuthToken, UserId, UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
+import type { GameStateEvents } from "../../game/server/game-state-events";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -59,7 +62,6 @@ import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
 import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
-import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 import { NpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { CharacterService } from "./db/services/character-service";
@@ -143,8 +145,11 @@ const rpcTransceivers = setupRpcTransceivers({
 const patchOptimizerSettings = { enabled: opt.patchOptimizer };
 const patchOptimizer = createGameStatePatchOptimizer();
 
-const gameState: GameStateMachine = createSyncStateMachine({
-  initialState: { actors: {} },
+const gameState: GameState = {
+  actors: ActorFactory.map(),
+};
+
+const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
   patchOptimizer: () =>
     patchOptimizerSettings.enabled ? patchOptimizer : undefined,
   clientIds: () => wss.clients.values().map(getSocketId),
@@ -154,6 +159,8 @@ const gameState: GameStateMachine = createSyncStateMachine({
     areas,
   ),
 });
+
+gameStateEmitter.attachPatchObservers(gameState);
 
 const npcService = new NpcService(db);
 const gameService = new GameService(db);
@@ -173,10 +180,10 @@ const updateTicker = new Ticker({
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
 const spawnsFromDbAndAreas = [
   ...allNpcsAndSpawns,
-  ...deriveNpcSpawnsFromAreas(
-    areas,
-    allNpcsAndSpawns.map(({ npc }) => npc),
-  ),
+  // ...deriveNpcSpawnsFromAreas(
+  //   areas,
+  //   allNpcsAndSpawns.map(({ npc }) => npc),
+  // ),
 ];
 const characterService = new CharacterService(db, areas, actorModels, rng);
 const npcSpawner = new NpcSpawner(
@@ -190,7 +197,8 @@ const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
-  .provide(ctxGameStateMachine, gameState)
+  .provide(ctxGameState, gameState)
+  .provide(ctxGameStateEmitter, gameStateEmitter)
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenVerifier, tokenVerifier)
   .provide(ctxClientRegistry, clients)
@@ -208,13 +216,15 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-const npcAi = new NpcAi(gameState, areas, rng);
+const npcAi = new NpcAi(gameState, gameStateEmitter, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, areas));
+updateTicker.subscribe(combatBehavior(gameState, gameStateEmitter, areas));
 updateTicker.subscribe(npcAi.createTickHandler());
-updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
+updateTicker.subscribe(
+  createGameStateFlusher(gameState, gameStateEmitter, wss.clients, metrics),
+);
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, user }) =>

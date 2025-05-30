@@ -1,11 +1,13 @@
 import type { AuthToken } from "@mp/auth";
-import { ctxGameStateMachine } from "../game-state";
+import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { ctxTokenVerifier } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 import type { CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
+import { ctxGameStateEmitter } from "../game-state-emitter";
+import { ActorFactory } from "../traits/actor";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = rpc.router({
@@ -24,8 +26,9 @@ export const worldRouter = rpc.router({
       const user = result.value;
       clients.add(clientId, user);
 
-      const state = ctx.get(ctxGameStateMachine);
-      state.$flush.markToResendFullState(clientId);
+      const state = ctx.get(ctxGameState);
+      const stateEmitter = ctx.get(ctxGameStateEmitter);
+      stateEmitter.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = state.actors
@@ -38,14 +41,17 @@ export const worldRouter = rpc.router({
       }
 
       const char = await characterService.getOrCreateCharacterForUser(user);
-      state.actors.set(char.id, { type: "character", ...char });
+      state.actors.set(
+        char.id,
+        ActorFactory.create({ type: "character", ...char }),
+      );
       return char.id;
     }),
 
   requestFullState: rpc.procedure.query(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
-    const state = ctx.get(ctxGameStateMachine);
-    state.$flush.markToResendFullState(clientId);
+    const stateEmitter = ctx.get(ctxGameStateEmitter);
+    stateEmitter.markToResendFullState(clientId);
   }),
 
   leave: rpc.procedure.input<CharacterId>().mutation(({ ctx }) => {

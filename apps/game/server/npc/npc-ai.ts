@@ -1,10 +1,10 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import type { Rng } from "@mp/std";
-import type { ReadonlyDeep } from "@mp/sync";
-import type { GameStateMachine } from "../game-state";
+import { assert, type Rng } from "@mp/std";
+import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
+import type { GameStateEmitter } from "../game-state-emitter";
 import type { NpcInstance, NpcInstanceId } from "./types";
 import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
@@ -24,7 +24,8 @@ export class NpcAi {
   private combatMemories = new Map<ActorId, NpcAiCombatMemory>();
 
   constructor(
-    private gameState: GameStateMachine,
+    private gameState: GameState,
+    private gameStateEmitter: GameStateEmitter,
     private areas: AreaLookup,
     private rng: Rng,
   ) {}
@@ -41,6 +42,7 @@ export class NpcAi {
         const taskInput: TaskInput = {
           areas: this.areas,
           gameState: this.gameState,
+          gameStateEmitter: this.gameStateEmitter,
           npcCombatMemories: this.combatMemories,
           npc: subject,
           tick,
@@ -58,11 +60,11 @@ export class NpcAi {
     };
   }
 
-  private observeAttacksDoneThisTick(observer: ReadonlyDeep<NpcInstance>) {
-    for (const attack of this.gameState.$event.peek("combat.attack")) {
+  private observeAttacksDoneThisTick(observer: NpcInstance) {
+    for (const attack of this.gameStateEmitter.peekEvent("combat.attack")) {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
-          const combatant = this.gameState.actors()[combatantId];
+          const combatant = assert(this.gameState.actors.get(combatantId));
           const distance = observer.coords.distance(combatant.coords);
           return distance <= observer.aggroRange;
         },
@@ -88,7 +90,7 @@ export class NpcAi {
     }
   }
 
-  deriveTask = (npc: ReadonlyDeep<NpcInstance>, tick: TickEvent): Task => {
+  deriveTask = (npc: NpcInstance, tick: TickEvent): Task => {
     switch (npc.npcType) {
       case "static":
         return createIdleTask();

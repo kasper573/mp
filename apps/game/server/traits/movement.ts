@@ -2,7 +2,7 @@ import { type CardinalDirection, type Path, type Vector } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
-import type { GameStateMachine } from "../game-state";
+import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
@@ -30,7 +30,7 @@ export interface MovementTrait {
 }
 
 export function movementBehavior(
-  state: GameStateMachine,
+  state: GameState,
   areas: AreaLookup,
 ): TickEventHandler {
   const nextPathFinds = new Map<ActorId, TimeSpan>();
@@ -57,10 +57,8 @@ export function movementBehavior(
     for (const actor of state.actors.values()) {
       // The dead don't move
       if (actor.health <= 0) {
-        state.actors.update(actor.id, (update) => {
-          update.add("path", undefined);
-          update.add("moveTarget", undefined);
-        });
+        actor.path = undefined;
+        actor.moveTarget = undefined;
         continue;
       }
 
@@ -87,11 +85,8 @@ export function movementBehavior(
 
       // Consume the move target and produce a new path to move along
       if (moveTarget) {
-        state.actors.update(actor.id, (update) =>
-          update
-            .add("path", findPathForSubject(actor, areas, moveTarget))
-            .add("moveTarget", undefined),
-        );
+        actor.path = findPathForSubject(actor, areas, moveTarget);
+        actor.moveTarget = undefined;
       }
 
       if (actor.path) {
@@ -102,9 +97,8 @@ export function movementBehavior(
           timeSinceLastTick,
         );
 
-        state.actors.update(actor.id, (update) => {
-          update.add("coords", newCoords).add("path", newPath);
-        });
+        actor.coords = newCoords;
+        actor.path = newPath;
       }
 
       // Process portals
@@ -114,12 +108,9 @@ export function movementBehavior(
           hit.object.properties.get("goto")?.value as AreaId,
         );
         if (targetArea) {
-          state.actors.update(actor.id, (update) =>
-            update
-              .add("path", undefined)
-              .add("areaId", targetArea.id)
-              .add("coords", targetArea.start),
-          );
+          actor.path = undefined;
+          actor.areaId = targetArea.id;
+          actor.coords = targetArea.start;
         }
       }
     }

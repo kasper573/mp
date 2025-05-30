@@ -1,11 +1,11 @@
 import type { UserId } from "@mp/auth";
 import type { Logger } from "@mp/logger";
 import type { ClientRegistry } from "../user/client-registry";
-import type { GameStateMachine } from "../game-state";
+import type { GameState } from "../game-state";
 
 export function characterRemoveBehavior(
   clients: ClientRegistry,
-  state: GameStateMachine,
+  state: GameState,
   logger: Logger,
   timeout: number,
 ) {
@@ -43,7 +43,7 @@ export function characterRemoveBehavior(
       .filter((actor) => actor.type === "character")) {
       if (char.userId === userId) {
         logger.info("Removing character", char.id);
-        state.actors.remove(char.id);
+        state.actors.delete(char.id);
       }
     }
   }

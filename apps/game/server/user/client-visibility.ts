@@ -19,9 +19,9 @@ export function deriveClientVisibility(
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
-    const clientCharacter = Object.values(state.actors).find(
-      (actor) => actor.type === "character" && actor.userId === userId,
-    );
+    const clientCharacter = state.actors
+      .values()
+      .find((actor) => actor.type === "character" && actor.userId === userId);
     return { actors: visibleActors(state, clientCharacter) };
   };
 
@@ -31,7 +31,7 @@ export function deriveClientVisibility(
   ): ReadonlySet<ActorId> {
     const visible = new Set<ActorId>();
     if (observer) {
-      for (const other of Object.values(state.actors)) {
+      for (const other of state.actors.values()) {
         if (canSeeSubject(observer, other)) {
           visible.add(other.id);
         }

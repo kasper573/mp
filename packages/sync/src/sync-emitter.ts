@@ -10,12 +10,13 @@ import type { PatchOptimizer } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
 import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
+// TODO think of a better name for this.
 export class SyncEmitter<
   State extends PatchableState,
   EventMap extends SyncEventMap,
 > {
-  patch: Patch = [];
-  events: ServerSyncEvent<State>[] = [];
+  private patch: Patch = [];
+  private events: ServerSyncEvent<State>[] = [];
 
   constructor(private options: SyncEmitterOptions<State, EventMap>) {}
 

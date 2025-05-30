@@ -52,14 +52,11 @@ export async function seed(
         if (npcType === "patrol" || npcType === "static") {
           continue;
         }
-        if (npcType !== "protective") {
-          //continue;
-        }
 
         yield tx.insert(npcSpawnTable).values({
           npcType,
           areaId,
-          count: 5,
+          count: 0,
           id: String(`${areaId}-${i}`) as NpcSpawnId,
           npcId: soldier.id,
         });

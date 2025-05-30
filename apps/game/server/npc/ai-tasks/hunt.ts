@@ -5,36 +5,31 @@ import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
-    const { npc, gameState, areas, rng, npcCombatMemories } = input;
+    const { npc, gameState, gameStateEmitter, areas, rng, npcCombatMemories } =
+      input;
 
-    const deadActorsThisTick = gameState.$event.peek("actor.death");
+    const deadActorsThisTick = gameStateEmitter.peekEvent("actor.death");
     npcCombatMemories.get(npc.id)?.forgetCombatatants(deadActorsThisTick);
 
     if (npc.attackTargetId) {
-      const target = gameState.actors()[npc.attackTargetId];
+      const target = assert(gameState.actors.get(npc.attackTargetId));
       if (npc.coords.distance(target.coords) > npc.aggroRange) {
         // Target out of range, lose aggro
-        gameState.actors.update(npc.id, (update) =>
-          update
-            .add("attackTargetId", undefined)
-            .add("moveTarget", undefined)
-            .add("path", undefined)
-            // TODO this is temporary until we have a buff/ability system
-            .add("speed", 1 as Tile),
-        );
+        npc.attackTargetId = undefined;
+        npc.moveTarget = undefined;
+        npc.path = undefined;
+        // TODO this is temporary until we have a buff/ability system
+        npc.speed = 1 as Tile;
       }
       return hunt;
     }
 
     const newEnemyId = findNewEnemy(input);
     if (newEnemyId !== undefined) {
-      gameState.actors.update(npc.id, (update) =>
-        update
-          .add("attackTargetId", newEnemyId)
-          // TODO this is temporary until we have a buff/ability system
-          // The idea is that a hunter should cast a speed buff when detecting a new enemy
-          .add("speed", 2 as Tile),
-      );
+      npc.attackTargetId = newEnemyId;
+      // TODO this is temporary until we have a buff/ability system
+      // The idea is that a hunter should cast a speed buff when detecting a new enemy
+      npc.speed = 2 as Tile;
       return hunt;
     }
 
@@ -42,12 +37,9 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     if (!npc.path) {
       const area = assert(areas.get(npc.areaId));
       const toNode = rng.oneOf(area.graph.getNodes());
-      gameState.actors.update(npc.id, (update) =>
-        update
-          .add("moveTarget", toNode.data.vector)
-          // TODO this is temporary until we have a buff/ability system
-          .add("speed", 1 as Tile),
-      );
+      npc.moveTarget = toNode.data.vector;
+      // TODO this is temporary until we have a buff/ability system
+      npc.speed = 1 as Tile;
     }
 
     return hunt;

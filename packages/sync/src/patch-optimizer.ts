@@ -13,7 +13,7 @@ export type PatchOptimizer<
   EventMap extends SyncEventMap,
 > = {
   [EntityName in keyof State]?: EntityPatchOptimizer<
-    State[EntityName][keyof State[EntityName]],
+    inferEntityValue<State[EntityName]>,
     EventMap
   >;
 };

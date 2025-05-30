@@ -15,7 +15,7 @@ import type { GameStateEvents } from "../server/game-state-events";
 export function createOptimisticGameState(
   settings: Accessor<OptimisticGameStateSettings>,
 ) {
-  const gameState = createMutable<GameState>({ actors: {} });
+  const gameState = createMutable<GameState>({ actors: new Map() });
 
   /**
    * Returns the current optimistic game state.
@@ -31,7 +31,7 @@ export function createOptimisticGameState(
     }));
 
     if (enabled) {
-      for (const actor of Object.values(actors)) {
+      for (const actor of actors.values()) {
         if (actor.path && actor.health > 0) {
           const [newCoords, newPath] = moveAlongPath(
             actor.coords,
@@ -57,7 +57,7 @@ export function createOptimisticGameState(
           return actor.path[0];
         }
         if (actor.attackTargetId) {
-          const target = actors[actor.attackTargetId] as Actor | undefined;
+          const target = actors.get(actor.attackTargetId);
           return target?.coords;
         }
       }
