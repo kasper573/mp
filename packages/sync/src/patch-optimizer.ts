@@ -1,7 +1,7 @@
 import type { Patch, UpdateOperation } from "./patch";
 import { PatchType } from "./patch";
 import type { EventAccessFn, SyncEventMap } from "./sync-event";
-import type { PatchableState } from "./sync-emitter";
+import type { inferEntityValue, PatchableState } from "./sync-emitter";
 
 /**
  * A patch optimizer is a set of rules that can be applied to a patch to
@@ -69,10 +69,7 @@ export class PatchOptimizerBuilder<
     entityName: EntityName,
     configure: (
       builder: Omit<
-        EntityOptimizerBuilder<
-          State[EntityName][keyof State[EntityName]],
-          EventMap
-        >,
+        EntityOptimizerBuilder<inferEntityValue<State[EntityName]>, EventMap>,
         "build"
       >,
     ) => void,
@@ -211,7 +208,7 @@ function optimizeUpdateOperation<
     return op;
   }
 
-  const entity = state[entityName][entityId];
+  const entity = state[entityName].get(entityId as never);
 
   if (!entity) {
     // Entity doesn't exist in local state, which means the update is likely

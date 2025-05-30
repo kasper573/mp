@@ -1,13 +1,18 @@
 import { beforeEach } from "node:test";
 import { describe, expect, it } from "vitest";
-import { PatchCollector } from "../src/patch-collector";
-import { applyPatch, type Patch } from "../src/patch";
+import { PatchCollectorFactory } from "../src/patch-collector";
+import type { PatchPath } from "../src/patch";
+import { applyPatch, PatchType, type Patch } from "../src/patch";
 
 describe("basic object behavior", () => {
-  const Entity = new PatchCollector<{
+  const Entity = new PatchCollectorFactory<{
     name: string;
     cash: number;
   }>();
+
+  beforeEach(() => {
+    PatchCollectorFactory.restrictDeepMutations = false;
+  });
 
   it("instance is structurally equal to its initial data", () => {
     const initialData = { name: "john", cash: 100 };
@@ -29,7 +34,7 @@ describe("basic object behavior", () => {
   });
 
   it("can perform deep mutations by default (object property set)", () => {
-    const Nested = new PatchCollector<{
+    const Nested = new PatchCollectorFactory<{
       foo: {
         bar: string;
       };
@@ -41,7 +46,7 @@ describe("basic object behavior", () => {
   });
 
   it("can perform deep mutations by default (array push)", () => {
-    const Nested = new PatchCollector<{
+    const Nested = new PatchCollectorFactory<{
       list: unknown[];
     }>();
 
@@ -51,35 +56,35 @@ describe("basic object behavior", () => {
   });
 
   it("can opt-in to prevent deep mutations (array push)", () => {
-    const Nested = new PatchCollector<{
+    const Nested = new PatchCollectorFactory<{
       list: unknown[];
     }>();
 
-    Nested.restrictDeepMutations = true;
+    PatchCollectorFactory.restrictDeepMutations = true;
 
     const entity = Nested.create({ list: [] });
     expect(() => entity.list.push(123)).toThrow();
   });
 
   it("can opt-in to prevent deep mutations (object property set)", () => {
-    const Nested = new PatchCollector<{
+    const Nested = new PatchCollectorFactory<{
       foo: {
         bar: string;
       };
     }>();
 
-    Nested.restrictDeepMutations = true;
+    PatchCollectorFactory.restrictDeepMutations = true;
 
     const entity = Nested.create({ foo: { bar: "baz" } });
     expect(() => (entity.foo.bar = "qux")).toThrow();
   });
 
   it("can opt-in to prevent deep mutations (array push)", () => {
-    const Nested = new PatchCollector<{
+    const Nested = new PatchCollectorFactory<{
       list: unknown[];
     }>();
 
-    Nested.restrictDeepMutations = true;
+    PatchCollectorFactory.restrictDeepMutations = true;
 
     const entity = Nested.create({ list: [] });
     expect(() => entity.list.push(123)).toThrow();
@@ -87,22 +92,117 @@ describe("basic object behavior", () => {
 });
 
 describe("patch collection", () => {
-  const Entity = new PatchCollector<{
-    name: string;
-    cash: number;
-  }>();
+  it("can observe mutations on entities", () => {
+    const Entity = new PatchCollectorFactory<{
+      name: string;
+      cash: number;
+    }>();
 
-  const patch: Patch = [];
-  beforeEach(() => patch.splice(0, patch.length));
-  Entity.setReceiver((op) => patch.push(op));
+    const patch: Patch = [];
 
-  it("collects a patch when a property is mutated", () => {
+    Entity.subscribe(({ key, value }) =>
+      patch.push([PatchType.Set, [key] as PatchPath, value]),
+    );
+
     const initialData = { name: "john", cash: 100 };
+    const target = structuredClone(initialData);
+
     const entity = Entity.create(initialData);
     entity.name = "jane";
 
-    const target = structuredClone(initialData);
     applyPatch(target, patch);
     expect(target).toEqual({ name: "jane", cash: 100 });
+  });
+
+  describe("can observe mutations on entity maps", () => {
+    it("set", () => {
+      const Entity = new PatchCollectorFactory<
+        { name: string; cash: number },
+        string
+      >((entity) => entity.name);
+
+      const patch: Patch = [];
+      const source = Entity.map();
+
+      source.subscribe((op) => patch.push(op));
+      source.set("john", Entity.create({ name: "john", cash: 123 }));
+
+      const receiver = new Map();
+      applyPatch(receiver, patch);
+      expect(receiver).toEqual(
+        new Map([["john", { name: "john", cash: 123 }]]),
+      );
+    });
+
+    it("clear", () => {
+      const Entity = new PatchCollectorFactory<
+        { name: string; cash: number },
+        string
+      >((e) => e.name);
+      const patch: Patch = [];
+
+      const source = Entity.map([
+        ["john", Entity.create({ name: "john", cash: 0 })],
+        ["jane", Entity.create({ name: "jane", cash: 50 })],
+      ]);
+
+      source.subscribe((op) => patch.push(op));
+      source.clear();
+
+      const receiver = new Map([
+        ["john", { name: "john", cash: 0 }],
+        ["jane", { name: "jane", cash: 50 }],
+      ]);
+
+      applyPatch(receiver, patch);
+      expect(receiver).toEqual(new Map());
+    });
+
+    it("delete", () => {
+      type Data = { id: string; cash: number };
+      const Entity = new PatchCollectorFactory<Data, string>((e) => e.id);
+      const patch: Patch = [];
+
+      const john = Entity.create({ id: "john", cash: 0 });
+      const jane = Entity.create({ id: "jane", cash: 50 });
+      const source = Entity.map([
+        [john.id, john],
+        [jane.id, jane],
+      ]);
+
+      source.subscribe((op) => patch.push(op));
+      source.delete(john.id);
+
+      const receiver = new Map<Data["id"], Data>([
+        [john.id, { id: john.id, cash: 0 }],
+        [jane.id, { id: jane.id, cash: 50 }],
+      ]);
+
+      applyPatch(receiver, patch);
+      expect(receiver).toEqual(
+        new Map<Data["id"], Data>([[jane.id, { id: jane.id, cash: 50 }]]),
+      );
+    });
+
+    it("entity mutation", () => {
+      type Data = { id: string; cash: number };
+      const Entity = new PatchCollectorFactory<Data, Data["id"]>((e) => e.id);
+      const patch: Patch = [];
+
+      const john = Entity.create({ id: "john", cash: 0 });
+      const source = Entity.map([[john.id, john]]);
+
+      source.subscribe((op) => patch.push(op));
+      source.get("john")!.cash = 25;
+
+      const receiver = new Map<Data["id"], Data>([
+        [john.id, { id: john.id, cash: 0 }],
+      ]);
+
+      applyPatch(receiver, patch);
+      expect(receiver).toEqual(
+        new Map<Data["id"], Data>([[john.id, { id: john.id, cash: 25 }]]),
+      );
+    });
   });
 });

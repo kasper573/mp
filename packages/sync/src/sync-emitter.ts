@@ -1,4 +1,10 @@
-import { PatchType, type Patch, type PatchPath } from "./patch";
+import {
+  PatchType,
+  prefixOperation,
+  type Patch,
+  type PatchPath,
+} from "./patch";
+import { PatchCollectorMap } from "./patch-collector";
 import { dedupePatch } from "./patch-deduper";
 import type { PatchOptimizer } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
@@ -56,7 +62,7 @@ export class SyncEmitter<
           clientPatch.push([
             PatchType.Set,
             [entityName, addedId] as PatchPath,
-            state[entityName][addedId],
+            state[entityName].get(addedId),
           ]);
         }
 
@@ -74,7 +80,7 @@ export class SyncEmitter<
         ...this.patch.filter(([type, [entityName, entityId]]) => {
           return entityId === undefined
             ? false
-            : nextVisibility[entityName].has(entityId);
+            : nextVisibility[entityName].has(entityId as never);
         }),
       );
 
@@ -97,21 +103,41 @@ export class SyncEmitter<
     return { clientPatches, clientEvents };
   }
 
+  attachPatchObservers(state: State): () => void {
+    const subscriptions = new Set<() => void>();
+    for (const [entityName, entityMap] of Object.entries(state)) {
+      if (!(entityMap instanceof PatchCollectorMap)) {
+        throw new TypeError(
+          `Entity "${entityName}" is not a PatchCollectorMap, cannot attach patch observers.`,
+        );
+      }
+
+      subscriptions.add(
+        entityMap.subscribe((operation) => {
+          this.patch.push(prefixOperation(entityName, operation));
+        }),
+      );
+    }
+
+    return function detach() {
+      for (const unsubscribe of subscriptions) {
+        unsubscribe();
+      }
+      subscriptions.clear();
+    };
+  }
+
   markToResendFullState(...clientIds: ClientId[]) {
     for (const clientId of clientIds) {
       this.hasBeenGivenFullState.delete(clientId);
     }
   }
 
-  addPatch(patch: Patch): void {
-    this.patch.push(...patch);
-  }
-
   addEvent<EventName extends keyof EventMap>(
     eventName: EventName,
     payload: EventMap[EventName],
     visibility?: {
-      [EntityName in keyof State]: Iterable<keyof State[EntityName]>;
+      [EntityName in keyof State]: Iterable<inferEntityId<State[EntityName]>>;
     },
   ): void {
     const newEvent: ServerSyncEvent<State> = {
@@ -139,10 +165,10 @@ function deriveClientState<State extends PatchableState>(
 ): State {
   return Object.fromEntries(
     Object.entries(visibilities).map(
-      ([entityName, entityIds]: [string, ReadonlySet<PatchableEntityId>]) => {
+      ([entityName, entityIds]: [string, ReadonlySet<unknown>]) => {
         const allEntities = state[entityName];
-        const referencedEntities = Object.fromEntries(
-          entityIds.values().map((id) => [id, allEntities[id]]),
+        const referencedEntities = new Map(
+          entityIds.values().map((id) => [id, allEntities.get(id)]),
         );
         return [entityName, referencedEntities];
       },
@@ -208,16 +234,16 @@ export type ClientPatches = Map<ClientId, Patch>;
 export type ClientEvents = Map<ClientId, SyncEvent[]>;
 
 export type ClientVisibility<State extends PatchableState> = {
-  [EntityName in keyof State]: ReadonlySet<keyof State[EntityName]>;
+  [EntityName in keyof State]: ReadonlySet<inferEntityId<State[EntityName]>>;
 };
 
-export type PatchableEntityId = string;
+export type PatchableEntities<Id = unknown, Entity = unknown> = Map<Id, Entity>;
 
-export type PatchableEntity = unknown;
+export type inferEntityId<Entities extends PatchableEntities> =
+  Entities extends PatchableEntities<infer Id> ? Id : never;
 
-export type PatchableEntities = {
-  [entityId: PatchableEntityId]: PatchableEntity;
-};
+export type inferEntityValue<Entities extends PatchableEntities> =
+  Entities extends PatchableEntities<infer Id, infer Entity> ? Entity : never;
 
 export type PatchableState = { [entityName: string]: PatchableEntities };
 

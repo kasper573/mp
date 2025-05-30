@@ -1,171 +1,279 @@
-import { describe, beforeEach, it, expect } from "vitest";
-import { PatchType } from "../src/patch";
+import { it, expect } from "vitest";
+import { applyPatch } from "../src/patch";
 import { SyncEmitter } from "../src/sync-emitter";
+import { PatchCollectorFactory } from "../src/patch-collector";
 
 type TestState = {
-  items: Record<string, number>;
+  items: Map<string, number>;
 };
 
 type TestEventMap = {
-  update: { id: string };
-  notify: string;
+  message: string;
 };
 
-const clientIds = ["client1", "client2"] as const;
-
-describe("SyncEmitter", () => {
-  let emitter: SyncEmitter<TestState, TestEventMap>;
-
-  beforeEach(() => {
-    emitter = new SyncEmitter<TestState, TestEventMap>({
-      clientIds: () => clientIds,
-      clientVisibility: (clientId, state) => {
-        // client1 sees all items; client2 sees only even‐numbered ids
-        const allIds = Object.keys(state.items);
-        const visible =
-          clientId === "client1"
-            ? allIds
-            : allIds.filter((k) => Number.parseInt(k, 10) % 2 === 0);
-        return { items: new Set(visible) };
-      },
-    });
+it("sends full state patch on initial flush and respects client visibility config", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client1", "client2"],
+    clientVisibility: (id, state) => ({
+      items: new Set(id === "client1" ? state.items.keys() : "2"),
+    }),
   });
 
-  it("sends full‐state patch on initial flush and respects client visibility config", () => {
-    const initialState = { items: { "1": 10, "2": 20, "3": 30 } };
-    const { clientPatches } = emitter.flush(initialState);
+  const initialState = {
+    items: new Map([
+      ["1", 10],
+      ["2", 20],
+      ["3", 30],
+    ]),
+  };
+  const { clientPatches } = emitter.flush(initialState);
 
-    expect(clientPatches.size).toBe(2);
+  const client1State: TestState = { items: new Map() };
+  const client2State: TestState = { items: new Map() };
 
-    // client1 sees all three
-    expect(clientPatches.get("client1")).toEqual([
-      [PatchType.Set, ["items"], { "1": 10, "2": 20, "3": 30 }],
-    ]);
+  applyPatch(client1State, clientPatches.get("client1")!);
+  applyPatch(client2State, clientPatches.get("client2")!);
 
-    // client2 sees only '2'
-    expect(clientPatches.get("client2")).toEqual([
-      [PatchType.Set, ["items"], { "2": 20 }],
-    ]);
+  expect(client1State).toEqual({
+    items: new Map([
+      ["1", 10],
+      ["2", 20],
+      ["3", 30],
+    ]),
+  });
+  expect(client2State).toEqual({
+    items: new Map([["2", 20]]),
+  });
+});
+
+it("returns no patches or events when flushed twice with no changes", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({ items: new Set(state.items.keys()) }),
   });
 
-  it("returns empty maps when flushed twice with no changes", () => {
-    const state = { items: { "1": 1, "2": 2 } };
-    emitter.flush(state);
-    const { clientPatches, clientEvents } = emitter.flush(state);
+  const state: TestState = {
+    items: new Map([
+      ["1", 1],
+      ["2", 2],
+    ]),
+  };
+  emitter.flush(state);
+  const { clientPatches, clientEvents } = emitter.flush(state);
 
-    expect(clientPatches.size).toBe(0);
-    expect(clientEvents.size).toBe(0);
+  expect(clientPatches.size).toBe(0);
+  expect(clientEvents.size).toBe(0);
+});
+
+it("can collect patches", () => {
+  interface Person {
+    id: string;
+    cash: number;
+  }
+  type TestState = {
+    persons: Map<Person["id"], Person>;
+  };
+  const PersonFactory = new PatchCollectorFactory<Person, Person["id"]>();
+  const emitter = new SyncEmitter<TestState, {}>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      persons: new Set(state.persons.keys()),
+    }),
   });
 
-  it("includes patches added via addPatch, filtered by visibility", () => {
-    const state = { items: { "1": 10, "2": 20, "3": 30 } };
-    emitter.flush(state); // clear full‐state
+  const john = PersonFactory.create({ id: "john", cash: 0 });
+  const jane = PersonFactory.create({ id: "john", cash: 50 });
+  const serverState = {
+    persons: PersonFactory.map([
+      [john.id, john],
+      [jane.id, jane],
+    ]),
+  };
 
-    emitter.addPatch([
-      [PatchType.Set, ["items", "2"], 25],
-      [PatchType.Remove, ["items", "3"]],
-    ]);
-    const { clientPatches } = emitter.flush(state);
+  emitter.attachPatchObservers(serverState);
 
-    // Both clients get the Set for '2'; only client1 sees '3' removal,
-    // but since client2 never saw '3', Remove is filtered out.
-    expect(clientPatches.get("client1")).toEqual(
-      expect.arrayContaining([
-        [PatchType.Set, ["items", "2"], 25],
-        [PatchType.Remove, ["items", "3"]],
-      ]),
-    );
-    expect(clientPatches.get("client1")!.length).toBe(2);
+  const clientState: TestState = { persons: new Map() };
 
-    expect(clientPatches.get("client2")).toEqual([
-      [PatchType.Set, ["items", "2"], 25],
-    ]);
+  // Flush initial state
+  const flush1 = emitter.flush(serverState);
+  applyPatch(clientState, flush1.clientPatches.get("client") ?? []);
+
+  // Mutating server state should trigger patch observers
+  john.cash += 25;
+  jane.cash -= 25;
+
+  // Flush changes
+  const flush2 = emitter.flush(serverState);
+  applyPatch(clientState, flush2.clientPatches.get("client") ?? []);
+
+  expect(clientState).toEqual({
+    persons: new Map([
+      [john.id, { id: john.id, cash: 25 }],
+      [jane.id, { id: jane.id, cash: 25 }],
+    ]),
+  });
+});
+
+it("delivers events according to visibility", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client1", "client2"],
+    clientVisibility: (id, state) => ({
+      items: new Set(id === "client1" ? state.items.keys() : "2"),
+    }),
   });
 
-  it("delivers events according to visibility, and no‐visibility events to all", () => {
-    const state = { items: { "1": 10, "2": 20, "3": 30 } };
-    emitter.flush(state);
+  const state = {
+    items: new Map([
+      ["1", 10],
+      ["2", 20],
+      ["3", 30],
+    ]),
+  };
 
-    emitter.addEvent("update", { id: "1" }); // broadcast
-    emitter.addEvent("notify", "secret", { items: ["3"] }); // only clients seeing '3'
+  emitter.addEvent("message", "broadcast");
+  emitter.addEvent("message", "direct", { items: ["3"] });
+  const { clientEvents } = emitter.flush(state);
 
-    const { clientEvents } = emitter.flush(state);
+  // 'broadcast' goes to both
+  expect(clientEvents.get("client1")).toEqual(
+    expect.arrayContaining([["message", "broadcast"]]),
+  );
+  expect(clientEvents.get("client2")).toEqual(
+    expect.arrayContaining([["message", "broadcast"]]),
+  );
 
-    // 'update' goes to both
-    expect(clientEvents.get("client1")).toEqual(
-      expect.arrayContaining([["update", { id: "1" }]]),
-    );
-    expect(clientEvents.get("client2")).toEqual(
-      expect.arrayContaining([["update", { id: "1" }]]),
-    );
+  // 'direct' only to client1
+  expect(clientEvents.get("client1")).toEqual(
+    expect.arrayContaining([["message", "direct"]]),
+  );
+  expect(clientEvents.get("client2")).not.toEqual(
+    expect.arrayContaining([["message", "direct"]]),
+  );
+});
 
-    // 'notify' only to client1 (only it sees '3')
-    expect(clientEvents.get("client1")).toEqual(
-      expect.arrayContaining([["notify", "secret"]]),
-    );
-    expect(clientEvents.get("client2")).not.toEqual(
-      expect.arrayContaining([["notify", "secret"]]),
-    );
+it("can access events by name before flushing", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      items: new Set(state.items.keys()),
+    }),
   });
+  emitter.addEvent("message", "broadcast");
+  emitter.addEvent("message", "direct", { items: ["2"] });
 
-  it("peekEvent returns all payloads for a given event name without consuming them", () => {
-    emitter.addEvent("update", { id: "1" });
-    emitter.addEvent("update", { id: "2" });
-    emitter.addEvent("notify", "hi", { items: ["2"] });
+  const updates1 = emitter.peekEvent("message");
+  expect(updates1).toEqual(["broadcast", "direct"]);
+});
 
-    const updates1 = emitter.peekEvent("update");
-    expect(updates1).toEqual([{ id: "1" }, { id: "2" }]);
-
-    const notifies1 = emitter.peekEvent("notify");
-    expect(notifies1).toEqual(["hi"]);
-
-    // events should still be there until flush
-    const state = { items: { "1": 10, "2": 20 } };
-    emitter.flush(state);
-
-    expect(emitter.peekEvent("update")).toEqual([]);
-    expect(emitter.peekEvent("notify")).toEqual([]);
+it("markToResendFullState forces a client to get full patch again", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client1", "client2"],
+    clientVisibility: (id, state) => ({
+      items: new Set(id === "client1" ? state.items.keys() : "2"),
+    }),
   });
+  const serverState = {
+    items: new Map([
+      ["1", 1],
+      ["2", 2],
+    ]),
+  };
+  emitter.flush(serverState); // Throw away initial flush output
+  emitter.markToResendFullState("client1");
+  const { clientPatches } = emitter.flush(serverState); // Flush again, but only for client1
 
-  it("markToResendFullState forces a client to get full patch again", () => {
-    const state = { items: { "1": 1, "2": 2 } };
-    emitter.flush(state); // both marked given
-    emitter.markToResendFullState("client1");
+  const client1State: TestState = { items: new Map() };
+  const client2State: TestState = { items: new Map() };
 
-    const { clientPatches } = emitter.flush(state);
-    expect(clientPatches.size).toBe(1);
-    expect(clientPatches.get("client1")).toEqual([
-      [PatchType.Set, ["items"], { "1": 1, "2": 2 }],
-    ]);
+  applyPatch(client1State, clientPatches.get("client1") ?? []);
+  applyPatch(client2State, clientPatches.get("client2") ?? []);
+
+  expect(client1State).toEqual(serverState);
+  expect(client2State).not.toEqual(serverState);
+});
+
+it("fabricates 'remove' operations when entities leave visibility", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      items: new Set(
+        state.items
+          .entries()
+          .filter(([, value]) => value > 10)
+          .map(([key]) => key),
+      ),
+    }),
   });
+  const state1 = {
+    items: new Map([
+      ["1", 20],
+      ["2", 30],
+      ["3", 40],
+    ]),
+  };
+  const state2 = {
+    items: new Map([
+      ["1", 20],
+      ["2", 5],
+      ["3", 40],
+    ]),
+  };
 
-  it("fabricates 'remove' operations when entities leave visibility", () => {
-    const state1 = { items: { "1": 10, "2": 20, "3": 30 } };
-    const state2 = { items: { "1": 10, "3": 30 } }; // '2' gone
+  const clientState: TestState = { items: new Map() };
 
-    emitter.flush(state1);
-    const { clientPatches } = emitter.flush(state2);
+  const flush1 = emitter.flush(state1);
+  applyPatch(clientState, flush1.clientPatches.get("client")!);
+  const flush2 = emitter.flush(state2);
+  applyPatch(clientState, flush2.clientPatches.get("client")!);
 
-    // Both clients previously saw '2'; now must get Remove for it
-    for (const cid of clientIds) {
-      expect(clientPatches.get(cid)).toEqual([
-        [PatchType.Remove, ["items", "2"]],
-      ]);
-    }
+  expect(clientState).toEqual({
+    items: new Map([
+      ["1", 20],
+      // '2' no longer visible since it's less than 10
+      ["3", 40],
+    ]),
   });
+});
 
-  it("fabricates 'set' operations when new entities enter visibility", () => {
-    const state1 = { items: { "1": 10, "3": 30 } };
-    const state2 = { items: { "1": 10, "3": 30, "4": 40 } }; // new '4'
+it("fabricates 'set' operations when new entities enter visibility", () => {
+  const emitter = new SyncEmitter<TestState, TestEventMap>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      items: new Set(
+        state.items
+          .entries()
+          .filter(([, value]) => value > 10)
+          .map(([key]) => key),
+      ),
+    }),
+  });
+  const state1 = {
+    items: new Map([
+      ["1", 20],
+      ["2", 5],
+      ["3", 40],
+    ]),
+  };
+  const state2 = {
+    items: new Map([
+      ["1", 20],
+      ["2", 30],
+      ["3", 40],
+    ]),
+  };
 
-    emitter.flush(state1);
-    const { clientPatches } = emitter.flush(state2);
+  const clientState: TestState = { items: new Map() };
 
-    // Both clients gain '4' in their visibility sets
-    for (const cid of clientIds) {
-      expect(clientPatches.get(cid)).toEqual([
-        [PatchType.Set, ["items", "4"], 40],
-      ]);
-    }
+  const flush1 = emitter.flush(state1);
+  applyPatch(clientState, flush1.clientPatches.get("client")!);
+  const flush2 = emitter.flush(state2);
+  applyPatch(clientState, flush2.clientPatches.get("client")!);
+
+  expect(clientState).toEqual({
+    items: new Map([
+      ["1", 20],
+      ["2", 30],
+      ["3", 40],
+    ]),
   });
 });

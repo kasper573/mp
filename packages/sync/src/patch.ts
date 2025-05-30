@@ -42,6 +42,14 @@ export function applyPatch(target: object, patch: Patch): void {
   }
 }
 
+export function prefixOperation(
+  prefix: PatchPathStep,
+  operation: Operation,
+): Operation {
+  const [type, path, ...rest] = operation;
+  return [type, [prefix, ...path] as PatchPath, ...rest] as Operation;
+}
+
 function applyOperation(target: object, [type, path, value]: Operation): void {
   switch (type) {
     case PatchType.Set:
@@ -56,7 +64,11 @@ function applyOperation(target: object, [type, path, value]: Operation): void {
 function setValue(root: object, path: PatchPath, value: unknown): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  target[lastKey] = value;
+  if (target instanceof Map) {
+    target.set(lastKey, value);
+  } else {
+    target[lastKey] = value;
+  }
 }
 
 function updateValue(root: object, path: PatchPath, value: unknown): void {
@@ -72,12 +84,20 @@ function updateValue(root: object, path: PatchPath, value: unknown): void {
 function removeValue(root: object, path: PatchPath): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  delete target[lastKey];
+  if (target instanceof Map) {
+    target.delete(lastKey);
+  } else {
+    delete target[lastKey];
+  }
 }
 
 function getValue(target: object, path: unknown[]): unknown {
   for (const key of path) {
-    target = target[key as keyof typeof target];
+    if (target instanceof Map) {
+      target = target.get(key) as never;
+    } else {
+      target = target[key as keyof typeof target];
+    }
   }
   return target;
 }
