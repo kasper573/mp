@@ -2,12 +2,12 @@ import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyPatch, PatchOptimizerBuilder } from "@mp/sync";
+import { applyOperation, applyPatch, PatchType } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
-import { nearestCardinalDirection, type Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
-import type { Actor } from "../server";
+import { isPathEqual, nearestCardinalDirection, type Vector } from "@mp/math";
+import { typedKeys, type Tile } from "@mp/std";
+import type { Actor, ActorId } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 import type { GameStateEvents } from "../server/game-state-events";
@@ -69,10 +69,11 @@ export function createOptimisticGameState(
     events: EventAccessFn<GameStateEvents>,
   ) => {
     batch(() => {
-      const filteredPatch = settings().usePatchOptimizer
-        ? optimizeClientSidePatch(gameState, patch, events)
-        : patch;
-      applyPatch(gameState, filteredPatch);
+      if (settings().usePatchOptimizer) {
+        applyPatchOptimized(gameState, patch, events);
+      } else {
+        applyPatch(gameState, patch);
+      }
     });
   };
 
@@ -95,64 +96,76 @@ export const OptimisticGameStateContext = createContext(
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 
-function optimizeClientSidePatch(
-  gameState: GameState,
-  patch: Patch,
-  getEvents: EventAccessFn<GameStateEvents>,
-): Patch {
-  return patch;
-}
-
 // We need to ignore some updates to let the interpolator complete its work.
 // If we receive updates that we trust the interpolator to already be working on,
-// we use a patch optimizer to simply ignore those patch operations.
-function clientSidePatchOptimizer(events: EventAccessFn<GameStateEvents>) {
-  return new PatchOptimizerBuilder<GameState>()
-    .entity("actors", (b) =>
-      b
-        .property("coords", (b) =>
-          b.filter((newValue, oldValue, actor) => {
-            // TODO restore this somehow
-            // if (update.areaId && update.areaId !== actor.areaId) {
-            //   return true; // Always trust new coord when area changes
-            // }
-            const threshold = actor.speed * teleportThreshold.totalSeconds;
-            if (newValue.distance(oldValue) >= threshold) {
-              return true; // Snap to new coords if the distance is too large
-            }
-            return false;
-          }),
-        )
-        .property("path", (b) =>
-          b.filter((newValue, oldValue, actor) => {
-            if (events("movement.stop").some((id) => id === actor.id)) {
-              return true;
-            }
-            // TODO restore this somehow
-            // if (update.areaId && update.areaId !== actor.areaId) {
-            //   return true; // Always trust new path when area changes
-            // }
-            if (newValue?.length) {
-              return true; // Any new path should be trusted
-            }
-            // If server says to stop moving, we need to check if to let lerp finish
-            const lastRemainingLocalStep = oldValue?.[0];
-            if (
-              lastRemainingLocalStep &&
-              lastRemainingLocalStep.distance(actor.coords) <= tileMargin
-            ) {
-              // The last remaining step is within the tile margin,
-              // which means the stop command was likely due to the movement completing,
-              // so we want to let the lerp finish its remaining step.
-              return false;
-            } else {
-              // Stopped moving for some other reason than finishing moving naturally,
-              // ie. teleport or some other effect. We do not want to finish lerping.
-              // Just stop immediately and snap to the new coords.
-              return true;
-            }
-          }),
-        ),
-    )
-    .build();
+// we simply ignore those property changes.
+function applyPatchOptimized(
+  gameState: GameState,
+  patch: Patch,
+  events: EventAccessFn<GameStateEvents>,
+): void {
+  for (const op of patch) {
+    const [type, [entityName, entityId], update] = op;
+
+    if (
+      entityName === ("actors" satisfies keyof GameState) &&
+      type === PatchType.Update
+    ) {
+      const actor = gameState[entityName][entityId as ActorId];
+      for (const key of typedKeys(update)) {
+        if (!shouldApplyActorUpdate(actor, update, key, events)) {
+          delete update[key];
+        }
+      }
+    }
+
+    applyOperation(gameState, op);
+  }
+}
+
+function shouldApplyActorUpdate<Key extends keyof Actor>(
+  actor: Actor,
+  update: Partial<Actor>,
+  key: Key,
+  events: EventAccessFn<GameStateEvents>,
+) {
+  switch (key) {
+    case "coords": {
+      if (update.areaId && update.areaId !== actor.areaId) {
+        return true; // Always trust new coord when area changes
+      }
+      const threshold = actor.speed * teleportThreshold.totalSeconds;
+      if (update.coords && update.coords.distance(actor.coords) >= threshold) {
+        return true; // Snap to new coords if the distance is too large
+      }
+
+      return false;
+    }
+
+    case "path": {
+      if (events("movement.stop").some((id) => id === actor.id)) {
+        return true;
+      }
+      if (update.areaId && update.areaId !== actor.areaId) {
+        return true; // Always trust new path when area changes
+      }
+      if (update.path?.length) {
+        return true; // Any new path should be trusted
+      }
+      // If server says to stop moving, we need to check if to let lerp finish
+      const lastRemainingLocalStep = actor.path?.[0];
+      if (
+        lastRemainingLocalStep &&
+        lastRemainingLocalStep.distance(actor.coords) <= tileMargin
+      ) {
+        // The last remaining step is within the tile margin,
+        // which means the stop command was likely due to the movement completing,
+        // so we want to let the lerp finish its remaining step.
+        return false;
+      }
+      return !isPathEqual(update.path, actor.path);
+    }
+  }
+
+  return update[key] !== actor[key];
 }

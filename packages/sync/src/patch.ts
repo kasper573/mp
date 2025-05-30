@@ -31,7 +31,7 @@ export type SetOperation = [PatchType.Set, path: PatchPath, value: unknown];
 export type UpdateOperation = [
   PatchType.Update,
   path: PatchPath,
-  value: unknown,
+  value: object,
 ];
 
 export type RemoveOperation = [PatchType.Remove, path: PatchPath];
@@ -50,7 +50,10 @@ export function prefixOperation(
   return [type, [prefix, ...path] as PatchPath, ...rest] as Operation;
 }
 
-function applyOperation(target: object, [type, path, value]: Operation): void {
+export function applyOperation(
+  target: object,
+  [type, path, value]: Operation,
+): void {
   switch (type) {
     case PatchType.Set:
       return setValue(target, path, value);
