@@ -69,6 +69,7 @@ import { NpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { CharacterService } from "./db/services/character-service";
 import { GameService } from "./db/services/game-service";
+import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 
 registerEncoderExtensions();
 
@@ -182,10 +183,10 @@ const updateTicker = new Ticker({
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
 const spawnsFromDbAndAreas = [
   ...allNpcsAndSpawns,
-  // ...deriveNpcSpawnsFromAreas(
-  //   areas,
-  //   allNpcsAndSpawns.map(({ npc }) => npc),
-  // ),
+  ...deriveNpcSpawnsFromAreas(
+    areas,
+    allNpcsAndSpawns.map(({ npc }) => npc),
+  ),
 ];
 const characterService = new CharacterService(db, areas, actorModels, rng);
 const npcSpawner = new NpcSpawner(
