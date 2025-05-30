@@ -1,6 +1,6 @@
 import { Vector, type VectorLike } from "@mp/math";
-import { assert, type Tile } from "@mp/std";
-import type { ActorId } from "../traits/actor";
+import { type Tile } from "@mp/std";
+import type { Actor, ActorId } from "../traits/actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
@@ -22,7 +22,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.move]))
     .mutation(({ input: { characterId, to }, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameState);
-      const char = state.actors.get(characterId);
+      const char = state.actors[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");
@@ -45,7 +45,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.attack]))
     .mutation(({ input: { characterId, targetId }, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameState);
-      const char = state.actors.get(characterId);
+      const char = state.actors[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");
@@ -67,8 +67,8 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.kill]))
     .mutation(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameState);
-      const target = state.actors.get(targetId);
-      assert(target).health = 0;
+      const target = state.actors[targetId];
+      target.health = 0;
     }),
 
   respawn: rpc.procedure
@@ -76,7 +76,7 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.respawn]))
     .mutation(({ input: characterId, ctx, mwc: { user } }) => {
       const state = ctx.get(ctxGameState);
-      const char = state.actors.get(characterId);
+      const char = state.actors[characterId] as Actor | undefined;
 
       if (!char || char.type !== "character") {
         throw new Error("Character not found");

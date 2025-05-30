@@ -45,7 +45,7 @@ export function movementBehavior(
     // We need to make a first pass to set the weights for the path finding graph.
     // This helps promote more natural movement in avoiding walking over each other.
     tileNodeWeights.clear();
-    for (const actor of state.actors.values()) {
+    for (const actor of Object.values(state.actors)) {
       const area = assert(areas.get(actor.areaId));
       const node = area.graph.getNearestNode(actor.coords);
       if (node) {
@@ -54,7 +54,7 @@ export function movementBehavior(
       }
     }
 
-    for (const actor of state.actors.values()) {
+    for (const actor of Object.values(state.actors)) {
       // The dead don't move
       if (actor.health <= 0) {
         actor.path = undefined;

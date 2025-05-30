@@ -64,11 +64,8 @@ function applyOperation(target: object, [type, path, value]: Operation): void {
 function setValue(root: object, path: PatchPath, value: unknown): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  if (target instanceof Map) {
-    target.set(lastKey, value);
-  } else {
-    target[lastKey] = value;
-  }
+
+  target[lastKey] = value;
 }
 
 function updateValue(root: object, path: PatchPath, value: unknown): void {
@@ -84,20 +81,13 @@ function updateValue(root: object, path: PatchPath, value: unknown): void {
 function removeValue(root: object, path: PatchPath): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  if (target instanceof Map) {
-    target.delete(lastKey);
-  } else {
-    delete target[lastKey];
-  }
+
+  delete target[lastKey];
 }
 
 function getValue(target: object, path: unknown[]): unknown {
   for (const key of path) {
-    if (target instanceof Map) {
-      target = target.get(key) as never;
-    } else {
-      target = target[key as keyof typeof target];
-    }
+    target = target[key as keyof typeof target];
   }
   return target;
 }

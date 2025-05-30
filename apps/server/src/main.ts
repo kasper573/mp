@@ -146,7 +146,7 @@ const patchOptimizerSettings = { enabled: opt.patchOptimizer };
 const patchOptimizer = createGameStatePatchOptimizer();
 
 const gameState: GameState = {
-  actors: ActorFactory.map(),
+  actors: ActorFactory.record(),
 };
 
 const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({

@@ -114,7 +114,7 @@ describe("patch collection", () => {
     expect(target).toEqual({ name: "jane", cash: 100 });
   });
 
-  describe("can observe mutations on entity maps", () => {
+  describe("can observe mutations on entity records", () => {
     it("set", () => {
       const Entity = new PatchCollectorFactory<
         { name: string; cash: number },
@@ -122,40 +122,16 @@ describe("patch collection", () => {
       >((entity) => entity.name);
 
       const patch: Patch = [];
-      const source = Entity.map();
+      const source = Entity.record();
 
-      source.subscribe((op) => patch.push(op));
-      source.set("john", Entity.create({ name: "john", cash: 123 }));
+      source.$subscribe((op) => patch.push(op));
+      source["john"] = Entity.create({ name: "john", cash: 123 });
 
-      const receiver = new Map();
+      const receiver = {};
       applyPatch(receiver, patch);
       expect(receiver).toEqual(
-        new Map([["john", { name: "john", cash: 123 }]]),
+        Object.fromEntries([["john", { name: "john", cash: 123 }]]),
       );
-    });
-
-    it("clear", () => {
-      const Entity = new PatchCollectorFactory<
-        { name: string; cash: number },
-        string
-      >((e) => e.name);
-      const patch: Patch = [];
-
-      const source = Entity.map([
-        ["john", Entity.create({ name: "john", cash: 0 })],
-        ["jane", Entity.create({ name: "jane", cash: 50 })],
-      ]);
-
-      source.subscribe((op) => patch.push(op));
-      source.clear();
-
-      const receiver = new Map([
-        ["john", { name: "john", cash: 0 }],
-        ["jane", { name: "jane", cash: 50 }],
-      ]);
-
-      applyPatch(receiver, patch);
-      expect(receiver).toEqual(new Map());
     });
 
     it("delete", () => {
@@ -165,22 +141,22 @@ describe("patch collection", () => {
 
       const john = Entity.create({ id: "john", cash: 0 });
       const jane = Entity.create({ id: "jane", cash: 50 });
-      const source = Entity.map([
+      const source = Entity.record([
         [john.id, john],
         [jane.id, jane],
       ]);
 
-      source.subscribe((op) => patch.push(op));
-      source.delete(john.id);
+      source.$subscribe((op) => patch.push(op));
+      delete source[john.id];
 
-      const receiver = new Map<Data["id"], Data>([
+      const receiver = Object.fromEntries([
         [john.id, { id: john.id, cash: 0 }],
         [jane.id, { id: jane.id, cash: 50 }],
       ]);
 
       applyPatch(receiver, patch);
       expect(receiver).toEqual(
-        new Map<Data["id"], Data>([[jane.id, { id: jane.id, cash: 50 }]]),
+        Object.fromEntries([[jane.id, { id: jane.id, cash: 50 }]]),
       );
     });
 
@@ -190,18 +166,18 @@ describe("patch collection", () => {
       const patch: Patch = [];
 
       const john = Entity.create({ id: "john", cash: 0 });
-      const source = Entity.map([[john.id, john]]);
+      const source = Entity.record([[john.id, john]]);
 
-      source.subscribe((op) => patch.push(op));
-      source.get("john")!.cash = 25;
+      source.$subscribe((op) => patch.push(op));
+      john.cash = 25;
 
-      const receiver = new Map<Data["id"], Data>([
+      const receiver = Object.fromEntries([
         [john.id, { id: john.id, cash: 0 }],
       ]);
 
       applyPatch(receiver, patch);
       expect(receiver).toEqual(
-        new Map<Data["id"], Data>([[john.id, { id: john.id, cash: 25 }]]),
+        Object.fromEntries([[john.id, { id: john.id, cash: 25 }]]),
       );
     });
   });

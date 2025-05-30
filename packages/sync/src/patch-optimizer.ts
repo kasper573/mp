@@ -208,7 +208,7 @@ function optimizeUpdateOperation<
     return op;
   }
 
-  const entity = state[entityName].get(entityId as never);
+  const entity = state[entityName][entityId as never];
 
   if (!entity) {
     // Entity doesn't exist in local state, which means the update is likely

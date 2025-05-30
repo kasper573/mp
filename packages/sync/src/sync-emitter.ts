@@ -4,7 +4,8 @@ import {
   type Patch,
   type PatchPath,
 } from "./patch";
-import { PatchCollectorMap } from "./patch-collector";
+import { isPatchCollectorRecord } from "./patch-collector";
+
 import { dedupePatch } from "./patch-deduper";
 import type { PatchOptimizer } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
@@ -63,7 +64,7 @@ export class SyncEmitter<
           clientPatch.push([
             PatchType.Set,
             [entityName, addedId] as PatchPath,
-            state[entityName].get(addedId),
+            state[entityName][addedId],
           ]);
         }
 
@@ -106,15 +107,15 @@ export class SyncEmitter<
 
   attachPatchObservers(state: State): () => void {
     const subscriptions = new Set<() => void>();
-    for (const [entityName, entityMap] of Object.entries(state)) {
-      if (!(entityMap instanceof PatchCollectorMap)) {
+    for (const [entityName, entityRecord] of Object.entries(state)) {
+      if (!isPatchCollectorRecord(entityRecord)) {
         throw new TypeError(
-          `Entity "${entityName}" is not a PatchCollectorMap, cannot attach patch observers.`,
+          `Entity "${entityName}" is not a PatchCollectorRecord, cannot attach patch observers.`,
         );
       }
 
       subscriptions.add(
-        entityMap.subscribe((operation) => {
+        entityRecord.$subscribe((operation) => {
           this.patch.push(prefixOperation(entityName, operation));
         }),
       );
@@ -166,10 +167,10 @@ function deriveClientState<State extends PatchableState>(
 ): State {
   return Object.fromEntries(
     Object.entries(visibilities).map(
-      ([entityName, entityIds]: [string, ReadonlySet<unknown>]) => {
+      ([entityName, entityIds]: [string, ReadonlySet<string>]) => {
         const allEntities = state[entityName];
-        const referencedEntities = new Map(
-          entityIds.values().map((id) => [id, allEntities.get(id)]),
+        const referencedEntities = Object.fromEntries(
+          entityIds.values().map((id) => [id, allEntities[id]]),
         );
         return [entityName, referencedEntities];
       },
@@ -238,7 +239,12 @@ export type ClientVisibility<State extends PatchableState> = {
   [EntityName in keyof State]: ReadonlySet<inferEntityId<State[EntityName]>>;
 };
 
-export type PatchableEntities<Id = unknown, Entity = unknown> = Map<Id, Entity>;
+export type PatchableEntityId = string;
+
+export type PatchableEntities<
+  Id extends PatchableEntityId = PatchableEntityId,
+  Entity = unknown,
+> = Record<Id, Entity>;
 
 export type inferEntityId<Entities extends PatchableEntities> =
   Entities extends PatchableEntities<infer Id> ? Id : never;

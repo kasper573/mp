@@ -22,10 +22,9 @@ export function collectUserMetrics(
     registers: [registry],
     collect() {
       this.set(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "character")
-          .toArray().length,
+        Object.values(state.actors).filter(
+          (actor) => actor.type === "character",
+        ).length,
       );
     },
   });
@@ -36,10 +35,8 @@ export function collectUserMetrics(
     registers: [registry],
     collect() {
       this.set(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "npc")
-          .toArray().length,
+        Object.values(state.actors).filter((actor) => actor.type === "npc")
+          .length,
       );
     },
   });

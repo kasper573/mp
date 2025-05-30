@@ -38,12 +38,12 @@ export function characterRemoveBehavior(
   });
 
   function removeCharacter(userId: UserId) {
-    for (const char of state.actors
-      .values()
-      .filter((actor) => actor.type === "character")) {
+    for (const char of Object.values(state.actors).filter(
+      (actor) => actor.type === "character",
+    )) {
       if (char.userId === userId) {
         logger.info("Removing character", char.id);
-        state.actors.delete(char.id);
+        delete state.actors[char.id];
       }
     }
   }

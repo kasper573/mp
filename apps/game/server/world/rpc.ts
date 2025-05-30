@@ -31,8 +31,7 @@ export const worldRouter = rpc.router({
       stateEmitter.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
-      const existingCharacter = state.actors
-        .values()
+      const existingCharacter = Object.values(state.actors)
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === user.id);
 
@@ -41,10 +40,10 @@ export const worldRouter = rpc.router({
       }
 
       const char = await characterService.getOrCreateCharacterForUser(user);
-      state.actors.set(
-        char.id,
-        ActorFactory.create({ type: "character", ...char }),
-      );
+      state.actors[char.id] = ActorFactory.create({
+        type: "character",
+        ...char,
+      });
       return char.id;
     }),
 

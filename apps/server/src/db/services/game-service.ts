@@ -8,8 +8,7 @@ export class GameService {
   persist = (state: GameState) => {
     return this.db.transaction((tx) =>
       Promise.all(
-        state.actors
-          .values()
+        Object.values(state.actors)
           .filter((actor) => actor.type === "character")
           .map((char) => {
             return tx.insert(characterTable).values(char).onConflictDoUpdate({

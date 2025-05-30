@@ -10,12 +10,12 @@ interface User {
 }
 
 type State = {
-  users: Map<string, User>;
-  posts: Map<string, { title: string; published: boolean }>;
+  users: Record<string, User>;
+  posts: Record<string, { title: string; published: boolean }>;
 };
 
 type CommentsState = {
-  comments: Map<string, { text: string }>;
+  comments: Record<string, { text: string }>;
 };
 
 const filtersForState = new PatchOptimizerBuilder<State, {}>()
@@ -28,8 +28,8 @@ const filtersForState = new PatchOptimizerBuilder<State, {}>()
   .build();
 
 const baseState: State = {
-  users: new Map([["1", { name: "Alice", age: 20, active: true }]]),
-  posts: new Map([["a", { title: "Hello", published: false }]]),
+  users: Object.fromEntries([["1", { name: "Alice", age: 20, active: true }]]),
+  posts: Object.fromEntries([["a", { title: "Hello", published: false }]]),
 };
 
 describe("filterPatchUpdates", () => {
@@ -50,7 +50,7 @@ describe("filterPatchUpdates", () => {
 
     const stateWithComments: State & CommentsState = {
       ...baseState,
-      comments: new Map([["42", { text: "Original" }]]),
+      comments: Object.fromEntries([["42", { text: "Original" }]]),
     };
 
     const result = optimizePatch<State & CommentsState, {}>(

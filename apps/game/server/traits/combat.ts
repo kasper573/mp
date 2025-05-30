@@ -27,7 +27,7 @@ export function combatBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
-    for (const actor of state.actors.values()) {
+    for (const actor of Object.values(state.actors)) {
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
@@ -45,7 +45,7 @@ export function combatBehavior(
       return; // Not attacking
     }
 
-    const target = state.actors.get(actor.attackTargetId);
+    const target = state.actors[actor.attackTargetId] as Actor | undefined;
     if (!target || !isTargetable(actor, target)) {
       actor.attackTargetId = undefined;
       return;

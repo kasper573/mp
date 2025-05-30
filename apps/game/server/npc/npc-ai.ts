@@ -1,6 +1,6 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import { assert, type Rng } from "@mp/std";
+import { type Rng } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
@@ -32,7 +32,7 @@ export class NpcAi {
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
-      for (const subject of this.gameState.actors.values()) {
+      for (const subject of Object.values(this.gameState.actors)) {
         if (subject.type !== "npc" || subject.health <= 0) {
           continue;
         }
@@ -64,7 +64,7 @@ export class NpcAi {
     for (const attack of this.gameStateEmitter.peekEvent("combat.attack")) {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
-          const combatant = assert(this.gameState.actors.get(combatantId));
+          const combatant = this.gameState.actors[combatantId];
           const distance = observer.coords.distance(combatant.coords);
           return distance <= observer.aggroRange;
         },
@@ -82,7 +82,7 @@ export class NpcAi {
   }
 
   private removeExpiredCombats() {
-    const liveActorIds = new Set(this.gameState.actors.keys());
+    const liveActorIds = new Set(Object.keys(this.gameState.actors));
     const memorizedActorIds = new Set(this.combatMemories.keys());
     const expiredActorIds = memorizedActorIds.difference(liveActorIds);
     for (const actorId of expiredActorIds) {

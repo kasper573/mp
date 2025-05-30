@@ -1,16 +1,14 @@
 import type { Operation, PatchPath } from "./patch";
 import { PatchType } from "./patch";
+import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
 export class PatchCollectorFactory<
   Entity extends object,
-  EntityId = undefined,
+  EntityId extends PatchableEntityId = PatchableEntityId,
 > {
   private subscriptions = new Set<MutationReceiver<EntityId, Entity>>();
 
-  constructor(
-    private getEntityId: (entity: Entity) => EntityId = () =>
-      undefined as EntityId,
-  ) {}
+  constructor(private getEntityId?: (entity: Entity) => EntityId) {}
 
   create(initialData: Entity): Entity {
     const proxy = new Proxy(initialData as object, {
@@ -20,7 +18,7 @@ export class PatchCollectorFactory<
         if (oldValue !== value) {
           target[key] = value as never;
           this.dispatch({
-            entityId: this.getEntityId(target as Entity),
+            entityId: this.getEntityId?.(target as Entity) as EntityId,
             key,
             value: value as never,
           });
@@ -55,12 +53,12 @@ export class PatchCollectorFactory<
   }
 
   /**
-   * Convenience method to create a PatchCollectorMap instance for this factory.
+   * Convenience method to create a PatchCollectorRecord instance for this factory.
    */
-  map(
-    initialEntries?: Iterable<readonly [EntityId, Entity]> | null,
-  ): PatchCollectorMap<EntityId, Entity> {
-    return new PatchCollectorMap<EntityId, Entity>(this, initialEntries);
+  record(
+    initialEntries?: Iterable<readonly [EntityId, Entity]>,
+  ): PatchCollectorRecord<EntityId, Entity> {
+    return createPatchCollectorRecord<EntityId, Entity>(this, initialEntries);
   }
 
   static restrictDeepMutations = false;
@@ -99,56 +97,52 @@ function deepMutationGuard<T extends object>(
   return value;
 }
 
-export class PatchCollectorMap<EntityId, Entity extends object> extends Map<
-  EntityId,
-  Entity
-> {
-  private subscriptions = new Set<OperationReceiver>();
+export type PatchCollectorRecord<
+  EntityId extends PatchableEntityId,
+  Entity extends object,
+> = PatchableEntities<EntityId, Entity> & {
+  [subscribeFunctionName](emitOperation: OperationReceiver): () => void;
+};
 
-  constructor(
-    private entityFactory: PatchCollectorFactory<Entity, EntityId>,
-    initialEntries?: Iterable<readonly [EntityId, Entity]> | null,
-  ) {
-    // Can't pass initial entries to super constructor because it will lead to calls to set,
-    // which will need to accses idLookup before it's been initialized
-    super();
+export function createPatchCollectorRecord<
+  EntityId extends PatchableEntityId,
+  Entity extends object,
+>(
+  entityFactory: PatchCollectorFactory<Entity, EntityId>,
+  initialEntries: Iterable<readonly [EntityId, Entity]> = [],
+): PatchCollectorRecord<EntityId, Entity> {
+  const subscriptions = new Set<OperationReceiver>();
+  return new Proxy(
+    Object.fromEntries(initialEntries) as PatchCollectorRecord<
+      EntityId,
+      Entity
+    >,
+    {
+      set: (record, prop, value) => {
+        if (!isPatchCollectorInstance(value)) {
+          throw new Error("Subject is not a patch collector instance");
+        }
 
-    if (initialEntries) {
-      for (const [id, value] of initialEntries) {
-        this.set(id, value);
-      }
-    }
-  }
+        const result = Reflect.set(record, prop, value);
+        dispatch([PatchType.Set, [prop] as PatchPath, value]);
+        return result;
+      },
+      deleteProperty: (record, prop) => {
+        const result = Reflect.deleteProperty(record, prop);
+        dispatch([PatchType.Remove, [prop] as PatchPath]);
+        return result;
+      },
+      get(target, p, receiver) {
+        if (p === subscribeFunctionName) {
+          return subscribe;
+        }
+        return Reflect.get(target, p, receiver) as unknown;
+      },
+    },
+  );
 
-  override clear(): void {
-    const removedIds = Array.from(this.keys());
-    for (const id of removedIds) {
-      this.delete(id);
-    }
-  }
-
-  override delete(entityId: EntityId): boolean {
-    const entity = this.get(entityId);
-    if (entity) {
-      super.delete(entityId);
-      this.dispatch([PatchType.Remove, [entityId] as PatchPath]);
-      return true;
-    }
-    return false;
-  }
-
-  override set(id: EntityId, entity: Entity): this {
-    if (!isPatchCollectorInstance(entity)) {
-      throw new Error("Subject is not a patch collector instance");
-    }
-
-    super.set(id, entity);
-    this.dispatch([PatchType.Set, [id] as PatchPath, entity]);
-    return this;
-  }
-
-  subscribe(emitOperation: OperationReceiver): () => void {
-    const unsubscribeFromFactory = this.entityFactory.subscribe((mutation) => {
+  function subscribe(emitOperation: OperationReceiver): () => void {
+    const unsubscribeFromFactory = entityFactory.subscribe((mutation) => {
       emitOperation([
         PatchType.Set,
         [mutation.entityId, mutation.key] as PatchPath,
@@ -156,21 +150,33 @@ export class PatchCollectorMap<EntityId, Entity extends object> extends Map<
       ]);
     });
 
-    this.subscriptions.add(emitOperation);
+    subscriptions.add(emitOperation);
     return () => {
-      this.subscriptions.delete(emitOperation);
+      subscriptions.delete(emitOperation);
       unsubscribeFromFactory();
     };
   }
 
-  private dispatch(operation: Operation) {
-    for (const receiver of this.subscriptions) {
+  function dispatch(operation: Operation) {
+    for (const receiver of subscriptions) {
       receiver(operation);
     }
   }
 }
 
 const patchCollectorInstanceSymbol = Symbol("patch-collector-instance");
+
+// $ to try to avoid colliding with keys
+const subscribeFunctionName = "$subscribe";
+
+export function isPatchCollectorRecord<
+  EntityId extends PatchableEntityId,
+  Entity extends object,
+>(subject: unknown): subject is PatchCollectorRecord<EntityId, Entity> {
+  return subject
+    ? typeof Reflect.get(subject, subscribeFunctionName) === "function"
+    : false;
+}
 
 function isPatchCollectorInstance(target: unknown): boolean {
   return target
