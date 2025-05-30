@@ -1,8 +1,7 @@
 import { beforeEach } from "node:test";
 import { describe, expect, it } from "vitest";
 import { PatchCollectorFactory } from "../src/patch-collector";
-import type { PatchPath } from "../src/patch";
-import { applyPatch, PatchType, type Patch } from "../src/patch";
+import { applyPatch, type Patch } from "../src/patch";
 
 describe("basic object behavior", () => {
   const Entity = new PatchCollectorFactory<{
@@ -98,17 +97,13 @@ describe("patch collection", () => {
       cash: number;
     }>();
 
-    const patch: Patch = [];
-
-    Entity.subscribe(({ key, value }) =>
-      patch.push([PatchType.Set, [key] as PatchPath, value]),
-    );
-
     const initialData = { name: "john", cash: 100 };
     const target = structuredClone(initialData);
 
     const entity = Entity.create(initialData);
     entity.name = "jane";
+
+    const patch: Patch = [entity.$flush()];
 
     applyPatch(target, patch);
     expect(target).toEqual({ name: "jane", cash: 100 });
@@ -116,16 +111,15 @@ describe("patch collection", () => {
 
   describe("can observe mutations on entity records", () => {
     it("set", () => {
-      const Entity = new PatchCollectorFactory<
-        { name: string; cash: number },
-        string
-      >((entity) => entity.name);
+      const Entity = new PatchCollectorFactory<{
+        name: string;
+        cash: number;
+      }>();
 
-      const patch: Patch = [];
       const source = Entity.record();
-
-      source.$subscribe((op) => patch.push(op));
       source["john"] = Entity.create({ name: "john", cash: 123 });
+
+      const patch = source.$flush();
 
       const receiver = {};
       applyPatch(receiver, patch);
@@ -136,8 +130,7 @@ describe("patch collection", () => {
 
     it("delete", () => {
       type Data = { id: string; cash: number };
-      const Entity = new PatchCollectorFactory<Data, string>((e) => e.id);
-      const patch: Patch = [];
+      const Entity = new PatchCollectorFactory<Data>();
 
       const john = Entity.create({ id: "john", cash: 0 });
       const jane = Entity.create({ id: "jane", cash: 50 });
@@ -146,15 +139,14 @@ describe("patch collection", () => {
         [jane.id, jane],
       ]);
 
-      source.$subscribe((op) => patch.push(op));
+      // Flush initial state
+      const receiver = Object.fromEntries([]);
+      applyPatch(receiver, source.$flush());
+
+      // Apply and flush delete
       delete source[john.id];
+      applyPatch(receiver, source.$flush());
 
-      const receiver = Object.fromEntries([
-        [john.id, { id: john.id, cash: 0 }],
-        [jane.id, { id: jane.id, cash: 50 }],
-      ]);
-
-      applyPatch(receiver, patch);
       expect(receiver).toEqual(
         Object.fromEntries([[jane.id, { id: jane.id, cash: 50 }]]),
       );
@@ -162,18 +154,18 @@ describe("patch collection", () => {
 
     it("entity mutation", () => {
       type Data = { id: string; cash: number };
-      const Entity = new PatchCollectorFactory<Data, Data["id"]>((e) => e.id);
-      const patch: Patch = [];
+      const Entity = new PatchCollectorFactory<Data>();
 
       const john = Entity.create({ id: "john", cash: 0 });
       const source = Entity.record([[john.id, john]]);
 
-      source.$subscribe((op) => patch.push(op));
       john.cash = 25;
 
       const receiver = Object.fromEntries([
         [john.id, { id: john.id, cash: 0 }],
       ]);
+
+      const patch = source.$flush();
 
       applyPatch(receiver, patch);
       expect(receiver).toEqual(

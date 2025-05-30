@@ -1,3 +1,4 @@
+import type { Operation } from "./patch";
 import {
   PatchType,
   prefixOperation,
@@ -16,7 +17,6 @@ export class SyncEmitter<
   State extends PatchableState,
   EventMap extends SyncEventMap,
 > {
-  private patch: Patch = [];
   private events: ServerSyncEvent<State>[] = [];
 
   constructor(private options: SyncEmitterOptions<State, EventMap>) {}
@@ -37,6 +37,7 @@ export class SyncEmitter<
       ]),
     );
 
+    const serverPatch: Patch = Array.from(this.flushPatchCollectors());
     const clientPatches: ClientPatches = new Map();
     const clientEvents: ClientEvents = new Map();
 
@@ -79,7 +80,7 @@ export class SyncEmitter<
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...this.patch.filter(([type, [entityName, entityId]]) => {
+        ...serverPatch.filter(([type, [entityName, entityId]]) => {
           return entityId === undefined
             ? false
             : nextVisibility[entityName].has(entityId as never);
@@ -99,34 +100,32 @@ export class SyncEmitter<
       }
     }
 
-    this.patch.splice(0, this.patch.length);
     this.events.splice(0, this.events.length);
 
     return { clientPatches, clientEvents };
   }
 
-  attachPatchObservers(state: State): () => void {
-    const subscriptions = new Set<() => void>();
-    for (const [entityName, entityRecord] of Object.entries(state)) {
-      if (!isPatchCollectorRecord(entityRecord)) {
-        throw new TypeError(
-          `Entity "${entityName}" is not a PatchCollectorRecord, cannot attach patch observers.`,
-        );
-      }
+  private patchCollectors = new Set<State>();
 
-      subscriptions.add(
-        entityRecord.$subscribe((operation) => {
-          this.patch.push(prefixOperation(entityName, operation));
-        }),
-      );
+  private *flushPatchCollectors(): Generator<Operation> {
+    for (const state of this.patchCollectors) {
+      for (const [entityName, entityRecord] of Object.entries(state)) {
+        if (!isPatchCollectorRecord(entityRecord)) {
+          throw new TypeError(
+            `Entity "${entityName}" is not a PatchCollectorRecord, cannot attach patch observers.`,
+          );
+        }
+
+        for (const operation of entityRecord.$flush()) {
+          yield prefixOperation(entityName, operation);
+        }
+      }
     }
+  }
 
-    return function detach() {
-      for (const unsubscribe of subscriptions) {
-        unsubscribe();
-      }
-      subscriptions.clear();
-    };
+  attachPatchCollectors(collectors: State): () => void {
+    this.patchCollectors.add(collectors);
+    return () => this.patchCollectors.delete(collectors);
   }
 
   markToResendFullState(...clientIds: ClientId[]) {

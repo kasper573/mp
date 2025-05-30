@@ -19,7 +19,6 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "type-fest": "4.35.0",
     "vitest": "catalog:"
   }
 }

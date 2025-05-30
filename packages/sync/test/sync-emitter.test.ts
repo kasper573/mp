@@ -75,7 +75,7 @@ it("can collect patches", () => {
   type TestState = {
     persons: Record<Person["id"], Person>;
   };
-  const PersonFactory = new PatchCollectorFactory<Person, Person["id"]>();
+  const PersonFactory = new PatchCollectorFactory<Person>();
   const emitter = new SyncEmitter<TestState, {}>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
@@ -92,7 +92,7 @@ it("can collect patches", () => {
     ]),
   };
 
-  emitter.attachPatchObservers(serverState);
+  emitter.attachPatchCollectors(serverState);
 
   const clientState: TestState = { persons: {} };
 

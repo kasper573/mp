@@ -1,84 +1,61 @@
-import type { Operation, PatchPath } from "./patch";
-import { PatchType } from "./patch";
+import type { PatchPath, PatchPathStep, UpdateOperation } from "./patch";
+import { PatchType, type Patch } from "./patch";
 import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
-export class PatchCollectorFactory<
-  Entity extends object,
-  EntityId extends PatchableEntityId = PatchableEntityId,
-> {
-  private subscriptions = new Set<MutationReceiver<EntityId, Entity>>();
+export class PatchCollectorFactory<Entity extends object> {
+  create(initialState: Entity): PatchCollector<Entity> {
+    let changes: Partial<Entity> = {};
+    let hasChanges = false;
 
-  constructor(private getEntityId?: (entity: Entity) => EntityId) {}
-
-  create(initialData: Entity): Entity {
-    const proxy = new Proxy(initialData as object, {
+    const record = new Proxy(initialState, {
       set: (target, prop, value) => {
-        const key = prop as keyof typeof target;
-        const oldValue = target[key];
-        if (oldValue !== value) {
-          target[key] = value as never;
-          this.dispatch({
-            entityId: this.getEntityId?.(target as Entity) as EntityId,
-            key,
-            value: value as never,
-          });
-        }
+        Reflect.set(target, prop, value);
+        Reflect.set(changes, prop, value);
+        hasChanges = true;
         return true;
       },
       get(target, p, receiver) {
-        if (p === patchCollectorInstanceSymbol) {
-          return true;
+        if (p === flushFunctionName) {
+          return flush;
         }
-
         if (PatchCollectorFactory.restrictDeepMutations) {
           return deepMutationGuard(target, p, receiver);
         }
-
         return Reflect.get(target, p, receiver) as unknown;
       },
     });
 
-    return proxy as Entity;
-  }
+    const flush: EntityFlushFn = (...path) => {
+      let update: UpdateOperation | undefined;
+      if (hasChanges) {
+        update = [PatchType.Update, path as PatchPath, changes];
+      }
 
-  subscribe(receiver: MutationReceiver<EntityId, Entity>) {
-    this.subscriptions.add(receiver);
-    return () => this.subscriptions.delete(receiver);
-  }
+      changes = {};
+      hasChanges = false;
+      return update;
+    };
 
-  private dispatch(mutation: Mutation<EntityId, Entity>) {
-    for (const receiver of this.subscriptions) {
-      receiver(mutation);
-    }
+    return record as PatchCollector<Entity>;
   }
 
   /**
    * Convenience method to create a PatchCollectorRecord instance for this factory.
    */
-  record(
+  record<EntityId extends PatchableEntityId>(
     initialEntries?: Iterable<readonly [EntityId, Entity]>,
   ): PatchCollectorRecord<EntityId, Entity> {
-    return createPatchCollectorRecord<EntityId, Entity>(this, initialEntries);
+    return createPatchCollectorRecord<EntityId, Entity>(initialEntries);
   }
 
   static restrictDeepMutations = false;
 }
 
-type MutationReceiver<EntityId, Entity> = (
-  mutation: Mutation<EntityId, Entity>,
-) => void;
-
-export type Mutation<
-  EntityId,
-  Entity,
-  K extends keyof Entity = keyof Entity,
-> = {
-  entityId: EntityId;
-  key: K;
-  value: Entity[K];
+type PatchCollector<Entity> = Entity & {
+  [flushFunctionName]: EntityFlushFn;
 };
 
-type OperationReceiver = (operation: Operation) => void;
+type EntityFlushFn = (...path: PatchPathStep[]) => UpdateOperation | undefined;
 
 function deepMutationGuard<T extends object>(
   target: T,
@@ -101,85 +78,81 @@ export type PatchCollectorRecord<
   EntityId extends PatchableEntityId,
   Entity extends object,
 > = PatchableEntities<EntityId, Entity> & {
-  [subscribeFunctionName](emitOperation: OperationReceiver): () => void;
+  [flushFunctionName](): Patch;
 };
 
 export function createPatchCollectorRecord<
   EntityId extends PatchableEntityId,
   Entity extends object,
 >(
-  entityFactory: PatchCollectorFactory<Entity, EntityId>,
   initialEntries: Iterable<readonly [EntityId, Entity]> = [],
 ): PatchCollectorRecord<EntityId, Entity> {
-  const subscriptions = new Set<OperationReceiver>();
-  return new Proxy(
+  let previouslyFlushedIds = new Set<EntityId>();
+
+  const record = new Proxy(
     Object.fromEntries(initialEntries) as PatchCollectorRecord<
       EntityId,
       Entity
     >,
     {
-      set: (record, prop, value) => {
-        if (!isPatchCollectorInstance(value)) {
-          throw new Error("Subject is not a patch collector instance");
-        }
-
-        const result = Reflect.set(record, prop, value);
-        dispatch([PatchType.Set, [prop] as PatchPath, value]);
-        return result;
-      },
-      deleteProperty: (record, prop) => {
-        const result = Reflect.deleteProperty(record, prop);
-        dispatch([PatchType.Remove, [prop] as PatchPath]);
-        return result;
-      },
       get(target, p, receiver) {
-        if (p === subscribeFunctionName) {
-          return subscribe;
+        if (p === flushFunctionName) {
+          return flush;
         }
         return Reflect.get(target, p, receiver) as unknown;
       },
     },
   );
 
-  function subscribe(emitOperation: OperationReceiver): () => void {
-    const unsubscribeFromFactory = entityFactory.subscribe((mutation) => {
-      emitOperation([
-        PatchType.Set,
-        [mutation.entityId, mutation.key] as PatchPath,
-        mutation.value,
-      ]);
-    });
+  function flush(): Patch {
+    const patch: Patch = [];
+    const currentIds = new Set(Object.keys(record) as EntityId[]);
 
-    subscriptions.add(emitOperation);
-    return () => {
-      subscriptions.delete(emitOperation);
-      unsubscribeFromFactory();
-    };
-  }
-
-  function dispatch(operation: Operation) {
-    for (const receiver of subscriptions) {
-      receiver(operation);
+    const addedIds = currentIds.difference(previouslyFlushedIds);
+    for (const id of addedIds) {
+      patch.push([PatchType.Set, [id], record[id]]);
     }
+
+    const removedIds = previouslyFlushedIds.difference(currentIds);
+    for (const id of removedIds) {
+      patch.push([PatchType.Remove, [id]]);
+    }
+
+    const potentiallyUpdatedIds = previouslyFlushedIds.intersection(currentIds);
+    for (const id of potentiallyUpdatedIds) {
+      const entity = record[id];
+      if (isPatchCollector(entity)) {
+        const update = entity[flushFunctionName](id);
+        if (update) {
+          patch.push(update);
+        }
+      }
+    }
+
+    previouslyFlushedIds = currentIds;
+
+    return patch;
   }
+
+  return record;
 }
 
-const patchCollectorInstanceSymbol = Symbol("patch-collector-instance");
-
 // $ to try to avoid colliding with keys
-const subscribeFunctionName = "$subscribe";
+const flushFunctionName = "$flush";
 
 export function isPatchCollectorRecord<
   EntityId extends PatchableEntityId,
   Entity extends object,
 >(subject: unknown): subject is PatchCollectorRecord<EntityId, Entity> {
   return subject
-    ? typeof Reflect.get(subject, subscribeFunctionName) === "function"
+    ? typeof Reflect.get(subject, flushFunctionName) === "function"
     : false;
 }
 
-function isPatchCollectorInstance(target: unknown): boolean {
-  return target
-    ? Reflect.get(target, patchCollectorInstanceSymbol) === true
+function isPatchCollector<Entity>(
+  subject: unknown,
+): subject is PatchCollector<Entity> {
+  return subject
+    ? typeof Reflect.get(subject, flushFunctionName) === "function"
     : false;
 }

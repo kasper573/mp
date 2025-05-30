@@ -8,6 +8,4 @@ export type Actor =
   | ({ type: "character" } & Character)
   | ({ type: "npc" } & NpcInstance);
 
-export const ActorFactory = new PatchCollectorFactory<Actor, ActorId>(
-  (entity) => entity.id,
-);
+export const ActorFactory = new PatchCollectorFactory<Actor>();
