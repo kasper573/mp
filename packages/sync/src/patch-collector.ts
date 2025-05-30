@@ -1,4 +1,4 @@
-import type { PatchPath, PatchPathStep, UpdateOperation } from "./patch";
+import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
@@ -26,14 +26,14 @@ export class PatchCollectorFactory<Entity extends object> {
     });
 
     const flush: EntityFlushFn = (...path) => {
-      let update: UpdateOperation | undefined;
+      let patch: Patch = [];
       if (hasChanges) {
-        update = [PatchType.Update, path as PatchPath, changes];
+        patch = [[PatchType.Update, path as PatchPath, changes]];
       }
 
       changes = {};
       hasChanges = false;
-      return update;
+      return patch;
     };
 
     return record as PatchCollector<Entity>;
@@ -55,7 +55,7 @@ type PatchCollector<Entity> = Entity & {
   [flushFunctionName]: EntityFlushFn;
 };
 
-type EntityFlushFn = (...path: PatchPathStep[]) => UpdateOperation | undefined;
+type EntityFlushFn = (...path: PatchPathStep[]) => Patch;
 
 function deepMutationGuard<T extends object>(
   target: T,
@@ -122,9 +122,9 @@ export function createPatchCollectorRecord<
     for (const id of potentiallyUpdatedIds) {
       const entity = record[id];
       if (isPatchCollector(entity)) {
-        const update = entity[flushFunctionName](id);
-        if (update) {
-          patch.push(update);
+        const operations = entity[flushFunctionName](id);
+        if (operations.length > 0) {
+          patch.push(...operations);
         }
       }
     }

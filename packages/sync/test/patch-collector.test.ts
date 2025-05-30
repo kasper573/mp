@@ -103,7 +103,7 @@ describe("patch collection", () => {
     const entity = Entity.create(initialData);
     entity.name = "jane";
 
-    const patch: Patch = [entity.$flush()];
+    const patch: Patch = entity.$flush();
 
     applyPatch(target, patch);
     expect(target).toEqual({ name: "jane", cash: 100 });
