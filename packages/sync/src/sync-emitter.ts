@@ -8,7 +8,6 @@ import {
 import { isPatchCollectorRecord } from "./patch-collector";
 
 import { dedupePatch } from "./patch-deduper";
-import type { PatchOptimizer } from "./patch-optimizer";
 import type { EventAccessFn } from "./sync-event";
 import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
@@ -19,7 +18,7 @@ export class SyncEmitter<
 > {
   private events: ServerSyncEvent<State>[] = [];
 
-  constructor(private options: SyncEmitterOptions<State, EventMap>) {}
+  constructor(private options: SyncEmitterOptions<State>) {}
 
   private hasBeenGivenFullState = new Set<ClientId>();
   private visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
@@ -38,6 +37,7 @@ export class SyncEmitter<
     );
 
     const serverPatch: Patch = Array.from(this.flushPatchCollectors());
+
     const clientPatches: ClientPatches = new Map();
     const clientEvents: ClientEvents = new Map();
 
@@ -216,13 +216,9 @@ export interface ServerSyncEvent<State extends PatchableState> {
   visibility?: ClientVisibility<State>;
 }
 
-export interface SyncEmitterOptions<
-  State extends PatchableState,
-  EventMap extends SyncEventMap,
-> {
+export interface SyncEmitterOptions<State extends PatchableState> {
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizer?: () => PatchOptimizer<State, EventMap> | undefined;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

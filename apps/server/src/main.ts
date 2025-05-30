@@ -5,14 +5,13 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import { SyncEmitter } from "@mp/sync";
+import { PatchCollectorFactory, SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
   ActorFactory,
-  createGameStatePatchOptimizer,
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
@@ -61,12 +60,11 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
+import { ctxUpdateTicker } from "./etc/system-rpc";
 import { NpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { CharacterService } from "./db/services/character-service";
 import { GameService } from "./db/services/game-service";
-import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 
 registerEncoderExtensions();
 
@@ -143,16 +141,14 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const patchOptimizerSettings = { enabled: opt.patchOptimizer };
-const patchOptimizer = createGameStatePatchOptimizer();
+PatchCollectorFactory.optimize = opt.patchOptimizer;
+PatchCollectorFactory.restrictDeepMutations = opt.restrictDeepMutations;
 
 const gameState: GameState = {
   actors: ActorFactory.record(),
 };
 
 const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
-  patchOptimizer: () =>
-    patchOptimizerSettings.enabled ? patchOptimizer : undefined,
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
@@ -181,10 +177,10 @@ const updateTicker = new Ticker({
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
 const spawnsFromDbAndAreas = [
   ...allNpcsAndSpawns,
-  ...deriveNpcSpawnsFromAreas(
-    areas,
-    allNpcsAndSpawns.map(({ npc }) => npc),
-  ),
+  // ...deriveNpcSpawnsFromAreas(
+  //   areas,
+  //   allNpcsAndSpawns.map(({ npc }) => npc),
+  // ),
 ];
 const characterService = new CharacterService(db, areas, actorModels, rng);
 const npcSpawner = new NpcSpawner(
@@ -208,7 +204,6 @@ const ioc = new InjectionContainer()
   )
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxUpdateTicker, updateTicker)
-  .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
 

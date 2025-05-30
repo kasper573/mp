@@ -6,6 +6,7 @@ import {
   assertEnv,
   boolish,
   csv,
+  fallback,
   numeric,
   object,
   optional,
@@ -137,6 +138,12 @@ export const serverOptionsSchema = object({
    * Set to true to enable the patch optimizer on the server side.
    */
   patchOptimizer: boolish(),
+
+  /**
+   * Set to true to restrict deep mutations in the patch collector.
+   * Lowers performance, best to only use in development.
+   */
+  restrictDeepMutations: fallback(boolish(), false),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

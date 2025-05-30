@@ -17,7 +17,6 @@ export * from "./traits/movement";
 export * from "./traits/appearance";
 export * from "./traits/actor";
 export * from "./user/client-registry";
-export * from "./game-state-patch-optimizer";
 export * from "../shared/client-view-distance-rect";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";

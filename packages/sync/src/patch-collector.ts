@@ -1,18 +1,44 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
+import type {
+  EntityPatchOptimizer,
+  PropertyPatchOptimizer,
+} from "./patch-optimizer";
 import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
 export class PatchCollectorFactory<Entity extends object> {
+  constructor(private optimizer?: EntityPatchOptimizer<Entity>) {}
+
   create(initialState: Entity): PatchCollector<Entity> {
     let changes: Partial<Entity> = {};
-    let hasChanges = false;
+    let dirty = false;
 
     const record = new Proxy(initialState, {
-      set: (target, prop, value) => {
-        Reflect.set(target, prop, value);
-        Reflect.set(changes, prop, value);
-        hasChanges = true;
-        return true;
+      set: (target, prop, newValue) => {
+        let shouldCollectValue = true;
+
+        if (PatchCollectorFactory.optimize) {
+          let prevValue = Reflect.get(target, prop) as unknown;
+
+          const optimizer = this.optimizer?.[prop as keyof Entity] as
+            | PropertyPatchOptimizer<unknown, object>
+            | undefined;
+
+          if (optimizer?.transform) {
+            newValue = optimizer.transform(newValue);
+            prevValue = optimizer.transform(prevValue);
+          }
+
+          const filter = optimizer?.filter ?? refDiff;
+          shouldCollectValue = filter(newValue, prevValue, target);
+        }
+
+        if (shouldCollectValue) {
+          Reflect.set(changes, prop, newValue);
+          dirty = true;
+        }
+
+        return Reflect.set(target, prop, newValue);
       },
       get(target, p, receiver) {
         if (p === flushFunctionName) {
@@ -27,12 +53,12 @@ export class PatchCollectorFactory<Entity extends object> {
 
     const flush: EntityFlushFn = (...path) => {
       let patch: Patch = [];
-      if (hasChanges) {
+      if (dirty) {
         patch = [[PatchType.Update, path as PatchPath, changes]];
       }
 
       changes = {};
-      hasChanges = false;
+      dirty = false;
       return patch;
     };
 
@@ -48,6 +74,7 @@ export class PatchCollectorFactory<Entity extends object> {
     return createPatchCollectorRecord<EntityId, Entity>(initialEntries);
   }
 
+  static optimize = true;
   static restrictDeepMutations = false;
 }
 
@@ -156,3 +183,5 @@ function isPatchCollector<Entity>(
     ? typeof Reflect.get(subject, flushFunctionName) === "function"
     : false;
 }
+
+const refDiff = <T>(a: T, b: T) => a !== b;
