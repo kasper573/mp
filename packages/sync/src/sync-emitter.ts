@@ -5,7 +5,7 @@ import {
   type Patch,
   type PatchPath,
 } from "./patch";
-import { isPatchCollectorRecord } from "./patch-collector";
+import { flushRecord } from "./patch-collector";
 
 import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";
@@ -108,10 +108,8 @@ export class SyncEmitter<
   private *flushPatchCollectors(): Generator<Operation> {
     for (const state of this.patchCollectors) {
       for (const [entityName, entities] of Object.entries(state)) {
-        if (isPatchCollectorRecord(entities)) {
-          for (const operation of entities.$flush()) {
-            yield prefixOperation(entityName, operation);
-          }
+        for (const operation of flushRecord(entities)) {
+          yield prefixOperation(entityName, operation);
         }
       }
     }

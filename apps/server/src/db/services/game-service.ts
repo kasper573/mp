@@ -1,4 +1,5 @@
-import type { GameState } from "@mp/game/server";
+import type { Character, GameState } from "@mp/game/server";
+import { selectCollectableSubset } from "@mp/sync";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
 
@@ -11,10 +12,14 @@ export class GameService {
         Object.values(state.actors)
           .filter((actor) => actor.type === "character")
           .map((char) => {
-            return tx.insert(characterTable).values(char).onConflictDoUpdate({
-              target: characterTable.id,
-              set: char,
-            });
+            const values = selectCollectableSubset(char);
+            return tx
+              .insert(characterTable)
+              .values(values as Character)
+              .onConflictDoUpdate({
+                target: characterTable.id,
+                set: values,
+              });
           }),
       ),
     );

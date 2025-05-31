@@ -5,17 +5,12 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import {
-  PatchCollectorFactory,
-  setPatchOptimizerEnabled,
-  SyncEmitter,
-} from "@mp/sync";
+import { setPatchOptimizerEnabled, SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
-  ActorFactory,
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
@@ -148,11 +143,7 @@ const rpcTransceivers = setupRpcTransceivers({
 
 setPatchOptimizerEnabled(opt.patchOptimizer);
 
-PatchCollectorFactory.restrictDeepMutations = opt.restrictDeepMutations;
-
-const gameState: GameState = {
-  actors: ActorFactory.record(),
-};
+const gameState: GameState = { actors: {} };
 
 const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
   clientIds: () => wss.clients.values().map(getSocketId),

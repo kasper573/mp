@@ -8,10 +8,10 @@ import type {
   AreaId,
   AreaLookup,
   ActorModelLookup,
-  Character,
   AppearanceTrait,
   ActorModelId,
 } from "@mp/game/server";
+import { Character } from "@mp/game/server";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
@@ -41,22 +41,22 @@ export class CharacterService {
       .where(eq(characterTable.userId, user.id))
       .limit(1);
 
-    const char = result.length > 0 ? result[0] : undefined;
-    if (!char) {
+    const databaseFields = result.length > 0 ? result[0] : undefined;
+    if (!databaseFields) {
       return;
     }
-    const model = assert(this.models.get(char.modelId));
-    return {
-      ...char,
+    const model = assert(this.models.get(databaseFields.modelId));
+    return Character.create({
+      ...databaseFields,
       hitBox: model.hitBox,
       dir: this.rng.oneOf(cardinalDirections),
       name:
         user.name ??
         uniqueNamesGenerator({
           dictionaries: [names],
-          seed: char.id,
+          seed: databaseFields.id,
         }),
-    };
+    });
   }
 
   getDefaultSpawnPoint() {
@@ -107,12 +107,12 @@ export class CharacterService {
       throw new Error("Failed to insert character");
     }
 
-    return {
+    return Character.create({
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
       dir: this.rng.oneOf(cardinalDirections),
-    };
+    });
   }
 }
 

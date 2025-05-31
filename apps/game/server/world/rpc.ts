@@ -4,10 +4,9 @@ import { rpc } from "../rpc";
 import { ctxTokenVerifier } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
-import type { CharacterId } from "../character/types";
+import { type CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateEmitter } from "../game-state-emitter";
-import { ActorFactory } from "../traits/actor";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = rpc.router({
@@ -40,10 +39,7 @@ export const worldRouter = rpc.router({
       }
 
       const char = await characterService.getOrCreateCharacterForUser(user);
-      state.actors[char.id] = ActorFactory.create({
-        type: "character",
-        ...char,
-      });
+      state.actors[char.id] = char;
       return char.id;
     }),
 
