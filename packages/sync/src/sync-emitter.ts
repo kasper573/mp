@@ -8,7 +8,7 @@ import {
 import { isPatchCollectorRecord } from "./patch-collector";
 
 import { dedupePatch } from "./patch-deduper";
-import type { PatchOptimizer } from "./patch-optimizer";
+import type { StateOptimizer } from "./optimizer/state-optimizer";
 import type { EventAccessFn } from "./sync-event";
 import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
@@ -36,6 +36,7 @@ export class SyncEmitter<
       ]),
     );
 
+    const { stateOptimizer } = this.options;
     const serverPatch: Patch = Array.from(this.flushPatchCollectors());
 
     const clientPatches: ClientPatches = new Map();
@@ -50,8 +51,8 @@ export class SyncEmitter<
 
       if (!this.hasBeenGivenFullState.has(clientId)) {
         let clientState = deriveClientState(state, nextVisibility);
-        if (this.options.patchOptimizer) {
-          clientState = this.options.patchOptimizer(clientState);
+        if (stateOptimizer) {
+          clientState = stateOptimizer(clientState);
         }
         clientPatch.push(...createFullStatePatch(clientState));
         this.hasBeenGivenFullState.add(clientId);
@@ -60,14 +61,19 @@ export class SyncEmitter<
       // Emulate adds and removals of entities due to visibility changes
 
       for (const entityName in state) {
+        const entityOptimizer = stateOptimizer?.getEntityOptimizer(entityName);
         const prevIds = prevVisibility[entityName];
         const nextIds = nextVisibility[entityName];
 
         for (const addedId of nextIds.difference(prevIds)) {
+          let entity = state[entityName][addedId];
+          if (entityOptimizer) {
+            entity = entityOptimizer(entity as never) as never;
+          }
           clientPatch.push([
             PatchType.Set,
             [entityName, addedId] as PatchPath,
-            state[entityName][addedId],
+            entity,
           ]);
         }
 
@@ -217,7 +223,7 @@ export interface ServerSyncEvent<State extends PatchableState> {
 export interface SyncEmitterOptions<State extends PatchableState> {
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
-  patchOptimizer?: PatchOptimizer<State>;
+  stateOptimizer?: StateOptimizer<State>;
 }
 
 export type ClientVisibilityFactory<State extends PatchableState> = (

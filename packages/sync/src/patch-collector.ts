@@ -1,10 +1,10 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
-import type { EntityPatchOptimizer } from "./patch-optimizer";
+import type { EntityOptimizer } from "./optimizer/entity-optimizer";
 import type { PatchableEntities, PatchableEntityId } from "./sync-emitter";
 
 export class PatchCollectorFactory<Entity extends object> {
-  constructor(private optimizer?: EntityPatchOptimizer<Entity>) {}
+  constructor(private optimizer?: EntityOptimizer<Entity>) {}
 
   /**
    * Create a PatchCollector instance for this entity type.
@@ -17,7 +17,9 @@ export class PatchCollectorFactory<Entity extends object> {
       set: (target, prop, newValue) => {
         let shouldCollectValue = true;
         let collectedValue = newValue as unknown;
-        const optimizer = this.optimizer?.[prop as keyof Entity];
+        const optimizer = this.optimizer?.getPropertyOptimizer(
+          prop as keyof Entity,
+        );
 
         if (optimizer) {
           [shouldCollectValue, collectedValue] = optimizer(
