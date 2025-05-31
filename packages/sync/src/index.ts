@@ -1,6 +1,5 @@
 export * from "./encoding";
 export * from "./sync-emitter";
-export * from "./optimizer/state-optimizer";
 export * from "./optimizer/entity-optimizer";
 export * from "./optimizer/property-optimizer";
 export * from "./optimizer/settings";
