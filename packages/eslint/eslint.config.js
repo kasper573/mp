@@ -96,6 +96,9 @@ export default tseslint.config(
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
 
+      // Gives false positives for when using decorator auto accessors
+      "@typescript-eslint/no-extraneous-class": "off",
+
       ...noMathRandom(),
 
       "@typescript-eslint/naming-convention": [
