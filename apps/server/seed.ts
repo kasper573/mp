@@ -40,6 +40,7 @@ export async function seed(
         attackSpeed: 1 as TimesPerSecond,
         speed: oneTile,
         maxHealth: 25,
+        xpReward: 10,
         modelId,
         name: "Soldier",
       };
@@ -51,14 +52,11 @@ export async function seed(
         if (npcType === "patrol" || npcType === "static") {
           continue;
         }
-        if (npcType !== "protective") {
-          //continue;
-        }
 
         yield tx.insert(npcSpawnTable).values({
           npcType,
           areaId,
-          count: 5,
+          count: 10,
           id: String(`${areaId}-${i}`) as NpcSpawnId,
           npcId: soldier.id,
         });

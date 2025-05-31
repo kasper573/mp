@@ -19,9 +19,9 @@ export function deriveClientVisibility(
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const userId = clients.getUserId(clientId);
-    const clientCharacter = Object.values(state.actors).find(
-      (actor) => actor.type === "character" && actor.userId === userId,
-    );
+    const clientCharacter = Object.values(state.actors)
+
+      .find((actor) => actor.type === "character" && actor.userId === userId);
     return { actors: visibleActors(state, clientCharacter) };
   };
 

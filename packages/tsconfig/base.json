@@ -7,7 +7,7 @@
     "noImplicitOverride": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
-    "experimentalDecorators": true,
+    "experimentalDecorators": false,
     "noErrorTruncation": true,
     "inlineSources": false,
     "isolatedModules": true,

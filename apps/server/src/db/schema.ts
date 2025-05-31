@@ -33,6 +33,7 @@ export const characterTable = pgTable("character", {
   attackRange: real().$type<Tile>().notNull(),
   modelId: actorModelId().notNull(),
   name: varchar({ length: 64 }).notNull(),
+  xp: real().notNull(),
 });
 
 export const npcId = () => shortId().$type<NpcId>();
@@ -54,6 +55,7 @@ export const npcTable = pgTable("npc", {
   name: varchar({ length: 64 }).notNull(),
   npcType: npcType.notNull(),
   aggroRange: real().$type<Tile>().notNull(),
+  xpReward: real().notNull(),
 });
 
 export const npcRelations = relations(npcTable, ({ many }) => ({

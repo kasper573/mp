@@ -6,7 +6,7 @@ export function createWanderTask(
   nextTask: (input: TaskInput) => Task,
 ): Task {
   return function wander(input) {
-    const { areas, gameState, npc, tick, rng } = input;
+    const { areas, npc, tick, rng } = input;
     if (tick.totalTimeElapsed.compareTo(endTime) > 0) {
       return nextTask(input);
     }
@@ -18,11 +18,8 @@ export function createWanderTask(
       }
 
       const toNode = rng.oneOf(area.graph.getNodes());
-      gameState.actors.update(npc.id, (update) =>
-        update
-          .add("moveTarget", toNode.data.vector)
-          .add("attackTargetId", undefined),
-      );
+      npc.moveTarget = toNode.data.vector;
+      npc.attackTargetId = undefined;
     }
 
     return wander;
