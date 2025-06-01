@@ -66,7 +66,7 @@ export class NpcSpawner {
     const area = assert(this.areas.get(spawn.areaId));
     const coords = determineSpawnCoords(spawn, area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
-    return NpcInstance.create({
+    return new NpcInstance({
       ...npc,
       id,
       npcId: npc.id,

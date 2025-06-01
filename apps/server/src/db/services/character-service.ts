@@ -46,7 +46,7 @@ export class CharacterService {
       return;
     }
     const model = assert(this.models.get(databaseFields.modelId));
-    return Character.create({
+    return new Character({
       ...databaseFields,
       hitBox: model.hitBox,
       dir: this.rng.oneOf(cardinalDirections),
@@ -107,7 +107,7 @@ export class CharacterService {
       throw new Error("Failed to insert character");
     }
 
-    return Character.create({
+    return new Character({
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
