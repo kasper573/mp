@@ -15,55 +15,71 @@ export class Character implements AppearanceTrait, MovementTrait, CombatTrait {
   @collect()
   accessor type = "character" as const;
   @collect()
-  accessor id!: CharacterId;
+  accessor id: CharacterId;
   @collect()
-  accessor userId!: UserId;
+  accessor userId: UserId;
   @collect()
-  accessor xp!: number;
+  accessor xp: number;
   @collect()
-  accessor color!: number | undefined; // HEX
+  accessor color: number | undefined; // HEX
   @collect()
-  accessor opacity!: number | undefined; // 0-1
+  accessor opacity: number | undefined; // 0-1
   @collect()
-  accessor modelId!: ActorModelId;
+  accessor modelId: ActorModelId;
   @collect()
-  accessor name!: string;
+  accessor name: string;
   @collect(patchOptimizers.coords)
-  accessor coords!: Vector<Tile>;
+  accessor coords: Vector<Tile>;
   @collect()
-  accessor speed!: Tile;
+  accessor speed: Tile;
   @collect()
-  accessor areaId!: AreaId;
+  accessor areaId: AreaId;
   @collect()
-  accessor moveTarget!: Vector<Tile> | undefined;
+  accessor moveTarget: Vector<Tile> | undefined;
   @collect(patchOptimizers.path)
-  accessor path!: Path<Tile> | undefined;
+  accessor path: Path<Tile> | undefined;
   @collect()
-  accessor dir!: CardinalDirection;
+  accessor dir: CardinalDirection;
   @collect()
-  accessor hitBox!: Rect<Tile>;
+  accessor hitBox: Rect<Tile>;
   @collect()
-  accessor health!: number;
+  accessor health: number;
   @collect()
-  accessor maxHealth!: number;
+  accessor maxHealth: number;
   @collect()
-  accessor attackDamage!: number;
+  accessor attackDamage: number;
   @collect()
-  accessor attackSpeed!: TimesPerSecond;
+  accessor attackSpeed: TimesPerSecond;
   @collect()
-  accessor attackRange!: Tile;
+  accessor attackRange: Tile;
   @collect()
-  accessor attackTargetId!: ActorId | undefined;
+  accessor attackTargetId: ActorId | undefined;
   @collect()
-  accessor lastAttack!: TimeSpan | undefined;
+  accessor lastAttack: TimeSpan | undefined;
 
-  private constructor() {}
-
-  static create(data: Omit<MinimalInput<Character>, "type">): Character {
-    const instance = new Character();
-    instance.type = "character";
-    Object.assign(instance, data);
-    return instance;
+  constructor(data: Omit<MinimalInput<Character>, "type">) {
+    this.type = "character";
+    this.id = data.id;
+    this.userId = data.userId;
+    this.xp = data.xp;
+    this.color = data.color;
+    this.opacity = data.opacity;
+    this.modelId = data.modelId;
+    this.name = data.name;
+    this.coords = data.coords;
+    this.speed = data.speed;
+    this.areaId = data.areaId;
+    this.moveTarget = data.moveTarget;
+    this.path = data.path;
+    this.dir = data.dir;
+    this.hitBox = data.hitBox;
+    this.health = data.health;
+    this.maxHealth = data.maxHealth;
+    this.attackDamage = data.attackDamage;
+    this.attackSpeed = data.attackSpeed;
+    this.attackRange = data.attackRange;
+    this.attackTargetId = data.attackTargetId;
+    this.lastAttack = data.lastAttack;
   }
 }
 
