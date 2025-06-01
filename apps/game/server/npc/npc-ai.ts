@@ -1,6 +1,6 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import { type Rng } from "@mp/std";
+import { recordValues, type Rng } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../traits/actor";
@@ -32,7 +32,7 @@ export class NpcAi {
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
-      for (const subject of Object.values(this.gameState.actors)) {
+      for (const subject of recordValues(this.gameState.actors)) {
         if (subject.type !== "npc" || subject.health <= 0) {
           continue;
         }

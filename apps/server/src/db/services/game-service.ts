@@ -1,4 +1,5 @@
 import type { GameState } from "@mp/game/server";
+import { recordValues } from "@mp/std";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
 
@@ -8,7 +9,7 @@ export class GameService {
   persist = (state: GameState) => {
     return this.db.transaction((tx) =>
       Promise.all(
-        Object.values(state.actors)
+        recordValues(state.actors)
           .filter((actor) => actor.type === "character")
           .map((values) => {
             return tx.insert(characterTable).values(values).onConflictDoUpdate({

@@ -1,5 +1,5 @@
 import type { Vector, Rect } from "@mp/math";
-import { type Tile, type TimesPerSecond } from "@mp/std";
+import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
 import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -27,7 +27,7 @@ export function combatBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   return ({ totalTimeElapsed }) => {
-    for (const actor of Object.values(state.actors)) {
+    for (const actor of recordValues(state.actors)) {
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions

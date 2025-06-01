@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import { assert, createShortId, recordValues } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { InjectionContext } from "@mp/ioc";
@@ -32,7 +32,7 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of Object.values(state.actors)) {
+      for (const actor of recordValues(state.actors)) {
         if (actor.type === "npc" && actor.health <= 0) {
           let cleanupTime = corpseCleanupTimers.get(actor.id);
           if (!cleanupTime) {
@@ -47,9 +47,9 @@ export class NpcSpawner {
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = Object.values(state.actors).filter(
-          (actor) => actor.type === "npc" && actor.spawnId === spawn.id,
-        ).length;
+        const currentSpawnCount = recordValues(state.actors)
+          .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
+          .toArray().length;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {

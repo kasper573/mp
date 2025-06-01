@@ -1,5 +1,6 @@
 import type { UserId } from "@mp/auth";
 import type { Logger } from "@mp/logger";
+import { recordValues } from "@mp/std";
 import type { ClientRegistry } from "../user/client-registry";
 import type { GameState } from "../game-state";
 
@@ -38,7 +39,7 @@ export function characterRemoveBehavior(
   });
 
   function removeCharacter(userId: UserId) {
-    for (const char of Object.values(state.actors).filter(
+    for (const char of recordValues(state.actors).filter(
       (actor) => actor.type === "character",
     )) {
       if (char.userId === userId) {

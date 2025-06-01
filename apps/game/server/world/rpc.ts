@@ -1,4 +1,5 @@
 import type { AuthToken } from "@mp/auth";
+import { recordValues } from "@mp/std";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { ctxTokenVerifier } from "../user/auth";
@@ -30,7 +31,7 @@ export const worldRouter = rpc.router({
       stateEmitter.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
-      const existingCharacter = Object.values(state.actors)
+      const existingCharacter = recordValues(state.actors)
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === user.id);
 

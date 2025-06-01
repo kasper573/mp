@@ -13,6 +13,7 @@
   "dependencies": {
     "@mp/solid-pixi": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
+    "@mp/std": "workspace:*",
     "pixi.js": "catalog:",
     "solid-js": "catalog:"
   },

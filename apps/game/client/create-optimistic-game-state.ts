@@ -6,7 +6,7 @@ import { applyOperation, applyPatch, PatchType } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
 import { isPathEqual, nearestCardinalDirection, type Vector } from "@mp/math";
-import { typedKeys, type Tile } from "@mp/std";
+import { recordValues, typedKeys, type Tile } from "@mp/std";
 import type { Actor, ActorId } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
@@ -31,7 +31,7 @@ export function createOptimisticGameState(
     }));
 
     if (enabled) {
-      for (const actor of Object.values(actors)) {
+      for (const actor of recordValues(actors)) {
         if (actor.path && actor.health > 0) {
           const [newCoords, newPath] = moveAlongPath(
             actor.coords,
