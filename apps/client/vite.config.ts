@@ -6,15 +6,7 @@ import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 
 import type { Plugin } from "vite";
 
-const babelPlugins = [
-  // esbuild already supports stage 3 decorators, but solid uses babel and not esbuild, so we need this plugin
-  ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
-];
-
 export default defineConfig({
-  esbuild: {
-    target: "es2022", // Required for decorators
-  },
   plugins: [
     tanstackRouterPlugin({
       target: "solid",
@@ -25,7 +17,7 @@ export default defineConfig({
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    solid({ babel: { plugins: babelPlugins } }),
+    solid(),
     checker({ typescript: true }),
     ...(process.env.MP_CLIENT_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],
