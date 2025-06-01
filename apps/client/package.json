@@ -32,7 +32,8 @@
     "@mp/tsconfig": "workspace:*",
     "@tanstack/router-plugin": "1.115.3",
     "@vanilla-extract/vite-plugin": "5.0.1",
-    "vite": "6.2.5",
+    "@babel/plugin-proposal-decorators": "7.27.1",
+    "vite": "6.3.5",
     "vite-plugin-checker": "0.9.1",
     "vite-plugin-solid": "2.11.6"
   }
