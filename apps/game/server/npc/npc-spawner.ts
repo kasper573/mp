@@ -9,7 +9,7 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
-import type { Actor } from "../traits/actor";
+import type { NpcInstance } from "./types";
 import {
   type Npc,
   type NpcType,
@@ -60,7 +60,7 @@ export class NpcSpawner {
     };
   }
 
-  createInstance(npc: Npc, spawn: NpcSpawn): Actor {
+  createInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
     const id = createShortId() as NpcInstanceId;
     const model = assert(this.models.get(npc.modelId));
     const area = assert(this.areas.get(spawn.areaId));
