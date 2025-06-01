@@ -15,7 +15,7 @@ import {
   type NpcType,
   type NpcInstanceId,
   type NpcSpawn,
-  NpcInstance,
+  NpcInstanceFactory,
 } from "./types";
 
 export class NpcSpawner {
@@ -66,7 +66,8 @@ export class NpcSpawner {
     const area = assert(this.areas.get(spawn.areaId));
     const coords = determineSpawnCoords(spawn, area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
-    return new NpcInstance({
+    return NpcInstanceFactory.create({
+      type: "npc",
       ...npc,
       id,
       npcId: npc.id,

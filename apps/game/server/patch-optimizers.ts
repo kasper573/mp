@@ -1,9 +1,9 @@
 import type { Path, Vector } from "@mp/math";
 import { isPathEqual } from "@mp/math";
 import type { Tile } from "@mp/std";
-import type { CollectDecoratorOptions } from "@mp/sync";
+import type { PropertyPatchOptimizer } from "@mp/sync";
 
-export const coords: CollectDecoratorOptions<Vector<Tile>> = {
+export const coords: PropertyPatchOptimizer<Vector<Tile>> = {
   filter: (newValue, oldValue) =>
     // Since the client lerps coords along its current path we don't need to
     // send actual coordinate updates at a high frequency, so only sending
@@ -17,7 +17,7 @@ export const coords: CollectDecoratorOptions<Vector<Tile>> = {
 };
 
 // The client never need to see the whole path, just enough to do lerping
-export const path: CollectDecoratorOptions<Path<Tile> | undefined> = {
+export const path: PropertyPatchOptimizer<Path<Tile> | undefined> = {
   transform: (value) => value?.slice(0, 2),
   filter: (a, b) => !isPathEqual(a, b),
 };

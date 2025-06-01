@@ -10,8 +10,9 @@ import type {
   ActorModelLookup,
   AppearanceTrait,
   ActorModelId,
+  Character,
 } from "@mp/game/server";
-import { Character } from "@mp/game/server";
+import { CharacterFactory } from "@mp/game/server";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
@@ -46,7 +47,8 @@ export class CharacterService {
       return;
     }
     const model = assert(this.models.get(databaseFields.modelId));
-    return new Character({
+    return CharacterFactory.create({
+      type: "character",
       ...databaseFields,
       hitBox: model.hitBox,
       dir: this.rng.oneOf(cardinalDirections),
@@ -107,7 +109,8 @@ export class CharacterService {
       throw new Error("Failed to insert character");
     }
 
-    return new Character({
+    return CharacterFactory.create({
+      type: "character",
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
