@@ -89,13 +89,12 @@ function getOrCreateFromInstance<T>(
   symbol: symbol,
   defaultValue: () => T,
 ): T {
-  if (Reflect.has(instance, symbol)) {
-    return Reflect.get(instance, symbol) as T;
-  } else {
-    const newValue = defaultValue();
-    Reflect.set(instance, symbol, newValue);
-    return newValue;
+  let value = Reflect.get(instance, symbol) as T | undefined;
+  if (value === undefined) {
+    value = defaultValue();
+    Reflect.set(instance, symbol, value);
   }
+  return value;
 }
 
 /**
