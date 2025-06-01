@@ -1,4 +1,3 @@
-import type { Branded } from "@mp/std";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
@@ -28,10 +27,12 @@ export function collect<V>({
   ): ClassAccessorDecoratorResult<T, V> => {
     return {
       init(initialValue) {
-        registerCollectedPropertyName(
-          classIdentifier(this),
-          String(context.name),
+        const collectedProperties = getOrCreateFromInstance(
+          this,
+          symbols.collectedProperties,
+          () => new Set<PropertyKey>(),
         );
+        collectedProperties.add(context.name);
         return initialValue;
       },
       get() {
@@ -41,7 +42,11 @@ export function collect<V>({
         let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        const assignedProperties = getAssignedProperties(this);
+        const assignedProperties = getOrCreateFromInstance(
+          this,
+          symbols.assignedProperties,
+          () => new Set<PropertyKey>(),
+        );
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
         if (shouldOptimizeCollects && assignedProperties.has(context.name)) {
@@ -51,15 +56,12 @@ export function collect<V>({
         }
 
         if (shouldCollectValue) {
-          let changes = instanceChanges.get(this) as
-            | Record<string, V>
-            | undefined;
-
-          if (!changes) {
-            changes = {};
-            instanceChanges.set(this, changes);
-          }
-          changes[String(context.name)] = collectedValue;
+          const instanceChanges = getOrCreateFromInstance(
+            this,
+            symbols.instanceChanges,
+            () => ({}) as Record<string, unknown>,
+          );
+          instanceChanges[String(context.name)] = collectedValue;
         }
 
         value.set.call(this, newValue);
@@ -69,19 +71,31 @@ export function collect<V>({
   };
 }
 
-const assignedPropertiesSymbol = Symbol("assignedProperties");
+const symbols = {
+  collectedProperties: Symbol("collectedPropertyNames"),
+  assignedProperties: Symbol("assignedProperties"),
+  previouslyFlushedKeys: Symbol("previouslyFlushedRecordKeys"),
+  instanceChanges: Symbol("instanceChanges"),
+};
 
-function getAssignedProperties(instance: object): Set<PropertyKey> {
-  let set = Reflect.get(instance, assignedPropertiesSymbol) as
-    | Set<PropertyKey>
-    | undefined;
-
-  if (!set) {
-    set = new Set<PropertyKey>();
-    Reflect.set(instance, assignedPropertiesSymbol, set);
+function getFromInstance<T>(instance: object, symbol: symbol): T | undefined {
+  if (Reflect.has(instance, symbol)) {
+    return Reflect.get(instance, symbol) as T;
   }
+}
 
-  return set;
+function getOrCreateFromInstance<T>(
+  instance: object,
+  symbol: symbol,
+  defaultValue: () => T,
+): T {
+  if (Reflect.has(instance, symbol)) {
+    return Reflect.get(instance, symbol) as T;
+  } else {
+    const newValue = defaultValue();
+    Reflect.set(instance, symbol, newValue);
+    return newValue;
+  }
 }
 
 /**
@@ -91,10 +105,13 @@ export function flushClassInstance(
   instance: object,
   ...path: PatchPathStep[]
 ): Patch {
-  const changes = instanceChanges.get(instance);
+  const changes = Reflect.get(instance, symbols.instanceChanges) as
+    | object
+    | undefined;
+
   if (changes) {
     const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
-    instanceChanges.delete(instance);
+    Reflect.set(instance, symbols.instanceChanges, undefined);
     return patch;
   }
   return [];
@@ -110,7 +127,8 @@ export function flushRecord(
   const patch: Patch = [];
   const currentIds = new Set(Object.keys(record));
   const previousIds =
-    previouslyFlushedRecordKeys.get(record) ?? new Set<string>();
+    getFromInstance<Set<string>>(record, symbols.previouslyFlushedKeys) ??
+    new Set();
 
   const addedIds = currentIds.difference(previousIds);
   for (const id of addedIds) {
@@ -134,7 +152,7 @@ export function flushRecord(
     }
   }
 
-  previouslyFlushedRecordKeys.set(record, currentIds);
+  Reflect.set(record, symbols.previouslyFlushedKeys, currentIds);
 
   return patch;
 }
@@ -145,52 +163,26 @@ export function flushRecord(
 export function selectCollectableSubset<T extends object>(
   instance: T,
 ): Partial<T> {
-  const names = collectedPropertyNames.get(classIdentifier(instance)) as
-    | Set<keyof T>
-    | undefined;
-
-  if (!names) {
-    return {};
-  }
-
-  const props = Object.fromEntries(
-    Array.from(names).map((name) => [name, instance[name]]),
+  const propertyNames = getFromInstance<Set<string>>(
+    instance,
+    symbols.collectedProperties,
   );
 
-  return props as Partial<T>;
+  if (!propertyNames) {
+    return {} as Partial<T>;
+  }
+
+  const subset = Object.fromEntries(
+    Array.from(propertyNames).map((name) => [name, instance[name as keyof T]]),
+  );
+
+  return subset as Partial<T>;
 }
-
-const instanceChanges = new WeakMap<object, object>();
-
-/**
- * Key: record instance
- * Value: Set of keys that was flushed last time for this instance.
- */
-const previouslyFlushedRecordKeys = new WeakMap<object, Set<string>>();
-
-const collectedPropertyNames = new WeakMap<ClassIdentifier, Set<string>>();
 
 let shouldOptimizeCollects = true;
 
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
-function classIdentifier(instance: object) {
-  return instance.constructor as unknown as ClassIdentifier;
-}
-
-type ClassIdentifier = Branded<object, "ClassIdentifier">;
-
-function registerCollectedPropertyName(
-  id: ClassIdentifier,
-  propertyName: string,
-): void {
-  const names = collectedPropertyNames.get(id);
-  if (names) {
-    names.add(propertyName);
-  } else {
-    collectedPropertyNames.set(id, new Set([propertyName]));
-  }
-}
 
 export function isPatchOptimizerEnabled(): boolean {
   return shouldOptimizeCollects;
