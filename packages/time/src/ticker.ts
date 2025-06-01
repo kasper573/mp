@@ -6,15 +6,6 @@ export class Ticker {
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
   private intervalId?: NodeJS.Timeout;
-  #interval?: TimeSpan;
-
-  get interval(): TimeSpan | undefined {
-    return this.#interval;
-  }
-
-  get isRunning(): boolean {
-    return this.intervalId !== undefined;
-  }
 
   constructor(public options: TickerOptions) {
     this.getTimeSinceLastTick = createDeltaFn();
@@ -27,11 +18,10 @@ export class Ticker {
   }
 
   start(interval: TimeSpan) {
-    if (this.isRunning) {
+    if (this.intervalId !== undefined) {
       throw new Error("Ticker is already running");
     }
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.#interval = interval;
     this.intervalId = setInterval(this.tick, interval.totalMilliseconds);
   }
 
