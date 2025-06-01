@@ -41,7 +41,10 @@ export function collect<V>({
         let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        if (shouldOptimizeCollects) {
+        const assignedProperties = getAssignedProperties(this);
+
+        // We can't guarantee that the prevValue exists until a value has been assigned at least once.
+        if (shouldOptimizeCollects && assignedProperties.has(context.name)) {
           const prevValue = value.get.call(this);
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
@@ -60,9 +63,25 @@ export function collect<V>({
         }
 
         value.set.call(this, newValue);
+        assignedProperties.add(context.name);
       },
     };
   };
+}
+
+const assignedPropertiesSymbol = Symbol("assignedProperties");
+
+function getAssignedProperties(instance: object): Set<PropertyKey> {
+  let set = Reflect.get(instance, assignedPropertiesSymbol) as
+    | Set<PropertyKey>
+    | undefined;
+
+  if (!set) {
+    set = new Set<PropertyKey>();
+    Reflect.set(instance, assignedPropertiesSymbol, set);
+  }
+
+  return set;
 }
 
 /**
