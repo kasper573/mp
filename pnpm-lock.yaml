@@ -550,22 +550,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/soma:
-    dependencies:
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      vitest:
-        specifier: 'catalog:'
-        version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
-
   packages/state:
     dependencies:
       solid-js:
@@ -587,9 +571,6 @@ importers:
       random:
         specifier: ^5.4.0
         version: 5.4.0
-      type-fest:
-        specifier: 4.41.0
-        version: 4.41.0
       uuid:
         specifier: 11.0.4
         version: 11.0.4
@@ -628,9 +609,6 @@ importers:
       '@mp/encoding':
         specifier: workspace:*
         version: link:../encoding
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
