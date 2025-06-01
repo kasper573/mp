@@ -6,10 +6,14 @@ export class Ticker {
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
   private intervalId?: NodeJS.Timeout;
+  #interval?: TimeSpan;
 
-  #isEnabled = false;
-  get isEnabled() {
-    return this.#isEnabled;
+  get interval(): TimeSpan | undefined {
+    return this.#interval;
+  }
+
+  get isRunning(): boolean {
+    return this.intervalId !== undefined;
   }
 
   constructor(public options: TickerOptions) {
@@ -22,20 +26,19 @@ export class Ticker {
     return () => this.subscriptions.delete(fn);
   }
 
-  start() {
-    this.stop();
-    this.#isEnabled = true;
+  start(interval: TimeSpan) {
+    if (this.isRunning) {
+      throw new Error("Ticker is already running");
+    }
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.intervalId = setInterval(
-      this.tick,
-      this.options.interval.totalMilliseconds,
-    );
+    this.#interval = interval;
+    this.intervalId = setInterval(this.tick, interval.totalMilliseconds);
   }
 
   stop() {
-    this.#isEnabled = false;
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
     clearInterval(this.intervalId);
+    this.intervalId = undefined;
   }
 
   private tick = () => {
@@ -76,7 +79,6 @@ export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
 export interface TickerOptions {
   onError?: (error: unknown) => void;
   middleware?: TickMiddleware;
-  interval: TimeSpan;
 }
 
 export type Unsubscribe = () => void;

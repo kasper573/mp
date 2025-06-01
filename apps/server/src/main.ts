@@ -161,13 +161,11 @@ const gameService = new GameService(db);
 
 const persistTicker = new Ticker({
   onError: logger.error,
-  interval: opt.persistInterval,
   middleware: () => gameService.persist(gameState),
 });
 
 const updateTicker = new Ticker({
   onError: logger.error,
-  interval: opt.tickInterval,
   middleware: createTickMetricsObserver(metrics),
 });
 
@@ -228,8 +226,8 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });
 
-persistTicker.start();
-updateTicker.start();
+persistTicker.start(opt.persistInterval);
+updateTicker.start(opt.tickInterval);
 
 function createBypassUser(token: AuthToken): UserIdentity {
   return {
