@@ -14,8 +14,8 @@
   "dependencies": {
     "nanoid": "5.1.5",
     "neverthrow": "8.1.1",
-    "type-fest": "4.41.0",
     "random": "^5.4.0",
+    "type-fest": "4.41.0",
     "uuid": "11.0.4"
   },
   "devDependencies": {
