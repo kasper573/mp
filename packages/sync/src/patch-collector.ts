@@ -18,50 +18,6 @@ export interface CollectDecoratorOptions<T> {
   transform?: (value: T) => T;
 }
 
-export function collectOld<V>({
-  transform = passThrough,
-  filter = refDiff,
-}: CollectDecoratorOptions<V> = {}): PropertyDecorator {
-  return function (target, propertyKey): void {
-    const backingKey = Symbol(`${String(propertyKey)}_value`);
-
-    registerCollectedPropertyName(classIdentifier(target), String(propertyKey));
-
-    Object.defineProperty(target, propertyKey, {
-      get(): V {
-        return Reflect.get(target, backingKey) as V;
-      },
-      set(newValue: V) {
-        //console.log("setting", propertyKey, "to", newValue);
-        let collectedValue = newValue;
-        let shouldCollectValue = true;
-
-        if (shouldOptimizeCollects) {
-          const prevValue = Reflect.get(target, backingKey) as V;
-          collectedValue = transform(newValue);
-          shouldCollectValue = filter(collectedValue, transform(prevValue));
-        }
-
-        if (shouldCollectValue) {
-          let changes = instanceChanges.get(target) as
-            | Record<string, V>
-            | undefined;
-
-          if (!changes) {
-            changes = {};
-            instanceChanges.set(target, changes);
-          }
-          Reflect.set(changes, propertyKey, collectedValue);
-        }
-
-        Reflect.set(target, backingKey, newValue);
-      },
-      enumerable: true,
-      configurable: false,
-    });
-  };
-}
-
 export function collect<V>({
   transform = passThrough,
   filter = refDiff,
