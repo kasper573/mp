@@ -8,10 +8,11 @@ import type {
   AreaId,
   AreaLookup,
   ActorModelLookup,
-  Character,
   AppearanceTrait,
   ActorModelId,
+  Character,
 } from "@mp/game/server";
+import { CharacterFactory } from "@mp/game/server";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
@@ -41,22 +42,23 @@ export class CharacterService {
       .where(eq(characterTable.userId, user.id))
       .limit(1);
 
-    const char = result.length > 0 ? result[0] : undefined;
-    if (!char) {
+    const databaseFields = result.length > 0 ? result[0] : undefined;
+    if (!databaseFields) {
       return;
     }
-    const model = assert(this.models.get(char.modelId));
-    return {
-      ...char,
+    const model = assert(this.models.get(databaseFields.modelId));
+    return CharacterFactory.create({
+      type: "character",
+      ...databaseFields,
       hitBox: model.hitBox,
       dir: this.rng.oneOf(cardinalDirections),
       name:
         user.name ??
         uniqueNamesGenerator({
           dictionaries: [names],
-          seed: char.id,
+          seed: databaseFields.id,
         }),
-    };
+    });
   }
 
   getDefaultSpawnPoint() {
@@ -87,6 +89,7 @@ export class CharacterService {
       attackSpeed: 1 as TimesPerSecond,
       attackRange: 1 as Tile,
       userId: user.id,
+      xp: 0,
       name:
         user.name ??
         uniqueNamesGenerator({
@@ -106,12 +109,13 @@ export class CharacterService {
       throw new Error("Failed to insert character");
     }
 
-    return {
+    return CharacterFactory.create({
+      type: "character",
       ...input,
       ...returned,
       hitBox: Rect.fromDiameter(Vector.zero(), 1 as Tile),
       dir: this.rng.oneOf(cardinalDirections),
-    };
+    });
   }
 }
 

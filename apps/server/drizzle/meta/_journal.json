@@ -15,6 +15,13 @@
       "when": 1748122026338,
       "tag": "0001_curvy_cassandra_nova",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1748524627944,
+      "tag": "0002_clever_thor_girl",
+      "breakpoints": true
     }
   ]
 }

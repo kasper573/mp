@@ -1,4 +1,4 @@
-import { ctxGameStateMachine } from "../game-state";
+import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
@@ -12,7 +12,7 @@ export const npcRouter = rpc.router({
   spawnRandomNpc: rpc.procedure
     .use(roles([npcRoles.spawnRandom]))
     .mutation(({ ctx }) => {
-      const state = ctx.get(ctxGameStateMachine);
+      const state = ctx.get(ctxGameState);
       const rng = ctx.get(ctxRng);
       const spawner = ctx.get(ctxNpcSpawner);
 
@@ -22,7 +22,7 @@ export const npcRouter = rpc.router({
       }
 
       const instance = spawner.createInstance(selected.npc, selected.spawn);
-      state.actors.set(instance.id, { type: "npc", ...instance });
+      state.actors[instance.id] = instance;
     }),
 });
 

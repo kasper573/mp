@@ -31,7 +31,7 @@ export type SetOperation = [PatchType.Set, path: PatchPath, value: unknown];
 export type UpdateOperation = [
   PatchType.Update,
   path: PatchPath,
-  value: unknown,
+  value: object,
 ];
 
 export type RemoveOperation = [PatchType.Remove, path: PatchPath];
@@ -42,7 +42,18 @@ export function applyPatch(target: object, patch: Patch): void {
   }
 }
 
-function applyOperation(target: object, [type, path, value]: Operation): void {
+export function prefixOperation(
+  prefix: PatchPathStep,
+  operation: Operation,
+): Operation {
+  const [type, path, ...rest] = operation;
+  return [type, [prefix, ...path] as PatchPath, ...rest] as Operation;
+}
+
+export function applyOperation(
+  target: object,
+  [type, path, value]: Operation,
+): void {
   switch (type) {
     case PatchType.Set:
       return setValue(target, path, value);
@@ -56,6 +67,7 @@ function applyOperation(target: object, [type, path, value]: Operation): void {
 function setValue(root: object, path: PatchPath, value: unknown): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
+
   target[lastKey] = value;
 }
 
@@ -72,6 +84,7 @@ function updateValue(root: object, path: PatchPath, value: unknown): void {
 function removeValue(root: object, path: PatchPath): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
+
   delete target[lastKey];
 }
 

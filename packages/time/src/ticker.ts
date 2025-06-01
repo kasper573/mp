@@ -5,11 +5,15 @@ export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
   private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
-  private stopAsyncInterval?: () => void;
+  private intervalId?: NodeJS.Timeout;
+  #interval?: TimeSpan;
 
-  #isEnabled = false;
-  get isEnabled() {
-    return this.#isEnabled;
+  get interval(): TimeSpan | undefined {
+    return this.#interval;
+  }
+
+  get isRunning(): boolean {
+    return this.intervalId !== undefined;
   }
 
   constructor(public options: TickerOptions) {
@@ -22,26 +26,25 @@ export class Ticker {
     return () => this.subscriptions.delete(fn);
   }
 
-  start() {
-    this.stop();
-    this.#isEnabled = true;
+  start(interval: TimeSpan) {
+    if (this.isRunning) {
+      throw new Error("Ticker is already running");
+    }
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.stopAsyncInterval = setAsyncInterval(
-      this.tick,
-      () => this.options.interval,
-    );
+    this.#interval = interval;
+    this.intervalId = setInterval(this.tick, interval.totalMilliseconds);
   }
 
   stop() {
-    this.#isEnabled = false;
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
-    this.stopAsyncInterval?.();
+    clearInterval(this.intervalId);
+    this.intervalId = undefined;
   }
 
-  private tick = async () => {
+  private tick = () => {
     try {
       const middleware = this.options.middleware ?? noopMiddleware;
-      await middleware({
+      middleware({
         timeSinceLastTick: this.getTimeSinceLastTick(),
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
@@ -55,9 +58,9 @@ export class Ticker {
     }
   };
 
-  private emit: TickEventHandler = async (...args) => {
+  private emit: TickEventHandler = (...args) => {
     for (const fn of this.subscriptions) {
-      await fn(...args);
+      fn(...args);
     }
   };
 }
@@ -76,12 +79,11 @@ export type TickMiddleware = (opts: TickMiddlewareOpts) => unknown;
 export interface TickerOptions {
   onError?: (error: unknown) => void;
   middleware?: TickMiddleware;
-  interval: TimeSpan;
 }
 
 export type Unsubscribe = () => void;
 
-export type TickEventHandler = (event: TickEvent) => void | Promise<void>;
+export type TickEventHandler = (event: TickEvent) => void;
 
 const noopMiddleware: TickMiddleware = ({ next, ...event }) => next(event);
 
@@ -92,36 +94,4 @@ function createDeltaFn(): () => TimeSpan {
     getMeasurement = beginMeasuringTimeSpan();
     return delta;
   };
-}
-
-function setAsyncInterval(
-  handler: () => Promise<void>,
-  interval: () => TimeSpan,
-) {
-  let enabled = true;
-  let timeoutId: NodeJS.Timeout;
-
-  function enqueue(lastRunTime: TimeSpan) {
-    timeoutId = setTimeout(
-      run as () => void,
-      interval().subtract(lastRunTime).totalMilliseconds,
-    );
-  }
-
-  async function run() {
-    const stopMeasuring = beginMeasuringTimeSpan();
-    await handler();
-    if (enabled) {
-      enqueue(stopMeasuring());
-    }
-  }
-
-  function stop() {
-    clearTimeout(timeoutId);
-    enabled = false;
-  }
-
-  enqueue(TimeSpan.Zero);
-
-  return stop;
 }

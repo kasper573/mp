@@ -1,10 +1,12 @@
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { Path, Vector } from "@mp/math";
+import { PatchCollectorFactory } from "@mp/sync";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
 import { type AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../../shared/area/area-id";
+import * as patchOptimizers from "../patch-optimizers";
 
 export type NpcType = (typeof npcTypes)[number];
 export const npcTypes = [
@@ -45,6 +47,7 @@ export interface Npc {
   name: string;
   npcType: NpcType;
   aggroRange: Tile;
+  xpReward: number;
 }
 
 export type NpcSpawnId = Branded<string, "NpcSpawnId">;
@@ -75,10 +78,15 @@ export interface NpcInstance
     MovementTrait,
     AppearanceTrait,
     CombatTrait {
+  type: "npc";
   id: NpcInstanceId;
   npcId: NpcId;
   spawnId: NpcSpawnId;
   patrol?: Path<Tile>;
 }
+
+export const NpcInstanceFactory = new PatchCollectorFactory<NpcInstance>(
+  patchOptimizers,
+);
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

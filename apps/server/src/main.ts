@@ -5,16 +5,16 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
-import { createSyncStateMachine } from "@mp/sync";
+import { PatchCollectorFactory, SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
 import { InjectionContainer } from "@mp/ioc";
 import {
-  createGameStatePatchOptimizer,
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
+  ctxGameStateEmitter,
   ctxNpcSpawner,
   ctxTokenVerifier,
   NpcAi,
@@ -23,7 +23,7 @@ import {
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
-import type { GameStateMachine } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import {
   ctxRng,
   ctxAreaFileUrlResolver,
@@ -34,7 +34,7 @@ import {
   characterRemoveBehavior,
   ctxCharacterService,
   ctxNpcService,
-  ctxGameStateMachine,
+  ctxGameState,
   deriveClientVisibility,
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
@@ -42,6 +42,7 @@ import { clientViewDistance } from "@mp/game/server";
 
 import type { AuthToken, UserId, UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
+import type { GameStateEvents } from "../../game/server/game-state-events";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -58,12 +59,12 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { ctxIsPatchOptimizerSettings, ctxUpdateTicker } from "./etc/system-rpc";
-import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
+import { ctxUpdateTicker } from "./etc/system-rpc";
 import { NpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { CharacterService } from "./db/services/character-service";
 import { GameService } from "./db/services/game-service";
+import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 
 registerEncoderExtensions();
 
@@ -140,13 +141,11 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-const patchOptimizerSettings = { enabled: opt.patchOptimizer };
-const patchOptimizer = createGameStatePatchOptimizer();
+PatchCollectorFactory.optimize = opt.patchOptimizer;
 
-const gameState: GameStateMachine = createSyncStateMachine({
-  initialState: { actors: {} },
-  patchOptimizer: () =>
-    patchOptimizerSettings.enabled ? patchOptimizer : undefined,
+const gameState: GameState = { actors: {} };
+
+const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
@@ -155,18 +154,18 @@ const gameState: GameStateMachine = createSyncStateMachine({
   ),
 });
 
+gameStateEmitter.attachPatchCollectors(gameState);
+
 const npcService = new NpcService(db);
 const gameService = new GameService(db);
 
 const persistTicker = new Ticker({
   onError: logger.error,
-  interval: opt.persistInterval,
   middleware: () => gameService.persist(gameState),
 });
 
 const updateTicker = new Ticker({
   onError: logger.error,
-  interval: opt.tickInterval,
   middleware: createTickMetricsObserver(metrics),
 });
 
@@ -190,7 +189,8 @@ const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
-  .provide(ctxGameStateMachine, gameState)
+  .provide(ctxGameState, gameState)
+  .provide(ctxGameStateEmitter, gameStateEmitter)
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenVerifier, tokenVerifier)
   .provide(ctxClientRegistry, clients)
@@ -199,7 +199,6 @@ const ioc = new InjectionContainer()
   )
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxUpdateTicker, updateTicker)
-  .provide(ctxIsPatchOptimizerSettings, patchOptimizerSettings)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
 
@@ -208,13 +207,15 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-const npcAi = new NpcAi(gameState, areas, rng);
+const npcAi = new NpcAi(gameState, gameStateEmitter, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, areas));
+updateTicker.subscribe(combatBehavior(gameState, gameStateEmitter, areas));
 updateTicker.subscribe(npcAi.createTickHandler());
-updateTicker.subscribe(createGameStateFlusher(gameState, wss.clients, metrics));
+updateTicker.subscribe(
+  createGameStateFlusher(gameState, gameStateEmitter, wss.clients, metrics),
+);
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, user }) =>
@@ -225,8 +226,8 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });
 
-persistTicker.start();
-updateTicker.start();
+persistTicker.start(opt.persistInterval);
+updateTicker.start(opt.tickInterval);
 
 function createBypassUser(token: AuthToken): UserIdentity {
   return {

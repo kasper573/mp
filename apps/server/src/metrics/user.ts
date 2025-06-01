@@ -1,11 +1,11 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { ClientRegistry, GameStateMachine } from "@mp/game/server";
+import type { ClientRegistry, GameState } from "@mp/game/server";
 
 export function collectUserMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
-  state: GameStateMachine,
+  state: GameState,
 ) {
   new MetricsGague({
     name: "active_user_count",
@@ -22,10 +22,9 @@ export function collectUserMetrics(
     registers: [registry],
     collect() {
       this.set(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "character")
-          .toArray().length,
+        Object.values(state.actors).filter(
+          (actor) => actor.type === "character",
+        ).length,
       );
     },
   });
@@ -36,10 +35,8 @@ export function collectUserMetrics(
     registers: [registry],
     collect() {
       this.set(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "npc")
-          .toArray().length,
+        Object.values(state.actors).filter((actor) => actor.type === "npc")
+          .length,
       );
     },
   });

@@ -21,10 +21,10 @@ export function createTickMetricsObserver(
     buckets: msBuckets,
   });
 
-  return async ({ next, ...event }) => {
+  return ({ next, ...event }) => {
     interval.observe(event.timeSinceLastTick.totalMilliseconds);
     const getMeasurement = beginMeasuringTimeSpan();
-    await next(event);
+    next(event);
     duration.observe(getMeasurement().totalMilliseconds);
   };
 }

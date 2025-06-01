@@ -96,7 +96,21 @@ export default tseslint.config(
       // Gives false positives for branded number types
       "@typescript-eslint/no-unsafe-unary-minus": "off",
 
-      ...noMathRandom(),
+      // Gives false positives for when using decorator auto accessors
+      "@typescript-eslint/no-extraneous-class": "off",
+
+      "no-restricted-syntax": [
+        "error",
+        {
+          selector: `MemberExpression[object.name="Math"][property.name="random"]`,
+          message:
+            "Do not use Math.random(). Use a Rng class from @mp/std instead.",
+        },
+        ...["PropertyDefinition", "AccessorProperty"].map((base) => ({
+          selector: `${base}[definite = true]`,
+          message: "Definite assignment assertions are not allowed.",
+        })),
+      ],
 
       "@typescript-eslint/naming-convention": [
         "error",
@@ -239,16 +253,3 @@ export default tseslint.config(
     },
   },
 );
-
-function noMathRandom() {
-  return {
-    "no-restricted-syntax": [
-      "error",
-      {
-        selector: `MemberExpression[object.name="Math"][property.name="random"]`,
-        message:
-          "Do not use Math.random(). Use a Rng class from @mp/std instead.",
-      },
-    ],
-  };
-}
