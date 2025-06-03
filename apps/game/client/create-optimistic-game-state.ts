@@ -5,8 +5,8 @@ import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyOperation, applyPatch, PatchType } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, createContext, untrack } from "solid-js";
-import { isPathEqual, nearestCardinalDirection, type Vector } from "@mp/math";
-import { recordValues, typedKeys, type Tile } from "@mp/std";
+import { isPathEqual, nearestCardinalDirection } from "@mp/math";
+import { recordValues, typedKeys } from "@mp/std";
 import type { Actor, ActorId } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
@@ -30,35 +30,26 @@ export function createOptimisticGameState(
       actors: gameState.actors,
     }));
 
-    if (enabled) {
-      for (const actor of recordValues(actors)) {
-        if (actor.path && actor.health > 0) {
-          const [newCoords, newPath] = moveAlongPath(
-            actor.coords,
-            actor.path,
-            actor.speed,
-            opt.timeSinceLastFrame,
-          );
+    if (!enabled) {
+      return;
+    }
 
-          actor.coords = newCoords;
-          actor.path = newPath;
+    for (const actor of recordValues(actors)) {
+      if (actor.path && actor.health > 0) {
+        const [newCoords, newPath] = moveAlongPath(
+          actor.coords,
+          actor.path,
+          actor.speed,
+          opt.timeSinceLastFrame,
+        );
 
-          const facingTarget = getFacingTarget(actor);
-          if (facingTarget) {
-            actor.dir = nearestCardinalDirection(
-              actor.coords.angle(facingTarget),
-            );
-          }
-        }
-      }
+        actor.coords = newCoords;
+        actor.path = newPath;
 
-      function getFacingTarget(actor: Actor): Vector<Tile> | undefined {
-        if (actor.path?.length) {
-          return actor.path[0];
-        }
-        if (actor.attackTargetId) {
-          const target = actors[actor.attackTargetId] as Actor | undefined;
-          return target?.coords;
+        // Face the direction the actor is moving towards
+        const target = newPath?.[0];
+        if (target) {
+          actor.dir = nearestCardinalDirection(actor.coords.angle(target));
         }
       }
     }
@@ -73,6 +64,19 @@ export function createOptimisticGameState(
         applyPatchOptimized(gameState, patch, events);
       } else {
         applyPatch(gameState, patch);
+      }
+
+      // Face actors toward their attack targets when they attack
+      for (const { actorId, targetId } of events("combat.attack")) {
+        const [actor, target] = untrack(() => [
+          gameState.actors[actorId] as Actor | undefined,
+          gameState.actors[targetId] as Actor | undefined,
+        ]);
+        if (actor && target) {
+          actor.dir = nearestCardinalDirection(
+            actor.coords.angle(target.coords),
+          );
+        }
       }
     });
   };
@@ -164,6 +168,10 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
         return false;
       }
       return !isPathEqual(update.path, actor.path);
+    }
+    case "dir": {
+      // Client handles actor facing directions completely manually
+      return false;
     }
   }
 
