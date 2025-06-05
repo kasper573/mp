@@ -1,6 +1,6 @@
-import type { Vector, Rect } from "@mp/math";
+import { type Vector, type Rect, clamp } from "@mp/math";
 import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
-import type { TickEventHandler, TimeSpan } from "@mp/time";
+import { TimeSpan, type TickEventHandler } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { GameStateEmitter } from "../game-state-emitter";
@@ -21,12 +21,25 @@ export interface CombatTrait {
   lastAttack?: TimeSpan;
 }
 
+const hpRegenInterval = TimeSpan.fromSeconds(10);
+
 export function combatBehavior(
   state: GameState,
   emitter: GameStateEmitter,
   areas: AreaLookup,
 ): TickEventHandler {
+  let nextHpRegenTime = TimeSpan.fromSeconds(0);
   return ({ totalTimeElapsed }) => {
+    // Give all characters some health every so often
+    if (totalTimeElapsed.compareTo(nextHpRegenTime) > 0) {
+      nextHpRegenTime = totalTimeElapsed.add(hpRegenInterval);
+      for (const actor of recordValues(state.actors).filter(
+        (a) => a.type === "character",
+      )) {
+        actor.health = clamp(actor.health + 5, 0, actor.maxHealth);
+      }
+    }
+
     for (const actor of recordValues(state.actors)) {
       attemptAttack(actor, totalTimeElapsed);
 
