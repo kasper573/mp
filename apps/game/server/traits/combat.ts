@@ -4,7 +4,7 @@ import type { TickEventHandler, TimeSpan } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { GameStateEmitter } from "../game-state-emitter";
-import type { ActorId, Actor } from "./actor";
+import type { ActorId, Actor } from "../actor";
 import { findPathForSubject } from "./movement";
 
 export interface CombatTrait {

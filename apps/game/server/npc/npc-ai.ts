@@ -3,7 +3,7 @@ import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { recordValues, type Rng } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
-import type { ActorId } from "../traits/actor";
+import type { ActorId } from "../actor";
 import type { GameStateEmitter } from "../game-state-emitter";
 import type { NpcInstance, NpcInstanceId } from "./types";
 import { type Task, type TaskInput } from "./ai-tasks/task";

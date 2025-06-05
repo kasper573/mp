@@ -9,7 +9,7 @@ import {
   useContext,
 } from "solid-js";
 import type { TiledResource } from "../../shared/area/tiled-resource";
-import type { Actor } from "../../server/traits/actor";
+import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
 import { GameStateClientContext } from "../game-state-client";
 import { deriveActorSpriteState } from "./derive-actor-sprite-state";
