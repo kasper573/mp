@@ -60,8 +60,9 @@ export function combatBehavior(
     }
 
     if (actor.lastAttack) {
+      const attackDelay = 1 / actor.attackSpeed;
       const timeSinceLastAttack = currentTime.subtract(actor.lastAttack);
-      if (timeSinceLastAttack.totalSeconds < actor.attackSpeed) {
+      if (timeSinceLastAttack.totalSeconds < attackDelay) {
         return; // attack on cooldown
       }
     }
