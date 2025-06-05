@@ -5,7 +5,11 @@ import { RouterProvider } from "@tanstack/solid-router";
 import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
 import { registerEncoderExtensions } from "@mp/game/client";
 import { GameRpcSliceApiContext } from "@mp/game/client";
-import { QueryClient, QueryClientProvider } from "@mp/rpc/solid";
+import {
+  QueryClient,
+  QueryClientProvider,
+  SolidQueryDevtools,
+} from "@mp/rpc/solid";
 import { createWebSocket } from "@mp/ws/client";
 import { onCleanup } from "solid-js";
 import { createClientRouter } from "./integrations/router/router";
@@ -62,7 +66,12 @@ export default function App() {
                 <RpcClientContext.Provider value={rpc}>
                   <GameRpcSliceApiContext.Provider value={rpc}>
                     <RouterProvider router={router} />
-                    <TanStackRouterDevtools router={router} />
+                    {showDevTools && (
+                      <>
+                        <TanStackRouterDevtools router={router} />
+                        <SolidQueryDevtools client={query} />
+                      </>
+                    )}
                   </GameRpcSliceApiContext.Provider>
                 </RpcClientContext.Provider>
               </SocketContext.Provider>
@@ -73,3 +82,5 @@ export default function App() {
     </>
   );
 }
+
+const showDevTools = import.meta.env.DEV;

@@ -7,12 +7,13 @@ import { useRpc } from "../use-rpc";
 import { BuildVersionContext } from "../build-version-context";
 import { AreaResource } from "../../shared/area/area-resource";
 
-export function useAreaResource(areaId?: Accessor<AreaId | undefined>) {
+export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
   const rpc = useRpc();
   const { server: serverVersion } = useContext(BuildVersionContext);
 
   return rpc.area.areaFileUrl.useQuery(() => ({
-    input: areaId?.() ?? skipToken,
+    input: areaId() ?? skipToken,
+    staleTime: Infinity,
     async map(url, input) {
       const loadTiled = createTiledLoader({
         loadJson,

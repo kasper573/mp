@@ -8,29 +8,60 @@ import {
   Match,
   Suspense,
   createSignal,
+  createMemo,
 } from "solid-js";
 import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { AuthContext } from "@mp/auth/client";
+import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
+import { skipToken, useQuery } from "@mp/rpc/solid";
 import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
-import { ActorSpritesheetProvider } from "./actor/actor-spritesheets-provider";
+import { loadActorSpritesheets } from "./actor/actor-spritesheets-provider";
 import { GameDebugUi } from "./debug/game-debug-ui";
 import type { GameDebugUiState } from "./debug/game-debug-ui-state";
 import { GameDebugUiContext } from "./debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "./debug/game-state-debug-info";
+import { useRpc } from "./use-rpc";
+import { ActorSpritesheetContext } from "./actor/actor-sprite";
 
 export function Game(
   props: ParentProps<{ class?: string; style?: JSX.CSSProperties }>,
 ) {
+  const rpc = useRpc();
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const state = useContext(GameStateClientContext);
   const auth = useContext(AuthContext);
   const actions = useGameActions();
+
   const area = useAreaResource(state.areaId);
+
+  const areaSpritesheets = useQuery(() => ({
+    queryKey: ["areaSpritesheets", area.data?.id],
+    staleTime: Infinity,
+    queryFn: area.data
+      ? () => loadTiledMapSpritesheets(area.data.tiled.map)
+      : skipToken,
+  }));
+
+  const actorSpritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
+    input: void 0,
+    map: loadActorSpritesheets,
+    staleTime: Infinity,
+  }));
+
+  const assets = createMemo(() => {
+    if (area.data && areaSpritesheets.data && actorSpritesheets.data) {
+      return {
+        area: area.data,
+        spritesheets: areaSpritesheets.data,
+        actorSpritesheets: actorSpritesheets.data,
+      };
+    }
+  });
 
   const debugUiState: GameDebugUiState = {
     portalContainer,
@@ -48,20 +79,24 @@ export function Game(
 
   return (
     <Switch>
-      <Match when={area.data} keyed>
-        {(area) => (
+      <Match when={assets()} keyed>
+        {({ area, spritesheets, actorSpritesheets }) => (
           <Suspense
             fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
           >
-            <ActorSpritesheetProvider>
-              <Application
-                class={clsx(styles.container, props.class)}
-                style={props.style}
-              >
-                {({ viewport }) => (
+            <Application
+              class={clsx(styles.container, props.class)}
+              style={props.style}
+            >
+              {({ viewport }) => (
+                <ActorSpritesheetContext.Provider value={actorSpritesheets}>
                   <EngineProvider viewport={viewport}>
                     <GameDebugUiContext.Provider value={debugUiState}>
-                      <AreaScene area={area} />
+                      <Suspense
+                        fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
+                      >
+                        <AreaScene area={area} spritesheets={spritesheets} />
+                      </Suspense>
                       <GameStateClientAnimations />
                       {props.children}
                       <GameDebugUi>
@@ -69,12 +104,13 @@ export function Game(
                       </GameDebugUi>
                     </GameDebugUiContext.Provider>
                   </EngineProvider>
-                )}
-              </Application>
-            </ActorSpritesheetProvider>
+                </ActorSpritesheetContext.Provider>
+              )}
+            </Application>
           </Suspense>
         )}
       </Match>
+
       <Match when={state.readyState() !== WebSocket.OPEN}>
         <LoadingSpinner>Connecting to game server</LoadingSpinner>
       </Match>

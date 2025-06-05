@@ -1,6 +1,6 @@
 import * as tanstack from "@tanstack/solid-query";
 import type { UseMutationResult, UseQueryResult } from "@tanstack/solid-query";
-import { skipToken, type SkipToken } from "@tanstack/solid-query";
+import { skipToken } from "@tanstack/solid-query";
 import type {
   AnyMutationNode,
   AnyQueryNode,
@@ -12,6 +12,10 @@ import type {
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
 import type { RpcCaller, RpcProcedureInvoker } from "./proxy-invoker";
+
+export { useQuery, skipToken, type SkipToken } from "@tanstack/solid-query";
+
+export { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
 
 export function createSolidRpcInvoker<Node extends AnyRpcNode>(
   call: RpcCaller,
@@ -38,11 +42,11 @@ function createUseQuery(
     options?: () => SolidRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): UseQueryResult {
     return tanstack.useQuery(() => {
-      const { input, throwOnError } = options?.() ?? {};
+      const { input, map, ...tanstackOptions } = options?.() ?? {};
       return {
         queryKey: [path, input],
         queryFn: input === skipToken ? skipToken : queryFn,
-        throwOnError,
+        ...tanstackOptions,
       };
     });
 
@@ -84,10 +88,13 @@ export type SolidRpcRouterInvoker<Router extends AnyRouterNode> = {
   [K in keyof Router["routes"]]: SolidRpcInvoker<Router["routes"][K]>;
 };
 
-export interface SolidRpcQueryOptions<Input, Output, MappedOutput> {
+export interface SolidRpcQueryOptions<Input, Output, MappedOutput>
+  extends Omit<
+    tanstack.SolidQueryOptions<Input, tanstack.DefaultError, Output>,
+    "initialData" | "queryKey" | "queryFn"
+  > {
   input: Input | tanstack.SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
-  throwOnError?: boolean;
 }
 
 export interface SolidRpcQueryInvoker<Node extends AnyQueryNode>
@@ -126,5 +133,4 @@ export interface SolidRpcMutationInvoker<Node extends AnyMutationNode>
   [useMutationProperty]: UseMutation<Node>;
 }
 
-export { skipToken, type SkipToken };
 export { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
