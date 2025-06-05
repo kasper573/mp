@@ -64,8 +64,10 @@ export function AreaScene(
   const entityAtPointer = createMemo(() =>
     state
       .actorList()
-      .find((actor) =>
-        actor.hitBox.offset(actor.coords).contains(pointerTile()),
+      .find(
+        (actor) =>
+          actor.health > 0 &&
+          actor.hitBox.offset(actor.coords).contains(pointerTile()),
       ),
   );
 
