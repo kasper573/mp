@@ -32,6 +32,7 @@ export function Actor(props: {
   const [sprite, spriteCommands] = createActorSprite(
     () => props.actor.modelId,
     () => props.actor.dir,
+    () => props.actor.attackSpeed,
   );
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
