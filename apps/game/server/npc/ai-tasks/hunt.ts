@@ -1,6 +1,6 @@
 import type { Tile } from "@mp/std";
 import { assert, recordValues } from "@mp/std";
-import type { ActorId } from "../../traits/actor";
+import type { ActorId } from "../../actor";
 import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {

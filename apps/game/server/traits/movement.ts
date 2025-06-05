@@ -6,7 +6,7 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
-import type { ActorId } from "./actor";
+import type { ActorId } from "../actor";
 
 export interface MovementTrait {
   /**

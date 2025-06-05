@@ -1,5 +1,5 @@
 import type { Branded } from "@mp/std";
-import type { ActorId } from "../traits/actor";
+import type { ActorId } from "../actor";
 
 /**
  * Combats that a single npc has observed

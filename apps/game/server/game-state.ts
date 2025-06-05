@@ -1,5 +1,5 @@
 import { InjectionContext } from "@mp/ioc";
-import type { Actor, ActorId } from "./traits/actor";
+import type { Actor, ActorId } from "./actor";
 
 export type GameState = {
   actors: Record<ActorId, Actor>;

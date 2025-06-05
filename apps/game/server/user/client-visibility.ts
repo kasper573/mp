@@ -2,7 +2,7 @@ import type { ClientVisibilityFactory } from "@mp/sync";
 import { recordValues, type Tile } from "@mp/std";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import type { MovementTrait } from "../traits/movement";
-import type { Actor, ActorId } from "../traits/actor";
+import type { Actor, ActorId } from "../actor";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ClientRegistry } from "./client-registry";

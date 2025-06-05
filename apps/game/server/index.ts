@@ -15,7 +15,7 @@ export * from "./area/rpc";
 export * from "./traits/combat";
 export * from "./traits/movement";
 export * from "./traits/appearance";
-export * from "./traits/actor";
+export * from "./actor";
 export * from "./user/client-registry";
 export * from "../shared/client-view-distance-rect";
 export * from "../shared/encoder-extensions";

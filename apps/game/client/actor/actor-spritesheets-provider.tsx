@@ -1,22 +1,21 @@
 import type { Texture } from "pixi.js";
 import { Assets } from "pixi.js";
-import type { ParentProps } from "solid-js";
-import { Show } from "solid-js";
 import {
   type ActorModelId,
   type ActorModelState,
 } from "../../server/traits/appearance";
-import { useRpc } from "../use-rpc";
 import type { ActorSpritesheetUrls } from "../../server";
-import { ActorSpritesheetContext } from "./actor-sprite";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
 
+export type ActorSpritesheets = ReadonlyMap<
+  ActorModelId,
+  ReadonlyMap<ActorModelState, ActorSpritesheet>
+>;
+
 export async function loadActorSpritesheets(
   urls: ActorSpritesheetUrls,
-): Promise<
-  ReadonlyMap<ActorModelId, ReadonlyMap<ActorModelState, ActorSpritesheet>>
-> {
+): Promise<ActorSpritesheets> {
   return new Map(
     await Promise.all(
       urls.entries().map(async ([modelId, states]) => {
@@ -40,22 +39,5 @@ export async function loadActorSpritesheets(
         ] as const;
       }),
     ),
-  );
-}
-
-export function ActorSpritesheetProvider(props: ParentProps) {
-  const rpc = useRpc();
-  const spritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
-    input: void 0,
-    map: loadActorSpritesheets,
-  }));
-  return (
-    <Show when={spritesheets.data} keyed>
-      {(loadedSpritesheets) => (
-        <ActorSpritesheetContext.Provider value={loadedSpritesheets}>
-          {props.children}
-        </ActorSpritesheetContext.Provider>
-      )}
-    </Show>
   );
 }

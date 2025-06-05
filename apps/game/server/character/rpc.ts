@@ -1,6 +1,6 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { type Tile } from "@mp/std";
-import type { Actor, ActorId } from "../traits/actor";
+import type { Actor, ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";

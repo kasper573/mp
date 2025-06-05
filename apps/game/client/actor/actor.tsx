@@ -9,7 +9,7 @@ import {
   useContext,
 } from "solid-js";
 import type { TiledResource } from "../../shared/area/tiled-resource";
-import type { Actor } from "../../server/traits/actor";
+import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
 import { GameStateClientContext } from "../game-state-client";
 import { deriveActorSpriteState } from "./derive-actor-sprite-state";
@@ -32,6 +32,7 @@ export function Actor(props: {
   const [sprite, spriteCommands] = createActorSprite(
     () => props.actor.modelId,
     () => props.actor.dir,
+    () => props.actor.attackSpeed,
   );
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });

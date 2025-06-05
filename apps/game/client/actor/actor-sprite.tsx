@@ -15,7 +15,9 @@ import {
   nearestCardinalDirection,
   type CardinalDirection,
 } from "@mp/math";
+import type { TimesPerSecond } from "@mp/std";
 import { assert } from "@mp/std";
+import { TimeSpan } from "@mp/time";
 import {
   actorModelStates,
   type ActorModelId,
@@ -26,6 +28,7 @@ import type { ActorSpritesheet } from "./actor-spritesheet";
 export function createActorSprite(
   modelId: Accessor<ActorModelId>,
   desiredDirection: Accessor<CardinalDirection>,
+  attackSpeed: Accessor<TimesPerSecond> = () => 1 as TimesPerSecond,
 ): [AnimatedSprite, ActorSpriteCommands] {
   const [desiredState, setDesiredState] =
     createSignal<ActorModelState>("idle-normal");
@@ -42,9 +45,12 @@ export function createActorSprite(
   );
   const textures = createMemo((): FrameObject[] => {
     const textures = spritesheet().animations[direction()];
+    const frameDuration = isAttacking()
+      ? TimeSpan.fromSeconds(1 / attackSpeed()).divide(textures.length)
+      : TimeSpan.fromMilliseconds(100);
     return textures.map((texture) => ({
       texture,
-      time: 100, // TODO should come as metadata from the spritesheet
+      time: frameDuration.totalMilliseconds,
     }));
   });
 

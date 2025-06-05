@@ -24,6 +24,7 @@
     "@mp/encoding": "workspace:*",
     "@mp/std": "workspace:*",
     "@tanstack/solid-query": "5.74.3",
+    "@tanstack/solid-query-devtools": "5.74.3",
     "solid-js": "catalog:"
   },
   "devDependencies": {

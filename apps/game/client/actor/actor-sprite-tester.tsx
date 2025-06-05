@@ -5,6 +5,7 @@ import {
   createSignal,
   For,
   onCleanup,
+  Show,
   useContext,
 } from "solid-js";
 import { Container, Text } from "pixi.js";
@@ -21,21 +22,30 @@ import {
   type ActorModelId,
   type ActorModelState,
 } from "../../server/traits/appearance";
+import { useRpc } from "../use-rpc";
 import { ActorSpritesheetContext, createActorSprite } from "./actor-sprite";
-
-import { ActorSpritesheetProvider } from "./actor-spritesheets-provider";
+import { loadActorSpritesheets } from "./actor-spritesheets-provider";
 
 export function ActorSpriteTester() {
+  const rpc = useRpc();
+  const spritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
+    input: void 0,
+    map: loadActorSpritesheets,
+  }));
   return (
-    <Application style={{ display: "flex", flex: 1 }}>
-      {({ viewport }) => (
-        <EngineProvider viewport={viewport}>
-          <ActorSpritesheetProvider>
-            <ActorSpriteList />
-          </ActorSpritesheetProvider>
-        </EngineProvider>
+    <Show when={spritesheets.data} keyed>
+      {(spritesheets) => (
+        <ActorSpritesheetContext.Provider value={spritesheets}>
+          <Application style={{ display: "flex", flex: 1 }}>
+            {({ viewport }) => (
+              <EngineProvider viewport={viewport}>
+                <ActorSpriteList />
+              </EngineProvider>
+            )}
+          </Application>
+        </ActorSpritesheetContext.Provider>
       )}
-    </Application>
+    </Show>
   );
 }
 

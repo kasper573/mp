@@ -1,4 +1,4 @@
-import type { ActorId } from "./traits/actor";
+import type { ActorId } from "./actor";
 
 export type GameStateEvents = {
   "combat.attack": {

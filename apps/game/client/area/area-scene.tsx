@@ -11,10 +11,9 @@ import {
   untrack,
   For,
   createContext,
-  Show,
-  createResource,
 } from "solid-js";
-import { loadTiledMapSpritesheets, TiledRenderer } from "@mp/tiled-renderer";
+import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import { TiledRenderer } from "@mp/tiled-renderer";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
@@ -24,16 +23,16 @@ import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { RespawnDialog } from "./respawn-dialog";
 
-export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
+export function AreaScene(
+  props: ParentProps<{
+    area: AreaResource;
+    spritesheets: TiledSpritesheetRecord;
+  }>,
+) {
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
   const actions = useGameActions();
   const { renderedTileCount } = useContext(AreaSceneContext);
-
-  const [spritesheets] = createResource(
-    () => props.area.tiled.map,
-    loadTiledMapSpritesheets,
-  );
 
   const myCoords = () => assert(state.character()).coords;
 
@@ -65,8 +64,10 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
   const entityAtPointer = createMemo(() =>
     state
       .actorList()
-      .find((actor) =>
-        actor.hitBox.offset(actor.coords).contains(pointerTile()),
+      .find(
+        (actor) =>
+          actor.health > 0 &&
+          actor.hitBox.offset(actor.coords).contains(pointerTile()),
       ),
   );
 
@@ -113,31 +114,27 @@ export function AreaScene(props: ParentProps<{ area: AreaResource }>) {
         sortableChildren
         matrix={engine.camera.transform.data}
       >
-        <Show when={spritesheets()} keyed>
-          {(data) => (
-            <TiledRenderer
-              layers={props.area.tiled.map.layers.filter(
-                (l) => l.type !== "objectgroup",
-              )}
-              spritesheets={data}
-              label={props.area.id}
-            >
-              {{
-                [props.area.dynamicLayer.name]: () => (
-                  <For each={state.actorList()}>
-                    {(actor) => (
-                      <Actor
-                        tiled={props.area.tiled}
-                        actor={actor}
-                        isPlayer={actor.id === state.characterId()}
-                      />
-                    )}
-                  </For>
-                ),
-              }}
-            </TiledRenderer>
+        <TiledRenderer
+          layers={props.area.tiled.map.layers.filter(
+            (l) => l.type !== "objectgroup",
           )}
-        </Show>
+          spritesheets={props.spritesheets}
+          label={props.area.id}
+        >
+          {{
+            [props.area.dynamicLayer.name]: () => (
+              <For each={state.actorList()}>
+                {(actor) => (
+                  <Actor
+                    tiled={props.area.tiled}
+                    actor={actor}
+                    isPlayer={actor.id === state.characterId()}
+                  />
+                )}
+              </For>
+            ),
+          }}
+        </TiledRenderer>
         {props.children}
         <TileHighlight area={props.area} target={highlightTarget()} />
         <GameDebugUiPortal>
