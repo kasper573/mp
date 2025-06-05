@@ -86,7 +86,7 @@ export class CharacterService {
       health: 100,
       maxHealth: 100,
       attackDamage: 5,
-      attackSpeed: 1 as TimesPerSecond,
+      attackSpeed: 1.25 as TimesPerSecond,
       attackRange: 1 as Tile,
       userId: user.id,
       xp: 0,
