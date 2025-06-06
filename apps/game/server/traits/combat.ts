@@ -30,11 +30,11 @@ export function combatBehavior(
 ): TickEventHandler {
   let nextHpRegenTime = TimeSpan.fromSeconds(0);
   return ({ totalTimeElapsed }) => {
-    // Give all characters some health every so often
+    // Give all alive characters some health every so often
     if (totalTimeElapsed.compareTo(nextHpRegenTime) > 0) {
       nextHpRegenTime = totalTimeElapsed.add(hpRegenInterval);
       for (const actor of recordValues(state.actors).filter(
-        (a) => a.type === "character",
+        (a) => a.type === "character" && a.health > 0,
       )) {
         actor.health = clamp(actor.health + 5, 0, actor.maxHealth);
       }
