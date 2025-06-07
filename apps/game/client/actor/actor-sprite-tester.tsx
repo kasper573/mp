@@ -4,7 +4,6 @@ import {
   createMemo,
   createSignal,
   For,
-  onCleanup,
   Show,
   useContext,
 } from "solid-js";
@@ -17,14 +16,16 @@ import {
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 
+import { assert } from "@mp/std";
 import {
-  actorModelStates,
+  actorAnimationNames,
   type ActorModelId,
-  type ActorModelState,
+  type ActorAnimationName,
 } from "../../server/traits/appearance";
 import { useRpc } from "../use-rpc";
-import { ActorSpritesheetContext, createActorSprite } from "./actor-sprite";
-import { loadActorSpritesheets } from "./actor-spritesheets-provider";
+import { ActorSprite } from "./actor-sprite";
+import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
+import { loadActorSpritesheets } from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester() {
   const rpc = useRpc();
@@ -51,7 +52,8 @@ export function ActorSpriteTester() {
 
 function ActorSpriteList() {
   const allModelIds = useContext(ActorSpritesheetContext).keys().toArray();
-  const [state, setState] = createSignal<ActorModelState>("walk-normal");
+  const [animationName, setAnimationName] =
+    createSignal<ActorAnimationName>("walk-normal");
   const [modelId, setModelId] = createSignal(allModelIds[0]);
   return (
     <>
@@ -59,14 +61,14 @@ function ActorSpriteList() {
         {([name, angle], index) => (
           <SpecificActorAngle
             modelId={modelId()}
-            state={state()}
+            animationName={animationName()}
             angle={angle}
             name={name}
             pos={new Vector(0, index() * 64)}
           />
         )}
       </For>
-      <DynamicActorAngle modelId={modelId()} state={state()} />
+      <DynamicActorAngle modelId={modelId()} animationName={animationName()} />
       <div
         style={{
           position: "absolute",
@@ -77,9 +79,9 @@ function ActorSpriteList() {
         }}
       >
         <Select
-          value={state()}
-          onChange={setState}
-          options={actorModelStates}
+          value={animationName()}
+          onChange={setAnimationName}
+          options={actorAnimationNames}
         />
         <Select value={modelId()} onChange={setModelId} options={allModelIds} />
       </div>
@@ -89,7 +91,7 @@ function ActorSpriteList() {
 
 function DynamicActorAngle(props: {
   modelId: ActorModelId;
-  state: ActorModelState;
+  animationName: ActorAnimationName;
 }) {
   const center = useScreenCenter();
   const engine = useContext(EngineContext);
@@ -102,7 +104,7 @@ function DynamicActorAngle(props: {
         pos={center()}
         anchor={new Vector(0.5, 0.5)}
         showFrameNumber
-        state={props.state}
+        animationName={props.animationName}
       />
     </>
   );
@@ -127,13 +129,10 @@ function SpecificActorAngle(props: {
   pos: Vector<number>;
   anchor?: Vector<number>;
   showFrameNumber?: boolean;
-  state: ActorModelState;
+  animationName: ActorAnimationName;
 }) {
-  const engine = useContext(EngineContext);
-  const [sprite, spriteCommands] = createActorSprite(
-    () => props.modelId,
-    () => nearestCardinalDirection(props.angle),
-  );
+  const allSpritesheets = useContext(ActorSpritesheetContext);
+  const sprite = new ActorSprite();
   const container = new Container();
   const text = new Text({ style: { fill: "white", fontSize: "14px" } });
   text.scale.set(0.5);
@@ -148,15 +147,17 @@ function SpecificActorAngle(props: {
   container.addChild(frameNumberText);
   container.scale.set(2);
 
-  function updateFrameText() {
-    frameNumberText.text = `Frame: ${sprite.currentFrame}`;
-  }
-
   createEffect(() => {
-    spriteCommands.setState(props.state);
+    sprite.spritesheets = assert(allSpritesheets.get(props.modelId));
   });
 
-  onCleanup(engine.addFrameCallback(updateFrameText));
+  createEffect(() => {
+    sprite.direction = nearestCardinalDirection(props.angle);
+  });
+
+  createEffect(() => {
+    sprite.switchAnimationSmoothly(props.animationName);
+  });
 
   createEffect(() => {
     if (props.name) {

@@ -5,6 +5,7 @@ import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
+import { ctxGameStateEmitter } from "../game-state-emitter";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./types";
 
@@ -67,8 +68,10 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.kill]))
     .mutation(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameState);
+      const emitter = ctx.get(ctxGameStateEmitter);
       const target = state.actors[targetId];
       target.health = 0;
+      emitter.addEvent("actor.death", target.id);
     }),
 
   respawn: rpc.procedure

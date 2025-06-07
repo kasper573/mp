@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import type {
   ActorModel,
   ActorModelId,
-  ActorModelState,
+  ActorAnimationName,
   ActorModelLookup,
 } from "@mp/game/server";
 import type { LocalFile, PublicUrl, Tile } from "@mp/std";
@@ -21,22 +21,23 @@ export async function loadActorModels(
         const spritesheetFiles = await fs.readdir(
           path.resolve(publicDir, "actors", modelFolder),
         );
-        const spritesheets: ReadonlyMap<ActorModelState, PublicUrl> = new Map(
-          await Promise.all(
-            spritesheetFiles.map(
-              (spritesheet): [ActorModelState, PublicUrl] => {
-                const state = path.basename(
-                  spritesheet,
-                  path.extname(spritesheet),
-                ) as ActorModelState;
-                const url = serverFileToPublicUrl(
-                  path.join("actors", modelFolder, spritesheet) as LocalFile,
-                );
-                return [state, url];
-              },
+        const spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl> =
+          new Map(
+            await Promise.all(
+              spritesheetFiles.map(
+                (spritesheet): [ActorAnimationName, PublicUrl] => {
+                  const state = path.basename(
+                    spritesheet,
+                    path.extname(spritesheet),
+                  ) as ActorAnimationName;
+                  const url = serverFileToPublicUrl(
+                    path.join("actors", modelFolder, spritesheet) as LocalFile,
+                  );
+                  return [state, url];
+                },
+              ),
             ),
-          ),
-        );
+          );
         const model: ActorModel = {
           id: modelId,
           spritesheets,

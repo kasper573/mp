@@ -19,13 +19,13 @@ import * as styles from "./game.css";
 import { GameStateClientContext, useGameActions } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
-import { loadActorSpritesheets } from "./actor/actor-spritesheets-provider";
+import { loadActorSpritesheets } from "./actor/actor-spritesheet-lookup";
 import { GameDebugUi } from "./debug/game-debug-ui";
 import type { GameDebugUiState } from "./debug/game-debug-ui-state";
 import { GameDebugUiContext } from "./debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "./debug/game-state-debug-info";
 import { useRpc } from "./use-rpc";
-import { ActorSpritesheetContext } from "./actor/actor-sprite";
+import { ActorSpritesheetContext } from "./actor/actor-spritesheet-lookup";
 
 export function Game(
   props: ParentProps<{ class?: string; style?: JSX.CSSProperties }>,

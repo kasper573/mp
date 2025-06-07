@@ -5,39 +5,43 @@ import {
   createMemo,
   onCleanup,
   Show,
-  untrack,
   useContext,
 } from "solid-js";
+import { assert } from "@mp/std";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
 import { GameStateClientContext } from "../game-state-client";
-import { deriveActorSpriteState } from "./derive-actor-sprite-state";
-import { createActorSprite } from "./actor-sprite";
+import { ActorSprite } from "./actor-sprite";
+import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
 
 export function Actor(props: {
   tiled: TiledResource;
   actor: Actor;
   isPlayer?: boolean;
 }) {
+  const allSpriteshets = useContext(ActorSpritesheetContext);
   const { eventBus } = useContext(GameStateClientContext);
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),
   );
+  const isMoving = createMemo(() => !!props.actor.path?.length);
+  const isFast = createMemo(() => props.actor.speed >= 2);
 
-  const container = new Container();
-
-  const state = createMemo(() => deriveActorSpriteState(props.actor));
-
-  const [sprite, spriteCommands] = createActorSprite(
-    () => props.actor.modelId,
-    () => props.actor.dir,
-    () => props.actor.attackSpeed,
-  );
+  const sprite = new ActorSprite();
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
+  const container = new Container();
   container.addChild(sprite);
   container.addChild(text);
+
+  createEffect(() => {
+    sprite.spritesheets = assert(allSpriteshets.get(props.actor.modelId));
+  });
+
+  createEffect(() => (sprite.attackSpeed = props.actor.attackSpeed));
+
+  createEffect(() => (sprite.direction = props.actor.dir));
 
   createEffect(() => {
     const { opacity, color } = props.actor;
@@ -60,15 +64,46 @@ export function Actor(props: {
     container.zIndex = props.actor.coords.y;
   });
 
-  createEffect(() => spriteCommands.setState(state()));
+  function switchAnimationToMovingOrIdle() {
+    if (isAlive()) {
+      if (isMoving()) {
+        sprite.switchAnimationSmoothly(isFast() ? "run-spear" : "walk-spear");
+      } else {
+        sprite.switchAnimationSmoothly("idle-spear");
+      }
+    }
+  }
+
+  const isAlive = () =>
+    props.actor.health > 0 &&
+    !sprite.currentAnimationName?.startsWith("death-");
+
+  createEffect(switchAnimationToMovingOrIdle);
 
   onCleanup(
+    // eslint-disable-next-line solid/reactivity
     eventBus.subscribe("combat.attack", (attack) => {
-      if (attack.actorId === untrack(() => props.actor.id)) {
-        spriteCommands.attack();
+      if (attack.actorId === props.actor.id) {
+        void sprite
+          .playToEndAndStop("attack-spear")
+          .then(switchAnimationToMovingOrIdle);
       }
     }),
   );
+
+  onCleanup(
+    // eslint-disable-next-line solid/reactivity
+    eventBus.subscribe("actor.death", (deadActorId) => {
+      if (deadActorId === props.actor.id) {
+        void sprite.playToEndAndStop("death-spear");
+      }
+    }),
+  );
+
+  onCleanup(() => {
+    sprite.destroy();
+    container.destroy();
+  });
 
   return (
     <Show when={position()}>
