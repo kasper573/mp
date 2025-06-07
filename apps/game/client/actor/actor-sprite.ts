@@ -6,7 +6,7 @@ import { AnimationController } from "./animation-controller";
 export class ActorSprite extends AnimationController<ActorAnimationName> {
   attackSpeed = 1 as TimesPerSecond;
 
-  constructor() {
+  constructor(initialAnimationName?: ActorAnimationName) {
     super({
       width: 48,
       height: 64,
@@ -16,6 +16,12 @@ export class ActorSprite extends AnimationController<ActorAnimationName> {
           ? TimeSpan.fromMilliseconds(100).divide(this.attackSpeed)
           : TimeSpan.fromMilliseconds(100),
     });
+    if (initialAnimationName) {
+      this.fixed = {
+        name: initialAnimationName,
+        type: "fixed-at-end",
+      };
+    }
   }
 }
 

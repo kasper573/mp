@@ -28,7 +28,10 @@ export function Actor(props: {
   const isMoving = createMemo(() => !!props.actor.path?.length);
   const isFast = createMemo(() => props.actor.speed >= 2);
 
-  const sprite = new ActorSprite();
+  const sprite = new ActorSprite(
+    // eslint-disable-next-line solid/reactivity
+    props.actor.health > 0 ? "idle-spear" : "death-spear",
+  );
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   const container = new Container();
