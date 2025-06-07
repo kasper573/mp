@@ -27,10 +27,11 @@ export function Actor(props: {
   );
   const isMoving = createMemo(() => !!props.actor.path?.length);
   const isFast = createMemo(() => props.actor.speed >= 2);
+  const isAlive = () => props.actor.health > 0;
 
   const sprite = new ActorSprite(
     // eslint-disable-next-line solid/reactivity
-    props.actor.health > 0 ? "idle-spear" : "death-spear",
+    isAlive() ? "idle-spear" : "death-spear",
   );
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
@@ -76,10 +77,6 @@ export function Actor(props: {
       }
     }
   }
-
-  const isAlive = () =>
-    props.actor.health > 0 &&
-    !sprite.currentAnimationName?.startsWith("death-");
 
   createEffect(switchAnimationToMovingOrIdle);
 
