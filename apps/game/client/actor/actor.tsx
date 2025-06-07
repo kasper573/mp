@@ -20,7 +20,7 @@ export function Actor(props: {
   actor: Actor;
   isPlayer?: boolean;
 }) {
-  const allSpriteshets = useContext(ActorSpritesheetContext);
+  const allSpritesheets = useContext(ActorSpritesheetContext);
   const { eventBus } = useContext(GameStateClientContext);
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),
@@ -36,7 +36,7 @@ export function Actor(props: {
   container.addChild(text);
 
   createEffect(() => {
-    sprite.spritesheets = assert(allSpriteshets.get(props.actor.modelId));
+    sprite.spritesheets = assert(allSpritesheets.get(props.actor.modelId));
   });
 
   createEffect(() => (sprite.attackSpeed = props.actor.attackSpeed));

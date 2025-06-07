@@ -51,7 +51,7 @@ export const ActorSpritesheetContext = createContext(
     >,
     {
       get() {
-        throw new Error("CharacterSpritesheetContext is not initialized");
+        throw new Error("ActorSpritesheetContext is not initialized");
       },
     },
   ),
