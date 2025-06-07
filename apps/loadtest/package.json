@@ -10,8 +10,11 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/server": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp/ws": "workspace:*"
   },
   "devDependencies": {

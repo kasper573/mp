@@ -1,5 +1,6 @@
 import { hideBin } from "yargs/helpers";
 import yargs from "yargs";
+import { TimeSpan } from "@mp/time";
 
 export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
@@ -44,6 +45,7 @@ export function readCliOptions(argv = process.argv) {
       type: "number",
       demandOption: true,
       default: 60_000,
+      coerce: (value: number) => TimeSpan.fromMilliseconds(value),
     })
     .parseSync();
 

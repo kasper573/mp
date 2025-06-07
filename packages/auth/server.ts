@@ -13,9 +13,9 @@ export interface TokenVerifierOption {
   audience: string;
   algorithms: AuthAlgorithm[];
   /**
-   * A user that will bypass token verification
+   * Provide this function to allow bypassing real JWT verification.
    */
-  bypassUser?: UserIdentity;
+  getBypassUser?: (token: AuthToken) => UserIdentity | undefined;
 }
 
 export interface TokenVerifier {
@@ -27,7 +27,7 @@ export function createTokenVerifier({
   issuer,
   audience,
   algorithms,
-  bypassUser,
+  getBypassUser,
 }: TokenVerifierOption): TokenVerifier {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
@@ -36,7 +36,8 @@ export function createTokenVerifier({
       return err("A token must be provided");
     }
 
-    if (token === bypassUser?.token) {
+    const bypassUser = getBypassUser?.(token);
+    if (bypassUser) {
       return ok(bypassUser);
     }
 

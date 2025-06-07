@@ -14,7 +14,6 @@ import {
   string,
   transform,
 } from "@mp/env";
-import type { AuthToken } from "@mp/auth";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
 
@@ -84,16 +83,10 @@ export const serverOptionsSchema = object({
      */
     algorithms: csv(picklist(authAlgorithms)),
     /**
-     * An auth token that when specified will enable a special user in the auth server
-     * who is allowed to bypass token verification.
-     * Should ideally only be used for development, ie. for easily allowing load test clients to connect without authing.
+     * Allow bypassing JWT verification using fake tokens.
+     * Used by load test to automatically sign in as a new user and character.
      */
-    bypassUser: optional(
-      pipe(
-        string(),
-        transform((token) => token as AuthToken),
-      ),
-    ),
+    allowBypassUsers: boolish(),
   }),
 
   /**
