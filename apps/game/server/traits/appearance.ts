@@ -11,7 +11,7 @@ export interface AppearanceTrait {
 
 export interface ActorModel {
   id: ActorModelId;
-  spritesheets: ReadonlyMap<ActorModelState, PublicUrl>;
+  spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl>;
   hitBox: Rect<Tile>;
 }
 
@@ -22,9 +22,9 @@ export const ctxActorModelLookup =
 
 export type ActorModelId = Branded<string, "ActorModelId">;
 
-export type ActorModelState = (typeof actorModelStates)[number];
+export type ActorAnimationName = (typeof actorAnimationNames)[number];
 
-export const actorModelStates = Object.freeze([
+export const actorAnimationNames = Object.freeze([
   "attack-shooting",
   "attack-spear",
   "dash-dust",

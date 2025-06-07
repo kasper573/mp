@@ -5,7 +5,7 @@ import { rpc } from "../rpc";
 import {
   ctxActorModelLookup,
   type ActorModelId,
-  type ActorModelState,
+  type ActorAnimationName,
 } from "../traits/appearance";
 
 export type AssetsRouter = typeof assetsRouter;
@@ -36,5 +36,5 @@ export const ctxAreaFileUrlResolver = InjectionContext.new<
 
 export type ActorSpritesheetUrls = ReadonlyMap<
   ActorModelId,
-  ReadonlyMap<ActorModelState, PublicUrl>
+  ReadonlyMap<ActorAnimationName, PublicUrl>
 >;

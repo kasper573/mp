@@ -7,13 +7,13 @@ import type {
   SpritesheetData,
 } from "pixi.js";
 import { Spritesheet } from "pixi.js";
-import type { ActorModelState } from "../../server";
+import type { ActorAnimationName } from "../../server";
 
 export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;
 
 export type ActorSpritesheetData = Omit<SpritesheetData, "animations"> & {
   animations?: {
-    [K in ActorModelState]: string[];
+    [K in ActorAnimationName]: string[];
   };
 };
 

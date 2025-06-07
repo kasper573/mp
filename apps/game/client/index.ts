@@ -6,7 +6,7 @@ export * from "./area/area-debug-ui";
 export * from "./area/area-scene";
 export * from "./actor/actor-sprite-tester";
 export * from "./actor/actor-spritesheet";
-export * from "./actor/actor-spritesheets-provider";
+export * from "./actor/actor-spritesheet-lookup";
 export * from "./create-optimistic-game-state";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";

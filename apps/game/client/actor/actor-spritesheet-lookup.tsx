@@ -1,21 +1,22 @@
 import type { Texture } from "pixi.js";
 import { Assets } from "pixi.js";
+import { createContext } from "solid-js";
 import {
   type ActorModelId,
-  type ActorModelState,
+  type ActorAnimationName,
 } from "../../server/traits/appearance";
 import type { ActorSpritesheetUrls } from "../../server";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
 
-export type ActorSpritesheets = ReadonlyMap<
+export type ActorSpritesheetLookup = ReadonlyMap<
   ActorModelId,
-  ReadonlyMap<ActorModelState, ActorSpritesheet>
+  ReadonlyMap<ActorAnimationName, ActorSpritesheet>
 >;
 
 export async function loadActorSpritesheets(
   urls: ActorSpritesheetUrls,
-): Promise<ActorSpritesheets> {
+): Promise<ActorSpritesheetLookup> {
   return new Map(
     await Promise.all(
       urls.entries().map(async ([modelId, states]) => {
@@ -41,3 +42,17 @@ export async function loadActorSpritesheets(
     ),
   );
 }
+
+export const ActorSpritesheetContext = createContext(
+  new Proxy(
+    {} as ReadonlyMap<
+      ActorModelId,
+      ReadonlyMap<ActorAnimationName, ActorSpritesheet>
+    >,
+    {
+      get() {
+        throw new Error("ActorSpritesheetContext is not initialized");
+      },
+    },
+  ),
+);
