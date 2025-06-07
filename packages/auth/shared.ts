@@ -1,4 +1,4 @@
-import type { Branded } from "@mp/std";
+import { createUuid, type Branded } from "@mp/std";
 import type { JWTPayload } from "jose";
 
 export type AuthToken = Branded<string, "AuthToken">;
@@ -27,6 +27,26 @@ export function extractRolesFromJwtPayload(
   payload: OurJwtPayload,
 ): ReadonlySetLike<UserRole> {
   return new Set(payload.realm_access.roles);
+}
+
+const bypassTokenPrefix = "bypass:";
+
+export function createBypassUser(name: string): AuthToken {
+  return (bypassTokenPrefix + name) as AuthToken;
+}
+
+export function parseBypassUser(token: AuthToken): UserIdentity | undefined {
+  if (!token.startsWith(bypassTokenPrefix)) {
+    return;
+  }
+
+  const name = token.slice(bypassTokenPrefix.length);
+  return {
+    id: createUuid() as UserId,
+    token,
+    roles: new Set(),
+    name,
+  };
 }
 
 export { type JWTPayload } from "jose";

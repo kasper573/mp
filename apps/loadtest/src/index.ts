@@ -2,7 +2,7 @@ import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver, createRpcProxyInvoker } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
-import type { AuthToken } from "@mp/auth";
+import { createBypassUser } from "@mp/auth";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -13,13 +13,13 @@ const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
 
 const start = performance.now();
 
-await Promise.all([loadTestHttp(), loadTestSocketsWithRpc()]);
+await Promise.all([testAllHttpRequests(), testAllGameClients()]);
 
 const end = performance.now();
 
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-async function loadTestHttp() {
+async function testAllHttpRequests() {
   logger.info("Testing", httpRequests, "HTTP requests");
   const results = await Promise.allSettled(
     range(httpRequests).map(async () => {
@@ -44,11 +44,11 @@ async function loadTestHttp() {
   }
 }
 
-async function loadTestSocketsWithRpc() {
+async function testAllGameClients() {
   logger.info("Testing", gameClients, "sockets with Rpc");
 
   const results = await Promise.allSettled(
-    range(gameClients).map(testSocketWithRpc),
+    range(gameClients).map(testOneGameClient),
   );
 
   const successes = results.filter((r) => r.status === "fulfilled");
@@ -59,7 +59,7 @@ async function loadTestSocketsWithRpc() {
   );
 }
 
-async function testSocketWithRpc(n: number) {
+async function testOneGameClient(n: number) {
   if (verbose) {
     logger.info(`Creating socket ${n}`);
   }
@@ -78,7 +78,7 @@ async function testSocketWithRpc(n: number) {
       logger.info(`Socket ${n} connected`);
     }
     const characterId = await rpc.world.join(
-      process.env.MP_SERVER_AUTH__BYPASS_USER as AuthToken,
+      createBypassUser(`Test User ${n}`),
     );
     if (verbose) {
       logger.info(`Socket ${n} joined as character ${characterId}`);
