@@ -3,6 +3,9 @@ import { type ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver, createRpcProxyInvoker } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
+import { Rng } from "@mp/std";
+import type { Tile } from "@mp/std";
+import { Vector } from "@mp/math";
 import { readCliOptions } from "./cli";
 
 const logger = new Logger();
@@ -80,10 +83,33 @@ async function testOneGameClient(n: number) {
     const characterId = await rpc.world.join(
       createBypassUser(`Test User ${n}`),
     );
+
+    const rng = new Rng();
+    const tiles = Array.from(generateTiles(new Vector(44 as Tile, 30 as Tile)));
+
+    const endTime = Date.now() + timeout.totalMilliseconds;
+    while (Date.now() < endTime) {
+      try {
+        // Ty to respawn in case we got killed
+        await rpc.character.respawn(characterId);
+      } catch {
+        // Character is likely alive already
+      }
+
+      try {
+        const to = rng.oneOf(tiles);
+        await rpc.character.move({ characterId, to });
+        logger.info("Moving character", characterId, "to", to);
+        await wait(1000 + rng.next() * 6000);
+      } catch {
+        logger.warn("Could not move character", characterId);
+        await wait(1000);
+      }
+    }
+
     if (verbose) {
       logger.info(`Socket ${n} joined as character ${characterId}`);
     }
-    await wait(timeout);
     logger.info(`Socket ${n} test finished`);
   } catch (error) {
     if (verbose) {
@@ -110,4 +136,12 @@ function range(n: number) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function* generateTiles(areaSize: Vector<Tile>): Generator<Vector<Tile>> {
+  for (let x = 0; x < areaSize.x; x++) {
+    for (let y = 0; y < areaSize.y; y++) {
+      yield new Vector(x as Tile, y as Tile);
+    }
+  }
 }

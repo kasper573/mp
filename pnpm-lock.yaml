@@ -229,12 +229,21 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
       '@mp/server':
         specifier: workspace:*
         version: link:../server
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../packages/std
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../packages/time
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
