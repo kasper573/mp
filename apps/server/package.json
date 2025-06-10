@@ -37,6 +37,7 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/ws": "workspace:*",
+    "@pyroscope/nodejs": "^0.4.5",
     "cors": "2.8.5",
     "dotenv": "16.4.5",
     "drizzle-orm": "0.38.3",
