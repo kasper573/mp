@@ -7,6 +7,14 @@ import {
   SpanKind,
 } from "@mp/telemetry/otel";
 
+type NgraphModule = {
+  aStar: (graph: unknown, options: unknown) => NgraphPathFinder;
+};
+
+type NgraphPathFinder = {
+  find: (fromId: string, toId: string) => unknown[] | null;
+};
+
 export class NgraphPathInstrumentation extends InstrumentationBase {
   constructor() {
     super("@mp/ngraph-path-instrumentation", "1.0.0", {});
@@ -16,35 +24,34 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
     return new InstrumentationNodeModuleDefinition(
       "ngraph.path",
       [">=1.0.0"],
-      (moduleExports: any) => {
-        this._wrap(moduleExports, "aStar", this._patchAStar.bind(this));
+      (moduleExports: NgraphModule) => {
+        this._wrap(moduleExports, "aStar", this.patchAstar.bind(this));
         return moduleExports;
       },
-      (moduleExports: any) => {
-        if (moduleExports) {
-          this._unwrap(moduleExports, "aStar");
-        }
+      (moduleExports: NgraphModule) => {
+        this._unwrap(moduleExports, "aStar");
         return moduleExports;
       }
     );
   }
 
-  private _patchAStar(original: any) {
+  private patchAstar(original: NgraphModule["aStar"]) {
+    // eslint-disable-next-line @typescript-eslint/no-this-alias, unicorn/no-this-assignment
     const instrumentation = this;
-    return function patchedAStar(this: any, graph: any, options: any) {
-      const pathFinder = original.call(this, graph, options);
+    return function wrappedAstar(graph: unknown, options: unknown): NgraphPathFinder {
+      const pathFinder = original(graph, options);
       
       // Wrap the find method
-      instrumentation._wrap(pathFinder, "find", instrumentation._patchFind.bind(instrumentation));
+      instrumentation._wrap(pathFinder, "find", instrumentation.patchFind.bind(instrumentation));
       
       return pathFinder;
     };
   }
 
-  private _patchFind(original: any) {
+  private patchFind(original: NgraphPathFinder["find"]) {
     const tracer = trace.getTracer("ngraph-path-instrumentation");
     
-    return function patchedFind(this: any, fromId: string, toId: string) {
+    return function wrappedFind(fromId: string, toId: string): unknown[] | null {
       const span = tracer.startSpan("ngraph.path.find", {
         kind: SpanKind.INTERNAL,
         attributes: {
