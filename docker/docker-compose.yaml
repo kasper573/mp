@@ -117,6 +117,17 @@ services:
       - -config.file=/etc/tempo-config/tempo.yaml
       - -config.expand-env=true
 
+  pyroscope:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/pyroscope:1.10.0
+    volumes:
+      - ./grafana/pyroscope.yaml:/etc/pyroscope/config.yaml
+    command:
+      - -config.file=/etc/pyroscope/config.yaml
+    ports:
+      - "4040:4040"
+
   alloy:
     env_file: *env_files
     logging: *logging

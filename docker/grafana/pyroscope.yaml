@@ -1,2 +1,13 @@
+server:
+  http_listen_port: 4040
+
+# Configure storage backend  
+pyroscopedb:
+  data_path: /data
+
+# Configure log level
+log_level: info
+
+# Disable self profiling to avoid conflicts
 self_profiling:
   disable_push: true
