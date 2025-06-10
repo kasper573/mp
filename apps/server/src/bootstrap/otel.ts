@@ -17,6 +17,7 @@ import {
   FsInstrumentation,
 } from "@mp/telemetry/otel";
 import { createAddHookMessageChannel } from "import-in-the-middle";
+import { NgraphPathInstrumentation } from "../metrics/path-finding";
 
 const { registerOptions, waitForAllMessagesAcknowledged } =
   createAddHookMessageChannel();
@@ -58,6 +59,7 @@ registerInstrumentations({
       sendSpans: true,
       messageEvents: true,
     }),
+    new NgraphPathInstrumentation(),
   ],
 });
 

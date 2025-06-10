@@ -45,8 +45,9 @@ export class AreaResource {
     this.start = tiled.worldCoordToTile(Vector.from(startObj)).round();
   }
 
-  findPath: VectorPathFinder<Tile> = (...args) =>
-    AreaResource.findPathMiddleware(args, this.#findPath);
+  get findPath(): VectorPathFinder<Tile> {
+    return this.#findPath;
+  }
 
   findPathBetweenTiles(
     start: Vector<Tile>,
@@ -68,11 +69,6 @@ export class AreaResource {
       this.tiled.tileCoordToWorld(getCoordOfSubject(subject)),
     );
   }
-
-  static findPathMiddleware = (
-    args: Parameters<VectorPathFinder<Tile>>,
-    next: VectorPathFinder<Tile>,
-  ): ReturnType<VectorPathFinder<Tile>> => next(...args);
 }
 
 const dynamicLayerName = "Dynamic";
