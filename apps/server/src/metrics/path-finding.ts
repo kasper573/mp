@@ -6,6 +6,9 @@ import {
   SpanStatusCode,
   SpanKind,
 } from "@mp/telemetry/otel";
+import { MetricsHistogram, exponentialBuckets } from "@mp/telemetry/prom";
+import { beginMeasuringTimeSpan } from "@mp/time";
+import { getGlobalMetricsRegistry } from "./registry";
 
 type NgraphModule = {
   aStar: (graph: unknown, options: unknown) => NgraphPathFinder;
@@ -16,8 +19,25 @@ type NgraphPathFinder = {
 };
 
 export class NgraphPathInstrumentation extends InstrumentationBase {
+  private findPathHistogram?: MetricsHistogram;
+
   constructor() {
     super("@mp/ngraph-path-instrumentation", "1.0.0", {});
+  }
+
+  private ensureHistogram() {
+    if (!this.findPathHistogram) {
+      const metricsRegistry = getGlobalMetricsRegistry();
+      if (metricsRegistry) {
+        this.findPathHistogram = new MetricsHistogram({
+          name: "findPath",
+          help: "Path finding duration in milliseconds",
+          registers: [metricsRegistry],
+          buckets: exponentialBuckets(0.1, 2, 20), // 0.1ms to ~100s
+        });
+      }
+    }
+    return this.findPathHistogram;
   }
 
   protected init() {
@@ -50,6 +70,8 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
 
   private patchFind(original: NgraphPathFinder["find"]) {
     const tracer = trace.getTracer("ngraph-path-instrumentation");
+    // eslint-disable-next-line @typescript-eslint/no-this-alias, unicorn/no-this-assignment
+    const instrumentation = this;
     
     return function wrappedFind(this: unknown, fromId: string, toId: string): unknown[] | null {
       const span = tracer.startSpan("ngraph.path.find", {
@@ -60,6 +82,8 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
           "pathfinding.algorithm": "a-star",
         },
       });
+
+      const getMeasurement = beginMeasuringTimeSpan();
 
       return context.with(trace.setSpan(context.active(), span), () => {
         try {
@@ -78,6 +102,14 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
           }
           
           span.setStatus({ code: SpanStatusCode.OK });
+          
+          // Record metrics if histogram is available
+          const histogram = instrumentation.ensureHistogram();
+          if (histogram) {
+            const duration = getMeasurement();
+            histogram.observe(duration.totalMilliseconds);
+          }
+          
           return result;
         } catch (error) {
           span.recordException(error as Error);
@@ -85,6 +117,14 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
             code: SpanStatusCode.ERROR,
             message: (error as Error).message,
           });
+          
+          // Still record metrics for failed operations
+          const histogram = instrumentation.ensureHistogram();
+          if (histogram) {
+            const duration = getMeasurement();
+            histogram.observe(duration.totalMilliseconds);
+          }
+          
           throw error;
         } finally {
           span.end();

@@ -47,6 +47,7 @@ import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
 import { createTickMetricsObserver } from "./metrics/tick";
+import { setGlobalMetricsRegistry } from "./metrics/registry";
 import { createExpressLogger } from "./express/logger";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
@@ -76,6 +77,7 @@ RateLimiter.enabled = opt.rateLimit;
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
+setGlobalMetricsRegistry(metrics);
 const tokenVerifier = createTokenVerifier({
   ...opt.auth,
   getBypassUser,
