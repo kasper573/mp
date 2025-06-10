@@ -8,6 +8,8 @@ ls:
     .dir: regex:.*
   .husky:
     .dir: regex:.*
+  .devcontainer:
+    .dir: regex:.*
   apps/client/src/routes/**:
     .*: regex:~?(__)?[a-z0-9\-]+
 

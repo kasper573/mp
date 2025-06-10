@@ -42,7 +42,7 @@ Local development is done using node and docker compose.
 - Install [Docker](https://www.docker.com/)
 - Install [NodeJS](https://nodejs.org/)
 - Clone this repository
-- Run `cd docker && ./dockerctl.sh dev up -d`
+- Run `cd docker && COMPOSE_ENV=dev docker compose -f docker-compose.yaml -f docker-compose.dev.yaml up -d`
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
 - Run `./docker/install-cert.sh`
@@ -52,6 +52,19 @@ Local development is done using node and docker compose.
 - Run `pnpm -F server devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
+### Development with VS Code Devcontainers
+
+Alternatively, you can use VS Code Devcontainers for a consistent development environment:
+
+1. Install [VS Code](https://code.visualstudio.com/) and the [Dev Containers extension](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+2. Open the repository in VS Code
+3. Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on macOS) and select "Dev Containers: Reopen in Container"
+4. VS Code will build and start the development containers automatically
+5. The mp-server and mp-client will run inside containers with hot reload enabled
+6. All services (postgres, keycloak, etc.) will be available and properly networked
+
+This provides the benefits of containerized development while maintaining excellent developer experience with hot reload and VS Code integration.
+
 ### Before each development session
 
 - Run `pnpm dev`
@@ -59,7 +72,7 @@ Local development is done using node and docker compose.
 
 ### If you make docker related changes
 
-You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script. See [quirks](#quirks).
+You will have to perform the appropriate docker compose commands to apply your changes. For development, use `COMPOSE_ENV=dev docker compose -f docker-compose.yaml -f docker-compose.dev.yaml <command>`. For production, use `COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml <command>`.
 
 ### If you make database related changes
 
@@ -77,11 +90,11 @@ User roles are defined in typescript source code as a single source of truth and
 
 While most of the repo should be fairly conventional, I've made a few choices that may be unexpected and is worth mentioning. Here's what you need to know:
 
-In development, our own apps run on the host machine and outside of the docker network, while 3rd party services run inside the docker network, contrary to production and testing where everything runs inside the docker network.
+In development, our own apps run inside the docker network using development-optimized containers that support hot reload and volume mounting, while 3rd party services also run inside the docker network. This provides excellent development experience since source code changes are immediately reflected without rebuilding containers, while still maintaining a consistent containerized environment.
 
-> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, drizzle-kit cli, pnpm link, etc.
+> This is made possible using development-specific Dockerfiles and docker compose configurations that mount source code as volumes and use development tools like tsx watch for hot reload.
 
-We don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
+Docker compose is used directly for container management. For development, use `COMPOSE_ENV=dev docker compose -f docker-compose.yaml -f docker-compose.dev.yaml <commands>`. For production, use `COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml <commands>`. You can also use the default configuration with just `docker compose <commands>` which will automatically load the development overrides via docker-compose.override.yaml.
 
 ## Docker
 
@@ -94,7 +107,7 @@ The `/docker` folder is designed to serve both as the required configuration for
 
 Building images: You can build docker images from source, and it will depend on the rest of the source code from the repo to be present.
 
-Starting containers: You can also start containers for prebuilt docker images, in which case only the `/docker` folder is required to be present. You can do so by running `dockerctl.sh` with `prod` or `test` environment. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `dockerctl.sh prod <docker compose command>`.
+Starting containers: You can also start containers for prebuilt docker images, in which case only the `/docker` folder is required to be present. You can do so by running docker compose with the production configuration. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml <command>`.
 
 # Production deployment
 

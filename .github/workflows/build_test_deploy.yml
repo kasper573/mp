@@ -44,10 +44,10 @@ jobs:
           password: ${{ env.DOCKER_PASSWORD }}
 
       - name: Build docker images
-        run: cd docker && ./dockerctl.sh prod build
+        run: cd docker && COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml build
 
       - name: Push docker images
-        run: cd docker && ./dockerctl.sh prod push
+        run: cd docker && COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml push
 
   test-e2e:
     needs: [build]
@@ -59,7 +59,7 @@ jobs:
       - name: Install playwright dependencies
         run: pnpm -F e2e exec playwright install --with-deps
       - name: Start application
-        run: cd ./docker && ./dockerctl.sh test up --no-build -d
+        run: cd ./docker && COMPOSE_ENV=test docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up --no-build -d
       - name: Run end-to-end tests
         run: pnpm -F @mp/e2e start
       - name: Dump docker logs
@@ -128,10 +128,10 @@ jobs:
             echo "KC_ADMIN_PASSWORD=\"${{ secrets.KC_ADMIN_PASSWORD }}\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
-            ./dockerctl.sh prod pull
-            ./dockerctl.sh prod down
+            COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml pull
+            COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml down
 
-            if ! ./dockerctl.sh prod up -d --remove-orphans --no-build; then
+            if ! COMPOSE_ENV=prod docker compose -f docker-compose.yaml -f docker-compose.prod.yaml up -d --remove-orphans --no-build; then
               echo "🚨 docker-compose up failed — gathering all container logs"
               mkdir -p logs
               for id in $(docker ps -aq); do
