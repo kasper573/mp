@@ -1,0 +1,17 @@
+# Production-specific docker compose configuration
+# Use with: docker compose -f docker-compose.yaml -f docker-compose.prod.yaml
+
+services:
+  # In production, we exclude the dev services entirely
+  # This is done by setting their scale to 0 and removing build context requirements
+  mp-server-dev:
+    image: alpine  # Minimal image that won't be used
+    command: ["echo", "Development service disabled in production"]
+    deploy:
+      replicas: 0  # Don't run this service in production
+
+  mp-client-dev:
+    image: alpine  # Minimal image that won't be used
+    command: ["echo", "Development service disabled in production"]
+    deploy:
+      replicas: 0  # Don't run this service in production

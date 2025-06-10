@@ -19,7 +19,6 @@ services:
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
-    profiles: ["prod", "test"]
     depends_on:
       - mp-server
 
@@ -31,7 +30,6 @@ services:
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
-    profiles: ["prod", "test"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
       interval: 3s
@@ -46,7 +44,6 @@ services:
   mp-server-healthcheck:
     image: alpine
     restart: no
-    profiles: ["prod", "test"]
     depends_on:
       mp-server:
         condition: service_healthy

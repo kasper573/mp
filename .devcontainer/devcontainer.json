@@ -1,0 +1,48 @@
+{
+  "name": "MP Development Environment",
+  "dockerComposeFile": [
+    "../docker/docker-compose.yaml",
+    "../docker/docker-compose.dev.yaml"
+  ],
+  "service": "mp-server-dev",
+  "workspaceFolder": "/workdir",
+  "features": {
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {}
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "ms-vscode.vscode-typescript-next"
+      ],
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode"
+      }
+    }
+  },
+  "forwardPorts": [5173, 9999, 8080, 5432],
+  "portsAttributes": {
+    "5173": {
+      "label": "Client (Vite)",
+      "onAutoForward": "notify"
+    },
+    "9999": {
+      "label": "Server API",
+      "onAutoForward": "notify"
+    },
+    "8080": {
+      "label": "Keycloak",
+      "onAutoForward": "notify"
+    },
+    "5432": {
+      "label": "PostgreSQL",
+      "onAutoForward": "ignore"
+    }
+  },
+  "postCreateCommand": "pnpm install",
+  "remoteUser": "node"
+}

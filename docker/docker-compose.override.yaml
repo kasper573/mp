@@ -1,13 +1,7 @@
+# Docker Compose override for development
+# This file is automatically loaded by docker compose and provides development-specific configuration
+
 services:
-  # In development, disable production versions of mp-server and mp-client
-  mp-server:
-    deploy:
-      replicas: 0  # Disable production service in development
-
-  mp-client:
-    deploy:
-      replicas: 0  # Disable production service in development
-
   # Development version of mp-server with hot reload
   mp-server-dev:
     build:
@@ -52,20 +46,6 @@ services:
         required: false
       - .env.dev
       - .env.shared
-
-  # Development-specific overrides for existing services
-  keycloak:
-    ports:
-      - "8080:8080"
-  postgres:
-    ports:
-      - "5432:5432"
-  alloy:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-  caddy:
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
 
 volumes:
   mp-server-node-modules:

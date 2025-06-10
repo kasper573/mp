@@ -1,0 +1,29 @@
+# Development Dockerfile for mp-server
+# This runs the server in development mode with hot reload and source code mounting
+FROM node:22.12.0-alpine3.21
+
+WORKDIR /workdir
+
+# Install dependencies system-wise to avoid rebuild on every change
+RUN npm install -g corepack@0.31.0 tsx@4.19.1 && corepack enable
+
+# Copy package management files
+COPY package.json pnpm-lock.yaml .npmrc pnpm-workspace.yaml ./
+
+# Create workspace structure and copy package.json files
+COPY packages/ packages/
+COPY apps/ apps/
+
+# Prepare pnpm
+RUN corepack prepare
+
+# Install all dependencies (will be cached in image)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+# Set development environment
+ENV NODE_ENV=development
+ENV MP_SERVER_PUBLIC_DIR=/workdir/public
+
+# Source code will be mounted as volume in development
+# Use tsx directly for better performance in development
+CMD ["pnpm", "-F", "server", "watch"]
