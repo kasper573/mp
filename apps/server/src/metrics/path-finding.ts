@@ -51,7 +51,7 @@ export class NgraphPathInstrumentation extends InstrumentationBase {
   private patchFind(original: NgraphPathFinder["find"]) {
     const tracer = trace.getTracer("ngraph-path-instrumentation");
     
-    return function wrappedFind(fromId: string, toId: string): unknown[] | null {
+    return function wrappedFind(this: unknown, fromId: string, toId: string): unknown[] | null {
       const span = tracer.startSpan("ngraph.path.find", {
         kind: SpanKind.INTERNAL,
         attributes: {
