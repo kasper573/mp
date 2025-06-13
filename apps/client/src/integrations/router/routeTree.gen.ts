@@ -8,104 +8,44 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-// Import Routes
+import { Route as rootRouteImport } from './../../routes/~__root'
+import { Route as SandboxRouteImport } from './../../routes/~sandbox'
+import { Route as PlayRouteImport } from './../../routes/~play'
+import { Route as ContactRouteImport } from './../../routes/~contact'
+import { Route as AuthCallbackRouteImport } from './../../routes/~auth-callback'
+import { Route as ActorTesterRouteImport } from './../../routes/~actor-tester'
+import { Route as IndexRouteImport } from './../../routes/~index'
 
-import { Route as rootRoute } from './../../routes/~__root'
-import { Route as SandboxImport } from './../../routes/~sandbox'
-import { Route as PlayImport } from './../../routes/~play'
-import { Route as ContactImport } from './../../routes/~contact'
-import { Route as AuthCallbackImport } from './../../routes/~auth-callback'
-import { Route as ActorTesterImport } from './../../routes/~actor-tester'
-import { Route as IndexImport } from './../../routes/~index'
-
-// Create/Update Routes
-
-const SandboxRoute = SandboxImport.update({
+const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
   path: '/sandbox',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const PlayRoute = PlayImport.update({
+const PlayRoute = PlayRouteImport.update({
   id: '/play',
   path: '/play',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const ContactRoute = ContactImport.update({
+const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const AuthCallbackRoute = AuthCallbackImport.update({
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth-callback',
   path: '/auth-callback',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const ActorTesterRoute = ActorTesterImport.update({
+const ActorTesterRoute = ActorTesterRouteImport.update({
   id: '/actor-tester',
   path: '/actor-tester',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-const IndexRoute = IndexImport.update({
+const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRoute,
+  getParentRoute: () => rootRouteImport,
 } as any)
-
-// Populate the FileRoutesByPath interface
-
-declare module '@tanstack/solid-router' {
-  interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexImport
-      parentRoute: typeof rootRoute
-    }
-    '/actor-tester': {
-      id: '/actor-tester'
-      path: '/actor-tester'
-      fullPath: '/actor-tester'
-      preLoaderRoute: typeof ActorTesterImport
-      parentRoute: typeof rootRoute
-    }
-    '/auth-callback': {
-      id: '/auth-callback'
-      path: '/auth-callback'
-      fullPath: '/auth-callback'
-      preLoaderRoute: typeof AuthCallbackImport
-      parentRoute: typeof rootRoute
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactImport
-      parentRoute: typeof rootRoute
-    }
-    '/play': {
-      id: '/play'
-      path: '/play'
-      fullPath: '/play'
-      preLoaderRoute: typeof PlayImport
-      parentRoute: typeof rootRoute
-    }
-    '/sandbox': {
-      id: '/sandbox'
-      path: '/sandbox'
-      fullPath: '/sandbox'
-      preLoaderRoute: typeof SandboxImport
-      parentRoute: typeof rootRoute
-    }
-  }
-}
-
-// Create and export the route tree
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -115,7 +55,6 @@ export interface FileRoutesByFullPath {
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
 }
-
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/actor-tester': typeof ActorTesterRoute
@@ -124,9 +63,8 @@ export interface FileRoutesByTo {
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
 }
-
 export interface FileRoutesById {
-  __root__: typeof rootRoute
+  __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
@@ -134,7 +72,6 @@ export interface FileRoutesById {
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
 }
-
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
@@ -162,7 +99,6 @@ export interface FileRouteTypes {
     | '/sandbox'
   fileRoutesById: FileRoutesById
 }
-
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ActorTesterRoute: typeof ActorTesterRoute
@@ -170,6 +106,53 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   PlayRoute: typeof PlayRoute
   SandboxRoute: typeof SandboxRoute
+}
+
+declare module '@tanstack/solid-router' {
+  interface FileRoutesByPath {
+    '/sandbox': {
+      id: '/sandbox'
+      path: '/sandbox'
+      fullPath: '/sandbox'
+      preLoaderRoute: typeof SandboxRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/play': {
+      id: '/play'
+      path: '/play'
+      fullPath: '/play'
+      preLoaderRoute: typeof PlayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth-callback': {
+      id: '/auth-callback'
+      path: '/auth-callback'
+      fullPath: '/auth-callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/actor-tester': {
+      id: '/actor-tester'
+      path: '/actor-tester'
+      fullPath: '/actor-tester'
+      preLoaderRoute: typeof ActorTesterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+  }
 }
 
 const rootRouteChildren: RootRouteChildren = {
@@ -180,43 +163,6 @@ const rootRouteChildren: RootRouteChildren = {
   PlayRoute: PlayRoute,
   SandboxRoute: SandboxRoute,
 }
-
-export const routeTree = rootRoute
+export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-/* ROUTE_MANIFEST_START
-{
-  "routes": {
-    "__root__": {
-      "filePath": "~__root.tsx",
-      "children": [
-        "/",
-        "/actor-tester",
-        "/auth-callback",
-        "/contact",
-        "/play",
-        "/sandbox"
-      ]
-    },
-    "/": {
-      "filePath": "~index.tsx"
-    },
-    "/actor-tester": {
-      "filePath": "~actor-tester.tsx"
-    },
-    "/auth-callback": {
-      "filePath": "~auth-callback.tsx"
-    },
-    "/contact": {
-      "filePath": "~contact.tsx"
-    },
-    "/play": {
-      "filePath": "~play.tsx"
-    },
-    "/sandbox": {
-      "filePath": "~sandbox.tsx"
-    }
-  }
-}
-ROUTE_MANIFEST_END */
