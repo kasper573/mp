@@ -1,2 +1,2 @@
-self_profiling:
-  disable_push: true
+server:
+  http_listen_port: 4040
