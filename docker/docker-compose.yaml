@@ -111,11 +111,26 @@ services:
     env_file: *env_files
     logging: *logging
     image: grafana/tempo:2.6.1
+    user: root
     volumes:
       - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
+      - ./tempo-entrypoint.sh:/tempo-entrypoint.sh
+      - tempo-data:/data
+    entrypoint: ["/tempo-entrypoint.sh"]
     command:
+      - /tempo
       - -config.file=/etc/tempo-config/tempo.yaml
       - -config.expand-env=true
+
+  pyroscope:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/pyroscope:1.9.2
+    volumes:
+      - ./grafana/pyroscope.yaml:/etc/pyroscope/config.yaml
+      - pyroscope-data:/data
+    command:
+      - -config.file=/etc/pyroscope/config.yaml
 
   alloy:
     env_file: *env_files
@@ -136,6 +151,7 @@ services:
       - grafana
       - loki
       - tempo
+      - pyroscope
 
   loki:
     logging: *logging
@@ -183,5 +199,7 @@ volumes:
   grafana-data:
   loki-data:
   mimir-data:
+  tempo-data:
+  pyroscope-data:
   caddy-data:
   caddy-config:
