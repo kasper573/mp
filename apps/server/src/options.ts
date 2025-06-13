@@ -112,6 +112,10 @@ export const serverOptionsSchema = object({
    */
   buildVersion: string(),
   /**
+   * The branch/tag name of the build
+   */
+  buildBranch: string(),
+  /**
    * Whether to expose detailed error information to clients
    */
   exposeErrorDetails: boolish(),
