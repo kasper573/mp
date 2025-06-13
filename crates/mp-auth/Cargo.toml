@@ -1,0 +1,13 @@
+[package]
+name = "mp-auth"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+thiserror.workspace = true
+uuid.workspace = true
+reqwest = { version = "0.11", features = ["json"] }
+jsonwebtoken = "9.3"

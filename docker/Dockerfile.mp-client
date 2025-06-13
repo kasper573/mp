@@ -1,37 +1,131 @@
-# Make sure to keep this version aligned with the version of the engine field in the root package.json
-FROM node:22.12.0 AS base
+# Build stage
+FROM rust:1.76 AS builder
 
-FROM base AS builder
+# Install wasm-pack and trunk for WASM building
+RUN cargo install wasm-pack trunk
+
 WORKDIR /workdir
 
-# Enable pnpm
-RUN npm install -g corepack@0.31.0
-RUN corepack enable
-COPY package.json .
-RUN corepack prepare
+# Copy Cargo files
+COPY Cargo.toml ./
+COPY client/Cargo.toml ./client/
+COPY crates/ ./crates/
 
-# install most of node dependencies
-COPY pnpm-lock.yaml .npmrc ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+# Create dummy source files to cache dependencies
+RUN mkdir -p client/src && echo "fn main() {}" > client/src/lib.rs
+RUN find crates -name "Cargo.toml" -exec dirname {} \; | xargs -I {} mkdir -p {}/src
+RUN find crates -name "Cargo.toml" -exec dirname {} \; | xargs -I {} touch {}/src/lib.rs
 
-# copy source code and install any node dependencies missed by pnpm fetch
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# Build dependencies
+RUN cd client && wasm-pack build --target web --no-typescript || true
+RUN rm -rf client/src crates/*/src
 
-ENV NODE_ENV=production
-RUN pnpm -F client build
+# Copy actual source code
+COPY client/src ./client/src
+COPY crates/*/src ./crates/*/src
 
-FROM nginx:alpine3.20-slim AS runner
-WORKDIR /workdir
+# Create index.html for the client
+RUN mkdir -p client/dist
+COPY <<EOF client/index.html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>MP Game</title>
+    <link data-trunk rel="css" href="style.css">
+</head>
+<body>
+    <div id="app"></div>
+</body>
+</html>
+EOF
 
-# Copy client build to nginx
-COPY --from=builder /workdir/apps/client/dist /usr/share/nginx/html
+# Create basic CSS
+COPY <<EOF client/style.css
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 20px;
+    background-color: #1a1a1a;
+    color: #ffffff;
+}
+
+.app {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.connection-status {
+    margin-bottom: 20px;
+    padding: 10px;
+    background-color: #2a2a2a;
+    border-radius: 5px;
+}
+
+.chat {
+    border: 1px solid #444;
+    border-radius: 5px;
+    background-color: #2a2a2a;
+}
+
+.messages {
+    height: 300px;
+    overflow-y: auto;
+    padding: 10px;
+    border-bottom: 1px solid #444;
+}
+
+.message {
+    margin-bottom: 5px;
+    padding: 5px;
+    background-color: #333;
+    border-radius: 3px;
+}
+
+.input-area {
+    display: flex;
+    padding: 10px;
+}
+
+.input-area input {
+    flex: 1;
+    padding: 8px;
+    margin-right: 10px;
+    background-color: #333;
+    border: 1px solid #555;
+    color: #fff;
+    border-radius: 3px;
+}
+
+.input-area button {
+    padding: 8px 16px;
+    background-color: #0066cc;
+    border: none;
+    color: white;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.input-area button:hover {
+    background-color: #0052a3;
+}
+EOF
+
+# Build the WASM application
+WORKDIR /workdir/client
+RUN trunk build --release --public-url "/"
+
+# Runtime stage
+FROM nginx:alpine AS runtime
+
+# Copy the built WASM application
+COPY --from=builder /workdir/client/dist /usr/share/nginx/html
 
 # Install runtime env substitution script
 COPY ./docker/embed-client-env.sh /docker-entrypoint.d/10-embed-client-env.sh
 RUN chmod +x /docker-entrypoint.d/10-embed-client-env.sh
 
-# Add SPA configuration
+# Add SPA configuration  
 COPY <<EOF /etc/nginx/conf.d/default.conf
 server {
     listen 80;

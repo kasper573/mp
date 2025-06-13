@@ -1,33 +1,53 @@
-# Make sure to keep this version aligned with the version of the engine field in the root package.json
-FROM node:22.12.0-alpine3.21 AS base
+# Build stage
+FROM rust:1.76-alpine AS builder
+
+# Install system dependencies
+RUN apk add --no-cache musl-dev
+
 WORKDIR /workdir
-RUN npm install -g corepack@0.31.0
-RUN corepack enable
-COPY package.json .
-RUN corepack prepare
 
-# Note: We use pnpm deploy instead of efficient bundling via ie. esbuild.
-# Anything that transpiles or bundles is off the table,
-# because of opentelemetry, which heavily relies on monkey patching
-# node modules at runtime. Bundling or transpiling will arbitrarily
-# and silently break some opentelemetry instrumentations.
-# This might be solved some day via https://github.com/open-telemetry/opentelemetry-js/issues/4174
+# Copy Cargo files
+COPY Cargo.toml ./
+COPY server/Cargo.toml ./server/
+COPY crates/ ./crates/
 
-FROM base AS builder
+# Create dummy source files to cache dependencies
+RUN mkdir -p server/src && echo "fn main() {}" > server/src/main.rs
+RUN find crates -name "Cargo.toml" -exec dirname {} \; | xargs -I {} mkdir -p {}/src
+RUN find crates -name "Cargo.toml" -exec dirname {} \; | xargs -I {} touch {}/src/lib.rs
 
-# install most of node dependencies
-COPY pnpm-lock.yaml .npmrc ./
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+# Build dependencies
+RUN cargo build --release --bin mp-server
+RUN rm -rf server/src crates/*/src
 
-# copy source code and install any node dependencies missed by pnpm fetch
-COPY . .
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+# Copy actual source code
+COPY server/src ./server/src
+COPY crates/*/src ./crates/*/src
 
-# collect the sources and dependencies required by the server app
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm -F server deploy --legacy pnpm-deploy
+# Build the application
+RUN touch server/src/main.rs
+RUN cargo build --release --bin mp-server
 
-FROM base AS runner
-RUN apk add --no-cache curl
-COPY --from=builder /workdir/pnpm-deploy .
+# Runtime stage
+FROM alpine:3.19 AS runtime
+
+# Install runtime dependencies
+RUN apk add --no-cache curl ca-certificates
+
+WORKDIR /workdir
+
+# Copy the binary
+COPY --from=builder /workdir/target/release/mp-server /usr/local/bin/mp-server
+
+# Copy migrations
+COPY --from=builder /workdir/crates/mp-db/migrations ./migrations
+
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
-CMD ["sh", "-c", "pnpm db migrate && pnpm provision && pnpm start"]
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:${MP_SERVER_PORT:-3000}/health || exit 1
+
+EXPOSE 3000
+
+CMD ["mp-server"]

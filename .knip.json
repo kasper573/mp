@@ -1,9 +1,0 @@
-{
-  "include": ["dependencies"],
-  "ignoreDependencies": [
-    "eslint-import-resolver-typescript",
-    "@mp/tsconfig",
-    "@mp/eslint",
-    "tsx"
-  ]
-}
