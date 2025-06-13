@@ -24,16 +24,16 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
-    "@tanstack/solid-router": "1.115.3",
-    "@tanstack/solid-router-devtools": "1.115.3",
+    "@tanstack/solid-router": "1.121.3",
+    "@tanstack/solid-router-devtools": "1.121.8",
     "solid-js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@tanstack/router-plugin": "1.115.3",
-    "@vanilla-extract/vite-plugin": "5.0.1",
+    "@tanstack/router-plugin": "1.121.10",
+    "@vanilla-extract/vite-plugin": "5.0.6",
     "vite": "6.3.5",
-    "vite-plugin-checker": "0.9.1",
+    "vite-plugin-checker": "0.9.3",
     "vite-plugin-solid": "2.11.6"
   }
 }
