@@ -1,0 +1,2 @@
+apps/mp-client/Cargo.toml
+docker/Dockerfile.mp-client-rust

@@ -1,0 +1,13 @@
+[package]
+name = "mp-time"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

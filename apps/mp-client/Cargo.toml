@@ -1,0 +1,41 @@
+[package]
+name = "mp-client"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+mp-std = { path = "../../crates/mp-std" }
+mp-math = { path = "../../crates/mp-math" }
+mp-rpc = { path = "../../crates/mp-rpc" }
+
+wasm-bindgen = { workspace = true }
+web-sys = { workspace = true, features = [
+  "console",
+  "Document",
+  "Element",
+  "HtmlElement",
+  "Window",
+  "WebSocket",
+  "MessageEvent",
+  "ErrorEvent",
+  "CloseEvent",
+] }
+js-sys = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+console_error_panic_hook = { workspace = true }
+
+[dependencies.wee_alloc]
+version = "0.4.5"
+optional = true
+
+[features]
+default = ["wee_alloc"]
+
+[dev-dependencies]
+wasm-bindgen-test = { workspace = true }

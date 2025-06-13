@@ -1,0 +1,36 @@
+[package]
+name = "mp-server"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "mp-server"
+path = "src/main.rs"
+
+[dependencies]
+mp-std = { path = "../../crates/mp-std" }
+mp-math = { path = "../../crates/mp-math" }
+mp-time = { path = "../../crates/mp-time" }
+mp-rpc = { path = "../../crates/mp-rpc" }
+
+tokio = { workspace = true }
+axum = { workspace = true }
+axum-extra = { workspace = true }
+tower = { workspace = true }
+tower-http = { workspace = true }
+sqlx = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio-tungstenite = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+dotenvy = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }
+axum-test = "15.0"

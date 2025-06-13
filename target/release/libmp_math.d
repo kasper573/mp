@@ -1,0 +1,1 @@
+/home/runner/work/mp/mp/target/release/libmp_math.rlib: /home/runner/work/mp/mp/crates/mp-math/src/cardinal_direction.rs /home/runner/work/mp/mp/crates/mp-math/src/clamp.rs /home/runner/work/mp/mp/crates/mp-math/src/lib.rs /home/runner/work/mp/mp/crates/mp-math/src/rect.rs /home/runner/work/mp/mp/crates/mp-math/src/vector.rs

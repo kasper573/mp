@@ -1,0 +1,1 @@
+std::option::Option<Box<(dyn Fn(Box<(dyn StdError + Send + Sync + 'static)>) + Send + Sync + 'static)>>

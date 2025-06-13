@@ -1,0 +1,12 @@
+[package]
+name = "mp-math"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+serde = { workspace = true }
+glam = { workspace = true }
+
+[dev-dependencies]
+pretty_assertions = { workspace = true }

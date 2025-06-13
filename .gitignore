@@ -16,6 +16,10 @@ test-results
 .cache-loader
 *.tsbuildinfo
 
+# Rust build artifacts
+target/
+Cargo.lock
+
 # misc
 .DS_Store
 *.pem

@@ -1,0 +1,83 @@
+[workspace]
+members = [
+    "crates/*",
+    "apps/mp-server",
+    "apps/mp-client",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/kasper573/mp"
+
+[workspace.dependencies]
+# Core async runtime
+tokio = { version = "1.0", features = ["full"] }
+tokio-util = "0.7"
+
+# Web server framework
+axum = { version = "0.7", features = ["ws", "macros"] }
+axum-extra = { version = "0.9", features = ["typed-header"] }
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "chrono", "uuid", "json"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# WebSocket
+tokio-tungstenite = "0.21"
+
+# Math and utilities
+glam = "0.27"
+nalgebra = "0.32"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# WASM and client-side
+wasm-bindgen = "0.2"
+web-sys = "0.3"
+js-sys = "0.3"
+gloo = "0.10"
+
+# Frontend framework for WASM
+yew = { version = "0.21", features = ["csr"] }
+
+# Graphics and rendering
+wgpu = "0.19"
+
+# Pathfinding
+pathfinding = "4.0"
+
+# Rate limiting
+governor = "0.6"
+
+# Authentication
+jsonwebtoken = "9.0"
+oauth2 = "4.0"
+
+# Development and testing
+pretty_assertions = "1.0"
+
+# Additional WASM dependencies
+wee_alloc = "0.4.5"
+console_error_panic_hook = "0.1"
+wasm_logger = "0.2"
+wasm-bindgen-test = "0.3"
