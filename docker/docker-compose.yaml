@@ -111,10 +111,14 @@ services:
     env_file: *env_files
     logging: *logging
     image: grafana/tempo:2.6.1
+    user: root
     volumes:
       - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
+      - ./tempo-entrypoint.sh:/tempo-entrypoint.sh
       - tempo-data:/data
+    entrypoint: ["/tempo-entrypoint.sh"]
     command:
+      - /tempo
       - -config.file=/etc/tempo-config/tempo.yaml
       - -config.expand-env=true
 
