@@ -23,6 +23,17 @@
         "hide": false,
         "iconColor": "red",
         "name": "Server Restarts"
+      },
+      {
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
+        "enable": true,
+        "expr": "increase(nodejs_gc_duration_seconds_count[1m]) > 0",
+        "hide": false,
+        "iconColor": "blue",
+        "name": "GC Events"
       }
     ]
   },
