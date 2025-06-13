@@ -164,7 +164,7 @@ const persistTicker = new Ticker({
 
 const updateTicker = new Ticker({
   onError: logger.error,
-  middleware: createTickMetricsObserver(metrics),
+  middleware: createTickMetricsObserver(metrics, opt.tickInterval),
 });
 
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
