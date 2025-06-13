@@ -30,6 +30,7 @@ const tracerProvider = new NodeTracerProvider({
     new Resource({
       [ATTR_SERVICE_NAME]: "mp-server",
       [ATTR_SERVICE_VERSION]: process.env.MP_SERVER_BUILD_VERSION,
+      "service.branch": process.env.MP_SERVER_BUILD_BRANCH,
     }),
   ),
 });

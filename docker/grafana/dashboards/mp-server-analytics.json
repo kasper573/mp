@@ -22,7 +22,9 @@
         "expr": "process_uptime_seconds < 60",
         "hide": false,
         "iconColor": "red",
-        "name": "Server Restarts"
+        "name": "Server Restarts",
+        "titleFormat": "Server restart: {{branch}} ({{version}})",
+        "textFormat": "Server restarted with branch: {{branch}}, version: {{version}}"
       }
     ]
   },
