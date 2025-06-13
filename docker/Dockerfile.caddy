@@ -1,5 +1,15 @@
 FROM caddy:2.8.4-builder AS builder
-RUN xcaddy build --with github.com/mholt/caddy-ratelimit
- 
+
+# Set build variables for better caching
+ENV CGO_ENABLED=0
+ENV GOOS=linux
+ENV GOARCH=amd64
+
+# Use xcaddy with a specific version for deterministic builds
+# This pinned version ensures Docker can cache the layer
+# unless we explicitly change the version
+RUN xcaddy build \
+    --with github.com/mholt/caddy-ratelimit@v0.1.0
+
 FROM caddy:2.8.4
 COPY --from=builder /usr/bin/caddy /usr/bin/caddy
