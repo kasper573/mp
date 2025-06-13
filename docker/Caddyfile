@@ -3,6 +3,14 @@
     email admin@{$MP_DOMAIN}
 }
 
+# Global access logging for fail2ban monitoring
+(access_log) {
+    log {
+        output file /var/log/caddy/access.log
+        format json
+    }
+}
+
 (common_rate_limit) {
     rate_limit {
         zone dynamic_zone {
@@ -14,10 +22,12 @@
 }
 
 grafana.{$MP_DOMAIN} {
+    import access_log
     reverse_proxy http://grafana:3000
 }
 
 auth.{$MP_DOMAIN} {
+    import access_log
     tracing {
         span keycloak
     }
@@ -25,15 +35,18 @@ auth.{$MP_DOMAIN} {
 }
 
 faro.{$MP_DOMAIN} {
+    import access_log
     reverse_proxy alloy:18273
 }
 
 {$MP_CLIENT_DOMAIN} {
+    import access_log
     import common_rate_limit
     reverse_proxy {$MP_CLIENT_PROXY_HOST}
 }
 
 {$MP_SERVER_DOMAIN} {
+    import access_log
     import common_rate_limit
     tracing {
         span mp_server

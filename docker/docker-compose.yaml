@@ -178,6 +178,27 @@ services:
       - ./Caddyfile:/etc/caddy/Caddyfile
       - caddy-data:/data
       - caddy-config:/config
+      - caddy-logs:/var/log/caddy
+
+  fail2ban:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./Dockerfile.fail2ban
+      context: .
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-fail2ban:${DOCKER_IMAGE_VERSION:-latest}
+    restart: unless-stopped
+    profiles: ["prod", "test"]
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    network_mode: "host"
+    volumes:
+      - caddy-logs:/var/log/caddy:ro
+      - fail2ban-data:/var/lib/fail2ban
+      - fail2ban-logs:/var/log/fail2ban
+    depends_on:
+      - caddy
 
 volumes:
   grafana-data:
@@ -185,3 +206,6 @@ volumes:
   mimir-data:
   caddy-data:
   caddy-config:
+  caddy-logs:
+  fail2ban-data:
+  fail2ban-logs:
