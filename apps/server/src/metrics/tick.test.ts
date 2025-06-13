@@ -46,6 +46,36 @@ describe("createTickMetricsObserver", () => {
     expect(mockNext).toHaveBeenCalled();
   });
 
+  it("should resolve the 14ms mystery overhead issue", () => {
+    // This test demonstrates the fix for the specific issue described
+    const metrics = new MetricsRegistry();
+    const configuredInterval = TimeSpan.fromMilliseconds(50); // Server configured for 50ms ticks
+    const observer = createTickMetricsObserver(metrics, configuredInterval);
+    
+    const intervalObserveMock = vi.fn();
+    const intervalHistogram = metrics.getSingleMetric("server_tick_interval");
+    
+    if (intervalHistogram && "observe" in intervalHistogram) {
+      intervalHistogram.observe = intervalObserveMock;
+    }
+
+    // Simulate the original issue: server runs at 50ms intervals but
+    // actual time between ticks is ~64ms due to processing overhead
+    const mysteryOverhead = 14; // The 14ms overhead from the issue
+    const actualTimeBetweenTicks = TimeSpan.fromMilliseconds(50 + mysteryOverhead);
+    
+    observer({
+      timeSinceLastTick: actualTimeBetweenTicks,
+      totalTimeElapsed: TimeSpan.fromMilliseconds(1000),
+      next: vi.fn(),
+    });
+
+    // With the fix, the metric should show the configured 50ms
+    // instead of the problematic 64ms (~50ms + 14ms overhead)
+    expect(intervalObserveMock).toHaveBeenCalledWith(50);
+    expect(intervalObserveMock).not.toHaveBeenCalledWith(64);
+  });
+
   it("should measure actual processing duration", () => {
     const metrics = new MetricsRegistry();
     const configuredInterval = TimeSpan.fromMilliseconds(50);
@@ -77,5 +107,28 @@ describe("createTickMetricsObserver", () => {
     const measuredDuration = durationObserveMock.mock.calls[0]?.[0] as number;
     expect(measuredDuration).toBeGreaterThan(5); // Should be at least 5ms
     expect(measuredDuration).toBeLessThan(50); // Should be less than 50ms
+  });
+
+  it("should work with different configured intervals", () => {
+    // Test that the fix works for different tick intervals
+    const metrics = new MetricsRegistry();
+    const customInterval = TimeSpan.fromMilliseconds(100); // 100ms interval
+    const observer = createTickMetricsObserver(metrics, customInterval);
+    
+    const intervalObserveMock = vi.fn();
+    const intervalHistogram = metrics.getSingleMetric("server_tick_interval");
+    
+    if (intervalHistogram && "observe" in intervalHistogram) {
+      intervalHistogram.observe = intervalObserveMock;
+    }
+
+    observer({
+      timeSinceLastTick: TimeSpan.fromMilliseconds(120), // Actual time with overhead
+      totalTimeElapsed: TimeSpan.fromMilliseconds(1000),
+      next: vi.fn(),
+    });
+
+    // Should report the configured 100ms, not the actual 120ms
+    expect(intervalObserveMock).toHaveBeenCalledWith(100);
   });
 });
