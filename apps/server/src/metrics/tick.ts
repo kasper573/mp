@@ -2,7 +2,6 @@ import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
 import type { TickMiddleware } from "@mp/time";
 import { beginMeasuringTimeSpan } from "@mp/time";
-import { opt } from "../options";
 import { msBuckets } from "./shared";
 
 export function createTickMetricsObserver(
@@ -23,12 +22,7 @@ export function createTickMetricsObserver(
   });
 
   return ({ next, ...event }) => {
-    // It may seem redundant to measure the fixed tick interval here,
-    // since it never changes during the server's lifetime.
-    // However, this is useful for monitoring purposes, as it allows us to
-    // see if there's a correlation between the tick duration and the tick interval.
-    // We can measure over long periods of time as server configurations changes.
-    interval.observe(opt.tickInterval.totalMilliseconds);
+    interval.observe(event.timeSinceLastTick.totalMilliseconds);
 
     const getMeasurement = beginMeasuringTimeSpan();
     next(event);
