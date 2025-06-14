@@ -5,9 +5,16 @@ services:
   postgres:
     ports:
       - "5432:5432"
+    volumes:
+      # Developers may be using postgres for other things,
+      # so we use a named volume to avoid conflicts.
+      - postgres-data:/var/lib/postgresql/data
   alloy:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   caddy:
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+volumes:
+  postgres-data:
