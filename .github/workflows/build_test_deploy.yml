@@ -84,8 +84,34 @@ jobs:
           path: ./apps/e2e/.playwright/
           include-hidden-files: true
 
+  test-load:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install node dependencies
+        uses: ./.github/workflows/composites/install_node_things/
+      - name: Start application
+        run: cd ./docker && ./dockerctl.sh test up --no-build -d
+      - name: Run load tests
+        run: pnpm -F loadtest start --verbose --gc 100 --http 100 --timeout 30
+      - name: Dump docker logs
+        if: always()
+        run: |
+          mkdir -p load-test-docker-logs
+          for container in $(docker ps -aq); do
+            name=$(docker inspect --format='{{.Name}}' "$container" | sed 's|/||g')
+            docker logs "$container" &> "load-test-docker-logs/${name}.log"
+          done
+      - name: Save docker logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: load-test-docker-logs
+          path: load-test-docker-logs/
+
   deploy:
-    needs: [conventions, build, test-unit, test-e2e]
+    needs: [conventions, build, test-unit, test-e2e, test-load]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:
