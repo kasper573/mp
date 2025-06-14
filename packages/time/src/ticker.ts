@@ -3,13 +3,13 @@ import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
   private subscriptions = new Set<TickEventHandler>();
-  private getTimeSinceLastTick: () => TimeSpan;
   private getTotalTimeElapsed: () => TimeSpan;
+  private getTimeSinceLastTick: () => TimeSpan;
   private intervalId?: NodeJS.Timeout;
 
   constructor(public options: TickerOptions) {
-    this.getTimeSinceLastTick = createDeltaFn();
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
+    this.getTimeSinceLastTick = () => TimeSpan.Zero;
   }
 
   subscribe(fn: TickEventHandler): Unsubscribe {
@@ -22,20 +22,23 @@ export class Ticker {
       throw new Error("Ticker is already running");
     }
     this.getTotalTimeElapsed = beginMeasuringTimeSpan();
+    this.getTimeSinceLastTick = () => TimeSpan.Zero;
     this.intervalId = setInterval(this.tick, interval.totalMilliseconds);
   }
 
   stop() {
     this.getTotalTimeElapsed = () => TimeSpan.Zero;
+    this.getTimeSinceLastTick = () => TimeSpan.Zero;
     clearInterval(this.intervalId);
     this.intervalId = undefined;
   }
 
   private tick = () => {
     try {
+      const timeSinceLastTick = this.getTimeSinceLastTick();
       const middleware = this.options.middleware ?? noopMiddleware;
       middleware({
-        timeSinceLastTick: this.getTimeSinceLastTick(),
+        timeSinceLastTick,
         totalTimeElapsed: this.getTotalTimeElapsed(),
         next: this.emit,
       });
@@ -45,6 +48,8 @@ export class Ticker {
       } else {
         throw error;
       }
+    } finally {
+      this.getTimeSinceLastTick = beginMeasuringTimeSpan();
     }
   };
 
@@ -76,12 +81,3 @@ export type Unsubscribe = () => void;
 export type TickEventHandler = (event: TickEvent) => void;
 
 const noopMiddleware: TickMiddleware = ({ next, ...event }) => next(event);
-
-function createDeltaFn(): () => TimeSpan {
-  let getMeasurement = beginMeasuringTimeSpan();
-  return () => {
-    const delta = getMeasurement();
-    getMeasurement = beginMeasuringTimeSpan();
-    return delta;
-  };
-}
