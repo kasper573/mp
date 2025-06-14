@@ -82,8 +82,10 @@ services:
     logging: *logging
     image: postgres:16.4
     restart: always
+    entrypoint: ["/ensure-databases.sh"]
     volumes:
       - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+      - ./ensure-databases.sh:/ensure-databases.sh
       - /var/lib/postgresql/data:/var/lib/postgresql/data
     healthcheck:
       test:
