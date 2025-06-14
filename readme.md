@@ -45,7 +45,7 @@ Local development is done using node and docker compose.
 - Run `cd docker && ./dockerctl.sh dev up -d`
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `./docker/install-cert.sh`
+- Run `sudo ./docker/install-cert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
 - Run `pnpm -F server devenv db push` to initialize your database
