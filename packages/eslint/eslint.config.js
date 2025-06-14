@@ -247,6 +247,9 @@ export default tseslint.config(
       // Collides with prettier
       "unicorn/number-literal-case": "off",
 
+      // I have CLI apps
+      "unicorn/no-process-exit": "off",
+
       // Has false positives
       "unicorn/no-useless-undefined": "off",
       "unicorn/prefer-includes": "off",

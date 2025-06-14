@@ -16,11 +16,19 @@ const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
 
 const start = performance.now();
 
-await Promise.all([testAllHttpRequests(), testAllGameClients()]);
+const [httpSuccess, gameClientSuccess] = await Promise.all([
+  testAllHttpRequests(),
+  testAllGameClients(),
+]);
 
 const end = performance.now();
 
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
+
+if (!httpSuccess || !gameClientSuccess) {
+  logger.error("HTTP request test failed");
+  process.exit(1);
+}
 
 async function testAllHttpRequests() {
   logger.info("Testing", httpRequests, "HTTP requests");
@@ -45,6 +53,8 @@ async function testAllHttpRequests() {
       logger.error(result.reason);
     }
   }
+
+  return failures.length === 0;
 }
 
 async function testAllGameClients() {
@@ -60,6 +70,8 @@ async function testAllGameClients() {
   logger.info(
     `Socket test finished: ${successes.length} successes, ${failures.length} failures`,
   );
+
+  return failures.length === 0;
 }
 
 async function testOneGameClient(n: number) {
@@ -115,6 +127,7 @@ async function testOneGameClient(n: number) {
     if (verbose) {
       logger.error(`Socket ${n} error:`, error);
     }
+    throw error;
   } finally {
     socket.close();
     socket.removeEventListener("message", handleMessage);
