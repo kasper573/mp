@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts"
+    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts",
+    "start:test": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- tsx src/index.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",

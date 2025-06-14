@@ -94,7 +94,7 @@ jobs:
       - name: Start application
         run: cd ./docker && ./dockerctl.sh test up --no-build -d
       - name: Run load tests
-        run: pnpm -F loadtest start --verbose --gc 100 --http 100 --timeout 30
+        run: pnpm -F loadtest start:test --verbose --gc 100 --http 100 --timeout 30
       - name: Dump docker logs
         if: always()
         run: |
