@@ -18,29 +18,18 @@
           "type": "prometheus",
           "uid": "mimir"
         },
-        "enable": true,
+        "enable": false,
         "expr": "process_uptime_seconds < 60",
         "hide": false,
         "iconColor": "red",
         "name": "Server Restarts"
-      },
-      {
-        "datasource": {
-          "type": "prometheus",
-          "uid": "mimir"
-        },
-        "enable": true,
-        "expr": "increase(nodejs_gc_duration_seconds_count[1m]) > 0",
-        "hide": false,
-        "iconColor": "blue",
-        "name": "GC"
       }
     ]
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 14,
+  "id": 3,
   "links": [],
   "panels": [
     {
@@ -104,7 +93,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 8,
         "x": 0,
         "y": 0
@@ -226,7 +215,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 8,
         "x": 8,
         "y": 0
@@ -330,7 +319,7 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
+        "h": 6,
         "w": 8,
         "x": 16,
         "y": 0
@@ -436,15 +425,135 @@
                 "value": 80
               }
             ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "id": 11,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"major\"}[$__rate_interval])))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Major",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"minor\"}[$__rate_interval])))",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Minor",
+          "range": true,
+          "refId": "A",
+          "useBackend": false
+        }
+      ],
+      "title": "GC",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
           }
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 0,
-        "y": 5
+        "h": 6,
+        "w": 8,
+        "x": 8,
+        "y": 6
       },
       "id": 1,
       "options": {
@@ -577,10 +686,10 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 5,
-        "w": 12,
-        "x": 12,
-        "y": 5
+        "h": 6,
+        "w": 8,
+        "x": 16,
+        "y": 6
       },
       "id": 6,
       "options": {
@@ -632,7 +741,7 @@
         "h": 18,
         "w": 12,
         "x": 0,
-        "y": 10
+        "y": 12
       },
       "id": 9,
       "options": {
@@ -676,7 +785,7 @@
         "h": 18,
         "w": 12,
         "x": 12,
-        "y": 10
+        "y": 12
       },
       "id": 8,
       "options": {
@@ -716,12 +825,12 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "browser",
   "title": "mp-server (custom)",
   "uid": "ae3kps81booaoe",
-  "version": 12
+  "version": 11
 }
