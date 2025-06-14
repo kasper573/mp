@@ -107,20 +107,32 @@ services:
       - mimir-data:/data
     entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
 
+  # Init container to set up proper permissions for Tempo data directory
+  # This is a common Docker pattern to handle volume permissions
+  tempo-init:
+    image: alpine:latest
+    volumes:
+      - tempo-data:/data
+    command: |
+      sh -c "
+        mkdir -p /data/blocks /data/wal /data/generator &&
+        chown -R 10001:10001 /data &&
+        chmod -R 755 /data
+      "
+
   tempo:
     env_file: *env_files
     logging: *logging
     image: grafana/tempo:2.6.1
-    user: root
+    user: "10001:10001"  # Run as tempo user for security
     volumes:
       - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
-      - ./tempo-entrypoint.sh:/tempo-entrypoint.sh
       - tempo-data:/data
-    entrypoint: ["/tempo-entrypoint.sh"]
     command:
-      - /tempo
       - -config.file=/etc/tempo-config/tempo.yaml
       - -config.expand-env=true
+    depends_on:
+      - tempo-init
 
   pyroscope:
     env_file: *env_files
