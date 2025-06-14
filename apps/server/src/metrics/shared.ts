@@ -5,7 +5,7 @@ import { exponentialBuckets, linearBuckets } from "@mp/telemetry/prom";
  */
 export const msBuckets = [
   ...linearBuckets(0, 0.2, 6),
-  ...exponentialBuckets(2, 2, 10),
+  ...exponentialBuckets(2, 1.5, 20),
 ];
 
 /**
