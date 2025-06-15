@@ -91,7 +91,7 @@ export function AreaScene(
 
   const moveThrottled = dedupe(
     throttle((to: Vector<Tile>) => actions.move(to), 100),
-    (a, b) => a.equals(b),
+    ([a], [b]) => a.equals(b),
   );
 
   createEffect(() => {
