@@ -206,7 +206,7 @@ collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
 // Set up metrics file writer
-const metricsFilePath = path.resolve(opt.publicDir, opt.metricsFilePath);
+const metricsFilePath = opt.metricsFilePath;
 const metricsFileWriter = new MetricsFileWriter(
   metrics,
   metricsFilePath,

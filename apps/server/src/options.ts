@@ -127,11 +127,11 @@ export const serverOptionsSchema = object({
   rngSeed: optional(numeric()),
 
   /**
-   * The path where the metrics file will be written (relative to publicDir)
+   * The absolute path where the metrics file will be written
    */
   metricsFilePath: pipe(
     optional(string()),
-    transform((p) => p ?? "metrics.txt"),
+    transform((p) => p ?? path.resolve("metrics.txt")),
   ),
   /**
    * How often (in milliseconds) to write the metrics file

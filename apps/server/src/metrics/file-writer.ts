@@ -44,7 +44,9 @@ export class MetricsFileWriter {
   createTickHandler() {
     return () => {
       this.writeMetrics().catch((error: unknown) => {
-        this.logger.error("Metrics write tick handler failed", { error: String(error) });
+        this.logger.error("Metrics write tick handler failed", {
+          error: String(error),
+        });
       });
     };
   }
