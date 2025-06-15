@@ -67,7 +67,7 @@ export function movementBehavior(
       // The dead don't move
       if (actor.health <= 0) {
         actor.path = undefined;
-        delete actor.moveTarget;
+        actor.moveTarget = undefined;
         continue;
       }
 
@@ -95,7 +95,7 @@ export function movementBehavior(
       // Consume the move target and produce a new path to move along
       if (moveTarget) {
         actor.path = findPathForSubject(actor, areas, moveTarget);
-        delete actor.moveTarget;
+        actor.moveTarget = undefined;
       }
 
       if (actor.path) {
@@ -120,7 +120,7 @@ export function movementBehavior(
         );
         if (destinationArea && actor.desiredPortalId === object.id) {
           actor.path = undefined;
-          delete actor.desiredPortalId;
+          actor.desiredPortalId = undefined;
           actor.areaId = destinationArea.id;
           actor.coords = destinationArea.start;
         }
