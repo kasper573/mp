@@ -49,6 +49,7 @@ import { collectUserMetrics } from "./metrics/user";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
 import { collectPathFindingMetrics } from "./metrics/path-finding";
+import { MetricsFileWriter } from "./metrics/file-writer";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
@@ -87,7 +88,7 @@ db.$client.on("error", logger.error);
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
-  .use(metricsMiddleware(metrics))
+  // .use(metricsMiddleware(metrics)) // Disabled: replaced with metrics file writer
   .use("/health", (req, res) => res.send("OK"))
   // the above is intentionally placed before logger since it's so verbose and unnecessary to log
   .use(createExpressLogger(logger))
@@ -205,6 +206,14 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
+// Set up metrics file writer
+const metricsFilePath = path.resolve(opt.publicDir, opt.metricsFilePath);
+const metricsFileWriter = new MetricsFileWriter(metrics, metricsFilePath, logger);
+const metricsWriteTicker = new Ticker({
+  onError: (error) => logger.error("Metrics write ticker error", { error }),
+});
+metricsWriteTicker.subscribe(metricsFileWriter.createTickHandler());
+
 const npcAi = new NpcAi(gameState, gameStateEmitter, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
@@ -226,6 +235,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
 
 persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
+metricsWriteTicker.start(opt.metricsWriteInterval);
 
 function getBypassUser(token: AuthToken): UserIdentity | undefined {
   if (!opt.auth.allowBypassUsers) {

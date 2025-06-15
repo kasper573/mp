@@ -127,6 +127,21 @@ export const serverOptionsSchema = object({
   rngSeed: optional(numeric()),
 
   /**
+   * The path where the metrics file will be written (relative to publicDir)
+   */
+  metricsFilePath: pipe(
+    optional(string()),
+    transform((p) => p ?? "metrics.txt"),
+  ),
+  /**
+   * How often (in milliseconds) to write the metrics file
+   */
+  metricsWriteInterval: pipe(
+    optional(numeric()),
+    transform((ms) => TimeSpan.fromMilliseconds(ms ?? 1000)),
+  ),
+
+  /**
    * Set to true to enable the patch optimizer on the server side.
    */
   patchOptimizer: boolish(),
