@@ -112,8 +112,7 @@ async function testOneGameClient(n: number) {
     const areaId = await waitFor(() => gameState.areaId());
 
     const url = await rpc.area.areaFileUrl(areaId);
-    const serverVersion = await rpc.system.buildVersion();
-    const area = await loadAreaResource(url, areaId, serverVersion);
+    const area = await loadAreaResource(url, areaId);
     const tiles = Array.from(area.graph.getNodes()).map(
       (node) => node.data.vector,
     );
