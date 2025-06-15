@@ -120,11 +120,9 @@ async function testOneGameClient(n: number) {
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {
-      try {
-        // Ty to respawn in case we got killed
+      // Ty to respawn in case we got killed
+      if (!gameState.character()?.health) {
         await gameActions.respawn();
-      } catch {
-        // Character is likely alive already
       }
 
       try {
