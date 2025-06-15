@@ -14,8 +14,12 @@ import {
 } from "solid-js";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
+import type { ObjectId } from "@mp/tiled-loader";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
-import type { AreaResource } from "../../shared/area/area-resource";
+import {
+  getAreaIdFromObject,
+  type AreaResource,
+} from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { AreaDebugUi } from "./area-debug-ui";
@@ -78,20 +82,25 @@ export function AreaScene(
         type: "attack",
         rect: entity.hitBox.offset(entity.coords),
       };
-    } else {
-      const tileNode = props.area.graph.getNearestNode(pointerTile());
-      if (tileNode) {
-        return {
-          rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
-          type: "move",
-        };
-      }
+    }
+
+    const tileNode = props.area.graph.getNearestNode(pointerTile());
+    if (tileNode) {
+      return {
+        rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
+        type: "move",
+      };
     }
   });
 
   const moveThrottled = dedupe(
-    throttle((to: Vector<Tile>) => actions.move(to), 100),
-    ([a], [b]) => a.equals(b),
+    throttle(
+      (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
+        actions.move(to, desiredPortalId),
+      100,
+    ),
+    ([aVector, aPortalId], [bVector, bPortalId]) =>
+      aVector.equals(bVector) && aPortalId === bPortalId,
   );
 
   createEffect(() => {
@@ -102,7 +111,11 @@ export function AreaScene(
       } else {
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
-          moveThrottled(tileNode.data.vector);
+          const portal = props.area
+            .hitTestObjects([engine.pointer.worldPosition])
+            .find(getAreaIdFromObject);
+
+          moveThrottled(tileNode.data.vector, portal?.id);
         }
       }
     }

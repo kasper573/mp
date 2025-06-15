@@ -1,6 +1,7 @@
 import { Vector } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
-import { assert, type Pixel, type Tile } from "@mp/std";
+import type { Pixel } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
 import { type TiledResource } from "./tiled-resource";
 import { graphFromTiled } from "./graph-from-tiled";
@@ -60,13 +61,14 @@ export class AreaResource {
     return this.findPath(startNode.id, endNode.id);
   }
 
-  hitTestObjects<Subject>(
-    subjects: Iterable<Subject>,
-    getCoordOfSubject: (s: Subject) => Vector<Tile>,
-  ) {
-    return hitTestObjects(this.objects, subjects, (subject) =>
-      this.tiled.tileCoordToWorld(getCoordOfSubject(subject)),
-    );
+  *hitTestObjects(candidates: Iterable<Vector<Pixel>>): Generator<TiledObject> {
+    for (const coord of candidates) {
+      for (const object of this.objects) {
+        if (hitTestTiledObject(object, coord)) {
+          yield object;
+        }
+      }
+    }
   }
 
   static findPathMiddleware = (
@@ -75,19 +77,9 @@ export class AreaResource {
   ): ReturnType<VectorPathFinder<Tile>> => next(...args);
 }
 
-const dynamicLayerName = "Dynamic";
-
-function* hitTestObjects<Subject>(
-  objects: Iterable<TiledObject>,
-  subjects: Iterable<Subject>,
-  getCoordOfSubject: (s: Subject) => Vector<Pixel>,
-): Generator<{ subject: Subject; object: TiledObject }> {
-  for (const subject of subjects) {
-    const worldPos = getCoordOfSubject(subject);
-    for (const object of objects) {
-      if (hitTestTiledObject(object, worldPos)) {
-        yield { subject, object };
-      }
-    }
-  }
+export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
+  const prop = object.properties.get("goto");
+  return prop ? (prop.value as AreaId) : undefined;
 }
+
+const dynamicLayerName = "Dynamic";

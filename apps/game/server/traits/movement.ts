@@ -1,12 +1,15 @@
-import { type CardinalDirection, type Path, type Vector } from "@mp/math";
+import type { Vector } from "@mp/math";
+import { type CardinalDirection, type Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, recordValues, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
+import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
 import type { ActorId } from "../actor";
+import { getAreaIdFromObject } from "../../shared/area/area-resource";
 
 export interface MovementTrait {
   /**
@@ -19,6 +22,12 @@ export interface MovementTrait {
    * A desired target. Will be consumed by the movement behavior to find a new path.
    */
   moveTarget?: Vector<Tile>;
+  /**
+   * Has to be explicitly set by the client for portal traversal to be able to happen.
+   * This avoids unintended portal traversal by actors that are not supposed to use portals.
+   * The movement behavior will continuously check if the actor has reached this portal.
+   */
+  desiredPortalId?: ObjectId;
   /**
    * The current path the subject is following.
    */
@@ -103,14 +112,17 @@ export function movementBehavior(
 
       // Process portals
       const area = assert(areas.get(actor.areaId));
-      for (const hit of area.hitTestObjects([actor], (c) => c.coords)) {
-        const targetArea = areas.get(
-          hit.object.properties.get("goto")?.value as AreaId,
+      for (const object of area.hitTestObjects([
+        area.tiled.tileCoordToWorld(actor.coords),
+      ])) {
+        const destinationArea = areas.get(
+          getAreaIdFromObject(object) as AreaId,
         );
-        if (targetArea) {
+        if (destinationArea && actor.desiredPortalId === object.id) {
           actor.path = undefined;
-          actor.areaId = targetArea.id;
-          actor.coords = targetArea.start;
+          actor.desiredPortalId = undefined;
+          actor.areaId = destinationArea.id;
+          actor.coords = destinationArea.start;
         }
       }
     }
