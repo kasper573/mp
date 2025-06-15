@@ -2,7 +2,7 @@ import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
 import type { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import { type Tile, type Pixel, assert } from "@mp/std";
+import { type Tile, type Pixel, assert, dedupe, throttle } from "@mp/std";
 import type { ParentProps } from "solid-js";
 import {
   useContext,
@@ -89,6 +89,11 @@ export function AreaScene(
     }
   });
 
+  const moveThrottled = dedupe(
+    throttle((to: Vector<Tile>) => actions.move(to), 100),
+    (a, b) => a.equals(b),
+  );
+
   createEffect(() => {
     if (engine.pointer.isDown) {
       const entity = untrack(entityAtPointer);
@@ -97,7 +102,7 @@ export function AreaScene(
       } else {
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
-          actions.move(tileNode.data.vector);
+          moveThrottled(tileNode.data.vector);
         }
       }
     }

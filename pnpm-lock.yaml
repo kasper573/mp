@@ -235,6 +235,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../game
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger

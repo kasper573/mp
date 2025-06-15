@@ -5,11 +5,12 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- vite-node src/index.ts",
+    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- vite-node src/index.ts --inspect-brk",
     "start:test": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- vite-node src/index.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/rpc": "workspace:*",
@@ -23,9 +24,9 @@
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "17.0.33",
     "@vanilla-extract/vite-plugin": "catalog:",
+    "tsx": "catalog:",
     "vite": "catalog:",
     "vite-plugin-solid": "catalog:",
-    "tsx": "catalog:",
     "yargs": "17.7.2"
   }
 }

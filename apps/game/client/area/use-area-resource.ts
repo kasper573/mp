@@ -15,17 +15,25 @@ export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
     input: areaId() ?? skipToken,
     staleTime: Infinity,
     async map(url, input) {
-      const loadTiled = createTiledLoader({
-        loadJson,
-        relativePath: (path, base) => relativeUrl(path, base, serverVersion()),
-      });
-      const result = await loadTiled(url);
-      if (result.isErr()) {
-        throw result.error;
-      }
-      return new AreaResource(input, new TiledResource(result.value));
+      return loadAreaResource(url, input, serverVersion());
     },
   }));
+}
+
+export async function loadAreaResource(
+  areaFileUrl: string,
+  areaId: AreaId,
+  serverVersion: string,
+): Promise<AreaResource> {
+  const loadTiled = createTiledLoader({
+    loadJson,
+    relativePath: (path, base) => relativeUrl(path, base, serverVersion),
+  });
+  const result = await loadTiled(areaFileUrl);
+  if (result.isErr()) {
+    throw result.error;
+  }
+  return new AreaResource(areaId, new TiledResource(result.value));
 }
 
 async function loadJson(url: string) {
