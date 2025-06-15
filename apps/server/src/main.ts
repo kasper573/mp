@@ -1,7 +1,7 @@
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
-import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { Logger, pinoLoggerHandler } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
@@ -70,7 +70,7 @@ registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
 const logger = new Logger();
-logger.subscribe(consoleLoggerHandler(console));
+logger.subscribe(pinoLoggerHandler());
 logger.info(`Server started with options`, opt);
 
 RateLimiter.enabled = opt.rateLimit;
