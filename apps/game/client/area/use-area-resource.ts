@@ -1,15 +1,13 @@
 import { createTiledLoader } from "@mp/tiled-loader";
 import { skipToken } from "@mp/rpc/solid";
-import { useContext, type Accessor } from "solid-js";
+import type { Accessor } from "solid-js";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
 import { useRpc } from "../use-rpc";
-import { BuildVersionContext } from "../build-version-context";
 import { AreaResource } from "../../shared/area/area-resource";
 
 export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
   const rpc = useRpc();
-  const { server: serverVersion } = useContext(BuildVersionContext);
 
   return rpc.area.areaFileUrl.useQuery(() => ({
     input: areaId() ?? skipToken,
@@ -17,7 +15,7 @@ export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
     async map(url, input) {
       const loadTiled = createTiledLoader({
         loadJson,
-        relativePath: (path, base) => relativeUrl(path, base, serverVersion()),
+        relativePath: (path, base) => relativeUrl(path, base),
       });
       const result = await loadTiled(url);
       if (result.isErr()) {
@@ -39,13 +37,12 @@ async function loadJson(url: string) {
   return json as Record<string, unknown>;
 }
 
-function relativeUrl(path: string, base: string, version: string) {
+function relativeUrl(path: string, base: string) {
   base = base.startsWith("//") ? window.location.protocol + base : base;
   const url = new URL(path, base);
 
-  // Since relative urls in tile map files are resolved on the client side we have to add
-  // the version param manually (it's easier than dynamically updating the tile map files to have the version params embedded)
-  url.searchParams.set("v", version);
+  // Cache busting is now handled via ETags instead of version query parameters
+  // This allows the browser to handle caching according to HTTP standards
 
   return url.toString();
 }
