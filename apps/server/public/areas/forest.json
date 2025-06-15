@@ -330,7 +330,7 @@
                  "y":298.077
                 }, 
                 {
-                 "height":16,
+                 "height":16.75,
                  "id":39,
                  "name":"Warp",
                  "properties":[
@@ -342,9 +342,9 @@
                  "rotation":0,
                  "type":"warp",
                  "visible":true,
-                 "width":17.0197,
-                 "x":46.5054,
-                 "y":335.575
+                 "width":16.2697,
+                 "x":47.3917636363636,
+                 "y":335.847727272727
                 }],
          "opacity":1,
          "type":"objectgroup",
@@ -353,7 +353,7 @@
          "y":0
         }],
  "nextlayerid":11,
- "nextobjectid":46,
+ "nextobjectid":48,
  "orientation":"orthogonal",
  "properties":[
         {

@@ -54,7 +54,6 @@
         {
          "draworder":"topdown",
          "id":4,
-         "locked":true,
          "name":"Objects",
          "objects":[
                 {
@@ -82,9 +81,9 @@
                  "rotation":0,
                  "type":"warp",
                  "visible":true,
-                 "width":17.0197,
-                 "x":622.838,
-                 "y":416
+                 "width":15.8322,
+                 "x":623.838,
+                 "y":415.8125
                 }, 
                 {
                  "height":0,
