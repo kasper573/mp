@@ -1,7 +1,9 @@
+prometheus.exporter.textfile "mp_server" {
+	directory = "/app/metrics"
+}
+
 prometheus.scrape "mp_server" {
-	targets = [{
-		__address__ = env("MP_SERVER_PROXY_HOST"),
-	}]
+	targets = prometheus.exporter.textfile.mp_server.targets
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "mp_server"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")

@@ -131,7 +131,7 @@ export const serverOptionsSchema = object({
    */
   metricsFilePath: pipe(
     optional(string()),
-    transform((p) => p ?? path.resolve("metrics.txt")),
+    transform((p) => p ?? path.resolve("/app/metrics/metrics.prom")),
   ),
   /**
    * How often (in milliseconds) to write the metrics file

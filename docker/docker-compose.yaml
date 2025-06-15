@@ -32,6 +32,8 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
+    volumes:
+      - metrics-data:/app/metrics
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
       interval: 3s
@@ -126,6 +128,7 @@ services:
       - /var/lib/docker/containers:/var/lib/docker/containers:ro
       - /var/log:/var/log:ro
       - /tmp:/tmp
+      - metrics-data:/app/metrics:ro
     entrypoint:
       - "/bin/alloy"
       - "run"
@@ -185,3 +188,4 @@ volumes:
   mimir-data:
   caddy-data:
   caddy-config:
+  metrics-data:
