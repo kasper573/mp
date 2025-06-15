@@ -5,8 +5,8 @@
   "type": "module",
   "scripts": {
     "build": "tsc",
-    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- tsx src/index.ts",
-    "start:test": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- tsx src/index.ts"
+    "start:dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- vite-node src/index.ts",
+    "start:test": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- vite-node src/index.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
@@ -16,11 +16,15 @@
     "@mp/server": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
-    "@mp/ws": "workspace:*"
+    "@mp/ws": "workspace:*",
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "17.0.33",
+    "@vanilla-extract/vite-plugin": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-solid": "catalog:",
     "tsx": "catalog:",
     "yargs": "17.7.2"
   }
