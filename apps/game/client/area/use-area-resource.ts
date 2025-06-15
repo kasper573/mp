@@ -40,9 +40,5 @@ async function loadJson(url: string) {
 function relativeUrl(path: string, base: string) {
   base = base.startsWith("//") ? window.location.protocol + base : base;
   const url = new URL(path, base);
-
-  // Cache busting is now handled via ETags instead of version query parameters
-  // This allows the browser to handle caching according to HTTP standards
-
   return url.toString();
 }

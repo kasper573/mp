@@ -96,9 +96,6 @@ const webServer = express()
     opt.publicPath,
     express.static(opt.publicDir, {
       maxAge: opt.publicMaxAge * 1000,
-      etag: true, // Enable ETag generation (default is true, but explicit for clarity)
-      lastModified: true, // Enable Last-Modified header (default is true)
-      immutable: false, // Files can change, so not immutable
     }),
   );
 

@@ -7,9 +7,5 @@ export function serverFileToPublicUrl(fileInPublicDir: LocalFile): PublicUrl {
     ? path.relative(opt.publicDir, fileInPublicDir)
     : fileInPublicDir;
   const url = new URL(`${opt.httpBaseUrl}${opt.publicPath}${relativePath}`);
-
-  // Cache busting is now handled via ETags instead of version query parameters
-  // This provides better cache performance and follows HTTP caching standards
-
   return url.toString() as PublicUrl;
 }
