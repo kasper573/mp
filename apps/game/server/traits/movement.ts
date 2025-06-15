@@ -9,6 +9,7 @@ import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../../shared/area/area-id";
 import { moveAlongPath } from "../../shared/area/move-along-path";
 import type { ActorId } from "../actor";
+import { getAreaIdFromObject } from "../../shared/area/area-resource";
 
 export interface MovementTrait {
   /**
@@ -115,7 +116,7 @@ export function movementBehavior(
         area.tiled.tileCoordToWorld(actor.coords),
       ])) {
         const destinationArea = areas.get(
-          object.properties.get("goto")?.value as AreaId,
+          getAreaIdFromObject(object) as AreaId,
         );
         if (destinationArea && actor.desiredPortalId === object.id) {
           actor.path = undefined;

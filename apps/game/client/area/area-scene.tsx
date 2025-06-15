@@ -16,7 +16,10 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import { GameStateClientContext, useGameActions } from "../game-state-client";
-import type { AreaResource } from "../../shared/area/area-resource";
+import {
+  getAreaIdFromObject,
+  type AreaResource,
+} from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { AreaDebugUi } from "./area-debug-ui";
@@ -110,7 +113,7 @@ export function AreaScene(
         if (tileNode) {
           const portal = props.area
             .hitTestObjects([engine.pointer.worldPosition])
-            .find((obj) => obj.properties.get("goto"));
+            .find(getAreaIdFromObject);
 
           moveThrottled(tileNode.data.vector, portal?.id);
         }

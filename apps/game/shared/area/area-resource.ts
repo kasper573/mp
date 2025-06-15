@@ -77,4 +77,9 @@ export class AreaResource {
   ): ReturnType<VectorPathFinder<Tile>> => next(...args);
 }
 
+export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
+  const prop = object.properties.get("goto");
+  return prop ? (prop.value as AreaId) : undefined;
+}
+
 const dynamicLayerName = "Dynamic";
