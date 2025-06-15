@@ -7,6 +7,7 @@ import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
+import type { ObjectId } from "@mp/tiled-loader";
 import type { Character, CharacterId } from "../server/character/types";
 import type { ActorId } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
@@ -102,8 +103,13 @@ export function createGameActions(
   rpc: GameSolidRpcInvoker,
   state: GameStateClient,
 ) {
-  const move = (to: Vector<Tile>) =>
-    rpc.character.move({ characterId: assert(state.characterId()), to });
+  const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
+    return rpc.character.move({
+      characterId: assert(state.characterId()),
+      to,
+      desiredPortalId,
+    });
+  };
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({

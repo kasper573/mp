@@ -1,5 +1,6 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { type Tile } from "@mp/std";
+import type { ObjectId } from "@mp/tiled-loader";
 import type { Actor, ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
@@ -19,27 +20,34 @@ export const characterRoles = defineRoles("character", [
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = rpc.router({
   move: rpc.procedure
-    .input<{ characterId: CharacterId; to: VectorLike<Tile> }>()
+    .input<{
+      characterId: CharacterId;
+      to: VectorLike<Tile>;
+      desiredPortalId?: ObjectId;
+    }>()
     .use(roles([characterRoles.move]))
-    .mutation(({ input: { characterId, to }, ctx, mwc: { user } }) => {
-      const state = ctx.get(ctxGameState);
-      const char = state.actors[characterId] as Actor | undefined;
+    .mutation(
+      ({ input: { characterId, to, desiredPortalId }, ctx, mwc: { user } }) => {
+        const state = ctx.get(ctxGameState);
+        const char = state.actors[characterId] as Actor | undefined;
 
-      if (!char || char.type !== "character") {
-        throw new Error("Character not found");
-      }
+        if (!char || char.type !== "character") {
+          throw new Error("Character not found");
+        }
 
-      if (char.userId !== user.id) {
-        throw new Error("You don't have access to this character");
-      }
+        if (char.userId !== user.id) {
+          throw new Error("You don't have access to this character");
+        }
 
-      if (!char.health) {
-        throw new Error("Cannot move a dead character");
-      }
+        if (!char.health) {
+          throw new Error("Cannot move a dead character");
+        }
 
-      char.attackTargetId = undefined;
-      char.moveTarget = Vector.from(to);
-    }),
+        char.attackTargetId = undefined;
+        char.moveTarget = Vector.from(to);
+        char.desiredPortalId = desiredPortalId;
+      },
+    ),
 
   attack: rpc.procedure
     .input<{ characterId: CharacterId; targetId: ActorId }>()
