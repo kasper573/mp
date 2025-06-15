@@ -1,13 +1,7 @@
 import type { Accessor } from "solid-js";
-import {
-  createContext,
-  createMemo,
-  createSignal,
-  onCleanup,
-  useContext,
-} from "solid-js";
+import { createContext, createSignal, onCleanup, useContext } from "solid-js";
 import type { Vector } from "@mp/math";
-import { assert, dedupe, throttle, type Tile } from "@mp/std";
+import { assert, throttle, type Tile } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import type { AuthToken } from "@mp/auth";
@@ -16,6 +10,7 @@ import type { Logger } from "@mp/logger";
 import type { Character, CharacterId } from "../server/character/types";
 import type { ActorId } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
+import type { GameSolidRpcInvoker } from "./use-rpc";
 import { useRpc } from "./use-rpc";
 import type { OptimisticGameStateSettings } from "./create-optimistic-game-state";
 import { createOptimisticGameState } from "./create-optimistic-game-state";
@@ -23,6 +18,7 @@ import { createOptimisticGameState } from "./create-optimistic-game-state";
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export function createGameStateClient(
+  rpc: GameSolidRpcInvoker,
   socket: WebSocket,
   logger: Logger,
   settings: Accessor<OptimisticGameStateSettings>,
@@ -30,21 +26,21 @@ export function createGameStateClient(
   const eventBus = new SyncEventBus<GameStateEvents>();
   const gameState = createOptimisticGameState(settings);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
-
   const [readyState, setReadyState] = createSignal(socket.readyState);
-  const areaId = createMemo(() => {
+
+  const areaId = () => {
     const id = characterId();
     const actor = id ? gameState().actors[id] : undefined;
     return actor?.areaId;
-  });
+  };
 
-  const character = createMemo(() => {
+  const character = () => {
     const id = characterId();
     const actor = id ? gameState().actors[id] : undefined;
     return actor ? (actor as Character) : undefined;
-  });
+  };
 
-  const actorList = createMemo(() => Object.values(gameState().actors));
+  const actorList = () => Object.values(gameState().actors);
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);
@@ -75,8 +71,6 @@ export function createGameStateClient(
     }
   };
 
-  const rpc = useRpc();
-
   // We throttle because when stale patches are detected, they usually come in batches,
   // and we only want to send one request for full state.
   const refreshState = throttle(rpc.world.requestFullState, 5000);
@@ -100,21 +94,16 @@ export function createGameStateClient(
     character,
     frameCallback: gameState.frameCallback,
     eventBus,
+    get: () => gameState(),
   };
 }
 
-export function useGameActions() {
-  const rpc = useRpc();
-  const state = useContext(GameStateClientContext);
-
-  const move = dedupe(
-    throttle(
-      (to: Vector<Tile>) =>
-        rpc.character.move({ characterId: assert(state.characterId()), to }),
-      100,
-    ),
-    (a, b) => a.equals(b),
-  );
+export function createGameActions(
+  rpc: GameSolidRpcInvoker,
+  state: GameStateClient,
+) {
+  const move = (to: Vector<Tile>) =>
+    rpc.character.move({ characterId: assert(state.characterId()), to });
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({
@@ -133,6 +122,12 @@ export function useGameActions() {
     move,
     attack,
   };
+}
+
+export function useGameActions() {
+  const rpc = useRpc();
+  const state = useContext(GameStateClientContext);
+  return createGameActions(rpc, state);
 }
 
 export const GameStateClientContext = createContext<GameStateClient>(

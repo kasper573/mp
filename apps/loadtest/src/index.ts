@@ -1,12 +1,19 @@
 import { consoleLoggerHandler, Logger } from "@mp/logger";
 import { type ServerRpcRouter } from "@mp/server";
-import { BinaryRpcTransceiver, createRpcProxyInvoker } from "@mp/rpc";
+import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
-import type { Tile } from "@mp/std";
-import { Vector } from "@mp/math";
+import {
+  createGameActions,
+  createGameStateClient,
+  loadAreaResource,
+  registerEncoderExtensions,
+} from "@mp/game/client";
+import { createSolidRpcInvoker } from "@mp/rpc/solid";
 import { readCliOptions } from "./cli";
+
+registerEncoderExtensions();
 
 const logger = new Logger();
 logger.subscribe(consoleLoggerHandler(console));
@@ -48,12 +55,6 @@ async function testAllHttpRequests() {
     `HTTP request test finished: ${successes.length} successes, ${failures.length} failures`,
   );
 
-  if (verbose) {
-    for (const result of failures) {
-      logger.error(result.reason);
-    }
-  }
-
   return failures.length === 0;
 }
 
@@ -83,7 +84,7 @@ async function testOneGameClient(n: number) {
   const transceiver = new BinaryRpcTransceiver({
     send: socket.send.bind(socket),
   });
-  const rpc = createRpcProxyInvoker<ServerRpcRouter>(transceiver.call);
+  const rpc = createSolidRpcInvoker<ServerRpcRouter>(transceiver.call);
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 
@@ -92,37 +93,51 @@ async function testOneGameClient(n: number) {
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
-    const characterId = await rpc.world.join(
-      createBypassUser(`Test User ${n}`),
-    );
 
-    const rng = new Rng();
-    const tiles = Array.from(generateTiles(new Vector(44 as Tile, 30 as Tile)));
+    // Seeded rng to get consistent behavior over time across runs in the ci pipeline
+    const rng = new Rng(1337);
+
+    const gameState = createGameStateClient(rpc, socket, logger, () => ({
+      useInterpolator: false,
+      usePatchOptimizer: false,
+    }));
+
+    const gameActions = createGameActions(rpc, gameState);
+
+    await gameActions.join(createBypassUser(`Test User ${n}`));
+
+    if (verbose) {
+      logger.info(`Waiting for areaId for socket ${n}`);
+    }
+    const areaId = await waitFor(() => gameState.areaId());
+
+    const url = await rpc.area.areaFileUrl(areaId);
+    const serverVersion = await rpc.system.buildVersion();
+    const area = await loadAreaResource(url, areaId, serverVersion);
+    const tiles = Array.from(area.graph.getNodes()).map(
+      (node) => node.data.vector,
+    );
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {
-      try {
-        // Ty to respawn in case we got killed
-        await rpc.character.respawn(characterId);
-      } catch {
-        // Character is likely alive already
+      // Ty to respawn in case we got killed
+      if (!gameState.character()?.health) {
+        await gameActions.respawn();
       }
 
       try {
         const to = rng.oneOf(tiles);
-        await rpc.character.move({ characterId, to });
-        logger.info("Moving character", characterId, "to", to);
+        await gameActions.move(to);
+        logger.info("Moving character for socket", n, "to", to);
         await wait(1000 + rng.next() * 6000);
       } catch {
-        logger.warn("Could not move character", characterId);
+        logger.warn("Could not move character for socket", n);
         await wait(1000);
       }
     }
-
     if (verbose) {
-      logger.info(`Socket ${n} joined as character ${characterId}`);
+      logger.info(`Socket ${n} test finished`);
     }
-    logger.info(`Socket ${n} test finished`);
   } catch (error) {
     if (verbose) {
       logger.error(`Socket ${n} error:`, error);
@@ -151,10 +166,21 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function* generateTiles(areaSize: Vector<Tile>): Generator<Vector<Tile>> {
-  for (let x = 0; x < areaSize.x; x++) {
-    for (let y = 0; y < areaSize.y; y++) {
-      yield new Vector(x as Tile, y as Tile);
-    }
-  }
+function waitFor<T>(
+  predicate: () => T | undefined,
+  timeoutMs = 5000,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const interval = setInterval(() => {
+      const result = predicate();
+      if (result !== undefined) {
+        clearInterval(interval);
+        resolve(result);
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(interval);
+        reject(new Error("Timeout waiting for condition"));
+      }
+    }, 100);
+  });
 }

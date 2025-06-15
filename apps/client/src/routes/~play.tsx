@@ -49,7 +49,7 @@ function PlayPage() {
     },
   );
 
-  const sync = createGameStateClient(socket, logger, settings);
+  const sync = createGameStateClient(rpc, socket, logger, settings);
 
   return (
     <BuildVersionContext.Provider
