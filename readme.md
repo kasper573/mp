@@ -44,11 +44,11 @@ Local development is done using node and docker compose.
 - Clone this repository
 - Run `cd docker && ./dockerctl.sh dev up -d`
   > If you're on WSL you may need to run `dockerctl.sh` with `sudo`
-- Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
-- Run `pnpm install`
 - Run `sudo ./docker/install-cert.sh`
   > You may need to add the root certificate manually to your browser depending
   > on which browser you are using.
+- Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
+- Run `pnpm install`
 - Run `pnpm -F server devenv db push` to initialize your database
 - Run `pnpm -F server devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
