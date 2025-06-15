@@ -241,9 +241,6 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../packages/math
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc

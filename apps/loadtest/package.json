@@ -12,7 +12,6 @@
     "@mp/auth": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/math": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/server": "workspace:*",
     "@mp/std": "workspace:*",
