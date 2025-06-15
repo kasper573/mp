@@ -43,7 +43,7 @@ Local development is done using node and docker compose.
 - Install [NodeJS](https://nodejs.org/)
 - Clone this repository
 - Run `cd docker && ./dockerctl.sh dev up -d`
-  > If you're on WSL you may need to run `dockerctl.sh` this with `sudo`
+  > If you're on WSL you may need to run `dockerctl.sh` with `sudo`
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.12.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
 - Run `sudo ./docker/install-cert.sh`
