@@ -12,17 +12,17 @@ export function throttle<T extends (...args: never[]) => unknown>(
   };
 }
 
-export function dedupe<Input, Output>(
-  fn: (input: Input) => Output,
-  isEqual: (a: Input, b: Input) => boolean,
-): (input: Input) => Output {
-  let previous: { input: Input; output: Output } | undefined;
-  return (input: Input): Output => {
-    if (previous && isEqual(previous.input, input)) {
+export function dedupe<Args extends unknown[], Output>(
+  fn: (...args: Args) => Output,
+  isEqual: (a: Args, b: Args) => boolean,
+): (...args: Args) => Output {
+  let previous: { args: Args; output: Output } | undefined;
+  return (...args: Args): Output => {
+    if (previous && isEqual(previous.args, args)) {
       return previous.output;
     }
-    const output = fn(input);
-    previous = { input, output };
+    const output = fn(...args);
+    previous = { args, output };
     return output;
   };
 }
