@@ -18,6 +18,7 @@ ignore:
   - "**/Dockerfile*"
   # Generated code should not be linted
   - .git
+  - "**/.tanstack"
   - "**/.playwright"
   - "**/dist"
   - "apps/server/drizzle/**"
