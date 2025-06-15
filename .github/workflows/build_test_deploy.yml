@@ -93,6 +93,8 @@ jobs:
         uses: ./.github/workflows/composites/install_node_things/
       - name: Start application
         run: cd ./docker && ./dockerctl.sh test up --no-build -d
+      - name: Typecheck load test
+        run: pnpm -F loadtest build
       - name: Run load tests
         run: pnpm -F loadtest start:test --verbose --gc 100 --http 100 --timeout 30
       - name: Dump docker logs
