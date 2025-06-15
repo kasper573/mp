@@ -44,7 +44,6 @@ import { parseBypassUser, type AuthToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 import type { GameStateEvents } from "../../game/server/game-state-events";
 import { collectProcessMetrics } from "./metrics/process";
-import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
@@ -208,11 +207,19 @@ collectPathFindingMetrics(metrics);
 
 // Set up metrics file writer
 const metricsFilePath = path.resolve(opt.publicDir, opt.metricsFilePath);
-const metricsFileWriter = new MetricsFileWriter(metrics, metricsFilePath, logger);
+const metricsFileWriter = new MetricsFileWriter(
+  metrics,
+  metricsFilePath,
+  logger,
+);
 const metricsWriteTicker = new Ticker({
   onError: (error) => logger.error("Metrics write ticker error", { error }),
 });
 metricsWriteTicker.subscribe(metricsFileWriter.createTickHandler());
+
+logger.info(
+  `Metrics file writer configured to write to ${metricsFilePath} every ${opt.metricsWriteInterval.totalMilliseconds}ms`,
+);
 
 const npcAi = new NpcAi(gameState, gameStateEmitter, areas, rng);
 

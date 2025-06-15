@@ -1,5 +1,4 @@
 import { writeFile } from "node:fs/promises";
-import path from "node:path";
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import type { Logger } from "@mp/logger";
 
@@ -29,8 +28,11 @@ export class MetricsFileWriter {
       const metricsData = await this.registry.metrics();
       await writeFile(this.filePath, metricsData, "utf8");
       // Only log successful writes occasionally to avoid spam
-    } catch (error) {
-      this.logger.error("Failed to write metrics file", { error, filePath: this.filePath });
+    } catch (error: unknown) {
+      this.logger.error("Failed to write metrics file", {
+        error: String(error),
+        filePath: this.filePath,
+      });
     } finally {
       this.isWriting = false;
     }
@@ -41,8 +43,8 @@ export class MetricsFileWriter {
    */
   createTickHandler() {
     return () => {
-      this.writeMetrics().catch((error) => {
-        this.logger.error("Metrics write tick handler failed", { error });
+      this.writeMetrics().catch((error: unknown) => {
+        this.logger.error("Metrics write tick handler failed", { error: String(error) });
       });
     };
   }
