@@ -9,7 +9,7 @@ export function PlayerSpectatorTool() {
   const rpc = useRpc();
   const [spectatedPlayers, setSpectatedPlayers] = createSignal<UserId[]>([]);
 
-  const activePlayers = rpc.spectator.listActivePlayers.useQuery(() => ({
+  const activePlayers = rpc.world.listActivePlayers.useQuery(() => ({
     input: void 0,
   }));
 
@@ -46,7 +46,6 @@ export function PlayerSpectatorTool() {
                 <div class={styles.playerItem}>
                   <div class={styles.playerInfo}>
                     <div class={styles.playerName}>{player.username}</div>
-                    <div class={styles.playerArea}>Area: {player.areaId}</div>
                   </div>
                   <Button
                     onClick={() => addPlayerToSpectate(player.userId)}

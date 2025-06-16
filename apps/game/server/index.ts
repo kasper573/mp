@@ -7,7 +7,7 @@ export * from "./character/character-remove-behavior";
 export * from "./character/rpc";
 export * from "./character/service";
 export * from "./character/types";
-export * from "./spectator/rpc";
+export * from "./spectator";
 export * from "./game-state";
 export * from "./game-state-emitter";
 export * from "./user/client-visibility";

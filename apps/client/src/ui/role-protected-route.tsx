@@ -1,11 +1,11 @@
 import type { JSX, ParentProps } from "solid-js";
 import { useContext, Switch, Match } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
-import type { RoleDefinition } from "@mp/game/server";
+import type { SpectatorViewRole } from "@mp/game/shared/spectator-roles";
 import PermissionDenied from "../routes/permission-denied";
 
 interface RoleProtectedRouteProps extends ParentProps {
-  requiredRole: RoleDefinition;
+  requiredRole: SpectatorViewRole;
 }
 
 export function RoleProtectedRoute(

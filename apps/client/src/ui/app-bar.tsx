@@ -3,7 +3,7 @@ import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
 import { Button, LinearProgress } from "@mp/ui";
-import { spectatorRoles } from "@mp/game/server";
+import { spectatorViewRole } from "@mp/game/shared/spectator-roles";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
@@ -16,7 +16,7 @@ export default function AppBar() {
 
   const hasSpectatorRole = () => {
     const identity = auth.identity();
-    return identity?.roles.has(spectatorRoles.view) ?? false;
+    return identity?.roles.has(spectatorViewRole) ?? false;
   };
 
   return (

@@ -13,3 +13,4 @@ export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
 export * from "./use-rpc";
 export * from "./admin/player-spectator-tool";
+export * from "./admin/spectator-game-client";

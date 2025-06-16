@@ -14,6 +14,11 @@
       "types": "./server/index.ts",
       "import": "./server/index.ts",
       "require": "./server/index.ts"
+    },
+    "./shared/spectator-roles": {
+      "types": "./shared/spectator-roles.ts",
+      "import": "./shared/spectator-roles.ts",
+      "require": "./shared/spectator-roles.ts"
     }
   },
   "dependencies": {
