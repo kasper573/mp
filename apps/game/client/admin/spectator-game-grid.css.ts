@@ -25,8 +25,7 @@ export const grid = style([
 
 export const gameSlot = style([
   atoms({
-    borderWidth: "thin",
-    borderStyle: "solid",
+    border: "thin",
     borderRadius: "s",
     position: "relative",
   }),

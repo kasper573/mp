@@ -17,8 +17,7 @@ export const header = style([
     display: "flex",
     alignItems: "center",
     padding: "s",
-    borderBottomWidth: "thin",
-    borderBottomStyle: "solid",
+    borderBottom: "thin",
   }),
   {
     justifyContent: "space-between",

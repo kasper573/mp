@@ -15,8 +15,6 @@ export const sidebar = style([
     borderColor: "surface.face_subtle",
     backgroundColor: "surface.base",
     color: "surface.face",
-    borderWidth: "thin",
-    borderStyle: "solid",
     padding: "xl",
   }),
   {
@@ -24,7 +22,7 @@ export const sidebar = style([
     minWidth: "300px",
     borderRight: "1px solid",
     borderLeft: "none",
-    borderTop: "none", 
+    borderTop: "none",
     borderBottom: "none",
     overflowY: "auto",
   },
@@ -50,11 +48,10 @@ export const playerItem = style([
     display: "flex",
     alignItems: "center",
     padding: "m",
-    backgroundColor: "surface.raised",
+    backgroundColor: "surface.base",
     borderRadius: "m",
     marginBottom: "s",
-    borderWidth: "thin",
-    borderStyle: "solid",
+    border: "thin",
     borderColor: "surface.face_subtle",
   }),
   {
@@ -65,12 +62,10 @@ export const playerItem = style([
 export const spectatedPlayerItem = style([
   atoms({
     display: "flex",
-    alignItems: "center", 
+    alignItems: "center",
     padding: "s",
     borderRadius: "s",
     marginBottom: "xs",
-    borderWidth: "thin",
-    borderStyle: "solid",
   }),
   {
     justifyContent: "space-between",
@@ -87,9 +82,10 @@ export const playerInfo = style([
 
 export const playerName = style([
   atoms({
-    fontSize: "s",
+    flex: 1,
   }),
   {
+    fontSize: "14px",
     fontWeight: "600",
   },
 ]);
@@ -97,7 +93,7 @@ export const playerName = style([
 export const playerArea = style([
   atoms({
     color: "surface.face_subtle",
-    marginTop: "2xs",
+    marginTop: "xs",
   }),
   {
     fontSize: "12px",

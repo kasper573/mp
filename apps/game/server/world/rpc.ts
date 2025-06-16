@@ -80,7 +80,9 @@ export const worldRouter = rpc.router({
     }),
 
   listActivePlayers: rpc.procedure
-    .output<Array<{ userId: UserId; username: string; characterId: CharacterId }>>()
+    .output<
+      Array<{ userId: UserId; username: string; characterId: CharacterId }>
+    >()
     .use(roles([spectatorRoles.view]))
     .query(({ ctx }) => {
       const state = ctx.get(ctxGameState);
@@ -97,7 +99,10 @@ export const worldRouter = rpc.router({
 
       // Get all active characters (players) - filter out NPCs
       const activeCharacters = recordValues(state.actors)
-        .filter((actor): actor is Character => actor.type === "character" && actor.health > 0)
+        .filter(
+          (actor): actor is Character =>
+            actor.type === "character" && actor.health > 0,
+        )
         .map((character) => ({
           userId: character.userId,
           username: connectedUsers.get(character.userId) || "Unknown",
