@@ -12,7 +12,7 @@ interface SpectatorGameInstanceProps {
 export function SpectatorGameInstance(props: SpectatorGameInstanceProps) {
   const rpc = useRpc();
   const [playerName, setPlayerName] = createSignal<string>("Unknown");
-  
+
   const playerGameState = rpc.spectator.getPlayerGameState.useQuery(() => ({
     input: { userId: props.userId },
     refetchInterval: 1000, // Refresh every second for real-time updates
@@ -23,7 +23,7 @@ export function SpectatorGameInstance(props: SpectatorGameInstanceProps) {
   }));
 
   createEffect(() => {
-    const player = activePlayers.data?.find(p => p.userId === props.userId);
+    const player = activePlayers.data?.find((p) => p.userId === props.userId);
     if (player) {
       setPlayerName(player.username);
     }
@@ -40,24 +40,28 @@ export function SpectatorGameInstance(props: SpectatorGameInstanceProps) {
           <span class={styles.loading}>Loading...</span>
         </Show>
       </div>
-      
+
       <div class={styles.gameContainer}>
-        <Show 
+        <Show
           when={playerGameState.data}
           fallback={
             <div class={styles.fallback}>
-              <Show 
+              <Show
                 when={playerGameState.error}
                 fallback={<LoadingSpinner debugId="spectator-game-loading" />}
               >
-                <ErrorFallback error={playerGameState.error || new Error("Unknown error")} />
+                <ErrorFallback
+                  error={playerGameState.error || new Error("Unknown error")}
+                />
               </Show>
             </div>
           }
         >
           {(gameStateInfo) => (
-            <Suspense fallback={<LoadingSpinner debugId="spectator-game-suspense" />}>
-              <SpectatorGame 
+            <Suspense
+              fallback={<LoadingSpinner debugId="spectator-game-suspense" />}
+            >
+              <SpectatorGame
                 userId={props.userId}
                 gameStateInfo={gameStateInfo()}
               />

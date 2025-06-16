@@ -23,17 +23,19 @@ export function SpectatorGameGrid(props: SpectatorGameGridProps) {
 
   return (
     <div class={styles.container}>
-      <Show 
-        when={props.spectatedPlayers.length > 0} 
+      <Show
+        when={props.spectatedPlayers.length > 0}
         fallback={
           <div class={styles.emptyState}>
             <h3 class={styles.emptyStateTitle}>No Players Selected</h3>
-            <p class={styles.emptyStateText}>Add players from the sidebar to start spectating</p>
+            <p class={styles.emptyStateText}>
+              Add players from the sidebar to start spectating
+            </p>
           </div>
         }
       >
-        <div 
-          class={styles.grid} 
+        <div
+          class={styles.grid}
           style={{
             "grid-template-columns": `repeat(${gridLayout().cols}, 1fr)`,
             "grid-template-rows": `repeat(${gridLayout().rows}, 1fr)`,

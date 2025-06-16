@@ -7,7 +7,9 @@ interface RoleProtectedRouteProps extends ParentProps {
   requiredRole: string;
 }
 
-export function RoleProtectedRoute(props: RoleProtectedRouteProps): JSX.Element {
+export function RoleProtectedRoute(
+  props: RoleProtectedRouteProps,
+): JSX.Element {
   const auth = useContext(AuthContext);
 
   const hasRequiredRole = () => {

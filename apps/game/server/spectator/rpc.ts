@@ -35,7 +35,7 @@ export const spectatorRouter = rpc.router({
     .query(({ ctx }) => {
       const state = ctx.get(ctxGameState);
       const clients = ctx.get(ctxClientRegistry);
-      
+
       // Get all connected users
       const connectedUsers = new Map<UserId, UserIdentity>();
       for (const clientId of clients.getClientIds()) {
@@ -44,11 +44,12 @@ export const spectatorRouter = rpc.router({
           connectedUsers.set(user.id, user);
         }
       }
-      
+
       // Get all active characters (players)
       const activeCharacters: PlayerInfo[] = recordValues(state.actors)
-        .filter((actor): actor is Character => 
-          actor.type === "character" && actor.health > 0
+        .filter(
+          (actor): actor is Character =>
+            actor.type === "character" && actor.health > 0,
         )
         .map((character) => {
           const user = connectedUsers.get(character.userId);
@@ -71,7 +72,7 @@ export const spectatorRouter = rpc.router({
     .use(roles([spectatorRoles.view]))
     .query(({ input: { userId }, ctx }) => {
       const state = ctx.get(ctxGameState);
-      
+
       // Find the character for this user
       const character = recordValues(state.actors)
         .filter((actor): actor is Character => actor.type === "character")
