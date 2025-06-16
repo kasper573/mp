@@ -1,7 +1,7 @@
 import { createSignal, createEffect, Suspense, Show } from "solid-js";
 import type { UserId } from "@mp/auth";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
-import { useRpc } from "../../integrations/rpc";
+import { useRpc } from "../use-rpc";
 import { SpectatorGame } from "./spectator-game";
 import * as styles from "./spectator-game-instance.css";
 

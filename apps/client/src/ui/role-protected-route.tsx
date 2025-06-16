@@ -1,10 +1,11 @@
 import type { JSX, ParentProps } from "solid-js";
 import { useContext, Switch, Match } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
+import type { RoleDefinition } from "@mp/game/server";
 import PermissionDenied from "../routes/permission-denied";
 
 interface RoleProtectedRouteProps extends ParentProps {
-  requiredRole: string;
+  requiredRole: RoleDefinition;
 }
 
 export function RoleProtectedRoute(

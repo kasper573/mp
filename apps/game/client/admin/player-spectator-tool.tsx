@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from "solid-js";
 import type { UserId } from "@mp/auth";
 import { Button } from "@mp/ui";
-import { useRpc } from "../../integrations/rpc";
+import { useRpc } from "../use-rpc";
 import { SpectatorGameGrid } from "./spectator-game-grid";
 import * as styles from "./player-spectator-tool.css";
 
