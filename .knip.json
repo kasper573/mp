@@ -1,9 +1,4 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": [
-    "eslint-import-resolver-typescript",
-    "@mp/tsconfig",
-    "@mp/eslint",
-    "pino-pretty"
-  ]
+  "ignoreDependencies": ["@mp/tsconfig", "pino-pretty"]
 }

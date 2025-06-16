@@ -12,8 +12,8 @@
     "build": "pnpm -r --stream build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r --stream test",
-    "lint": "eslint . --max-warnings=0 && ls-lint && manypkg check && knip",
-    "lint:fix": "eslint . --fix && manypkg fix",
+    "lint": "oxlint --import-plugin --tsconfig=./tsconfig.json . && ls-lint && manypkg check && knip",
+    "lint:fix": "oxlint --import-plugin --tsconfig=./tsconfig.json . --fix --fix-suggestions && manypkg fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "prepare": "husky"
@@ -24,7 +24,6 @@
     "@dotenvx/dotenvx": "1.31.3",
     "@ls-lint/ls-lint": "2.3.0",
     "@manypkg/cli": "^0.24.0",
-    "@mp/eslint": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "husky": "9.0.11",

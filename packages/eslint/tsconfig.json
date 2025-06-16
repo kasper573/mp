@@ -1,7 +1,0 @@
-{
-  "extends": ["@mp/tsconfig/node.json"],
-  "include": ["./eslint.config.js"],
-  "compilerOptions": {
-    "allowJs": true
-  }
-}

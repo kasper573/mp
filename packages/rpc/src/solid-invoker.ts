@@ -5,7 +5,7 @@ import type {
   AnyMutationNode,
   AnyQueryNode,
   AnyRouterNode,
-  AnyRpcNode as AnyRpcNode,
+  AnyRpcNode,
   InferInput,
   InferOutput,
 } from "./builder";
