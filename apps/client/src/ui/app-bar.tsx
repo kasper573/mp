@@ -13,6 +13,11 @@ export default function AppBar() {
 
   const auth = useContext(AuthContext);
 
+  const hasSpectatorRole = () => {
+    const identity = auth.identity();
+    return identity?.roles.has("spectator.view") ?? false;
+  };
+
   return (
     <nav class={styles.nav}>
       <Link to="/">Home</Link>
@@ -20,6 +25,9 @@ export default function AppBar() {
       <Link to="/sandbox">Dev Tools</Link>
       <Link to="/contact">Contact</Link>
       <Link to="/actor-tester">Actor Tester</Link>
+      <Show when={hasSpectatorRole()}>
+        <Link to="/admin/player-spectator">Spectator</Link>
+      </Show>
 
       <LinearProgress
         class={dock({ position: "top" })}

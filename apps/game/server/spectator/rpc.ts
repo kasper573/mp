@@ -1,19 +1,15 @@
+import type { UserId, UserIdentity } from "@mp/auth";
+import type { Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
 import { recordValues } from "@mp/std";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { defineRoles } from "../user/define-roles";
 import { ctxClientRegistry } from "../user/client-registry";
-import { deriveClientVisibility } from "../user/client-visibility";
-import { clientViewDistance } from "../../shared/client-view-distance-settings";
-import { ctxAreaLookup } from "../area/lookup";
 import type { Character, CharacterId } from "../character/types";
-import type { UserId, UserIdentity } from "@mp/auth";
-import type { ClientId } from "../user/client-id";
 import type { GameState } from "../game-state";
 import type { AreaId } from "../../shared/area/area-id";
-import { Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
 
 export const spectatorRoles = defineRoles("spectator", ["view"]);
 
