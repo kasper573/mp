@@ -1,4 +1,4 @@
-import type { UserId, UserIdentity } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
 import type { ClientId } from "./client-id";
 
@@ -6,19 +6,19 @@ export const ctxClientRegistry =
   InjectionContext.new<ClientRegistry>("ClientRegistry");
 
 export class ClientRegistry {
-  private map = new Map<ClientId, UserIdentity>();
+  private map = new Map<ClientId, UserId>();
   private eventHandlers = new Set<ClientRegistryEventHandler>();
 
-  add(clientId: ClientId, user: UserIdentity) {
-    this.map.set(clientId, user);
-    this.emit({ type: "add", user, clientId });
+  add(clientId: ClientId, userId: UserId) {
+    this.map.set(clientId, userId);
+    this.emit({ type: "add", userId, clientId });
   }
 
   remove(clientId: ClientId) {
-    const user = this.map.get(clientId);
-    if (user !== undefined) {
+    const userId = this.map.get(clientId);
+    if (userId !== undefined) {
       this.map.delete(clientId);
-      this.emit({ type: "remove", user, clientId });
+      this.emit({ type: "remove", userId, clientId });
     }
   }
 
@@ -31,11 +31,11 @@ export class ClientRegistry {
   }
 
   getUserId(clientId: ClientId): UserId | undefined {
-    return this.map.get(clientId)?.id;
+    return this.map.get(clientId);
   }
 
   hasClient(userId: UserId): boolean {
-    return this.map.values().some((user) => user.id === userId);
+    return new Set(this.map.values()).has(userId);
   }
 
   on(handler: ClientRegistryEventHandler): Unsubscribe {
@@ -54,11 +54,7 @@ export type Unsubscribe = () => void;
 
 export interface ClientRegistryEvent {
   type: "add" | "remove";
-  /**
-   * This is a temporary solution. We should just store ids, and let user info fetching be a separate concern.
-   * @deprecated
-   */
-  user: UserIdentity;
+  userId: UserId;
   clientId: ClientId;
 }
 

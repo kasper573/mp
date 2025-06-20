@@ -12,39 +12,39 @@ export function characterRemoveBehavior(
 ) {
   const removeTimeouts = new Map<UserId, NodeJS.Timeout>();
 
-  const stop = clients.on(({ type, user }) => {
+  const stop = clients.on(({ type, userId }) => {
     switch (type) {
       case "remove": {
-        if (clients.hasClient(user.id)) {
+        if (clients.hasClient(userId)) {
           // User is still connected with another client, no need to remove character
           break;
         }
 
-        logger.info(
-          { userId: user.id },
-          "Scheduling character removal for user",
+        logger.info({ userId }, "Scheduling character removal for user");
+        const timeoutId = setTimeout(
+          () => removeCharactersForUser(userId),
+          timeout,
         );
-        const timeoutId = setTimeout(() => removeCharacter(user.id), timeout);
-        removeTimeouts.set(user.id, timeoutId);
+        removeTimeouts.set(userId, timeoutId);
         break;
       }
 
       case "add": {
-        const timeoutId = removeTimeouts.get(user.id);
+        const timeoutId = removeTimeouts.get(userId);
         if (timeoutId) {
           logger.info(
-            { userId: user.id },
+            { userId },
             "User reconnected, cancelling removal timeout",
           );
           clearTimeout(timeoutId);
-          removeTimeouts.delete(user.id);
+          removeTimeouts.delete(userId);
         }
         break;
       }
     }
   });
 
-  function removeCharacter(userId: UserId) {
+  function removeCharactersForUser(userId: UserId) {
     for (const char of recordValues(state.actors).filter(
       (actor) => actor.type === "character",
     )) {

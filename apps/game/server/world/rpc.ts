@@ -51,7 +51,7 @@ export const worldRouter = rpc.router({
       stateEmitter.markToResendFullState(clientId);
 
       const clients = ctx.get(ctxClientRegistry);
-      clients.add(clientId, mwc.user);
+      clients.add(clientId, mwc.user.id);
 
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors)

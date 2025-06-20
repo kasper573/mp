@@ -215,8 +215,8 @@ updateTicker.subscribe(
 );
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
-clients.on(({ type, clientId, user }) =>
-  logger.info({ clientId, userId: user.id }, `[ClientRegistry][${type}]`),
+clients.on(({ type, clientId, userId }) =>
+  logger.info({ clientId, userId }, `[ClientRegistry][${type}]`),
 );
 
 httpServer.listen(opt.port, opt.hostname, () => {
