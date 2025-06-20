@@ -22,16 +22,8 @@ import type { MiscDebugSettings } from "../ui/misc-debug-ui";
 import { MiscDebugUi } from "../ui/misc-debug-ui";
 
 export const Route = createFileRoute("/play")({
-  component: RouteComponent,
+  component: AuthBoundary.wrap(PlayPage),
 });
-
-function RouteComponent() {
-  return (
-    <AuthBoundary>
-      <PlayPage />
-    </AuthBoundary>
-  );
-}
 
 function PlayPage() {
   const logger = useContext(LoggerContext);

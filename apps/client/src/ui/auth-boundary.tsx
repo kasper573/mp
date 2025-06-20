@@ -1,11 +1,15 @@
 import { AuthContext } from "@mp/auth/client";
-import type { JSX, ParentProps } from "solid-js";
+import type { Component, JSX, ParentProps } from "solid-js";
 import { useContext, Switch, Match, createMemo } from "solid-js";
 import type { RoleDefinition } from "@mp/auth";
 import PermissionDenied from "../routes/permission-denied";
 
+interface AuthBoundaryProps {
+  requiredRoles?: Iterable<RoleDefinition>;
+}
+
 export function AuthBoundary(
-  props: ParentProps<{ requiredRoles?: Iterable<RoleDefinition> }>,
+  props: ParentProps<AuthBoundaryProps>,
 ): JSX.Element {
   const auth = useContext(AuthContext);
 
@@ -27,3 +31,11 @@ export function AuthBoundary(
     </Switch>
   );
 }
+
+AuthBoundary.wrap = (Component: Component, props?: AuthBoundaryProps) => {
+  return () => (
+    <AuthBoundary {...props}>
+      <Component />
+    </AuthBoundary>
+  );
+};
