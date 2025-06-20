@@ -1,4 +1,5 @@
 import type { RuntimeFn } from "@vanilla-extract/recipes";
+import type { ComplexStyleRule } from "@vanilla-extract/css";
 import clsx from "clsx";
 import { splitProps } from "solid-js";
 
@@ -34,5 +35,4 @@ export function processStyleProps<Props extends { class?: string }>(
 
 type AnyProps = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type AnyRecipe = RuntimeFn<any>;
+type AnyRecipe = RuntimeFn<Record<string, Record<string, ComplexStyleRule | string>>>;

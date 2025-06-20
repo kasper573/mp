@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export class RpcBuilder<Context = void> {
   context<Context>() {
     return new RpcBuilder<Context>();
@@ -85,20 +83,31 @@ export interface RouterNode<Routes extends AnyRouteRecord>
   routes: Routes;
 }
 
+/**
+ * Utility types for RPC nodes that can accept any Input/Output/MwContext combination.
+ * Note: `any` is used here for type parameters where maximum flexibility is required
+ * for these types to work as generic constraints (e.g., `Node extends AnyRpcNode`).
+ * Using `unknown` would break assignability with concrete types.
+ */
 export type AnyMutationNode<Context = any> = MutationNode<
   any,
   any,
   Context,
   any
 >;
+
 export type AnyQueryNode<Context = any> = QueryNode<any, any, Context, any>;
+
 export type AnyProcedureNode<Context = any> =
   | AnyMutationNode<Context>
   | AnyQueryNode<Context>;
+
 export type AnyRouterNode<Context = any> = RouterNode<AnyRouteRecord<Context>>;
+
 export type AnyRpcNode<Context = any> =
   | AnyProcedureNode<Context>
   | AnyRouterNode<Context>;
+
 export type AnyRouteRecord<Context = any> = Record<string, AnyRpcNode<Context>>;
 
 export class ProcedureBuilder<Input, Output, Context, MwContext> {

@@ -22,10 +22,10 @@ export function createRpcInvoker<Context>(
 }
 
 function resolveRpcNode<Context>(
-  start: AnyRpcNode,
+  start: AnyRpcNode<Context>,
   path: string[],
 ): AnyRpcNode<Context> | undefined {
-  let node: AnyRpcNode | undefined = start;
+  let node: AnyRpcNode<Context> | undefined = start;
   for (const key of path) {
     if (node.type === "router") {
       node = node.routes[key];
