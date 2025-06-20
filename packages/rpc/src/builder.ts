@@ -84,10 +84,16 @@ export interface RouterNode<Routes extends AnyRouteRecord>
 }
 
 /**
- * Utility types for RPC nodes that can accept any Input/Output/MwContext combination.
- * Note: `any` is used here for type parameters where maximum flexibility is required
- * for these types to work as generic constraints (e.g., `Node extends AnyRpcNode`).
- * Using `unknown` would break assignability with concrete types.
+ * Utility types for RPC nodes that require maximum type flexibility.
+ *
+ * IMPORTANT: These types use `any` for Input/Output/Context/MwContext parameters because:
+ * 1. They serve as upper bounds for generic constraints (e.g., `Node extends AnyRpcNode`)
+ * 2. Concrete types like `QueryNode<string, number, SpecificContext, SomeType>` must be assignable to these
+ * 3. Using `unknown` breaks assignability since specific types are not assignable to `unknown`
+ * 4. This is a legitimate TypeScript pattern for creating flexible utility types
+ *
+ * The `any` usage here does NOT bypass type safety - it enables the type system to work
+ * with the diverse concrete types used throughout the RPC system.
  */
 export type AnyMutationNode<Context = any> = MutationNode<
   any,

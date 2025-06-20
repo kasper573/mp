@@ -35,4 +35,6 @@ export function processStyleProps<Props extends { class?: string }>(
 
 type AnyProps = Record<string, unknown>;
 
-type AnyRecipe = RuntimeFn<Record<string, Record<string, ComplexStyleRule | string>>>;
+type AnyRecipe = RuntimeFn<
+  Record<string, Record<string, ComplexStyleRule | string>>
+>;
