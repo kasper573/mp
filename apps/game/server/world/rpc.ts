@@ -55,7 +55,7 @@ export const worldRouter = rpc.router({
 
   join: rpc.procedure
     .use(roles([worldRoles.join]))
-    .output<CharacterId>()
+    .output<Pick<Character, "id" | "areaId">>()
     .mutation(async ({ ctx, mwc }) => {
       const clientId = ctx.get(ctxClientId);
       const state = ctx.get(ctxGameState);
@@ -68,12 +68,13 @@ export const worldRouter = rpc.router({
         .find((actor) => actor.userId === mwc.user.id);
 
       if (existingCharacter) {
-        return existingCharacter.id;
+        return existingCharacter;
       }
 
       const char = await characterService.getOrCreateCharacterForUser(mwc.user);
       state.actors[char.id] = char;
-      return char.id;
+      const { id, areaId } = char;
+      return { id, areaId };
     }),
 
   requestFullState: rpc.procedure.query(({ ctx }) => {

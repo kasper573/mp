@@ -118,7 +118,11 @@ export function createGameActions(
 
   const respawn = () => rpc.character.respawn(assert(state.characterId()));
 
-  const join = () => rpc.world.join().then(state.setCharacterId);
+  const join = () =>
+    rpc.world.join().then((char) => {
+      state.setCharacterId(char.id);
+      return char;
+    });
 
   return {
     respawn,
