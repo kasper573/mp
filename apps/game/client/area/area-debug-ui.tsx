@@ -65,6 +65,7 @@ export function AreaDebugUi(props: {
         <div>
           Visible Graph lines:{" "}
           <Select
+            required
             options={visibleGraphTypes}
             value={settings().visibleGraphType}
             onChange={(visibleGraphType) =>

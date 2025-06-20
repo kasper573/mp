@@ -10,12 +10,30 @@ type SelectOptionsInput<Value> =
   | readonly SelectOption<Value>[]
   | readonly Value[];
 
-export interface SelectProps<Value>
+export type SelectProps<Value> =
+  | OptionalSelectProps<Value>
+  | RequiredSelectProps<Value>;
+
+interface BaseSelectProps<Value, InputValue, OutputValue>
   extends Pick<JSX.HTMLAttributes<HTMLSelectElement>, "class" | "style"> {
   options: SelectOptionsInput<Value>;
-  value: NoInfer<Value>;
-  onChange: (value: NoInfer<Value>) => void;
+  value: InputValue;
+  onChange: (value: OutputValue) => void;
   isSameValue?: (a: NoInfer<Value>, b: NoInfer<Value>) => boolean;
+}
+
+export interface OptionalSelectProps<Value>
+  extends BaseSelectProps<
+    Value,
+    NoInfer<Value> | undefined,
+    NoInfer<Value> | undefined
+  > {
+  required?: false;
+}
+
+export interface RequiredSelectProps<Value>
+  extends BaseSelectProps<Value, NoInfer<Value>, NoInfer<Value>> {
+  required: true;
 }
 
 export function Select<const Value>(props: SelectProps<Value>) {
@@ -23,7 +41,9 @@ export function Select<const Value>(props: SelectProps<Value>) {
   const isSameValue = (a: Value, b: Value) =>
     props.isSameValue?.(a, b) ?? a === b;
   const selectedIndex = createMemo(() =>
-    options().findIndex((option) => isSameValue(option.value, props.value)),
+    options().findIndex((option) =>
+      isSameValue(option.value, props.value as Value),
+    ),
   );
   return (
     <select
