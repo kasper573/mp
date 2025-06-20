@@ -8,7 +8,7 @@ import {
   type UserIdentity,
 } from "./shared";
 
-export interface TokenVerifierOption {
+export interface TokenResolverOption {
   jwksUri: string;
   issuer: string;
   audience: string;
@@ -19,17 +19,17 @@ export interface TokenVerifierOption {
   getBypassUser?: (token: AuthToken) => UserIdentity | undefined;
 }
 
-export interface TokenVerifier {
-  (token?: AuthToken): Promise<TokenVerifierResult>;
+export interface TokenResolver {
+  (token?: AuthToken): Promise<TokenResolverResult>;
 }
 
-export function createTokenVerifier({
+export function createTokenResolver({
   jwksUri,
   issuer,
   audience,
   algorithms,
   getBypassUser,
-}: TokenVerifierOption): TokenVerifier {
+}: TokenResolverOption): TokenResolver {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
   return async function verifyToken(token) {
@@ -78,7 +78,7 @@ export function createTokenVerifier({
   };
 }
 
-export type TokenVerifierResult = Result<UserIdentity, string>;
+export type TokenResolverResult = Result<UserIdentity, string>;
 
 // Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [

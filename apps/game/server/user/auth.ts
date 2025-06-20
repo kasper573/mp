@@ -1,15 +1,15 @@
 import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserIdentity } from "@mp/auth";
-import type { TokenVerifier } from "@mp/auth/server";
+import type { TokenResolver } from "@mp/auth/server";
 import { rpc } from "../rpc";
 
-export const ctxTokenVerifier =
-  InjectionContext.new<TokenVerifier>("TokenVerifier");
+export const ctxTokenResolver =
+  InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
   return rpc.middleware(async ({ ctx, headers }): Promise<AuthContext> => {
-    const tokenVerifier = ctx.get(ctxTokenVerifier);
-    const result = await tokenVerifier(headers.authToken);
+    const tokenResolver = ctx.get(ctxTokenResolver);
+    const result = await tokenResolver(headers.authToken);
     if (result.isErr()) {
       throw new Error("Invalid token", { cause: result.error });
     }
@@ -30,8 +30,8 @@ export function roles(requiredRoles: RoleDefinition[]) {
 export function optionalAuth() {
   return rpc.middleware(
     async ({ ctx, headers }): Promise<Partial<AuthContext>> => {
-      const tokenVerifier = ctx.get(ctxTokenVerifier);
-      const result = await tokenVerifier(headers.authToken);
+      const tokenResolver = ctx.get(ctxTokenResolver);
+      const result = await tokenResolver(headers.authToken);
       return { user: result.unwrapOr(undefined) };
     },
   );

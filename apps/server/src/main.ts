@@ -4,7 +4,7 @@ import path from "node:path";
 import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import { createTokenVerifier } from "@mp/auth/server";
+import { createTokenResolver } from "@mp/auth/server";
 import { PatchCollectorFactory, SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
@@ -16,7 +16,7 @@ import {
   ctxClientRegistry,
   ctxGameStateEmitter,
   ctxNpcSpawner,
-  ctxTokenVerifier,
+  ctxTokenResolver,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -76,7 +76,7 @@ RateLimiter.enabled = opt.rateLimit;
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const tokenVerifier = createTokenVerifier({
+const tokenResolver = createTokenResolver({
   ...opt.auth,
   getBypassUser,
 });
@@ -189,7 +189,7 @@ const ioc = new InjectionContainer()
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateEmitter, gameStateEmitter)
   .provide(ctxAreaLookup, areas)
-  .provide(ctxTokenVerifier, tokenVerifier)
+  .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
