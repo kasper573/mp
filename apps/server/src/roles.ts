@@ -8,6 +8,7 @@ export const playerRoles = [
   characterRoles.move,
   characterRoles.attack,
   characterRoles.respawn,
+  worldRoles.join,
 ];
 
 /**

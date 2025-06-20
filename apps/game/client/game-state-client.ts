@@ -120,7 +120,10 @@ export function createGameActions(
   const respawn = () => rpc.character.respawn(assert(state.characterId()));
 
   const join = (token: AuthToken) =>
-    rpc.world.join(token).then(state.setCharacterId);
+    rpc.world
+      .auth(token)
+      .then(() => rpc.world.join())
+      .then(state.setCharacterId);
 
   return {
     respawn,

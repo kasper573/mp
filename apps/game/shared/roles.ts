@@ -1,6 +1,6 @@
 import { defineRoles } from "@mp/auth";
 
-export const worldRoles = defineRoles("world", ["spectate"]);
+export const worldRoles = defineRoles("world", ["spectate", "join"]);
 
 export const characterRoles = defineRoles("character", [
   "move",

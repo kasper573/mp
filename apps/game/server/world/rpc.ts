@@ -36,28 +36,30 @@ export const worldRouter = rpc.router({
       );
       return characterPaginator(characters.toArray(), input, 50);
     }),
-  joinAsSpectator: rpc.procedure
+
+  auth: rpc.procedure.input<AuthToken>().mutation(async ({ input, ctx }) => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    const tokenVerifier = ctx.get(ctxTokenVerifier);
+    const result = await tokenVerifier(input);
+    if (result.isErr()) {
+      throw new Error("Invalid token", { cause: result.error });
+    }
+
+    const user = result.value;
+    clients.add(clientId, user);
+  }),
+
+  spectate: rpc.procedure
     .use(roles([worldRoles.spectate]))
-    .input<{
-      token: AuthToken;
-      characterId: CharacterId;
-    }>()
+    .input<CharacterId>()
     .mutation(() => {}),
+
   join: rpc.procedure
-    .input<AuthToken>()
+    .use(roles([worldRoles.join]))
     .output<CharacterId>()
-    .mutation(async ({ input: token, ctx }) => {
+    .mutation(async ({ ctx, mwc }) => {
       const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      const tokenVerifier = ctx.get(ctxTokenVerifier);
-      const result = await tokenVerifier(token);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-
-      const user = result.value;
-      clients.add(clientId, user);
-
       const state = ctx.get(ctxGameState);
       const stateEmitter = ctx.get(ctxGameStateEmitter);
       stateEmitter.markToResendFullState(clientId);
@@ -65,13 +67,13 @@ export const worldRouter = rpc.router({
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors)
         .filter((actor) => actor.type === "character")
-        .find((actor) => actor.userId === user.id);
+        .find((actor) => actor.userId === mwc.user.id);
 
       if (existingCharacter) {
         return existingCharacter.id;
       }
 
-      const char = await characterService.getOrCreateCharacterForUser(user);
+      const char = await characterService.getOrCreateCharacterForUser(mwc.user);
       state.actors[char.id] = char;
       return char.id;
     }),
