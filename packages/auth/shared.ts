@@ -1,4 +1,4 @@
-import { createSeededUuidLike, type Branded } from "@mp/std";
+import { createSeededUuid, type Branded } from "@mp/std";
 import type { JWTPayload } from "jose";
 
 export type AuthToken = Branded<string, "AuthToken">;
@@ -41,7 +41,7 @@ export function parseBypassUser(token: AuthToken): UserIdentity | undefined {
 
   const name = token.slice(bypassTokenPrefix.length);
   return {
-    id: createSeededUuidLike(
+    id: createSeededUuid(
       token,
       "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     ) as UserId,
