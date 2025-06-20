@@ -8,30 +8,25 @@ import {
 } from "./rpc-invoker";
 import type { RpcCaller } from "./proxy-invoker";
 
-export interface RpcTransceiverOptions<Context, RpcHeaders> {
-  sendCall: (rpc: RpcCall<unknown, RpcHeaders>) => void;
+export interface RpcTransceiverOptions<Context> {
+  sendCall: (rpc: RpcCall<unknown>) => void;
   sendResponse: (response: RcpResponse<unknown>) => void;
   invoke?: RpcInvoker<Context>;
   formatResponseError?: (error: unknown) => unknown;
   timeout?: number;
-  requiresResponse?: (call: RpcCall<unknown, RpcHeaders>) => boolean;
-  /**
-   * Get the headers to send with the call.
-   * If omitted, void will be used.
-   */
-  headers?: () => RpcHeaders;
+  requiresResponse?: (call: RpcCall<unknown>) => boolean;
 }
 
-export class RpcTransceiver<Context = void, RpcHeaders = void> {
+export class RpcTransceiver<Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
     RpcCallId,
     (response: RcpResponse<unknown>) => void
   >();
 
-  constructor(private options: RpcTransceiverOptions<Context, RpcHeaders>) {}
+  constructor(private options: RpcTransceiverOptions<Context>) {}
 
-  private requiresResponse(call: RpcCall<unknown, RpcHeaders>): boolean {
+  private requiresResponse(call: RpcCall<unknown>): boolean {
     return this.options.requiresResponse?.(call) ?? true;
   }
 
@@ -39,12 +34,7 @@ export class RpcTransceiver<Context = void, RpcHeaders = void> {
     const { sendCall, timeout } = this.options;
 
     const id = this.nextId();
-    const call: RpcCall<unknown, RpcHeaders> = [
-      path,
-      input,
-      id,
-      this.options.headers?.() as RpcHeaders,
-    ];
+    const call: RpcCall<unknown> = [path, input, id];
     sendCall(call);
 
     if (!this.requiresResponse(call)) {
@@ -81,9 +71,9 @@ export class RpcTransceiver<Context = void, RpcHeaders = void> {
   };
 
   handleCall = async (
-    call: RpcCall<unknown, RpcHeaders>,
+    call: RpcCall<unknown>,
     context: Context,
-  ): Promise<RpcInvokerResult<unknown, unknown, RpcHeaders>> => {
+  ): Promise<RpcInvokerResult<unknown, unknown>> => {
     const {
       invoke,
       formatResponseError = passThrough,
@@ -137,7 +127,7 @@ export class RpcRemoteError extends Error {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export type AnyRpcTransceiver = RpcTransceiver<any, any>;
+export type AnyRpcTransceiver = RpcTransceiver<any>;
 
 export type RcpResponse<Output> = [
   id: RpcCallId,

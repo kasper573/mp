@@ -6,19 +6,14 @@ export function createRpcInvoker<Context>(
   root: AnyRpcNode<Context>,
 ): RpcInvoker<Context> {
   return async function invokeRpc(call, ctx) {
-    const [path, input, , headers] = call;
+    const [path, input] = call;
     const node = resolveRpcNode<Context>(root, path);
     if (!node || node.type === "router") {
       return err(new RpcInvokerError(call, "path not found"));
     }
 
     try {
-      const output = (await node.handler({
-        ctx,
-        input,
-        mwc,
-        headers,
-      })) as unknown;
+      const output = (await node.handler({ ctx, input, mwc })) as unknown;
       return ok(output);
     } catch (error) {
       return err(new RpcInvokerError(call, error));
@@ -39,8 +34,8 @@ function resolveRpcNode<Context>(
   return node;
 }
 
-export class RpcInvokerError<Input, RpcHeaders> extends Error {
-  constructor(call: RpcCall<Input, RpcHeaders>, cause?: unknown) {
+export class RpcInvokerError<Input> extends Error {
+  constructor(call: RpcCall<Input>, cause?: unknown) {
     super(`error in rpc handler "${call[0].join(".")}" (callId: ${call[2]})`, {
       cause,
     });
@@ -49,23 +44,18 @@ export class RpcInvokerError<Input, RpcHeaders> extends Error {
 }
 
 export type RpcInvoker<Context = void> = (
-  call: RpcCall<unknown, unknown>,
+  call: RpcCall<unknown>,
   context: Context,
-) => Promise<RpcInvokerResult<unknown, unknown, unknown>>;
+) => Promise<RpcInvokerResult<unknown, unknown>>;
 
-export type RpcInvokerResult<Input, Output, RpcHeaders> = Result<
+export type RpcInvokerResult<Input, Output> = Result<
   Output,
-  RpcInvokerError<Input, RpcHeaders>
+  RpcInvokerError<Input>
 >;
 
 export type RpcCallId = Branded<number, "RpcCallId">;
 
-export type RpcCall<Input, RpcHeaders> = [
-  path: string[],
-  input: Input,
-  id: RpcCallId,
-  headers: RpcHeaders,
-];
+export type RpcCall<Input> = [path: string[], input: Input, id: RpcCallId];
 
 // The first handler never has a middleware context,
 // but we provide an empty object to make debugging easier,

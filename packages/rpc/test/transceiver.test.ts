@@ -109,12 +109,7 @@ describe("RpcTransceiver", () => {
   });
 
   describe("handleCall()", () => {
-    const dummyCall: RpcCall<unknown, void> = [
-      ["path"],
-      "input",
-      1 as RpcCallId,
-      void 0,
-    ];
+    const dummyCall: RpcCall<unknown> = [["path"], "input", 1 as RpcCallId];
     const dummyCtx = void 0;
 
     it("returns err and does not sendResponse when no invoke is provided", async () => {
@@ -148,7 +143,7 @@ describe("RpcTransceiver", () => {
         invoke,
         requiresResponse: () => true,
       });
-      const call: RpcCall<unknown, void> = [["do"], 42, 7 as RpcCallId, void 0];
+      const call: RpcCall<unknown> = [["do"], 42, 7 as RpcCallId];
 
       const result = await t.handleCall(call, dummyCtx);
 
@@ -175,12 +170,7 @@ describe("RpcTransceiver", () => {
         formatResponseError: formatError,
         requiresResponse: () => true,
       });
-      const call: RpcCall<unknown, void> = [
-        ["do"],
-        null,
-        5 as RpcCallId,
-        void 0,
-      ];
+      const call: RpcCall<unknown> = [["do"], null, 5 as RpcCallId];
 
       const result = await t.handleCall(call, dummyCtx);
 

@@ -17,20 +17,16 @@ export function createRpcProxyInvoker<Node extends AnyRpcNode>(
   return proxy as RpcProxyInvoker<Node>;
 }
 
-export function createRpcProxyInvokerForNode<
-  Node extends AnyRpcNode,
-  RpcHeaders,
->(
+export function createRpcProxyInvokerForNode<Node extends AnyRpcNode>(
   node: Node,
   context: InferContext<Node>,
-  getRpcHeaders: () => RpcHeaders,
 ): RpcProxyInvoker<Node> {
   const invoke = createRpcInvoker(node);
 
   let idCounter = 0;
   const proxy = createInvocationProxy(
     (path) => (input) =>
-      invoke([path, input, idCounter++ as RpcCallId, getRpcHeaders()], context),
+      invoke([path, input, idCounter++ as RpcCallId], context),
   );
 
   return proxy as RpcProxyInvoker<Node>;

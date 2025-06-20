@@ -3,26 +3,19 @@ import type { RcpResponse, RpcTransceiverOptions } from "./transceiver";
 import { RpcTransceiver } from "./transceiver";
 import type { RpcCall } from "./rpc-invoker";
 
-export interface BinaryRpcTransceiverOptions<Context, RpcHeaders>
-  extends Omit<
-    RpcTransceiverOptions<Context, RpcHeaders>,
-    "sendCall" | "sendResponse"
-  > {
+export interface BinaryRpcTransceiverOptions<Context>
+  extends Omit<RpcTransceiverOptions<Context>, "sendCall" | "sendResponse"> {
   send: (messageBuffer: ArrayBufferLike) => void;
 }
 
 export class BinaryRpcTransceiver<
   Context = void,
-  RpcHeaders = void,
-> extends RpcTransceiver<Context, RpcHeaders> {
+> extends RpcTransceiver<Context> {
   // Claiming the range 41_000 - 41_999 for the binary Rpc protocol
-  private callEncoding = createEncoding<RpcCall<unknown, RpcHeaders>>(41_000);
+  private callEncoding = createEncoding<RpcCall<unknown>>(41_000);
   private responseEncoding = createEncoding<RcpResponse<unknown>>(41_001);
 
-  constructor({
-    send,
-    ...options
-  }: BinaryRpcTransceiverOptions<Context, RpcHeaders>) {
+  constructor({ send, ...options }: BinaryRpcTransceiverOptions<Context>) {
     super({
       ...options,
       sendCall: (call) => {

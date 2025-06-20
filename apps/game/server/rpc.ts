@@ -1,4 +1,3 @@
-import type { AuthToken } from "@mp/auth";
 import { InjectionContext, type InjectionContainer } from "@mp/ioc";
 import type { RpcFactories, RpcMiddleware } from "@mp/rpc";
 import { RpcBuilder } from "@mp/rpc";
@@ -10,22 +9,10 @@ export const rpc = buildRpc();
 
 export type GameRpcContext = InjectionContainer;
 
-export interface GameRpcHeaders {
-  authToken?: AuthToken;
-}
+export type GameRpcMiddleware = RpcMiddleware<GameRpcContext, unknown, unknown>;
 
-export type GameRpcMiddleware = RpcMiddleware<
-  GameRpcContext,
-  unknown,
-  unknown,
-  GameRpcHeaders
->;
-
-function buildRpc(): RpcFactories<GameRpcContext, GameRpcHeaders> {
-  const rpc = new RpcBuilder()
-    .context<GameRpcContext>()
-    .headers<GameRpcHeaders>()
-    .build();
+function buildRpc(): RpcFactories<GameRpcContext> {
+  const rpc = new RpcBuilder().context<GameRpcContext>().build();
 
   const globalMiddleware = rpc.middleware((opt) => {
     const middleware = opt.ctx.get(ctxGlobalMiddleware);
