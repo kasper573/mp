@@ -1,11 +1,9 @@
-import { defineRoles } from "@mp/auth";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { ctxRng } from "../rng";
+import { npcRoles } from "../../shared/roles";
 import { ctxNpcSpawner } from "./npc-spawner";
-
-export const npcRoles = defineRoles("npc", ["spawnRandom"]);
 
 export type NpcRouter = typeof npcRouter;
 export const npcRouter = rpc.router({

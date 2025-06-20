@@ -15,6 +15,7 @@ import { Route as ContactRouteImport } from './../../routes/~contact'
 import { Route as AuthCallbackRouteImport } from './../../routes/~auth-callback'
 import { Route as ActorTesterRouteImport } from './../../routes/~actor-tester'
 import { Route as IndexRouteImport } from './../../routes/~index'
+import { Route as AdminSpectatorRouteImport } from './../../routes/~admin.spectator'
 
 const SandboxRoute = SandboxRouteImport.update({
   id: '/sandbox',
@@ -46,6 +47,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminSpectatorRoute = AdminSpectatorRouteImport.update({
+  id: '/admin/spectator',
+  path: '/admin/spectator',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -54,6 +60,7 @@ export interface FileRoutesByFullPath {
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
+  '/admin/spectator': typeof AdminSpectatorRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -62,6 +69,7 @@ export interface FileRoutesByTo {
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
+  '/admin/spectator': typeof AdminSpectatorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -71,6 +79,7 @@ export interface FileRoutesById {
   '/contact': typeof ContactRoute
   '/play': typeof PlayRoute
   '/sandbox': typeof SandboxRoute
+  '/admin/spectator': typeof AdminSpectatorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -81,6 +90,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/play'
     | '/sandbox'
+    | '/admin/spectator'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -89,6 +99,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/play'
     | '/sandbox'
+    | '/admin/spectator'
   id:
     | '__root__'
     | '/'
@@ -97,6 +108,7 @@ export interface FileRouteTypes {
     | '/contact'
     | '/play'
     | '/sandbox'
+    | '/admin/spectator'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -106,6 +118,7 @@ export interface RootRouteChildren {
   ContactRoute: typeof ContactRoute
   PlayRoute: typeof PlayRoute
   SandboxRoute: typeof SandboxRoute
+  AdminSpectatorRoute: typeof AdminSpectatorRoute
 }
 
 declare module '@tanstack/solid-router' {
@@ -152,6 +165,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/spectator': {
+      id: '/admin/spectator'
+      path: '/admin/spectator'
+      fullPath: '/admin/spectator'
+      preLoaderRoute: typeof AdminSpectatorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -162,6 +182,7 @@ const rootRouteChildren: RootRouteChildren = {
   ContactRoute: ContactRoute,
   PlayRoute: PlayRoute,
   SandboxRoute: SandboxRoute,
+  AdminSpectatorRoute: AdminSpectatorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

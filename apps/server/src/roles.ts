@@ -1,4 +1,5 @@
-import { characterRoles, npcRoles } from "@mp/game/server";
+import { characterRoles, npcRoles, worldRoles } from "@mp/game/server";
+
 import { systemRoles } from "./etc/system-rpc";
 
 export const playerGroup = "player";
@@ -19,6 +20,7 @@ export const groupedRoles = {
     characterRoles.kill,
     npcRoles.spawnRandom,
     systemRoles.admin,
+    worldRoles.spectate,
   ],
   [playerGroup]: playerRoles,
 } satisfies Record<string, string[]>;

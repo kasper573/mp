@@ -1,16 +1,24 @@
-import type { AuthToken } from "@mp/auth";
+import { type AuthToken } from "@mp/auth";
 import { recordValues } from "@mp/std";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
-import { ctxTokenVerifier } from "../user/auth";
+import { ctxTokenVerifier, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 import { type CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateEmitter } from "../game-state-emitter";
+import { worldRoles } from "../../shared/roles";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = rpc.router({
+  joinAsSpectator: rpc.procedure
+    .use(roles([worldRoles.spectate]))
+    .input<{
+      token: AuthToken;
+      characterId: CharacterId;
+    }>()
+    .mutation(() => {}),
   join: rpc.procedure
     .input<AuthToken>()
     .output<CharacterId>()

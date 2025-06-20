@@ -11,4 +11,5 @@ export * from "./actor/actor-spritesheet-lookup";
 export * from "./create-optimistic-game-state";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
+export * from "../shared/roles";
 export * from "./use-rpc";

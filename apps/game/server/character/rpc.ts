@@ -1,21 +1,14 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import { defineRoles } from "@mp/auth";
 import type { Actor, ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
 import { ctxGameStateEmitter } from "../game-state-emitter";
+import { characterRoles } from "../../shared/roles";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./types";
-
-export const characterRoles = defineRoles("character", [
-  "move",
-  "attack",
-  "kill",
-  "respawn",
-]);
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = rpc.router({
