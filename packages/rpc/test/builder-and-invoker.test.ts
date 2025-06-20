@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import type { RpcCall, RpcCallId } from "../src";
 import { RpcBuilder, createRpcInvoker, RpcInvokerError } from "../src";
 
@@ -12,7 +12,7 @@ describe("builder and invoker", () => {
       .query(({ input }) => input * 2);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<number> = [[], 5, 1 as RpcCallId];
+    const call: RpcCall<number, void> = [[], 5, 1 as RpcCallId, void 0];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -28,7 +28,7 @@ describe("builder and invoker", () => {
       .mutation(({ input }) => `mutated: ${input}`);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<string> = [[], "data", 1 as RpcCallId];
+    const call: RpcCall<string, void> = [[], "data", 1 as RpcCallId, void 0];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -45,7 +45,12 @@ describe("builder and invoker", () => {
       .query(({ ctx }) => ctx.value * 3);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      [],
+      undefined,
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, { value: 4 });
 
     expect(result.isOk()).toBe(true);
@@ -63,7 +68,12 @@ describe("builder and invoker", () => {
 
     const root = rpc.router({ greet });
     const invoker = createRpcInvoker(root);
-    const call: RpcCall<string> = [["greet"], "Test", 1 as RpcCallId];
+    const call: RpcCall<string, void> = [
+      ["greet"],
+      "Test",
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -75,7 +85,12 @@ describe("builder and invoker", () => {
     const rpc = new RpcBuilder().build();
     const root = rpc.router({});
     const invoker = createRpcInvoker(root);
-    const call: RpcCall<unknown> = [["unknown"], {}, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      ["unknown"],
+      {},
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
@@ -95,7 +110,12 @@ describe("builder and invoker", () => {
     });
     const root = rpc.router({ nested: nestedRouter });
     const invoker = createRpcInvoker(root);
-    const call: RpcCall<unknown> = [["nested"], {}, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      ["nested"],
+      {},
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
@@ -116,7 +136,12 @@ describe("builder and invoker", () => {
 
     const root = rpc.router({ broken: brokenProc });
     const invoker = createRpcInvoker(root);
-    const call: RpcCall<unknown> = [["broken"], {}, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      ["broken"],
+      {},
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
@@ -141,7 +166,12 @@ describe("builder and invoker", () => {
       }));
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      [],
+      undefined,
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, { userId: 7 });
 
     expect(result.isOk()).toBe(true);
@@ -162,7 +192,12 @@ describe("builder and invoker", () => {
       .query(({ ctx, mwc }) => ({ userId: ctx.userId, ...mwc }));
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      [],
+      undefined,
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, { userId: 42 });
 
     expect(result.isOk()).toBe(true);
@@ -182,7 +217,12 @@ describe("builder and invoker", () => {
       .query(({ mwc }) => mwc.count);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<unknown> = [[], undefined, 1 as RpcCallId];
+    const call: RpcCall<unknown, void> = [
+      [],
+      undefined,
+      1 as RpcCallId,
+      void 0,
+    ];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -201,11 +241,30 @@ describe("builder and invoker", () => {
       .query(({ input }) => input.length);
 
     const invoker = createRpcInvoker(node);
-    const call: RpcCall<string> = [[], "hello", 1 as RpcCallId];
+    const call: RpcCall<string, void> = [[], "hello", 1 as RpcCallId, void 0];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.value).toBe(5);
+  });
+
+  it("supports headers", async () => {
+    type RpcHeaders = { foo: number };
+    const rpc = new RpcBuilder().headers<RpcHeaders>().build();
+    const fn = vi.fn();
+    const node = rpc.procedure.query(({ headers }) => {
+      fn(headers);
+    });
+
+    const invoker = createRpcInvoker(node);
+    const call: RpcCall<string, RpcHeaders> = [
+      [],
+      "test",
+      1 as RpcCallId,
+      { foo: 42 },
+    ];
+    await invoker(call, undefined);
+    expect(fn).toHaveBeenCalledWith({ foo: 42 });
   });
 });
