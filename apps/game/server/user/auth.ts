@@ -2,14 +2,19 @@ import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserIdentity } from "@mp/auth";
 import type { TokenResolver } from "@mp/auth/server";
 import { rpc } from "../rpc";
+import { ctxClientRegistry } from "./client-registry";
+import { ctxClientId } from "./client-id";
 
 export const ctxTokenResolver =
   InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
-  return rpc.middleware(async ({ ctx, headers }): Promise<AuthContext> => {
+  return rpc.middleware(async ({ ctx }): Promise<AuthContext> => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
     const tokenResolver = ctx.get(ctxTokenResolver);
-    const result = await tokenResolver(headers.authToken);
+    const token = clients.getAuthToken(clientId);
+    const result = await tokenResolver(token);
     if (result.isErr()) {
       throw new Error("Invalid token", { cause: result.error });
     }
@@ -28,13 +33,14 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return rpc.middleware(
-    async ({ ctx, headers }): Promise<Partial<AuthContext>> => {
-      const tokenResolver = ctx.get(ctxTokenResolver);
-      const result = await tokenResolver(headers.authToken);
-      return { user: result.unwrapOr(undefined) };
-    },
-  );
+  return rpc.middleware(async ({ ctx }): Promise<Partial<AuthContext>> => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    const tokenResolver = ctx.get(ctxTokenResolver);
+    const token = clients.getAuthToken(clientId);
+    const result = await tokenResolver(token);
+    return { user: result.unwrapOr(undefined) };
+  });
 }
 
 export interface AuthContext {

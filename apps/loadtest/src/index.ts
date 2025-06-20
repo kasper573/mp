@@ -1,5 +1,5 @@
 import { createPinoLogger } from "@mp/logger";
-import { type ServerRpcRouter, type GameRpcHeaders } from "@mp/server";
+import { type ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
@@ -80,9 +80,8 @@ async function testOneGameClient(n: number) {
   }
 
   const socket = createWebSocket(wsUrl);
-  const transceiver = new BinaryRpcTransceiver<void, GameRpcHeaders>({
+  const transceiver = new BinaryRpcTransceiver<void>({
     send: socket.send.bind(socket),
-    headers: () => ({ authToken: createBypassUser(`Test User ${n}`) }),
   });
   const rpc = createSolidRpcInvoker<ServerRpcRouter>(transceiver.call);
   const handleMessage = transceiver.messageEventHandler(logger.error);
@@ -104,6 +103,7 @@ async function testOneGameClient(n: number) {
 
     const gameActions = createGameActions(rpc, gameState);
 
+    await rpc.world.auth(createBypassUser(`Test User ${n}`));
     await gameActions.join();
 
     if (verbose) {

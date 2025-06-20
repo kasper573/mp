@@ -12,7 +12,7 @@ export function characterRemoveBehavior(
 ) {
   const removeTimeouts = new Map<UserId, NodeJS.Timeout>();
 
-  const stop = clients.on(({ type, userId }) => {
+  const stop = clients.on(({ type, user: { userId } }) => {
     switch (type) {
       case "remove": {
         if (clients.hasClient(userId)) {

@@ -221,7 +221,7 @@ updateTicker.subscribe(
 );
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
-clients.on(({ type, clientId, userId }) =>
+clients.on(({ type, clientId, user: { userId } }) =>
   logger.info({ clientId, userId }, `[ClientRegistry][${type}]`),
 );
 

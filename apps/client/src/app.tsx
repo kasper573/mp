@@ -11,7 +11,7 @@ import {
   SolidQueryDevtools,
 } from "@mp/rpc/solid";
 import { createWebSocket } from "@mp/ws/client";
-import { onCleanup } from "solid-js";
+import { createEffect, onCleanup } from "solid-js";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -36,9 +36,7 @@ export default function App() {
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
-  const rpc = createRpcClient(socket, logger, () => ({
-    authToken: auth.identity()?.token,
-  }));
+  const rpc = createRpcClient(socket, logger);
   const query = new QueryClient({
     defaultOptions: {
       queries: {
@@ -46,6 +44,13 @@ export default function App() {
         refetchOnWindowFocus: false,
       },
     },
+  });
+
+  createEffect(() => {
+    const token = auth.identity()?.token;
+    if (token) {
+      void rpc.world.auth(token);
+    }
   });
 
   void auth.refresh();

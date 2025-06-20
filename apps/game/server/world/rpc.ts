@@ -1,7 +1,8 @@
 import { recordValues } from "@mp/std";
+import type { AuthToken } from "@mp/auth";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
-import { roles } from "../user/auth";
+import { ctxTokenResolver, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 import type { Character } from "../character/types";
@@ -36,6 +37,17 @@ export const worldRouter = rpc.router({
       return characterPaginator(characters.toArray(), input, 50);
     }),
 
+  auth: rpc.procedure.input<AuthToken>().mutation(async ({ input, ctx }) => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    const tokenResolver = ctx.get(ctxTokenResolver);
+    const result = await tokenResolver(input);
+    if (result.isErr()) {
+      throw new Error("Failed to authenticate", { cause: result.error });
+    }
+    clients.set(clientId, { userId: result.value.id, authToken: input });
+  }),
+
   spectate: rpc.procedure
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
@@ -49,9 +61,6 @@ export const worldRouter = rpc.router({
       const state = ctx.get(ctxGameState);
       const stateEmitter = ctx.get(ctxGameStateEmitter);
       stateEmitter.markToResendFullState(clientId);
-
-      const clients = ctx.get(ctxClientRegistry);
-      clients.add(clientId, mwc.user.id);
 
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors)
