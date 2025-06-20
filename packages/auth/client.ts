@@ -30,8 +30,8 @@ export interface AuthClient {
   isSignedIn: Accessor<boolean>;
   refresh: () => Promise<void>;
   signOut: () => Promise<void>;
-  redirectToSignIn: () => Promise<void>;
-  signInCallback: () => Promise<UserIdentity | undefined>;
+  redirectToSignIn: (state?: SignInState) => Promise<void>;
+  signInCallback: () => Promise<SignInState | undefined>;
 }
 
 export interface AuthClientOptions {
@@ -85,9 +85,17 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     isSignedIn,
     refresh,
     signOut: () => userManager.signoutRedirect(),
-    redirectToSignIn: () => userManager.signinRedirect(),
-    signInCallback: () => userManager.signinCallback().then(extractIdentity),
+    redirectToSignIn: (state) => userManager.signinRedirect({ state }),
+    signInCallback: () =>
+      userManager.signinCallback().then((user) => {
+        extractIdentity(user);
+        return user?.state as SignInState | undefined;
+      }),
   };
+}
+
+interface SignInState {
+  returnUrl?: string;
 }
 
 function extractIdentity(user?: User | null): UserIdentity | undefined {

@@ -13,9 +13,10 @@ function RouteComponent() {
 
   createResource(async () => {
     try {
-      await auth.signInCallback();
-      void navigate({ to: "/play" });
+      const state = await auth.signInCallback();
+      void navigate({ to: state?.returnUrl ?? "/" });
     } catch {
+      // If visiting the callback URL without a sign-in attempt
       void navigate({ to: "/" });
     }
   });
