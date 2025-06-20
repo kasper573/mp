@@ -4,16 +4,9 @@ import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
-import {
-  createGameActions,
-  createGameStateClient,
-  loadAreaResource,
-  registerEncoderExtensions,
-} from "@mp/game/client";
+import { loadAreaResource } from "@mp/game/client";
 import { createSolidRpcInvoker } from "@mp/rpc/solid";
 import { readCliOptions } from "./cli";
-
-registerEncoderExtensions();
 
 const logger = createPinoLogger();
 
@@ -96,41 +89,31 @@ async function testOneGameClient(n: number) {
     // Seeded rng to get consistent behavior over time across runs in the ci pipeline
     const rng = new Rng(1337);
 
-    const gameState = createGameStateClient(rpc, socket, logger, () => ({
-      useInterpolator: false,
-      usePatchOptimizer: false,
-    }));
-
-    const gameActions = createGameActions(rpc, gameState);
-
     await rpc.world.auth(createBypassUser(`Test User ${n}`));
-    await gameActions.join();
-
     if (verbose) {
-      logger.info(`Waiting for areaId for socket ${n}`);
+      logger.info(`Socket ${n} authenticated`);
     }
-    const areaId = await waitFor(() => gameState.areaId());
 
-    const url = await rpc.area.areaFileUrl(areaId);
-    const area = await loadAreaResource(url, areaId);
+    const character = await rpc.world.join();
+    if (verbose) {
+      logger.info({ character }, `Socket ${n} joined`);
+    }
+
+    const url = await rpc.area.areaFileUrl(character.areaId);
+    const area = await loadAreaResource(url, character.areaId);
     const tiles = Array.from(area.graph.getNodes()).map(
       (node) => node.data.vector,
     );
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {
-      // Ty to respawn in case we got killed
-      if (!gameState.character()?.health) {
-        await gameActions.respawn();
-      }
-
       try {
         const to = rng.oneOf(tiles);
-        await gameActions.move(to);
-        logger.info("Moving character for socket", n, "to", to);
+        await rpc.character.move({ characterId: character.id, to });
+        logger.info(`Moving character for socket ${n} to ${to}`);
         await wait(1000 + rng.next() * 6000);
-      } catch {
-        logger.warn("Could not move character for socket", n);
+      } catch (error) {
+        logger.error(error, `Could not move character for socket ${n}`);
         await wait(1000);
       }
     }
@@ -163,23 +146,4 @@ function range(n: number) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function waitFor<T>(
-  predicate: () => T | undefined,
-  timeoutMs = 5000,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const start = Date.now();
-    const interval = setInterval(() => {
-      const result = predicate();
-      if (result !== undefined) {
-        clearInterval(interval);
-        resolve(result);
-      } else if (Date.now() - start > timeoutMs) {
-        clearInterval(interval);
-        reject(new Error("Timeout waiting for condition"));
-      }
-    }, 100);
-  });
 }
