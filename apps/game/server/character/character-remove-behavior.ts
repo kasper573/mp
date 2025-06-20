@@ -20,7 +20,10 @@ export function characterRemoveBehavior(
           break;
         }
 
-        logger.info("Scheduling character removal for user", user.id);
+        logger.info(
+          { userId: user.id },
+          "Scheduling character removal for user",
+        );
         const timeoutId = setTimeout(() => removeCharacter(user.id), timeout);
         removeTimeouts.set(user.id, timeoutId);
         break;
@@ -29,7 +32,10 @@ export function characterRemoveBehavior(
       case "add": {
         const timeoutId = removeTimeouts.get(user.id);
         if (timeoutId) {
-          logger.info("User reconnected, cancelling removal timeout");
+          logger.info(
+            { userId: user.id },
+            "User reconnected, cancelling removal timeout",
+          );
           clearTimeout(timeoutId);
           removeTimeouts.delete(user.id);
         }
@@ -43,7 +49,7 @@ export function characterRemoveBehavior(
       (actor) => actor.type === "character",
     )) {
       if (char.userId === userId) {
-        logger.info("Removing character", char.id);
+        logger.info({ characterId: char.id }, "Removing character");
         delete state.actors[char.id];
       }
     }

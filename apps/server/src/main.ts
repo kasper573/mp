@@ -70,7 +70,7 @@ registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger();
-logger.info(`Server started with options`, opt);
+logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;
 
@@ -216,7 +216,7 @@ updateTicker.subscribe(
 characterRemoveBehavior(clients, gameState, logger, 5000);
 
 clients.on(({ type, clientId, user }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId: user.id }),
+  logger.info({ clientId, userId: user.id }, `[ClientRegistry][${type}]`),
 );
 
 httpServer.listen(opt.port, opt.hostname, () => {

@@ -1,9 +1,9 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
-import { createPinoLogger } from "@mp/logger";
+import { createConsoleLogger } from "@mp/logger";
 import { assert } from "@mp/std";
 import { groupedRoles, playerGroup } from "./src/roles";
 
-const logger = createPinoLogger();
+const logger = createConsoleLogger();
 
 function log(...args: unknown[]) {
   logger.info("[keycloak provision]", ...args);

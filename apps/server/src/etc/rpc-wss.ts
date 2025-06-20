@@ -64,7 +64,7 @@ export function setupRpcTransceivers<Context>({
       if (info.error) {
         logger.error(info.error, `[rpc]`);
       } else {
-        logger.info(`[rpc]`, info);
+        logger.info(info, `[rpc]`);
       }
     });
   });
