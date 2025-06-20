@@ -1,7 +1,7 @@
+import { defineRoles } from "@mp/auth";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
-import { defineRoles } from "../user/define-roles";
 import { ctxRng } from "../rng";
 import { ctxNpcSpawner } from "./npc-spawner";
 

@@ -1,6 +1,7 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
 import {
+  extractRolesFromJwtPayload,
   isOurJwtPayload,
   type AuthToken,
   type UserId,
@@ -67,7 +68,7 @@ export function createTokenVerifier({
     const user: UserIdentity = {
       id: jwtPayload.sub as UserId,
       token,
-      roles: new Set(jwtPayload.realm_access.roles),
+      roles: extractRolesFromJwtPayload(jwtPayload),
       name: jwtPayload.preferred_username
         ? String(jwtPayload.preferred_username)
         : undefined,

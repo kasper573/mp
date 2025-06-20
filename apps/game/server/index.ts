@@ -25,7 +25,6 @@ export * from "../shared/area/area-resource";
 export * from "../shared/area/tiled-resource";
 export * from "./user/client-id";
 export * from "./user/auth";
-export * from "./user/define-roles";
 export * from "./rng";
 export * from "./rpc";
 export * from "./rpc.slice";

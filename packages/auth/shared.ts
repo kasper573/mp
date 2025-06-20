@@ -3,13 +3,12 @@ import type { JWTPayload } from "jose";
 
 export type AuthToken = Branded<string, "AuthToken">;
 export type UserId = Branded<string, "UserId">;
-export type UserRole = string;
 
 export interface UserIdentity {
   id: UserId;
   token: AuthToken;
   name?: string;
-  roles: ReadonlySetLike<UserRole>;
+  roles: ReadonlySetLike<RoleDefinition>;
 }
 
 export interface OurJwtPayload extends JWTPayload {
@@ -25,8 +24,8 @@ export function isOurJwtPayload(payload: JWTPayload): payload is OurJwtPayload {
 
 export function extractRolesFromJwtPayload(
   payload: OurJwtPayload,
-): ReadonlySetLike<UserRole> {
-  return new Set(payload.realm_access.roles);
+): ReadonlySetLike<RoleDefinition> {
+  return new Set(payload.realm_access.roles) as ReadonlySetLike<RoleDefinition>;
 }
 
 const bypassTokenPrefix = "bypass:";
@@ -48,5 +47,25 @@ export function parseBypassUser(token: AuthToken): UserIdentity | undefined {
     name,
   };
 }
+
+export function defineRoles<const RoleNames extends string[]>(
+  prefix: string,
+  shortNames: RoleNames,
+): RoleDefinitionRecord<RoleNames> {
+  const record = Object.fromEntries(
+    shortNames.map((shortName) => {
+      const fullName = `${prefix}.${shortName}` as RoleDefinition;
+      return [shortName, fullName];
+    }),
+  );
+
+  return record as RoleDefinitionRecord<RoleNames>;
+}
+
+export type RoleDefinition = Branded<string, "RoleDefinition">;
+
+export type RoleDefinitionRecord<ShortNames extends string[]> = {
+  [ShortName in ShortNames[number]]: RoleDefinition;
+};
 
 export { type JWTPayload } from "jose";

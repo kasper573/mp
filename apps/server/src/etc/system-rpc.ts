@@ -1,7 +1,8 @@
-import { defineRoles, roles, rpc } from "@mp/game/server";
+import { roles, rpc } from "@mp/game/server";
 import type { Ticker } from "@mp/time";
 import { InjectionContext } from "@mp/ioc";
 import { PatchCollectorFactory } from "@mp/sync";
+import { defineRoles } from "@mp/auth";
 import { opt } from "../options";
 
 export const systemRoles = defineRoles("sys", ["admin"]);

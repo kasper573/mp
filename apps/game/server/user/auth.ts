@@ -1,9 +1,8 @@
 import { InjectionContext } from "@mp/ioc";
-import type { UserIdentity } from "@mp/auth";
+import type { RoleDefinition, UserIdentity } from "@mp/auth";
 import type { TokenVerifier } from "@mp/auth/server";
 import { rpc } from "../rpc";
 import { ctxClientRegistry } from "./client-registry";
-import type { RoleDefinition } from "./define-roles";
 import { ctxClientId } from "./client-id";
 
 export const ctxTokenVerifier =

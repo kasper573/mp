@@ -9,6 +9,7 @@ import {
   onCleanup,
 } from "solid-js";
 import {
+  extractRolesFromJwtPayload,
   isOurJwtPayload,
   type AuthToken,
   type JWTPayload,
@@ -103,7 +104,7 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
     id: user.profile.sub as UserId,
     token: user.access_token as AuthToken,
     name: user.profile.name,
-    roles: new Set(payload.realm_access.roles),
+    roles: extractRolesFromJwtPayload(payload),
   };
 }
 
