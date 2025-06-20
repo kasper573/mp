@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { worldRoles } from "@mp/game/client";
+import { SpectatorClient, worldRoles } from "@mp/game/client";
 import { AuthBoundary } from "../ui/auth-boundary";
 
 export const Route = createFileRoute("/admin/spectator")({
@@ -9,5 +9,9 @@ export const Route = createFileRoute("/admin/spectator")({
 });
 
 function RouteComponent() {
-  return <div>Hello "/admin/spectator"!</div>;
+  return (
+    <div style={{ padding: "32px" }}>
+      <SpectatorClient />
+    </div>
+  );
 }
