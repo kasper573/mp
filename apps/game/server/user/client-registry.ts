@@ -34,14 +34,6 @@ export class ClientRegistry {
     return this.map.get(clientId)?.id;
   }
 
-  /**
-   * This is a temporary solution. We should just store ids, and let user info fetching be a separate concern.
-   * @deprecated
-   */
-  getUser(clientId: ClientId): UserIdentity | undefined {
-    return this.map.get(clientId);
-  }
-
   hasClient(userId: UserId): boolean {
     return this.map.values().some((user) => user.id === userId);
   }
