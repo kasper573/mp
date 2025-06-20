@@ -10,12 +10,9 @@ export function SpectatorClient() {
   const rpc = useRpc();
   const characterOptions = rpc.world.characterList.useQuery(() => ({
     input: void 0,
-    map: (result): SelectOption<CharacterId>[] => {
-      return result.items.map((character) => ({
-        value: character.id,
-        label: character.name,
-      }));
-    },
+    refetchInterval: 5000,
+    map: (result): SelectOption<CharacterId>[] =>
+      result.items.map(({ id, name }) => ({ value: id, label: name })),
   }));
   return (
     <>
