@@ -4,7 +4,6 @@ import type { Vector } from "@mp/math";
 import { assert, throttle, type Tile } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
-import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -119,11 +118,7 @@ export function createGameActions(
 
   const respawn = () => rpc.character.respawn(assert(state.characterId()));
 
-  const join = (token: AuthToken) =>
-    rpc.world
-      .auth(token)
-      .then(() => rpc.world.join())
-      .then(state.setCharacterId);
+  const join = () => rpc.world.join().then(state.setCharacterId);
 
   return {
     respawn,

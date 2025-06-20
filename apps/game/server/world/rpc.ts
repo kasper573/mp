@@ -1,8 +1,7 @@
-import { type AuthToken } from "@mp/auth";
 import { recordValues } from "@mp/std";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
-import { ctxTokenVerifier, roles } from "../user/auth";
+import { roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 import type { Character } from "../character/types";
@@ -37,19 +36,6 @@ export const worldRouter = rpc.router({
       return characterPaginator(characters.toArray(), input, 50);
     }),
 
-  auth: rpc.procedure.input<AuthToken>().mutation(async ({ input, ctx }) => {
-    const clientId = ctx.get(ctxClientId);
-    const clients = ctx.get(ctxClientRegistry);
-    const tokenVerifier = ctx.get(ctxTokenVerifier);
-    const result = await tokenVerifier(input);
-    if (result.isErr()) {
-      throw new Error("Invalid token", { cause: result.error });
-    }
-
-    const user = result.value;
-    clients.add(clientId, user);
-  }),
-
   spectate: rpc.procedure
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
@@ -63,6 +49,9 @@ export const worldRouter = rpc.router({
       const state = ctx.get(ctxGameState);
       const stateEmitter = ctx.get(ctxGameStateEmitter);
       stateEmitter.markToResendFullState(clientId);
+
+      const clients = ctx.get(ctxClientRegistry);
+      clients.add(clientId, mwc.user);
 
       const characterService = ctx.get(ctxCharacterService);
       const existingCharacter = recordValues(state.actors)

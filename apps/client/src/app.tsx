@@ -33,10 +33,12 @@ registerEncoderExtensions();
 export default function App() {
   const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
-  const rpc = createRpcClient(socket, logger);
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
+  const rpc = createRpcClient(socket, logger, () => ({
+    authToken: auth.identity()?.token,
+  }));
   const query = new QueryClient({
     defaultOptions: {
       queries: {

@@ -9,15 +9,13 @@ export const ctxTokenVerifier =
   InjectionContext.new<TokenVerifier>("TokenVerifier");
 
 export function auth() {
-  return rpc.middleware(({ ctx }): AuthContext => {
-    const clients = ctx.get(ctxClientRegistry);
-    const clientId = ctx.get(ctxClientId);
-    const user = clients.getUser(clientId);
-
-    if (!user) {
-      throw new Error("User is not authenticated");
+  return rpc.middleware(async ({ ctx, headers }): Promise<AuthContext> => {
+    const tokenVerifier = ctx.get(ctxTokenVerifier);
+    const result = await tokenVerifier(headers.authToken);
+    if (result.isErr()) {
+      throw new Error("Invalid token", { cause: result.error });
     }
-    return { user };
+    return { user: result.value };
   });
 }
 

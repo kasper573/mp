@@ -4,6 +4,8 @@ import { systemRouter } from "./etc/system-rpc";
 
 export type ServerRpcRouter = typeof serverRpcRouter;
 
+export type { GameRpcHeaders } from "@mp/game/server";
+
 export const serverRpcRouter = rpc.router({
   system: systemRouter,
   ...gameServerRpcSlice,
