@@ -11,7 +11,7 @@ import {
   SolidQueryDevtools,
 } from "@mp/rpc/solid";
 import { createWebSocket } from "@mp/ws/client";
-import { createEffect, onCleanup } from "solid-js";
+import { createEffect, createMemo, onCleanup } from "solid-js";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -46,8 +46,10 @@ export default function App() {
     },
   });
 
+  const authToken = createMemo(() => auth.identity()?.token);
+
   createEffect(() => {
-    const token = auth.identity()?.token;
+    const token = authToken();
     if (token) {
       void rpc.world.auth(token);
     }
