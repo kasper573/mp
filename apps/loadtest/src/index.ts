@@ -1,4 +1,4 @@
-import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { createPinoLogger } from "@mp/logger";
 import { type ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
@@ -15,8 +15,7 @@ import { readCliOptions } from "./cli";
 
 registerEncoderExtensions();
 
-const logger = new Logger();
-logger.subscribe(consoleLoggerHandler(console));
+const logger = createPinoLogger();
 
 const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
   readCliOptions();
@@ -139,7 +138,7 @@ async function testOneGameClient(n: number) {
     }
   } catch (error) {
     if (verbose) {
-      logger.error(`Socket ${n} error:`, error);
+      logger.error(error, `Socket ${n} error`);
     }
     throw error;
   } finally {

@@ -1,7 +1,7 @@
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
-import { Logger, pinoLoggerHandler } from "@mp/logger";
+import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenVerifier } from "@mp/auth/server";
@@ -69,8 +69,7 @@ import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = new Logger();
-logger.subscribe(pinoLoggerHandler());
+const logger = createPinoLogger();
 logger.info(`Server started with options`, opt);
 
 RateLimiter.enabled = opt.rateLimit;
@@ -83,7 +82,7 @@ const tokenVerifier = createTokenVerifier({
 });
 const db = createDbClient(opt.databaseUrl);
 
-db.$client.on("error", logger.error);
+db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
