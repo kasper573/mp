@@ -110,6 +110,7 @@ await seed(db, areas, actorModels);
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
+  maxPayload: 5000,
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
@@ -127,8 +128,13 @@ const wss = new WebSocketServer({
   },
 });
 
+wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
+
 wss.on("connection", (socket) => {
   socket.on("close", () => clients.remove(getSocketId(socket)));
+  socket.on("error", (err) =>
+    logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
+  );
 });
 
 const rpcTransceivers = setupRpcTransceivers({
