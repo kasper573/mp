@@ -5,13 +5,37 @@ import { rpc } from "../rpc";
 import { ctxTokenVerifier, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
+import type { Character } from "../character/types";
 import { type CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateEmitter } from "../game-state-emitter";
 import { worldRoles } from "../../shared/roles";
+import type { SimpleQueryQueryForItem } from "../pagination";
+import {
+  createPaginator,
+  createSimpleFilter,
+  createSimpleSortFactory,
+  type SearchResult,
+} from "../pagination";
+
+const characterPaginator = createPaginator(
+  createSimpleFilter<Character>(),
+  createSimpleSortFactory(),
+);
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = rpc.router({
+  characterList: rpc.procedure
+    .use(roles([worldRoles.spectate]))
+    .input<SimpleQueryQueryForItem<Character> | undefined>()
+    .output<SearchResult<Character>>()
+    .query(({ ctx, input = { filter: {} } }) => {
+      const state = ctx.get(ctxGameState);
+      const characters = recordValues(state.actors).filter(
+        (actor) => actor.type === "character",
+      );
+      return characterPaginator(characters.toArray(), input, 50);
+    }),
   joinAsSpectator: rpc.procedure
     .use(roles([worldRoles.spectate]))
     .input<{

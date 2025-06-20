@@ -1,19 +1,26 @@
+import type { SelectOption } from "@mp/ui";
 import { Select } from "@mp/ui";
 import { createSignal } from "solid-js";
 import type { CharacterId } from "../server";
+import { useRpc } from "./use-rpc";
 
 export function SpectatorClient() {
-  const activeCharacters = [
-    { label: "Player 1", value: "player1" as CharacterId },
-    { label: "Player 2", value: "player2" as CharacterId },
-    { label: "Player 3", value: "player3" as CharacterId },
-  ];
   const [spectatedCharacterId, setSpectatedCharacterId] =
     createSignal<CharacterId>();
+  const rpc = useRpc();
+  const characterOptions = rpc.world.characterList.useQuery(() => ({
+    input: void 0,
+    map: (result): SelectOption<CharacterId>[] => {
+      return result.items.map((character) => ({
+        value: character.id,
+        label: character.name,
+      }));
+    },
+  }));
   return (
     <>
       <Select
-        options={activeCharacters}
+        options={characterOptions.data ?? []}
         value={spectatedCharacterId()}
         onChange={setSpectatedCharacterId}
       />
