@@ -2,7 +2,7 @@ import type { ClientVisibilityFactory } from "@mp/sync";
 import { recordValues, type Tile } from "@mp/std";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import type { MovementTrait } from "../traits/movement";
-import type { Actor, ActorId } from "../actor";
+import type { ActorId } from "../actor";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ClientRegistry } from "./client-registry";
@@ -18,29 +18,27 @@ export function deriveClientVisibility(
   areas: AreaLookup,
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
-    const characterId = clients.characterIds.get(clientId);
-
+    const observerIds = [
+      clients.characterIds.get(clientId),
+      clients.spectatedCharacterIds.get(clientId),
+    ];
     return {
-      actors: visibleActors(
-        state,
-        characterId ? state.actors[characterId] : undefined,
-      ),
+      actors: new Set(visibleActors(state, observerIds)),
     };
   };
 
-  function visibleActors(
+  function* visibleActors(
     state: GameState,
-    observer?: Actor,
-  ): ReadonlySet<ActorId> {
-    const visible = new Set<ActorId>();
-    if (observer) {
-      for (const other of recordValues(state.actors)) {
-        if (canSeeSubject(observer, other)) {
-          visible.add(other.id);
+    observerIds: Iterable<ActorId | undefined>,
+  ): Generator<ActorId> {
+    for (const other of recordValues(state.actors)) {
+      for (const observerId of observerIds) {
+        const observer = observerId ? state.actors[observerId] : undefined;
+        if (observer && canSeeSubject(observer, other)) {
+          yield other.id;
         }
       }
     }
-    return visible;
   }
 
   function canSeeSubject(a: MovementTrait, b: MovementTrait) {

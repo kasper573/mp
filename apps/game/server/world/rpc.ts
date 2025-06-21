@@ -64,7 +64,13 @@ export const worldRouter = rpc.router({
   spectate: rpc.procedure
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
-    .mutation(() => {}),
+    .mutation(({ ctx, input }) => {
+      const clients = ctx.get(ctxClientRegistry);
+      const clientId = ctx.get(ctxClientId);
+      clients.spectatedCharacterIds.set(clientId, input);
+      const stateEmitter = ctx.get(ctxGameStateEmitter);
+      stateEmitter.markToResendFullState(clientId);
+    }),
 
   join: rpc.procedure
     .use(roles([worldRoles.join]))
@@ -107,6 +113,7 @@ export const worldRouter = rpc.router({
     // This allows the character to remain in the game state for a moment before removal,
     // preventing "quick disconnect" cheating, or allows for connection losses to be handled gracefully.
     clients.characterIds.delete(clientId);
+    clients.spectatedCharacterIds.delete(clientId);
   }),
 });
 

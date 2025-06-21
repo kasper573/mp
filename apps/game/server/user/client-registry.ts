@@ -12,10 +12,12 @@ export const ctxClientRegistry =
 export class ClientRegistry {
   readonly userIds = new Map<ClientId, UserId>();
   readonly characterIds = new Map<ClientId, CharacterId>();
+  readonly spectatedCharacterIds = new Map<ClientId, CharacterId>();
 
   removeClient(clientId: ClientId) {
     this.userIds.delete(clientId);
     this.characterIds.delete(clientId);
+    this.spectatedCharacterIds.delete(clientId);
   }
 
   getClientIds(): ReadonlySet<ClientId> {
