@@ -18,11 +18,14 @@ export function deriveClientVisibility(
   areas: AreaLookup,
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
-    const userId = clients.getUserId(clientId);
-    const clientCharacter = recordValues(state.actors).find(
-      (actor) => actor.type === "character" && actor.userId === userId,
-    );
-    return { actors: visibleActors(state, clientCharacter) };
+    const characterId = clients.characterIds.get(clientId);
+
+    return {
+      actors: visibleActors(
+        state,
+        characterId ? state.actors[characterId] : undefined,
+      ),
+    };
   };
 
   function visibleActors(

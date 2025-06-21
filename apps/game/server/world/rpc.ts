@@ -45,7 +45,8 @@ export const worldRouter = rpc.router({
     if (result.isErr()) {
       throw new Error("Failed to authenticate", { cause: result.error });
     }
-    clients.set(clientId, { userId: result.value.id, authToken: input });
+    clients.userIds.set(clientId, result.value.id);
+    clients.authTokens.set(clientId, input);
   }),
 
   spectate: rpc.procedure
@@ -63,16 +64,18 @@ export const worldRouter = rpc.router({
       stateEmitter.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
-      const existingCharacter = recordValues(state.actors)
+      let char = recordValues(state.actors)
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === mwc.user.id);
 
-      if (existingCharacter) {
-        return existingCharacter;
+      if (!char) {
+        char = await characterService.getOrCreateCharacterForUser(mwc.user);
+        state.actors[char.id] = char;
       }
 
-      const char = await characterService.getOrCreateCharacterForUser(mwc.user);
-      state.actors[char.id] = char;
+      const clients = ctx.get(ctxClientRegistry);
+      clients.characterIds.set(clientId, char.id);
+
       const { id, areaId } = char;
       return { id, areaId };
     }),
@@ -86,7 +89,12 @@ export const worldRouter = rpc.router({
   leave: rpc.procedure.input<CharacterId>().mutation(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
-    clients.remove(clientId);
+
+    // Removing the clients character from the registry will eventually
+    // lead to the game behavior removing the actor from the game state.
+    // This allows the character to remain in the game state for a moment before removal,
+    // preventing "quick disconnect" cheating, or allows for connection losses to be handled gracefully.
+    clients.characterIds.delete(clientId);
   }),
 });
 

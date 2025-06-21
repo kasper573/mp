@@ -1,78 +1,34 @@
 import type { AuthToken, UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
+import type { CharacterId } from "../character/types";
 import type { ClientId } from "./client-id";
 
 export const ctxClientRegistry =
   InjectionContext.new<ClientRegistry>("ClientRegistry");
 
+/**
+ * Stores meta data about connected clients in memory
+ */
 export class ClientRegistry {
-  private map = new Map<ClientId, ClientRegistryUser>();
-  private eventHandlers = new Set<ClientRegistryEventHandler>();
+  readonly userIds = new Map<ClientId, UserId>();
+  readonly authTokens = new Map<ClientId, AuthToken>();
+  readonly characterIds = new Map<ClientId, CharacterId>();
 
-  set(clientId: ClientId, user: ClientRegistryUser) {
-    this.map.set(clientId, user);
-    this.emit({ type: "add", user, clientId });
-  }
-
-  remove(clientId: ClientId) {
-    const user = this.map.get(clientId);
-    if (user !== undefined) {
-      this.map.delete(clientId);
-      this.emit({ type: "remove", user, clientId });
-    }
+  removeClient(clientId: ClientId) {
+    this.userIds.delete(clientId);
+    this.authTokens.delete(clientId);
+    this.characterIds.delete(clientId);
   }
 
   getClientIds(): ReadonlySet<ClientId> {
-    return new Set(this.map.keys());
+    return new Set([
+      ...this.userIds.keys(),
+      ...this.authTokens.keys(),
+      ...this.characterIds.keys(),
+    ]);
   }
 
   getUserCount(): number {
-    return new Set(this.map.values()).size;
-  }
-
-  getUserId(clientId: ClientId): UserId | undefined {
-    return this.map.get(clientId)?.userId;
-  }
-
-  getAuthToken(clientId: ClientId): AuthToken | undefined {
-    return this.map.get(clientId)?.authToken;
-  }
-
-  hasClient(userId: UserId): boolean {
-    return this.map.values().some((u) => u.userId === userId);
-  }
-
-  on(handler: ClientRegistryEventHandler): Unsubscribe {
-    this.eventHandlers.add(handler);
-    return () => this.eventHandlers.delete(handler);
-  }
-
-  private emit(event: ClientRegistryEvent) {
-    for (const handler of this.eventHandlers) {
-      handler(event);
-    }
+    return new Set(this.userIds.values()).size;
   }
 }
-
-export interface ClientRegistryUser {
-  /**
-   * THe user id that the client is associated with
-   */
-  userId: UserId;
-  /**
-   * The most recent auth token the user has provided
-   */
-  authToken: AuthToken;
-}
-
-export type Unsubscribe = () => void;
-
-export interface ClientRegistryEvent {
-  type: "add" | "remove";
-  user: ClientRegistryUser;
-  clientId: ClientId;
-}
-
-export type ClientRegistryEventHandler = (
-  event: ClientRegistryEvent,
-) => unknown;

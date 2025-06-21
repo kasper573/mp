@@ -131,7 +131,7 @@ const wss = new WebSocketServer({
 wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
 
 wss.on("connection", (socket) => {
-  socket.on("close", () => clients.remove(getSocketId(socket)));
+  socket.on("close", () => clients.removeClient(getSocketId(socket)));
   socket.on("error", (err) =>
     logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
   );
@@ -219,11 +219,7 @@ updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
   createGameStateFlusher(gameState, gameStateEmitter, wss.clients, metrics),
 );
-characterRemoveBehavior(clients, gameState, logger, 5000);
-
-clients.on(({ type, clientId, user: { userId } }) =>
-  logger.info({ clientId, userId }, `[ClientRegistry][${type}]`),
-);
+updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);

@@ -13,7 +13,7 @@ export function auth() {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const tokenResolver = ctx.get(ctxTokenResolver);
-    const token = clients.getAuthToken(clientId);
+    const token = clients.authTokens.get(clientId);
     const result = await tokenResolver(token);
     if (result.isErr()) {
       throw new Error("Invalid token", { cause: result.error });
@@ -37,7 +37,7 @@ export function optionalAuth() {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const tokenResolver = ctx.get(ctxTokenResolver);
-    const token = clients.getAuthToken(clientId);
+    const token = clients.authTokens.get(clientId);
     const result = await tokenResolver(token);
     return { user: result.unwrapOr(undefined) };
   });
