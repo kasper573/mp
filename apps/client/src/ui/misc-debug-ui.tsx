@@ -7,6 +7,7 @@ import type { Setter } from "solid-js";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { assert } from "@mp/std";
 import { useRpc } from "../integrations/rpc";
+import { env } from "../env";
 
 export function MiscDebugUi(props: {
   settings: MiscDebugSettings;
@@ -17,8 +18,12 @@ export function MiscDebugUi(props: {
   const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
     createServerPatchOptimizerSignal();
 
+  const serverVersion = rpc.system.buildVersion.useQuery();
+
   return (
     <>
+      <div>Client version: {env.buildVersion}</div>
+      <div>Server version: {serverVersion.data ?? "unknown"}</div>
       <div>
         <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
           Spawn random NPC
