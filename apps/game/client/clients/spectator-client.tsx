@@ -19,8 +19,10 @@ export function SpectatorClient(
     input: void 0,
     refetchInterval: 5000,
     enabled: !!auth.identity(),
-    map: (result): SelectOption<CharacterId>[] =>
-      result.items.map(({ id, name }) => ({ value: id, label: name })),
+    map: (result): SelectOption<CharacterId>[] => [
+      { value: undefined as unknown as CharacterId, label: "Select character" },
+      ...result.items.map(({ id, name }) => ({ value: id, label: name })),
+    ],
   }));
 
   const isSocketOpen = createMemo(
