@@ -16,7 +16,8 @@ import { AuthContext } from "@mp/auth/client";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
 import * as styles from "./game.css";
-import { GameStateClientContext, useGameActions } from "./game-state-client";
+import type { GameStateClient } from "./game-state-client";
+import { createGameActions, GameStateClientContext } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
 import { loadActorSpritesheets } from "./actor/actor-spritesheet-lookup";
@@ -28,16 +29,19 @@ import { useRpc } from "./use-rpc";
 import { ActorSpritesheetContext } from "./actor/actor-spritesheet-lookup";
 
 export function Game(
-  props: ParentProps<{ class?: string; style?: JSX.CSSProperties }>,
+  props: ParentProps<{
+    gameState: GameStateClient;
+    class?: string;
+    style?: JSX.CSSProperties;
+  }>,
 ) {
   const rpc = useRpc();
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
-  const state = useContext(GameStateClientContext);
   const auth = useContext(AuthContext);
-  const actions = useGameActions();
+  const actions = createGameActions(rpc, () => props.gameState);
 
-  const area = useAreaResource(state.areaId);
+  const area = useAreaResource(() => props.gameState.areaId());
 
   const areaSpritesheets = useQuery(() => ({
     queryKey: ["areaSpritesheets", area.data?.id],
@@ -72,61 +76,65 @@ export function Game(
 
   createEffect(() => {
     const user = auth.identity();
-    if (state.readyState() === WebSocket.OPEN && user) {
+    if (props.gameState.readyState() === WebSocket.OPEN && user) {
       void actions.join(user.token);
     }
   });
 
   return (
-    <Switch>
-      <Match when={assets()} keyed>
-        {({ area, spritesheets, actorSpritesheets }) => (
-          <Suspense
-            fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
-          >
-            <Application
-              class={clsx(styles.container, props.class)}
-              style={props.style}
+    <GameStateClientContext.Provider value={props.gameState}>
+      <Switch>
+        <Match when={assets()} keyed>
+          {({ area, spritesheets, actorSpritesheets }) => (
+            <Suspense
+              fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
             >
-              {({ viewport }) => (
-                <ActorSpritesheetContext.Provider value={actorSpritesheets}>
-                  <EngineProvider viewport={viewport}>
-                    <GameDebugUiContext.Provider value={debugUiState}>
-                      <Suspense
-                        fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
-                      >
-                        <AreaScene area={area} spritesheets={spritesheets} />
-                      </Suspense>
-                      <GameStateClientAnimations />
-                      {props.children}
-                      <GameDebugUi>
-                        <GameStateDebugInfo tiled={area.tiled} />
-                      </GameDebugUi>
-                    </GameDebugUiContext.Provider>
-                  </EngineProvider>
-                </ActorSpritesheetContext.Provider>
-              )}
-            </Application>
-          </Suspense>
-        )}
-      </Match>
+              <Application
+                class={clsx(styles.container, props.class)}
+                style={props.style}
+              >
+                {({ viewport }) => (
+                  <ActorSpritesheetContext.Provider value={actorSpritesheets}>
+                    <EngineProvider viewport={viewport}>
+                      <GameDebugUiContext.Provider value={debugUiState}>
+                        <Suspense
+                          fallback={
+                            <LoadingSpinner>Loading area</LoadingSpinner>
+                          }
+                        >
+                          <AreaScene area={area} spritesheets={spritesheets} />
+                        </Suspense>
+                        <GameStateClientAnimations />
+                        {props.children}
+                        <GameDebugUi>
+                          <GameStateDebugInfo tiled={area.tiled} />
+                        </GameDebugUi>
+                      </GameDebugUiContext.Provider>
+                    </EngineProvider>
+                  </ActorSpritesheetContext.Provider>
+                )}
+              </Application>
+            </Suspense>
+          )}
+        </Match>
 
-      <Match when={state.readyState() !== WebSocket.OPEN}>
-        <LoadingSpinner>Connecting to game server</LoadingSpinner>
-      </Match>
-      <Match when={!state.areaId()}>
-        <LoadingSpinner>Waiting for game state</LoadingSpinner>
-      </Match>
-      <Match when={area.isLoading}>
-        <LoadingSpinner>Loading area</LoadingSpinner>
-      </Match>
-      <Match when={!area.data}>
-        <ErrorFallback
-          error="Could not load area data"
-          reset={() => void area.refetch()}
-        />
-      </Match>
-    </Switch>
+        <Match when={props.gameState.readyState() !== WebSocket.OPEN}>
+          <LoadingSpinner>Connecting to game server</LoadingSpinner>
+        </Match>
+        <Match when={!props.gameState.areaId()}>
+          <LoadingSpinner>Waiting for game state</LoadingSpinner>
+        </Match>
+        <Match when={area.isLoading}>
+          <LoadingSpinner>Loading area</LoadingSpinner>
+        </Match>
+        <Match when={!area.data}>
+          <ErrorFallback
+            error="Could not load area data"
+            reset={() => void area.refetch()}
+          />
+        </Match>
+      </Switch>
+    </GameStateClientContext.Provider>
   );
 }
 

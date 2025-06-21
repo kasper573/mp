@@ -2,11 +2,7 @@ import { createFileRoute } from "@tanstack/solid-router";
 import { GameDebugUiPortal } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
-import {
-  createGameStateClient,
-  Game,
-  GameStateClientContext,
-} from "@mp/game/client";
+import { createGameStateClient, Game } from "@mp/game/client";
 import { createStorageSignal } from "@mp/state";
 import { SocketContext, useRpc } from "../integrations/rpc";
 import { AuthBoundary } from "../ui/auth-boundary";
@@ -33,22 +29,22 @@ function PlayPage() {
     },
   );
 
-  const sync = createGameStateClient(rpc, socket, logger, settings);
+  const gameState = createGameStateClient(rpc, socket, logger, settings);
 
+  // It's important to have a suspense boundary here to avoid game resources suspending
+  // all the way up to the routers pending component, which would unmount the page,
+  // which in turn would stop the game client.
   return (
-    <GameStateClientContext.Provider value={sync}>
-      {/* 
-        It's important to have a suspense boundary here to avoid game resources suspending 
-        all the way up to the routers pending component, which would unmount the page, 
-        which in turn would stop the game client.
-        */}
-      <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-        <Game>
-          <GameDebugUiPortal>
-            <MiscDebugUi settings={settings()} setSettings={setSettings} />
-          </GameDebugUiPortal>
-        </Game>
-      </Suspense>
-    </GameStateClientContext.Provider>
+    <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
+      <Game gameState={gameState}>
+        <GameDebugUiPortal>
+          <MiscDebugUi
+            gameState={gameState}
+            settings={settings()}
+            setSettings={setSettings}
+          />
+        </GameDebugUiPortal>
+      </Game>
+    </Suspense>
   );
 }

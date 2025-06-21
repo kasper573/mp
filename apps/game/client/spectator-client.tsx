@@ -3,8 +3,10 @@ import { Select } from "@mp/ui";
 import { createSignal } from "solid-js";
 import type { CharacterId } from "../server";
 import { useRpc } from "./use-rpc";
+import { Game } from "./game";
+import type { GameStateClient } from "./game-state-client";
 
-export function SpectatorClient() {
+export function SpectatorClient(props: { gameState: GameStateClient }) {
   const [spectatedCharacterId, setSpectatedCharacterId] =
     createSignal<CharacterId>();
   const rpc = useRpc();
@@ -21,6 +23,8 @@ export function SpectatorClient() {
         value={spectatedCharacterId()}
         onChange={setSpectatedCharacterId}
       />
+
+      <Game gameState={props.gameState} />
     </>
   );
 }

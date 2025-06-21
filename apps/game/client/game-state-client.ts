@@ -101,11 +101,11 @@ export function createGameStateClient(
 
 export function createGameActions(
   rpc: GameSolidRpcInvoker,
-  state: GameStateClient,
+  state: Accessor<GameStateClient>,
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
     return rpc.character.move({
-      characterId: assert(state.characterId()),
+      characterId: assert(state().characterId()),
       to,
       desiredPortalId,
     });
@@ -113,16 +113,16 @@ export function createGameActions(
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({
-      characterId: assert(state.characterId()),
+      characterId: assert(state().characterId()),
       targetId,
     });
 
-  const respawn = () => rpc.character.respawn(assert(state.characterId()));
+  const respawn = () => rpc.character.respawn(assert(state().characterId()));
 
   const join = async (authToken: AuthToken) => {
     await rpc.world.auth(authToken);
     const char = await rpc.world.join();
-    state.setCharacterId(char.id);
+    state().setCharacterId(char.id);
     return char;
   };
 
@@ -137,7 +137,7 @@ export function createGameActions(
 export function useGameActions() {
   const rpc = useRpc();
   const state = useContext(GameStateClientContext);
-  return createGameActions(rpc, state);
+  return createGameActions(rpc, () => state);
 }
 
 export const GameStateClientContext = createContext<GameStateClient>(

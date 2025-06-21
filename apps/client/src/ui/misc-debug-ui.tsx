@@ -1,20 +1,18 @@
 import { Button } from "@mp/ui";
-import {
-  GameStateClientContext,
-  type OptimisticGameStateSettings,
-} from "@mp/game/client";
+import type { GameStateClient } from "@mp/game/client";
+import { type OptimisticGameStateSettings } from "@mp/game/client";
 import type { Setter } from "solid-js";
-import { createEffect, createSignal, useContext } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 import { assert } from "@mp/std";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 
 export function MiscDebugUi(props: {
+  gameState: GameStateClient;
   settings: MiscDebugSettings;
   setSettings: Setter<MiscDebugSettings>;
 }) {
   const rpc = useRpc();
-  const gameState = useContext(GameStateClientContext);
   const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
     createServerPatchOptimizerSignal();
 
@@ -31,7 +29,7 @@ export function MiscDebugUi(props: {
         <Button
           on:click={() =>
             void rpc.character.kill({
-              targetId: assert(gameState.characterId()),
+              targetId: assert(props.gameState.characterId()),
             })
           }
         >
