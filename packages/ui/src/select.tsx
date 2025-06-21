@@ -1,5 +1,5 @@
 import type { JSX } from "solid-js";
-import { createMemo, For } from "solid-js";
+import { createMemo, Index } from "solid-js";
 
 export interface SelectOption<Value> {
   label: JSX.Element;
@@ -45,19 +45,20 @@ export function Select<const Value>(props: SelectProps<Value>) {
       isSameValue(option.value, props.value as Value),
     ),
   );
+
   return (
     <select
       value={selectedIndex()}
-      onChange={(e) => {
+      onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
         props.onChange(options()[optionIndex].value);
       }}
       style={props.style}
       class={props.class}
     >
-      <For each={options()}>
-        {(option, index) => <option value={index()}>{option.label}</option>}
-      </For>
+      <Index each={options()}>
+        {(option, index) => <option value={index}>{option().label}</option>}
+      </Index>
     </select>
   );
 }
