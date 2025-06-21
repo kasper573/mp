@@ -2,10 +2,10 @@ import type { SelectOption } from "@mp/ui";
 import { Select } from "@mp/ui";
 import { createEffect, createMemo, createSignal, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
-import type { CharacterId } from "../server";
-import { useRpc } from "./use-rpc";
-import { Game } from "./game";
-import { type GameStateClient } from "./game-state-client";
+import type { CharacterId } from "../../server";
+import { useRpc } from "../use-rpc";
+import { type GameStateClient } from "../game-state-client";
+import { Game } from "./game-client";
 
 export function SpectatorClient(props: { gameState: GameStateClient }) {
   const [spectatedCharacterId, setSpectatedCharacterId] =

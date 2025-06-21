@@ -13,18 +13,18 @@ import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
-import * as styles from "./game.css";
-import type { GameStateClient } from "./game-state-client";
-import { GameStateClientContext } from "./game-state-client";
-import { AreaScene } from "./area/area-scene";
-import { useAreaResource } from "./area/use-area-resource";
-import { loadActorSpritesheets } from "./actor/actor-spritesheet-lookup";
-import { GameDebugUi } from "./debug/game-debug-ui";
-import type { GameDebugUiState } from "./debug/game-debug-ui-state";
-import { GameDebugUiContext } from "./debug/game-debug-ui-state";
-import { GameStateDebugInfo } from "./debug/game-state-debug-info";
-import { useRpc } from "./use-rpc";
-import { ActorSpritesheetContext } from "./actor/actor-spritesheet-lookup";
+import type { GameStateClient } from "../game-state-client";
+import { GameStateClientContext } from "../game-state-client";
+import { AreaScene } from "../area/area-scene";
+import { useAreaResource } from "../area/use-area-resource";
+import { loadActorSpritesheets } from "../actor/actor-spritesheet-lookup";
+import { GameDebugUi } from "../debug/game-debug-ui";
+import type { GameDebugUiState } from "../debug/game-debug-ui-state";
+import { GameDebugUiContext } from "../debug/game-debug-ui-state";
+import { GameStateDebugInfo } from "../debug/game-state-debug-info";
+import { useRpc } from "../use-rpc";
+import { ActorSpritesheetContext } from "../actor/actor-spritesheet-lookup";
+import * as styles from "./game-client.css";
 
 export function Game(
   props: ParentProps<{

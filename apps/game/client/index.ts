@@ -1,4 +1,4 @@
-export * from "./game";
+export * from "./clients/game-client";
 export * from "./game-state-client";
 export * from "./debug/game-debug-ui-state";
 export * from "./area/area-debug-ui";
@@ -8,7 +8,7 @@ export * from "./actor/actor-sprite-tester";
 export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
 export * from "./create-optimistic-game-state";
-export * from "./spectator-client";
+export * from "./clients/spectator-client";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
 export * from "../shared/roles";
