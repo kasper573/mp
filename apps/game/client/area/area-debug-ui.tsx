@@ -15,8 +15,6 @@ import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 
-import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
-
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
 
@@ -60,7 +58,7 @@ export function AreaDebugUi(props: {
           ) : null
         }
       </For>
-      <GameDebugUiPortal>
+      <>
         <div>
           Visible Graph lines:{" "}
           <Select
@@ -113,7 +111,7 @@ export function AreaDebugUi(props: {
           />
           Show npc aggro range
         </label>
-      </GameDebugUiPortal>
+      </>
 
       <Show when={settings().showFogOfWar && props.playerCoords}>
         {(coords) => (
