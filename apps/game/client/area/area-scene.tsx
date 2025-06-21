@@ -4,7 +4,14 @@ import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
 import type { ParentProps } from "solid-js";
-import { useContext, createMemo, createEffect, untrack, For } from "solid-js";
+import {
+  useContext,
+  createMemo,
+  createEffect,
+  untrack,
+  For,
+  Show,
+} from "solid-js";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -148,7 +155,9 @@ export function AreaScene(
           }}
         </TiledRenderer>
         {props.children}
-        <TileHighlight area={props.area} target={highlightTarget()} />
+        <Show when={engine.isInteractive}>
+          <TileHighlight area={props.area} target={highlightTarget()} />
+        </Show>
         <GameDebugUiPortal>
           <AreaDebugUi
             area={props.area}

@@ -24,7 +24,7 @@ export function SpectatorClient(props: { gameState: GameStateClient }) {
         onChange={setSpectatedCharacterId}
       />
 
-      <Game gameState={props.gameState} />
+      <Game interactive={false} gameState={props.gameState} />
     </>
   );
 }

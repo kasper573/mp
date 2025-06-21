@@ -31,6 +31,7 @@ import { ActorSpritesheetContext } from "./actor/actor-spritesheet-lookup";
 export function Game(
   props: ParentProps<{
     gameState: GameStateClient;
+    interactive?: boolean;
     class?: string;
     style?: JSX.CSSProperties;
   }>,
@@ -40,6 +41,7 @@ export function Game(
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const auth = useContext(AuthContext);
   const actions = createGameActions(rpc, () => props.gameState);
+  const interactive = () => props.interactive ?? true;
 
   const area = useAreaResource(() => props.gameState.areaId());
 
@@ -97,7 +99,10 @@ export function Game(
               >
                 {({ viewport }) => (
                   <ActorSpritesheetContext.Provider value={actorSpritesheets}>
-                    <EngineProvider viewport={viewport}>
+                    <EngineProvider
+                      interactive={interactive()}
+                      viewport={viewport}
+                    >
                       <GameDebugUiContext.Provider value={debugUiState}>
                         <Suspense
                           fallback={

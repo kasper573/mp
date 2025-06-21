@@ -9,6 +9,7 @@ export class Engine {
   #previousFrameTime = performance.now();
   #previousFrameDuration = TimeSpan.Zero;
   #isRunning = false;
+  #isInteractive = false;
   pointer: PointerForCamera;
   keyboard: Keyboard;
   #viewportSizeObserver?: ResizeObserver;
@@ -16,6 +17,10 @@ export class Engine {
 
   get frameCallbackCount() {
     return this.#frameCallbacks.size;
+  }
+
+  get isInteractive() {
+    return this.#isInteractive;
   }
 
   readonly camera: Camera;
@@ -27,6 +32,7 @@ export class Engine {
   }
 
   start = (interactive: boolean) => {
+    this.#isInteractive = interactive;
     if (interactive) {
       this.pointer.start();
       this.keyboard.start();
