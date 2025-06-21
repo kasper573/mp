@@ -1,4 +1,5 @@
-export * from "./clients/game-client";
+export * from "./clients/spectator-client";
+export * from "./clients/player-client";
 export * from "./game-state-client";
 export * from "./debug/game-debug-ui-state";
 export * from "./area/area-debug-ui";
