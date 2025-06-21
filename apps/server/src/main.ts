@@ -61,12 +61,12 @@ import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
 import { ctxUpdateTicker } from "./etc/system-rpc";
-import { NpcService } from "./db/services/npc-service";
+import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
-import { CharacterService } from "./db/services/character-service";
-import { GameService } from "./db/services/game-service";
+import { createCharacterService } from "./db/services/character-service";
 import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
-import { UserService } from "./db/services/user-service";
+import { createUserService } from "./db/services/user-service";
+import { createGameStateService } from "./db/services/game-service";
 
 registerEncoderExtensions();
 
@@ -76,7 +76,7 @@ logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;
 
-const userService = new UserService();
+const userService = createUserService();
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const tokenResolver = createTokenResolver({
@@ -167,8 +167,8 @@ const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
 
 gameStateEmitter.attachPatchCollectors(gameState);
 
-const npcService = new NpcService(db);
-const gameService = new GameService(db);
+const npcService = createNpcService(db);
+const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
   onError: logger.error,
@@ -189,7 +189,7 @@ const spawnsFromDbAndAreas = [
   ),
 ];
 
-const characterService = new CharacterService(
+const characterService = createCharacterService(
   db,
   userService,
   areas,
