@@ -252,6 +252,19 @@
           "range": true,
           "refId": "D",
           "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "active_character_count",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "characters",
+          "range": true,
+          "refId": "A"
         }
       ],
       "title": "Game State",
@@ -594,23 +607,6 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "active_character_count",
-          "fullMetaSearch": false,
-          "hide": false,
-          "includeNullMetadata": true,
-          "instant": false,
-          "legendFormat": "characters",
-          "range": true,
-          "refId": "B",
-          "useBackend": false
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "mimir"
-          },
-          "disableTextWrap": false,
-          "editorMode": "builder",
           "expr": "active_client_count",
           "fullMetaSearch": false,
           "hide": false,
@@ -832,5 +828,5 @@
   "timezone": "browser",
   "title": "mp-server (custom)",
   "uid": "ae3kps81booaoe",
-  "version": 11
+  "version": 14
 }
