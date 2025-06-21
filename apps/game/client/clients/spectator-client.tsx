@@ -31,6 +31,7 @@ export function SpectatorClient(
     const user = auth.identity();
     const characterId = spectatedCharacterId();
     if (isSocketOpen() && user && characterId) {
+      props.gameState.setCharacterId(characterId);
       void rpc.world.spectate(characterId);
     }
   });
