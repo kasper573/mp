@@ -81,8 +81,10 @@ export function Game(
     }
   });
 
+  const neededToPassGameStateToContext = () => props.gameState;
+
   return (
-    <GameStateClientContext.Provider value={props.gameState}>
+    <GameStateClientContext.Provider value={neededToPassGameStateToContext}>
       <Switch>
         <Match when={assets()} keyed>
           {({ area, spritesheets, actorSpritesheets }) => (
@@ -143,6 +145,6 @@ export function Game(
 function GameStateClientAnimations() {
   const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
-  engine.addFrameCallback(state.frameCallback);
+  engine.addFrameCallback(state().frameCallback);
   return null;
 }

@@ -41,7 +41,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
       frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
       frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameCallbackCount,
-      character: trimCharacterInfo(state.character()),
+      character: trimCharacterInfo(state().character()),
     };
   });
 

@@ -32,7 +32,7 @@ export function AreaScene(
   const actions = useGameActions();
   const { renderedTileCount } = clientViewDistance;
 
-  const myCoords = () => state.character()?.coords ?? Vector.zero();
+  const myCoords = () => state().character()?.coords ?? Vector.zero();
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),
@@ -60,7 +60,7 @@ export function AreaScene(
   );
 
   const entityAtPointer = createMemo(() =>
-    state
+    state()
       .actorList()
       .find(
         (actor) =>
@@ -135,12 +135,12 @@ export function AreaScene(
         >
           {{
             [props.area.dynamicLayer.name]: () => (
-              <For each={state.actorList()}>
+              <For each={state().actorList()}>
                 {(actor) => (
                   <Actor
                     tiled={props.area.tiled}
                     actor={actor}
-                    isPlayer={actor.id === state.characterId()}
+                    isPlayer={actor.id === state().characterId()}
                   />
                 )}
               </For>
@@ -153,12 +153,12 @@ export function AreaScene(
           <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
-            actors={state.actorList()}
+            actors={state().actorList()}
           />
         </GameDebugUiPortal>
       </Pixi>
 
-      <RespawnDialog open={(state.character()?.health ?? 0) <= 0} />
+      <RespawnDialog open={(state().character()?.health ?? 0) <= 0} />
     </>
   );
 }

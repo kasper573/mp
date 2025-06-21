@@ -137,11 +137,11 @@ export function createGameActions(
 export function useGameActions() {
   const rpc = useRpc();
   const state = useContext(GameStateClientContext);
-  return createGameActions(rpc, () => state);
+  return createGameActions(rpc, state);
 }
 
-export const GameStateClientContext = createContext<GameStateClient>(
-  new Proxy({} as GameStateClient, {
+export const GameStateClientContext = createContext<Accessor<GameStateClient>>(
+  new Proxy({} as Accessor<GameStateClient>, {
     get() {
       throw new Error("GameStateClientContext not provided");
     },
