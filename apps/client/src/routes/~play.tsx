@@ -1,14 +1,9 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import {
-  clientViewDistance,
-  GameDebugUiPortal,
-  OptimisticGameStateContext,
-} from "@mp/game/client";
+import { GameDebugUiPortal, OptimisticGameStateContext } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import {
   BuildVersionContext,
-  AreaSceneContext,
   createGameStateClient,
   Game,
   GameStateClientContext,
@@ -50,27 +45,22 @@ function PlayPage() {
         client: () => env.buildVersion,
       }}
     >
-      <AreaSceneContext.Provider value={clientViewDistance}>
-        <GameStateClientContext.Provider value={sync}>
-          {/* 
+      <GameStateClientContext.Provider value={sync}>
+        {/* 
             It's important to have a suspense boundary here to avoid game resources suspending 
             all the way up to the routers pending component, which would unmount the page, 
             which in turn would stop the game client.
             */}
-          <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-            <OptimisticGameStateContext.Provider value={settings()}>
-              <Game>
-                <GameDebugUiPortal>
-                  <MiscDebugUi
-                    settings={settings()}
-                    setSettings={setSettings}
-                  />
-                </GameDebugUiPortal>
-              </Game>
-            </OptimisticGameStateContext.Provider>
-          </Suspense>
-        </GameStateClientContext.Provider>
-      </AreaSceneContext.Provider>
+        <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
+          <OptimisticGameStateContext.Provider value={settings()}>
+            <Game>
+              <GameDebugUiPortal>
+                <MiscDebugUi settings={settings()} setSettings={setSettings} />
+              </GameDebugUiPortal>
+            </Game>
+          </OptimisticGameStateContext.Provider>
+        </Suspense>
+      </GameStateClientContext.Provider>
     </BuildVersionContext.Provider>
   );
 }

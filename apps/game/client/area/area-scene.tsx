@@ -4,14 +4,7 @@ import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
 import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
 import type { ParentProps } from "solid-js";
-import {
-  useContext,
-  createMemo,
-  createEffect,
-  untrack,
-  For,
-  createContext,
-} from "solid-js";
+import { useContext, createMemo, createEffect, untrack, For } from "solid-js";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -22,6 +15,7 @@ import {
 } from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
+import { clientViewDistance } from "../../server";
 import { AreaDebugUi } from "./area-debug-ui";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
@@ -36,7 +30,7 @@ export function AreaScene(
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
   const actions = useGameActions();
-  const { renderedTileCount } = useContext(AreaSceneContext);
+  const { renderedTileCount } = clientViewDistance;
 
   const myCoords = () => state.character()?.coords ?? Vector.zero();
 
@@ -168,20 +162,6 @@ export function AreaScene(
     </>
   );
 }
-
-export const AreaSceneContext = createContext(
-  new Proxy(
-    {} as {
-      renderedTileCount: Tile;
-      networkFogOfWarTileCount: Tile;
-    },
-    {
-      get() {
-        throw new Error("AreaSceneContext not provided");
-      },
-    },
-  ),
-);
 
 function createZoomLevelForViewDistance(
   tileSize: Vector<Pixel>,
