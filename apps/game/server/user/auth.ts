@@ -16,7 +16,7 @@ export function auth() {
     const token = clients.authTokens.get(clientId);
     const result = await tokenResolver(token);
     if (result.isErr()) {
-      throw new Error("Invalid token", { cause: result.error });
+      throw new Error(result.error);
     }
     return { user: result.value };
   });

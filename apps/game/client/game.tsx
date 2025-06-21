@@ -73,7 +73,7 @@ export function Game(
   createEffect(() => {
     const user = auth.identity();
     if (state.readyState() === WebSocket.OPEN && user) {
-      void actions.join();
+      void actions.join(user.token);
     }
   });
 

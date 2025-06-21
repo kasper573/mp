@@ -7,6 +7,7 @@ import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { ObjectId } from "@mp/tiled-loader";
+import type { AuthToken } from "@mp/auth";
 import type { Character, CharacterId } from "../server/character/types";
 import type { ActorId } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
@@ -118,11 +119,12 @@ export function createGameActions(
 
   const respawn = () => rpc.character.respawn(assert(state.characterId()));
 
-  const join = () =>
-    rpc.world.join().then((char) => {
-      state.setCharacterId(char.id);
-      return char;
-    });
+  const join = async (authToken: AuthToken) => {
+    await rpc.world.auth(authToken);
+    const char = await rpc.world.join();
+    state.setCharacterId(char.id);
+    return char;
+  };
 
   return {
     respawn,

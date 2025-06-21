@@ -11,6 +11,11 @@ export const ctxClientRegistry =
  */
 export class ClientRegistry {
   readonly userIds = new Map<ClientId, UserId>();
+  /**
+   * Temporary solution to be able to look up user information.
+   * This should be replaced with a proper user service that retrieves by id
+   * @deprecated
+   */
   readonly authTokens = new Map<ClientId, AuthToken>();
   readonly characterIds = new Map<ClientId, CharacterId>();
 
