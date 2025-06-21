@@ -17,6 +17,11 @@ export interface TokenResolverOption {
    * Provide this function to allow bypassing real JWT verification.
    */
   getBypassUser?: (token: AuthToken) => UserIdentity | undefined;
+  /**
+   * Optional callback to handle the result of the token resolution.
+   * This can be used for logging or other side effects.
+   */
+  onResolve?: (result: TokenResolverResult) => void;
 }
 
 export interface TokenResolver {
@@ -29,10 +34,11 @@ export function createTokenResolver({
   audience,
   algorithms,
   getBypassUser,
+  onResolve,
 }: TokenResolverOption): TokenResolver {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
-  return async function verifyToken(token) {
+  const resolveToken: TokenResolver = async (token) => {
     if (token === undefined) {
       return err("A token must be provided");
     }
@@ -75,6 +81,12 @@ export function createTokenResolver({
     };
 
     return ok(user);
+  };
+
+  return async (token) => {
+    const result = await resolveToken(token);
+    onResolve?.(result);
+    return result;
   };
 }
 

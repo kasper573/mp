@@ -1,4 +1,4 @@
-import type { AuthToken, UserId } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
 import type { CharacterId } from "../character/types";
 import type { ClientId } from "./client-id";
@@ -11,26 +11,15 @@ export const ctxClientRegistry =
  */
 export class ClientRegistry {
   readonly userIds = new Map<ClientId, UserId>();
-  /**
-   * Temporary solution to be able to look up user information.
-   * This should be replaced with a proper user service that retrieves by id
-   * @deprecated
-   */
-  readonly authTokens = new Map<ClientId, AuthToken>();
   readonly characterIds = new Map<ClientId, CharacterId>();
 
   removeClient(clientId: ClientId) {
     this.userIds.delete(clientId);
-    this.authTokens.delete(clientId);
     this.characterIds.delete(clientId);
   }
 
   getClientIds(): ReadonlySet<ClientId> {
-    return new Set([
-      ...this.userIds.keys(),
-      ...this.authTokens.keys(),
-      ...this.characterIds.keys(),
-    ]);
+    return new Set([...this.userIds.keys(), ...this.characterIds.keys()]);
   }
 
   getUserCount(): number {

@@ -46,7 +46,6 @@ export const worldRouter = rpc.router({
       throw new Error("Failed to authenticate", { cause: result.error });
     }
     clients.userIds.set(clientId, result.value.id);
-    clients.authTokens.set(clientId, input);
   }),
 
   spectate: rpc.procedure
@@ -66,10 +65,10 @@ export const worldRouter = rpc.router({
       const characterService = ctx.get(ctxCharacterService);
       let char = recordValues(state.actors)
         .filter((actor) => actor.type === "character")
-        .find((actor) => actor.userId === mwc.user.id);
+        .find((actor) => actor.userId === mwc.userId);
 
       if (!char) {
-        char = await characterService.getOrCreateCharacterForUser(mwc.user);
+        char = await characterService.getOrCreateCharacterForUser(mwc.userId);
         state.actors[char.id] = char;
       }
 

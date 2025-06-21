@@ -1,30 +1,31 @@
 import { InjectionContext } from "@mp/ioc";
-import type { RoleDefinition, UserIdentity } from "@mp/auth";
+import type { RoleDefinition, UserId } from "@mp/auth";
 import type { TokenResolver } from "@mp/auth/server";
 import { rpc } from "../rpc";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
+import { ctxUserService } from "./service";
 
 export const ctxTokenResolver =
   InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
-  return rpc.middleware(async ({ ctx }): Promise<AuthContext> => {
+  return rpc.middleware(({ ctx }): AuthContext => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
-    const tokenResolver = ctx.get(ctxTokenResolver);
-    const token = clients.authTokens.get(clientId);
-    const result = await tokenResolver(token);
-    if (result.isErr()) {
-      throw new Error(result.error);
+    const userId = clients.userIds.get(clientId);
+    if (userId === undefined) {
+      throw new Error("User not authenticated");
     }
-    return { user: result.value };
+    return { userId };
   });
 }
 
 export function roles(requiredRoles: RoleDefinition[]) {
-  return auth().pipe(({ mwc }) => {
-    if (!new Set(requiredRoles).isSubsetOf(mwc.user.roles)) {
+  return auth().pipe(async ({ ctx, mwc }) => {
+    const userService = ctx.get(ctxUserService);
+    const roles = await userService.getRoles(mwc.userId);
+    if (!new Set(requiredRoles).isSubsetOf(roles)) {
       throw new Error("Insufficient permissions");
     }
 
@@ -33,16 +34,14 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return rpc.middleware(async ({ ctx }): Promise<Partial<AuthContext>> => {
+  return rpc.middleware(({ ctx }): Partial<AuthContext> => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
-    const tokenResolver = ctx.get(ctxTokenResolver);
-    const token = clients.authTokens.get(clientId);
-    const result = await tokenResolver(token);
-    return { user: result.unwrapOr(undefined) };
+    const userId = clients.userIds.get(clientId);
+    return { userId };
   });
 }
 
 export interface AuthContext {
-  user: UserIdentity;
+  userId: UserId;
 }

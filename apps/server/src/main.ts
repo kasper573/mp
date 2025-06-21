@@ -17,6 +17,7 @@ import {
   ctxGameStateEmitter,
   ctxNpcSpawner,
   ctxTokenResolver,
+  ctxUserService,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -65,6 +66,7 @@ import { createDbClient } from "./db/client";
 import { CharacterService } from "./db/services/character-service";
 import { GameService } from "./db/services/game-service";
 import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
+import { UserService } from "./db/services/user-service";
 
 registerEncoderExtensions();
 
@@ -74,14 +76,20 @@ logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;
 
+const userService = new UserService();
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const tokenResolver = createTokenResolver({
   ...opt.auth,
   getBypassUser,
+  onResolve(result) {
+    if (result.isOk()) {
+      userService.memorizeUserInfo(result.value);
+    }
+  },
 });
-const db = createDbClient(opt.databaseUrl);
 
+const db = createDbClient(opt.databaseUrl);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const webServer = express()
@@ -180,7 +188,14 @@ const spawnsFromDbAndAreas = [
     allNpcsAndSpawns.map(({ npc }) => npc),
   ),
 ];
-const characterService = new CharacterService(db, areas, actorModels, rng);
+
+const characterService = new CharacterService(
+  db,
+  userService,
+  areas,
+  actorModels,
+  rng,
+);
 const npcSpawner = new NpcSpawner(
   areas,
   actorModels,
@@ -190,6 +205,7 @@ const npcSpawner = new NpcSpawner(
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
+  .provide(ctxUserService, userService)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameState, gameState)
