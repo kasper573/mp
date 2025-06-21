@@ -43,10 +43,23 @@ export const worldRouter = rpc.router({
     const tokenResolver = ctx.get(ctxTokenResolver);
     const result = await tokenResolver(input);
     if (result.isErr()) {
-      throw new Error("Failed to authenticate", { cause: result.error });
+      throw new Error("Invalid token", { cause: result.error });
     }
     clients.userIds.set(clientId, result.value.id);
   }),
+
+  removeAuth: rpc.procedure
+    .input<AuthToken>()
+    .mutation(async ({ input, ctx }) => {
+      const clientId = ctx.get(ctxClientId);
+      const clients = ctx.get(ctxClientRegistry);
+      const tokenResolver = ctx.get(ctxTokenResolver);
+      const result = await tokenResolver(input);
+      if (result.isErr()) {
+        throw new Error("Invalid token", { cause: result.error });
+      }
+      clients.userIds.delete(clientId);
+    }),
 
   spectate: rpc.procedure
     .use(roles([worldRoles.spectate]))

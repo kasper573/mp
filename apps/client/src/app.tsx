@@ -21,6 +21,7 @@ import {
 } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 import { createFaroClient } from "./integrations/faro";
+import { gameAuthMiddleware } from "./integrations/game-auth";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -33,7 +34,10 @@ registerEncoderExtensions();
 export default function App() {
   const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
-  const auth = createAuthClient(env.auth);
+  const auth = createAuthClient({
+    ...env.auth,
+    middleware: gameAuthMiddleware(() => rpc),
+  });
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
   const rpc = createRpcClient(socket, logger);

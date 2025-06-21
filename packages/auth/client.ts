@@ -38,7 +38,13 @@ export interface AuthClientOptions {
   authority: string;
   audience: string;
   redirectUri: string;
+  middleware?: AuthClientMiddleware;
 }
+
+export type AuthClientMiddleware = (
+  newIdentity: UserIdentity | undefined,
+  prevIdentity: UserIdentity | undefined,
+) => Promise<UserIdentity | undefined> | UserIdentity | undefined;
 
 export function createAuthClient(settings: AuthClientOptions): AuthClient {
   const userManager = new UserManager({
@@ -53,9 +59,16 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
   const [identity, setIdentity] = createSignal<UserIdentity>();
   const isSignedIn = createMemo(() => !!identity());
 
-  function handleUpdatedUser(updatedUser?: User | null) {
-    const updatedIdentity = extractIdentity(updatedUser);
-    if (!isEqual(updatedIdentity, identity())) {
+  async function handleUpdatedUser(updatedUser?: User | null) {
+    let updatedIdentity = extractIdentity(updatedUser);
+    const prevIdentity = identity();
+    if (!isEqual(updatedIdentity, prevIdentity)) {
+      if (settings.middleware) {
+        updatedIdentity = await settings.middleware(
+          updatedIdentity,
+          prevIdentity,
+        );
+      }
       setIdentity(updatedIdentity);
     }
   }
@@ -77,7 +90,7 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
   });
 
   async function refresh() {
-    handleUpdatedUser(await userManager.getUser());
+    void handleUpdatedUser(await userManager.getUser());
   }
 
   return {

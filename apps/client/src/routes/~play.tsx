@@ -38,7 +38,7 @@ function PlayPage() {
   createEffect(() => {
     const user = auth.identity();
     if (gameState.readyState() === WebSocket.OPEN && user) {
-      void actions.join(user.token);
+      void actions.join();
     }
   });
 
