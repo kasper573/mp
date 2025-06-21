@@ -3,7 +3,6 @@ import { Application } from "@mp/solid-pixi";
 import type { JSX, ParentProps } from "solid-js";
 import {
   useContext,
-  createEffect,
   Switch,
   Match,
   Suspense,
@@ -12,12 +11,11 @@ import {
 } from "solid-js";
 import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
-import { AuthContext } from "@mp/auth/client";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
 import * as styles from "./game.css";
 import type { GameStateClient } from "./game-state-client";
-import { createGameActions, GameStateClientContext } from "./game-state-client";
+import { GameStateClientContext } from "./game-state-client";
 import { AreaScene } from "./area/area-scene";
 import { useAreaResource } from "./area/use-area-resource";
 import { loadActorSpritesheets } from "./actor/actor-spritesheet-lookup";
@@ -39,8 +37,6 @@ export function Game(
   const rpc = useRpc();
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
-  const auth = useContext(AuthContext);
-  const actions = createGameActions(rpc, () => props.gameState);
   const interactive = () => props.interactive ?? true;
 
   const area = useAreaResource(() => props.gameState.areaId());
@@ -75,13 +71,6 @@ export function Game(
     enabled: isDebugUiEnabled,
     setEnabled: setDebugUiEnabled,
   };
-
-  createEffect(() => {
-    const user = auth.identity();
-    if (props.gameState.readyState() === WebSocket.OPEN && user) {
-      void actions.join(user.token);
-    }
-  });
 
   const neededToPassGameStateToContext = () => props.gameState;
 
