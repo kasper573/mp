@@ -29,9 +29,19 @@ function RouteComponent() {
   );
 
   return (
-    <div style={{ padding: "32px" }}>
+    <div
+      style={{
+        padding: "32px",
+        display: "flex",
+        "flex-direction": "column",
+        flex: 1,
+      }}
+    >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
-        <SpectatorClient gameState={gameState}>
+        <SpectatorClient
+          gameState={gameState}
+          style={{ display: "flex", flex: 1 }}
+        >
           <GameDebugUiPortal>
             <MiscDebugUi />
           </GameDebugUiPortal>

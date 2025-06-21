@@ -9,7 +9,6 @@ import {
   createSignal,
   createMemo,
 } from "solid-js";
-import { clsx } from "@mp/style";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
@@ -24,16 +23,15 @@ import { GameDebugUiContext } from "../debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "../debug/game-state-debug-info";
 import { useRpc } from "../use-rpc";
 import { ActorSpritesheetContext } from "../actor/actor-spritesheet-lookup";
-import * as styles from "./game-client.css";
 
-export function Game(
-  props: ParentProps<{
-    gameState: GameStateClient;
-    interactive?: boolean;
-    class?: string;
-    style?: JSX.CSSProperties;
-  }>,
-) {
+export type GameClientProps = ParentProps<{
+  gameState: GameStateClient;
+  interactive?: boolean;
+  class?: string;
+  style?: JSX.CSSProperties;
+}>;
+
+export function GameClient(props: GameClientProps) {
   const rpc = useRpc();
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
@@ -82,10 +80,7 @@ export function Game(
             <Suspense
               fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
             >
-              <Application
-                class={clsx(styles.container, props.class)}
-                style={props.style}
-              >
+              <Application class={props.class} style={props.style}>
                 {({ viewport }) => (
                   <ActorSpritesheetContext.Provider value={actorSpritesheets}>
                     <EngineProvider
