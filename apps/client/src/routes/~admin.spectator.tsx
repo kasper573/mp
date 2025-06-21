@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import {
   createGameStateClient,
+  GameDebugUiPortal,
   SpectatorClient,
   useRpc,
   worldRoles,
@@ -10,6 +11,8 @@ import { LoadingSpinner } from "@mp/ui";
 import { AuthBoundary } from "../ui/auth-boundary";
 import { SocketContext } from "../integrations/rpc";
 import { LoggerContext } from "../logger";
+import { MiscDebugUi } from "../ui/misc-debug-ui";
+import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -18,20 +21,21 @@ export const Route = createFileRoute("/admin/spectator")({
 });
 
 function RouteComponent() {
-  const logger = useContext(LoggerContext);
-  const socket = useContext(SocketContext);
-  const rpc = useRpc();
-
-  const gameState = createGameStateClient(rpc, socket, logger, () => ({
-    useInterpolator: true,
-    usePatchOptimizer: true,
-    visualizeNetworkFogOfWar: false,
-  }));
+  const gameState = createGameStateClient(
+    useRpc(),
+    useContext(SocketContext),
+    useContext(LoggerContext),
+    miscDebugSettings,
+  );
 
   return (
     <div style={{ padding: "32px" }}>
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
-        <SpectatorClient gameState={gameState} />
+        <SpectatorClient gameState={gameState}>
+          <GameDebugUiPortal>
+            <MiscDebugUi />
+          </GameDebugUiPortal>
+        </SpectatorClient>
       </Suspense>
     </div>
   );

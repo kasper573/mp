@@ -1,5 +1,6 @@
 import type { SelectOption } from "@mp/ui";
 import { Select } from "@mp/ui";
+import type { ParentProps } from "solid-js";
 import { createEffect, createMemo, createSignal, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import type { CharacterId } from "../../server";
@@ -7,7 +8,9 @@ import { useRpc } from "../use-rpc";
 import { type GameStateClient } from "../game-state-client";
 import { Game } from "./game-client";
 
-export function SpectatorClient(props: { gameState: GameStateClient }) {
+export function SpectatorClient(
+  props: ParentProps<{ gameState: GameStateClient }>,
+) {
   const [spectatedCharacterId, setSpectatedCharacterId] =
     createSignal<CharacterId>();
   const rpc = useRpc();
@@ -40,7 +43,9 @@ export function SpectatorClient(props: { gameState: GameStateClient }) {
         onChange={setSpectatedCharacterId}
       />
 
-      <Game interactive={false} gameState={props.gameState} />
+      <Game interactive={false} gameState={props.gameState}>
+        {props.children}
+      </Game>
     </>
   );
 }

@@ -1,22 +1,21 @@
 import { Button } from "@mp/ui";
-import type { GameStateClient } from "@mp/game/client";
-import { type OptimisticGameStateSettings } from "@mp/game/client";
-import type { Setter } from "solid-js";
-import { createEffect, createSignal } from "solid-js";
+import { GameStateClientContext } from "@mp/game/client";
+import { createEffect, createSignal, useContext } from "solid-js";
 import { assert } from "@mp/std";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
+import {
+  miscDebugSettings,
+  setMiscDebugSettings,
+} from "../signals/misc-debug-ui-settings";
 
-export function MiscDebugUi(props: {
-  gameState: GameStateClient;
-  settings: MiscDebugSettings;
-  setSettings: Setter<MiscDebugSettings>;
-}) {
+export function MiscDebugUi() {
   const rpc = useRpc();
   const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
     createServerPatchOptimizerSignal();
 
   const serverVersion = rpc.system.buildVersion.useQuery();
+  const gameState = useContext(GameStateClientContext);
 
   return (
     <>
@@ -29,7 +28,7 @@ export function MiscDebugUi(props: {
         <Button
           on:click={() =>
             void rpc.character.kill({
-              targetId: assert(props.gameState.characterId()),
+              targetId: assert(gameState().characterId()),
             })
           }
         >
@@ -50,9 +49,9 @@ export function MiscDebugUi(props: {
         Use client side patch optimizer:{" "}
         <input
           type="checkbox"
-          checked={props.settings.usePatchOptimizer}
+          checked={miscDebugSettings().usePatchOptimizer}
           on:change={(e) =>
-            props.setSettings((prev) => ({
+            setMiscDebugSettings((prev) => ({
               ...prev,
               usePatchOptimizer: e.currentTarget.checked,
             }))
@@ -63,9 +62,9 @@ export function MiscDebugUi(props: {
         Use client side game state interpolator:{" "}
         <input
           type="checkbox"
-          checked={props.settings.useInterpolator}
+          checked={miscDebugSettings().useInterpolator}
           on:change={(e) =>
-            props.setSettings((prev) => ({
+            setMiscDebugSettings((prev) => ({
               ...prev,
               useInterpolator: e.currentTarget.checked,
             }))
@@ -92,8 +91,4 @@ function createServerPatchOptimizerSignal() {
   });
 
   return [enabled, setEnabled] as const;
-}
-
-export interface MiscDebugSettings extends OptimisticGameStateSettings {
-  visualizeNetworkFogOfWar: boolean;
 }
