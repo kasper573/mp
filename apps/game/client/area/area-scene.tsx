@@ -1,8 +1,8 @@
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import type { Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import { type Tile, type Pixel, assert, dedupe, throttle } from "@mp/std";
+import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
 import type { ParentProps } from "solid-js";
 import {
   useContext,
@@ -38,7 +38,7 @@ export function AreaScene(
   const actions = useGameActions();
   const { renderedTileCount } = useContext(AreaSceneContext);
 
-  const myCoords = () => assert(state.character()).coords;
+  const myCoords = () => state.character()?.coords ?? Vector.zero();
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),
