@@ -1,10 +1,9 @@
-import { InjectionContext } from "@mp/ioc";
 import { eq } from "drizzle-orm";
-import type { NpcSpawn, Npc } from "@mp/game/server";
+import type { NpcSpawn, Npc, NpcService as INpcService } from "@mp/game/server";
 import { npcSpawnTable, npcTable } from "../schema";
 import type { DbClient } from "../client";
 
-export class NpcService {
+export class NpcService implements INpcService {
   constructor(private db: DbClient) {}
 
   async getAllSpawnsAndTheirNpcs(): Promise<
@@ -23,5 +22,3 @@ export class NpcService {
     });
   }
 }
-
-export const ctxNpcService = InjectionContext.new<NpcService>("NpcService");
