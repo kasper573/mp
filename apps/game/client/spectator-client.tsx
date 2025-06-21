@@ -15,6 +15,7 @@ export function SpectatorClient(props: { gameState: GameStateClient }) {
   const characterOptions = rpc.world.characterList.useQuery(() => ({
     input: void 0,
     refetchInterval: 5000,
+    enabled: !!auth.identity(),
     map: (result): SelectOption<CharacterId>[] =>
       result.items.map(({ id, name }) => ({ value: id, label: name })),
   }));
