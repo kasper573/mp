@@ -4,7 +4,7 @@ import { createMutable } from "solid-js/store";
 import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyOperation, applyPatch, PatchType } from "@mp/sync";
 import type { Accessor } from "solid-js";
-import { batch, createContext, untrack } from "solid-js";
+import { batch, untrack } from "solid-js";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import { recordValues, typedKeys } from "@mp/std";
 import type { Actor, ActorId } from "../server";
@@ -88,14 +88,6 @@ export interface OptimisticGameStateSettings {
   useInterpolator: boolean;
   usePatchOptimizer: boolean;
 }
-
-export const OptimisticGameStateContext = createContext(
-  new Proxy({} as OptimisticGameStateSettings, {
-    get() {
-      throw new Error("OptimisticGameStateContext has not been initialized");
-    },
-  }),
-);
 
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles

@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { GameDebugUiPortal, OptimisticGameStateContext } from "@mp/game/client";
+import { GameDebugUiPortal } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import {
@@ -38,18 +38,16 @@ function PlayPage() {
   return (
     <GameStateClientContext.Provider value={sync}>
       {/* 
-            It's important to have a suspense boundary here to avoid game resources suspending 
-            all the way up to the routers pending component, which would unmount the page, 
-            which in turn would stop the game client.
-            */}
+        It's important to have a suspense boundary here to avoid game resources suspending 
+        all the way up to the routers pending component, which would unmount the page, 
+        which in turn would stop the game client.
+        */}
       <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-        <OptimisticGameStateContext.Provider value={settings()}>
-          <Game>
-            <GameDebugUiPortal>
-              <MiscDebugUi settings={settings()} setSettings={setSettings} />
-            </GameDebugUiPortal>
-          </Game>
-        </OptimisticGameStateContext.Provider>
+        <Game>
+          <GameDebugUiPortal>
+            <MiscDebugUi settings={settings()} setSettings={setSettings} />
+          </GameDebugUiPortal>
+        </Game>
       </Suspense>
     </GameStateClientContext.Provider>
   );
