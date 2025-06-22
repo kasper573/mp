@@ -2,14 +2,21 @@
 
 import pino, { type Logger as PinoLogger } from "pino";
 
-export function createPinoLogger(): Logger {
+export function createPinoLogger(pretty = true): Logger {
   return pino({
-    transport: {
-      target: "pino-pretty",
-      options: {
-        colorize: true,
-      },
-    },
+    transport: pretty
+      ? {
+          target: "pino-pretty",
+          options: {
+            colorize: true,
+          },
+        }
+      : {
+          // Outputs to stdout, not file
+          // https://getpino.io/#/docs/transports?id=writing-to-a-custom-transport-amp-stdout
+          target: "pino/file",
+          options: { destination: 1 },
+        },
   });
 }
 
