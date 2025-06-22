@@ -659,9 +659,6 @@ importers:
       '@grafana/faro-web-tracing':
         specifier: ^1.12.2
         version: 1.12.2
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../logger
       '@opentelemetry/api':
         specifier: 1.9.0
         version: 1.9.0
