@@ -86,7 +86,13 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     isSignedIn,
     refresh,
     signOut: () => userManager.signoutRedirect(),
-    redirectToSignIn: (state) => userManager.signinRedirect({ state }),
+    redirectToSignIn: (state) => {
+      state = {
+        returnUrl: window.location.pathname + window.location.search,
+        ...state,
+      };
+      return userManager.signinRedirect({ state });
+    },
     signInCallback: () =>
       userManager.signinCallback().then((user) => {
         extractIdentity(user);
