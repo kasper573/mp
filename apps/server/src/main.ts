@@ -41,7 +41,7 @@ import {
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 
-import { parseBypassUser, type AuthToken, type UserIdentity } from "@mp/auth";
+import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 import type { GameStateEvents } from "../../game/server/game-state-events";
 import { collectProcessMetrics } from "./metrics/process";
@@ -244,7 +244,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
 persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
 
-function getBypassUser(token: AuthToken): UserIdentity | undefined {
+function getBypassUser(token: AccessToken): UserIdentity | undefined {
   if (!opt.auth.allowBypassUsers) {
     return;
   }

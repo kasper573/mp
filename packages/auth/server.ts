@@ -3,7 +3,7 @@ import { err, ok, type Result } from "@mp/std";
 import {
   extractRolesFromJwtPayload,
   isOurJwtPayload,
-  type AuthToken,
+  type AccessToken,
   type UserId,
   type UserIdentity,
 } from "./shared";
@@ -16,7 +16,7 @@ export interface TokenResolverOption {
   /**
    * Provide this function to allow bypassing real JWT verification.
    */
-  getBypassUser?: (token: AuthToken) => UserIdentity | undefined;
+  getBypassUser?: (token: AccessToken) => UserIdentity | undefined;
   /**
    * Optional callback to handle the result of the token resolution.
    * This can be used for logging or other side effects.
@@ -25,7 +25,7 @@ export interface TokenResolverOption {
 }
 
 export interface TokenResolver {
-  (token?: AuthToken): Promise<TokenResolverResult>;
+  (token?: AccessToken): Promise<TokenResolverResult>;
 }
 
 export function createTokenResolver({

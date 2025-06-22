@@ -11,7 +11,7 @@ import {
 import {
   extractRolesFromJwtPayload,
   isOurJwtPayload,
-  type AuthToken,
+  type AccessToken,
   type JWTPayload,
   type UserId,
   type UserIdentity,
@@ -126,7 +126,7 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
 
   return {
     id: user.profile.sub as UserId,
-    token: user.access_token as AuthToken,
+    token: user.access_token as AccessToken,
     name: user.profile.name,
     roles: extractRolesFromJwtPayload(payload),
   };

@@ -1,12 +1,12 @@
 import { createSeededUuid, type Branded } from "@mp/std";
 import type { JWTPayload } from "jose";
 
-export type AuthToken = Branded<string, "AuthToken">;
+export type AccessToken = Branded<string, "AccessToken">;
 export type UserId = Branded<string, "UserId">;
 
 export interface UserIdentity {
   id: UserId;
-  token: AuthToken;
+  token: AccessToken;
   name?: string;
   roles: ReadonlySetLike<RoleDefinition>;
 }
@@ -30,11 +30,11 @@ export function extractRolesFromJwtPayload(
 
 const bypassTokenPrefix = "bypass:";
 
-export function createBypassUser(name: string): AuthToken {
-  return (bypassTokenPrefix + name) as AuthToken;
+export function createBypassUser(name: string): AccessToken {
+  return (bypassTokenPrefix + name) as AccessToken;
 }
 
-export function parseBypassUser(token: AuthToken): UserIdentity | undefined {
+export function parseBypassUser(token: AccessToken): UserIdentity | undefined {
   if (!token.startsWith(bypassTokenPrefix)) {
     return;
   }

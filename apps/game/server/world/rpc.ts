@@ -1,5 +1,5 @@
 import { recordValues } from "@mp/std";
-import type { AuthToken } from "@mp/auth";
+import type { AccessToken } from "@mp/auth";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { ctxTokenResolver, roles } from "../user/auth";
@@ -37,7 +37,7 @@ export const worldRouter = rpc.router({
       return characterPaginator(characters.toArray(), input, 50);
     }),
 
-  auth: rpc.procedure.input<AuthToken>().mutation(async ({ input, ctx }) => {
+  auth: rpc.procedure.input<AccessToken>().mutation(async ({ input, ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const tokenResolver = ctx.get(ctxTokenResolver);
@@ -49,7 +49,7 @@ export const worldRouter = rpc.router({
   }),
 
   removeAuth: rpc.procedure
-    .input<AuthToken>()
+    .input<AccessToken>()
     .mutation(async ({ input, ctx }) => {
       const clientId = ctx.get(ctxClientId);
       const clients = ctx.get(ctxClientRegistry);

@@ -50,10 +50,10 @@ export default function App() {
     },
   });
 
-  const authToken = createMemo(() => auth.identity()?.token);
+  const accessToken = createMemo(() => auth.identity()?.token);
 
   createEffect(() => {
-    const token = authToken();
+    const token = accessToken();
     if (token) {
       void rpc.world.auth(token);
     }
