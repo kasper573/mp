@@ -5,6 +5,9 @@ import solid from "vite-plugin-solid";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 
 import type { Plugin } from "vite";
+import { themes } from "@mp/style";
+
+process.env.VITE_HTML_CLASS = themes.dark;
 
 export default defineConfig({
   plugins: [

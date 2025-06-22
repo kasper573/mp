@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/naming-convention */
 import { createTheme } from "@vanilla-extract/css";
-import { themeContract } from "../src/theme.css";
-import { palette } from "../src/tokens";
+import { themeContract } from "../theme.css";
+import { palette } from "../tokens";
 
 const darkValues = {
   color: {

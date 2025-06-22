@@ -1,16 +1,14 @@
-import { dark } from "@mp/style/themes/dark.css";
+import "@mp/style/index.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
-import { render } from "solid-js/web";
 import { LoadingSpinner } from "@mp/ui";
 import { assert } from "@mp/std";
+import { render } from "solid-js/web";
 import * as styles from "./main.css";
 
 // Note that main.tsx is not the composition root of the application,
 // only the entry point that then lazy loads the real composition root, app.tsx.
 // This file should have a minimal amount of dependencies to keep the initial load time low.
 const App = lazy(() => import("./app"));
-
-document.documentElement.classList.add(dark);
 
 const rootElement = assert(document.querySelector("div#root"));
 rootElement.classList.add(styles.root);

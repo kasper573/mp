@@ -1,4 +1,5 @@
 import { globalStyle, theme, style, tokens } from "@mp/style";
+import "./assets/fonts/inter/inter.css";
 
 globalStyle(`html, body`, {
   overflow: "hidden",
