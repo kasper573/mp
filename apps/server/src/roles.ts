@@ -1,6 +1,14 @@
-import { characterRoles, npcRoles, worldRoles } from "@mp/game/server";
+import {
+  characterRoles,
+  npcRoles,
+  systemRoles,
+  worldRoles,
+} from "@mp/game/server";
 
-import { systemRoles } from "./etc/system-rpc";
+/**
+ * This is the single source of truth of groups and roles.
+ * Changing this will provision updates in keycloak when pushed to production.
+ */
 
 export const playerGroup = "player";
 
@@ -11,16 +19,13 @@ export const playerRoles = [
   worldRoles.join,
 ];
 
-/**
- * This is the single source of truth of groups and roles.
- * Changing this will provision updates in keycloak when pushed to production.
- */
 export const groupedRoles = {
   admin: [
     ...playerRoles,
+    systemRoles.changeSettings,
+    systemRoles.useDevTools,
     characterRoles.kill,
     npcRoles.spawnRandom,
-    systemRoles.admin,
     worldRoles.spectate,
   ],
   [playerGroup]: playerRoles,

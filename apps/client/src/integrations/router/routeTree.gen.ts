@@ -11,12 +11,13 @@
 import { Route as rootRouteImport } from './../../routes/~__root'
 import { Route as AuthCallbackRouteImport } from './../../routes/~auth-callback'
 import { Route as LayoutRouteRouteImport } from './../../routes/~_layout/~route'
-import { Route as LayoutSandboxRouteImport } from './../../routes/~_layout/~sandbox'
 import { Route as LayoutPlayRouteImport } from './../../routes/~_layout/~play'
 import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~contact'
-import { Route as LayoutActorTesterRouteImport } from './../../routes/~_layout/~actor-tester'
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
-import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin.spectator'
+import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
+import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
+import { Route as LayoutAdminDevtoolsActorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~actor-tester'
+import { Route as LayoutAdminDevtoolsIndexRouteImport } from './../../routes/~_layout/~admin/~devtools/~index'
 
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth-callback',
@@ -27,11 +28,6 @@ const LayoutRouteRoute = LayoutRouteRouteImport.update({
   id: '/_layout',
   getParentRoute: () => rootRouteImport,
 } as any)
-const LayoutSandboxRoute = LayoutSandboxRouteImport.update({
-  id: '/sandbox',
-  path: '/sandbox',
-  getParentRoute: () => LayoutRouteRoute,
-} as any)
 const LayoutPlayRoute = LayoutPlayRouteImport.update({
   id: '/play',
   path: '/play',
@@ -40,11 +36,6 @@ const LayoutPlayRoute = LayoutPlayRouteImport.update({
 const LayoutContactRoute = LayoutContactRouteImport.update({
   id: '/contact',
   path: '/contact',
-  getParentRoute: () => LayoutRouteRoute,
-} as any)
-const LayoutActorTesterRoute = LayoutActorTesterRouteImport.update({
-  id: '/actor-tester',
-  path: '/actor-tester',
   getParentRoute: () => LayoutRouteRoute,
 } as any)
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
@@ -57,65 +48,87 @@ const LayoutAdminSpectatorRoute = LayoutAdminSpectatorRouteImport.update({
   path: '/admin/spectator',
   getParentRoute: () => LayoutRouteRoute,
 } as any)
+const LayoutAdminDevtoolsRouteRoute =
+  LayoutAdminDevtoolsRouteRouteImport.update({
+    id: '/admin/devtools',
+    path: '/admin/devtools',
+    getParentRoute: () => LayoutRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsActorTesterRoute =
+  LayoutAdminDevtoolsActorTesterRouteImport.update({
+    id: '/actor-tester',
+    path: '/actor-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsIndexRoute =
+  LayoutAdminDevtoolsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/auth-callback': typeof AuthCallbackRoute
   '/': typeof LayoutIndexRoute
-  '/actor-tester': typeof LayoutActorTesterRoute
   '/contact': typeof LayoutContactRoute
   '/play': typeof LayoutPlayRoute
-  '/sandbox': typeof LayoutSandboxRoute
+  '/admin/devtools': typeof LayoutAdminDevtoolsRouteRouteWithChildren
   '/admin/spectator': typeof LayoutAdminSpectatorRoute
+  '/admin/devtools/': typeof LayoutAdminDevtoolsIndexRoute
+  '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
 }
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
   '/': typeof LayoutIndexRoute
-  '/actor-tester': typeof LayoutActorTesterRoute
   '/contact': typeof LayoutContactRoute
   '/play': typeof LayoutPlayRoute
-  '/sandbox': typeof LayoutSandboxRoute
   '/admin/spectator': typeof LayoutAdminSpectatorRoute
+  '/admin/devtools': typeof LayoutAdminDevtoolsIndexRoute
+  '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_layout': typeof LayoutRouteRouteWithChildren
   '/auth-callback': typeof AuthCallbackRoute
   '/_layout/': typeof LayoutIndexRoute
-  '/_layout/actor-tester': typeof LayoutActorTesterRoute
   '/_layout/contact': typeof LayoutContactRoute
   '/_layout/play': typeof LayoutPlayRoute
-  '/_layout/sandbox': typeof LayoutSandboxRoute
+  '/_layout/admin/devtools': typeof LayoutAdminDevtoolsRouteRouteWithChildren
   '/_layout/admin/spectator': typeof LayoutAdminSpectatorRoute
+  '/_layout/admin/devtools/': typeof LayoutAdminDevtoolsIndexRoute
+  '/_layout/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/auth-callback'
     | '/'
-    | '/actor-tester'
     | '/contact'
     | '/play'
-    | '/sandbox'
+    | '/admin/devtools'
     | '/admin/spectator'
+    | '/admin/devtools/'
+    | '/admin/devtools/actor-tester'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-callback'
     | '/'
-    | '/actor-tester'
     | '/contact'
     | '/play'
-    | '/sandbox'
     | '/admin/spectator'
+    | '/admin/devtools'
+    | '/admin/devtools/actor-tester'
   id:
     | '__root__'
     | '/_layout'
     | '/auth-callback'
     | '/_layout/'
-    | '/_layout/actor-tester'
     | '/_layout/contact'
     | '/_layout/play'
-    | '/_layout/sandbox'
+    | '/_layout/admin/devtools'
     | '/_layout/admin/spectator'
+    | '/_layout/admin/devtools/'
+    | '/_layout/admin/devtools/actor-tester'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -139,13 +152,6 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof LayoutRouteRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_layout/sandbox': {
-      id: '/_layout/sandbox'
-      path: '/sandbox'
-      fullPath: '/sandbox'
-      preLoaderRoute: typeof LayoutSandboxRouteImport
-      parentRoute: typeof LayoutRouteRoute
-    }
     '/_layout/play': {
       id: '/_layout/play'
       path: '/play'
@@ -158,13 +164,6 @@ declare module '@tanstack/solid-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof LayoutContactRouteImport
-      parentRoute: typeof LayoutRouteRoute
-    }
-    '/_layout/actor-tester': {
-      id: '/_layout/actor-tester'
-      path: '/actor-tester'
-      fullPath: '/actor-tester'
-      preLoaderRoute: typeof LayoutActorTesterRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
     '/_layout/': {
@@ -181,24 +180,59 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof LayoutAdminSpectatorRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/admin/devtools': {
+      id: '/_layout/admin/devtools'
+      path: '/admin/devtools'
+      fullPath: '/admin/devtools'
+      preLoaderRoute: typeof LayoutAdminDevtoolsRouteRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
+    '/_layout/admin/devtools/actor-tester': {
+      id: '/_layout/admin/devtools/actor-tester'
+      path: '/actor-tester'
+      fullPath: '/admin/devtools/actor-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsActorTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
+    '/_layout/admin/devtools/': {
+      id: '/_layout/admin/devtools/'
+      path: '/'
+      fullPath: '/admin/devtools/'
+      preLoaderRoute: typeof LayoutAdminDevtoolsIndexRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
   }
 }
 
+interface LayoutAdminDevtoolsRouteRouteChildren {
+  LayoutAdminDevtoolsIndexRoute: typeof LayoutAdminDevtoolsIndexRoute
+  LayoutAdminDevtoolsActorTesterRoute: typeof LayoutAdminDevtoolsActorTesterRoute
+}
+
+const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildren =
+  {
+    LayoutAdminDevtoolsIndexRoute: LayoutAdminDevtoolsIndexRoute,
+    LayoutAdminDevtoolsActorTesterRoute: LayoutAdminDevtoolsActorTesterRoute,
+  }
+
+const LayoutAdminDevtoolsRouteRouteWithChildren =
+  LayoutAdminDevtoolsRouteRoute._addFileChildren(
+    LayoutAdminDevtoolsRouteRouteChildren,
+  )
+
 interface LayoutRouteRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
-  LayoutActorTesterRoute: typeof LayoutActorTesterRoute
   LayoutContactRoute: typeof LayoutContactRoute
   LayoutPlayRoute: typeof LayoutPlayRoute
-  LayoutSandboxRoute: typeof LayoutSandboxRoute
+  LayoutAdminDevtoolsRouteRoute: typeof LayoutAdminDevtoolsRouteRouteWithChildren
   LayoutAdminSpectatorRoute: typeof LayoutAdminSpectatorRoute
 }
 
 const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
-  LayoutActorTesterRoute: LayoutActorTesterRoute,
   LayoutContactRoute: LayoutContactRoute,
   LayoutPlayRoute: LayoutPlayRoute,
-  LayoutSandboxRoute: LayoutSandboxRoute,
+  LayoutAdminDevtoolsRouteRoute: LayoutAdminDevtoolsRouteRouteWithChildren,
   LayoutAdminSpectatorRoute: LayoutAdminSpectatorRoute,
 }
 

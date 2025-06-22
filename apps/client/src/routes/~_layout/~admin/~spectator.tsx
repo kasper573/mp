@@ -8,11 +8,11 @@ import {
 } from "@mp/game/client";
 import { Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
-import { AuthBoundary } from "../../ui/auth-boundary";
-import { SocketContext } from "../../integrations/rpc";
-import { LoggerContext } from "../../logger";
-import { MiscDebugUi } from "../../ui/misc-debug-ui";
-import { miscDebugSettings } from "../../signals/misc-debug-ui-settings";
+import { AuthBoundary } from "../../../ui/auth-boundary";
+import { SocketContext } from "../../../integrations/rpc";
+import { LoggerContext } from "../../../logger";
+import { MiscDebugUi } from "../../../ui/misc-debug-ui";
+import { miscDebugSettings } from "../../../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {

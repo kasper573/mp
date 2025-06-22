@@ -1,26 +1,26 @@
-import { roles, rpc } from "@mp/game/server";
+import { roles, rpc, systemRoles } from "@mp/game/server";
 import type { Ticker } from "@mp/time";
 import { InjectionContext } from "@mp/ioc";
 import { PatchCollectorFactory } from "@mp/sync";
-import { defineRoles } from "@mp/auth";
 import { opt } from "../options";
-
-export const systemRoles = defineRoles("sys", ["admin"]);
 
 export const systemRouter = rpc.router({
   buildVersion: rpc.procedure.output<string>().query(() => opt.buildVersion),
 
-  testError: rpc.procedure.output<string>().query(() => {
-    throw new Error("This is a test error that was thrown in the server");
-  }),
+  testError: rpc.procedure
+    .use(roles([systemRoles.useDevTools]))
+    .output<string>()
+    .query(() => {
+      throw new Error("This is a test error that was thrown in the server");
+    }),
 
   isPatchOptimizerEnabled: rpc.procedure
-    .use(roles([systemRoles.admin]))
+    .use(roles([systemRoles.changeSettings]))
     .output<boolean>()
     .query(() => PatchCollectorFactory.optimize),
 
   setPatchOptimizerEnabled: rpc.procedure
-    .use(roles([systemRoles.admin]))
+    .use(roles([systemRoles.changeSettings]))
     .input<boolean>()
     .mutation(({ input }) => {
       PatchCollectorFactory.optimize = input;

@@ -29,7 +29,7 @@ export interface AuthClient {
   identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
   refresh: () => Promise<void>;
-  signOut: () => Promise<void>;
+  signOutRedirect: (returnUri?: string) => Promise<void>;
   redirectToSignIn: (state?: SignInState) => Promise<void>;
   signInCallback: () => Promise<SignInState | undefined>;
 }
@@ -85,12 +85,16 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     identity,
     isSignedIn,
     refresh,
-    signOut: () => userManager.signoutRedirect(),
+    signOutRedirect: (returnUri = defaultReturnUrl()) =>
+      userManager.signoutRedirect({
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        post_logout_redirect_uri: new URL(
+          returnUri,
+          window.location.origin,
+        ).toString(),
+      }),
     redirectToSignIn: (state) => {
-      state = {
-        returnUrl: window.location.pathname + window.location.search,
-        ...state,
-      };
+      state = { returnUrl: defaultReturnUrl(), ...state };
       return userManager.signinRedirect({ state });
     },
     signInCallback: () =>
@@ -99,6 +103,10 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
         return user?.state as SignInState | undefined;
       }),
   };
+}
+
+function defaultReturnUrl() {
+  return window.location.pathname + window.location.search;
 }
 
 interface SignInState {
