@@ -1,7 +1,9 @@
-import { fontFace } from "@vanilla-extract/css";
+import { globalFontFace } from "@vanilla-extract/css";
+import { tokens } from "@mp/style";
 import { interFontFaces } from "./font-faces";
 
-export const inter = fontFace(
+globalFontFace(
+  tokens.fontFaces.default,
   interFontFaces.map(({ fontStyle, fontWeight, format, url }) => ({
     src: `url(${url}) format("${format}")`,
     fontStyle,

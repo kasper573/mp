@@ -1,3 +1,4 @@
+import "./assets/fonts";
 import { dark } from "@mp/style/themes/dark.css";
 import { ErrorBoundary, lazy, Suspense } from "solid-js";
 import { render } from "solid-js/web";
