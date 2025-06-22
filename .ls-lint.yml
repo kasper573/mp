@@ -6,8 +6,6 @@ ls:
     .dir: regex:.*
   .github:
     .dir: regex:.*
-  .husky:
-    .dir: regex:.*
   apps/client/src/routes/**:
     .*: regex:~?(__)?[a-z0-9\-]+
 
