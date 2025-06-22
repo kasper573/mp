@@ -61,6 +61,16 @@ export default function App() {
 
   void auth.refresh();
 
+  socket.addEventListener("close", (e) => {
+    // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
+    // Abnormal closure means we're reconnecting, so we need to refresh auth.
+    // We opt-in to clear local auth state to make sure that all auth state
+    // dependant logic is re-evaluated.
+    if (e.code !== 1000) {
+      void auth.refresh(true);
+    }
+  });
+
   socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
   onCleanup(() => socket.close());
 

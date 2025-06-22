@@ -28,7 +28,7 @@ export const AuthContext = createContext<AuthClient>(
 export interface AuthClient {
   identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
-  refresh: () => Promise<void>;
+  refresh: (clearLocalState?: boolean) => Promise<void>;
   signOut: () => Promise<void>;
   redirectToSignIn: (state?: SignInState) => Promise<void>;
   signInCallback: () => Promise<SignInState | undefined>;
@@ -89,7 +89,10 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     });
   });
 
-  async function refresh() {
+  async function refresh(clearLocalState = false) {
+    if (clearLocalState) {
+      setIdentity(undefined);
+    }
     void handleUpdatedUser(await userManager.getUser());
   }
 
