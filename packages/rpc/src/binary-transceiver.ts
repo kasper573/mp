@@ -5,7 +5,7 @@ import type { RpcCall } from "./rpc-invoker";
 
 export interface BinaryRpcTransceiverOptions<Context>
   extends Omit<RpcTransceiverOptions<Context>, "sendCall" | "sendResponse"> {
-  send: (messageBuffer: ArrayBufferLike) => void;
+  send: (messageBuffer: ArrayBufferLike) => unknown;
 }
 
 export class BinaryRpcTransceiver<

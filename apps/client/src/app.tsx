@@ -11,7 +11,7 @@ import {
   SolidQueryDevtools,
 } from "@mp/rpc/solid";
 import { createWebSocket } from "@mp/ws/client";
-import { createEffect, createMemo, onCleanup } from "solid-js";
+import { onCleanup } from "solid-js";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -21,7 +21,6 @@ import {
 } from "./integrations/rpc";
 import { LoggerContext } from "./logger";
 import { createFaroClient } from "./integrations/faro";
-import { gameAuthMiddleware } from "./integrations/game-auth";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -34,13 +33,10 @@ registerEncoderExtensions();
 export default function App() {
   const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
-  const auth = createAuthClient({
-    ...env.auth,
-    middleware: gameAuthMiddleware(() => rpc),
-  });
+  const auth = createAuthClient(env.auth);
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
-  const rpc = createRpcClient(socket, logger);
+  const rpc = createRpcClient(socket, logger, () => auth.identity()?.token);
   const query = new QueryClient({
     defaultOptions: {
       queries: {
@@ -50,26 +46,7 @@ export default function App() {
     },
   });
 
-  const accessToken = createMemo(() => auth.identity()?.token);
-
-  createEffect(() => {
-    const token = accessToken();
-    if (token) {
-      void rpc.world.auth(token);
-    }
-  });
-
   void auth.refresh();
-
-  socket.addEventListener("close", (e) => {
-    // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
-    // Abnormal closure means we're reconnecting, so we need to refresh auth.
-    // We opt-in to clear local auth state to make sure that all auth state
-    // dependant logic is re-evaluated.
-    if (e.code !== 1000) {
-      void auth.refresh(true);
-    }
-  });
 
   socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
   onCleanup(() => socket.close());
