@@ -24,7 +24,6 @@
   "dependencies": {
     "@grafana/faro-web-sdk": "^1.12.2",
     "@grafana/faro-web-tracing": "^1.12.2",
-    "@mp/logger": "workspace:*",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/auto-instrumentations-node": "0.53.0",
     "@opentelemetry/core": "1.26.0",

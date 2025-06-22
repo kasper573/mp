@@ -1,75 +1,30 @@
-import type { UserId, UserIdentity } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
+import type { CharacterId } from "../character/types";
 import type { ClientId } from "./client-id";
 
 export const ctxClientRegistry =
   InjectionContext.new<ClientRegistry>("ClientRegistry");
 
+/**
+ * Stores meta data about connected clients in memory
+ */
 export class ClientRegistry {
-  private map = new Map<ClientId, UserIdentity>();
-  private eventHandlers = new Set<ClientRegistryEventHandler>();
+  readonly userIds = new Map<ClientId, UserId>();
+  readonly characterIds = new Map<ClientId, CharacterId>();
+  readonly spectatedCharacterIds = new Map<ClientId, CharacterId>();
 
-  add(clientId: ClientId, user: UserIdentity) {
-    this.map.set(clientId, user);
-    this.emit({ type: "add", user, clientId });
-  }
-
-  remove(clientId: ClientId) {
-    const user = this.map.get(clientId);
-    if (user !== undefined) {
-      this.map.delete(clientId);
-      this.emit({ type: "remove", user, clientId });
-    }
+  removeClient(clientId: ClientId) {
+    this.userIds.delete(clientId);
+    this.characterIds.delete(clientId);
+    this.spectatedCharacterIds.delete(clientId);
   }
 
   getClientIds(): ReadonlySet<ClientId> {
-    return new Set(this.map.keys());
+    return new Set([...this.userIds.keys(), ...this.characterIds.keys()]);
   }
 
   getUserCount(): number {
-    return new Set(this.map.values()).size;
-  }
-
-  getUserId(clientId: ClientId): UserId | undefined {
-    return this.map.get(clientId)?.id;
-  }
-
-  /**
-   * This is a temporary solution. We should just store ids, and let user info fetching be a separate concern.
-   * @deprecated
-   */
-  getUser(clientId: ClientId): UserIdentity | undefined {
-    return this.map.get(clientId);
-  }
-
-  hasClient(userId: UserId): boolean {
-    return this.map.values().some((user) => user.id === userId);
-  }
-
-  on(handler: ClientRegistryEventHandler): Unsubscribe {
-    this.eventHandlers.add(handler);
-    return () => this.eventHandlers.delete(handler);
-  }
-
-  private emit(event: ClientRegistryEvent) {
-    for (const handler of this.eventHandlers) {
-      handler(event);
-    }
+    return new Set(this.userIds.values()).size;
   }
 }
-
-export type Unsubscribe = () => void;
-
-export interface ClientRegistryEvent {
-  type: "add" | "remove";
-  /**
-   * This is a temporary solution. We should just store ids, and let user info fetching be a separate concern.
-   * @deprecated
-   */
-  user: UserIdentity;
-  clientId: ClientId;
-}
-
-export type ClientRegistryEventHandler = (
-  event: ClientRegistryEvent,
-) => unknown;

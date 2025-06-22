@@ -1,21 +1,15 @@
 import { Vector, type VectorLike } from "@mp/math";
 import { type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { Actor, ActorId } from "../actor";
+import type { ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
-import { defineRoles } from "../user/define-roles";
 import { ctxGameStateEmitter } from "../game-state-emitter";
+import { characterRoles } from "../../shared/roles";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./types";
-
-export const characterRoles = defineRoles("character", [
-  "move",
-  "attack",
-  "kill",
-  "respawn",
-]);
+import { accessCharacter } from "./access";
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = rpc.router({
@@ -26,43 +20,23 @@ export const characterRouter = rpc.router({
       desiredPortalId?: ObjectId;
     }>()
     .use(roles([characterRoles.move]))
-    .mutation(
-      ({ input: { characterId, to, desiredPortalId }, ctx, mwc: { user } }) => {
-        const state = ctx.get(ctxGameState);
-        const char = state.actors[characterId] as Actor | undefined;
+    .mutation(({ input: { characterId, to, desiredPortalId }, ctx }) => {
+      const char = accessCharacter(ctx, characterId);
 
-        if (!char || char.type !== "character") {
-          throw new Error("Character not found");
-        }
+      if (!char.health) {
+        throw new Error("Cannot move a dead character");
+      }
 
-        if (char.userId !== user.id) {
-          throw new Error("You don't have access to this character");
-        }
-
-        if (!char.health) {
-          throw new Error("Cannot move a dead character");
-        }
-
-        char.attackTargetId = undefined;
-        char.moveTarget = Vector.from(to);
-        char.desiredPortalId = desiredPortalId;
-      },
-    ),
+      char.attackTargetId = undefined;
+      char.moveTarget = Vector.from(to);
+      char.desiredPortalId = desiredPortalId;
+    }),
 
   attack: rpc.procedure
     .input<{ characterId: CharacterId; targetId: ActorId }>()
     .use(roles([characterRoles.attack]))
-    .mutation(({ input: { characterId, targetId }, ctx, mwc: { user } }) => {
-      const state = ctx.get(ctxGameState);
-      const char = state.actors[characterId] as Actor | undefined;
-
-      if (!char || char.type !== "character") {
-        throw new Error("Character not found");
-      }
-
-      if (char.userId !== user.id) {
-        throw new Error("You don't have access to this character");
-      }
+    .mutation(({ input: { characterId, targetId }, ctx }) => {
+      const char = accessCharacter(ctx, characterId);
 
       if (targetId === characterId) {
         throw new Error("You can't attack yourself");
@@ -85,17 +59,8 @@ export const characterRouter = rpc.router({
   respawn: rpc.procedure
     .input<CharacterId>()
     .use(roles([characterRoles.respawn]))
-    .mutation(({ input: characterId, ctx, mwc: { user } }) => {
-      const state = ctx.get(ctxGameState);
-      const char = state.actors[characterId] as Actor | undefined;
-
-      if (!char || char.type !== "character") {
-        throw new Error("Character not found");
-      }
-
-      if (char.userId !== user.id) {
-        throw new Error("You don't have access to this character");
-      }
+    .mutation(({ input: characterId, ctx }) => {
+      const char = accessCharacter(ctx, characterId);
 
       if (char.health > 0) {
         throw new Error("Character is not dead");

@@ -9,8 +9,9 @@ import {
   onCleanup,
 } from "solid-js";
 import {
+  extractRolesFromJwtPayload,
   isOurJwtPayload,
-  type AuthToken,
+  type AccessToken,
   type JWTPayload,
   type UserId,
   type UserIdentity,
@@ -28,9 +29,9 @@ export interface AuthClient {
   identity: Accessor<UserIdentity | undefined>;
   isSignedIn: Accessor<boolean>;
   refresh: () => Promise<void>;
-  signOut: () => Promise<void>;
-  redirectToSignIn: () => Promise<void>;
-  signInCallback: () => Promise<UserIdentity | undefined>;
+  signOutRedirect: (returnUri?: string) => Promise<void>;
+  redirectToSignIn: (state?: SignInState) => Promise<void>;
+  signInCallback: () => Promise<SignInState | undefined>;
 }
 
 export interface AuthClientOptions {
@@ -54,7 +55,8 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
 
   function handleUpdatedUser(updatedUser?: User | null) {
     const updatedIdentity = extractIdentity(updatedUser);
-    if (!isEqual(updatedIdentity, identity())) {
+    const prevIdentity = identity();
+    if (!isEqual(updatedIdentity, prevIdentity)) {
       setIdentity(updatedIdentity);
     }
   }
@@ -83,10 +85,32 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     identity,
     isSignedIn,
     refresh,
-    signOut: () => userManager.signoutRedirect(),
-    redirectToSignIn: () => userManager.signinRedirect(),
-    signInCallback: () => userManager.signinCallback().then(extractIdentity),
+    signOutRedirect: (returnUri = defaultReturnUrl()) =>
+      userManager.signoutRedirect({
+        // eslint-disable-next-line @typescript-eslint/naming-convention
+        post_logout_redirect_uri: new URL(
+          returnUri,
+          window.location.origin,
+        ).toString(),
+      }),
+    redirectToSignIn: (state) => {
+      state = { returnUrl: defaultReturnUrl(), ...state };
+      return userManager.signinRedirect({ state });
+    },
+    signInCallback: () =>
+      userManager.signinCallback().then((user) => {
+        extractIdentity(user);
+        return user?.state as SignInState | undefined;
+      }),
   };
+}
+
+function defaultReturnUrl() {
+  return window.location.pathname + window.location.search;
+}
+
+interface SignInState {
+  returnUrl?: string;
 }
 
 function extractIdentity(user?: User | null): UserIdentity | undefined {
@@ -101,9 +125,9 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
 
   return {
     id: user.profile.sub as UserId,
-    token: user.access_token as AuthToken,
+    token: user.access_token as AccessToken,
     name: user.profile.name,
-    roles: new Set(payload.realm_access.roles),
+    roles: extractRolesFromJwtPayload(payload),
   };
 }
 

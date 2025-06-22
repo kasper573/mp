@@ -1,4 +1,4 @@
-import { consoleLoggerHandler, Logger } from "@mp/logger";
+import { createConsoleLogger } from "@mp/logger";
 import { AuthContext, createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/solid-router";
@@ -31,12 +31,12 @@ import { createFaroClient } from "./integrations/faro";
 registerEncoderExtensions();
 
 export default function App() {
-  const logger = new Logger();
+  const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
-  const rpc = createRpcClient(socket, logger);
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
   const faro = createFaroClient(logger, auth.identity);
+  const rpc = createRpcClient(socket, logger, () => auth.identity()?.token);
   const query = new QueryClient({
     defaultOptions: {
       queries: {
@@ -48,8 +48,7 @@ export default function App() {
 
   void auth.refresh();
 
-  socket.addEventListener("error", (e) => logger.error("Socket error", e));
-  onCleanup(logger.subscribe(consoleLoggerHandler(console)));
+  socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
   onCleanup(() => socket.close());
 
   return (
@@ -58,7 +57,7 @@ export default function App() {
         <LoggerContext.Provider value={logger}>
           <ErrorFallbackContext.Provider
             value={{
-              handleError: (e) => logger.error("SolidJS error", e),
+              handleError: (e) => logger.error(e, "SolidJS error"),
             }}
           >
             <AuthContext.Provider value={auth}>

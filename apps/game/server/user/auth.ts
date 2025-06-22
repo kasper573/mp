@@ -1,30 +1,31 @@
 import { InjectionContext } from "@mp/ioc";
-import type { UserIdentity } from "@mp/auth";
-import type { TokenVerifier } from "@mp/auth/server";
+import type { RoleDefinition, UserId } from "@mp/auth";
+import type { TokenResolver } from "@mp/auth/server";
 import { rpc } from "../rpc";
 import { ctxClientRegistry } from "./client-registry";
-import type { RoleDefinition } from "./define-roles";
 import { ctxClientId } from "./client-id";
+import { ctxUserService } from "./service";
 
-export const ctxTokenVerifier =
-  InjectionContext.new<TokenVerifier>("TokenVerifier");
+export const ctxTokenResolver =
+  InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
   return rpc.middleware(({ ctx }): AuthContext => {
-    const clients = ctx.get(ctxClientRegistry);
     const clientId = ctx.get(ctxClientId);
-    const user = clients.getUser(clientId);
-
-    if (!user) {
-      throw new Error("User is not authenticated");
+    const clients = ctx.get(ctxClientRegistry);
+    const userId = clients.userIds.get(clientId);
+    if (userId === undefined) {
+      throw new Error("User not authenticated");
     }
-    return { user };
+    return { userId };
   });
 }
 
 export function roles(requiredRoles: RoleDefinition[]) {
-  return auth().pipe(({ mwc }) => {
-    if (!new Set(requiredRoles).isSubsetOf(mwc.user.roles)) {
+  return auth().pipe(async ({ ctx, mwc }) => {
+    const userService = ctx.get(ctxUserService);
+    const roles = await userService.getRoles(mwc.userId);
+    if (!new Set(requiredRoles).isSubsetOf(roles)) {
       throw new Error("Insufficient permissions");
     }
 
@@ -34,14 +35,13 @@ export function roles(requiredRoles: RoleDefinition[]) {
 
 export function optionalAuth() {
   return rpc.middleware(({ ctx }): Partial<AuthContext> => {
-    const clients = ctx.get(ctxClientRegistry);
     const clientId = ctx.get(ctxClientId);
-    const user = clients.getUser(clientId);
-
-    return { user };
+    const clients = ctx.get(ctxClientRegistry);
+    const userId = clients.userIds.get(clientId);
+    return { userId };
   });
 }
 
 export interface AuthContext {
-  user: UserIdentity;
+  userId: UserId;
 }

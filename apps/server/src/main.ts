@@ -1,10 +1,10 @@
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
-import { Logger, pinoLoggerHandler } from "@mp/logger";
+import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
-import { createTokenVerifier } from "@mp/auth/server";
+import { createTokenResolver } from "@mp/auth/server";
 import { PatchCollectorFactory, SyncEmitter } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
@@ -16,7 +16,8 @@ import {
   ctxClientRegistry,
   ctxGameStateEmitter,
   ctxNpcSpawner,
-  ctxTokenVerifier,
+  ctxTokenResolver,
+  ctxUserService,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -40,7 +41,7 @@ import {
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 
-import { parseBypassUser, type AuthToken, type UserIdentity } from "@mp/auth";
+import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 import type { GameStateEvents } from "../../game/server/game-state-events";
 import { collectProcessMetrics } from "./metrics/process";
@@ -60,30 +61,36 @@ import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
 import { ctxUpdateTicker } from "./etc/system-rpc";
-import { NpcService } from "./db/services/npc-service";
+import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
-import { CharacterService } from "./db/services/character-service";
-import { GameService } from "./db/services/game-service";
+import { createCharacterService } from "./db/services/character-service";
 import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
+import { createUserService } from "./db/services/user-service";
+import { createGameStateService } from "./db/services/game-service";
 
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = new Logger();
-logger.subscribe(pinoLoggerHandler());
-logger.info(`Server started with options`, opt);
+const logger = createPinoLogger();
+logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;
 
+const userService = createUserService();
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const tokenVerifier = createTokenVerifier({
+const tokenResolver = createTokenResolver({
   ...opt.auth,
   getBypassUser,
+  onResolve(result) {
+    if (result.isOk()) {
+      userService.memorizeUserInfo(result.value);
+    }
+  },
 });
-const db = createDbClient(opt.databaseUrl);
 
-db.$client.on("error", logger.error);
+const db = createDbClient(opt.databaseUrl);
+db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
@@ -111,6 +118,7 @@ await seed(db, areas, actorModels);
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
+  maxPayload: 5000,
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
@@ -128,8 +136,13 @@ const wss = new WebSocketServer({
   },
 });
 
+wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
+
 wss.on("connection", (socket) => {
-  socket.on("close", () => clients.remove(getSocketId(socket)));
+  socket.on("close", () => clients.removeClient(getSocketId(socket)));
+  socket.on("error", (err) =>
+    logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
+  );
 });
 
 const rpcTransceivers = setupRpcTransceivers({
@@ -154,8 +167,8 @@ const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
 
 gameStateEmitter.attachPatchCollectors(gameState);
 
-const npcService = new NpcService(db);
-const gameService = new GameService(db);
+const npcService = createNpcService(db);
+const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
   onError: logger.error,
@@ -175,7 +188,14 @@ const spawnsFromDbAndAreas = [
     allNpcsAndSpawns.map(({ npc }) => npc),
   ),
 ];
-const characterService = new CharacterService(db, areas, actorModels, rng);
+
+const characterService = createCharacterService(
+  db,
+  userService,
+  areas,
+  actorModels,
+  rng,
+);
 const npcSpawner = new NpcSpawner(
   areas,
   actorModels,
@@ -185,12 +205,13 @@ const npcSpawner = new NpcSpawner(
 
 const ioc = new InjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
+  .provide(ctxUserService, userService)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateEmitter, gameStateEmitter)
   .provide(ctxAreaLookup, areas)
-  .provide(ctxTokenVerifier, tokenVerifier)
+  .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
@@ -214,11 +235,7 @@ updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
   createGameStateFlusher(gameState, gameStateEmitter, wss.clients, metrics),
 );
-characterRemoveBehavior(clients, gameState, logger, 5000);
-
-clients.on(({ type, clientId, user }) =>
-  logger.info(`[ClientRegistry][${type}]`, { clientId, userId: user.id }),
-);
+updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
@@ -227,7 +244,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
 persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
 
-function getBypassUser(token: AuthToken): UserIdentity | undefined {
+function getBypassUser(token: AccessToken): UserIdentity | undefined {
   if (!opt.auth.allowBypassUsers) {
     return;
   }

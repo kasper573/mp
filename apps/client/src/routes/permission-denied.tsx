@@ -1,14 +1,34 @@
 import { AuthContext } from "@mp/auth/client";
 import { Button } from "@mp/ui";
-import { useContext } from "solid-js";
+import { Match, Switch, useContext } from "solid-js";
 
 export default function PermissionDenied() {
   const auth = useContext(AuthContext);
+
   return (
-    <div>
-      <h1>Permission Denied</h1>
-      <p>You must be signed in to access this page.</p>
-      <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>
+    <div
+      style={{
+        position: "absolute",
+        top: "128px",
+        left: 0,
+        right: 0,
+        "text-align": "center",
+      }}
+    >
+      <Switch>
+        <Match when={auth.isSignedIn()}>
+          <h1>Permission Denied</h1>
+          <p>
+            Your account does not have the required permissions to access this
+            page.
+          </p>
+        </Match>
+        <Match when={!auth.isSignedIn()}>
+          <h1>Permission Denied</h1>
+          <p>You must be signed in to access this page.</p>
+          <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>
+        </Match>
+      </Switch>
     </div>
   );
 }

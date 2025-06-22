@@ -1,8 +1,8 @@
 import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
-import type { Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import { type Tile, type Pixel, assert, dedupe, throttle } from "@mp/std";
+import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
 import type { ParentProps } from "solid-js";
 import {
   useContext,
@@ -10,7 +10,7 @@ import {
   createEffect,
   untrack,
   For,
-  createContext,
+  Show,
 } from "solid-js";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
@@ -22,6 +22,7 @@ import {
 } from "../../shared/area/area-resource";
 import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
+import { clientViewDistance } from "../../server";
 import { AreaDebugUi } from "./area-debug-ui";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
@@ -36,9 +37,9 @@ export function AreaScene(
   const engine = useContext(EngineContext);
   const state = useContext(GameStateClientContext);
   const actions = useGameActions();
-  const { renderedTileCount } = useContext(AreaSceneContext);
+  const { renderedTileCount } = clientViewDistance;
 
-  const myCoords = () => assert(state.character()).coords;
+  const myCoords = () => state().character()?.coords ?? Vector.zero();
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),
@@ -66,7 +67,7 @@ export function AreaScene(
   );
 
   const entityAtPointer = createMemo(() =>
-    state
+    state()
       .actorList()
       .find(
         (actor) =>
@@ -141,12 +142,12 @@ export function AreaScene(
         >
           {{
             [props.area.dynamicLayer.name]: () => (
-              <For each={state.actorList()}>
+              <For each={state().actorList()}>
                 {(actor) => (
                   <Actor
                     tiled={props.area.tiled}
                     actor={actor}
-                    isPlayer={actor.id === state.characterId()}
+                    isPlayer={actor.id === state().characterId()}
                   />
                 )}
               </For>
@@ -154,34 +155,22 @@ export function AreaScene(
           }}
         </TiledRenderer>
         {props.children}
-        <TileHighlight area={props.area} target={highlightTarget()} />
+        <Show when={engine.isInteractive}>
+          <TileHighlight area={props.area} target={highlightTarget()} />
+        </Show>
         <GameDebugUiPortal>
           <AreaDebugUi
             area={props.area}
             playerCoords={myCoords()}
-            actors={state.actorList()}
+            actors={state().actorList()}
           />
         </GameDebugUiPortal>
       </Pixi>
 
-      <RespawnDialog open={(state.character()?.health ?? 0) <= 0} />
+      <RespawnDialog open={(state().character()?.health ?? 0) <= 0} />
     </>
   );
 }
-
-export const AreaSceneContext = createContext(
-  new Proxy(
-    {} as {
-      renderedTileCount: Tile;
-      networkFogOfWarTileCount: Tile;
-    },
-    {
-      get() {
-        throw new Error("AreaSceneContext not provided");
-      },
-    },
-  ),
-);
 
 function createZoomLevelForViewDistance(
   tileSize: Vector<Pixel>,

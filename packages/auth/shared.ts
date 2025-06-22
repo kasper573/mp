@@ -1,15 +1,14 @@
-import { createUuid, type Branded } from "@mp/std";
+import { createSeededUuid, type Branded } from "@mp/std";
 import type { JWTPayload } from "jose";
 
-export type AuthToken = Branded<string, "AuthToken">;
+export type AccessToken = Branded<string, "AccessToken">;
 export type UserId = Branded<string, "UserId">;
-export type UserRole = string;
 
 export interface UserIdentity {
   id: UserId;
-  token: AuthToken;
+  token: AccessToken;
   name?: string;
-  roles: ReadonlySetLike<UserRole>;
+  roles: ReadonlySetLike<RoleDefinition>;
 }
 
 export interface OurJwtPayload extends JWTPayload {
@@ -25,28 +24,51 @@ export function isOurJwtPayload(payload: JWTPayload): payload is OurJwtPayload {
 
 export function extractRolesFromJwtPayload(
   payload: OurJwtPayload,
-): ReadonlySetLike<UserRole> {
-  return new Set(payload.realm_access.roles);
+): ReadonlySetLike<RoleDefinition> {
+  return new Set(payload.realm_access.roles) as ReadonlySetLike<RoleDefinition>;
 }
 
 const bypassTokenPrefix = "bypass:";
 
-export function createBypassUser(name: string): AuthToken {
-  return (bypassTokenPrefix + name) as AuthToken;
+export function createBypassUser(name: string): AccessToken {
+  return (bypassTokenPrefix + name) as AccessToken;
 }
 
-export function parseBypassUser(token: AuthToken): UserIdentity | undefined {
+export function parseBypassUser(token: AccessToken): UserIdentity | undefined {
   if (!token.startsWith(bypassTokenPrefix)) {
     return;
   }
 
   const name = token.slice(bypassTokenPrefix.length);
   return {
-    id: createUuid() as UserId,
+    id: createSeededUuid(
+      token,
+      "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
+    ) as UserId,
     token,
     roles: new Set(),
     name,
   };
 }
+
+export function defineRoles<const RoleNames extends string[]>(
+  prefix: string,
+  shortNames: RoleNames,
+): RoleDefinitionRecord<RoleNames> {
+  const record = Object.fromEntries(
+    shortNames.map((shortName) => {
+      const fullName = `${prefix}.${shortName}` as RoleDefinition;
+      return [shortName, fullName];
+    }),
+  );
+
+  return record as RoleDefinitionRecord<RoleNames>;
+}
+
+export type RoleDefinition = Branded<string, "RoleDefinition">;
+
+export type RoleDefinitionRecord<ShortNames extends string[]> = {
+  [ShortName in ShortNames[number]]: RoleDefinition;
+};
 
 export { type JWTPayload } from "jose";

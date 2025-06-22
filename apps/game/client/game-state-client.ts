@@ -4,7 +4,6 @@ import type { Vector } from "@mp/math";
 import { assert, throttle, type Tile } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
-import type { AuthToken } from "@mp/auth";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -101,11 +100,11 @@ export function createGameStateClient(
 
 export function createGameActions(
   rpc: GameSolidRpcInvoker,
-  state: GameStateClient,
+  state: Accessor<GameStateClient>,
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
     return rpc.character.move({
-      characterId: assert(state.characterId()),
+      characterId: assert(state().characterId()),
       to,
       desiredPortalId,
     });
@@ -113,14 +112,17 @@ export function createGameActions(
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({
-      characterId: assert(state.characterId()),
+      characterId: assert(state().characterId()),
       targetId,
     });
 
-  const respawn = () => rpc.character.respawn(assert(state.characterId()));
+  const respawn = () => rpc.character.respawn(assert(state().characterId()));
 
-  const join = (token: AuthToken) =>
-    rpc.world.join(token).then(state.setCharacterId);
+  const join = async () => {
+    const char = await rpc.world.join();
+    state().setCharacterId(char.id);
+    return char;
+  };
 
   return {
     respawn,
@@ -136,8 +138,8 @@ export function useGameActions() {
   return createGameActions(rpc, state);
 }
 
-export const GameStateClientContext = createContext<GameStateClient>(
-  new Proxy({} as GameStateClient, {
+export const GameStateClientContext = createContext<Accessor<GameStateClient>>(
+  new Proxy({} as Accessor<GameStateClient>, {
     get() {
       throw new Error("GameStateClientContext not provided");
     },

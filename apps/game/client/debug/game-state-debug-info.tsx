@@ -9,11 +9,9 @@ import {
   createMemo,
 } from "solid-js";
 import type { Character, TiledResource } from "../../server";
-import { BuildVersionContext } from "../build-version-context";
 import { GameStateClientContext } from "../game-state-client";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
-  const versions = useContext(BuildVersionContext);
   const state = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
 
@@ -39,13 +37,11 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
       world: worldPosition,
       tile: tilePos,
       tileSnapped: tilePos.round(),
-      client: versions.client(),
-      server: versions.server(),
       cameraTransform: engine.camera.transform.data,
       frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
       frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameCallbackCount,
-      character: trimCharacterInfo(state.character()),
+      character: trimCharacterInfo(state().character()),
     };
   });
 

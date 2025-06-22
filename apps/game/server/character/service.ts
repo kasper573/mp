@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
@@ -7,7 +7,7 @@ import type { Character } from "./types";
 
 export interface CharacterService {
   getDefaultSpawnPoint(): { areaId: AreaId; coords: Vector<Tile> };
-  getOrCreateCharacterForUser(user: UserIdentity): Promise<Character>;
+  getOrCreateCharacterForUser(userId: UserId): Promise<Character>;
 }
 
 export const ctxCharacterService =

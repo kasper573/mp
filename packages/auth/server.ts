@@ -1,13 +1,14 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
 import {
+  extractRolesFromJwtPayload,
   isOurJwtPayload,
-  type AuthToken,
+  type AccessToken,
   type UserId,
   type UserIdentity,
 } from "./shared";
 
-export interface TokenVerifierOption {
+export interface TokenResolverOption {
   jwksUri: string;
   issuer: string;
   audience: string;
@@ -15,23 +16,29 @@ export interface TokenVerifierOption {
   /**
    * Provide this function to allow bypassing real JWT verification.
    */
-  getBypassUser?: (token: AuthToken) => UserIdentity | undefined;
+  getBypassUser?: (token: AccessToken) => UserIdentity | undefined;
+  /**
+   * Optional callback to handle the result of the token resolution.
+   * This can be used for logging or other side effects.
+   */
+  onResolve?: (result: TokenResolverResult) => void;
 }
 
-export interface TokenVerifier {
-  (token?: AuthToken): Promise<TokenVerifierResult>;
+export interface TokenResolver {
+  (token?: AccessToken): Promise<TokenResolverResult>;
 }
 
-export function createTokenVerifier({
+export function createTokenResolver({
   jwksUri,
   issuer,
   audience,
   algorithms,
   getBypassUser,
-}: TokenVerifierOption): TokenVerifier {
+  onResolve,
+}: TokenResolverOption): TokenResolver {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
 
-  return async function verifyToken(token) {
+  const resolveToken: TokenResolver = async (token) => {
     if (token === undefined) {
       return err("A token must be provided");
     }
@@ -67,7 +74,7 @@ export function createTokenVerifier({
     const user: UserIdentity = {
       id: jwtPayload.sub as UserId,
       token,
-      roles: new Set(jwtPayload.realm_access.roles),
+      roles: extractRolesFromJwtPayload(jwtPayload),
       name: jwtPayload.preferred_username
         ? String(jwtPayload.preferred_username)
         : undefined,
@@ -75,9 +82,15 @@ export function createTokenVerifier({
 
     return ok(user);
   };
+
+  return async (token) => {
+    const result = await resolveToken(token);
+    onResolve?.(result);
+    return result;
+  };
 }
 
-export type TokenVerifierResult = Result<UserIdentity, string>;
+export type TokenResolverResult = Result<UserIdentity, string>;
 
 // Current implementation only supports asymmetric algorithms
 export const authAlgorithms = [

@@ -21,7 +21,7 @@ export function Actor(props: {
   isPlayer?: boolean;
 }) {
   const allSpritesheets = useContext(ActorSpritesheetContext);
-  const { eventBus } = useContext(GameStateClientContext);
+  const state = useContext(GameStateClientContext);
   const position = createMemo(() =>
     props.tiled.tileCoordToWorld(props.actor.coords),
   );
@@ -80,25 +80,27 @@ export function Actor(props: {
 
   createEffect(switchAnimationToMovingOrIdle);
 
-  onCleanup(
-    // eslint-disable-next-line solid/reactivity
-    eventBus.subscribe("combat.attack", (attack) => {
-      if (attack.actorId === props.actor.id) {
-        void sprite
-          .playToEndAndStop("attack-spear")
-          .then(switchAnimationToMovingOrIdle);
-      }
-    }),
-  );
+  createEffect(() => {
+    onCleanup(
+      // eslint-disable-next-line solid/reactivity
+      state().eventBus.subscribe("combat.attack", (attack) => {
+        if (attack.actorId === props.actor.id) {
+          void sprite
+            .playToEndAndStop("attack-spear")
+            .then(switchAnimationToMovingOrIdle);
+        }
+      }),
+    );
 
-  onCleanup(
-    // eslint-disable-next-line solid/reactivity
-    eventBus.subscribe("actor.death", (deadActorId) => {
-      if (deadActorId === props.actor.id) {
-        void sprite.playToEndAndStop("death-spear");
-      }
-    }),
-  );
+    onCleanup(
+      // eslint-disable-next-line solid/reactivity
+      state().eventBus.subscribe("actor.death", (deadActorId) => {
+        if (deadActorId === props.actor.id) {
+          void sprite.playToEndAndStop("death-spear");
+        }
+      }),
+    );
+  });
 
   onCleanup(() => {
     sprite.destroy();

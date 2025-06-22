@@ -10,13 +10,10 @@ import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { Select } from "@mp/ui";
 import { createStorageSignal } from "@mp/state";
-import type { Actor } from "../../server";
+import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
-
-import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
-import { AreaSceneContext } from "./area-scene";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
@@ -61,10 +58,11 @@ export function AreaDebugUi(props: {
           ) : null
         }
       </For>
-      <GameDebugUiPortal>
+      <>
         <div>
           Visible Graph lines:{" "}
           <Select
+            required
             options={visibleGraphTypes}
             value={settings().visibleGraphType}
             onChange={(visibleGraphType) =>
@@ -113,7 +111,7 @@ export function AreaDebugUi(props: {
           />
           Show npc aggro range
         </label>
-      </GameDebugUiPortal>
+      </>
 
       <Show when={settings().showFogOfWar && props.playerCoords}>
         {(coords) => (
@@ -228,7 +226,7 @@ function DebugNetworkFogOfWar(props: {
   playerCoords: Vector<Tile>;
   area: AreaResource;
 }) {
-  const { networkFogOfWarTileCount } = useContext(AreaSceneContext);
+  const { networkFogOfWarTileCount } = clientViewDistance;
 
   const gfx = new Graphics();
 

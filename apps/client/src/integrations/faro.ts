@@ -1,13 +1,12 @@
 import type { UserIdentity } from "@mp/auth";
 import type { FaroUser } from "@mp/telemetry/faro";
 import {
-  faroLoggerHandler,
   getWebInstrumentations,
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
 import type { Logger } from "@mp/logger";
-import { onCleanup, createEffect } from "solid-js";
+import { createEffect } from "solid-js";
 import { env } from "../env";
 
 export function createFaroClient(
@@ -27,7 +26,6 @@ export function createFaroClient(
     ],
   });
 
-  onCleanup(logger.subscribe(faroLoggerHandler(faro)));
   createEffect(() => faro.api.setUser(deriveFaroUser(identity())));
   return faro;
 }

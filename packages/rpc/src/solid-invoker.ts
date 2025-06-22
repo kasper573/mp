@@ -91,7 +91,7 @@ export type SolidRpcRouterInvoker<Router extends AnyRouterNode> = {
 export interface SolidRpcQueryOptions<Input, Output, MappedOutput>
   extends Omit<
     tanstack.SolidQueryOptions<Input, tanstack.DefaultError, Output>,
-    "initialData" | "queryKey" | "queryFn"
+    "initialData" | "queryKey" | "queryFn" | "select"
   > {
   input: Input | tanstack.SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;

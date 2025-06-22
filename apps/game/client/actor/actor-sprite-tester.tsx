@@ -39,7 +39,7 @@ export function ActorSpriteTester() {
         <ActorSpritesheetContext.Provider value={spritesheets}>
           <Application style={{ display: "flex", flex: 1 }}>
             {({ viewport }) => (
-              <EngineProvider viewport={viewport}>
+              <EngineProvider interactive viewport={viewport}>
                 <ActorSpriteList />
               </EngineProvider>
             )}

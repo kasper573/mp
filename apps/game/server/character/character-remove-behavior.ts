@@ -1,53 +1,51 @@
-import type { UserId } from "@mp/auth";
 import type { Logger } from "@mp/logger";
 import { recordValues } from "@mp/std";
+import type { TickEventHandler } from "@mp/time";
+import { TimeSpan } from "@mp/time";
 import type { ClientRegistry } from "../user/client-registry";
 import type { GameState } from "../game-state";
+import type { CharacterId } from "./types";
 
+/**
+ *  The client registry is the controller of which character SHOULD be in the game.
+ *  If a character actor is present in the game state, but not in the client registry,
+ *  this means that the player has logged out or disconnected and the character
+ *  should be scheduled for removal.
+ */
 export function characterRemoveBehavior(
   clients: ClientRegistry,
   state: GameState,
   logger: Logger,
-  timeout: number,
-) {
-  const removeTimeouts = new Map<UserId, NodeJS.Timeout>();
+): TickEventHandler {
+  const removeSchedules = new Map<CharacterId, TimeSpan>();
 
-  const stop = clients.on(({ type, user }) => {
-    switch (type) {
-      case "remove": {
-        if (clients.hasClient(user.id)) {
-          // User is still connected with another client, no need to remove character
-          break;
-        }
+  return ({ totalTimeElapsed }) => {
+    const registeredCharacterIds = new Set(clients.characterIds.values());
 
-        logger.info("Scheduling character removal for user", user.id);
-        const timeoutId = setTimeout(() => removeCharacter(user.id), timeout);
-        removeTimeouts.set(user.id, timeoutId);
-        break;
-      }
-
-      case "add": {
-        const timeoutId = removeTimeouts.get(user.id);
-        if (timeoutId) {
-          logger.info("User reconnected, cancelling removal timeout");
-          clearTimeout(timeoutId);
-          removeTimeouts.delete(user.id);
-        }
-        break;
-      }
-    }
-  });
-
-  function removeCharacter(userId: UserId) {
-    for (const char of recordValues(state.actors).filter(
-      (actor) => actor.type === "character",
+    for (const character of recordValues(state.actors).filter(
+      (a) => a.type === "character",
     )) {
-      if (char.userId === userId) {
-        logger.info("Removing character", char.id);
-        delete state.actors[char.id];
+      if (!registeredCharacterIds.has(character.id)) {
+        if (removeSchedules.has(character.id)) {
+          // Already scheduled for removal, nothing else to do
+        } else {
+          logger.info(`Scheduling removal of character ${character.id}`);
+          removeSchedules.set(character.id, totalTimeElapsed.add(removeDelay));
+        }
+      } else if (removeSchedules.has(character.id)) {
+        logger.info(`Canceling scheduled removal of character ${character.id}`);
+        removeSchedules.delete(character.id);
       }
     }
-  }
 
-  return stop;
+    for (const [characterId, removeTime] of removeSchedules.entries()) {
+      if (totalTimeElapsed.compareTo(removeTime) >= 0) {
+        logger.info(`Removing character ${characterId}`);
+        delete state.actors[characterId];
+        removeSchedules.delete(characterId);
+      }
+    }
+  };
 }
+
+const removeDelay = TimeSpan.fromSeconds(5);

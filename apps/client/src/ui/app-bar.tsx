@@ -3,6 +3,7 @@ import { AuthContext } from "@mp/auth/client";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
 import { Button, LinearProgress } from "@mp/ui";
+import { systemRoles, worldRoles } from "@mp/game/client";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
@@ -17,9 +18,16 @@ export default function AppBar() {
     <nav class={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
-      <Link to="/sandbox">Dev Tools</Link>
       <Link to="/contact">Contact</Link>
-      <Link to="/actor-tester">Actor Tester</Link>
+
+      <Show when={auth.identity()?.roles.has(systemRoles.useDevTools)}>
+        <Link to="/admin/devtools">Dev Tools</Link>
+        <Link to="/admin/devtools/actor-tester">Actor Tester</Link>
+      </Show>
+
+      <Show when={auth.identity()?.roles.has(worldRoles.spectate)}>
+        <Link to="/admin/spectator">Spectate</Link>
+      </Show>
 
       <LinearProgress
         class={dock({ position: "top" })}
@@ -35,7 +43,7 @@ export default function AppBar() {
         </Suspense>
 
         {auth.isSignedIn() ? (
-          <Button role="link" onClick={() => void auth.signOut()}>
+          <Button role="link" onClick={() => void auth.signOutRedirect()}>
             Sign out
           </Button>
         ) : (

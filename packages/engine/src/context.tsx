@@ -13,12 +13,12 @@ export const EngineContext = createContext<Engine>(
 export function EngineProvider(
   props: ParentProps<{
     viewport: HTMLElement;
-    interactive?: boolean;
+    interactive: boolean;
   }>,
 ) {
   const engine = createMemo(() => {
     const engine = new Engine(props.viewport);
-    engine.start(props.interactive ?? true);
+    engine.start(props.interactive);
     onCleanup(engine.stop);
     return engine;
   });
