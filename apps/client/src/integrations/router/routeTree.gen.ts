@@ -9,141 +9,122 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './../../routes/~__root'
-import { Route as SandboxRouteImport } from './../../routes/~sandbox'
-import { Route as PlayRouteImport } from './../../routes/~play'
-import { Route as ContactRouteImport } from './../../routes/~contact'
 import { Route as AuthCallbackRouteImport } from './../../routes/~auth-callback'
-import { Route as ActorTesterRouteImport } from './../../routes/~actor-tester'
-import { Route as IndexRouteImport } from './../../routes/~index'
-import { Route as AdminSpectatorRouteImport } from './../../routes/~admin.spectator'
+import { Route as LayoutRouteRouteImport } from './../../routes/~_layout/~route'
+import { Route as LayoutSandboxRouteImport } from './../../routes/~_layout/~sandbox'
+import { Route as LayoutPlayRouteImport } from './../../routes/~_layout/~play'
+import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~contact'
+import { Route as LayoutActorTesterRouteImport } from './../../routes/~_layout/~actor-tester'
+import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
+import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin.spectator'
 
-const SandboxRoute = SandboxRouteImport.update({
-  id: '/sandbox',
-  path: '/sandbox',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const PlayRoute = PlayRouteImport.update({
-  id: '/play',
-  path: '/play',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ContactRoute = ContactRouteImport.update({
-  id: '/contact',
-  path: '/contact',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AuthCallbackRoute = AuthCallbackRouteImport.update({
   id: '/auth-callback',
   path: '/auth-callback',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ActorTesterRoute = ActorTesterRouteImport.update({
+const LayoutRouteRoute = LayoutRouteRouteImport.update({
+  id: '/_layout',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LayoutSandboxRoute = LayoutSandboxRouteImport.update({
+  id: '/sandbox',
+  path: '/sandbox',
+  getParentRoute: () => LayoutRouteRoute,
+} as any)
+const LayoutPlayRoute = LayoutPlayRouteImport.update({
+  id: '/play',
+  path: '/play',
+  getParentRoute: () => LayoutRouteRoute,
+} as any)
+const LayoutContactRoute = LayoutContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => LayoutRouteRoute,
+} as any)
+const LayoutActorTesterRoute = LayoutActorTesterRouteImport.update({
   id: '/actor-tester',
   path: '/actor-tester',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => LayoutRouteRoute,
 } as any)
-const IndexRoute = IndexRouteImport.update({
+const LayoutIndexRoute = LayoutIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => LayoutRouteRoute,
 } as any)
-const AdminSpectatorRoute = AdminSpectatorRouteImport.update({
+const LayoutAdminSpectatorRoute = LayoutAdminSpectatorRouteImport.update({
   id: '/admin/spectator',
   path: '/admin/spectator',
-  getParentRoute: () => rootRouteImport,
+  getParentRoute: () => LayoutRouteRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
-  '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
-  '/admin/spectator': typeof AdminSpectatorRoute
+  '/': typeof LayoutIndexRoute
+  '/actor-tester': typeof LayoutActorTesterRoute
+  '/contact': typeof LayoutContactRoute
+  '/play': typeof LayoutPlayRoute
+  '/sandbox': typeof LayoutSandboxRoute
+  '/admin/spectator': typeof LayoutAdminSpectatorRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
-  '/actor-tester': typeof ActorTesterRoute
   '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
-  '/admin/spectator': typeof AdminSpectatorRoute
+  '/': typeof LayoutIndexRoute
+  '/actor-tester': typeof LayoutActorTesterRoute
+  '/contact': typeof LayoutContactRoute
+  '/play': typeof LayoutPlayRoute
+  '/sandbox': typeof LayoutSandboxRoute
+  '/admin/spectator': typeof LayoutAdminSpectatorRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
-  '/actor-tester': typeof ActorTesterRoute
+  '/_layout': typeof LayoutRouteRouteWithChildren
   '/auth-callback': typeof AuthCallbackRoute
-  '/contact': typeof ContactRoute
-  '/play': typeof PlayRoute
-  '/sandbox': typeof SandboxRoute
-  '/admin/spectator': typeof AdminSpectatorRoute
+  '/_layout/': typeof LayoutIndexRoute
+  '/_layout/actor-tester': typeof LayoutActorTesterRoute
+  '/_layout/contact': typeof LayoutContactRoute
+  '/_layout/play': typeof LayoutPlayRoute
+  '/_layout/sandbox': typeof LayoutSandboxRoute
+  '/_layout/admin/spectator': typeof LayoutAdminSpectatorRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
+    | '/auth-callback'
     | '/'
     | '/actor-tester'
-    | '/auth-callback'
     | '/contact'
     | '/play'
     | '/sandbox'
     | '/admin/spectator'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/auth-callback'
     | '/'
     | '/actor-tester'
-    | '/auth-callback'
     | '/contact'
     | '/play'
     | '/sandbox'
     | '/admin/spectator'
   id:
     | '__root__'
-    | '/'
-    | '/actor-tester'
+    | '/_layout'
     | '/auth-callback'
-    | '/contact'
-    | '/play'
-    | '/sandbox'
-    | '/admin/spectator'
+    | '/_layout/'
+    | '/_layout/actor-tester'
+    | '/_layout/contact'
+    | '/_layout/play'
+    | '/_layout/sandbox'
+    | '/_layout/admin/spectator'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
-  ActorTesterRoute: typeof ActorTesterRoute
+  LayoutRouteRoute: typeof LayoutRouteRouteWithChildren
   AuthCallbackRoute: typeof AuthCallbackRoute
-  ContactRoute: typeof ContactRoute
-  PlayRoute: typeof PlayRoute
-  SandboxRoute: typeof SandboxRoute
-  AdminSpectatorRoute: typeof AdminSpectatorRoute
 }
 
 declare module '@tanstack/solid-router' {
   interface FileRoutesByPath {
-    '/sandbox': {
-      id: '/sandbox'
-      path: '/sandbox'
-      fullPath: '/sandbox'
-      preLoaderRoute: typeof SandboxRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/play': {
-      id: '/play'
-      path: '/play'
-      fullPath: '/play'
-      preLoaderRoute: typeof PlayRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/contact': {
-      id: '/contact'
-      path: '/contact'
-      fullPath: '/contact'
-      preLoaderRoute: typeof ContactRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/auth-callback': {
       id: '/auth-callback'
       path: '/auth-callback'
@@ -151,38 +132,83 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof AuthCallbackRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/actor-tester': {
-      id: '/actor-tester'
+    '/_layout': {
+      id: '/_layout'
+      path: ''
+      fullPath: ''
+      preLoaderRoute: typeof LayoutRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_layout/sandbox': {
+      id: '/_layout/sandbox'
+      path: '/sandbox'
+      fullPath: '/sandbox'
+      preLoaderRoute: typeof LayoutSandboxRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
+    '/_layout/play': {
+      id: '/_layout/play'
+      path: '/play'
+      fullPath: '/play'
+      preLoaderRoute: typeof LayoutPlayRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
+    '/_layout/contact': {
+      id: '/_layout/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof LayoutContactRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
+    '/_layout/actor-tester': {
+      id: '/_layout/actor-tester'
       path: '/actor-tester'
       fullPath: '/actor-tester'
-      preLoaderRoute: typeof ActorTesterRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof LayoutActorTesterRouteImport
+      parentRoute: typeof LayoutRouteRoute
     }
-    '/': {
-      id: '/'
+    '/_layout/': {
+      id: '/_layout/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof LayoutIndexRouteImport
+      parentRoute: typeof LayoutRouteRoute
     }
-    '/admin/spectator': {
-      id: '/admin/spectator'
+    '/_layout/admin/spectator': {
+      id: '/_layout/admin/spectator'
       path: '/admin/spectator'
       fullPath: '/admin/spectator'
-      preLoaderRoute: typeof AdminSpectatorRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof LayoutAdminSpectatorRouteImport
+      parentRoute: typeof LayoutRouteRoute
     }
   }
 }
 
+interface LayoutRouteRouteChildren {
+  LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutActorTesterRoute: typeof LayoutActorTesterRoute
+  LayoutContactRoute: typeof LayoutContactRoute
+  LayoutPlayRoute: typeof LayoutPlayRoute
+  LayoutSandboxRoute: typeof LayoutSandboxRoute
+  LayoutAdminSpectatorRoute: typeof LayoutAdminSpectatorRoute
+}
+
+const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
+  LayoutIndexRoute: LayoutIndexRoute,
+  LayoutActorTesterRoute: LayoutActorTesterRoute,
+  LayoutContactRoute: LayoutContactRoute,
+  LayoutPlayRoute: LayoutPlayRoute,
+  LayoutSandboxRoute: LayoutSandboxRoute,
+  LayoutAdminSpectatorRoute: LayoutAdminSpectatorRoute,
+}
+
+const LayoutRouteRouteWithChildren = LayoutRouteRoute._addFileChildren(
+  LayoutRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
-  ActorTesterRoute: ActorTesterRoute,
+  LayoutRouteRoute: LayoutRouteRouteWithChildren,
   AuthCallbackRoute: AuthCallbackRoute,
-  ContactRoute: ContactRoute,
-  PlayRoute: PlayRoute,
-  SandboxRoute: SandboxRoute,
-  AdminSpectatorRoute: AdminSpectatorRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

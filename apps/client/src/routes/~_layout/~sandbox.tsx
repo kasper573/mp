@@ -10,9 +10,9 @@ import { Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
-import { useRpc } from "../integrations/rpc";
+import { useRpc } from "../../integrations/rpc";
 
-export const Route = createFileRoute("/sandbox")({
+export const Route = createFileRoute("/_layout/sandbox")({
   component: RouteComponent,
 });
 
