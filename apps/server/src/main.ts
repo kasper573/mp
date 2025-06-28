@@ -71,7 +71,7 @@ import { createGameStateService } from "./db/services/game-service";
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = createPinoLogger();
+const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;

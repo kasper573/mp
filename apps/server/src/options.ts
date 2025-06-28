@@ -127,6 +127,13 @@ export const serverOptionsSchema = object({
   rngSeed: optional(numeric()),
 
   /**
+   * Set to true to enable pretty formatted logs.
+   * This will make the logs more readable, but less performant.
+   * Should only be used in development.
+   */
+  prettyLogs: boolish(),
+
+  /**
    * Set to true to enable the patch optimizer on the server side.
    */
   patchOptimizer: boolish(),
