@@ -2,16 +2,15 @@ import type { UserId } from "@mp/auth";
 import type { Rng } from "@mp/std";
 import { assert, type Tile, type TimesPerSecond } from "@mp/std";
 import { cardinalDirections } from "@mp/math";
-import type {
-  AreaLookup,
-  ActorModelLookup,
-  AppearanceTrait,
-  ActorModelId,
+import {
+  type AreaLookup,
+  type ActorModelLookup,
+  type AppearanceTrait,
+  type ActorModelId,
+  type CharacterService,
+  type UserService,
   Character,
-  CharacterService,
-  UserService,
 } from "@mp/game/server";
-import { CharacterFactory } from "@mp/game/server";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
@@ -83,8 +82,7 @@ export function createCharacterService(
       }
 
       const model = assert(models.get(databaseFields.modelId));
-      return CharacterFactory.create({
-        type: "character",
+      return new Character({
         ...databaseFields,
         hitBox: model.hitBox,
         dir: rng.oneOf(cardinalDirections),

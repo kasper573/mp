@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncEmitter } from "../src/sync-emitter";
-import { PatchCollectorFactory } from "../src/patch-collector";
+import { collect } from "../src/patch-collector";
 
 type TestState = {
   items: Record<string, number>;
@@ -68,12 +68,18 @@ it("returns no patches or events when flushed twice with no changes", () => {
 });
 
 it("can collect patches", () => {
-  interface Person {
-    id: string;
-    cash: number;
-  }
+  class Person {
+    @collect()
+    accessor id: string = "";
 
-  const PersonFactory = new PatchCollectorFactory<Person>();
+    @collect()
+    accessor cash: number = 0;
+
+    constructor(id: string, cash: number) {
+      this.id = id;
+      this.cash = cash;
+    }
+  }
 
   type TestState = {
     persons: Record<Person["id"], Person>;
@@ -86,8 +92,8 @@ it("can collect patches", () => {
     }),
   });
 
-  const john = PersonFactory.create({ id: "john", cash: 0 });
-  const jane = PersonFactory.create({ id: "jane", cash: 50 });
+  const john = new Person("john", 0);
+  const jane = new Person("jane", 50);
   const serverState = {
     persons: Object.fromEntries([
       [john.id, john],

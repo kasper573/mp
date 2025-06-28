@@ -9,13 +9,12 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
-import type { NpcInstance } from "./types";
+import { NpcInstance } from "./types";
 import {
   type Npc,
   type NpcType,
   type NpcInstanceId,
   type NpcSpawn,
-  NpcInstanceFactory,
 } from "./types";
 
 export class NpcSpawner {
@@ -66,8 +65,7 @@ export class NpcSpawner {
     const area = assert(this.areas.get(spawn.areaId));
     const coords = determineSpawnCoords(spawn, area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
-    return NpcInstanceFactory.create({
-      type: "npc",
+    return new NpcInstance({
       ...npc,
       id,
       npcId: npc.id,

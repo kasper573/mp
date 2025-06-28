@@ -1,12 +1,15 @@
-import type { Branded, Tile, TimesPerSecond } from "@mp/std";
-import type { Path, Vector } from "@mp/math";
-import { PatchCollectorFactory } from "@mp/sync";
+import type { Branded, MinimalInput, Tile, TimesPerSecond } from "@mp/std";
+import type { CardinalDirection, Path, Rect, Vector } from "@mp/math";
+import { collect, selectCollectableSubset } from "@mp/sync";
+import type { TimeSpan } from "@mp/time";
+import { addEncoderExtension } from "@mp/encoding";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
 import { type AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../../shared/area/area-id";
 import * as patchOptimizers from "../patch-optimizers";
+import type { ActorId } from "../actor";
 
 export type NpcType = (typeof npcTypes)[number];
 export const npcTypes = [
@@ -73,20 +76,97 @@ export type NpcId = Branded<string, "NPCId">;
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-export interface NpcInstance
-  extends Omit<Npc, "id">,
-    MovementTrait,
-    AppearanceTrait,
-    CombatTrait {
-  type: "npc";
-  id: NpcInstanceId;
-  npcId: NpcId;
-  spawnId: NpcSpawnId;
-  patrol?: Path<Tile>;
+export class NpcInstance
+  implements Omit<Npc, "id">, MovementTrait, AppearanceTrait, CombatTrait
+{
+  @collect()
+  accessor type = "npc" as const;
+  @collect()
+  accessor id: NpcInstanceId;
+  @collect()
+  accessor npcId: NpcId;
+  @collect()
+  accessor spawnId: NpcSpawnId;
+  @collect()
+  accessor patrol: Path<Tile> | undefined;
+  @collect()
+  accessor modelId: ActorModelId;
+  @collect()
+  accessor name: string;
+  @collect()
+  accessor speed: Tile;
+  @collect()
+  accessor maxHealth: number;
+  @collect()
+  accessor attackDamage: number;
+  @collect()
+  accessor attackSpeed: TimesPerSecond;
+  @collect()
+  accessor attackRange: Tile;
+  @collect()
+  accessor npcType: NpcType;
+  @collect()
+  accessor aggroRange: Tile;
+  @collect()
+  accessor xpReward: number;
+  @collect(patchOptimizers.coords)
+  accessor coords: Vector<Tile>;
+  @collect()
+  accessor areaId: AreaId;
+  @collect()
+  accessor moveTarget: Vector<Tile> | undefined;
+  @collect(patchOptimizers.path)
+  accessor path: Path<Tile> | undefined;
+  @collect()
+  accessor dir: CardinalDirection;
+  @collect()
+  accessor color: number | undefined;
+  @collect()
+  accessor opacity: number | undefined;
+  @collect()
+  accessor hitBox: Rect<Tile>;
+  @collect()
+  accessor health: number;
+  @collect()
+  accessor attackTargetId: ActorId | undefined;
+  @collect()
+  accessor lastAttack: TimeSpan | undefined;
+
+  constructor(data: Omit<MinimalInput<NpcInstance>, "type">) {
+    this.id = data.id;
+    this.npcId = data.npcId;
+    this.spawnId = data.spawnId;
+    this.patrol = data.patrol;
+    this.modelId = data.modelId;
+    this.name = data.name;
+    this.speed = data.speed;
+    this.maxHealth = data.maxHealth;
+    this.attackDamage = data.attackDamage;
+    this.attackSpeed = data.attackSpeed;
+    this.attackRange = data.attackRange;
+    this.npcType = data.npcType;
+    this.aggroRange = data.aggroRange;
+    this.xpReward = data.xpReward;
+    this.coords = data.coords;
+    this.areaId = data.areaId;
+    this.moveTarget = data.moveTarget;
+    this.path = data.path;
+    this.dir = data.dir;
+    this.color = data.color;
+    this.opacity = data.opacity;
+    this.hitBox = data.hitBox;
+    this.health = data.health;
+    this.attackTargetId = data.attackTargetId;
+    this.lastAttack = data.lastAttack;
+  }
 }
 
-export const NpcInstanceFactory = new PatchCollectorFactory<NpcInstance>(
-  patchOptimizers,
-);
+// TODO move to encoder-externsions.ts when game package has been refactored to be organized by domain rathr than client/server.
+addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
+  Class: NpcInstance as never,
+  tag: 40_600,
+  encode: (npc, encode) => encode(selectCollectableSubset(npc)),
+  decode: (data) => new NpcInstance(data as MinimalInput<NpcInstance>),
+});
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

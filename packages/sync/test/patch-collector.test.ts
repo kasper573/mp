@@ -1,150 +1,231 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
-  flushInstance,
+  collect,
+  flushObject,
   flushRecord,
-  PatchCollectorFactory,
+  selectCollectableSubset,
+  subscribeToObject,
+  subscribeToRecord,
 } from "../src/patch-collector";
-import { applyPatch, type Patch } from "../src/patch";
+import { applyPatch, PatchType } from "../src/patch";
 
-describe("basic object behavior", () => {
-  const Entity = new PatchCollectorFactory<{
-    name: string;
-    cash: number;
-  }>();
+it("can collect changes as patch", () => {
+  class Entity {
+    @collect()
+    accessor count: number = 0;
+  }
 
-  it("instance is structurally equal to its initial data", () => {
-    const initialData = { name: "john", cash: 100 };
-    const entity = Entity.create(initialData);
-    expect(entity).toEqual(initialData);
+  const e = new Entity();
+  e.count = 1;
+  e.count = 2;
+
+  const patch = flushObject(e);
+  expect(patch).toEqual([[PatchType.Update, [], { count: 2 }]]);
+});
+
+it("does not collect changes to non decorated fields", () => {
+  class Entity {
+    @collect()
+    accessor count: number = 0;
+
+    notCollected = "value";
+  }
+
+  const e = new Entity();
+  e.notCollected = "changed";
+  const patch = flushObject(e);
+  expect(patch).toEqual([]);
+});
+
+it("can select collectable subset", () => {
+  class Entity {
+    @collect()
+    accessor count: number = 0;
+
+    @collect()
+    accessor name: string = "";
+
+    notCollected = "value";
+  }
+
+  const e = new Entity();
+  e.count = 1;
+  e.name = "john";
+  const subset = selectCollectableSubset(e);
+  expect(subset).toEqual({ count: 1, name: "john" });
+});
+
+describe("subscriptions", () => {
+  it("does not emit events on mutation", () => {
+    class Entity {
+      @collect()
+      accessor count: number = 0;
+    }
+
+    const fn = vi.fn();
+    const e = new Entity();
+    subscribeToObject(e, fn);
+    e.count = 1;
+    e.count = 2;
+    expect(fn).toHaveBeenCalledTimes(0);
   });
 
-  it("can read a property value", () => {
-    const initialData = { name: "john", cash: 100 };
-    const entity = Entity.create(initialData);
-    expect(entity.name).toEqual("john");
-    expect(entity.cash).toEqual(100);
+  it("can subscribe to changes on class instances", () => {
+    class Entity {
+      @collect()
+      accessor count: number = 0;
+    }
+
+    const fn = vi.fn();
+    const e = new Entity();
+    e.count = 1;
+    e.count = 2;
+
+    subscribeToObject(e, fn);
+    flushObject(e);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenNthCalledWith(1, { count: 2 });
   });
 
-  it("can mutate a property", () => {
-    const entity = Entity.create({ name: "john", cash: 100 });
-    entity.name = "jane";
-    expect(entity).toEqual({ name: "jane", cash: 100 });
+  it("can stop subscribing to changes on class instances", () => {
+    class Entity {
+      @collect()
+      accessor count: number = 0;
+    }
+
+    const fn = vi.fn();
+    const e = new Entity();
+
+    const stop = subscribeToObject(e, fn);
+
+    e.count = 1;
+    flushObject(e);
+
+    stop();
+
+    e.count = 2;
+    flushObject(e);
+
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenNthCalledWith(1, { count: 1 });
+  });
+
+  it("can subscribe to changes on records", () => {
+    class Entity {
+      constructor(public name: string) {}
+    }
+
+    const record: Record<string, Entity> = {};
+
+    const fn = vi.fn();
+    subscribeToRecord(record, fn);
+
+    // Adding
+    const john = new Entity("john");
+    record["1"] = john;
+    flushRecord(record);
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(fn).toHaveBeenNthCalledWith(1, {
+      type: "add",
+      key: "1",
+      value: john,
+    });
+
+    // Removing
+    delete record["1"];
+    flushRecord(record);
+    expect(fn).toHaveBeenCalledTimes(2);
+    expect(fn).toHaveBeenNthCalledWith(2, {
+      type: "remove",
+      key: "1",
+    });
+  });
+
+  it("can stop subscribing to changes on records", () => {
+    class Entity {
+      constructor(public name: string) {}
+    }
+
+    const record: Record<string, Entity> = {};
+
+    const fn = vi.fn();
+    const stop = subscribeToRecord(record, fn);
+
+    record["1"] = new Entity("john");
+    flushRecord(record);
+    expect(fn).toHaveBeenCalledTimes(1);
+
+    stop();
+
+    record["1"] = new Entity("jane");
+    flushRecord(record);
+    expect(fn).toHaveBeenCalledTimes(1); // unchanged
   });
 });
 
-describe("patch collection", () => {
-  it("can observe mutations on entities", () => {
-    const Entity = new PatchCollectorFactory<{
-      name: string;
-      cash: number;
-    }>();
+describe("can collect changes from record of decorated entities", () => {
+  it("set", () => {
+    class Entity {
+      @collect()
+      accessor cash: number = 0;
+    }
 
-    const initialData = { name: "john", cash: 100 };
-    const target = structuredClone(initialData);
+    const source: Record<string, Entity> = {};
+    source["john"] = new Entity();
+    source["john"].cash = 50;
 
-    const entity = Entity.create(initialData);
-    entity.name = "jane";
+    const patch = flushRecord(source);
 
-    const patch: Patch = flushInstance(entity);
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, patch);
 
-    applyPatch(target, patch);
-    expect(target).toEqual({ name: "jane", cash: 100 });
+    expect(receiver.john.cash).toBe(50);
   });
 
-  it("flushing immediately after creating instance returns an empty patch", () => {
-    const Entity = new PatchCollectorFactory<{
-      name: string;
-    }>();
+  it("delete", () => {
+    class Entity {
+      @collect()
+      accessor cash: number = 0;
+    }
 
-    const entity = Entity.create({ name: "john" });
+    const john = new Entity();
+    john.cash = 0;
+    const jane = new Entity();
+    jane.cash = 50;
 
-    const patch: Patch = flushInstance(entity);
+    const source: Record<string, Entity> = { john, jane };
 
-    expect(patch).toEqual([]);
+    // Flush initial state
+    const receiver: Record<string, Entity> = Object.fromEntries([]);
+    applyPatch(receiver, flushRecord(source));
+
+    // Apply and flush delete
+    delete source["john"];
+    applyPatch(receiver, flushRecord(source));
+
+    expect(receiver.john).toBeUndefined();
+    expect(receiver.jane.cash).toBe(50);
   });
 
-  it("assigning an unchanged property value yields an empty patch", () => {
-    const Entity = new PatchCollectorFactory<{
-      name: string;
-    }>();
+  it("entity mutation", () => {
+    class Entity {
+      @collect()
+      accessor cash: number = 0;
+    }
 
-    const entity = Entity.create({ name: "john" });
-    entity.name = "john";
+    const john = new Entity();
+    john.cash = 0;
+    const source = { john };
 
-    const patch: Patch = flushInstance(entity);
+    // Flush initial state
+    const receiver: Record<string, Entity> = {};
+    const patch = flushRecord(source);
+    applyPatch(receiver, patch);
 
-    expect(patch).toEqual([]);
-  });
+    // Apply and flush entity mutation
+    john.cash = 25;
+    applyPatch(receiver, patch);
 
-  describe("can observe mutations on entity records", () => {
-    it("set", () => {
-      interface Entity {
-        name: string;
-        cash: number;
-      }
-      const EntityFactory = new PatchCollectorFactory<Entity>();
-
-      const source: Record<string, Entity> = {};
-      source["john"] = EntityFactory.create({ name: "john", cash: 123 });
-
-      const patch = flushRecord(source);
-
-      const receiver = {};
-      applyPatch(receiver, patch);
-      expect(receiver).toEqual(
-        Object.fromEntries([["john", { name: "john", cash: 123 }]]),
-      );
-    });
-
-    it("delete", () => {
-      interface Entity {
-        id: string;
-        cash: number;
-      }
-      const EntityFactory = new PatchCollectorFactory<Entity>();
-
-      const john = EntityFactory.create({ id: "john", cash: 0 });
-      const jane = EntityFactory.create({ id: "jane", cash: 50 });
-      const source = Object.fromEntries([
-        [john.id, john],
-        [jane.id, jane],
-      ]);
-
-      // Flush initial state
-      const receiver = Object.fromEntries([]);
-      applyPatch(receiver, flushRecord(source));
-
-      // Apply and flush delete
-      delete source[john.id];
-      applyPatch(receiver, flushRecord(source));
-
-      expect(receiver).toEqual(
-        Object.fromEntries([[jane.id, { id: jane.id, cash: 50 }]]),
-      );
-    });
-
-    it("entity mutation", () => {
-      interface Entity {
-        id: string;
-        cash: number;
-      }
-      const EntityFactory = new PatchCollectorFactory<Entity>();
-
-      const john = EntityFactory.create({ id: "john", cash: 0 });
-      const source = Object.fromEntries([[john.id, john]]);
-
-      john.cash = 25;
-
-      const receiver = Object.fromEntries([
-        [john.id, { id: john.id, cash: 0 }],
-      ]);
-
-      const patch = flushRecord(source);
-
-      applyPatch(receiver, patch);
-      expect(receiver).toEqual(
-        Object.fromEntries([[john.id, { id: john.id, cash: 25 }]]),
-      );
-    });
+    expect(receiver.john.cash).toBe(25);
   });
 });

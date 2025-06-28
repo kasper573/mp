@@ -118,7 +118,11 @@ export function movementBehavior(
         const destinationArea = areas.get(
           getAreaIdFromObject(object) as AreaId,
         );
-        if (destinationArea && actor.desiredPortalId === object.id) {
+        if (
+          destinationArea &&
+          actor.type === "character" &&
+          actor.desiredPortalId === object.id
+        ) {
           actor.path = undefined;
           actor.desiredPortalId = undefined;
           actor.areaId = destinationArea.id;

@@ -1,11 +1,7 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
-export type EntityPatchOptimizers<T> = {
-  [K in keyof T]?: PropertyPatchOptimizer<T[K]>;
-};
-
-export interface PropertyPatchOptimizer<T> {
+export interface CollectDecoratorOptions<T> {
   /**
    * A predicate (prevValue, newValue) => boolean.
    * If provided, the change will only be recorded if this returns true.
@@ -15,72 +11,157 @@ export interface PropertyPatchOptimizer<T> {
 
   /**
    * A transform function that takes the "new" value and returns
-   * what actually gets recorded in the internal change‐list.
+   * what actually gets recorded in the internal change list.
    * The property on the instance is always set to the raw "new" value.
    */
   transform?: (value: T) => T;
 }
 
-export class PatchCollectorFactory<Instance extends object> {
-  constructor(private optimizers?: EntityPatchOptimizers<Instance>) {}
-
-  /**
-   * Create a PatchCollector instance for this entity type.
-   */
-  create(initialState: Instance): Instance {
-    const { optimizers } = this;
-    const proxy = new Proxy(initialState, {
-      set(target, prop, newValue) {
-        let collectedValue = newValue as unknown;
+export function collect<V>({
+  transform = passThrough,
+  filter = refDiff,
+}: CollectDecoratorOptions<V> = {}) {
+  return <T extends object>(
+    value: ClassAccessorDecoratorTarget<T, V>,
+    context: ClassAccessorDecoratorContext<T, V>,
+  ): ClassAccessorDecoratorResult<T, V> => {
+    return {
+      init(initialValue) {
+        const collectedProperties = getOrCreateFromInstance(
+          this,
+          symbols.collectedProperties,
+          () => new Set<PropertyKey>(),
+        );
+        collectedProperties.add(context.name);
+        return initialValue;
+      },
+      get() {
+        return value.get.call(this);
+      },
+      set(newValue) {
+        let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        const metaData = getOrCreateInstanceMetaData(proxy);
+        const assignedProperties = getOrCreateFromInstance(
+          this,
+          symbols.assignedProperties,
+          () => new Set<PropertyKey>(),
+        );
 
-        if (PatchCollectorFactory.optimize) {
-          const { filter = refDiff, transform = passThrough } = (optimizers?.[
-            prop as keyof Instance
-          ] ?? {}) as PropertyPatchOptimizer<unknown>;
-
-          const prevValue = Reflect.get(target, prop);
+        // We can't guarantee that the prevValue exists until a value has been assigned at least once.
+        if (shouldOptimizeCollects && assignedProperties.has(context.name)) {
+          const prevValue = value.get.call(this);
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
         }
 
         if (shouldCollectValue) {
-          metaData.changes ??= {};
-          metaData.changes[String(prop)] = collectedValue;
+          const instanceChanges = getOrCreateFromInstance(
+            this,
+            symbols.instanceChanges,
+            () => ({}) as Record<string, unknown>,
+          );
+          instanceChanges[String(context.name)] = collectedValue;
         }
 
-        return Reflect.set(target, prop, newValue);
+        value.set.call(this, newValue);
+        assignedProperties.add(context.name);
       },
-      get(target, p, receiver) {
-        return Reflect.get(target, p, receiver) as unknown;
-      },
-    });
+    };
+  };
+}
 
-    return proxy;
+const symbols = {
+  collectedProperties: Symbol("collectedPropertyNames"),
+  assignedProperties: Symbol("assignedProperties"),
+  previouslyFlushedKeys: Symbol("previouslyFlushedRecordKeys"),
+  instanceChanges: Symbol("instanceChanges"),
+  objectChangeHandlers: Symbol("objectChangeHandlers"),
+  recordChangeHandlers: Symbol("rcordChangeHandlers"),
+};
+
+function getFromInstance<T>(instance: object, symbol: symbol): T | undefined {
+  if (Reflect.has(instance, symbol)) {
+    return Reflect.get(instance, symbol) as T;
   }
+}
 
-  static optimize = true;
+function getOrCreateFromInstance<T>(
+  instance: object,
+  symbol: symbol,
+  defaultValue: () => T,
+): T {
+  let value = Reflect.get(instance, symbol) as T | undefined;
+  if (value === undefined) {
+    value = defaultValue();
+    Reflect.set(instance, symbol, value);
+  }
+  return value;
 }
 
 /**
  * Flushes all collected changes for @collect‐decorated properties on the given instance.
+ * Also emits the changes to all subscribed event handlers.
  */
-export function flushInstance(
-  instance: object,
-  ...path: PatchPathStep[]
-): Patch {
-  const metaData = instanceMetaData.get(instance);
+export function flushObject(instance: object, ...path: PatchPathStep[]): Patch {
+  const changes = Reflect.get(instance, symbols.instanceChanges) as
+    | object
+    | undefined;
 
-  if (metaData?.changes) {
-    const patch: Patch = [
-      [PatchType.Update, path as PatchPath, metaData.changes],
-    ];
-    delete metaData.changes;
+  if (changes) {
+    const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
+    Reflect.set(instance, symbols.instanceChanges, undefined);
+    const eventHandlers = getFromInstance<Set<ObjectChangeHandler<object>>>(
+      instance,
+      symbols.objectChangeHandlers,
+    );
+    if (eventHandlers) {
+      for (const handler of eventHandlers) {
+        handler(changes);
+      }
+    }
     return patch;
   }
+
   return [];
+}
+
+/**
+ * Subscribes to changes on a class instance that has @collect‐decorated properties.
+ */
+export function subscribeToObject<T extends object>(
+  instance: T,
+  eventHandler: ObjectChangeHandler<T>,
+) {
+  const eventHandlers = getOrCreateFromInstance(
+    instance,
+    symbols.objectChangeHandlers,
+    () => new Set<ObjectChangeHandler<T>>(),
+  );
+
+  eventHandlers.add(eventHandler);
+  return function unsubscribe() {
+    eventHandlers.delete(eventHandler);
+  };
+}
+
+/**
+ * Subscribes to changes on a record that has @collect‐decorated properties.
+ */
+export function subscribeToRecord<Key extends PropertyKey, Value>(
+  record: Record<Key, Value>,
+  eventHandler: RecordChangeHandler<Key, Value>,
+) {
+  const eventHandlers = getOrCreateFromInstance(
+    record,
+    symbols.recordChangeHandlers,
+    () => new Set<RecordChangeHandler<Key, Value>>(),
+  );
+
+  eventHandlers.add(eventHandler);
+  return function unsubscribe() {
+    eventHandlers.delete(eventHandler);
+  };
 }
 
 /**
@@ -92,17 +173,22 @@ export function flushRecord(
 ): Patch {
   const patch: Patch = [];
   const currentIds = new Set(Object.keys(record));
-  const metaData = getOrCreateInstanceMetaData(record);
-  const previousIds = metaData.previousIds ?? new Set();
+  const previousIds =
+    getFromInstance<Set<string>>(record, symbols.previouslyFlushedKeys) ??
+    new Set();
+
+  const events: RecordChangeEvent<string, unknown>[] = [];
 
   const addedIds = currentIds.difference(previousIds);
   for (const id of addedIds) {
     patch.push([PatchType.Set, [...path, id] as PatchPath, record[id]]);
+    events.push({ type: "add", key: id, value: record[id] });
   }
 
   const removedIds = previousIds.difference(currentIds);
   for (const id of removedIds) {
     patch.push([PatchType.Remove, [...path, id] as PatchPath]);
+    events.push({ type: "remove", key: id });
   }
 
   const potentiallyUpdatedIds = previousIds.intersection(currentIds);
@@ -110,35 +196,71 @@ export function flushRecord(
     const value = record[id];
     const operations =
       value && typeof value === "object"
-        ? flushInstance(value, ...path, id)
+        ? flushObject(value, ...path, id)
         : undefined;
     if (operations?.length) {
       patch.push(...operations);
     }
   }
 
-  metaData.previousIds = currentIds;
+  Reflect.set(record, symbols.previouslyFlushedKeys, currentIds);
+
+  const eventHandlers = getFromInstance<
+    Set<RecordChangeHandler<string, unknown>>
+  >(record, symbols.recordChangeHandlers);
+
+  if (events.length > 0 && eventHandlers) {
+    for (const event of events) {
+      for (const handler of eventHandlers) {
+        handler(event);
+      }
+    }
+  }
 
   return patch;
 }
 
-interface InstanceMetaData {
-  changes?: Record<string, unknown>;
-  previousIds?: Set<string>;
-}
-
-function getOrCreateInstanceMetaData<T extends object>(
+/**
+ * Selects the subset of properties that are collectable.
+ */
+export function selectCollectableSubset<T extends object>(
   instance: T,
-): InstanceMetaData {
-  let metaData = instanceMetaData.get(instance);
-  if (!metaData) {
-    metaData = {};
-    instanceMetaData.set(instance, metaData);
+): Partial<T> {
+  const propertyNames = getFromInstance<Set<string>>(
+    instance,
+    symbols.collectedProperties,
+  );
+
+  if (!propertyNames) {
+    return {} as Partial<T>;
   }
-  return metaData;
+
+  const subset = Object.fromEntries(
+    Array.from(propertyNames).map((name) => [name, instance[name as keyof T]]),
+  );
+
+  return subset as Partial<T>;
 }
 
-const instanceMetaData = new WeakMap<object, InstanceMetaData>();
+let shouldOptimizeCollects = true;
 
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
+
+export function isPatchOptimizerEnabled(): boolean {
+  return shouldOptimizeCollects;
+}
+
+export function setPatchOptimizerEnabled(enabled: boolean): void {
+  shouldOptimizeCollects = enabled;
+}
+
+export type ObjectChangeHandler<T> = (changes: Partial<T>) => unknown;
+
+export type RecordChangeEvent<Key, Value> =
+  | { type: "add"; key: Key; value: Value }
+  | { type: "remove"; key: Key };
+
+export type RecordChangeHandler<Key, Value> = (
+  event: RecordChangeEvent<Key, Value>,
+) => unknown;

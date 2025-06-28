@@ -609,6 +609,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      type-fest:
+        specifier: 4.41.0
+        version: 4.41.0
 
   packages/style:
     dependencies:
