@@ -4,7 +4,7 @@ import {
   PatchType,
   type PatchPath,
 } from "./patch";
-import { flushObject } from "./patch-collector";
+import { flushObject } from "./sync-entity";
 
 export class SyncMap<K, V> extends Map<K, V> {
   #previouslyFlushedKeys = new Set<K>();

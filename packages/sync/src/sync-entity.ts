@@ -1,6 +1,8 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
+export abstract class SyncEntity {}
+
 export interface CollectDecoratorOptions<T> {
   /**
    * A predicate (prevValue, newValue) => boolean.
@@ -27,6 +29,11 @@ export function collect<V>({
   ): ClassAccessorDecoratorResult<T, V> => {
     return {
       init(initialValue) {
+        if (!(this instanceof SyncEntity)) {
+          throw new TypeError(
+            `@collect can only be used on properties of classes that extend SyncEntity.`,
+          );
+        }
         const collectedProperties = getOrCreateFromInstance(
           this,
           symbols.collectedProperties,

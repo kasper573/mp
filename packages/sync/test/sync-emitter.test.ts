@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncEmitter } from "../src/sync-emitter";
 import { SyncMap } from "../src/sync-map";
-import { collect } from "../src/patch-collector";
+import { collect, SyncEntity } from "../src/sync-entity";
 
 type TestState = {
   items: SyncMap<string, number>;
@@ -69,7 +69,7 @@ it("returns no patches or events when flushed twice with no changes", () => {
 });
 
 it("can collect patches", () => {
-  class Person {
+  class Person extends SyncEntity {
     @collect()
     accessor id: string = "";
 
@@ -77,6 +77,7 @@ it("can collect patches", () => {
     accessor cash: number = 0;
 
     constructor(id: string, cash: number) {
+      super();
       this.id = id;
       this.cash = cash;
     }
