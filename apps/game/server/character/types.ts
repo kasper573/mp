@@ -93,7 +93,7 @@ addEncoderExtension<Character, Partial<Character>>({
   Class: Character as never,
   tag: 40_600,
   encode: (character, encode) => encode(selectCollectableSubset(character)),
-  decode: (data) => new Character(data as MinimalInput<Character>),
+  decode: (data) => data as Character,
 });
 
 export type CharacterId = Branded<string, "CharacterId">;

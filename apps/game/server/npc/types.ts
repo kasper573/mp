@@ -166,7 +166,7 @@ addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
   Class: NpcInstance as never,
   tag: 40_600,
   encode: (npc, encode) => encode(selectCollectableSubset(npc)),
-  decode: (data) => new NpcInstance(data as MinimalInput<NpcInstance>),
+  decode: (data) => data as NpcInstance,
 });
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;
