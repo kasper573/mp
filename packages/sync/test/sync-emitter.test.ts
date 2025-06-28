@@ -1,7 +1,7 @@
 import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncEmitter } from "../src/sync-emitter";
-import { SyncMap } from "../src/patch-collector";
+import { SyncMap } from "../src/sync-map";
 import { collect } from "../src/patch-collector";
 
 type TestState = {

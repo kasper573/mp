@@ -5,7 +5,7 @@ import {
   type Patch,
   type PatchPath,
 } from "./patch";
-import { SyncMap } from "./patch-collector";
+import { SyncMap } from "./sync-map";
 
 import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";

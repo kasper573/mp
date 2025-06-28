@@ -4,8 +4,8 @@ import {
   flushObject,
   selectCollectableSubset,
   subscribeToObject,
-  SyncMap,
 } from "../src/patch-collector";
+import { SyncMap } from "../src/sync-map";
 import { applyPatch, PatchType } from "../src/patch";
 
 it("can collect changes as patch", () => {
