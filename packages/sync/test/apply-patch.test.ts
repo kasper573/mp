@@ -80,3 +80,47 @@ describe("objects", () => {
     expect(target.items[2 as 1]).toBe("two");
   });
 });
+
+describe("maps", () => {
+  it("should set a value in a map", () => {
+    const target = new Map<string, number>();
+    const patch: Patch = [[PatchType.Set, ["key"], 42]];
+    applyPatch(target, patch);
+    expect(target.get("key")).toBe(42);
+  });
+
+  it("should update an existing value in a map", () => {
+    const john = { name: "john" };
+    const jane = { name: "jane" };
+    const target = new Map<string, object>([["user", john]]);
+    const patch: Patch = [[PatchType.Update, ["user"], jane]];
+    applyPatch(target, patch);
+    expect(target.get("user")).toEqual(jane);
+  });
+
+  it("should remove a value from a map", () => {
+    const target = new Map<string, number>([["mapKey", 10]]);
+    const patch: Patch = [[PatchType.Remove, ["mapKey"]]];
+    applyPatch(target, patch);
+    expect(target.has("mapKey")).toBe(false);
+  });
+
+  it("should handle multiple operations on a map", () => {
+    const john = { name: "john" };
+    const jane = { name: "jane" };
+    const jake = { name: "jake" };
+    const target = new Map<string, object>([
+      ["john", john],
+      ["jane", jane],
+    ]);
+    const patch: Patch = [
+      [PatchType.Set, ["jake"], jake],
+      [PatchType.Update, ["john"], { name: "johnny" }],
+      [PatchType.Remove, ["jane"]],
+    ];
+    applyPatch(target, patch);
+    expect(target.get("jake")).toEqual(jake);
+    expect(target.get("jane")).toBeUndefined();
+    expect(target.get("john")).toEqual({ name: "johnny" });
+  });
+});

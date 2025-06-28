@@ -2,11 +2,11 @@ import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyOperation, applyPatch, PatchType } from "@mp/sync";
+import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, untrack } from "solid-js";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
-import { recordValues, typedKeys } from "@mp/std";
+import { typedKeys } from "@mp/std";
 import type { Actor, ActorId } from "../server";
 import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
@@ -15,7 +15,7 @@ import type { GameStateEvents } from "../server/game-state-events";
 export function createOptimisticGameState(
   settings: Accessor<OptimisticGameStateSettings>,
 ) {
-  const gameState = createMutable<GameState>({ actors: {} });
+  const gameState = createMutable<GameState>({ actors: new SyncMap() });
 
   /**
    * Returns the current optimistic game state.
@@ -34,7 +34,7 @@ export function createOptimisticGameState(
       return;
     }
 
-    for (const actor of recordValues(actors)) {
+    for (const actor of actors.values()) {
       if (actor.path && actor.health > 0) {
         const [newCoords, newPath] = moveAlongPath(
           actor.coords,
@@ -69,8 +69,8 @@ export function createOptimisticGameState(
       // Face actors toward their attack targets when they attack
       for (const { actorId, targetId } of events("combat.attack")) {
         const [actor, target] = untrack(() => [
-          gameState.actors[actorId] as Actor | undefined,
-          gameState.actors[targetId] as Actor | undefined,
+          gameState.actors.get(actorId),
+          gameState.actors.get(targetId),
         ]);
         if (actor && target) {
           actor.dir = nearestCardinalDirection(
@@ -107,9 +107,9 @@ function applyPatchOptimized(
       entityName === ("actors" satisfies keyof GameState) &&
       type === PatchType.Update
     ) {
-      const actor = gameState[entityName][entityId as ActorId];
+      const actor = gameState[entityName].get(entityId as ActorId);
       for (const key of typedKeys(update)) {
-        if (!shouldApplyActorUpdate(actor, update, key, events)) {
+        if (actor && !shouldApplyActorUpdate(actor, update, key, events)) {
           delete update[key];
         }
       }

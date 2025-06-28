@@ -1,5 +1,5 @@
 import { type Vector, type Rect, clamp } from "@mp/math";
-import { recordValues, type Tile, type TimesPerSecond } from "@mp/std";
+import { type Tile, type TimesPerSecond } from "@mp/std";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -33,14 +33,14 @@ export function combatBehavior(
     // Give all alive characters some health every so often
     if (totalTimeElapsed.compareTo(nextHpRegenTime) > 0) {
       nextHpRegenTime = totalTimeElapsed.add(hpRegenInterval);
-      for (const actor of recordValues(state.actors).filter(
-        (a) => a.type === "character" && a.health > 0,
-      )) {
+      for (const actor of state.actors
+        .values()
+        .filter((a) => a.type === "character" && a.health > 0)) {
         actor.health = clamp(actor.health + 5, 0, actor.maxHealth);
       }
     }
 
-    for (const actor of recordValues(state.actors)) {
+    for (const actor of state.actors.values()) {
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
@@ -58,7 +58,7 @@ export function combatBehavior(
       return; // Not attacking
     }
 
-    const target = state.actors[actor.attackTargetId] as Actor | undefined;
+    const target = state.actors.get(actor.attackTargetId);
     if (!target || !isTargetable(actor, target)) {
       actor.attackTargetId = undefined;
       return;

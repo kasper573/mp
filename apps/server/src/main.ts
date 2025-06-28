@@ -5,7 +5,7 @@ import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
-import { setPatchOptimizerEnabled, SyncEmitter } from "@mp/sync";
+import { setPatchOptimizerEnabled, SyncEmitter, SyncMap } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -154,7 +154,7 @@ const rpcTransceivers = setupRpcTransceivers({
 
 setPatchOptimizerEnabled(opt.patchOptimizer);
 
-const gameState: GameState = { actors: {} };
+const gameState: GameState = { actors: new SyncMap() };
 
 const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
   clientIds: () => wss.clients.values().map(getSocketId),

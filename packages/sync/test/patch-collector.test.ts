@@ -2,10 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 import {
   collect,
   flushObject,
-  flushRecord,
   selectCollectableSubset,
   subscribeToObject,
-  subscribeToRecord,
+  SyncMap,
 } from "../src/patch-collector";
 import { applyPatch, PatchType } from "../src/patch";
 
@@ -110,20 +109,20 @@ describe("subscriptions", () => {
     expect(fn).toHaveBeenNthCalledWith(1, { count: 1 });
   });
 
-  it("can subscribe to changes on records", () => {
+  it("can subscribe to changes on maps", () => {
     class Entity {
       constructor(public name: string) {}
     }
 
-    const record: Record<string, Entity> = {};
+    const map = new SyncMap<string, Entity>();
 
     const fn = vi.fn();
-    subscribeToRecord(record, fn);
+    map.subscribe(fn);
 
     // Adding
     const john = new Entity("john");
-    record["1"] = john;
-    flushRecord(record);
+    map.set("1", john);
+    map.flush();
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenNthCalledWith(1, {
       type: "add",
@@ -132,8 +131,8 @@ describe("subscriptions", () => {
     });
 
     // Removing
-    delete record["1"];
-    flushRecord(record);
+    map.delete("1");
+    map.flush();
     expect(fn).toHaveBeenCalledTimes(2);
     expect(fn).toHaveBeenNthCalledWith(2, {
       type: "remove",
@@ -141,40 +140,40 @@ describe("subscriptions", () => {
     });
   });
 
-  it("can stop subscribing to changes on records", () => {
+  it("can stop subscribing to changes on maps", () => {
     class Entity {
       constructor(public name: string) {}
     }
 
-    const record: Record<string, Entity> = {};
+    const map = new SyncMap<string, Entity>();
 
     const fn = vi.fn();
-    const stop = subscribeToRecord(record, fn);
+    const stop = map.subscribe(fn);
 
-    record["1"] = new Entity("john");
-    flushRecord(record);
+    map.set("1", new Entity("john"));
+    map.flush();
     expect(fn).toHaveBeenCalledTimes(1);
 
     stop();
 
-    record["1"] = new Entity("jane");
-    flushRecord(record);
+    map.set("1", new Entity("jane"));
+    map.flush();
     expect(fn).toHaveBeenCalledTimes(1); // unchanged
   });
 });
 
-describe("can collect changes from record of decorated entities", () => {
+describe("can collect changes from map of decorated entities", () => {
   it("set", () => {
     class Entity {
       @collect()
       accessor cash: number = 0;
     }
 
-    const source: Record<string, Entity> = {};
-    source["john"] = new Entity();
-    source["john"].cash = 50;
+    const map = new SyncMap<string, Entity>();
+    map.set("john", new Entity());
+    map.get("john")!.cash = 50;
 
-    const patch = flushRecord(source);
+    const patch = map.flush();
 
     const receiver: Record<string, Entity> = {};
     applyPatch(receiver, patch);
@@ -193,15 +192,18 @@ describe("can collect changes from record of decorated entities", () => {
     const jane = new Entity();
     jane.cash = 50;
 
-    const source: Record<string, Entity> = { john, jane };
+    const map = new SyncMap<string, Entity>([
+      ["john", john],
+      ["jane", jane],
+    ]);
 
     // Flush initial state
-    const receiver: Record<string, Entity> = Object.fromEntries([]);
-    applyPatch(receiver, flushRecord(source));
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, map.flush());
 
     // Apply and flush delete
-    delete source["john"];
-    applyPatch(receiver, flushRecord(source));
+    map.delete("john");
+    applyPatch(receiver, map.flush());
 
     expect(receiver.john).toBeUndefined();
     expect(receiver.jane.cash).toBe(50);
@@ -215,11 +217,11 @@ describe("can collect changes from record of decorated entities", () => {
 
     const john = new Entity();
     john.cash = 0;
-    const source = { john };
+    const map = new SyncMap([["john", john]]);
 
     // Flush initial state
     const receiver: Record<string, Entity> = {};
-    const patch = flushRecord(source);
+    const patch = map.flush();
     applyPatch(receiver, patch);
 
     // Apply and flush entity mutation

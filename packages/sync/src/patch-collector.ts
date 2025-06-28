@@ -71,6 +71,72 @@ export function collect<V>({
   };
 }
 
+export class SyncMap<K, V> extends Map<K, V> {
+  #previouslyFlushedKeys = new Set<K>();
+  #subscribers: Set<SyncMapChangeHandler<K, V>> = new Set();
+
+  /**
+   * Triggers event handlers and produces a patch thatrepresents all changes since the last flush.
+   */
+  flush(...path: PatchPathStep[]): Patch {
+    const patch: Patch = [];
+    const currentKeys = new Set(this.keys());
+    const events: SyncMapChangeEvent<K, V>[] = [];
+
+    const addedKeys = currentKeys.difference(this.#previouslyFlushedKeys);
+    for (const key of addedKeys) {
+      const value = this.get(key) as V;
+      patch.push([
+        PatchType.Set,
+        [...path, key as PatchPathStep] as PatchPath,
+        value,
+      ]);
+      events.push({ type: "add", key: key, value });
+    }
+
+    const removedKeys = this.#previouslyFlushedKeys.difference(currentKeys);
+    for (const key of removedKeys) {
+      patch.push([
+        PatchType.Remove,
+        [...path, key as PatchPathStep] as PatchPath,
+      ]);
+      events.push({ type: "remove", key: key });
+    }
+
+    const potentiallyUpdatedKeys =
+      this.#previouslyFlushedKeys.intersection(currentKeys);
+    for (const key of potentiallyUpdatedKeys) {
+      const value = this.get(key);
+      const operations =
+        value && typeof value === "object"
+          ? flushObject(value, ...path, String(key))
+          : undefined;
+      if (operations?.length) {
+        patch.push(...operations);
+      }
+    }
+
+    this.#previouslyFlushedKeys = currentKeys;
+
+    if (events.length > 0) {
+      for (const event of events) {
+        for (const handler of this.#subscribers) {
+          handler(event);
+        }
+      }
+    }
+
+    return patch;
+  }
+
+  subscribe(handler: SyncMapChangeHandler<K, V>) {
+    this.#subscribers.add(handler);
+    return () => {
+      this.#subscribers.delete(handler);
+    };
+  }
+}
+
 const symbols = {
   collectedProperties: Symbol("collectedPropertyNames"),
   assignedProperties: Symbol("assignedProperties"),
@@ -150,74 +216,18 @@ export function subscribeToObject<T extends object>(
  */
 export function subscribeToRecord<Key extends PropertyKey, Value>(
   record: Record<Key, Value>,
-  eventHandler: RecordChangeHandler<Key, Value>,
+  eventHandler: SyncMapChangeHandler<Key, Value>,
 ) {
   const eventHandlers = getOrCreateFromInstance(
     record,
     symbols.recordChangeHandlers,
-    () => new Set<RecordChangeHandler<Key, Value>>(),
+    () => new Set<SyncMapChangeHandler<Key, Value>>(),
   );
 
   eventHandlers.add(eventHandler);
   return function unsubscribe() {
     eventHandlers.delete(eventHandler);
   };
-}
-
-/**
- * Flushes all collected changes for a record of @collect‐decorated class instances.
- */
-export function flushRecord(
-  record: Record<string, unknown>,
-  ...path: PatchPathStep[]
-): Patch {
-  const patch: Patch = [];
-  const currentIds = new Set(Object.keys(record));
-  const previousIds =
-    getFromInstance<Set<string>>(record, symbols.previouslyFlushedKeys) ??
-    new Set();
-
-  const events: RecordChangeEvent<string, unknown>[] = [];
-
-  const addedIds = currentIds.difference(previousIds);
-  for (const id of addedIds) {
-    patch.push([PatchType.Set, [...path, id] as PatchPath, record[id]]);
-    events.push({ type: "add", key: id, value: record[id] });
-  }
-
-  const removedIds = previousIds.difference(currentIds);
-  for (const id of removedIds) {
-    patch.push([PatchType.Remove, [...path, id] as PatchPath]);
-    events.push({ type: "remove", key: id });
-  }
-
-  const potentiallyUpdatedIds = previousIds.intersection(currentIds);
-  for (const id of potentiallyUpdatedIds) {
-    const value = record[id];
-    const operations =
-      value && typeof value === "object"
-        ? flushObject(value, ...path, id)
-        : undefined;
-    if (operations?.length) {
-      patch.push(...operations);
-    }
-  }
-
-  Reflect.set(record, symbols.previouslyFlushedKeys, currentIds);
-
-  const eventHandlers = getFromInstance<
-    Set<RecordChangeHandler<string, unknown>>
-  >(record, symbols.recordChangeHandlers);
-
-  if (events.length > 0 && eventHandlers) {
-    for (const event of events) {
-      for (const handler of eventHandlers) {
-        handler(event);
-      }
-    }
-  }
-
-  return patch;
 }
 
 /**
@@ -257,10 +267,10 @@ export function setPatchOptimizerEnabled(enabled: boolean): void {
 
 export type ObjectChangeHandler<T> = (changes: Partial<T>) => unknown;
 
-export type RecordChangeEvent<Key, Value> =
+export type SyncMapChangeEvent<Key, Value> =
   | { type: "add"; key: Key; value: Value }
   | { type: "remove"; key: Key };
 
-export type RecordChangeHandler<Key, Value> = (
-  event: RecordChangeEvent<Key, Value>,
+export type SyncMapChangeHandler<Key, Value> = (
+  event: SyncMapChangeEvent<Key, Value>,
 ) => unknown;

@@ -1,4 +1,3 @@
-import { recordValues } from "@mp/std";
 import type { AccessToken } from "@mp/auth";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
@@ -31,9 +30,9 @@ export const worldRouter = rpc.router({
     .output<SearchResult<Character>>()
     .query(({ ctx, input = { filter: {} } }) => {
       const state = ctx.get(ctxGameState);
-      const characters = recordValues(state.actors).filter(
-        (actor) => actor.type === "character",
-      );
+      const characters = state.actors
+        .values()
+        .filter((actor) => actor.type === "character");
       return characterPaginator(characters.toArray(), input, 50);
     }),
 
@@ -82,13 +81,14 @@ export const worldRouter = rpc.router({
       stateEmitter.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
-      let char = recordValues(state.actors)
+      let char = state.actors
+        .values()
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.userId === mwc.userId);
 
       if (!char) {
         char = await characterService.getOrCreateCharacterForUser(mwc.userId);
-        state.actors[char.id] = char;
+        state.actors.set(char.id, char);
       }
 
       const clients = ctx.get(ctxClientRegistry);

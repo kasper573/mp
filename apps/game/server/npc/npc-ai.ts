@@ -1,6 +1,6 @@
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import { recordValues, type Rng } from "@mp/std";
+import { assert, type Rng } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor";
@@ -32,7 +32,7 @@ export class NpcAi {
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
-      for (const subject of recordValues(this.gameState.actors)) {
+      for (const subject of this.gameState.actors.values()) {
         if (subject.type !== "npc" || subject.health <= 0) {
           continue;
         }
@@ -64,7 +64,7 @@ export class NpcAi {
     for (const attack of this.gameStateEmitter.peekEvent("combat.attack")) {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
-          const combatant = this.gameState.actors[combatantId];
+          const combatant = assert(this.gameState.actors.get(combatantId));
           const distance = observer.coords.distance(combatant.coords);
           return distance <= observer.aggroRange;
         },

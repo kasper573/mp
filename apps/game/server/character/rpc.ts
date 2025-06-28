@@ -1,5 +1,5 @@
 import { Vector, type VectorLike } from "@mp/math";
-import { type Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
@@ -51,7 +51,7 @@ export const characterRouter = rpc.router({
     .mutation(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameState);
       const emitter = ctx.get(ctxGameStateEmitter);
-      const target = state.actors[targetId];
+      const target = assert(state.actors.get(targetId));
       target.health = 0;
       emitter.addEvent("actor.death", target.id);
     }),

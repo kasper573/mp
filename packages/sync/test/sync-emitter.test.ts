@@ -1,10 +1,11 @@
 import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncEmitter } from "../src/sync-emitter";
+import { SyncMap } from "../src/patch-collector";
 import { collect } from "../src/patch-collector";
 
 type TestState = {
-  items: Record<string, number>;
+  items: SyncMap<string, number>;
 };
 
 type TestEventMap = {
@@ -15,12 +16,12 @@ it("sends full state patch on initial flush and respects client visibility confi
   const emitter = new SyncEmitter<TestState, TestEventMap>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
-      items: new Set(id === "client1" ? Object.keys(state.items) : "2"),
+      items: new Set(id === "client1" ? state.items.keys() : ["2"]),
     }),
   });
 
-  const initialState = {
-    items: Object.fromEntries([
+  const initialState: TestState = {
+    items: new SyncMap([
       ["1", 10],
       ["2", 20],
       ["3", 30],
@@ -28,21 +29,21 @@ it("sends full state patch on initial flush and respects client visibility confi
   };
   const { clientPatches } = emitter.flush(initialState);
 
-  const client1State: TestState = { items: {} };
-  const client2State: TestState = { items: {} };
+  const client1State: TestState = { items: new SyncMap() };
+  const client2State: TestState = { items: new SyncMap() };
 
   applyPatch(client1State, clientPatches.get("client1")!);
   applyPatch(client2State, clientPatches.get("client2")!);
 
   expect(client1State).toEqual({
-    items: Object.fromEntries([
+    items: new SyncMap([
       ["1", 10],
       ["2", 20],
       ["3", 30],
     ]),
   });
   expect(client2State).toEqual({
-    items: Object.fromEntries([["2", 20]]),
+    items: new SyncMap([["2", 20]]),
   });
 });
 
@@ -50,12 +51,12 @@ it("returns no patches or events when flushed twice with no changes", () => {
   const emitter = new SyncEmitter<TestState, TestEventMap>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
-      items: new Set(Object.keys(state.items)),
+      items: new Set(state.items.keys()),
     }),
   });
 
   const state: TestState = {
-    items: Object.fromEntries([
+    items: new SyncMap([
       ["1", 1],
       ["2", 2],
     ]),
@@ -82,20 +83,20 @@ it("can collect patches", () => {
   }
 
   type TestState = {
-    persons: Record<Person["id"], Person>;
+    persons: SyncMap<Person["id"], Person>;
   };
 
   const emitter = new SyncEmitter<TestState, {}>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
-      persons: new Set(Object.keys(state.persons)),
+      persons: new Set(state.persons.keys()),
     }),
   });
 
   const john = new Person("john", 0);
   const jane = new Person("jane", 50);
   const serverState = {
-    persons: Object.fromEntries([
+    persons: new SyncMap([
       [john.id, john],
       [jane.id, jane],
     ]),
@@ -103,7 +104,7 @@ it("can collect patches", () => {
 
   emitter.attachPatchCollectors(serverState);
 
-  const clientState: TestState = { persons: {} };
+  const clientState: TestState = { persons: new SyncMap() };
 
   // Flush initial state
   const flush1 = emitter.flush(serverState);
@@ -117,20 +118,20 @@ it("can collect patches", () => {
   const flush2 = emitter.flush(serverState);
   applyPatch(clientState, flush2.clientPatches.get("client") ?? []);
 
-  expect(clientState.persons.john.cash).toBe(25);
-  expect(clientState.persons.jane.cash).toBe(25);
+  expect(clientState.persons.get("john")?.cash).toBe(25);
+  expect(clientState.persons.get("jane")?.cash).toBe(25);
 });
 
 it("delivers events according to visibility", () => {
   const emitter = new SyncEmitter<TestState, TestEventMap>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
-      items: new Set(id === "client1" ? Object.keys(state.items) : "2"),
+      items: new Set(id === "client1" ? state.items.keys() : ["2"]),
     }),
   });
 
-  const state = {
-    items: Object.fromEntries([
+  const state: TestState = {
+    items: new SyncMap([
       ["1", 10],
       ["2", 20],
       ["3", 30],
@@ -162,7 +163,7 @@ it("can access events by name before flushing", () => {
   const emitter = new SyncEmitter<TestState, TestEventMap>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
-      items: new Set(Object.keys(state.items)),
+      items: new Set(state.items.keys()),
     }),
   });
   emitter.addEvent("message", "broadcast");
@@ -176,11 +177,11 @@ it("markToResendFullState forces a client to get full patch again", () => {
   const emitter = new SyncEmitter<TestState, TestEventMap>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
-      items: new Set(id === "client1" ? Object.keys(state.items) : "2"),
+      items: new Set(id === "client1" ? state.items.keys() : ["2"]),
     }),
   });
-  const serverState = {
-    items: Object.fromEntries([
+  const serverState: TestState = {
+    items: new SyncMap([
       ["1", 1],
       ["2", 2],
     ]),
@@ -189,14 +190,14 @@ it("markToResendFullState forces a client to get full patch again", () => {
   emitter.markToResendFullState("client1");
   const { clientPatches } = emitter.flush(serverState); // Flush again, but only for client1
 
-  const client1State: TestState = { items: {} };
-  const client2State: TestState = { items: {} };
+  const client1State: TestState = { items: new SyncMap() };
+  const client2State: TestState = { items: new SyncMap() };
 
   applyPatch(client1State, clientPatches.get("client1") ?? []);
   applyPatch(client2State, clientPatches.get("client2") ?? []);
 
   expect(client1State).toEqual(serverState);
-  expect(client2State).not.toEqual(serverState);
+  expect(client2State.items.size).toBe(0);
 });
 
 it("fabricates 'remove' operations when entities leave visibility", () => {
@@ -204,28 +205,29 @@ it("fabricates 'remove' operations when entities leave visibility", () => {
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(
-        Object.entries(state.items)
+        state.items
+          .entries()
           .filter(([, value]) => value > 10)
           .map(([key]) => key),
       ),
     }),
   });
-  const state1 = {
-    items: Object.fromEntries([
+  const state1: TestState = {
+    items: new SyncMap([
       ["1", 20],
       ["2", 30],
       ["3", 40],
     ]),
   };
-  const state2 = {
-    items: Object.fromEntries([
+  const state2: TestState = {
+    items: new SyncMap([
       ["1", 20],
       ["2", 5],
       ["3", 40],
     ]),
   };
 
-  const clientState: TestState = { items: {} };
+  const clientState: TestState = { items: new SyncMap() };
 
   const flush1 = emitter.flush(state1);
   applyPatch(clientState, flush1.clientPatches.get("client")!);
@@ -233,7 +235,7 @@ it("fabricates 'remove' operations when entities leave visibility", () => {
   applyPatch(clientState, flush2.clientPatches.get("client")!);
 
   expect(clientState).toEqual({
-    items: Object.fromEntries([
+    items: new SyncMap([
       ["1", 20],
       // '2' no longer visible since it's less than 10
       ["3", 40],
@@ -246,28 +248,29 @@ it("fabricates 'set' operations when new entities enter visibility", () => {
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(
-        Object.entries(state.items)
+        state.items
+          .entries()
           .filter(([, value]) => value > 10)
           .map(([key]) => key),
       ),
     }),
   });
-  const state1 = {
-    items: Object.fromEntries([
+  const state1: TestState = {
+    items: new SyncMap([
       ["1", 20],
       ["2", 5],
       ["3", 40],
     ]),
   };
-  const state2 = {
-    items: Object.fromEntries([
+  const state2: TestState = {
+    items: new SyncMap([
       ["1", 20],
       ["2", 30],
       ["3", 40],
     ]),
   };
 
-  const clientState: TestState = { items: {} };
+  const clientState: TestState = { items: new SyncMap() };
 
   const flush1 = emitter.flush(state1);
   applyPatch(clientState, flush1.clientPatches.get("client")!);
@@ -275,7 +278,7 @@ it("fabricates 'set' operations when new entities enter visibility", () => {
   applyPatch(clientState, flush2.clientPatches.get("client")!);
 
   expect(clientState).toEqual({
-    items: Object.fromEntries([
+    items: new SyncMap([
       ["1", 20],
       ["2", 30],
       ["3", 40],

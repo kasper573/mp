@@ -5,7 +5,7 @@ import {
   type Patch,
   type PatchPath,
 } from "./patch";
-import { flushRecord } from "./patch-collector";
+import { SyncMap } from "./patch-collector";
 
 import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";
@@ -63,7 +63,7 @@ export class SyncEmitter<
           clientPatch.push([
             PatchType.Set,
             [entityName, addedId] as PatchPath,
-            state[entityName][addedId],
+            state[entityName].get(addedId),
           ]);
         }
 
@@ -107,9 +107,11 @@ export class SyncEmitter<
 
   private *flushPatchCollectors(): Generator<Operation> {
     for (const state of this.patchCollectors) {
-      for (const [entityName, entities] of Object.entries(state)) {
-        for (const operation of flushRecord(entities)) {
-          yield prefixOperation(entityName, operation);
+      for (const [entityName, map] of Object.entries(state)) {
+        if (map instanceof SyncMap) {
+          for (const operation of map.flush()) {
+            yield prefixOperation(entityName, operation);
+          }
         }
       }
     }
@@ -156,17 +158,16 @@ function deriveClientState<State extends PatchableState>(
   state: State,
   visibilities: ClientVisibility<State>,
 ): State {
-  return Object.fromEntries(
-    Object.entries(visibilities).map(
-      ([entityName, entityIds]: [string, ReadonlySet<string>]) => {
-        const allEntities = state[entityName];
-        const referencedEntities = Object.fromEntries(
-          entityIds.values().map((id) => [id, allEntities[id]]),
-        );
-        return [entityName, referencedEntities];
-      },
-    ),
-  ) as State;
+  const derivedState = {} as State;
+  for (const entityName in visibilities) {
+    const entityIds = visibilities[entityName];
+    const map = state[entityName];
+    const derivedMap = new SyncMap(
+      entityIds.values().map((id) => [id, map.get(id)]),
+    );
+    derivedState[entityName] = derivedMap as never;
+  }
+  return derivedState;
 }
 
 function isVisible<State extends PatchableState>(
@@ -228,18 +229,21 @@ export type ClientVisibility<State extends PatchableState> = {
 
 export type PatchableEntityId = string;
 
-export type PatchableEntities<
-  Id extends PatchableEntityId = PatchableEntityId,
-  Entity = unknown,
-> = Record<Id, Entity>;
+export type PatchableEntities<Id extends PatchableEntityId, Entity> = Map<
+  Id,
+  Entity
+>;
 
-export type inferEntityId<Entities extends PatchableEntities> =
-  Entities extends PatchableEntities<infer Id> ? Id : never;
+export type inferEntityId<Entities> =
+  Entities extends PatchableEntities<infer Id, infer _> ? Id : never;
 
-export type inferEntityValue<Entities extends PatchableEntities> =
+export type inferEntityValue<Entities> =
   Entities extends PatchableEntities<infer Id, infer Entity> ? Entity : never;
 
-export type PatchableState = { [entityName: string]: PatchableEntities };
+export type PatchableState = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  [entityName: string]: PatchableEntities<PatchableEntityId, any>;
+};
 
 export type ClientId = Registry extends { clientId: infer T } ? T : string;
 

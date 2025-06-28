@@ -20,7 +20,7 @@ export const npcRouter = rpc.router({
       }
 
       const instance = spawner.createInstance(selected.npc, selected.spawn);
-      state.actors[instance.id] = instance;
+      state.actors.set(instance.id, instance);
     }),
 });
 
