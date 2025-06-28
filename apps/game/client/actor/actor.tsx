@@ -15,11 +15,7 @@ import { GameStateClientContext } from "../game-state-client";
 import { ActorSprite } from "./actor-sprite";
 import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
 
-export function Actor(props: {
-  tiled: TiledResource;
-  actor: Actor;
-  isPlayer?: boolean;
-}) {
+export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   const allSpritesheets = useContext(ActorSpritesheetContext);
   const state = useContext(GameStateClientContext);
   const position = createMemo(() =>
@@ -36,6 +32,7 @@ export function Actor(props: {
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   const container = new Container();
+
   container.addChild(sprite);
   container.addChild(text);
 

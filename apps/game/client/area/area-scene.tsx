@@ -143,13 +143,7 @@ export function AreaScene(
           {{
             [props.area.dynamicLayer.name]: () => (
               <For each={state().actorList()}>
-                {(actor) => (
-                  <Actor
-                    tiled={props.area.tiled}
-                    actor={actor}
-                    isPlayer={actor.id === state().characterId()}
-                  />
-                )}
+                {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
               </For>
             ),
           }}
