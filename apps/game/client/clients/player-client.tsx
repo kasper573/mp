@@ -1,7 +1,7 @@
 import { createEffect, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import { useRpc } from "../use-rpc";
-import { createGameActions } from "../game-state/game-state-client";
+import { createGameActions } from "../game-state/game-actions";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 

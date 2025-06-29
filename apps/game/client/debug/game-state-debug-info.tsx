@@ -9,7 +9,7 @@ import {
   createMemo,
 } from "solid-js";
 import type { Character, TiledResource } from "../../server";
-import { ReactiveGameStateContext } from "../game-state/game-state-client";
+import { ReactiveGameStateContext } from "../game-state/solid-js";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const gameState = useContext(ReactiveGameStateContext);

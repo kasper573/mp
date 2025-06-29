@@ -1,20 +1,13 @@
-import type { Accessor } from "solid-js";
-import { createContext, createMemo, useContext } from "solid-js";
-import type { Vector } from "@mp/math";
-import { assert, throttle, type Tile } from "@mp/std";
+import { throttle } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { ObjectId } from "@mp/tiled-loader";
 import type { Atom } from "@mp/state";
 import { atom } from "@mp/state";
-import type { Character, CharacterId } from "../../server/character/types";
-import { type ActorId } from "../../server";
+import type { CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
 import type { GameSolidRpcInvoker } from "../use-rpc";
-import { useRpc } from "../use-rpc";
-import { useSyncEntity, useSyncMap } from "../use-sync";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 
@@ -24,7 +17,7 @@ export interface GameStateClientOptions {
   rpc: GameSolidRpcInvoker;
   socket: WebSocket;
   logger: Logger;
-  settings: Accessor<OptimisticGameStateSettings>;
+  settings: () => OptimisticGameStateSettings;
 }
 
 export class GameStateClient {
@@ -103,86 +96,3 @@ export class GameStateClient {
     }
   };
 }
-
-export type ReactiveGameState = ReturnType<typeof deriveReactiveGameState>;
-
-export function deriveReactiveGameState(client: Accessor<GameStateClient>) {
-  const actors = useSyncMap(() => client().gameState.actors);
-
-  const actorList = () => Array.from(actors().values());
-
-  const character = createMemo(() => {
-    const char = actors().get(client().characterId.get() as CharacterId) as
-      | Character
-      | undefined;
-    return char ? useSyncEntity(char) : undefined;
-  });
-
-  const areaId = () => character()?.areaId;
-
-  return {
-    client,
-    actors,
-    actorList,
-    areaId,
-    character,
-  };
-}
-
-export function createGameActions(
-  rpc: GameSolidRpcInvoker,
-  characterId: Accessor<Atom<CharacterId | undefined>>,
-) {
-  const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
-    return rpc.character.move({
-      characterId: assert(characterId().get()),
-      to,
-      desiredPortalId,
-    });
-  };
-
-  const attack = (targetId: ActorId) =>
-    rpc.character.attack({
-      characterId: assert(characterId().get()),
-      targetId,
-    });
-
-  const respawn = () => rpc.character.respawn(assert(characterId().get()));
-
-  const join = async () => {
-    const char = await rpc.world.join();
-    characterId().set(char.id);
-    return char;
-  };
-
-  return {
-    respawn,
-    join,
-    move,
-    attack,
-  };
-}
-
-export function useGameActions() {
-  const rpc = useRpc();
-  const state = useContext(GameStateClientContext);
-  return createGameActions(rpc, () => state().characterId);
-}
-
-export const ReactiveGameStateContext = createContext<
-  Accessor<ReactiveGameState>
->(
-  new Proxy({} as Accessor<ReactiveGameState>, {
-    get() {
-      throw new Error("ReactiveGameStateContext not provided");
-    },
-  }),
-);
-
-export const GameStateClientContext = createContext<Accessor<GameStateClient>>(
-  new Proxy({} as Accessor<GameStateClient>, {
-    get() {
-      throw new Error("GameStateClientContext not provided");
-    },
-  }),
-);

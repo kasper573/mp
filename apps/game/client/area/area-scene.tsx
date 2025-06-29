@@ -16,10 +16,6 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import {
-  ReactiveGameStateContext,
-  useGameActions,
-} from "../game-state/game-state-client";
-import {
   getAreaIdFromObject,
   type AreaResource,
 } from "../../shared/area/area-resource";
@@ -27,6 +23,10 @@ import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { clientViewDistance } from "../../server";
 import { useSyncEntity } from "../use-sync";
+import {
+  ReactiveGameStateContext,
+  useGameActions,
+} from "../game-state/solid-js";
 import { AreaDebugUi } from "./area-debug-ui";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";

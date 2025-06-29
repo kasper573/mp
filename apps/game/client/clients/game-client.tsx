@@ -15,11 +15,6 @@ import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
 import type { GameStateClient } from "../game-state/game-state-client";
-import {
-  deriveReactiveGameState,
-  GameStateClientContext,
-  ReactiveGameStateContext,
-} from "../game-state/game-state-client";
 import { AreaScene } from "../area/area-scene";
 import { useAreaResource } from "../area/use-area-resource";
 import { loadActorSpritesheets } from "../actor/actor-spritesheet-lookup";
@@ -29,6 +24,11 @@ import { GameDebugUiContext } from "../debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "../debug/game-state-debug-info";
 import { useRpc } from "../use-rpc";
 import { ActorSpritesheetContext } from "../actor/actor-spritesheet-lookup";
+import {
+  deriveReactiveGameState,
+  GameStateClientContext,
+  ReactiveGameStateContext,
+} from "../game-state/solid-js";
 
 export type GameClientProps = ParentProps<{
   gameState: GameStateClient;
