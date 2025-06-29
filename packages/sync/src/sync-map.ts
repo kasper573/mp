@@ -4,14 +4,14 @@ import {
   PatchType,
   type PatchPath,
 } from "./patch";
-import { flushObject } from "./sync-entity";
+import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V> extends Map<K, V> {
   #previouslyFlushedKeys = new Set<K>();
   #subscribers: Set<SyncMapChangeHandler<K, V>> = new Set();
 
   /**
-   * Triggers event handlers and produces a patch thatrepresents all changes since the last flush.
+   * Triggers event handlers and produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
     const patch: Patch = [];
@@ -43,8 +43,8 @@ export class SyncMap<K, V> extends Map<K, V> {
     for (const key of potentiallyUpdatedKeys) {
       const value = this.get(key);
       const operations =
-        value && typeof value === "object"
-          ? flushObject(value, ...path, String(key))
+        value instanceof SyncEntity
+          ? value.flush(...path, String(key))
           : undefined;
       if (operations?.length) {
         patch.push(...operations);

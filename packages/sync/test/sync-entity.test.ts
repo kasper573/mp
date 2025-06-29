@@ -1,11 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  collect,
-  flushObject,
-  selectCollectableSubset,
-  subscribeToObject,
-  SyncEntity,
-} from "../src/sync-entity";
+import { collect, SyncEntity } from "../src/sync-entity";
 import { PatchType } from "../src/patch";
 
 it("can collect changes as patch", () => {
@@ -18,7 +12,7 @@ it("can collect changes as patch", () => {
   e.count = 1;
   e.count = 2;
 
-  const patch = flushObject(e);
+  const patch = e.flush();
   expect(patch).toEqual([[PatchType.Update, [], { count: 2 }]]);
 });
 
@@ -32,7 +26,7 @@ it("does not collect changes to non decorated fields", () => {
 
   const e = new Entity();
   e.notCollected = "changed";
-  const patch = flushObject(e);
+  const patch = e.flush();
   expect(patch).toEqual([]);
 });
 
@@ -50,7 +44,7 @@ it("can select collectable subset", () => {
   const e = new Entity();
   e.count = 1;
   e.name = "john";
-  const subset = selectCollectableSubset(e);
+  const subset = e.snapshot();
   expect(subset).toEqual({ count: 1, name: "john" });
 });
 
@@ -63,7 +57,7 @@ describe("subscriptions", () => {
 
     const fn = vi.fn();
     const e = new Entity();
-    subscribeToObject(e, fn);
+    e.subscribe(fn);
     e.count = 1;
     e.count = 2;
     expect(fn).toHaveBeenCalledTimes(0);
@@ -80,8 +74,8 @@ describe("subscriptions", () => {
     e.count = 1;
     e.count = 2;
 
-    subscribeToObject(e, fn);
-    flushObject(e);
+    e.subscribe(fn);
+    e.flush();
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenNthCalledWith(1, { count: 2 });
   });
@@ -95,15 +89,15 @@ describe("subscriptions", () => {
     const fn = vi.fn();
     const e = new Entity();
 
-    const stop = subscribeToObject(e, fn);
+    const stop = e.subscribe(fn);
 
     e.count = 1;
-    flushObject(e);
+    e.flush();
 
     stop();
 
     e.count = 2;
-    flushObject(e);
+    e.flush();
 
     expect(fn).toHaveBeenCalledTimes(1);
     expect(fn).toHaveBeenNthCalledWith(1, { count: 1 });

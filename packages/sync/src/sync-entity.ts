@@ -1,7 +1,68 @@
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
-export abstract class SyncEntity {}
+/**
+ * Base class for entities that has fields decorated with @collect.
+ */
+export abstract class SyncEntity {
+  #meta = new SyncEntityMeta<this>();
+
+  /**
+   * Triggers event handlers and produces a patch that represents all changes since the last flush.
+   */
+  flush(...path: PatchPathStep[]): Patch {
+    const changes = this.#meta.changes;
+    if (changes) {
+      const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
+      this.#meta.changes = undefined;
+      for (const handler of this.#meta.subscribers) {
+        handler(changes);
+      }
+      return patch;
+    }
+
+    return [];
+  }
+
+  /**
+   * Subscribes to changes to @collect‐decorated fields.
+   */
+  subscribe(handler: SyncEntityChangeHandler<this>) {
+    this.#meta.subscribers.add(handler);
+    return () => {
+      this.#meta.subscribers.delete(handler);
+    };
+  }
+
+  /**
+   * Returns a subset of the entity that contains only the properties that are decorated with @collect.
+   */
+  snapshot(): Partial<this> {
+    const subset = Object.fromEntries(
+      this.#meta.collectedProperties.values().map((name) => [name, this[name]]),
+    );
+    return subset as Partial<this>;
+  }
+
+  /**
+   * Accesses the private metadata of a SyncEntity instance.
+   * @internal Should only be used by the collect decorator.
+   */
+  static accessMeta<Entity extends SyncEntity>(entity: Entity) {
+    return entity.#meta;
+  }
+}
+
+/**
+ * Private metadata for a SyncEntity instance.
+ * Is only shared with the collect decorator.
+ */
+class SyncEntityMeta<CollectedProperties> {
+  subscribers = new Set<SyncEntityChangeHandler<CollectedProperties>>();
+  changes: Partial<CollectedProperties> | undefined;
+  collectedProperties = new Set<keyof CollectedProperties>();
+  assignedProperties = new Set<keyof CollectedProperties>();
+}
 
 export interface CollectDecoratorOptions<T> {
   /**
@@ -34,12 +95,8 @@ export function collect<V>({
             `@collect can only be used on properties of classes that extend SyncEntity.`,
           );
         }
-        const collectedProperties = getOrCreateFromInstance(
-          this,
-          symbols.collectedProperties,
-          () => new Set<PropertyKey>(),
-        );
-        collectedProperties.add(context.name);
+        const meta = SyncEntity.accessMeta(this);
+        meta.collectedProperties.add(context.name as keyof T);
         return initialValue;
       },
       get() {
@@ -49,128 +106,28 @@ export function collect<V>({
         let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        const assignedProperties = getOrCreateFromInstance(
-          this,
-          symbols.assignedProperties,
-          () => new Set<PropertyKey>(),
-        );
+        const meta = SyncEntity.accessMeta(this as T & SyncEntity);
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
-        if (shouldOptimizeCollects && assignedProperties.has(context.name)) {
+        if (
+          shouldOptimizeCollects &&
+          meta.assignedProperties.has(context.name as keyof T)
+        ) {
           const prevValue = value.get.call(this);
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
         }
 
         if (shouldCollectValue) {
-          const instanceChanges = getOrCreateFromInstance(
-            this,
-            symbols.instanceChanges,
-            () => ({}) as Record<string, unknown>,
-          );
-          instanceChanges[String(context.name)] = collectedValue;
+          meta.changes ??= {};
+          meta.changes[context.name as keyof T] = collectedValue as never;
         }
 
         value.set.call(this, newValue);
-        assignedProperties.add(context.name);
+        meta.assignedProperties.add(context.name as keyof T);
       },
     };
   };
-}
-
-const symbols = {
-  collectedProperties: Symbol("collectedPropertyNames"),
-  assignedProperties: Symbol("assignedProperties"),
-  previouslyFlushedKeys: Symbol("previouslyFlushedRecordKeys"),
-  instanceChanges: Symbol("instanceChanges"),
-  objectChangeHandlers: Symbol("objectChangeHandlers"),
-};
-
-function getFromInstance<T>(instance: object, symbol: symbol): T | undefined {
-  if (Reflect.has(instance, symbol)) {
-    return Reflect.get(instance, symbol) as T;
-  }
-}
-
-function getOrCreateFromInstance<T>(
-  instance: object,
-  symbol: symbol,
-  defaultValue: () => T,
-): T {
-  let value = Reflect.get(instance, symbol) as T | undefined;
-  if (value === undefined) {
-    value = defaultValue();
-    Reflect.set(instance, symbol, value);
-  }
-  return value;
-}
-
-/**
- * Flushes all collected changes for @collect‐decorated properties on the given instance.
- * Also emits the changes to all subscribed event handlers.
- */
-export function flushObject(instance: object, ...path: PatchPathStep[]): Patch {
-  const changes = Reflect.get(instance, symbols.instanceChanges) as
-    | object
-    | undefined;
-
-  if (changes) {
-    const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
-    Reflect.set(instance, symbols.instanceChanges, undefined);
-    const eventHandlers = getFromInstance<Set<ObjectChangeHandler<object>>>(
-      instance,
-      symbols.objectChangeHandlers,
-    );
-    if (eventHandlers) {
-      for (const handler of eventHandlers) {
-        handler(changes);
-      }
-    }
-    return patch;
-  }
-
-  return [];
-}
-
-/**
- * Subscribes to changes on a class instance that has @collect‐decorated properties.
- */
-export function subscribeToObject<T extends object>(
-  instance: T,
-  eventHandler: ObjectChangeHandler<T>,
-) {
-  const eventHandlers = getOrCreateFromInstance(
-    instance,
-    symbols.objectChangeHandlers,
-    () => new Set<ObjectChangeHandler<T>>(),
-  );
-
-  eventHandlers.add(eventHandler);
-  return function unsubscribe() {
-    eventHandlers.delete(eventHandler);
-  };
-}
-
-/**
- * Selects the subset of properties that are collectable.
- */
-export function selectCollectableSubset<T extends object>(
-  instance: T,
-): Partial<T> {
-  const propertyNames = getFromInstance<Set<string>>(
-    instance,
-    symbols.collectedProperties,
-  );
-
-  if (!propertyNames) {
-    return {} as Partial<T>;
-  }
-
-  const subset = Object.fromEntries(
-    Array.from(propertyNames).map((name) => [name, instance[name as keyof T]]),
-  );
-
-  return subset as Partial<T>;
 }
 
 let shouldOptimizeCollects = true;
@@ -186,4 +143,4 @@ export function setPatchOptimizerEnabled(enabled: boolean): void {
   shouldOptimizeCollects = enabled;
 }
 
-export type ObjectChangeHandler<T> = (changes: Partial<T>) => unknown;
+export type SyncEntityChangeHandler<T> = (changes: Partial<T>) => unknown;
