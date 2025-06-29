@@ -32,6 +32,16 @@ export function AreaDebugUi(props: {
   actors: Actor[];
   playerCoords?: Vector<Tile>;
 }) {
+  const settingsStorage = createReactiveStorage<AreaDebugSettings>(
+    localStorage,
+    "area-debug-settings",
+    {
+      visibleGraphType: "none",
+      showFogOfWar: false,
+      showAttackRange: false,
+      showAggroRange: false,
+    },
+  );
   const [settings, setSettings] = useStorage(settingsStorage);
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
@@ -143,17 +153,6 @@ export function AreaDebugUi(props: {
     </Pixi>
   );
 }
-
-const settingsStorage = createReactiveStorage<AreaDebugSettings>(
-  localStorage,
-  "area-debug-settings",
-  {
-    visibleGraphType: "none",
-    showFogOfWar: false,
-    showAttackRange: false,
-    showAggroRange: false,
-  },
-);
 
 function DebugGraph(props: {
   area: AreaResource;
