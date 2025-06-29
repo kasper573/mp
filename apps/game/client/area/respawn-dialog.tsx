@@ -1,6 +1,6 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { useGameActions } from "../game-state-client";
+import { useGameActions } from "../game-state/game-state-client";
 
 export function RespawnDialog(props: DialogProps) {
   const actions = useGameActions();

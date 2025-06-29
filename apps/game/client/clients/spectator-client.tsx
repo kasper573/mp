@@ -30,14 +30,14 @@ export function SpectatorClient(props: GameClientProps) {
   }));
 
   const isSocketOpen = createMemo(
-    () => props.gameState.readyState() === WebSocket.OPEN,
+    () => props.gameState.readyState.get() === WebSocket.OPEN,
   );
 
   createEffect(() => {
     const user = auth.identity();
     const characterId = spectatedCharacterId();
     if (isSocketOpen() && user && characterId) {
-      props.gameState.setCharacterId(characterId);
+      props.gameState.characterId.set(characterId);
       void rpc.world.spectate(characterId);
     }
   });

@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/solid-router";
 import {
-  createGameStateClient,
   GameDebugUiPortal,
+  GameStateClient,
   SpectatorClient,
   useRpc,
   worldRoles,
 } from "@mp/game/client";
-import { Suspense, useContext } from "solid-js";
+import { onCleanup, Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
@@ -21,12 +21,14 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const gameState = createGameStateClient(
-    useRpc(),
-    useContext(SocketContext),
-    useContext(LoggerContext),
-    miscDebugSettings,
-  );
+  const gameState = new GameStateClient({
+    rpc: useRpc(),
+    socket: useContext(SocketContext),
+    logger: useContext(LoggerContext),
+    settings: miscDebugSettings,
+  });
+
+  onCleanup(gameState.start());
 
   return (
     <div

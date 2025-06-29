@@ -4,10 +4,10 @@ import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import { typedKeys } from "@mp/std";
-import type { Actor, ActorId } from "../server";
-import { type GameState } from "../server";
-import { moveAlongPath } from "../shared/area/move-along-path";
-import type { GameStateEvents } from "../server/game-state-events";
+import type { Actor, ActorId } from "../../server";
+import { type GameState } from "../../server";
+import { moveAlongPath } from "../../shared/area/move-along-path";
+import type { GameStateEvents } from "../../server/game-state-events";
 
 export class OptimisticGameState implements GameState {
   actors = new SyncMap<ActorId, Actor>();

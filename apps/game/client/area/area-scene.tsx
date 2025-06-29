@@ -15,7 +15,10 @@ import {
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
-import { GameStateClientContext, useGameActions } from "../game-state-client";
+import {
+  ReactiveGameStateContext,
+  useGameActions,
+} from "../game-state/game-state-client";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -36,7 +39,7 @@ export function AreaScene(
   }>,
 ) {
   const engine = useContext(EngineContext);
-  const state = useContext(GameStateClientContext);
+  const state = useContext(ReactiveGameStateContext);
   const actions = useGameActions();
   const { renderedTileCount } = clientViewDistance;
 

@@ -9,10 +9,10 @@ import {
   createMemo,
 } from "solid-js";
 import type { Character, TiledResource } from "../../server";
-import { GameStateClientContext } from "../game-state-client";
+import { ReactiveGameStateContext } from "../game-state/game-state-client";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
-  const state = useContext(GameStateClientContext);
+  const gameState = useContext(ReactiveGameStateContext);
   const engine = useContext(EngineContext);
 
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
@@ -41,7 +41,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
       frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
       frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameCallbackCount,
-      character: trimCharacterInfo(state().character()),
+      character: trimCharacterInfo(gameState().character()),
     };
   });
 

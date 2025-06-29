@@ -11,7 +11,7 @@ import { assert } from "@mp/std";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
-import { GameStateClientContext } from "../game-state-client";
+import { GameStateClientContext } from "../game-state/game-state-client";
 import { useSyncEntity } from "../use-sync";
 import { ActorSprite } from "./actor-sprite";
 import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
