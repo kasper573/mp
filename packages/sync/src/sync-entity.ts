@@ -51,6 +51,8 @@ export abstract class SyncEntity {
   static accessMeta<Entity extends SyncEntity>(entity: Entity) {
     return entity.#meta;
   }
+
+  static shouldOptimizeCollects = false;
 }
 
 /**
@@ -110,7 +112,7 @@ export function collect<V>({
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
         if (
-          shouldOptimizeCollects &&
+          SyncEntity.shouldOptimizeCollects &&
           meta.assignedProperties.has(context.name as keyof T)
         ) {
           const prevValue = value.get.call(this);
@@ -130,17 +132,7 @@ export function collect<V>({
   };
 }
 
-let shouldOptimizeCollects = true;
-
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
-
-export function isPatchOptimizerEnabled(): boolean {
-  return shouldOptimizeCollects;
-}
-
-export function setPatchOptimizerEnabled(enabled: boolean): void {
-  shouldOptimizeCollects = enabled;
-}
 
 export type SyncEntityChangeHandler<T> = (changes: Partial<T>) => unknown;

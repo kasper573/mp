@@ -1,6 +1,6 @@
 import type { Branded, MinimalInput, Tile, TimesPerSecond } from "@mp/std";
 import type { CardinalDirection, Path, Rect, Vector } from "@mp/math";
-import { collect, selectCollectableSubset } from "@mp/sync";
+import { collect, SyncEntity } from "@mp/sync";
 import type { TimeSpan } from "@mp/time";
 import { addEncoderExtension } from "@mp/encoding";
 import type { MovementTrait } from "../traits/movement";
@@ -77,6 +77,7 @@ export type NpcId = Branded<string, "NPCId">;
  * Does not get persisted in the database.
  */
 export class NpcInstance
+  extends SyncEntity
   implements Omit<Npc, "id">, MovementTrait, AppearanceTrait, CombatTrait
 {
   @collect()
@@ -132,7 +133,10 @@ export class NpcInstance
   @collect()
   accessor lastAttack: TimeSpan | undefined;
 
-  constructor(data: Omit<MinimalInput<NpcInstance>, "type">) {
+  constructor(
+    data: Omit<MinimalInput<NpcInstance>, "type" | keyof SyncEntity>,
+  ) {
+    super();
     this.id = data.id;
     this.npcId = data.npcId;
     this.spawnId = data.spawnId;
@@ -165,7 +169,7 @@ export class NpcInstance
 addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
   Class: NpcInstance as never,
   tag: 40_600,
-  encode: (npc, encode) => encode(selectCollectableSubset(npc)),
+  encode: (npc, encode) => encode(npc.snapshot()),
   decode: (data) => data as NpcInstance,
 });
 

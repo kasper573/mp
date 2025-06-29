@@ -1,6 +1,6 @@
 import type { Branded, MinimalInput, Tile, TimesPerSecond } from "@mp/std";
 import type { UserId } from "@mp/auth";
-import { collect, selectCollectableSubset } from "@mp/sync";
+import { collect, SyncEntity } from "@mp/sync";
 import type { Vector, Path, CardinalDirection, Rect } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -13,7 +13,10 @@ import * as patchOptimizers from "../patch-optimizers";
 import type { AreaId } from "../../shared/area/area-id";
 import type { ActorId } from "../actor";
 
-export class Character implements AppearanceTrait, MovementTrait, CombatTrait {
+export class Character
+  extends SyncEntity
+  implements AppearanceTrait, MovementTrait, CombatTrait
+{
   @collect()
   accessor type = "character" as const;
   @collect()
@@ -61,7 +64,8 @@ export class Character implements AppearanceTrait, MovementTrait, CombatTrait {
   @collect()
   accessor desiredPortalId: ObjectId | undefined;
 
-  constructor(data: Omit<MinimalInput<Character>, "type">) {
+  constructor(data: Omit<MinimalInput<Character>, "type" | keyof SyncEntity>) {
+    super();
     this.type = "character";
     this.id = data.id;
     this.userId = data.userId;
@@ -92,7 +96,7 @@ export class Character implements AppearanceTrait, MovementTrait, CombatTrait {
 addEncoderExtension<Character, Partial<Character>>({
   Class: Character as never,
   tag: 40_600,
-  encode: (character, encode) => encode(selectCollectableSubset(character)),
+  encode: (character, encode) => encode(character.snapshot()),
   decode: (data) => data as Character,
 });
 

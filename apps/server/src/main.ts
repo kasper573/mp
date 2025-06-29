@@ -5,7 +5,7 @@ import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
-import { setPatchOptimizerEnabled, SyncEmitter, SyncMap } from "@mp/sync";
+import { SyncEmitter, SyncEntity, SyncMap } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -152,7 +152,7 @@ const rpcTransceivers = setupRpcTransceivers({
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
-setPatchOptimizerEnabled(opt.patchOptimizer);
+SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
 
 const gameState: GameState = { actors: new SyncMap() };
 

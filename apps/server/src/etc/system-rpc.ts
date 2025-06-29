@@ -1,7 +1,7 @@
 import { roles, rpc, systemRoles } from "@mp/game/server";
 import type { Ticker } from "@mp/time";
 import { InjectionContext } from "@mp/ioc";
-import { isPatchOptimizerEnabled, setPatchOptimizerEnabled } from "@mp/sync";
+import { SyncEntity } from "@mp/sync";
 import { opt } from "../options";
 
 export const systemRouter = rpc.router({
@@ -17,13 +17,13 @@ export const systemRouter = rpc.router({
   isPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
     .output<boolean>()
-    .query(isPatchOptimizerEnabled),
+    .query(() => SyncEntity.shouldOptimizeCollects),
 
   setPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
     .input<boolean>()
     .mutation(({ input }) => {
-      setPatchOptimizerEnabled(input);
+      SyncEntity.shouldOptimizeCollects = input;
     }),
 });
 
