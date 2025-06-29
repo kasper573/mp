@@ -3,7 +3,7 @@ import { type Tile, type TimesPerSecond } from "@mp/std";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
-import type { GameStateEmitter } from "../game-state-emitter";
+import type { GameStateServer } from "../game-state-server";
 import type { ActorId, Actor } from "../actor";
 import { findPathForSubject } from "./movement";
 
@@ -25,7 +25,7 @@ const hpRegenInterval = TimeSpan.fromSeconds(10);
 
 export function combatBehavior(
   state: GameState,
-  emitter: GameStateEmitter,
+  server: GameStateServer,
   areas: AreaLookup,
 ): TickEventHandler {
   let nextHpRegenTime = TimeSpan.fromSeconds(0);
@@ -83,7 +83,7 @@ export function combatBehavior(
     target.health = Math.max(0, target.health - actor.attackDamage);
 
     if (target.health <= 0) {
-      emitter.addEvent("actor.death", target.id);
+      server.addEvent("actor.death", target.id);
       if (actor.type === "character" && target.type === "npc") {
         actor.xp += target.xpReward;
       }
@@ -92,8 +92,8 @@ export function combatBehavior(
     actor.path = undefined; // stop moving when attacking
     actor.lastAttack = currentTime;
 
-    emitter.addEvent("movement.stop", actor.id);
-    emitter.addEvent(
+    server.addEvent("movement.stop", actor.id);
+    server.addEvent(
       "combat.attack",
       { actorId: actor.id, targetId: target.id },
       { actors: [actor.id, target.id] },

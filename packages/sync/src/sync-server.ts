@@ -11,8 +11,7 @@ import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";
 import { type SyncEvent, type SyncEventMap } from "./sync-event";
 
-// TODO think of a better name for this.
-export class SyncEmitter<
+export class SyncServer<
   State extends PatchableState,
   EventMap extends SyncEventMap,
 > {
@@ -20,7 +19,7 @@ export class SyncEmitter<
   private hasBeenGivenFullState = new Set<ClientId>();
   private visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
 
-  constructor(private options: SyncEmitterOptions<State>) {}
+  constructor(private options: SyncServerOptions<State>) {}
 
   flush(state: State): FlushResult {
     const clientIds = Array.from(this.options.clientIds());
@@ -212,7 +211,7 @@ export interface ServerSyncEvent<State extends PatchableState> {
   visibility?: ClientVisibility<State>;
 }
 
-export interface SyncEmitterOptions<State extends PatchableState> {
+export interface SyncServerOptions<State extends PatchableState> {
   clientVisibility: ClientVisibilityFactory<State>;
   clientIds: () => Iterable<ClientId>;
 }

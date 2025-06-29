@@ -5,10 +5,10 @@ import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
-    const { npc, gameState, gameStateEmitter, areas, rng, npcCombatMemories } =
+    const { npc, gameState, gameStateServer, areas, rng, npcCombatMemories } =
       input;
 
-    const deadActorsThisTick = gameStateEmitter.peekEvent("actor.death");
+    const deadActorsThisTick = gameStateServer.peekEvent("actor.death");
     npcCombatMemories.get(npc.id)?.forgetCombatatants(deadActorsThisTick);
 
     if (npc.attackTargetId) {

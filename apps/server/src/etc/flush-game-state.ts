@@ -1,5 +1,5 @@
 import { syncMessageEncoding } from "@mp/sync";
-import type { GameState, GameStateEmitter } from "@mp/game/server";
+import type { GameState, GameStateServer } from "@mp/game/server";
 import type { WebSocket } from "@mp/ws/server";
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
@@ -9,7 +9,7 @@ import { getSocketId } from "./get-socket-id";
 
 export function createGameStateFlusher(
   state: GameState,
-  emitter: GameStateEmitter,
+  server: GameStateServer,
   clients: Iterable<WebSocket>,
   metrics: MetricsRegistry,
 ): TickEventHandler {
@@ -21,7 +21,7 @@ export function createGameStateFlusher(
   });
   return () => {
     const time = new Date();
-    const { clientPatches, clientEvents } = emitter.flush(state);
+    const { clientPatches, clientEvents } = server.flush(state);
     for (const socket of clients) {
       const clientId = getSocketId(socket);
       const patch = clientPatches.get(clientId);

@@ -4,7 +4,7 @@ import { assert, type Rng } from "@mp/std";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor";
-import type { GameStateEmitter } from "../game-state-emitter";
+import type { GameStateServer } from "../game-state-server";
 import type { NpcInstance, NpcInstanceId } from "./types";
 import { type Task, type TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
@@ -25,7 +25,7 @@ export class NpcAi {
 
   constructor(
     private gameState: GameState,
-    private gameStateEmitter: GameStateEmitter,
+    private gameStateServer: GameStateServer,
     private areas: AreaLookup,
     private rng: Rng,
   ) {}
@@ -42,7 +42,7 @@ export class NpcAi {
         const taskInput: TaskInput = {
           areas: this.areas,
           gameState: this.gameState,
-          gameStateEmitter: this.gameStateEmitter,
+          gameStateServer: this.gameStateServer,
           npcCombatMemories: this.combatMemories,
           npc: subject,
           tick,
@@ -61,7 +61,7 @@ export class NpcAi {
   }
 
   private observeAttacksDoneThisTick(observer: NpcInstance) {
-    for (const attack of this.gameStateEmitter.peekEvent("combat.attack")) {
+    for (const attack of this.gameStateServer.peekEvent("combat.attack")) {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
           const combatant = assert(this.gameState.actors.get(combatantId));

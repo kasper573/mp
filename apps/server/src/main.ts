@@ -5,7 +5,7 @@ import { createPinoLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
-import { SyncEmitter, SyncEntity, SyncMap } from "@mp/sync";
+import { SyncServer, SyncEntity, SyncMap } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -14,7 +14,7 @@ import {
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
-  ctxGameStateEmitter,
+  ctxGameStateServer,
   ctxNpcSpawner,
   ctxTokenResolver,
   ctxUserService,
@@ -156,7 +156,7 @@ SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
 
 const gameState: GameState = { actors: new SyncMap() };
 
-const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
+const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   clientIds: () => wss.clients.values().map(getSocketId),
   clientVisibility: deriveClientVisibility(
     clients,
@@ -165,7 +165,7 @@ const gameStateEmitter = new SyncEmitter<GameState, GameStateEvents>({
   ),
 });
 
-gameStateEmitter.attachPatchCollectors(gameState);
+gameStateServer.attachPatchCollectors(gameState);
 
 const npcService = createNpcService(db);
 const gameService = createGameStateService(db);
@@ -209,7 +209,7 @@ const ioc = new InjectionContainer()
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)
   .provide(ctxGameState, gameState)
-  .provide(ctxGameStateEmitter, gameStateEmitter)
+  .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
@@ -226,14 +226,14 @@ collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
 collectPathFindingMetrics(metrics);
 
-const npcAi = new NpcAi(gameState, gameStateEmitter, areas, rng);
+const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
 
 updateTicker.subscribe(movementBehavior(gameState, areas));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, gameStateEmitter, areas));
+updateTicker.subscribe(combatBehavior(gameState, gameStateServer, areas));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
-  createGameStateFlusher(gameState, gameStateEmitter, wss.clients, metrics),
+  createGameStateFlusher(gameState, gameStateServer, wss.clients, metrics),
 );
 updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 

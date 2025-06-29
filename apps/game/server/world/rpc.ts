@@ -7,7 +7,7 @@ import { ctxClientId } from "../user/client-id";
 import type { Character } from "../character/types";
 import { type CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
-import { ctxGameStateEmitter } from "../game-state-emitter";
+import { ctxGameStateServer } from "../game-state-server";
 import { worldRoles } from "../../shared/roles";
 import type { SimpleQueryQueryForItem } from "../pagination";
 import {
@@ -67,8 +67,8 @@ export const worldRouter = rpc.router({
       const clients = ctx.get(ctxClientRegistry);
       const clientId = ctx.get(ctxClientId);
       clients.spectatedCharacterIds.set(clientId, input);
-      const stateEmitter = ctx.get(ctxGameStateEmitter);
-      stateEmitter.markToResendFullState(clientId);
+      const server = ctx.get(ctxGameStateServer);
+      server.markToResendFullState(clientId);
     }),
 
   join: rpc.procedure
@@ -77,8 +77,8 @@ export const worldRouter = rpc.router({
     .mutation(async ({ ctx, mwc }) => {
       const clientId = ctx.get(ctxClientId);
       const state = ctx.get(ctxGameState);
-      const stateEmitter = ctx.get(ctxGameStateEmitter);
-      stateEmitter.markToResendFullState(clientId);
+      const server = ctx.get(ctxGameStateServer);
+      server.markToResendFullState(clientId);
 
       const characterService = ctx.get(ctxCharacterService);
       let char = state.actors
@@ -100,8 +100,8 @@ export const worldRouter = rpc.router({
 
   requestFullState: rpc.procedure.query(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
-    const stateEmitter = ctx.get(ctxGameStateEmitter);
-    stateEmitter.markToResendFullState(clientId);
+    const server = ctx.get(ctxGameStateServer);
+    server.markToResendFullState(clientId);
   }),
 
   leave: rpc.procedure.input<CharacterId>().mutation(({ ctx }) => {
