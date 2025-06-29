@@ -25,7 +25,8 @@ export function createConsoleLogger(): Logger {
     info: console.info.bind(console),
     warn: console.warn.bind(console),
     error: console.error.bind(console),
+    debug: console.debug.bind(console),
   };
 }
 
-export type Logger = Pick<PinoLogger, "info" | "warn" | "error">;
+export type Logger = Pick<PinoLogger, "info" | "warn" | "error" | "debug">;

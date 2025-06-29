@@ -30,6 +30,7 @@ export function createGameStateClient(
   logger: Logger,
   settings: Accessor<OptimisticGameStateSettings>,
 ) {
+  logger.debug("Creating game state client");
   const eventBus = new SyncEventBus<GameStateEvents>();
   const gameState = new OptimisticGameState(settings);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
