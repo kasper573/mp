@@ -6,10 +6,11 @@ import {
   createEffect,
   Show,
 } from "solid-js";
-import { Spring } from "@mp/engine";
+import { FrameEmitter, Spring, useSpringValue } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
+import { useAtom } from "@mp/state/solid";
 import { useRpc } from "../../../../integrations/rpc";
 
 export const Route = createFileRoute("/_layout/admin/devtools/")({
@@ -83,7 +84,10 @@ function SpringTester() {
     precision: precision(),
   }));
 
+  const frameEmitter = new FrameEmitter();
   const spring = new Spring(target, options);
+  const springState = useAtom(spring.state);
+  const springValue = useSpringValue(spring, frameEmitter);
   createRenderEffect(spring.update);
 
   function flipSpringTarget() {
@@ -93,10 +97,12 @@ function SpringTester() {
   const toggleAutoFlip = () => setAutoFlip((now) => !now);
 
   createEffect(() => {
-    if (autoFlip() && spring.state() === "settled") {
+    if (autoFlip() && springState() === "settled") {
       flipSpringTarget();
     }
   });
+
+  onCleanup(frameEmitter.start());
 
   return (
     <>
@@ -149,8 +155,8 @@ function SpringTester() {
       <pre>
         {JSON.stringify(
           {
-            value: spring.value(),
-            state: spring.state(),
+            value: springValue(),
+            state: springState(),
             velocity: spring.velocity.get(),
           },
           null,
@@ -171,7 +177,7 @@ function SpringTester() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${spring.value() / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${springValue() / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />

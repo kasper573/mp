@@ -1,4 +1,4 @@
-import { EngineContext, useSpring, VectorSpring } from "@mp/engine";
+import { EngineContext, useSpringValue, VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
@@ -15,6 +15,7 @@ import {
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
+import { useAtom } from "@mp/state/solid";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -43,13 +44,18 @@ export function AreaScene(
   const actions = useGameActions();
   const { renderedTileCount } = clientViewDistance;
 
+  const cameraSize = useAtom(engine.camera.cameraSize);
+  const pointerWorldPosition = useAtom(engine.pointer.worldPosition);
+  const pointerIsDown = useAtom(engine.pointer.isDown);
+  const cameraTransform = useAtom(engine.camera.transform);
+
   const myCoords = () => state().character()?.coords ?? Vector.zero();
 
   const myWorldPos = createMemo(() =>
     props.area.tiled.tileCoordToWorld(myCoords()),
   );
 
-  const cameraPos = useSpring(
+  const cameraPos = useSpringValue(
     new VectorSpring<Pixel>(myWorldPos, () => ({
       stiffness: 80,
       damping: 40,
@@ -61,13 +67,13 @@ export function AreaScene(
   const zoom = createMemo(() =>
     createZoomLevelForViewDistance(
       props.area.tiled.tileSize,
-      engine.camera.cameraSize,
+      cameraSize(),
       renderedTileCount,
     ),
   );
 
   const pointerTile = createMemo(() =>
-    props.area.tiled.worldCoordToTile(engine.pointer.worldPosition),
+    props.area.tiled.worldCoordToTile(pointerWorldPosition()),
   );
 
   const entityAtPointer = createMemo(() =>
@@ -110,7 +116,7 @@ export function AreaScene(
   );
 
   createEffect(() => {
-    if (engine.pointer.isDown) {
+    if (pointerIsDown()) {
       const entity = untrack(entityAtPointer);
       if (entity) {
         void actions.attack(entity.id);
@@ -118,7 +124,7 @@ export function AreaScene(
         const tileNode = props.area.graph.getNearestNode(pointerTile());
         if (tileNode) {
           const portal = props.area
-            .hitTestObjects([engine.pointer.worldPosition])
+            .hitTestObjects([pointerWorldPosition()])
             .find(getAreaIdFromObject);
 
           moveThrottled(tileNode.data.vector, portal?.id);
@@ -133,11 +139,7 @@ export function AreaScene(
 
   return (
     <>
-      <Pixi
-        label="AreaScene"
-        sortableChildren
-        matrix={engine.camera.transform.data}
-      >
+      <Pixi label="AreaScene" sortableChildren matrix={cameraTransform().data}>
         <TiledRenderer
           layers={props.area.tiled.map.layers.filter(
             (l) => l.type !== "objectgroup",

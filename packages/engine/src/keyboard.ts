@@ -1,3 +1,4 @@
+import type { ReadonlyAtom } from "@mp/state";
 import { atom } from "@mp/state";
 
 export class Keyboard {
@@ -6,8 +7,8 @@ export class Keyboard {
 
   constructor(private window: Window) {}
 
-  get keysHeld(): ReadonlySet<KeyboardEventKey> {
-    return this.#keysHeld.get();
+  get keysHeld(): ReadonlyAtom<ReadonlySet<KeyboardEventKey>> {
+    return this.#keysHeld;
   }
 
   on(
@@ -39,14 +40,16 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    this.#keysHeld.set((current) =>
+    const current = this.#keysHeld.get();
+    this.#keysHeld.set(
       current.has(key) ? current : current.union(new Set([key])),
     );
   };
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    this.#keysHeld.set((current) =>
+    const current = this.#keysHeld.get();
+    this.#keysHeld.set(
       current.has(key) ? current.difference(new Set([key])) : current,
     );
   };

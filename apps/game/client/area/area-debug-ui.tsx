@@ -10,6 +10,7 @@ import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { Select } from "@mp/ui";
 import { createStorageSignal } from "@mp/state";
+import { useAtom } from "@mp/state/solid";
 import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
@@ -159,6 +160,7 @@ function DebugGraph(props: {
 }) {
   const gfx = new Graphics();
   const engine = useContext(EngineContext);
+  const pointerWorldPosition = useAtom(engine.pointer.worldPosition);
 
   createEffect(() => {
     gfx.clear();
@@ -170,7 +172,7 @@ function DebugGraph(props: {
       }
     } else if (props.visible() === "tile") {
       const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(engine.pointer.worldPosition),
+        tiled.worldCoordToTile(pointerWorldPosition()),
       );
       if (tileNode) {
         drawGraphNode(gfx, tiled, graph, tileNode);
@@ -178,11 +180,9 @@ function DebugGraph(props: {
     } else if (props.visible() === "coord") {
       drawStar(
         gfx,
-        engine.pointer.worldPosition,
+        pointerWorldPosition(),
         props.area.graph
-          .getAdjacentNodes(
-            tiled.worldCoordToTile(engine.pointer.worldPosition),
-          )
+          .getAdjacentNodes(tiled.worldCoordToTile(pointerWorldPosition()))
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }

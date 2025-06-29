@@ -150,7 +150,7 @@ function GameStateClientAnimations() {
   const client = useContext(GameStateClientContext);
   const engine = useContext(EngineContext);
   createEffect(() => {
-    onCleanup(engine.addFrameCallback(client().gameState.frameCallback));
+    onCleanup(engine.frameEmitter.subscribe(client().gameState.frameCallback));
   });
   return null;
 }

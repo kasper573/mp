@@ -1,7 +1,6 @@
 import { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
-import type { Computed } from "@mp/state";
-import { batch } from "@mp/state";
+import type { ReadonlyAtom } from "@mp/state";
 import { computed } from "@mp/state";
 import type { SpringLike, SpringOptions } from "./spring";
 import { Spring } from "./spring";
@@ -9,6 +8,8 @@ import { Spring } from "./spring";
 export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
   private xSpring: Spring<T>;
   private ySpring: Spring<T>;
+  readonly state: ReadonlyAtom<"settled" | "moving">;
+  readonly value: ReadonlyAtom<Vector<T>>;
 
   constructor(
     getTargetValue: () => Vector<T>,
@@ -17,22 +18,19 @@ export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
   ) {
     this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
     this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);
+    this.state = computed(
+      [this.xSpring.state, this.ySpring.state],
+      (xState, yState) =>
+        xState === "settled" && yState === "settled" ? "settled" : "moving",
+    );
     this.value = computed(
-      () => new Vector(this.xSpring.value(), this.ySpring.value()),
+      [this.xSpring.value, this.ySpring.value],
+      (x, y) => new Vector(x, y),
     );
   }
 
-  readonly value: Computed<Vector<T>>;
-
-  state = () =>
-    this.xSpring.state() === "settled" && this.ySpring.state() === "settled"
-      ? "settled"
-      : "moving";
-
   update = (dt: TimeSpan) => {
-    batch(() => {
-      this.xSpring.update(dt);
-      this.ySpring.update(dt);
-    });
+    this.xSpring.update(dt);
+    this.ySpring.update(dt);
   };
 }

@@ -17,6 +17,7 @@ import { EngineContext, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 
 import { assert } from "@mp/std";
+import { useAtom } from "@mp/state/solid";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -95,7 +96,8 @@ function DynamicActorAngle(props: {
 }) {
   const center = useScreenCenter();
   const engine = useContext(EngineContext);
-  const angle = createMemo(() => center().angle(engine.pointer.position));
+  const pointerPosition = useAtom(engine.pointer.position);
+  const angle = createMemo(() => center().angle(pointerPosition()));
   return (
     <>
       <SpecificActorAngle
@@ -112,12 +114,9 @@ function DynamicActorAngle(props: {
 
 function useScreenCenter() {
   const engine = useContext(EngineContext);
+  const cameraSize = useAtom(engine.camera.cameraSize);
   const center = createMemo(
-    () =>
-      new Vector(
-        engine.camera.cameraSize.x / 2,
-        engine.camera.cameraSize.y / 2,
-      ),
+    () => new Vector(cameraSize().x / 2, cameraSize().y / 2),
   );
   return center;
 }

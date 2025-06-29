@@ -1,17 +1,23 @@
 import { createEffect, onCleanup, useContext } from "solid-js";
+import { useAtom } from "@mp/state/solid";
 import { EngineContext } from "./context";
 import type { SpringLike } from "./spring";
+import type { FrameEmitter } from "./frame-emitter";
 
-export function useSpring<T>(spring: SpringLike<T>) {
-  const engine = useContext(EngineContext);
+export function useSpringValue<T>(
+  spring: SpringLike<T>,
+  frameEmitter: FrameEmitter = useContext(EngineContext).frameEmitter,
+) {
+  const value = useAtom(spring.value);
+  const state = useAtom(spring.state);
 
   createEffect(() => {
-    if (spring.state() === "moving") {
+    if (state() === "moving") {
       onCleanup(
-        engine.addFrameCallback((opt) => spring.update(opt.timeSinceLastFrame)),
+        frameEmitter.subscribe((opt) => spring.update(opt.timeSinceLastFrame)),
       );
     }
   });
 
-  return spring.value;
+  return value;
 }

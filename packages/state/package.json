@@ -9,10 +9,17 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./solid": {
+      "types": "./src/solid.ts",
+      "import": "./src/solid.ts",
+      "require": "./src/solid.ts"
     }
   },
   "dependencies": {
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "nanostores": "1.0.1",
+    "@nanostores/solid": "1.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
