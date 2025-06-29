@@ -727,9 +727,6 @@ importers:
       '@mp/solid-pixi':
         specifier: workspace:*
         version: link:../solid-pixi
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
