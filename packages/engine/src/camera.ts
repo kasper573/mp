@@ -71,3 +71,5 @@ export class Camera {
     );
   }
 }
+
+type T = VoidFunction;

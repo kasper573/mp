@@ -2,14 +2,13 @@ import { Button } from "@mp/ui";
 import { GameStateClientContext } from "@mp/game/client";
 import { createEffect, createSignal, useContext } from "solid-js";
 import { assert } from "@mp/std";
+import { useStorage } from "@mp/state/solid";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
-import {
-  miscDebugSettings,
-  setMiscDebugSettings,
-} from "../signals/misc-debug-ui-settings";
+import { miscDebugStorage } from "../signals/misc-debug-ui-settings";
 
 export function MiscDebugUi() {
+  const [settings, setSettings] = useStorage(miscDebugStorage);
   const rpc = useRpc();
   const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
     createServerPatchOptimizerSignal();
@@ -49,9 +48,9 @@ export function MiscDebugUi() {
         Use client side patch optimizer:{" "}
         <input
           type="checkbox"
-          checked={miscDebugSettings().usePatchOptimizer}
+          checked={settings().usePatchOptimizer}
           on:change={(e) =>
-            setMiscDebugSettings((prev) => ({
+            setSettings((prev) => ({
               ...prev,
               usePatchOptimizer: e.currentTarget.checked,
             }))
@@ -62,9 +61,9 @@ export function MiscDebugUi() {
         Use client side game state interpolator:{" "}
         <input
           type="checkbox"
-          checked={miscDebugSettings().useInterpolator}
+          checked={settings().useInterpolator}
           on:change={(e) =>
-            setMiscDebugSettings((prev) => ({
+            setSettings((prev) => ({
               ...prev,
               useInterpolator: e.currentTarget.checked,
             }))

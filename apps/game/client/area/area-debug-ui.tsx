@@ -9,8 +9,8 @@ import { EngineContext } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { Select } from "@mp/ui";
-import { createStorageSignal } from "@mp/state";
-import { useAtom } from "@mp/state/solid";
+import { createReactiveStorage } from "@mp/state";
+import { useAtom, useStorage } from "@mp/state/solid";
 import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
@@ -32,17 +32,7 @@ export function AreaDebugUi(props: {
   actors: Actor[];
   playerCoords?: Vector<Tile>;
 }) {
-  const [settings, setSettings] = createStorageSignal<AreaDebugSettings>(
-    localStorage,
-    "area-debug-settings",
-    {
-      visibleGraphType: "none",
-      showFogOfWar: false,
-      showAttackRange: false,
-      showAggroRange: false,
-    },
-  );
-
+  const [settings, setSettings] = useStorage(settingsStorage);
   return (
     <Pixi label="AreaDebugUI" isRenderGroup>
       <DebugGraph
@@ -153,6 +143,17 @@ export function AreaDebugUi(props: {
     </Pixi>
   );
 }
+
+const settingsStorage = createReactiveStorage<AreaDebugSettings>(
+  localStorage,
+  "area-debug-settings",
+  {
+    visibleGraphType: "none",
+    showFogOfWar: false,
+    showAttackRange: false,
+    showAggroRange: false,
+  },
+);
 
 function DebugGraph(props: {
   area: AreaResource;

@@ -1,2 +1,2 @@
 export * from "./atom";
-export * from "./create-storage-signal";
+export * from "./create-storage";

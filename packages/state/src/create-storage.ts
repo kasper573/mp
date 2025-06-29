@@ -1,18 +1,24 @@
-import type { Accessor, Setter } from "solid-js";
-import { createEffect, createSignal } from "solid-js";
+import { atom, type Atom, effect } from "./atom";
 
-export function createStorageSignal<T>(
+export interface ReactiveStorage<T> {
+  value: Atom<T>;
+  effect: () => () => void;
+}
+
+export function createReactiveStorage<T>(
   storage: Storage,
   key: string,
   defaultValue: T,
-): [Accessor<T>, Setter<T>] {
-  const [value, setValue] = createSignal(
-    loadFromStorage<T>(storage, key, defaultValue),
-  );
+): ReactiveStorage<T> {
+  const value = atom(loadFromStorage<T>(storage, key, defaultValue));
 
-  createEffect(() => saveToStorage(storage, key, value()));
+  function createStorageEffect() {
+    return effect(value, (value) => {
+      saveToStorage(storage, key, value);
+    });
+  }
 
-  return [value, setValue];
+  return { value, effect: createStorageEffect };
 }
 
 function loadFromStorage<T>(storage: Storage, key: string, defaultValue: T): T {
