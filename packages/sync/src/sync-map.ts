@@ -7,8 +7,18 @@ import {
 import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V> extends Map<K, V> {
-  #previouslyFlushedKeys = new Set<K>();
-  #subscribers: Set<SyncMapChangeHandler<K, V>> = new Set();
+  #keysLastFlush = new Set<K>();
+  #subscribers = new Set<SyncMapChangeHandler<K, V>>();
+
+  // Cannot be a private field because it needs to be accessed by the `set` method,
+  // which is an override and can thus not access private fields of the parent class.
+  dirtyKeys?: Set<K>;
+
+  override set(key: K, value: V): this {
+    this.dirtyKeys ??= new Set();
+    this.dirtyKeys.add(key);
+    return super.set(key, value);
+  }
 
   /**
    * Triggers event handlers and produces a patch that represents all changes since the last flush.
@@ -16,52 +26,42 @@ export class SyncMap<K, V> extends Map<K, V> {
   flush(...path: PatchPathStep[]): Patch {
     const patch: Patch = [];
     const currentKeys = new Set(this.keys());
-    const events: SyncMapChangeEvent<K, V>[] = [];
 
-    const addedKeys = currentKeys.difference(this.#previouslyFlushedKeys);
+    const addedKeys = currentKeys.difference(this.#keysLastFlush);
     for (const key of addedKeys) {
       const value = this.get(key) as V;
-      patch.push([
-        PatchType.Set,
-        [...path, key as PatchPathStep] as PatchPath,
-        value,
-      ]);
-      events.push({ type: "add", key: key, value });
+      patch.push([PatchType.Set, [...path, String(key)] as PatchPath, value]);
+      this.emit({ type: "add", key: key, value });
     }
 
-    const removedKeys = this.#previouslyFlushedKeys.difference(currentKeys);
+    const removedKeys = this.#keysLastFlush.difference(currentKeys);
     for (const key of removedKeys) {
-      patch.push([
-        PatchType.Remove,
-        [...path, key as PatchPathStep] as PatchPath,
-      ]);
-      events.push({ type: "remove", key: key });
+      patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
+      this.emit({ type: "remove", key: key });
     }
 
-    const potentiallyUpdatedKeys =
-      this.#previouslyFlushedKeys.intersection(currentKeys);
-    for (const key of potentiallyUpdatedKeys) {
-      const value = this.get(key);
-      const operations =
-        value instanceof SyncEntity
-          ? value.flush(...path, String(key))
-          : undefined;
-      if (operations?.length) {
-        patch.push(...operations);
+    const staleKeys = this.#keysLastFlush.intersection(currentKeys);
+    for (const key of staleKeys) {
+      const v = this.get(key) as V;
+      const op = v instanceof SyncEntity ? v.flush(...path, String(key)) : null;
+      if (op?.length) {
+        patch.push(...op);
+      }
+      if (this.dirtyKeys?.has(key)) {
+        this.emit({ type: "update", key: key, value: v });
       }
     }
 
-    this.#previouslyFlushedKeys = currentKeys;
-
-    if (events.length > 0) {
-      for (const event of events) {
-        for (const handler of this.#subscribers) {
-          handler(event);
-        }
-      }
-    }
+    this.#keysLastFlush = currentKeys;
+    this.dirtyKeys?.clear();
 
     return patch;
+  }
+
+  emit(event: SyncMapChangeEvent<K, V>) {
+    for (const handler of this.#subscribers) {
+      handler(event);
+    }
   }
 
   subscribe(handler: SyncMapChangeHandler<K, V>) {
@@ -74,6 +74,7 @@ export class SyncMap<K, V> extends Map<K, V> {
 
 export type SyncMapChangeEvent<Key, Value> =
   | { type: "add"; key: Key; value: Value }
+  | { type: "update"; key: Key; value: Value }
   | { type: "remove"; key: Key };
 
 export type SyncMapChangeHandler<Key, Value> = (

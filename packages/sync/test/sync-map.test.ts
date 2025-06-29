@@ -74,40 +74,82 @@ describe("can collect changes from map of decorated entities", () => {
 });
 
 describe("subscriptions", () => {
-  it("can subscribe to changes on maps", () => {
-    class Entity extends SyncEntity {
-      constructor(public name: string) {
-        super();
+  describe("can subscribe to", () => {
+    it("additions", () => {
+      class Entity extends SyncEntity {
+        constructor(public name: string) {
+          super();
+        }
       }
-    }
 
-    const map = new SyncMap<string, Entity>();
+      const map = new SyncMap<string, Entity>();
 
-    const fn = vi.fn();
-    map.subscribe(fn);
+      const fn = vi.fn();
+      map.subscribe(fn);
 
-    // Adding
-    const john = new Entity("john");
-    map.set("1", john);
-    map.flush();
-    expect(fn).toHaveBeenCalledTimes(1);
-    expect(fn).toHaveBeenNthCalledWith(1, {
-      type: "add",
-      key: "1",
-      value: john,
+      const john = new Entity("john");
+      map.set("1", john);
+      map.flush();
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(fn).toHaveBeenNthCalledWith(1, {
+        type: "add",
+        key: "1",
+        value: john,
+      });
     });
 
-    // Removing
-    map.delete("1");
-    map.flush();
-    expect(fn).toHaveBeenCalledTimes(2);
-    expect(fn).toHaveBeenNthCalledWith(2, {
-      type: "remove",
-      key: "1",
+    it("updates", () => {
+      class Entity extends SyncEntity {
+        constructor(public name: string) {
+          super();
+        }
+      }
+
+      const john = new Entity("john");
+      const map = new SyncMap<string, Entity>([["1", john]]);
+
+      map.flush(); // Discard initial state
+
+      const fn = vi.fn();
+      map.subscribe(fn);
+
+      const jane = new Entity("jane");
+      map.set("1", jane);
+      map.flush();
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(fn).toHaveBeenNthCalledWith(1, {
+        type: "update",
+        key: "1",
+        value: jane,
+      });
+    });
+
+    it("removals", () => {
+      class Entity extends SyncEntity {
+        constructor(public name: string) {
+          super();
+        }
+      }
+
+      const john = new Entity("john");
+      const map = new SyncMap<string, Entity>([["1", john]]);
+
+      map.flush(); // Discard initial state
+
+      const fn = vi.fn();
+      map.subscribe(fn);
+
+      map.delete("1");
+      map.flush();
+      expect(fn).toHaveBeenCalledTimes(1);
+      expect(fn).toHaveBeenNthCalledWith(1, {
+        type: "remove",
+        key: "1",
+      });
     });
   });
 
-  it("can stop subscribing to changes on maps", () => {
+  it("can unsubscribe", () => {
     class Entity {
       constructor(public name: string) {}
     }
