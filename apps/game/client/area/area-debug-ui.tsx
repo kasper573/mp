@@ -14,6 +14,7 @@ import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
+import { useSyncEntity } from "../use-sync";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
@@ -47,7 +48,7 @@ export function AreaDebugUi(props: {
         area={props.area}
         visible={() => settings().visibleGraphType}
       />
-      <For each={props.actors}>
+      <For each={props.actors.map(useSyncEntity)}>
         {(actor) =>
           actor.path ? (
             <DebugPath
@@ -119,7 +120,7 @@ export function AreaDebugUi(props: {
         )}
       </Show>
       <Show when={settings().showAttackRange}>
-        <For each={props.actors}>
+        <For each={props.actors.map(useSyncEntity)}>
           {(actor) => (
             <DebugCircle
               tiled={props.area.tiled}
@@ -131,7 +132,11 @@ export function AreaDebugUi(props: {
         </For>
       </Show>
       <Show when={settings().showAggroRange}>
-        <For each={props.actors.filter((actor) => actor.type === "npc")}>
+        <For
+          each={props.actors
+            .filter((actor) => actor.type === "npc")
+            .map(useSyncEntity)}
+        >
           {(npc) => (
             <DebugCircle
               tiled={props.area.tiled}

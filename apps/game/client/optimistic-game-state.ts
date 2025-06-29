@@ -1,10 +1,7 @@
 import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
-import { createMutable } from "solid-js/store";
 import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyOperation, applyPatch, PatchType } from "@mp/sync";
-import type { Accessor } from "solid-js";
-import { batch, untrack } from "solid-js";
+import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import { typedKeys } from "@mp/std";
 import type { Actor, ActorId } from "../server";
@@ -12,42 +9,17 @@ import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 import type { GameStateEvents } from "../server/game-state-events";
 
-/**
- * Temporary workaround allow using createMutable (which doesn't support Maps and class instances).
- * Remove this once we no longer use createMutable
- * @deprecated
- */
-type ClientState<T> = {
-  [K in keyof T]: T[K] extends Map<infer K, infer V>
-    ? Record<K & string, V>
-    : never;
-};
+export class OptimisticGameState implements GameState {
+  actors = new SyncMap<ActorId, Actor>();
 
-export function createOptimisticGameState(
-  settings: Accessor<OptimisticGameStateSettings>,
-) {
-  const gameState = createMutable<ClientState<GameState>>({
-    actors: {},
-  });
+  constructor(private settings: () => OptimisticGameStateSettings) {}
 
-  /**
-   * Returns the current optimistic game state.
-   */
-  function optimisticGameState(): ClientState<GameState> {
-    return gameState;
-  }
-
-  optimisticGameState.frameCallback = (opt: FrameCallbackOptions) => {
-    const { enabled, actors } = untrack(() => ({
-      enabled: settings().useInterpolator,
-      actors: gameState.actors,
-    }));
-
-    if (!enabled) {
+  frameCallback = (opt: FrameCallbackOptions) => {
+    if (!this.settings().useInterpolator) {
       return;
     }
 
-    for (const actor of Object.values(actors)) {
+    for (const actor of this.actors.values()) {
       if (actor.path && actor.health > 0) {
         const [newCoords, newPath] = moveAlongPath(
           actor.coords,
@@ -66,35 +38,28 @@ export function createOptimisticGameState(
         }
       }
     }
+
+    this.actors.flush();
   };
 
-  optimisticGameState.applyPatch = (
-    patch: Patch,
-    events: EventAccessFn<GameStateEvents>,
-  ) => {
-    batch(() => {
-      if (settings().usePatchOptimizer) {
-        applyPatchOptimized(gameState, patch, events);
-      } else {
-        applyPatch(gameState, patch);
-      }
+  applyPatch = (patch: Patch, events: EventAccessFn<GameStateEvents>) => {
+    if (this.settings().usePatchOptimizer) {
+      applyPatchOptimized(this, patch, events);
+    } else {
+      applyPatch(this, patch);
+    }
 
-      // Face actors toward their attack targets when they attack
-      for (const { actorId, targetId } of events("combat.attack")) {
-        const [actor, target] = untrack(() => [
-          gameState.actors[actorId] as Actor | undefined,
-          gameState.actors[targetId] as Actor | undefined,
-        ]);
-        if (actor && target) {
-          actor.dir = nearestCardinalDirection(
-            actor.coords.angle(target.coords),
-          );
-        }
+    // Face actors toward their attack targets when they attack
+    for (const { actorId, targetId } of events("combat.attack")) {
+      const actor = this.actors.get(actorId);
+      const target = this.actors.get(targetId);
+      if (actor && target) {
+        actor.dir = nearestCardinalDirection(actor.coords.angle(target.coords));
       }
-    });
+    }
+
+    this.actors.flush();
   };
-
-  return optimisticGameState;
 }
 
 export interface OptimisticGameStateSettings {
@@ -109,7 +74,7 @@ const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 // If we receive updates that we trust the interpolator to already be working on,
 // we simply ignore those property changes.
 function applyPatchOptimized(
-  gameState: ClientState<GameState>,
+  gameState: GameState,
   patch: Patch,
   events: EventAccessFn<GameStateEvents>,
 ): void {
@@ -120,9 +85,7 @@ function applyPatchOptimized(
       entityName === ("actors" satisfies keyof GameState) &&
       type === PatchType.Update
     ) {
-      const actor = gameState[entityName][entityId as ActorId] as
-        | Actor
-        | undefined;
+      const actor = gameState[entityName].get(entityId as ActorId);
       for (const key of typedKeys(update)) {
         if (actor && !shouldApplyActorUpdate(actor, update, key, events)) {
           delete update[key];

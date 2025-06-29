@@ -170,8 +170,7 @@ addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
   Class: NpcInstance as never,
   tag: 40_601,
   encode: (npc, encode) => encode(npc.snapshot()),
-  // TODO instantiate NpcInstance from snapshot
-  decode: (snapshot) => snapshot as NpcInstance,
+  decode: (snapshot) => new NpcInstance(snapshot as NpcInstance),
 });
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

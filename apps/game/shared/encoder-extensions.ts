@@ -49,8 +49,6 @@ export function registerEncoderExtensions(): void {
     Class: SyncMap,
     tag: nextTag(),
     encode: (map, encode) => encode(map.entries().toArray()),
-    decode: (entries) =>
-      // TODO instantiate SyncMap from snapshot
-      Object.fromEntries(entries) as SyncMap<unknown, unknown>,
+    decode: (entries) => new SyncMap(entries),
   });
 }

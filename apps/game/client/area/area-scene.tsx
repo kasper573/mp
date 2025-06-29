@@ -23,6 +23,7 @@ import {
 import { Actor } from "../actor/actor";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { clientViewDistance } from "../../server";
+import { useSyncEntity } from "../use-sync";
 import { AreaDebugUi } from "./area-debug-ui";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
@@ -69,6 +70,7 @@ export function AreaScene(
   const entityAtPointer = createMemo(() =>
     state()
       .actorList()
+      .map(useSyncEntity)
       .find(
         (actor) =>
           actor.health > 0 &&

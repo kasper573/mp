@@ -1,5 +1,11 @@
 import type { Accessor } from "solid-js";
-import { createContext, createSignal, onCleanup, useContext } from "solid-js";
+import {
+  createContext,
+  createMemo,
+  createSignal,
+  onCleanup,
+  useContext,
+} from "solid-js";
 import type { Vector } from "@mp/math";
 import { assert, throttle, type Tile } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
@@ -8,12 +14,13 @@ import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { Character, CharacterId } from "../server/character/types";
-import type { ActorId } from "../server";
+import type { ActorId, GameState } from "../server";
 import type { GameStateEvents } from "../server/game-state-events";
 import type { GameSolidRpcInvoker } from "./use-rpc";
 import { useRpc } from "./use-rpc";
-import type { OptimisticGameStateSettings } from "./create-optimistic-game-state";
-import { createOptimisticGameState } from "./create-optimistic-game-state";
+import type { OptimisticGameStateSettings } from "./optimistic-game-state";
+import { OptimisticGameState } from "./optimistic-game-state";
+import { useSyncEntity, useSyncMap } from "./use-sync";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
@@ -24,23 +31,22 @@ export function createGameStateClient(
   settings: Accessor<OptimisticGameStateSettings>,
 ) {
   const eventBus = new SyncEventBus<GameStateEvents>();
-  const gameState = createOptimisticGameState(settings);
+  const gameState = new OptimisticGameState(settings);
   const [characterId, setCharacterId] = createSignal<CharacterId | undefined>();
   const [readyState, setReadyState] = createSignal(socket.readyState);
 
-  const areaId = () => {
-    const id = characterId();
-    const actor = id ? gameState().actors[id] : undefined;
-    return actor?.areaId;
-  };
+  const actors = useSyncMap(() => gameState.actors);
 
-  const character = () => {
-    const id = characterId();
-    const actor = id ? gameState().actors[id] : undefined;
-    return actor ? (actor as Character) : undefined;
-  };
+  const actorList = () => Array.from(actors().values());
 
-  const actorList = () => Object.values(gameState().actors);
+  const character = createMemo(() => {
+    const char = actors().get(characterId() as CharacterId) as
+      | Character
+      | undefined;
+    return char ? useSyncEntity(char) : undefined;
+  });
+
+  const areaId = () => character()?.areaId;
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);
@@ -94,7 +100,7 @@ export function createGameStateClient(
     character,
     frameCallback: gameState.frameCallback,
     eventBus,
-    get: () => gameState(),
+    get: (): GameState => gameState,
   };
 }
 

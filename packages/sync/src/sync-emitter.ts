@@ -191,7 +191,10 @@ function createFullStatePatch<State extends PatchableState>(
 ): Patch {
   const patch: Patch = [];
   for (const key in state) {
-    patch.push([PatchType.Set, [key], state[key as keyof typeof state]]);
+    const entities = state[key as keyof typeof state];
+    for (const [entityId, entityValue] of entities.entries()) {
+      patch.push([PatchType.Set, [key, entityId], entityValue]);
+    }
   }
   return patch;
 }

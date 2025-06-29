@@ -12,23 +12,20 @@ import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
 import { GameStateClientContext } from "../game-state-client";
+import { useSyncEntity } from "../use-sync";
 import { ActorSprite } from "./actor-sprite";
 import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   const allSpritesheets = useContext(ActorSpritesheetContext);
+  const actor = useSyncEntity(() => props.actor);
   const state = useContext(GameStateClientContext);
-  const position = createMemo(() =>
-    props.tiled.tileCoordToWorld(props.actor.coords),
-  );
-  const isMoving = createMemo(() => !!props.actor.path?.length);
-  const isFast = createMemo(() => props.actor.speed >= 2);
-  const isAlive = () => props.actor.health > 0;
+  const position = createMemo(() => props.tiled.tileCoordToWorld(actor.coords));
+  const isMoving = createMemo(() => !!actor.path?.length);
+  const isFast = createMemo(() => actor.speed >= 2);
+  const isAlive = () => actor.health > 0;
 
-  const sprite = new ActorSprite(
-    // eslint-disable-next-line solid/reactivity
-    isAlive() ? "idle-spear" : "death-spear",
-  );
+  const sprite = new ActorSprite(isAlive() ? "idle-spear" : "death-spear");
 
   const text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
   const container = new Container();
@@ -37,32 +34,30 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
   container.addChild(text);
 
   createEffect(() => {
-    sprite.spritesheets = assert(allSpritesheets.get(props.actor.modelId));
+    sprite.spritesheets = assert(allSpritesheets.get(actor.modelId));
   });
 
-  createEffect(() => (sprite.attackSpeed = props.actor.attackSpeed));
+  createEffect(() => (sprite.attackSpeed = actor.attackSpeed));
 
-  createEffect(() => (sprite.direction = props.actor.dir));
+  createEffect(() => (sprite.direction = actor.dir));
 
   createEffect(() => {
-    const { opacity, color } = props.actor;
-    container.alpha = opacity ?? 1;
-    if (color !== undefined) {
-      sprite.filters = [createTintFilter(color)];
+    container.alpha = actor.opacity ?? 1;
+    if (actor.color !== undefined) {
+      sprite.filters = [createTintFilter(actor.color)];
     }
   });
 
   createEffect(() => {
-    const { name, health, maxHealth } = props.actor;
-    text.text = name + `\n${health}/${maxHealth}`;
-    if (props.actor.type === "character") {
-      text.text += `\n${props.actor.xp}xp`;
+    text.text = actor.name + `\n${actor.health}/${actor.maxHealth}`;
+    if (actor.type === "character") {
+      text.text += `\n${actor.xp}xp`;
     }
   });
 
   createEffect(() => {
     // Adjust draw order
-    container.zIndex = props.actor.coords.y;
+    container.zIndex = actor.coords.y;
   });
 
   function switchAnimationToMovingOrIdle() {
@@ -81,7 +76,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
     onCleanup(
       // eslint-disable-next-line solid/reactivity
       state().eventBus.subscribe("combat.attack", (attack) => {
-        if (attack.actorId === props.actor.id) {
+        if (attack.actorId === actor.id) {
           void sprite
             .playToEndAndStop("attack-spear")
             .then(switchAnimationToMovingOrIdle);
@@ -90,9 +85,8 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
     );
 
     onCleanup(
-      // eslint-disable-next-line solid/reactivity
       state().eventBus.subscribe("actor.death", (deadActorId) => {
-        if (deadActorId === props.actor.id) {
+        if (deadActorId === actor.id) {
           void sprite.playToEndAndStop("death-spear");
         }
       }),
@@ -108,7 +102,7 @@ export function Actor(props: { tiled: TiledResource; actor: Actor }) {
     <Show when={position()}>
       {(pos) => (
         <Pixi
-          label={`Actor (${props.actor.name}, ${props.actor.id})`}
+          label={`Actor (${actor.name}, ${actor.id})`}
           as={container}
           position={pos()}
         />

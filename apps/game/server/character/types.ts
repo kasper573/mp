@@ -97,8 +97,7 @@ addEncoderExtension<Character, Partial<Character>>({
   Class: Character as never,
   tag: 40_600,
   encode: (character, encode) => encode(character.snapshot()),
-  // TODO instantiate Character from snapshot
-  decode: (snapshot) => snapshot as Character,
+  decode: (snapshot) => new Character(snapshot as Character),
 });
 
 export type CharacterId = Branded<string, "CharacterId">;

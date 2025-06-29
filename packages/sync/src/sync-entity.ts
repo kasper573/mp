@@ -5,7 +5,7 @@ import { PatchType, type Patch } from "./patch";
  * Base class for entities that has fields decorated with @collect.
  */
 export abstract class SyncEntity {
-  #meta = new SyncEntityMeta<this>();
+  #meta = new SyncEntityMeta();
 
   /**
    * Triggers event handlers and produces a patch that represents all changes since the last flush.
@@ -39,7 +39,9 @@ export abstract class SyncEntity {
    */
   snapshot(): Partial<this> {
     const subset = Object.fromEntries(
-      this.#meta.collectedProperties.values().map((name) => [name, this[name]]),
+      this.#meta.collectedProperties
+        .values()
+        .map((name) => [name, this[name as keyof this]]),
     );
     return subset as Partial<this>;
   }
@@ -59,11 +61,11 @@ export abstract class SyncEntity {
  * Private metadata for a SyncEntity instance.
  * Is only shared with the collect decorator.
  */
-class SyncEntityMeta<CollectedProperties> {
-  subscribers = new Set<SyncEntityChangeHandler<CollectedProperties>>();
-  changes: Partial<CollectedProperties> | undefined;
-  collectedProperties = new Set<keyof CollectedProperties>();
-  assignedProperties = new Set<keyof CollectedProperties>();
+class SyncEntityMeta {
+  subscribers = new Set<SyncEntityChangeHandler<object>>();
+  changes: object | undefined;
+  collectedProperties = new Set<PropertyKey>();
+  assignedProperties = new Set<PropertyKey>();
 }
 
 export interface CollectDecoratorOptions<T> {
@@ -122,7 +124,8 @@ export function collect<V>({
 
         if (shouldCollectValue) {
           meta.changes ??= {};
-          meta.changes[context.name as keyof T] = collectedValue as never;
+          meta.changes[context.name as keyof typeof meta.changes] =
+            collectedValue as never;
         }
 
         value.set.call(this, newValue);

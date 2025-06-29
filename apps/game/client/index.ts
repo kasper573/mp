@@ -8,7 +8,7 @@ export * from "./area/use-area-resource";
 export * from "./actor/actor-sprite-tester";
 export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
-export * from "./create-optimistic-game-state";
+export * from "./optimistic-game-state";
 export * from "./clients/spectator-client";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
