@@ -12,12 +12,14 @@ export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
   readonly value: ReadonlyAtom<Vector<T>>;
 
   constructor(
-    getTargetValue: () => Vector<T>,
+    target: ReadonlyAtom<Vector<T>>,
     options: () => SpringOptions,
     init?: Vector<T>,
   ) {
-    this.xSpring = new Spring(() => getTargetValue().x, options, init?.x);
-    this.ySpring = new Spring(() => getTargetValue().y, options, init?.y);
+    const targetX = computed(target, (v) => v.x);
+    const targetY = computed(target, (v) => v.y);
+    this.xSpring = new Spring(targetX, options, init?.x);
+    this.ySpring = new Spring(targetY, options, init?.y);
     this.state = computed(
       [this.xSpring.state, this.ySpring.state],
       (xState, yState) =>

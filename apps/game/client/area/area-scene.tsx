@@ -15,7 +15,7 @@ import {
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
-import { useAtom } from "@mp/state/solid";
+import { useAtom, useSignalAsAtom } from "@mp/state/solid";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -55,8 +55,10 @@ export function AreaScene(
     props.area.tiled.tileCoordToWorld(myCoords()),
   );
 
+  const myWorldPosAtom = useSignalAsAtom(() => myWorldPos());
+
   const cameraPos = useSpringValue(
-    new VectorSpring<Pixel>(myWorldPos, () => ({
+    new VectorSpring<Pixel>(myWorldPosAtom, () => ({
       stiffness: 80,
       damping: 40,
       mass: 1,

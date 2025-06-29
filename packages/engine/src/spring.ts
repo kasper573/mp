@@ -12,24 +12,27 @@ export class Spring<T extends number> implements SpringLike<T> {
   }
 
   constructor(
-    public readonly target: () => T,
+    public readonly target: ReadonlyAtom<T>,
     private options: () => SpringOptions,
     init?: T,
   ) {
-    this.#value.set(init ?? target());
-    this.state = computed([this.#value, this.velocity], (value, velocity) => {
-      const { precision } = this.options();
-      const isSettled =
-        Math.abs(this.target() - value) < precision &&
-        Math.abs(velocity) < precision;
+    this.#value.set(init ?? target.get());
+    this.state = computed(
+      [this.#value, this.velocity, target],
+      (value, velocity, target) => {
+        const { precision } = this.options();
+        const isSettled =
+          Math.abs(target - value) < precision &&
+          Math.abs(velocity) < precision;
 
-      return isSettled ? "settled" : "moving";
-    });
+        return isSettled ? "settled" : "moving";
+      },
+    );
   }
 
   update = (dt: TimeSpan) => {
     const { stiffness, damping, mass } = this.options();
-    const currentTarget = this.target();
+    const currentTarget = this.target.get();
     const delta = currentTarget - this.#value.get();
     const force = stiffness * delta;
     const dampingForce = -damping * this.velocity.get();
