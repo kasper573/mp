@@ -30,17 +30,17 @@ export function createGameStateClient(
 
   const areaId = () => {
     const id = characterId();
-    const actor = id ? gameState().actors.get(id) : undefined;
+    const actor = id ? gameState().actors[id] : undefined;
     return actor?.areaId;
   };
 
   const character = () => {
     const id = characterId();
-    const actor = id ? gameState().actors.get(id) : undefined;
+    const actor = id ? gameState().actors[id] : undefined;
     return actor ? (actor as Character) : undefined;
   };
 
-  const actorList = () => Array.from(gameState().actors.values());
+  const actorList = () => Object.values(gameState().actors);
 
   const handleMessage = (e: MessageEvent<ArrayBuffer>) => {
     const result = syncMessageEncoding.decode(e.data);

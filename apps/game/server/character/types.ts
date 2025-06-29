@@ -92,12 +92,13 @@ export class Character
   }
 }
 
-// TODO move to encoder-externsions.ts when game package has been refactored to be organized by domain rathr than client/server.
+// TODO move to encoder-extensions.ts when game package has been refactored to be organized by domain rathr than client/server.
 addEncoderExtension<Character, Partial<Character>>({
   Class: Character as never,
   tag: 40_600,
   encode: (character, encode) => encode(character.snapshot()),
-  decode: (data) => data as Character,
+  // TODO instantiate Character from snapshot
+  decode: (snapshot) => snapshot as Character,
 });
 
 export type CharacterId = Branded<string, "CharacterId">;

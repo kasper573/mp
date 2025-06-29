@@ -165,12 +165,13 @@ export class NpcInstance
   }
 }
 
-// TODO move to encoder-externsions.ts when game package has been refactored to be organized by domain rathr than client/server.
+// TODO move to encoder-extensions.ts when game package has been refactored to be organized by domain rathr than client/server.
 addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
   Class: NpcInstance as never,
-  tag: 40_600,
+  tag: 40_601,
   encode: (npc, encode) => encode(npc.snapshot()),
-  decode: (data) => data as NpcInstance,
+  // TODO instantiate NpcInstance from snapshot
+  decode: (snapshot) => snapshot as NpcInstance,
 });
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

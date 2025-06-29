@@ -2,7 +2,7 @@ import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
 import { createMutable } from "solid-js/store";
 import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
+import { applyOperation, applyPatch, PatchType } from "@mp/sync";
 import type { Accessor } from "solid-js";
 import { batch, untrack } from "solid-js";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
@@ -12,15 +12,28 @@ import { type GameState } from "../server";
 import { moveAlongPath } from "../shared/area/move-along-path";
 import type { GameStateEvents } from "../server/game-state-events";
 
+/**
+ * Temporary workaround allow using createMutable (which doesn't support Maps and class instances).
+ * Remove this once we no longer use createMutable
+ * @deprecated
+ */
+type ClientState<T> = {
+  [K in keyof T]: T[K] extends Map<infer K, infer V>
+    ? Record<K & string, V>
+    : never;
+};
+
 export function createOptimisticGameState(
   settings: Accessor<OptimisticGameStateSettings>,
 ) {
-  const gameState = createMutable<GameState>({ actors: new SyncMap() });
+  const gameState = createMutable<ClientState<GameState>>({
+    actors: {},
+  });
 
   /**
    * Returns the current optimistic game state.
    */
-  function optimisticGameState(): GameState {
+  function optimisticGameState(): ClientState<GameState> {
     return gameState;
   }
 
@@ -34,7 +47,7 @@ export function createOptimisticGameState(
       return;
     }
 
-    for (const actor of actors.values()) {
+    for (const actor of Object.values(actors)) {
       if (actor.path && actor.health > 0) {
         const [newCoords, newPath] = moveAlongPath(
           actor.coords,
@@ -69,8 +82,8 @@ export function createOptimisticGameState(
       // Face actors toward their attack targets when they attack
       for (const { actorId, targetId } of events("combat.attack")) {
         const [actor, target] = untrack(() => [
-          gameState.actors.get(actorId),
-          gameState.actors.get(targetId),
+          gameState.actors[actorId] as Actor | undefined,
+          gameState.actors[targetId] as Actor | undefined,
         ]);
         if (actor && target) {
           actor.dir = nearestCardinalDirection(
@@ -96,7 +109,7 @@ const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 // If we receive updates that we trust the interpolator to already be working on,
 // we simply ignore those property changes.
 function applyPatchOptimized(
-  gameState: GameState,
+  gameState: ClientState<GameState>,
   patch: Patch,
   events: EventAccessFn<GameStateEvents>,
 ): void {
@@ -107,7 +120,9 @@ function applyPatchOptimized(
       entityName === ("actors" satisfies keyof GameState) &&
       type === PatchType.Update
     ) {
-      const actor = gameState[entityName].get(entityId as ActorId);
+      const actor = gameState[entityName][entityId as ActorId] as
+        | Actor
+        | undefined;
       for (const key of typedKeys(update)) {
         if (actor && !shouldApplyActorUpdate(actor, update, key, events)) {
           delete update[key];
