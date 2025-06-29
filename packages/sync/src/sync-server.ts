@@ -34,7 +34,7 @@ export class SyncServer<
       ]),
     );
 
-    const serverPatch: Patch = Array.from(this.flushPatchCollectors());
+    const serverPatch: Patch = Array.from(this.flushState(state));
 
     const clientPatches: ClientPatches = new Map();
     const clientEvents: ClientEvents = new Map();
@@ -102,23 +102,14 @@ export class SyncServer<
     return { clientPatches, clientEvents };
   }
 
-  private patchCollectors = new Set<State>();
-
-  private *flushPatchCollectors(): Generator<Operation> {
-    for (const state of this.patchCollectors) {
-      for (const [entityName, map] of Object.entries(state)) {
-        if (map instanceof SyncMap) {
-          for (const operation of map.flush()) {
-            yield prefixOperation(entityName, operation);
-          }
+  private *flushState(state: State): Generator<Operation> {
+    for (const [entityName, map] of Object.entries(state)) {
+      if (map instanceof SyncMap) {
+        for (const operation of map.flush()) {
+          yield prefixOperation(entityName, operation);
         }
       }
     }
-  }
-
-  attachPatchCollectors(collectors: State): () => void {
-    this.patchCollectors.add(collectors);
-    return () => this.patchCollectors.delete(collectors);
   }
 
   markToResendFullState(...clientIds: ClientId[]) {

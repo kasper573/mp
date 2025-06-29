@@ -165,8 +165,6 @@ const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   ),
 });
 
-gameStateServer.attachPatchCollectors(gameState);
-
 const npcService = createNpcService(db);
 const gameService = createGameStateService(db);
 

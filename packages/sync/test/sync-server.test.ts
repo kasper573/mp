@@ -103,8 +103,6 @@ it("can collect patches", () => {
     ]),
   };
 
-  server.attachPatchCollectors(serverState);
-
   const clientState: TestState = { persons: new SyncMap() };
 
   // Flush initial state
