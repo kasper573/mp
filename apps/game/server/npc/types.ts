@@ -2,7 +2,6 @@ import type { Branded, MinimalInput, Tile, TimesPerSecond } from "@mp/std";
 import type { CardinalDirection, Path, Rect, Vector } from "@mp/math";
 import { collect, SyncEntity } from "@mp/sync";
 import type { TimeSpan } from "@mp/time";
-import { addEncoderExtension } from "@mp/encoding";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
 import { type AppearanceTrait } from "../traits/appearance";
@@ -164,13 +163,5 @@ export class NpcInstance
     this.lastAttack = data.lastAttack;
   }
 }
-
-// TODO move to encoder-extensions.ts when game package has been refactored to be organized by domain rathr than client/server.
-addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
-  Class: NpcInstance as never,
-  tag: 40_601,
-  encode: (npc, encode) => encode(npc.snapshot()),
-  decode: (snapshot) => new NpcInstance(snapshot as NpcInstance),
-});
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

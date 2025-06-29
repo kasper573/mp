@@ -4,7 +4,6 @@ import { collect, SyncEntity } from "@mp/sync";
 import type { Vector, Path, CardinalDirection, Rect } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
 import type { ObjectId } from "@mp/tiled-loader";
-import { addEncoderExtension } from "@mp/encoding";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
 import { type AppearanceTrait } from "../traits/appearance";
@@ -91,13 +90,5 @@ export class Character
     this.desiredPortalId = data.desiredPortalId;
   }
 }
-
-// TODO move to encoder-extensions.ts when game package has been refactored to be organized by domain rathr than client/server.
-addEncoderExtension<Character, Partial<Character>>({
-  Class: Character as never,
-  tag: 40_600,
-  encode: (character, encode) => encode(character.snapshot()),
-  decode: (snapshot) => new Character(snapshot as Character),
-});
 
 export type CharacterId = Branded<string, "CharacterId">;
