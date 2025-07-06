@@ -83,15 +83,10 @@ export class AreaDebugGraphics extends Container {
     this.addChild(this.aggroRanges);
     this.addChild(this.fogOfWar);
 
-    Ticker.shared.add(this.update, this);
+    this.onRender = this.#onRender;
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    Ticker.shared.remove(this.update, this);
-  }
-
-  update = () => {
+  #onRender = () => {
     this.attackRanges.visible = this.settings().showAttackRange;
     this.aggroRanges.visible = this.settings().showAggroRange;
     this.fogOfWar.visible = this.settings().showFogOfWar;
@@ -105,15 +100,11 @@ class DebugTiledGraph extends Graphics {
     private visibleGraphType: () => VisibleGraphType,
   ) {
     super();
-    Ticker.shared.add(this.update, this);
+    this.onRender = this.#onRender;
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    Ticker.shared.remove(this.update, this);
-  }
-
-  update() {
+  #onRender = () => {
+    console.log("update");
     this.clear();
     const { tiled, graph } = this.area();
     const { worldPosition } = this.engine.pointer;
@@ -138,7 +129,7 @@ class DebugTiledGraph extends Graphics {
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }
-  }
+  };
 }
 
 class DebugCircle extends Graphics {
@@ -152,15 +143,10 @@ class DebugCircle extends Graphics {
   ) {
     super();
     this.alpha = 0.25;
-    Ticker.shared.add(this.update, this);
+    this.onRender = this.#onRender;
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    Ticker.shared.remove(this.update, this);
-  }
-
-  protected update = () => {
+  #onRender = () => {
     const { pos, radius, color, tiled } = this.options();
     const worldPos = tiled.tileCoordToWorld(pos);
     const worldRadius = tiled.tileToWorldUnit(radius);
@@ -180,15 +166,10 @@ class DebugPath extends Graphics {
     },
   ) {
     super();
-    Ticker.shared.add(this.update, this);
+    this.onRender = this.#onRender;
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    Ticker.shared.remove(this.update, this);
-  }
-
-  private update = () => {
+  #onRender = () => {
     const { tiled, path, color } = this.options();
     this.clear();
     if (path?.length) {
@@ -203,15 +184,10 @@ class DebugNetworkFogOfWar extends Graphics {
     private area: AreaResource,
   ) {
     super();
-    Ticker.shared.add(this.update, this);
+    this.onRender = this.#onRender;
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    Ticker.shared.remove(this.update, this);
-  }
-
-  private update = () => {
+  #onRender = () => {
     const coords = this.playerCoords();
     this.clear();
 
