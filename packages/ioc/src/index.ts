@@ -1,16 +1,25 @@
+import type { Result } from "@mp/std";
+import { err, ok } from "@mp/std";
+
 abstract class InjectionContainer {
   constructor(protected map: InjectionMap = new Map()) {}
 
+  /**
+   * Gets the value for the given context and asserts that its available
+   */
   get<Value>(context: InjectionContext<Value>): Value {
-    return context[readSymbol](this.map);
+    const result = this.access(context);
+    if (result.isErr()) {
+      throw new Error(result.error);
+    }
+    return result.value;
   }
 
-  getOr<Value>(context: InjectionContext<Value>, fallback: Value): Value {
-    try {
-      return this.get(context);
-    } catch {
-      return fallback;
-    }
+  /**
+   * Tries to access the value for the given context.
+   */
+  access<Value>(context: InjectionContext<Value>): Result<Value, string> {
+    return context[readSymbol](this.map);
   }
 }
 
@@ -51,18 +60,18 @@ export class InjectionContext<Value> {
   static withDefault<Value>(defaultValue: Value): InjectionContext<Value> {
     return new InjectionContext<Value>(function (map) {
       if (map.has(this as InjectionContext<unknown>)) {
-        return map.get(this as InjectionContext<unknown>) as Value;
+        return ok(map.get(this as InjectionContext<unknown>) as Value);
       }
-      return defaultValue;
+      return ok(defaultValue);
     });
   }
 
   static new<Value>(name: string): InjectionContext<Value> {
     return new InjectionContext<Value>(function (map) {
       if (map.has(this as InjectionContext<unknown>)) {
-        return map.get(this as InjectionContext<unknown>) as Value;
+        return ok(map.get(this as InjectionContext<unknown>) as Value);
       }
-      throw new Error(`"${name}" context is missing in IOC container`);
+      return err(`"${name}" context is missing in IOC container`);
     });
   }
 }
@@ -72,4 +81,4 @@ type InjectionMap = Map<InjectionContext<unknown>, unknown>;
 type InjectionReaderFn<Value> = (
   this: InjectionContext<Value>,
   map: InjectionMap,
-) => Value;
+) => Result<Value, string>;

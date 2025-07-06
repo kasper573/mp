@@ -398,6 +398,9 @@ importers:
 
   packages/engine:
     dependencies:
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../ioc
       '@mp/math':
         specifier: workspace:*
         version: link:../math
@@ -477,6 +480,10 @@ importers:
         version: 8.4.0(eslint@9.7.0)(typescript@5.8.2)
 
   packages/ioc:
+    dependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

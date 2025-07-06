@@ -21,10 +21,10 @@ describe("ImmutableInjectionContainer", () => {
     );
   });
 
-  it("can attempt to access an unavailable context if providing a fallback value", () => {
+  it("can access an unavailable context and get a result object back", () => {
     const context = InjectionContext.new<number>("test");
     const container = new ImmutableInjectionContainer();
-    expect(container.getOr(context, 123)).toBe(123);
+    expect(container.access(context).isErr()).toBe(true);
   });
 
   it("can access a context that is unavailable in the container if the context has a default value", () => {
@@ -51,10 +51,10 @@ describe("MutableInjectionContainer", () => {
     expect(value).toBe(123);
   });
 
-  it("can attempt to access an unavailable context if providing a fallback value", () => {
+  it("can access an unavailable context and get a result object back", () => {
     const context = InjectionContext.new<number>("test");
-    const container = new MutableInjectionContainer();
-    expect(container.getOr(context, 123)).toBe(123);
+    const container = new ImmutableInjectionContainer();
+    expect(container.access(context).isErr()).toBe(true);
   });
 
   it("attempting to access unavailable context throws an error", () => {
