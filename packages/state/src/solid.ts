@@ -4,7 +4,11 @@ import { useStore } from "@nanostores/solid";
 import type { ReadonlyAtom } from "./atom";
 import type { ReactiveStorage } from "./create-storage";
 
-export { useStore as useAtom } from "@nanostores/solid";
+/**
+ * Temporary deprecation to help me understand what code to remove to decouple pixi.js from solid-js.
+ * @deprecated
+ */
+export const useAtom = useStore;
 
 /**
  * This is an anti-pattern that should only be used while we're transitioning away from solid-js signals.

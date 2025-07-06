@@ -14,6 +14,10 @@ export interface PixiProps extends ParentProps {
   label?: string;
 }
 
+/**
+ * This should be removed
+ * @deprecated
+ */
 export function Pixi(props: PixiProps) {
   const parent = useContext(ParentContext);
 
