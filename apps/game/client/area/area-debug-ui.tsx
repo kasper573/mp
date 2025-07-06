@@ -1,21 +1,20 @@
-import { type Path, type Vector } from "@mp/math";
+import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
-import { Graphics } from "pixi.js";
-import type { Accessor } from "solid-js";
-import { createEffect, createMemo, For, Show, useContext } from "solid-js";
+import { Container, DestroyOptions, Graphics, Ticker } from "pixi.js";
+import { createEffect, useContext } from "solid-js";
 import { Pixi } from "@mp/solid-pixi";
-import { EngineContext } from "@mp/engine";
+import { Engine, EngineContext } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { Select } from "@mp/ui";
-import { createReactiveStorage } from "@mp/state";
-import { useAtom, useStorage } from "@mp/state/solid";
+import { computed, createReactiveStorage } from "@mp/state";
+import { useSignalAsAtom, useStorage } from "@mp/state/solid";
 import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
-import { useSyncEntity } from "../use-sync";
+import { ReactiveCollection } from "../reactive-collection";
 
 const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 type VisibleGraphType = (typeof visibleGraphTypes)[number];
@@ -43,23 +42,71 @@ export function AreaDebugUi(props: {
     },
   );
   const [settings, setSettings] = useStorage(settingsStorage);
+  const engine = useContext(EngineContext);
+
+  const actorsAtom = useSignalAsAtom(() => props.actors);
+
+  const areaDebugUI = new Container();
+
+  const debugTiled = new DebugTiledGraph(
+    engine,
+    () => props.area,
+    () => settings().visibleGraphType,
+  );
+
+  const actorPaths = new ReactiveCollection(
+    actorsAtom,
+    (actor) =>
+      new DebugPath(() => ({
+        tiled: props.area.tiled,
+        path: actor.path,
+        color: uniqolor(actor.id).color,
+      })),
+  );
+
+  const attackRanges = new ReactiveCollection(
+    actorsAtom,
+    (actor) =>
+      new DebugCircle(() => ({
+        tiled: props.area.tiled,
+        pos: actor.coords,
+        radius: actor.attackRange,
+        color: uniqolor(actor.id).color,
+      })),
+  );
+
+  const aggroRanges = new ReactiveCollection(
+    computed(actorsAtom, (actors) =>
+      actors.filter((actor) => actor.type === "npc"),
+    ),
+    (npc) =>
+      new DebugCircle(() => ({
+        tiled: props.area.tiled,
+        pos: npc.coords,
+        radius: npc.aggroRange,
+        color: npc.color ? hexColorFromInt(npc.color) : uniqolor(npc.id).color,
+      })),
+  );
+
+  const fogOfWar = new DebugNetworkFogOfWar(
+    () => props.playerCoords ?? Vector.zero(),
+    props.area,
+  );
+
+  areaDebugUI.addChild(actorPaths);
+  areaDebugUI.addChild(debugTiled);
+  areaDebugUI.addChild(attackRanges);
+  areaDebugUI.addChild(aggroRanges);
+  areaDebugUI.addChild(fogOfWar);
+
+  createEffect(() => {
+    attackRanges.visible = settings().showAttackRange;
+    aggroRanges.visible = settings().showAggroRange;
+    fogOfWar.visible = settings().showFogOfWar;
+  });
+
   return (
-    <Pixi label="AreaDebugUI" isRenderGroup>
-      <DebugGraph
-        area={props.area}
-        visible={() => settings().visibleGraphType}
-      />
-      <For each={props.actors.map(useSyncEntity)}>
-        {(actor) =>
-          actor.path ? (
-            <DebugPath
-              tiled={props.area.tiled}
-              path={actor.path}
-              color={uniqolor(actor.id).color}
-            />
-          ) : null
-        }
-      </For>
+    <Pixi as={areaDebugUI} label="AreaDebugUI" isRenderGroup>
       <>
         <div>
           Visible Graph lines:{" "}
@@ -114,151 +161,141 @@ export function AreaDebugUi(props: {
           Show npc aggro range
         </label>
       </>
-
-      <Show when={settings().showFogOfWar && props.playerCoords}>
-        {(coords) => (
-          <DebugNetworkFogOfWar playerCoords={coords()} area={props.area} />
-        )}
-      </Show>
-      <Show when={settings().showAttackRange}>
-        <For each={props.actors.map(useSyncEntity)}>
-          {(actor) => (
-            <DebugCircle
-              tiled={props.area.tiled}
-              pos={actor.coords}
-              radius={actor.attackRange}
-              color={uniqolor(actor.id).color}
-            />
-          )}
-        </For>
-      </Show>
-      <Show when={settings().showAggroRange}>
-        <For
-          each={props.actors
-            .filter((actor) => actor.type === "npc")
-            .map(useSyncEntity)}
-        >
-          {(npc) => (
-            <DebugCircle
-              tiled={props.area.tiled}
-              pos={npc.coords}
-              radius={npc.aggroRange}
-              color={
-                npc.color ? hexColorFromInt(npc.color) : uniqolor(npc.id).color
-              }
-            />
-          )}
-        </For>
-      </Show>
     </Pixi>
   );
 }
 
-function DebugGraph(props: {
-  area: AreaResource;
-  visible: Accessor<VisibleGraphType>;
-}) {
-  const gfx = new Graphics();
-  const engine = useContext(EngineContext);
-  const pointerWorldPosition = useAtom(engine.pointer.worldPosition);
+class DebugTiledGraph extends Graphics {
+  constructor(
+    private engine: Engine,
+    private area: () => AreaResource,
+    private visibleGraphType: () => VisibleGraphType,
+  ) {
+    super();
+    Ticker.shared.add(this.update, this);
+  }
 
-  createEffect(() => {
-    gfx.clear();
-    const { tiled, graph } = props.area;
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    Ticker.shared.remove(this.update, this);
+  }
 
-    if (props.visible() === "all") {
+  update() {
+    this.clear();
+    const { tiled, graph } = this.area();
+    const { worldPosition } = this.engine.pointer;
+
+    if (this.visibleGraphType() === "all") {
       for (const node of graph.getNodes()) {
-        drawGraphNode(gfx, tiled, graph, node);
+        drawGraphNode(this, tiled, graph, node);
       }
-    } else if (props.visible() === "tile") {
+    } else if (this.visibleGraphType() === "tile") {
       const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(pointerWorldPosition()),
+        tiled.worldCoordToTile(worldPosition.get()),
       );
       if (tileNode) {
-        drawGraphNode(gfx, tiled, graph, tileNode);
+        drawGraphNode(this, tiled, graph, tileNode);
       }
-    } else if (props.visible() === "coord") {
+    } else if (this.visibleGraphType() === "coord") {
       drawStar(
-        gfx,
-        pointerWorldPosition(),
-        props.area.graph
-          .getAdjacentNodes(tiled.worldCoordToTile(pointerWorldPosition()))
+        this,
+        worldPosition.get(),
+        graph
+          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.get()))
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }
-  });
-
-  return <Pixi label="GraphDebugUI" as={gfx} />;
+  }
 }
 
-function DebugCircle(props: {
-  tiled: TiledResource;
-  pos: Vector<Tile>;
-  radius: Tile;
-  color: string;
-}) {
-  const graphics = new Graphics();
-  graphics.alpha = 0.25;
-  createEffect(() => {
-    const pos = props.tiled.tileCoordToWorld(props.pos);
-    const radius = props.tiled.tileToWorldUnit(props.radius);
-    graphics.clear();
-    graphics.fillStyle = { color: props.color };
-    graphics.circle(pos.x, pos.y, radius);
-    graphics.fill();
-  });
-  return <Pixi as={graphics} />;
+class DebugCircle extends Graphics {
+  constructor(
+    private options: () => {
+      tiled: TiledResource;
+      pos: Vector<Tile>;
+      radius: Tile;
+      color: string;
+    },
+  ) {
+    super();
+    this.alpha = 0.25;
+    Ticker.shared.add(this.update, this);
+  }
+
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    Ticker.shared.remove(this.update, this);
+  }
+
+  protected update = () => {
+    const { pos, radius, color, tiled } = this.options();
+    const worldPos = tiled.tileCoordToWorld(pos);
+    const worldRadius = tiled.tileToWorldUnit(radius);
+    this.clear();
+    this.fillStyle = { color };
+    this.circle(worldPos.x, worldPos.y, worldRadius);
+    this.fill();
+  };
 }
 
-function DebugPath(props: {
-  tiled: TiledResource;
-  path: Path<Tile> | undefined;
-  color: string;
-}) {
-  const gfx = new Graphics();
+class DebugPath extends Graphics {
+  constructor(
+    private options: () => {
+      tiled: TiledResource;
+      path: Path<Tile> | undefined;
+      color: string;
+    },
+  ) {
+    super();
+    Ticker.shared.add(this.update, this);
+  }
 
-  createEffect(() => {
-    gfx.clear();
-    if (props.path?.length) {
-      drawPath(gfx, props.path.map(props.tiled.tileCoordToWorld), props.color);
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    Ticker.shared.remove(this.update, this);
+  }
+
+  private update = () => {
+    const { tiled, path, color } = this.options();
+    this.clear();
+    if (path?.length) {
+      drawPath(this, path.map(tiled.tileCoordToWorld), color);
     }
-  });
-
-  return <Pixi label="PathDebugUI" as={gfx} />;
+  };
 }
 
-function DebugNetworkFogOfWar(props: {
-  playerCoords: Vector<Tile>;
-  area: AreaResource;
-}) {
-  const { networkFogOfWarTileCount } = clientViewDistance;
+class DebugNetworkFogOfWar extends Graphics {
+  constructor(
+    private playerCoords: () => Vector<Tile>,
+    private area: AreaResource,
+  ) {
+    super();
+    Ticker.shared.add(this.update, this);
+  }
 
-  const gfx = new Graphics();
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    Ticker.shared.remove(this.update, this);
+  }
 
-  const rect = createMemo(() =>
-    clientViewDistanceRect(
-      props.playerCoords,
-      props.area.tiled.tileCount,
-      networkFogOfWarTileCount,
-    ).scale(props.area.tiled.tileSize),
-  );
+  private update = () => {
+    const coords = this.playerCoords();
+    this.clear();
 
-  const width = createMemo(() => rect().width);
-  const height = createMemo(() => rect().height);
-  const x = createMemo(() => rect().x);
-  const y = createMemo(() => rect().y);
+    if (!coords) {
+      return;
+    }
 
-  createEffect(() => {
-    gfx.clear();
-    gfx.rect(0, 0, width(), height());
-    gfx.fill({ color: "rgba(0, 255, 0, 0.5)" });
-  });
+    const { width, height, x, y } = clientViewDistanceRect(
+      coords,
+      this.area.tiled.tileCount,
+      clientViewDistance.networkFogOfWarTileCount,
+    ).scale(this.area.tiled.tileSize);
 
-  createEffect(() => {
-    gfx.position.set(x(), y());
-  });
-
-  return <Pixi label="DebugViewbox" as={gfx} />;
+    this.rect(0, 0, width, height);
+    this.fill({ color: "rgba(0, 255, 0, 0.5)" });
+    this.position.set(x, y);
+  };
 }
 
 function drawGraphNode(
