@@ -51,6 +51,15 @@ describe("MutableInjectionContainer", () => {
     expect(value).toBe(123);
   });
 
+  it("can remove context", () => {
+    const context = InjectionContext.new<number>("test");
+    const container = new MutableInjectionContainer();
+    const remove = container.register(context, 123);
+    remove();
+    const result = container.access(context);
+    expect(result.isErr()).toBe(true);
+  });
+
   it("can access an unavailable context and get a result object back", () => {
     const context = InjectionContext.new<number>("test");
     const container = new ImmutableInjectionContainer();

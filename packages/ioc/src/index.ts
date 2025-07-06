@@ -24,12 +24,12 @@ abstract class InjectionContainer {
 }
 
 export class MutableInjectionContainer extends InjectionContainer {
-  register<Value>(context: InjectionContext<Value>, value: Value): this {
+  register<Value>(context: InjectionContext<Value>, value: Value): () => void {
     if (this.map.has(context as InjectionContext<unknown>)) {
       throw new Error(`Context is already registered in the container`);
     }
     this.map.set(context as InjectionContext<unknown>, value);
-    return this;
+    return () => this.map.delete(context as InjectionContext<unknown>);
   }
 }
 
