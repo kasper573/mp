@@ -157,13 +157,7 @@ export function AreaScene(
 
   const [settings, setSettings] = useStorage(settingsStorage);
   const area = () => props.area;
-  const areaDebug = new AreaDebugGraphics(
-    engine,
-    area,
-    actors,
-    myCoords,
-    settings,
-  );
+  const areaDebug = new AreaDebugGraphics(area, actors, myCoords, settings);
 
   return (
     <>

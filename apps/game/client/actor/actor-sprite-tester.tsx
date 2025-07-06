@@ -1,18 +1,12 @@
 import { Application, Pixi } from "@mp/solid-pixi";
-import {
-  createEffect,
-  createSignal,
-  onCleanup,
-  Show,
-  useContext,
-} from "solid-js";
+import { createEffect, createSignal, Show } from "solid-js";
 import { Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import { ctxEngine, EngineContext, EngineProvider } from "@mp/engine";
+import { ctxEngine, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 import type { CSSProperties } from "@mp/style";
 import {
@@ -24,6 +18,7 @@ import { useRpc } from "../use-rpc";
 import { ioc } from "../context";
 import { ActorSprite } from "./actor-sprite";
 import {
+  ActorSpritesheetContextProvider,
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "./actor-spritesheet-lookup";
@@ -47,19 +42,13 @@ export function ActorSpriteTester() {
     }
   });
 
-  createEffect(() => {
-    if (spritesheets.data) {
-      onCleanup(ioc.register(ctxActorSpritesheetLookup, spritesheets.data));
-    }
-  });
-
   return (
     <Show when={spritesheets.data} keyed>
       {(allSpritesheets) => (
-        <>
+        <ActorSpritesheetContextProvider value={allSpritesheets}>
           <Application style={{ display: "flex", flex: 1 }}>
             {({ viewport }) => (
-              <EngineProvider interactive viewport={viewport}>
+              <EngineProvider interactive viewport={viewport} ioc={ioc}>
                 <Show when={modelId()} keyed>
                   {(id) => (
                     <Intermediate
@@ -86,7 +75,7 @@ export function ActorSpriteTester() {
               options={allSpritesheets.keys().toArray()}
             />
           </div>
-        </>
+        </ActorSpritesheetContextProvider>
       )}
     </Show>
   );
@@ -98,10 +87,6 @@ export function ActorSpriteTester() {
  */
 function Intermediate(props: { options: () => ActorTestSettings }) {
   const spriteList = new ActorSpriteList(props.options);
-  const engine = useContext(EngineContext);
-  createEffect(() => {
-    onCleanup(ioc.register(ctxEngine, engine));
-  });
   return <Pixi as={spriteList} />;
 }
 

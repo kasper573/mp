@@ -1,5 +1,13 @@
 import type { ParentProps } from "solid-js";
-import { createContext, createMemo, onCleanup, Show } from "solid-js";
+import {
+  createContext,
+  createEffect,
+  createMemo,
+  createSignal,
+  onCleanup,
+  Show,
+} from "solid-js";
+import type { MutableInjectionContainer } from "@mp/ioc";
 import { InjectionContext } from "@mp/ioc";
 import { Engine } from "./engine";
 
@@ -17,13 +25,23 @@ export function EngineProvider(
   props: ParentProps<{
     viewport: HTMLElement;
     interactive: boolean;
+    ioc?: MutableInjectionContainer;
   }>,
 ) {
+  const [isReady, setIsReady] = createSignal(false);
+
   const engine = createMemo(() => {
     const engine = new Engine(props.viewport);
     engine.start(props.interactive);
     onCleanup(engine.stop);
     return engine;
+  });
+
+  createEffect(() => {
+    if (props.ioc) {
+      onCleanup(props.ioc.register(ctxEngine, engine()));
+    }
+    setIsReady(true);
   });
 
   return (
@@ -32,12 +50,14 @@ export function EngineProvider(
     // business logic when in practice the engine instance is basically never re-created.
     // With a forced re-render, in the off chance that the engine instance would be re-created,
     // the app will instead re-render.
-    <Show when={engine()} keyed>
-      {(engine) => (
-        <EngineContext.Provider value={engine}>
-          {props.children}
-        </EngineContext.Provider>
-      )}
+    <Show when={isReady()}>
+      <Show when={engine()} keyed>
+        {(engine) => (
+          <EngineContext.Provider value={engine}>
+            {props.children}
+          </EngineContext.Provider>
+        )}
+      </Show>
     </Show>
   );
 }

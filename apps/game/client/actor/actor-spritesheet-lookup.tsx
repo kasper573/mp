@@ -58,12 +58,12 @@ export function ActorSpritesheetContextProvider(
     value: ActorSpritesheetLookup;
   }>,
 ) {
-  const [didRegister, setDidRegister] = createSignal(false);
+  const [isReady, setReady] = createSignal(false);
 
   createEffect(() => {
     onCleanup(ioc.register(ctxActorSpritesheetLookup, props.value));
-    setDidRegister(true);
+    setReady(true);
   });
 
-  return <Show when={didRegister()}>{props.children}</Show>;
+  return <Show when={isReady()}>{props.children}</Show>;
 }

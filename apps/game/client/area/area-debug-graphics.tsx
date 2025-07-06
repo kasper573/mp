@@ -2,7 +2,7 @@ import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Container, Graphics } from "pixi.js";
-import type { Engine } from "@mp/engine";
+import { ctxEngine } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import type { ReadonlyAtom } from "@mp/state";
@@ -13,6 +13,7 @@ import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import { ReactiveCollection } from "../reactive-collection";
+import { ioc } from "../context";
 import type {
   AreaDebugSettings,
   VisibleGraphType,
@@ -24,7 +25,6 @@ export class AreaDebugGraphics extends Container {
   private fogOfWar: DebugNetworkFogOfWar;
 
   constructor(
-    engine: Engine,
     area: () => AreaResource,
     actors: ReadonlyAtom<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
@@ -33,7 +33,6 @@ export class AreaDebugGraphics extends Container {
     super();
 
     const debugTiled = new DebugTiledGraph(
-      engine,
       area,
       () => this.settings().visibleGraphType,
     );
@@ -97,7 +96,6 @@ export class AreaDebugGraphics extends Container {
 
 class DebugTiledGraph extends Graphics {
   constructor(
-    private engine: Engine,
     private area: () => AreaResource,
     private visibleGraphType: () => VisibleGraphType,
   ) {
@@ -107,8 +105,9 @@ class DebugTiledGraph extends Graphics {
 
   #onRender = () => {
     this.clear();
+    const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area();
-    const { worldPosition } = this.engine.pointer;
+    const { worldPosition } = engine.pointer;
 
     if (this.visibleGraphType() === "all") {
       for (const node of graph.getNodes()) {

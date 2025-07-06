@@ -1,7 +1,7 @@
 import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 
-abstract class InjectionContainer {
+export abstract class InjectionContainer {
   constructor(protected map: InjectionMap = new Map()) {}
 
   /**

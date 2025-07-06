@@ -31,6 +31,7 @@ import {
   GameStateClientContext,
   ReactiveGameStateContext,
 } from "../game-state/solid-js";
+import { ioc } from "../context";
 
 export type GameClientProps = ParentProps<{
   gameState: GameStateClient;
@@ -99,6 +100,7 @@ export function GameClient(props: GameClientProps) {
                       <EngineProvider
                         interactive={interactive()}
                         viewport={viewport}
+                        ioc={ioc}
                       >
                         <GameDebugUiContext.Provider value={debugUiState}>
                           <Suspense
