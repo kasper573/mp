@@ -17,6 +17,7 @@ import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import { useAtom, useSignalAsAtom, useStorage } from "@mp/state/solid";
 import { createReactiveStorage } from "@mp/state";
+import { Container } from "pixi.js";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -159,9 +160,21 @@ export function AreaScene(
   const area = () => props.area;
   const areaDebug = new AreaDebugGraphics(area, actors, myCoords, settings);
 
+  const areaScene = new Container();
+
+  const tileHighlight = new TileHighlight(() => ({
+    area: props.area,
+    target: highlightTarget(),
+  }));
+
   return (
     <>
-      <Pixi label="AreaScene" sortableChildren matrix={cameraTransform().data}>
+      <Pixi
+        label="AreaScene"
+        as={areaScene}
+        sortableChildren
+        matrix={cameraTransform().data}
+      >
         <TiledRenderer
           layers={props.area.tiled.map.layers.filter(
             (l) => l.type !== "objectgroup",
@@ -179,7 +192,7 @@ export function AreaScene(
         </TiledRenderer>
         {props.children}
         <Show when={engine.isInteractive}>
-          <TileHighlight area={props.area} target={highlightTarget()} />
+          <Pixi as={tileHighlight} label="TileHighlight" />
         </Show>
         <Pixi as={areaDebug} label="AreaDebugGraphics" />
         <GameDebugUiPortal>
