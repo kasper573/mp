@@ -14,7 +14,10 @@ import {
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
-import type { GameStateClient } from "../game-state/game-state-client";
+import {
+  ctxGameStateClient,
+  type GameStateClient,
+} from "../game-state/game-state-client";
 import { AreaScene } from "../area/area-scene";
 import { useAreaResource } from "../area/use-area-resource";
 import {
@@ -84,6 +87,10 @@ export function GameClient(props: GameClientProps) {
 
   const gameStateAccessor = () => props.gameState;
   const reactiveGameStateAccessor = () => reactiveGameState;
+
+  createEffect(() => {
+    onCleanup(ioc.register(ctxGameStateClient, props.gameState));
+  });
 
   return (
     <GameStateClientContext.Provider value={gameStateAccessor}>

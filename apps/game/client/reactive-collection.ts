@@ -10,19 +10,39 @@ export class ReactiveCollection<T> extends Container {
     private createItem: (item: T) => Container,
   ) {
     super();
-    this.unsubscribe = this.items.subscribe(() => this.updateItems());
+    this.unsubscribe = reactiveCollectionBinding(this, items, createItem);
   }
 
   override destroy(options?: DestroyOptions): void {
     super.destroy(options);
     this.unsubscribe();
   }
+}
 
-  private updateItems() {
-    this.removeChildren();
-    for (const item of this.items.get()) {
-      const itemContainer = this.createItem(item);
-      this.addChild(itemContainer);
+export function reactiveCollectionBinding<Item>(
+  container: Container,
+  items: ReadonlyAtom<Item[]>,
+  createElement: (item: Item) => Container,
+) {
+  const elementsByItem = new Map<Item, Container>();
+  return items.subscribe((newList, oldList) => {
+    const newItems = new Set(newList);
+    const oldItems = new Set(oldList);
+    const addedItems = newItems.difference(oldItems);
+    const removedItems = oldItems.difference(newItems);
+
+    for (const item of addedItems) {
+      const element = createElement(item);
+      elementsByItem.set(item, element);
+      container.addChild(element);
     }
-  }
+
+    for (const item of removedItems) {
+      const element = elementsByItem.get(item);
+      if (element) {
+        container.removeChild(element);
+      }
+      elementsByItem.delete(item);
+    }
+  });
 }

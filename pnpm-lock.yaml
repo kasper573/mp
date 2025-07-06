@@ -737,18 +737,12 @@ importers:
 
   packages/tiled-renderer:
     dependencies:
-      '@mp/solid-pixi':
-        specifier: workspace:*
-        version: link:../solid-pixi
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
       pixi.js:
         specifier: 'catalog:'
         version: 8.3.3
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

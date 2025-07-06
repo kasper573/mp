@@ -28,7 +28,7 @@ export class LayerViewFactory {
     for (const [index, layer] of layers.entries()) {
       const view = this.createLayerView(layer);
       memorizeLayer(view, layer);
-      view.label = `${layer.type}: "${layer.name}"`;
+      view.label = layer.name;
       container.addChildAt(view, index);
     }
 

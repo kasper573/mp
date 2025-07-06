@@ -12,8 +12,6 @@ import type {
   TiledText,
 } from "@mp/tiled-loader";
 
-export * from "./renderer";
-
 export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {
     case "ellipse": {

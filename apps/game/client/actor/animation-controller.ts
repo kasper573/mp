@@ -14,7 +14,6 @@ import type {
 } from "pixi.js";
 import { Ticker } from "pixi.js";
 import { Sprite } from "pixi.js";
-import { assert } from "@mp/std";
 
 /**
  * Selects a texture from a set of spritesheets based on a current animation name and cardinal direction.
@@ -28,7 +27,7 @@ export class AnimationController<AnimationName extends string> extends Sprite {
   protected playToEnd?: PlayToEndAnimation<AnimationName>;
 
   direction: CardinalDirection = "s";
-  spritesheets = {} as ReadonlyMap<AnimationName, Spritesheet>;
+  spritesheets: ReadonlyMap<AnimationName, Spritesheet> = new Map();
 
   get animation(): Animation<AnimationName> | undefined {
     return this.fixed ?? this.playToEnd ?? this.smooth;
@@ -62,13 +61,23 @@ export class AnimationController<AnimationName extends string> extends Sprite {
       return;
     }
 
-    const spritesheet = assert(this.spritesheets.get(animation.name));
+    const spritesheet = this.spritesheets.get(animation.name);
+    if (!spritesheet) {
+      return;
+    }
+
     const compatibleDirection = spritesheetCompatibleDirection(
       this.direction,
       spritesheet,
     );
 
-    const textures = assert(spritesheet.animations[compatibleDirection]);
+    const textures = spritesheet.animations[compatibleDirection] as
+      | Texture[]
+      | undefined;
+
+    if (!textures) {
+      return;
+    }
 
     if (animation.type === "fixed-at-end") {
       this.texture = textures.at(-1) as Texture;

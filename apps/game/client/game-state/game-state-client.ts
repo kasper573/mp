@@ -5,6 +5,7 @@ import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { Atom } from "@mp/state";
 import { atom } from "@mp/state";
+import { InjectionContext } from "@mp/ioc";
 import type { CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
 import type { GameSolidRpcInvoker } from "../use-rpc";
@@ -96,3 +97,6 @@ export class GameStateClient {
     }
   };
 }
+
+export const ctxGameStateClient =
+  InjectionContext.new<GameStateClient>("GameStateClient");

@@ -8,15 +8,24 @@ import { ColorMatrixFilter } from "pixi.js";
 
 export function createTintFilter(
   color: number,
-  strength: number = 0.25,
+  strength?: number,
 ): ColorMatrixFilter {
+  const filter = new ColorMatrixFilter();
+  filter.matrix = createTintFilterMatrix(color, strength);
+  return filter;
+}
+
+export function createTintFilterMatrix(
+  color: number,
+  strength: number = 0.25,
+): ColorMatrixFilter["matrix"] {
   const r = ((color >> 16) & 0xff) / 255;
   const g = ((color >> 8) & 0xff) / 255;
   const b = (color & 0xff) / 255;
 
   const inv = 1 - strength;
 
-  const matrix: ColorMatrixFilter["matrix"] = [
+  return [
     inv,
     0,
     0,
@@ -38,8 +47,4 @@ export function createTintFilter(
     1,
     0,
   ];
-
-  const filter = new ColorMatrixFilter();
-  filter.matrix = matrix;
-  return filter;
 }

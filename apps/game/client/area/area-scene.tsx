@@ -2,27 +2,26 @@ import { EngineContext, useSpringValue, VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { Pixi } from "@mp/solid-pixi";
-import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
+import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
 import type { ParentProps } from "solid-js";
 import {
   useContext,
   createMemo,
   createEffect,
   untrack,
-  For,
-  Show,
+  onCleanup,
 } from "solid-js";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { TiledRenderer } from "@mp/tiled-renderer";
+import { createTiledTextureLookup, LayerViewFactory } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import { useAtom, useSignalAsAtom, useStorage } from "@mp/state/solid";
 import { createReactiveStorage } from "@mp/state";
-import { Container } from "pixi.js";
+import { Container, Matrix } from "pixi.js";
 import {
   getAreaIdFromObject,
   type AreaResource,
 } from "../../shared/area/area-resource";
-import { Actor } from "../actor/actor";
+import { ActorController } from "../actor/actor-controller";
 import { GameDebugUiPortal } from "../debug/game-debug-ui-state";
 import { clientViewDistance } from "../../server";
 import { useSyncEntity } from "../use-sync";
@@ -30,6 +29,7 @@ import {
   ReactiveGameStateContext,
   useGameActions,
 } from "../game-state/solid-js";
+import { reactiveCollectionBinding } from "../reactive-collection";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import { AreaDebugForm } from "./area-debug-settings-form";
@@ -158,43 +158,48 @@ export function AreaScene(
 
   const [settings, setSettings] = useStorage(settingsStorage);
   const area = () => props.area;
+
+  const areaScene = new Container({ sortableChildren: true });
+
+  const lookup = createTiledTextureLookup(props.spritesheets);
+  const factory = new LayerViewFactory(lookup);
+  const tileContainer = factory.createLayerContainer(
+    props.area.tiled.map.layers.filter((l) => l.type !== "objectgroup"),
+  );
+
+  const dynamicLayerView = assert(
+    tileContainer.getChildByLabel(props.area.dynamicLayer.name),
+  );
+
+  onCleanup(
+    reactiveCollectionBinding(
+      dynamicLayerView,
+      actors,
+      (actor) => new ActorController({ actor, tiled: props.area.tiled }),
+    ),
+  );
+
   const areaDebug = new AreaDebugGraphics(area, actors, myCoords, settings);
 
-  const areaScene = new Container();
+  areaScene.addChild(tileContainer);
+  areaScene.addChild(areaDebug);
 
-  const tileHighlight = new TileHighlight(() => ({
-    area: props.area,
-    target: highlightTarget(),
-  }));
+  if (engine.isInteractive) {
+    const tileHighlight = new TileHighlight(() => ({
+      area: props.area,
+      target: highlightTarget(),
+    }));
+    areaScene.addChild(tileHighlight);
+  }
+
+  createEffect(() => {
+    areaScene.setFromMatrix(new Matrix(...cameraTransform().data));
+  });
 
   return (
     <>
-      <Pixi
-        label="AreaScene"
-        as={areaScene}
-        sortableChildren
-        matrix={cameraTransform().data}
-      >
-        <TiledRenderer
-          layers={props.area.tiled.map.layers.filter(
-            (l) => l.type !== "objectgroup",
-          )}
-          spritesheets={props.spritesheets}
-          label={props.area.id}
-        >
-          {{
-            [props.area.dynamicLayer.name]: () => (
-              <For each={state().actorList()}>
-                {(actor) => <Actor tiled={props.area.tiled} actor={actor} />}
-              </For>
-            ),
-          }}
-        </TiledRenderer>
+      <Pixi label="AreaScene" as={areaScene}>
         {props.children}
-        <Show when={engine.isInteractive}>
-          <Pixi as={tileHighlight} label="TileHighlight" />
-        </Show>
-        <Pixi as={areaDebug} label="AreaDebugGraphics" />
         <GameDebugUiPortal>
           <AreaDebugForm value={settings()} onChange={setSettings} />
         </GameDebugUiPortal>
