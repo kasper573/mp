@@ -1,6 +1,20 @@
-export class MutableInjectionContainer {
-  constructor(private map: InjectionMap = new Map()) {}
+abstract class InjectionContainer {
+  constructor(protected map: InjectionMap = new Map()) {}
 
+  get<Value>(context: InjectionContext<Value>): Value {
+    return context[readSymbol](this.map);
+  }
+
+  getOr<Value>(context: InjectionContext<Value>, fallback: Value): Value {
+    try {
+      return this.get(context);
+    } catch {
+      return fallback;
+    }
+  }
+}
+
+export class MutableInjectionContainer extends InjectionContainer {
   register<Value>(context: InjectionContext<Value>, value: Value): this {
     if (this.map.has(context as InjectionContext<unknown>)) {
       throw new Error(`Context is already registered in the container`);
@@ -8,15 +22,9 @@ export class MutableInjectionContainer {
     this.map.set(context as InjectionContext<unknown>, value);
     return this;
   }
-
-  get<Value>(context: InjectionContext<Value>): Value {
-    return context[readSymbol](this.map);
-  }
 }
 
-export class ImmutableInjectionContainer {
-  constructor(private map: InjectionMap = new Map()) {}
-
+export class ImmutableInjectionContainer extends InjectionContainer {
   provide<Value>(
     context: InjectionContext<Value>,
     value: Value,
@@ -27,10 +35,6 @@ export class ImmutableInjectionContainer {
         [context as InjectionContext<unknown>, value],
       ]),
     );
-  }
-
-  get<Value>(context: InjectionContext<Value>): Value {
-    return context[readSymbol](this.map);
   }
 }
 
