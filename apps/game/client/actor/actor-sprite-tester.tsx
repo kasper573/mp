@@ -1,23 +1,17 @@
 import { Application, Pixi } from "@mp/solid-pixi";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  For,
-  Show,
-  useContext,
-} from "solid-js";
+import { createEffect, createSignal, Show, useContext } from "solid-js";
 import { Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
+import type { Engine } from "@mp/engine";
 import { EngineContext, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 
 import { assert } from "@mp/std";
-import { useAtom } from "@mp/state/solid";
+import type { CSSProperties } from "@mp/style";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -25,7 +19,7 @@ import {
 } from "../../server/traits/appearance";
 import { useRpc } from "../use-rpc";
 import { ActorSprite } from "./actor-sprite";
-import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
+import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 import { loadActorSpritesheets } from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester() {
@@ -34,150 +28,188 @@ export function ActorSpriteTester() {
     input: void 0,
     map: loadActorSpritesheets,
   }));
+  const [animationName, setAnimationName] =
+    createSignal<ActorAnimationName>("walk-normal");
+  const [modelId, setModelId] = createSignal<ActorModelId>();
+
+  createEffect(() => {
+    const firstModelId = spritesheets.data
+      ? Array.from(spritesheets.data.keys())[0]
+      : undefined;
+    if (modelId() === undefined && firstModelId) {
+      setModelId(firstModelId);
+    }
+  });
+
   return (
     <Show when={spritesheets.data} keyed>
-      {(spritesheets) => (
-        <ActorSpritesheetContext.Provider value={spritesheets}>
+      {(allSpritesheets) => (
+        <>
           <Application style={{ display: "flex", flex: 1 }}>
             {({ viewport }) => (
               <EngineProvider interactive viewport={viewport}>
-                <ActorSpriteList />
+                <Show when={modelId()} keyed>
+                  {(id) => (
+                    <Intermediate
+                      options={() => ({
+                        modelId: id,
+                        animationName: animationName(),
+                        allSpritesheets,
+                      })}
+                    />
+                  )}
+                </Show>
               </EngineProvider>
             )}
           </Application>
-        </ActorSpritesheetContext.Provider>
+          <div style={styles.settingsForm}>
+            <Select
+              value={animationName()}
+              onChange={setAnimationName}
+              options={actorAnimationNames}
+            />
+            <Select
+              value={modelId()}
+              onChange={setModelId}
+              options={allSpritesheets.keys().toArray()}
+            />
+          </div>
+        </>
       )}
     </Show>
   );
 }
 
-function ActorSpriteList() {
-  const allModelIds = useContext(ActorSpritesheetContext).keys().toArray();
-  const [animationName, setAnimationName] =
-    createSignal<ActorAnimationName>("walk-normal");
-  const [modelId, setModelId] = createSignal(allModelIds[0]);
-  return (
-    <>
-      <For each={Object.entries(cardinalDirectionAngles)}>
-        {([name, angle], index) => (
-          <SpecificActorAngle
-            modelId={modelId()}
-            animationName={animationName()}
-            angle={angle}
-            name={name}
-            pos={new Vector(0, index() * 64)}
-          />
-        )}
-      </For>
-      <DynamicActorAngle modelId={modelId()} animationName={animationName()} />
-      <div
-        style={{
-          position: "absolute",
-          top: "16px",
-          right: "16px",
-          background: "black",
-          color: "white",
-        }}
-      >
-        <Select
-          value={animationName()}
-          onChange={setAnimationName}
-          options={actorAnimationNames}
-        />
-        <Select value={modelId()} onChange={setModelId} options={allModelIds} />
-      </div>
-    </>
-  );
+/**
+ * Temporary, remove this once EngineProvider is removed
+ * @deprecated
+ */
+function Intermediate(props: { options: () => ActorTestSettings }) {
+  const engine = useContext(EngineContext);
+  const spriteList = new ActorSpriteList(engine, props.options);
+  return <Pixi as={spriteList} />;
 }
 
-function DynamicActorAngle(props: {
+const styles = {
+  settingsForm: {
+    position: "absolute",
+    top: "80px",
+    right: "16px",
+    background: "black",
+    color: "white",
+  },
+} satisfies Record<string, CSSProperties>;
+
+class ActorSpriteList extends Container {
+  constructor(engine: Engine, options: () => ActorTestSettings) {
+    super();
+
+    // eslint-disable-next-line unicorn/no-array-for-each
+    Object.entries(cardinalDirectionAngles).forEach(([name, angle], index) => {
+      this.addChild(
+        new SpecificActorAngle(() => ({
+          ...options(),
+          angle: angle,
+          name: name,
+          pos: new Vector(0, index * 64),
+        })),
+      );
+    });
+
+    this.addChild(new DynamicActorAngle(engine, options));
+  }
+}
+
+interface ActorTestSettings {
   modelId: ActorModelId;
   animationName: ActorAnimationName;
-}) {
-  const center = useScreenCenter();
-  const engine = useContext(EngineContext);
-  const pointerPosition = useAtom(engine.pointer.position);
-  const angle = createMemo(() => center().angle(pointerPosition()));
-  return (
-    <>
-      <SpecificActorAngle
-        modelId={props.modelId}
-        angle={angle()}
-        pos={center()}
-        anchor={new Vector(0.5, 0.5)}
-        showFrameNumber
-        animationName={props.animationName}
-      />
-    </>
-  );
+  allSpritesheets: ActorSpritesheetLookup;
 }
 
-function useScreenCenter() {
-  const engine = useContext(EngineContext);
-  const cameraSize = useAtom(engine.camera.cameraSize);
-  const center = createMemo(
-    () => new Vector(cameraSize().x / 2, cameraSize().y / 2),
-  );
-  return center;
-}
+class SpecificActorAngle extends Container {
+  private sprite: ActorSprite;
+  private text: Text;
+  private frameNumberText: Text;
 
-function SpecificActorAngle(props: {
-  modelId: ActorModelId;
-  angle: number;
-  name?: string;
-  pos: Vector<number>;
-  anchor?: Vector<number>;
-  showFrameNumber?: boolean;
-  animationName: ActorAnimationName;
-}) {
-  const allSpritesheets = useContext(ActorSpritesheetContext);
-  const sprite = new ActorSprite();
-  const container = new Container();
-  const text = new Text({ style: { fill: "white", fontSize: "14px" } });
-  text.scale.set(0.5);
-  const frameNumberText = new Text({
-    style: { fill: "white", fontSize: "14px" },
-  });
-  frameNumberText.scale.set(0.5);
-  frameNumberText.position.set(-10, 16);
+  constructor(
+    private options: () => ActorTestSettings & {
+      showFrameNumber?: boolean;
+      angle: number;
+      name?: string;
+      pos: Vector<number>;
+      anchor?: Vector<number>;
+    },
+  ) {
+    super();
 
-  container.addChild(sprite);
-  container.addChild(text);
-  container.addChild(frameNumberText);
-  container.scale.set(2);
+    this.sprite = new ActorSprite();
 
-  createEffect(() => {
-    sprite.spritesheets = assert(allSpritesheets.get(props.modelId));
-  });
+    this.text = new Text({ style: { fill: "white", fontSize: "14px" } });
+    this.text.scale.set(0.5);
+    this.frameNumberText = new Text({
+      style: { fill: "white", fontSize: "14px" },
+    });
+    this.frameNumberText.scale.set(0.5);
+    this.frameNumberText.position.set(-10, 16);
 
-  createEffect(() => {
-    sprite.direction = nearestCardinalDirection(props.angle);
-  });
+    this.addChild(this.sprite);
+    this.addChild(this.text);
+    this.addChild(this.frameNumberText);
+    this.scale.set(2);
 
-  createEffect(() => {
-    sprite.switchAnimationSmoothly(props.animationName);
-  });
+    this.onRender = this.#onRender;
+  }
 
-  createEffect(() => {
-    if (props.name) {
-      text.text = `${props.name} (${props.angle.toFixed(2)})`;
-      text.visible = true;
+  #onRender = () => {
+    const {
+      modelId,
+      angle,
+      name,
+      pos,
+      anchor,
+      showFrameNumber,
+      animationName,
+      allSpritesheets,
+    } = this.options();
+
+    this.sprite.spritesheets = assert(allSpritesheets.get(modelId));
+    this.sprite.direction = nearestCardinalDirection(angle);
+    this.sprite.switchAnimationSmoothly(animationName);
+
+    if (name) {
+      this.text.text = `${name} (${angle.toFixed(2)})`;
+      this.text.visible = true;
     } else {
-      text.visible = false;
+      this.text.visible = false;
     }
-    text.position.set(64, 32);
-    container.position.set(props.pos.x, props.pos.y);
-    frameNumberText.visible = props.showFrameNumber ?? false;
-  });
+    this.text.position.set(64, 32);
+    this.position.set(pos.x, pos.y);
+    this.frameNumberText.visible = showFrameNumber ?? false;
+    this.sprite.anchor.set(anchor?.x ?? 0, anchor?.y ?? 0);
+  };
+}
 
-  createEffect(() => {
-    sprite.anchor.set(props.anchor?.x ?? 0, props.anchor?.y ?? 0);
-  });
-
-  return (
-    <Pixi
-      label={`Character (angle: ${props.angle.toFixed(2)})`}
-      as={container}
-    />
-  );
+class DynamicActorAngle extends SpecificActorAngle {
+  constructor(
+    engine: Engine,
+    options: () => {
+      modelId: ActorModelId;
+      animationName: ActorAnimationName;
+      allSpritesheets: ActorSpritesheetLookup;
+    },
+  ) {
+    super(() => {
+      const { x, y } = engine.camera.cameraSize.get();
+      const center = new Vector(x / 2, y / 2);
+      const angle = center.angle(engine.pointer.position.get());
+      return {
+        ...options(),
+        angle,
+        pos: center,
+        anchor: new Vector(0.5, 0.5),
+        showFrameNumber: true,
+        animationName: options().animationName,
+      };
+    });
+  }
 }

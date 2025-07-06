@@ -44,15 +44,9 @@ export async function loadActorSpritesheets(
 }
 
 export const ActorSpritesheetContext = createContext(
-  new Proxy(
-    {} as ReadonlyMap<
-      ActorModelId,
-      ReadonlyMap<ActorAnimationName, ActorSpritesheet>
-    >,
-    {
-      get() {
-        throw new Error("ActorSpritesheetContext is not initialized");
-      },
+  new Proxy({} as ActorSpritesheetLookup, {
+    get() {
+      throw new Error("ActorSpritesheetContext is not initialized");
     },
-  ),
+  }),
 );
