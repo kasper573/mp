@@ -1,5 +1,6 @@
-import { ReadonlyAtom } from "@mp/state";
-import { Container, DestroyOptions } from "pixi.js";
+import type { ReadonlyAtom } from "@mp/state";
+import type { DestroyOptions } from "pixi.js";
+import { Container } from "pixi.js";
 
 export class ReactiveCollection<T> extends Container {
   private unsubscribe: () => void;

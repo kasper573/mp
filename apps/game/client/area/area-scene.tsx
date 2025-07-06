@@ -16,6 +16,7 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import { useAtom, useSignalAsAtom, useStorage } from "@mp/state/solid";
+import { createReactiveStorage } from "@mp/state";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -29,12 +30,11 @@ import {
   useGameActions,
 } from "../game-state/solid-js";
 import { AreaDebugGraphics } from "./area-debug-ui";
-import { AreaDebugSettings } from "./area-debug-settings-form";
+import type { AreaDebugSettings } from "./area-debug-settings-form";
 import { AreaDebugForm } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { RespawnDialog } from "./respawn-dialog";
-import { createReactiveStorage } from "@mp/state";
 
 export function AreaScene(
   props: ParentProps<{
@@ -156,9 +156,10 @@ export function AreaScene(
   );
 
   const [settings, setSettings] = useStorage(settingsStorage);
+  const area = () => props.area;
   const areaDebug = new AreaDebugGraphics(
     engine,
-    props.area,
+    area,
     actors,
     myCoords,
     settings,

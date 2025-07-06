@@ -1,17 +1,19 @@
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
-import { Container, DestroyOptions, Graphics, Ticker } from "pixi.js";
-import { Engine } from "@mp/engine";
+import { Container, Graphics } from "pixi.js";
+import type { Engine } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import { computed, ReadonlyAtom } from "@mp/state";
-import { clientViewDistance, NpcInstance, type Actor } from "../../server";
+import type { ReadonlyAtom } from "@mp/state";
+import { computed } from "@mp/state";
+import type { NpcInstance } from "../../server";
+import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import { ReactiveCollection } from "../reactive-collection";
-import {
+import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
@@ -23,7 +25,7 @@ export class AreaDebugGraphics extends Container {
 
   constructor(
     engine: Engine,
-    area: AreaResource,
+    area: () => AreaResource,
     actors: ReadonlyAtom<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
@@ -32,7 +34,7 @@ export class AreaDebugGraphics extends Container {
 
     const debugTiled = new DebugTiledGraph(
       engine,
-      () => area,
+      area,
       () => this.settings().visibleGraphType,
     );
 
@@ -40,7 +42,7 @@ export class AreaDebugGraphics extends Container {
       actors,
       (actor) =>
         new DebugPath(() => ({
-          tiled: area.tiled,
+          tiled: area().tiled,
           path: actor.path,
           color: uniqolor(actor.id).color,
         })),
@@ -50,7 +52,7 @@ export class AreaDebugGraphics extends Container {
       actors,
       (actor) =>
         new DebugCircle(() => ({
-          tiled: area.tiled,
+          tiled: area().tiled,
           pos: actor.coords,
           radius: actor.attackRange,
           color: uniqolor(actor.id).color,
@@ -63,7 +65,7 @@ export class AreaDebugGraphics extends Container {
       ),
       (npc) =>
         new DebugCircle(() => ({
-          tiled: area.tiled,
+          tiled: area().tiled,
           pos: npc.coords,
           radius: npc.aggroRange,
           color: npc.color
@@ -74,7 +76,7 @@ export class AreaDebugGraphics extends Container {
 
     this.fogOfWar = new DebugNetworkFogOfWar(
       () => playerCoords() ?? Vector.zero(),
-      area,
+      () => area().tiled,
     );
 
     this.addChild(actorPaths);
@@ -104,7 +106,6 @@ class DebugTiledGraph extends Graphics {
   }
 
   #onRender = () => {
-    console.log("update");
     this.clear();
     const { tiled, graph } = this.area();
     const { worldPosition } = this.engine.pointer;
@@ -181,25 +182,21 @@ class DebugPath extends Graphics {
 class DebugNetworkFogOfWar extends Graphics {
   constructor(
     private playerCoords: () => Vector<Tile>,
-    private area: AreaResource,
+    private tiled: () => TiledResource,
   ) {
     super();
     this.onRender = this.#onRender;
   }
 
   #onRender = () => {
-    const coords = this.playerCoords();
     this.clear();
-
-    if (!coords) {
-      return;
-    }
-
+    const coords = this.playerCoords();
+    const { tileCount, tileSize } = this.tiled();
     const { width, height, x, y } = clientViewDistanceRect(
       coords,
-      this.area.tiled.tileCount,
+      tileCount,
       clientViewDistance.networkFogOfWarTileCount,
-    ).scale(this.area.tiled.tileSize);
+    ).scale(tileSize);
 
     this.rect(0, 0, width, height);
     this.fill({ color: "rgba(0, 255, 0, 0.5)" });
