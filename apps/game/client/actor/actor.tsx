@@ -13,11 +13,12 @@ import type { Actor } from "../../server/actor";
 import { createTintFilter } from "../tint-filter";
 import { useSyncEntity } from "../use-sync";
 import { GameStateClientContext } from "../game-state/solid-js";
+import { ioc } from "../context";
 import { ActorSprite } from "./actor-sprite";
-import { ActorSpritesheetContext } from "./actor-spritesheet-lookup";
+import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
 export function Actor(props: { tiled: TiledResource; actor: Actor }) {
-  const allSpritesheets = useContext(ActorSpritesheetContext);
+  const allSpritesheets = ioc.get(ctxActorSpritesheetLookup);
   const actor = useSyncEntity(() => props.actor);
   const state = useContext(GameStateClientContext);
   const position = createMemo(() => props.tiled.tileCoordToWorld(actor.coords));

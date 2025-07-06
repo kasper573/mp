@@ -1,5 +1,6 @@
 import type { ParentProps } from "solid-js";
 import { createContext, createMemo, onCleanup, Show } from "solid-js";
+import { InjectionContext } from "@mp/ioc";
 import { Engine } from "./engine";
 
 export const EngineContext = createContext<Engine>(
@@ -9,6 +10,8 @@ export const EngineContext = createContext<Engine>(
     },
   }),
 );
+
+export const ctxEngine = InjectionContext.new<Engine>("Engine");
 
 export function EngineProvider(
   props: ParentProps<{

@@ -1,16 +1,19 @@
 import { Application, Pixi } from "@mp/solid-pixi";
-import { createEffect, createSignal, Show, useContext } from "solid-js";
+import {
+  createEffect,
+  createSignal,
+  onCleanup,
+  Show,
+  useContext,
+} from "solid-js";
 import { Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import type { Engine } from "@mp/engine";
-import { EngineContext, EngineProvider } from "@mp/engine";
+import { ctxEngine, EngineContext, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
-
-import { assert } from "@mp/std";
 import type { CSSProperties } from "@mp/style";
 import {
   actorAnimationNames,
@@ -18,9 +21,12 @@ import {
   type ActorAnimationName,
 } from "../../server/traits/appearance";
 import { useRpc } from "../use-rpc";
+import { ioc } from "../context";
 import { ActorSprite } from "./actor-sprite";
-import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
-import { loadActorSpritesheets } from "./actor-spritesheet-lookup";
+import {
+  ctxActorSpritesheetLookup,
+  loadActorSpritesheets,
+} from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester() {
   const rpc = useRpc();
@@ -38,6 +44,12 @@ export function ActorSpriteTester() {
       : undefined;
     if (modelId() === undefined && firstModelId) {
       setModelId(firstModelId);
+    }
+  });
+
+  createEffect(() => {
+    if (spritesheets.data) {
+      onCleanup(ioc.register(ctxActorSpritesheetLookup, spritesheets.data));
     }
   });
 
@@ -85,8 +97,11 @@ export function ActorSpriteTester() {
  * @deprecated
  */
 function Intermediate(props: { options: () => ActorTestSettings }) {
+  const spriteList = new ActorSpriteList(props.options);
   const engine = useContext(EngineContext);
-  const spriteList = new ActorSpriteList(engine, props.options);
+  createEffect(() => {
+    onCleanup(ioc.register(ctxEngine, engine));
+  });
   return <Pixi as={spriteList} />;
 }
 
@@ -101,7 +116,7 @@ const styles = {
 } satisfies Record<string, CSSProperties>;
 
 class ActorSpriteList extends Container {
-  constructor(engine: Engine, options: () => ActorTestSettings) {
+  constructor(options: () => ActorTestSettings) {
     super();
 
     // eslint-disable-next-line unicorn/no-array-for-each
@@ -116,14 +131,13 @@ class ActorSpriteList extends Container {
       );
     });
 
-    this.addChild(new DynamicActorAngle(engine, options));
+    this.addChild(new DynamicActorAngle(options));
   }
 }
 
 interface ActorTestSettings {
   modelId: ActorModelId;
   animationName: ActorAnimationName;
-  allSpritesheets: ActorSpritesheetLookup;
 }
 
 class SpecificActorAngle extends Container {
@@ -169,10 +183,16 @@ class SpecificActorAngle extends Container {
       anchor,
       showFrameNumber,
       animationName,
-      allSpritesheets,
     } = this.options();
 
-    this.sprite.spritesheets = assert(allSpritesheets.get(modelId));
+    const spritesheets = ioc
+      .access(ctxActorSpritesheetLookup)
+      .unwrapOr(undefined)
+      ?.get(modelId);
+
+    if (spritesheets) {
+      this.sprite.spritesheets = spritesheets;
+    }
     this.sprite.direction = nearestCardinalDirection(angle);
     this.sprite.switchAnimationSmoothly(animationName);
 
@@ -190,18 +210,12 @@ class SpecificActorAngle extends Container {
 }
 
 class DynamicActorAngle extends SpecificActorAngle {
-  constructor(
-    engine: Engine,
-    options: () => {
-      modelId: ActorModelId;
-      animationName: ActorAnimationName;
-      allSpritesheets: ActorSpritesheetLookup;
-    },
-  ) {
+  constructor(options: () => ActorTestSettings) {
     super(() => {
-      const { x, y } = engine.camera.cameraSize.get();
+      const engine = ioc.access(ctxEngine).unwrapOr(undefined);
+      const { x, y } = engine ? engine.camera.cameraSize.get() : Vector.zero();
       const center = new Vector(x / 2, y / 2);
-      const angle = center.angle(engine.pointer.position.get());
+      const angle = engine ? center.angle(engine.pointer.position.get()) : 0;
       return {
         ...options(),
         angle,

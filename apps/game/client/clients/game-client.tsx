@@ -17,13 +17,15 @@ import { skipToken, useQuery } from "@mp/rpc/solid";
 import type { GameStateClient } from "../game-state/game-state-client";
 import { AreaScene } from "../area/area-scene";
 import { useAreaResource } from "../area/use-area-resource";
-import { loadActorSpritesheets } from "../actor/actor-spritesheet-lookup";
+import {
+  ActorSpritesheetContextProvider,
+  loadActorSpritesheets,
+} from "../actor/actor-spritesheet-lookup";
 import { GameDebugUi } from "../debug/game-debug-ui";
 import type { GameDebugUiState } from "../debug/game-debug-ui-state";
 import { GameDebugUiContext } from "../debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "../debug/game-state-debug-info";
 import { useRpc } from "../use-rpc";
-import { ActorSpritesheetContext } from "../actor/actor-spritesheet-lookup";
 import {
   deriveReactiveGameState,
   GameStateClientContext,
@@ -93,7 +95,7 @@ export function GameClient(props: GameClientProps) {
               >
                 <Application class={props.class} style={props.style}>
                   {({ viewport }) => (
-                    <ActorSpritesheetContext.Provider value={actorSpritesheets}>
+                    <ActorSpritesheetContextProvider value={actorSpritesheets}>
                       <EngineProvider
                         interactive={interactive()}
                         viewport={viewport}
@@ -116,7 +118,7 @@ export function GameClient(props: GameClientProps) {
                           </GameDebugUi>
                         </GameDebugUiContext.Provider>
                       </EngineProvider>
-                    </ActorSpritesheetContext.Provider>
+                    </ActorSpritesheetContextProvider>
                   )}
                 </Application>
               </Suspense>
