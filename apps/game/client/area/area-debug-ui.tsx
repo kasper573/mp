@@ -2,167 +2,100 @@ import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Container, DestroyOptions, Graphics, Ticker } from "pixi.js";
-import { createEffect, useContext } from "solid-js";
-import { Pixi } from "@mp/solid-pixi";
-import { Engine, EngineContext } from "@mp/engine";
+import { Engine } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import { Select } from "@mp/ui";
-import { computed, createReactiveStorage } from "@mp/state";
-import { useSignalAsAtom, useStorage } from "@mp/state/solid";
-import { clientViewDistance, type Actor } from "../../server";
+import { computed, ReadonlyAtom } from "@mp/state";
+import { clientViewDistance, NpcInstance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import { ReactiveCollection } from "../reactive-collection";
+import {
+  AreaDebugSettings,
+  VisibleGraphType,
+} from "./area-debug-settings-form";
 
-const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
-type VisibleGraphType = (typeof visibleGraphTypes)[number];
+export class AreaDebugGraphics extends Container {
+  private attackRanges: ReactiveCollection<Actor>;
+  private aggroRanges: ReactiveCollection<NpcInstance>;
+  private fogOfWar: DebugNetworkFogOfWar;
 
-interface AreaDebugSettings {
-  visibleGraphType: VisibleGraphType;
-  showFogOfWar: boolean;
-  showAttackRange: boolean;
-  showAggroRange: boolean;
-}
+  constructor(
+    engine: Engine,
+    area: AreaResource,
+    actors: ReadonlyAtom<Actor[]>,
+    playerCoords: () => Vector<Tile> | undefined,
+    private settings: () => AreaDebugSettings,
+  ) {
+    super();
 
-export function AreaDebugUi(props: {
-  area: AreaResource;
-  actors: Actor[];
-  playerCoords?: Vector<Tile>;
-}) {
-  const settingsStorage = createReactiveStorage<AreaDebugSettings>(
-    localStorage,
-    "area-debug-settings",
-    {
-      visibleGraphType: "none",
-      showFogOfWar: false,
-      showAttackRange: false,
-      showAggroRange: false,
-    },
-  );
-  const [settings, setSettings] = useStorage(settingsStorage);
-  const engine = useContext(EngineContext);
+    const debugTiled = new DebugTiledGraph(
+      engine,
+      () => area,
+      () => this.settings().visibleGraphType,
+    );
 
-  const actorsAtom = useSignalAsAtom(() => props.actors);
+    const actorPaths = new ReactiveCollection(
+      actors,
+      (actor) =>
+        new DebugPath(() => ({
+          tiled: area.tiled,
+          path: actor.path,
+          color: uniqolor(actor.id).color,
+        })),
+    );
 
-  const areaDebugUI = new Container();
+    this.attackRanges = new ReactiveCollection(
+      actors,
+      (actor) =>
+        new DebugCircle(() => ({
+          tiled: area.tiled,
+          pos: actor.coords,
+          radius: actor.attackRange,
+          color: uniqolor(actor.id).color,
+        })),
+    );
 
-  const debugTiled = new DebugTiledGraph(
-    engine,
-    () => props.area,
-    () => settings().visibleGraphType,
-  );
+    this.aggroRanges = new ReactiveCollection(
+      computed(actors, (actors) =>
+        actors.filter((actor) => actor.type === "npc"),
+      ),
+      (npc) =>
+        new DebugCircle(() => ({
+          tiled: area.tiled,
+          pos: npc.coords,
+          radius: npc.aggroRange,
+          color: npc.color
+            ? hexColorFromInt(npc.color)
+            : uniqolor(npc.id).color,
+        })),
+    );
 
-  const actorPaths = new ReactiveCollection(
-    actorsAtom,
-    (actor) =>
-      new DebugPath(() => ({
-        tiled: props.area.tiled,
-        path: actor.path,
-        color: uniqolor(actor.id).color,
-      })),
-  );
+    this.fogOfWar = new DebugNetworkFogOfWar(
+      () => playerCoords() ?? Vector.zero(),
+      area,
+    );
 
-  const attackRanges = new ReactiveCollection(
-    actorsAtom,
-    (actor) =>
-      new DebugCircle(() => ({
-        tiled: props.area.tiled,
-        pos: actor.coords,
-        radius: actor.attackRange,
-        color: uniqolor(actor.id).color,
-      })),
-  );
+    this.addChild(actorPaths);
+    this.addChild(debugTiled);
+    this.addChild(this.attackRanges);
+    this.addChild(this.aggroRanges);
+    this.addChild(this.fogOfWar);
 
-  const aggroRanges = new ReactiveCollection(
-    computed(actorsAtom, (actors) =>
-      actors.filter((actor) => actor.type === "npc"),
-    ),
-    (npc) =>
-      new DebugCircle(() => ({
-        tiled: props.area.tiled,
-        pos: npc.coords,
-        radius: npc.aggroRange,
-        color: npc.color ? hexColorFromInt(npc.color) : uniqolor(npc.id).color,
-      })),
-  );
+    Ticker.shared.add(this.update, this);
+  }
 
-  const fogOfWar = new DebugNetworkFogOfWar(
-    () => props.playerCoords ?? Vector.zero(),
-    props.area,
-  );
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    Ticker.shared.remove(this.update, this);
+  }
 
-  areaDebugUI.addChild(actorPaths);
-  areaDebugUI.addChild(debugTiled);
-  areaDebugUI.addChild(attackRanges);
-  areaDebugUI.addChild(aggroRanges);
-  areaDebugUI.addChild(fogOfWar);
-
-  createEffect(() => {
-    attackRanges.visible = settings().showAttackRange;
-    aggroRanges.visible = settings().showAggroRange;
-    fogOfWar.visible = settings().showFogOfWar;
-  });
-
-  return (
-    <Pixi as={areaDebugUI} label="AreaDebugUI" isRenderGroup>
-      <>
-        <div>
-          Visible Graph lines:{" "}
-          <Select
-            required
-            options={visibleGraphTypes}
-            value={settings().visibleGraphType}
-            onChange={(visibleGraphType) =>
-              setSettings((prev) => ({ ...prev, visibleGraphType }))
-            }
-          />
-        </div>
-        <label>
-          <input
-            type="checkbox"
-            checked={settings().showFogOfWar}
-            on:change={(e) =>
-              setSettings((prev) => ({
-                ...prev,
-                showFogOfWar: e.currentTarget.checked,
-              }))
-            }
-          />
-          Visualize network fog of war
-        </label>
-        <br />
-        <label>
-          <input
-            type="checkbox"
-            checked={settings().showAttackRange}
-            on:change={(e) =>
-              setSettings((prev) => ({
-                ...prev,
-                showAttackRange: e.currentTarget.checked,
-              }))
-            }
-          />
-          Show actor attack range
-        </label>
-        <br />
-        <label>
-          <input
-            type="checkbox"
-            checked={settings().showAggroRange}
-            on:change={(e) =>
-              setSettings((prev) => ({
-                ...prev,
-                showAggroRange: e.currentTarget.checked,
-              }))
-            }
-          />
-          Show npc aggro range
-        </label>
-      </>
-    </Pixi>
-  );
+  update = () => {
+    this.attackRanges.visible = this.settings().showAttackRange;
+    this.aggroRanges.visible = this.settings().showAggroRange;
+    this.fogOfWar.visible = this.settings().showFogOfWar;
+  };
 }
 
 class DebugTiledGraph extends Graphics {

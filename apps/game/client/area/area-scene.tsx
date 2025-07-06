@@ -15,7 +15,7 @@ import {
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
-import { useAtom, useSignalAsAtom } from "@mp/state/solid";
+import { useAtom, useSignalAsAtom, useStorage } from "@mp/state/solid";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -28,10 +28,13 @@ import {
   ReactiveGameStateContext,
   useGameActions,
 } from "../game-state/solid-js";
-import { AreaDebugUi } from "./area-debug-ui";
+import { AreaDebugGraphics } from "./area-debug-ui";
+import { AreaDebugSettings } from "./area-debug-settings-form";
+import { AreaDebugForm } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { RespawnDialog } from "./respawn-dialog";
+import { createReactiveStorage } from "@mp/state";
 
 export function AreaScene(
   props: ParentProps<{
@@ -139,6 +142,28 @@ export function AreaScene(
     engine.camera.update(props.area.tiled.mapSize, zoom(), cameraPos());
   });
 
+  const actors = useSignalAsAtom(() => state().actorList());
+
+  const settingsStorage = createReactiveStorage<AreaDebugSettings>(
+    localStorage,
+    "area-debug-settings",
+    {
+      visibleGraphType: "none",
+      showFogOfWar: false,
+      showAttackRange: false,
+      showAggroRange: false,
+    },
+  );
+
+  const [settings, setSettings] = useStorage(settingsStorage);
+  const areaDebug = new AreaDebugGraphics(
+    engine,
+    props.area,
+    actors,
+    myCoords,
+    settings,
+  );
+
   return (
     <>
       <Pixi label="AreaScene" sortableChildren matrix={cameraTransform().data}>
@@ -161,12 +186,9 @@ export function AreaScene(
         <Show when={engine.isInteractive}>
           <TileHighlight area={props.area} target={highlightTarget()} />
         </Show>
+        <Pixi as={areaDebug} label="AreaDebugGraphics" />
         <GameDebugUiPortal>
-          <AreaDebugUi
-            area={props.area}
-            playerCoords={myCoords()}
-            actors={state().actorList()}
-          />
+          <AreaDebugForm value={settings()} onChange={setSettings} />
         </GameDebugUiPortal>
       </Pixi>
 
