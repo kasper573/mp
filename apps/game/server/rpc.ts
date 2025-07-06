@@ -1,4 +1,4 @@
-import { InjectionContext, type InjectionContainer } from "@mp/ioc";
+import { InjectionContext, type ImmutableInjectionContainer } from "@mp/ioc";
 import type { RpcFactories, RpcMiddleware } from "@mp/rpc";
 import { RpcBuilder } from "@mp/rpc";
 
@@ -7,7 +7,7 @@ export const ctxGlobalMiddleware =
 
 export const rpc = buildRpc();
 
-export type GameRpcContext = InjectionContainer;
+export type GameRpcContext = ImmutableInjectionContainer;
 
 export type GameRpcMiddleware = RpcMiddleware<GameRpcContext, unknown, unknown>;
 

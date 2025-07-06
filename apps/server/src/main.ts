@@ -9,7 +9,7 @@ import { SyncServer, SyncEntity, SyncMap } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
-import { InjectionContainer } from "@mp/ioc";
+import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
   ctxClientId,
@@ -201,7 +201,7 @@ const npcSpawner = new NpcSpawner(
   rng,
 );
 
-const ioc = new InjectionContainer()
+const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
   .provide(ctxUserService, userService)
   .provide(ctxNpcService, npcService)
