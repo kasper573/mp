@@ -29,7 +29,7 @@ import {
   ReactiveGameStateContext,
   useGameActions,
 } from "../game-state/solid-js";
-import { AreaDebugGraphics } from "./area-debug-ui";
+import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import { AreaDebugForm } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";

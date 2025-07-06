@@ -2,7 +2,7 @@ export * from "./clients/spectator-client";
 export * from "./clients/player-client";
 export * from "./game-state/game-state-client";
 export * from "./debug/game-debug-ui-state";
-export * from "./area/area-debug-ui";
+export * from "./area/area-debug-graphics";
 export * from "./area/area-scene";
 export * from "./area/use-area-resource";
 export * from "./actor/actor-sprite-tester";
