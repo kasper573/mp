@@ -12,7 +12,7 @@ import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
-import { ReactiveCollection } from "../reactive-collection";
+import { ReactiveCollection } from "../pixi/reactive-collection";
 import { ioc } from "../context";
 import type {
   AreaDebugSettings,

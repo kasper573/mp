@@ -116,7 +116,7 @@ class ActorSpriteList extends Container {
       );
     });
 
-    this.addChild(new DynamicActorAngle(options));
+    this.addChild(new LookAtPointerActor(options));
   }
 }
 
@@ -194,7 +194,7 @@ class SpecificActorAngle extends Container {
   };
 }
 
-class DynamicActorAngle extends SpecificActorAngle {
+class LookAtPointerActor extends SpecificActorAngle {
   constructor(options: () => ActorTestSettings) {
     super(() => {
       const engine = ioc.access(ctxEngine).unwrapOr(undefined);

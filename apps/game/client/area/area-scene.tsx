@@ -29,7 +29,7 @@ import {
   ReactiveGameStateContext,
   useGameActions,
 } from "../game-state/solid-js";
-import { reactiveCollectionBinding } from "../reactive-collection";
+import { reactiveCollectionBinding } from "../pixi/reactive-collection";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import { AreaDebugForm } from "./area-debug-settings-form";

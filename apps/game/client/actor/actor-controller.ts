@@ -1,11 +1,12 @@
 import { assert } from "@mp/std";
 import type { DestroyOptions } from "pixi.js";
 import { ColorMatrixFilter, Container, Text } from "pixi.js";
+import { TimeSpan } from "@mp/time";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
-import { createTintFilterMatrix } from "../tint-filter";
+import { createTintFilterMatrix } from "../pixi/tint-filter";
 import { ActorSprite } from "./actor-sprite";
 import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
@@ -21,7 +22,16 @@ export class ActorController extends Container {
     const { actor } = this.options;
 
     this.sprite = new ActorSprite(
-      actorAnimationState(actor).isAlive ? "idle-spear" : "death-spear",
+      actorAnimationState(actor).isAlive
+        ? {
+            name: "idle-spear",
+            type: "smooth-switch",
+            currentTime: TimeSpan.Zero,
+          }
+        : {
+            name: "death-spear",
+            type: "fixed-at-end",
+          },
     );
 
     this.text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
@@ -101,8 +111,7 @@ export class ActorController extends Container {
 
     this.zIndex = actor.coords.y;
 
-    const { x, y } = tiled.tileCoordToWorld(actor.coords);
-    this.position.set(x, y);
+    this.position.copyFrom(tiled.tileCoordToWorld(actor.coords));
   };
 }
 

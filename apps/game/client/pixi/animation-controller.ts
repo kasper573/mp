@@ -6,12 +6,7 @@ import {
   clamp,
 } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import type {
-  DestroyOptions,
-  SpriteOptions,
-  Spritesheet,
-  Texture,
-} from "pixi.js";
+import type { SpriteOptions, Spritesheet, Texture } from "pixi.js";
 import { Ticker } from "pixi.js";
 import { Sprite } from "pixi.js";
 
@@ -37,10 +32,22 @@ export class AnimationController<AnimationName extends string> extends Sprite {
     return this.animation?.name;
   }
 
-  constructor(private options: AnimationControllerOptions) {
+  constructor(private options: AnimationControllerOptions<AnimationName>) {
     super(options);
 
-    Ticker.shared.add(this.update, this);
+    switch (this.options.initialAnimation?.type) {
+      case "smooth-switch":
+        this.smooth = this.options.initialAnimation;
+        break;
+      case "play-to-end":
+        this.playToEnd = this.options.initialAnimation;
+        break;
+      case "fixed-at-end":
+        this.fixed = this.options.initialAnimation;
+        break;
+    }
+
+    this.onRender = this.#onRender;
   }
 
   subscribe(handler: AnimationEventHandler<AnimationName>) {
@@ -48,13 +55,7 @@ export class AnimationController<AnimationName extends string> extends Sprite {
     return () => this.eventSubscriptions.delete(handler);
   }
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-
-    Ticker.shared.remove(this.update, this);
-  }
-
-  private update = (ticker: Ticker) => {
+  #onRender = () => {
     const { animation } = this;
 
     if (!animation) {
@@ -87,7 +88,7 @@ export class AnimationController<AnimationName extends string> extends Sprite {
     const frameTime = this.options.frameTime();
     const endTime = frameTime.multiply(textures.length);
     animation.currentTime = animation.currentTime.add(
-      TimeSpan.fromMilliseconds(ticker.deltaMS),
+      TimeSpan.fromMilliseconds(Ticker.shared.deltaMS),
     );
 
     const currentFrame = clamp(
@@ -156,8 +157,10 @@ export class AnimationController<AnimationName extends string> extends Sprite {
   }
 }
 
-interface AnimationControllerOptions extends SpriteOptions {
+interface AnimationControllerOptions<Name extends string>
+  extends SpriteOptions {
   frameTime: () => TimeSpan;
+  initialAnimation?: Animation<Name>;
 }
 
 export type Animation<Name extends string> =
