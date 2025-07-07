@@ -25,7 +25,7 @@ export class AreaDebugGraphics extends Container {
   private fogOfWar: DebugNetworkFogOfWar;
 
   constructor(
-    area: () => AreaResource,
+    area: AreaResource,
     actors: ReadonlyAtom<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
@@ -41,7 +41,7 @@ export class AreaDebugGraphics extends Container {
       actors,
       (actor) =>
         new DebugPath(() => ({
-          tiled: area().tiled,
+          tiled: area.tiled,
           path: actor.path,
           color: uniqolor(actor.id).color,
         })),
@@ -51,7 +51,7 @@ export class AreaDebugGraphics extends Container {
       actors,
       (actor) =>
         new DebugCircle(() => ({
-          tiled: area().tiled,
+          tiled: area.tiled,
           pos: actor.coords,
           radius: actor.attackRange,
           color: uniqolor(actor.id).color,
@@ -64,7 +64,7 @@ export class AreaDebugGraphics extends Container {
       ),
       (npc) =>
         new DebugCircle(() => ({
-          tiled: area().tiled,
+          tiled: area.tiled,
           pos: npc.coords,
           radius: npc.aggroRange,
           color: npc.color
@@ -75,7 +75,7 @@ export class AreaDebugGraphics extends Container {
 
     this.fogOfWar = new DebugNetworkFogOfWar(
       () => playerCoords() ?? Vector.zero(),
-      () => area().tiled,
+      () => area.tiled,
     );
 
     this.addChild(actorPaths);
@@ -96,7 +96,7 @@ export class AreaDebugGraphics extends Container {
 
 class DebugTiledGraph extends Graphics {
   constructor(
-    private area: () => AreaResource,
+    private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
   ) {
     super();
@@ -106,7 +106,7 @@ class DebugTiledGraph extends Graphics {
   #onRender = () => {
     this.clear();
     const engine = ioc.get(ctxEngine);
-    const { tiled, graph } = this.area();
+    const { tiled, graph } = this.area;
     const { worldPosition } = engine.pointer;
 
     if (this.visibleGraphType() === "all") {

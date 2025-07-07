@@ -1,25 +1,21 @@
-import { EngineContext } from "@mp/engine";
+import { ctxEngine } from "@mp/engine";
 import type { TimeSpan } from "@mp/time";
-import {
-  useContext,
-  createSignal,
-  onMount,
-  onCleanup,
-  batch,
-  createMemo,
-} from "solid-js";
+import { createSignal, onMount, onCleanup, batch, createMemo } from "solid-js";
 import { useAtom } from "@mp/state/solid";
 import type { Character, TiledResource } from "../../server";
-import { ReactiveGameStateContext } from "../game-state/solid-js";
+import { ioc } from "../context";
+import { ctxGameStateClient } from "../game-state/game-state-client";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
-  const gameState = useContext(ReactiveGameStateContext);
-  const engine = useContext(EngineContext);
+  const client = ioc.get(ctxGameStateClient);
+  const engine = ioc.get(ctxEngine);
   const pointerPosition = useAtom(engine.pointer.position);
   const pointerWorldPosition = useAtom(engine.pointer.worldPosition);
   const cameraTransform = useAtom(engine.camera.transform);
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
+
+  const character = useAtom(client.character);
 
   onMount(() =>
     onCleanup(
@@ -44,7 +40,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
       frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
       frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameEmitter.callbackCount,
-      character: trimCharacterInfo(gameState().character()),
+      character: trimCharacterInfo(character()),
     };
   });
 

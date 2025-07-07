@@ -1,6 +1,5 @@
 import type { ParentProps } from "solid-js";
 import {
-  createContext,
   createEffect,
   createMemo,
   createSignal,
@@ -10,14 +9,6 @@ import {
 import type { MutableInjectionContainer } from "@mp/ioc";
 import { InjectionContext } from "@mp/ioc";
 import { Engine } from "./engine";
-
-export const EngineContext = createContext<Engine>(
-  new Proxy({} as Engine, {
-    get() {
-      throw new Error("EngineContext not provided");
-    },
-  }),
-);
 
 export const ctxEngine = InjectionContext.new<Engine>("Engine");
 
@@ -52,11 +43,7 @@ export function EngineProvider(
     // the app will instead re-render.
     <Show when={isReady()}>
       <Show when={engine()} keyed>
-        {(engine) => (
-          <EngineContext.Provider value={engine}>
-            {props.children}
-          </EngineContext.Provider>
-        )}
+        {props.children}
       </Show>
     </Show>
   );

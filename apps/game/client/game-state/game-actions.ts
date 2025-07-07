@@ -3,10 +3,12 @@ import type { Atom } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { CharacterId, ActorId } from "../../server";
-import type { GameSolidRpcInvoker } from "../use-rpc";
+import type { GameRpcClient } from "../game-rpc-client";
+
+export type GameActions = ReturnType<typeof createGameActions>;
 
 export function createGameActions(
-  rpc: GameSolidRpcInvoker,
+  rpc: GameRpcClient,
   characterId: () => Atom<CharacterId | undefined>,
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {

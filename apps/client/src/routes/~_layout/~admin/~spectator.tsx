@@ -3,7 +3,6 @@ import {
   GameDebugUiPortal,
   GameStateClient,
   SpectatorClient,
-  useRpc,
   worldRoles,
 } from "@mp/game/client";
 import { onCleanup, Suspense, useContext } from "solid-js";
@@ -24,7 +23,6 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 function RouteComponent() {
   const [settings] = useStorage(miscDebugStorage);
   const gameState = new GameStateClient({
-    rpc: useRpc(),
     socket: useContext(SocketContext),
     logger: useContext(LoggerContext),
     settings,

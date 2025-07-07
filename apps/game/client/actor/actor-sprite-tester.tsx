@@ -14,8 +14,8 @@ import {
   type ActorModelId,
   type ActorAnimationName,
 } from "../../server/traits/appearance";
-import { useRpc } from "../use-rpc";
 import { ioc } from "../context";
+import { ctxGameRpcClient } from "../game-rpc-client";
 import { ActorSprite } from "./actor-sprite";
 import {
   ActorSpritesheetContextProvider,
@@ -24,7 +24,7 @@ import {
 } from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester() {
-  const rpc = useRpc();
+  const rpc = ioc.get(ctxGameRpcClient);
   const spritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
     input: void 0,
     map: loadActorSpritesheets,
@@ -51,12 +51,14 @@ export function ActorSpriteTester() {
               <EngineProvider interactive viewport={viewport} ioc={ioc}>
                 <Show when={modelId()} keyed>
                   {(id) => (
-                    <Intermediate
-                      options={() => ({
-                        modelId: id,
-                        animationName: animationName(),
-                        allSpritesheets,
-                      })}
+                    <Pixi
+                      as={
+                        new ActorSpriteList(() => ({
+                          modelId: id,
+                          animationName: animationName(),
+                          allSpritesheets,
+                        }))
+                      }
                     />
                   )}
                 </Show>
@@ -79,15 +81,6 @@ export function ActorSpriteTester() {
       )}
     </Show>
   );
-}
-
-/**
- * Temporary, remove this once EngineProvider is removed
- * @deprecated
- */
-function Intermediate(props: { options: () => ActorTestSettings }) {
-  const spriteList = new ActorSpriteList(props.options);
-  return <Pixi as={spriteList} />;
 }
 
 const styles = {

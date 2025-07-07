@@ -3,11 +3,12 @@ import { skipToken } from "@mp/rpc/solid";
 import { type Accessor } from "solid-js";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
-import { useRpc } from "../use-rpc";
+import { ctxGameRpcClient } from "../game-rpc-client";
 import { AreaResource } from "../../shared/area/area-resource";
+import { ioc } from "../context";
 
 export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
-  const rpc = useRpc();
+  const rpc = ioc.get(ctxGameRpcClient);
   return rpc.area.areaFileUrl.useQuery(() => ({
     input: areaId() ?? skipToken,
     staleTime: Infinity,

@@ -1,6 +1,6 @@
 import { Button } from "@mp/ui";
-import { GameStateClientContext } from "@mp/game/client";
-import { createEffect, createSignal, useContext } from "solid-js";
+import { ctxGameStateClient, ioc } from "@mp/game/client";
+import { createEffect, createSignal } from "solid-js";
 import { assert } from "@mp/std";
 import { useStorage } from "@mp/state/solid";
 import { useRpc } from "../integrations/rpc";
@@ -14,7 +14,7 @@ export function MiscDebugUi() {
     createServerPatchOptimizerSignal();
 
   const serverVersion = rpc.system.buildVersion.useQuery();
-  const gameState = useContext(GameStateClientContext);
+  const gameState = ioc.get(ctxGameStateClient);
 
   return (
     <>
@@ -27,7 +27,7 @@ export function MiscDebugUi() {
         <Button
           on:click={() =>
             void rpc.character.kill({
-              targetId: assert(gameState().characterId.get()),
+              targetId: assert(gameState.characterId.get()),
             })
           }
         >

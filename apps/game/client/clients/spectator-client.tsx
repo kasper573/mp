@@ -10,14 +10,15 @@ import {
 } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
 import type { CharacterId } from "../../server";
-import { useRpc } from "../use-rpc";
+import { ctxGameRpcClient } from "../game-rpc-client";
+import { ioc } from "../context";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 
 export function SpectatorClient(props: GameClientProps) {
   const [spectatedCharacterId, setSpectatedCharacterId] =
     createSignal<CharacterId>();
-  const rpc = useRpc();
+  const rpc = ioc.get(ctxGameRpcClient);
   const auth = useContext(AuthContext);
   const characterOptions = rpc.world.characterList.useQuery(() => ({
     input: void 0,

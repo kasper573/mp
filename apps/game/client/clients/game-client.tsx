@@ -1,8 +1,7 @@
-import { EngineContext, EngineProvider } from "@mp/engine";
-import { Application } from "@mp/solid-pixi";
+import { ctxEngine, EngineProvider } from "@mp/engine";
+import { Application, Pixi } from "@mp/solid-pixi";
 import type { JSX, ParentProps } from "solid-js";
 import {
-  useContext,
   Switch,
   Match,
   Suspense,
@@ -14,6 +13,8 @@ import {
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
+import { useAtom, useStorage } from "@mp/state/solid";
+import { createReactiveStorage } from "@mp/state";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -28,13 +29,10 @@ import { GameDebugUi } from "../debug/game-debug-ui";
 import type { GameDebugUiState } from "../debug/game-debug-ui-state";
 import { GameDebugUiContext } from "../debug/game-debug-ui-state";
 import { GameStateDebugInfo } from "../debug/game-state-debug-info";
-import { useRpc } from "../use-rpc";
-import {
-  deriveReactiveGameState,
-  GameStateClientContext,
-  ReactiveGameStateContext,
-} from "../game-state/solid-js";
+import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
+import { AreaUi } from "../area/area-ui";
+import type { AreaDebugSettings } from "../area/area-debug-settings-form";
 
 export type GameClientProps = ParentProps<{
   gameState: GameStateClient;
@@ -44,15 +42,14 @@ export type GameClientProps = ParentProps<{
 }>;
 
 export function GameClient(props: GameClientProps) {
-  const rpc = useRpc();
+  const rpc = ioc.get(ctxGameRpcClient);
   const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const interactive = () => props.interactive ?? true;
 
-  // eslint-disable-next-line solid/reactivity
-  const reactiveGameState = deriveReactiveGameState(() => props.gameState);
+  const areaId = useAtom(props.gameState.areaId);
 
-  const area = useAreaResource(() => reactiveGameState.areaId());
+  const area = useAreaResource(areaId);
 
   const areaSpritesheets = useQuery(() => ({
     queryKey: ["areaSpritesheets", area.data?.id],
@@ -85,83 +82,102 @@ export function GameClient(props: GameClientProps) {
     setEnabled: setDebugUiEnabled,
   };
 
-  const gameStateAccessor = () => props.gameState;
-  const reactiveGameStateAccessor = () => reactiveGameState;
-
   createEffect(() => {
     onCleanup(ioc.register(ctxGameStateClient, props.gameState));
   });
 
-  return (
-    <GameStateClientContext.Provider value={gameStateAccessor}>
-      <ReactiveGameStateContext.Provider value={reactiveGameStateAccessor}>
-        <Switch>
-          <Match when={assets()} keyed>
-            {({ area, spritesheets, actorSpritesheets }) => (
-              <Suspense
-                fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
-              >
-                <Application class={props.class} style={props.style}>
-                  {({ viewport }) => (
-                    <ActorSpritesheetContextProvider value={actorSpritesheets}>
-                      <EngineProvider
-                        interactive={interactive()}
-                        viewport={viewport}
-                        ioc={ioc}
-                      >
-                        <GameDebugUiContext.Provider value={debugUiState}>
-                          <Suspense
-                            fallback={
-                              <LoadingSpinner>Loading area</LoadingSpinner>
-                            }
-                          >
-                            <AreaScene
-                              area={area}
-                              spritesheets={spritesheets}
-                            />
-                          </Suspense>
-                          <GameStateClientAnimations />
-                          {props.children}
-                          <GameDebugUi>
-                            <GameStateDebugInfo tiled={area.tiled} />
-                          </GameDebugUi>
-                        </GameDebugUiContext.Provider>
-                      </EngineProvider>
-                    </ActorSpritesheetContextProvider>
-                  )}
-                </Application>
-              </Suspense>
-            )}
-          </Match>
+  const [areaDebugSettings, setAreaDebugSettings] = useStorage(
+    createReactiveStorage<AreaDebugSettings>(
+      localStorage,
+      "area-debug-settings",
+      {
+        visibleGraphType: "none",
+        showFogOfWar: false,
+        showAttackRange: false,
+        showAggroRange: false,
+      },
+    ),
+  );
 
-          <Match when={props.gameState.readyState.get() !== WebSocket.OPEN}>
-            <LoadingSpinner>Connecting to game server</LoadingSpinner>
-          </Match>
-          <Match when={!reactiveGameState.areaId()}>
-            <LoadingSpinner>Waiting for game state</LoadingSpinner>
-          </Match>
-          <Match when={area.isLoading}>
-            <LoadingSpinner>Loading area</LoadingSpinner>
-          </Match>
-          <Match when={!area.data}>
-            <ErrorFallback
-              error="Could not load area data"
-              reset={() => void area.refetch()}
-            />
-          </Match>
-        </Switch>
-      </ReactiveGameStateContext.Provider>
-    </GameStateClientContext.Provider>
+  return (
+    <>
+      <Switch>
+        <Match when={assets()} keyed>
+          {({ area, spritesheets, actorSpritesheets }) => (
+            <Suspense
+              fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
+            >
+              <Application class={props.class} style={props.style}>
+                {({ viewport }) => (
+                  <ActorSpritesheetContextProvider value={actorSpritesheets}>
+                    <EngineProvider
+                      interactive={interactive()}
+                      viewport={viewport}
+                      ioc={ioc}
+                    >
+                      <GameDebugUiContext.Provider value={debugUiState}>
+                        <Suspense
+                          fallback={
+                            <LoadingSpinner>Loading area</LoadingSpinner>
+                          }
+                        >
+                          <Pixi
+                            as={
+                              new AreaScene({
+                                area,
+                                spritesheets,
+                                debugSettings: areaDebugSettings(),
+                              })
+                            }
+                          />
+                        </Suspense>
+                        <GameStateClientAnimations />
+                        {props.children}
+                        <AreaUi
+                          debugFormProps={{
+                            value: areaDebugSettings(),
+                            onChange: setAreaDebugSettings,
+                          }}
+                        />
+                        <GameDebugUi>
+                          <GameStateDebugInfo tiled={area.tiled} />
+                        </GameDebugUi>
+                      </GameDebugUiContext.Provider>
+                    </EngineProvider>
+                  </ActorSpritesheetContextProvider>
+                )}
+              </Application>
+            </Suspense>
+          )}
+        </Match>
+
+        <Match when={props.gameState.readyState.get() !== WebSocket.OPEN}>
+          <LoadingSpinner>Connecting to game server</LoadingSpinner>
+        </Match>
+        <Match when={!areaId()}>
+          <LoadingSpinner>Waiting for game state</LoadingSpinner>
+        </Match>
+        <Match when={area.isLoading}>
+          <LoadingSpinner>Loading area</LoadingSpinner>
+        </Match>
+        <Match when={!area.data}>
+          <ErrorFallback
+            error="Could not load area data"
+            reset={() => void area.refetch()}
+          />
+        </Match>
+      </Switch>
+    </>
   );
 }
 
 // TODO refactor. This is a hack to workaround the problematic Application/EngineProvider pattern.
 // It would be better if we could instantiate the engine higher up the tree so we can do this without a component.
 function GameStateClientAnimations() {
-  const client = useContext(GameStateClientContext);
-  const engine = useContext(EngineContext);
+  const client = ioc.get(ctxGameStateClient);
+  const engine = ioc.get(ctxEngine);
   createEffect(() => {
-    onCleanup(engine.frameEmitter.subscribe(client().gameState.frameCallback));
+    onCleanup(engine.frameEmitter.subscribe(client.gameState.frameCallback));
   });
   return null;
 }

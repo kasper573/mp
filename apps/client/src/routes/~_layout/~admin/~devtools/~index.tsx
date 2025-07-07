@@ -6,7 +6,7 @@ import {
   createEffect,
   Show,
 } from "solid-js";
-import { FrameEmitter, Spring, useSpringValue } from "@mp/engine";
+import { FrameEmitter, Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
@@ -89,7 +89,16 @@ function SpringTester() {
   const frameEmitter = new FrameEmitter();
   const spring = new Spring(target, options);
   const springState = useAtom(spring.state);
-  const springValue = useSpringValue(spring, frameEmitter);
+  const springValue = useAtom(spring.value);
+
+  createEffect(() => {
+    if (springState() === "moving") {
+      onCleanup(
+        frameEmitter.subscribe((opt) => spring.update(opt.timeSinceLastFrame)),
+      );
+    }
+  });
+
   createRenderEffect(spring.update);
 
   function flipSpringTarget() {

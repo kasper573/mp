@@ -3,19 +3,27 @@ import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { Atom } from "@mp/state";
-import { atom } from "@mp/state";
+import type { Atom, ReadonlyAtom } from "@mp/state";
+import { atom, computed } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
-import type { CharacterId } from "../../server/character/types";
+import type { Character, CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
-import type { GameSolidRpcInvoker } from "../use-rpc";
+import { ctxGameRpcClient } from "../game-rpc-client";
+import type { Actor, ActorId } from "../../server/actor";
+import type { AreaId } from "../../server";
+import { ioc } from "../context";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
+import type { GameActions } from "./game-actions";
+import { createGameActions } from "./game-actions";
+import {
+  syncEntityToAtomNotifyEffect,
+  syncMapToAtomNotifyEffect,
+} from "./sync-to-atom";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
-  rpc: GameSolidRpcInvoker;
   socket: WebSocket;
   logger: Logger;
   settings: () => OptimisticGameStateSettings;
@@ -23,9 +31,21 @@ export interface GameStateClientOptions {
 
 export class GameStateClient {
   readonly eventBus = new SyncEventBus<GameStateEvents>();
+  readonly actions: GameActions;
+
+  private rpc = ioc.get(ctxGameRpcClient);
+
+  // State
   readonly gameState: OptimisticGameState;
   readonly characterId = atom<CharacterId | undefined>(undefined);
   readonly readyState: Atom<WebSocket["readyState"]>;
+
+  // Derived state
+  readonly actorList: ReadonlyAtom<Actor[]>;
+  readonly character: ReadonlyAtom<Character | undefined>;
+  readonly areaId: ReadonlyAtom<AreaId | undefined>;
+
+  private actorMapAtom: ReadonlyAtom<ReadonlyMap<ActorId, Actor>>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(() => this.options.settings());
@@ -33,9 +53,26 @@ export class GameStateClient {
       this.options.socket.readyState,
     );
 
+    this.actions = createGameActions(this.rpc, () => this.characterId);
+
     // We throttle because when stale patches are detected, they usually come in batches,
     // and we only want to send one request for full state.
-    this.refreshState = throttle(this.options.rpc.world.requestFullState, 5000);
+    this.refreshState = throttle(this.rpc.world.requestFullState, 5000);
+
+    this.actorMapAtom = atom(this.gameState.actors);
+
+    this.actorList = computed(this.actorMapAtom, (actors) =>
+      actors.values().toArray(),
+    );
+
+    this.character = computed(
+      [this.actorMapAtom, this.characterId],
+      (actors, myId) => {
+        return actors.get(myId as CharacterId) as Character | undefined;
+      },
+    );
+
+    this.areaId = computed(this.character, (char) => char?.areaId);
   }
 
   private refreshState: () => unknown;
@@ -43,20 +80,26 @@ export class GameStateClient {
   start = () => {
     const { socket } = this.options;
 
-    const unsubscribeFromReadyState = subscribeToReadyState(
-      socket,
-      (newReadyState) => this.readyState.set(newReadyState),
-    );
+    const subscriptions = [
+      syncMapToAtomNotifyEffect(this.gameState.actors, this.actorMapAtom),
+      syncEntityToAtomNotifyEffect(this.character),
+      subscribeToReadyState(socket, (newReadyState) =>
+        this.readyState.set(newReadyState),
+      ),
+    ];
 
     socket.addEventListener("message", this.handleMessage);
 
     this.stop = () => {
-      unsubscribeFromReadyState();
+      for (const unsubscribe of subscriptions) {
+        unsubscribe();
+      }
+
       socket.removeEventListener("message", this.handleMessage);
 
       const id = this.characterId.get();
       if (id !== undefined) {
-        void this.options.rpc.world.leave(id);
+        void this.rpc.world.leave(id);
       }
     };
 

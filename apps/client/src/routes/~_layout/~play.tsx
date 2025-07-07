@@ -7,7 +7,7 @@ import {
 import { onCleanup, Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import { useStorage } from "@mp/state/solid";
-import { SocketContext, useRpc } from "../../integrations/rpc";
+import { SocketContext } from "../../integrations/rpc";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { LoggerContext } from "../../logger";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
@@ -20,7 +20,6 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const [settings] = useStorage(miscDebugStorage);
   const gameState = new GameStateClient({
-    rpc: useRpc(),
     socket: useContext(SocketContext),
     logger: useContext(LoggerContext),
     settings,

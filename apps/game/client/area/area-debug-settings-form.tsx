@@ -1,11 +1,13 @@
 import { Select } from "@mp/ui";
 
-export function AreaDebugForm(props: {
+export interface AreaDebugFormProps {
   value: AreaDebugSettings;
   onChange: (
     createSettings: (prev: AreaDebugSettings) => AreaDebugSettings,
   ) => void;
-}) {
+}
+
+export function AreaDebugForm(props: AreaDebugFormProps) {
   return (
     <>
       <div>

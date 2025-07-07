@@ -1,11 +1,12 @@
 import type { ParentProps } from "solid-js";
 import { createEffect, onCleanup, Show, useContext } from "solid-js";
-import { EngineContext } from "@mp/engine";
+import { ctxEngine } from "@mp/engine";
+import { ioc } from "../context";
 import * as styles from "./game-debug-ui.css";
 import { GameDebugUiContext } from "./game-debug-ui-state";
 
 export function GameDebugUi(props: ParentProps) {
-  const engine = useContext(EngineContext);
+  const engine = ioc.get(ctxEngine);
   const { setPortalContainer, setEnabled, enabled } =
     useContext(GameDebugUiContext);
 
