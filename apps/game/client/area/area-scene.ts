@@ -17,8 +17,6 @@ import { clientViewDistance } from "../../server";
 import { reactiveCollectionBinding } from "../pixi/reactive-collection";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
-import { createGameActions } from "../game-state/game-actions";
-import { ctxGameRpcClient } from "../game-rpc-client";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
@@ -29,10 +27,6 @@ export class AreaScene extends Container {
 
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
-  private actions = createGameActions(
-    ioc.get(ctxGameRpcClient),
-    () => this.state.characterId,
-  );
 
   constructor(
     private options: {
@@ -144,7 +138,7 @@ export class AreaScene extends Container {
   moveThrottled = dedupe(
     throttle(
       (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
-        this.actions.move(to, desiredPortalId),
+        this.state.actions.move(to, desiredPortalId),
       100,
     ),
     ([aVector, aPortalId], [bVector, bPortalId]) =>
@@ -167,7 +161,7 @@ export class AreaScene extends Container {
     if (this.engine.pointer.isDown.get()) {
       const entity = this.entityAtPointer();
       if (entity) {
-        void this.actions.attack(entity.id);
+        void this.state.actions.attack(entity.id);
       } else {
         const tileNode = this.options.area.graph.getNearestNode(
           this.pointerTile(),
