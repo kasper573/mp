@@ -16,6 +16,9 @@ import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~cont
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
 import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
 import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
+import { Route as LayoutAdminDevtoolsSpringTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~spring-tester'
+import { Route as LayoutAdminDevtoolsObservableTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~observable-tester'
+import { Route as LayoutAdminDevtoolsErrorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~error-tester'
 import { Route as LayoutAdminDevtoolsActorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~actor-tester'
 import { Route as LayoutAdminDevtoolsIndexRouteImport } from './../../routes/~_layout/~admin/~devtools/~index'
 
@@ -54,6 +57,24 @@ const LayoutAdminDevtoolsRouteRoute =
     path: '/admin/devtools',
     getParentRoute: () => LayoutRouteRoute,
   } as any)
+const LayoutAdminDevtoolsSpringTesterRoute =
+  LayoutAdminDevtoolsSpringTesterRouteImport.update({
+    id: '/spring-tester',
+    path: '/spring-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsObservableTesterRoute =
+  LayoutAdminDevtoolsObservableTesterRouteImport.update({
+    id: '/observable-tester',
+    path: '/observable-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsErrorTesterRoute =
+  LayoutAdminDevtoolsErrorTesterRouteImport.update({
+    id: '/error-tester',
+    path: '/error-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
 const LayoutAdminDevtoolsActorTesterRoute =
   LayoutAdminDevtoolsActorTesterRouteImport.update({
     id: '/actor-tester',
@@ -76,6 +97,9 @@ export interface FileRoutesByFullPath {
   '/admin/spectator': typeof LayoutAdminSpectatorRoute
   '/admin/devtools/': typeof LayoutAdminDevtoolsIndexRoute
   '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
+  '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
+  '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
+  '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
 }
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
@@ -85,6 +109,9 @@ export interface FileRoutesByTo {
   '/admin/spectator': typeof LayoutAdminSpectatorRoute
   '/admin/devtools': typeof LayoutAdminDevtoolsIndexRoute
   '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
+  '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
+  '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
+  '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -97,6 +124,9 @@ export interface FileRoutesById {
   '/_layout/admin/spectator': typeof LayoutAdminSpectatorRoute
   '/_layout/admin/devtools/': typeof LayoutAdminDevtoolsIndexRoute
   '/_layout/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
+  '/_layout/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
+  '/_layout/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
+  '/_layout/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -109,6 +139,9 @@ export interface FileRouteTypes {
     | '/admin/spectator'
     | '/admin/devtools/'
     | '/admin/devtools/actor-tester'
+    | '/admin/devtools/error-tester'
+    | '/admin/devtools/observable-tester'
+    | '/admin/devtools/spring-tester'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-callback'
@@ -118,6 +151,9 @@ export interface FileRouteTypes {
     | '/admin/spectator'
     | '/admin/devtools'
     | '/admin/devtools/actor-tester'
+    | '/admin/devtools/error-tester'
+    | '/admin/devtools/observable-tester'
+    | '/admin/devtools/spring-tester'
   id:
     | '__root__'
     | '/_layout'
@@ -129,6 +165,9 @@ export interface FileRouteTypes {
     | '/_layout/admin/spectator'
     | '/_layout/admin/devtools/'
     | '/_layout/admin/devtools/actor-tester'
+    | '/_layout/admin/devtools/error-tester'
+    | '/_layout/admin/devtools/observable-tester'
+    | '/_layout/admin/devtools/spring-tester'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -187,6 +226,27 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof LayoutAdminDevtoolsRouteRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/admin/devtools/spring-tester': {
+      id: '/_layout/admin/devtools/spring-tester'
+      path: '/spring-tester'
+      fullPath: '/admin/devtools/spring-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsSpringTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
+    '/_layout/admin/devtools/observable-tester': {
+      id: '/_layout/admin/devtools/observable-tester'
+      path: '/observable-tester'
+      fullPath: '/admin/devtools/observable-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsObservableTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
+    '/_layout/admin/devtools/error-tester': {
+      id: '/_layout/admin/devtools/error-tester'
+      path: '/error-tester'
+      fullPath: '/admin/devtools/error-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsErrorTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
     '/_layout/admin/devtools/actor-tester': {
       id: '/_layout/admin/devtools/actor-tester'
       path: '/actor-tester'
@@ -207,12 +267,19 @@ declare module '@tanstack/solid-router' {
 interface LayoutAdminDevtoolsRouteRouteChildren {
   LayoutAdminDevtoolsIndexRoute: typeof LayoutAdminDevtoolsIndexRoute
   LayoutAdminDevtoolsActorTesterRoute: typeof LayoutAdminDevtoolsActorTesterRoute
+  LayoutAdminDevtoolsErrorTesterRoute: typeof LayoutAdminDevtoolsErrorTesterRoute
+  LayoutAdminDevtoolsObservableTesterRoute: typeof LayoutAdminDevtoolsObservableTesterRoute
+  LayoutAdminDevtoolsSpringTesterRoute: typeof LayoutAdminDevtoolsSpringTesterRoute
 }
 
 const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildren =
   {
     LayoutAdminDevtoolsIndexRoute: LayoutAdminDevtoolsIndexRoute,
     LayoutAdminDevtoolsActorTesterRoute: LayoutAdminDevtoolsActorTesterRoute,
+    LayoutAdminDevtoolsErrorTesterRoute: LayoutAdminDevtoolsErrorTesterRoute,
+    LayoutAdminDevtoolsObservableTesterRoute:
+      LayoutAdminDevtoolsObservableTesterRoute,
+    LayoutAdminDevtoolsSpringTesterRoute: LayoutAdminDevtoolsSpringTesterRoute,
   }
 
 const LayoutAdminDevtoolsRouteRouteWithChildren =
