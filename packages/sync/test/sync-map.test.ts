@@ -88,7 +88,7 @@ describe("atom", () => {
       const fn = vi.fn((arg) => {
         received = arg;
       });
-      map.atom.listen(fn);
+      map.subscribe(fn);
 
       const john = new Entity("john");
       map.set("1", john);
@@ -113,7 +113,7 @@ describe("atom", () => {
       const fn = vi.fn((arg) => {
         received = arg;
       });
-      map.atom.listen(fn);
+      map.subscribe(fn);
 
       const jane = new Entity("jane");
       map.set("1", jane);
@@ -138,7 +138,7 @@ describe("atom", () => {
       const fn = vi.fn((arg) => {
         received = arg;
       });
-      map.atom.listen(fn);
+      map.subscribe(fn);
 
       map.delete("1");
       map.flush();
@@ -156,7 +156,7 @@ describe("atom", () => {
     const map = new SyncMap<string, Entity>();
 
     const fn = vi.fn();
-    const stop = map.atom.listen(fn);
+    const stop = map.subscribe(fn);
 
     map.set("1", new Entity("john"));
     map.flush();

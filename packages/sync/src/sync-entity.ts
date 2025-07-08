@@ -1,21 +1,13 @@
-import type { ReadonlyAtom } from "@mp/state";
-import { atom } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
+import type { Observable } from "./observable";
+import { observable } from "./observable";
 
 /**
  * Base class for entities that has fields decorated with @collect.
  */
 export abstract class SyncEntity {
   private meta = new SyncEntityMeta();
-  private atomBf = atom(this);
-
-  /**
-   * Reactive interface for the entity
-   */
-  get atom(): ReadonlyAtom<this> {
-    return this.atomBf;
-  }
 
   /**
    * Triggers event handlers and produces a patch that represents all changes since the last flush.
@@ -25,7 +17,7 @@ export abstract class SyncEntity {
     if (changes) {
       const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
       this.meta.changes = undefined;
-      this.atomBf.notify();
+      this.#observable.$notifySubscribers();
       return patch;
     }
 
@@ -53,6 +45,23 @@ export abstract class SyncEntity {
   }
 
   static shouldOptimizeCollects = false;
+
+  // Mixing in the Observable interface
+  // (SyncEntity does not use the implements keyword because we must pass the "this"
+  // type to the generic param of Observable, which is impossible with implements,
+  // but if we make sure to define the entire interface here, it still counts as
+  // implemented thanks to TypeScript's structural typing).
+  #observable = observable<this>(() => this);
+  derive: Observable<this>["derive"] = (...args) =>
+    this.#observable.derive(...args);
+  compose: Observable<this>["compose"] = (...args) =>
+    this.#observable.compose(...args);
+  subscribe: Observable<this>["subscribe"] = (...args) =>
+    this.#observable.subscribe(...args);
+  $notifySubscribers: Observable<this>["$notifySubscribers"] = (...args) =>
+    this.#observable.$notifySubscribers(...args);
+  $getObservableValue: Observable<this>["$getObservableValue"] = (...args) =>
+    this.#observable.$getObservableValue(...args);
 }
 
 /**

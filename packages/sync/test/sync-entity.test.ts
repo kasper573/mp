@@ -57,7 +57,7 @@ describe("atom", () => {
 
     const fn = vi.fn();
     const e = new Entity();
-    e.atom.listen(fn);
+    e.subscribe(fn);
     e.count = 1;
     e.count = 2;
     expect(fn).toHaveBeenCalledTimes(0);
@@ -77,7 +77,7 @@ describe("atom", () => {
     e.count = 1;
     e.count = 2;
 
-    e.atom.listen(fn);
+    e.subscribe(fn);
     e.flush();
     expect(fn).toHaveBeenCalledTimes(1);
     expect(receivedCount!).toEqual(2);
@@ -95,7 +95,7 @@ describe("atom", () => {
     });
     const e = new Entity();
 
-    const stop = e.atom.listen(fn);
+    const stop = e.subscribe(fn);
 
     e.count = 1;
     e.flush();

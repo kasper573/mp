@@ -1,5 +1,3 @@
-import type { Atom, ReadonlyAtom } from "@mp/state";
-import { atom } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -7,23 +5,14 @@ import {
   type PatchPath,
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
+import type { Observable } from "./observable";
+import { observable } from "./observable";
 
-export class SyncMap<K, V> extends Map<K, V> {
+export class SyncMap<K, V>
+  extends Map<K, V>
+  implements Observable<ReadonlyMap<K, V>>
+{
   #keysLastFlush = new Set<K>();
-
-  /**
-   * Reactive interface for the map
-   */
-  #atom: Atom<ReadonlyMap<K, V>>;
-
-  get atom(): ReadonlyAtom<ReadonlyMap<K, V>> {
-    return this.#atom;
-  }
-
-  constructor(...args: ConstructorParameters<typeof Map<K, V>>) {
-    super(...args);
-    this.#atom = atom(this);
-  }
 
   // Cannot be a private field because it needs to be accessed by the `set` method,
   // which is an override and can thus not access private fields of the parent class.
@@ -71,12 +60,26 @@ export class SyncMap<K, V> extends Map<K, V> {
     this.dirtyKeys?.clear();
 
     if (patch.length > 0 || didUpdateAnItem) {
-      console.log("Notifying", this.#atom.lc, "listeners", patch);
-      this.#atom.notify();
+      this.#observable.$notifySubscribers();
     }
 
     return patch;
   }
+
+  // Mixing in the Observable interface
+  #observable = observable<ReadonlyMap<K, V>>(() => this);
+  derive: Observable<ReadonlyMap<K, V>>["derive"] = (...args) =>
+    this.#observable.derive(...args);
+  compose: Observable<ReadonlyMap<K, V>>["compose"] = (...args) =>
+    this.#observable.compose(...args);
+  subscribe: Observable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
+    this.#observable.subscribe(...args);
+  $notifySubscribers: Observable<ReadonlyMap<K, V>>["$notifySubscribers"] = (
+    ...args
+  ) => this.#observable.$notifySubscribers(...args);
+  $getObservableValue: Observable<ReadonlyMap<K, V>>["$getObservableValue"] = (
+    ...args
+  ) => this.#observable.$getObservableValue(...args);
 }
 
 export type SyncMapChangeHandler<K, V> = (
