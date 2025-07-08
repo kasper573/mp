@@ -1,7 +1,7 @@
+import { observable } from "@mp/state";
+import type { Observable } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
-import type { Observable } from "./observable";
-import { observable } from "./observable";
 
 /**
  * Base class for entities that has fields decorated with @collect.

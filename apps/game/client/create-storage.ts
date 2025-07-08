@@ -1,27 +1,20 @@
-import type { MutableObservable } from "./observable";
-import { mutableObservable } from "./observable";
+import type { Accessor, Setter } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 
-export interface ReactiveStorage<T> {
-  value: MutableObservable<T>;
-  effect: () => () => void;
-}
-
-export function createReactiveStorage<T>(
+export function createStorage<T>(
   storage: Storage,
   key: string,
   defaultValue: T,
-): ReactiveStorage<T> {
-  const value = mutableObservable(
+): [Accessor<T>, Setter<T>] {
+  const [value, setValue] = createSignal(
     loadFromStorage<T>(storage, key, defaultValue),
   );
 
-  function createStorageEffect() {
-    return value.subscribe((value) => {
-      saveToStorage(storage, key, value);
-    });
-  }
+  createEffect(() => {
+    saveToStorage(storage, key, value());
+  });
 
-  return { value, effect: createStorageEffect };
+  return [value, setValue];
 }
 
 function loadFromStorage<T>(storage: Storage, key: string, defaultValue: T): T {

@@ -16,9 +16,11 @@
       "require": "./src/solid.ts"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
-    "@nanostores/solid": "1.0.0",
-    "nanostores": "1.0.1",
     "solid-js": "catalog:"
   },
   "devDependencies": {

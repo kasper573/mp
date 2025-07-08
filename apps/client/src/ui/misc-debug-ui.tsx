@@ -27,7 +27,7 @@ export function MiscDebugUi() {
         <Button
           on:click={() =>
             void rpc.character.kill({
-              targetId: assert(gameState.characterId.get()),
+              targetId: assert(gameState.characterId.$getObservableValue()),
             })
           }
         >

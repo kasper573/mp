@@ -11,7 +11,7 @@ import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
 import { useAtom } from "@mp/state/solid";
-import { atom } from "@mp/state";
+import { mutableObservable } from "@mp/state";
 import { useRpc } from "../../../../integrations/rpc";
 
 export const Route = createFileRoute("/_layout/admin/devtools/")({
@@ -77,7 +77,7 @@ function SpringTester() {
   const [damping, setDamping] = createSignal(40);
   const [mass, setMass] = createSignal(2);
   const [precision, setPrecision] = createSignal(1);
-  const target = atom(0);
+  const target = mutableObservable(0);
   const targetValue = useAtom(target);
   const options = createMemo(() => ({
     stiffness: stiffness(),
@@ -89,6 +89,7 @@ function SpringTester() {
   const frameEmitter = new FrameEmitter();
   const spring = new Spring(target, options);
   const springState = useAtom(spring.state);
+  const springVelocity = useAtom(spring.velocity);
   const springValue = useAtom(spring.value);
 
   createEffect(() => {
@@ -102,7 +103,7 @@ function SpringTester() {
   createRenderEffect(spring.update);
 
   function flipSpringTarget() {
-    target.set(target.get() ? 0 : 100);
+    target.set(target.$getObservableValue() ? 0 : 100);
   }
 
   const toggleAutoFlip = () => setAutoFlip((now) => !now);
@@ -168,7 +169,7 @@ function SpringTester() {
           {
             value: springValue(),
             state: springState(),
-            velocity: spring.velocity.get(),
+            velocity: springVelocity(),
           },
           null,
           2,

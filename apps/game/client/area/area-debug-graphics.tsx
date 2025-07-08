@@ -5,8 +5,7 @@ import { Container, Graphics } from "pixi.js";
 import { ctxEngine } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import type { ReadonlyAtom } from "@mp/state";
-import { computed } from "@mp/state";
+import type { ReadonlyObservable } from "@mp/state";
 import type { NpcInstance } from "../../server";
 import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
@@ -26,7 +25,7 @@ export class AreaDebugGraphics extends Container {
 
   constructor(
     area: AreaResource,
-    actors: ReadonlyAtom<Actor[]>,
+    actors: ReadonlyObservable<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
   ) {
@@ -59,9 +58,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(actors, (actors) =>
-        actors.filter((actor) => actor.type === "npc"),
-      ),
+      actors.derive((actors) => actors.filter((actor) => actor.type === "npc")),
       (npc) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
@@ -115,7 +112,7 @@ class DebugTiledGraph extends Graphics {
       }
     } else if (this.visibleGraphType() === "tile") {
       const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(worldPosition.get()),
+        tiled.worldCoordToTile(worldPosition.$getObservableValue()),
       );
       if (tileNode) {
         drawGraphNode(this, tiled, graph, tileNode);
@@ -123,9 +120,11 @@ class DebugTiledGraph extends Graphics {
     } else if (this.visibleGraphType() === "coord") {
       drawStar(
         this,
-        worldPosition.get(),
+        worldPosition.$getObservableValue(),
         graph
-          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.get()))
+          .getAdjacentNodes(
+            tiled.worldCoordToTile(worldPosition.$getObservableValue()),
+          )
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }

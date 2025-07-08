@@ -13,7 +13,10 @@ export function PlayerClient(props: GameClientProps) {
 
   createEffect(() => {
     const user = auth.identity();
-    if (props.gameState.readyState.get() === WebSocket.OPEN && user) {
+    if (
+      props.gameState.readyState.$getObservableValue() === WebSocket.OPEN &&
+      user
+    ) {
       void actions.join();
     }
   });

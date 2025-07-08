@@ -1,13 +1,13 @@
-import type { ReadonlyAtom } from "@mp/state";
-import { atom } from "@mp/state";
+import type { ReadonlyObservable } from "@mp/state";
+import { mutableObservable } from "@mp/state";
 
 export class Keyboard {
-  readonly #keysHeld = atom(new Set<KeyboardEventKey>());
+  readonly #keysHeld = mutableObservable(new Set<KeyboardEventKey>());
   #isRunning = false;
 
   constructor(private window: Window) {}
 
-  get keysHeld(): ReadonlyAtom<ReadonlySet<KeyboardEventKey>> {
+  get keysHeld(): ReadonlyObservable<ReadonlySet<KeyboardEventKey>> {
     return this.#keysHeld;
   }
 
@@ -40,7 +40,7 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
+    const current = this.#keysHeld.$getObservableValue();
     this.#keysHeld.set(
       current.has(key) ? current : current.union(new Set([key])),
     );
@@ -48,7 +48,7 @@ export class Keyboard {
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
+    const current = this.#keysHeld.$getObservableValue();
     this.#keysHeld.set(
       current.has(key) ? current.difference(new Set([key])) : current,
     );

@@ -3,8 +3,8 @@ import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { Atom, ReadonlyAtom } from "@mp/state";
-import { atom, computed, selfNotifyEffect } from "@mp/state";
+import type { MutableObservable, ReadonlyObservable } from "@mp/state";
+import { mutableObservable } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { Character, CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
@@ -33,17 +33,17 @@ export class GameStateClient {
 
   // State
   readonly gameState: OptimisticGameState;
-  readonly characterId = atom<CharacterId | undefined>(undefined);
-  readonly readyState: Atom<WebSocket["readyState"]>;
+  readonly characterId = mutableObservable<CharacterId | undefined>(undefined);
+  readonly readyState: MutableObservable<WebSocket["readyState"]>;
 
   // Derived state
-  readonly actorList: ReadonlyAtom<Actor[]>;
-  readonly character: ReadonlyAtom<Character | undefined>;
-  readonly areaId: ReadonlyAtom<AreaId | undefined>;
+  readonly actorList: ReadonlyObservable<Actor[]>;
+  readonly character: ReadonlyObservable<Character | undefined>;
+  readonly areaId: ReadonlyObservable<AreaId | undefined>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(() => this.options.settings());
-    this.readyState = atom<WebSocket["readyState"]>(
+    this.readyState = mutableObservable<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
 
@@ -53,19 +53,18 @@ export class GameStateClient {
     // and we only want to send one request for full state.
     this.refreshState = throttle(this.rpc.world.requestFullState, 5000);
 
-    this.actorList = computed(this.gameState.actors.atom, (actors) =>
+    this.actorList = this.gameState.actors.derive((actors) =>
       actors.values().toArray(),
     );
 
-    this.character = computed(
-      [this.gameState.actors.atom, this.characterId],
-      (actors, myId) => {
+    this.character = this.gameState.actors
+      .compose(this.characterId)
+      .derive(([actors, myId]) => {
         const char = actors.get(myId as CharacterId) as Character | undefined;
         return char;
-      },
-    );
+      });
 
-    this.areaId = computed(this.character, (char) => {
+    this.areaId = this.character.derive((char) => {
       console.log("computing new area id", char?.areaId);
       return char?.areaId;
     });
@@ -79,7 +78,6 @@ export class GameStateClient {
     console.log("starting game state client");
 
     const subscriptions = [
-      selfNotifyEffect(this.character, (char) => char?.atom),
       subscribeToReadyState(socket, (newReadyState) =>
         this.readyState.set(newReadyState),
       ),
@@ -96,7 +94,7 @@ export class GameStateClient {
 
       socket.removeEventListener("message", this.handleMessage);
 
-      const id = this.characterId.get();
+      const id = this.characterId.$getObservableValue();
       if (id !== undefined) {
         void this.rpc.world.leave(id);
       }

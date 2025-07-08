@@ -59,7 +59,7 @@ export class OptimisticGameState implements GameState {
       }
     }
 
-    console.log("Flushing actors", this.actors.atom.lc, "listeners");
+    console.log("Flushing actors");
     this.actors.flush();
   };
 }

@@ -1,3 +1,5 @@
+import type { Observable } from "@mp/state";
+import { observable } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -5,8 +7,6 @@ import {
   type PatchPath,
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
-import type { Observable } from "./observable";
-import { observable } from "./observable";
 
 export class SyncMap<K, V>
   extends Map<K, V>

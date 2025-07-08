@@ -42,7 +42,7 @@ export class ActorController extends Container {
     const state = ioc.get(ctxGameStateClient);
 
     this.subscriptions = [
-      actor.atom.listen(
+      actor.subscribe(
         diffCallback(
           () => actorAnimationState(actor),
           this.switchAnimationToMovingOrIdle,

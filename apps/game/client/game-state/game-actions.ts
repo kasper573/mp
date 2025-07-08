@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import type { Atom } from "@mp/state";
+import type { MutableObservable } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { CharacterId, ActorId } from "../../server";
@@ -9,11 +9,11 @@ export type GameActions = ReturnType<typeof createGameActions>;
 
 export function createGameActions(
   rpc: GameRpcClient,
-  characterId: () => Atom<CharacterId | undefined>,
+  characterId: () => MutableObservable<CharacterId | undefined>,
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
     return rpc.character.move({
-      characterId: assert(characterId().get()),
+      characterId: assert(characterId().$getObservableValue()),
       to,
       desiredPortalId,
     });
@@ -21,11 +21,12 @@ export function createGameActions(
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({
-      characterId: assert(characterId().get()),
+      characterId: assert(characterId().$getObservableValue()),
       targetId,
     });
 
-  const respawn = () => rpc.character.respawn(assert(characterId().get()));
+  const respawn = () =>
+    rpc.character.respawn(assert(characterId().$getObservableValue()));
 
   const join = async () => {
     const char = await rpc.world.join();

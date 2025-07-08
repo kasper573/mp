@@ -151,7 +151,11 @@ export function GameClient(props: GameClientProps) {
           )}
         </Match>
 
-        <Match when={props.gameState.readyState.get() !== WebSocket.OPEN}>
+        <Match
+          when={
+            props.gameState.readyState.$getObservableValue() !== WebSocket.OPEN
+          }
+        >
           <LoadingSpinner>Connecting to game server</LoadingSpinner>
         </Match>
         <Match when={!areaId()}>

@@ -1,4 +1,4 @@
-import type { ReadonlyAtom } from "@mp/state";
+import type { ReadonlyObservable } from "@mp/state";
 import type { DestroyOptions } from "pixi.js";
 import { Container } from "pixi.js";
 
@@ -6,7 +6,7 @@ export class ReactiveCollection<Item> extends Container {
   private unsubscribe: () => void;
 
   constructor(
-    items: ReadonlyAtom<Iterable<Item>>,
+    items: ReadonlyObservable<Iterable<Item>>,
     createElement: (item: Item) => Container,
   ) {
     super();
@@ -28,15 +28,18 @@ export class ReactiveCollection<Item> extends Container {
  */
 export function reactiveCollectionBinding<Item>(
   container: Container,
-  items: ReadonlyAtom<Iterable<Item>>,
+  items: ReadonlyObservable<Iterable<Item>>,
   createElement: (item: Item) => Container,
 ) {
   const elementsByItem = new Map<Item, Container>();
-  const unsubscribe = items.subscribe((newList, oldList) => {
-    const newItems = new Set(newList);
-    const oldItems = new Set(oldList);
-    const addedItems = newItems.difference(oldItems);
-    const removedItems = oldItems.difference(newItems);
+  const unsubscribe = items.subscribe(updateElements);
+
+  let prevItems = new Set<Item>();
+  function updateElements() {
+    const newItems = new Set(items.$getObservableValue());
+    const addedItems = newItems.difference(prevItems);
+    const removedItems = prevItems.difference(newItems);
+    prevItems = newItems;
 
     for (const item of addedItems) {
       const element = createElement(item);
@@ -52,7 +55,9 @@ export function reactiveCollectionBinding<Item>(
       }
       elementsByItem.delete(item);
     }
-  });
+  }
+
+  updateElements();
 
   return function cleanupCollectionBinding() {
     unsubscribe();

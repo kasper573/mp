@@ -593,12 +593,6 @@ importers:
 
   packages/state:
     dependencies:
-      '@nanostores/solid':
-        specifier: 1.0.0
-        version: 1.0.0(nanostores@1.0.1)(solid-js@1.9.5)
-      nanostores:
-        specifier: 1.0.1
-        version: 1.0.1
       solid-js:
         specifier: 'catalog:'
         version: 1.9.5
@@ -659,6 +653,9 @@ importers:
       '@mp/encoding':
         specifier: workspace:*
         version: link:../encoding
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -1822,12 +1819,6 @@ packages:
   '@manypkg/tools@2.0.0':
     resolution: {integrity: sha512-o4ZC8J9OmFT6Ar8hhObWrFe7M7TRFuskm8ROhroZZWdQ+/V1+RswP74wJkkDKY/VDcteKYCACq2PblifRRnj1g==}
     engines: {node: '>=20.0.0'}
-
-  '@nanostores/solid@1.0.0':
-    resolution: {integrity: sha512-H3P5mvHyX0oSlMMm4PF60zyUIhCCUoHeAJukdSjhYSAagxJUru7rde9/RfUH1tiMJ1Dt0o/c0DNX9QLUB+SvjA==}
-    peerDependencies:
-      nanostores: '>=0.9.0 <2.0.0'
-      solid-js: ^1.6.0
 
   '@napi-rs/wasm-runtime@0.2.7':
     resolution: {integrity: sha512-5yximcFK5FNompXfJFoWanu5l8v1hNGqNHh9du1xETp9HWk/B/PzvchX55WYOPaIeNglG8++68AAiauBAtbnzw==}
@@ -4665,10 +4656,6 @@ packages:
     engines: {node: ^18 || >=20}
     hasBin: true
 
-  nanostores@1.0.1:
-    resolution: {integrity: sha512-kNZ9xnoJYKg/AfxjrVL4SS0fKX++4awQReGqWnwTRHxeHGZ1FJFVgTqr/eMrNQdp0Tz7M7tG/TDaX8QfHDwVCw==}
-    engines: {node: ^20.0.0 || >=22.0.0}
-
   natural-compare@1.4.0:
     resolution: {integrity: sha512-OWND8ei3VtNC9h7V60qff3SVobHr996CTwgxubgyQYEpg290h9J0buyECNNJexkFm5sOajh5G116RYA1c8ZMSw==}
 
@@ -6804,11 +6791,6 @@ snapshots:
       jju: 1.4.0
       js-yaml: 4.1.0
       tinyglobby: 0.2.13
-
-  '@nanostores/solid@1.0.0(nanostores@1.0.1)(solid-js@1.9.5)':
-    dependencies:
-      nanostores: 1.0.1
-      solid-js: 1.9.5
 
   '@napi-rs/wasm-runtime@0.2.7':
     dependencies:
@@ -10125,8 +10107,6 @@ snapshots:
   nanoid@3.3.11: {}
 
   nanoid@5.1.5: {}
-
-  nanostores@1.0.1: {}
 
   natural-compare@1.4.0: {}
 

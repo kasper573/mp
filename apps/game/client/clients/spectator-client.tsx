@@ -31,7 +31,7 @@ export function SpectatorClient(props: GameClientProps) {
   }));
 
   const isSocketOpen = createMemo(
-    () => props.gameState.readyState.get() === WebSocket.OPEN,
+    () => props.gameState.readyState.$getObservableValue() === WebSocket.OPEN,
   );
 
   createEffect(() => {
