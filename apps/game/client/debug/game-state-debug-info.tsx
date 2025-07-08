@@ -1,7 +1,7 @@
 import { ctxEngine } from "@mp/engine";
 import type { TimeSpan } from "@mp/time";
 import { createSignal, onMount, onCleanup, batch, createMemo } from "solid-js";
-import { useAtom } from "@mp/state/solid";
+import { useObservable } from "@mp/state/solid";
 import type { Character, TiledResource } from "../../server";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
@@ -9,13 +9,13 @@ import { ctxGameStateClient } from "../game-state/game-state-client";
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const client = ioc.get(ctxGameStateClient);
   const engine = ioc.get(ctxEngine);
-  const pointerPosition = useAtom(engine.pointer.position);
-  const pointerWorldPosition = useAtom(engine.pointer.worldPosition);
-  const cameraTransform = useAtom(engine.camera.transform);
+  const pointerPosition = useObservable(engine.pointer.position);
+  const pointerWorldPosition = useObservable(engine.pointer.worldPosition);
+  const cameraTransform = useObservable(engine.camera.transform);
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
 
-  const character = useAtom(client.character);
+  const character = useObservable(client.character);
 
   onMount(() =>
     onCleanup(

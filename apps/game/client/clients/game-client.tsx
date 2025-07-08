@@ -13,7 +13,7 @@ import {
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
-import { useAtom, useStorage } from "@mp/state/solid";
+import { useObservable, useStorage } from "@mp/state/solid";
 import { createReactiveStorage } from "@mp/state";
 import {
   ctxGameStateClient,
@@ -47,7 +47,7 @@ export function GameClient(props: GameClientProps) {
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const interactive = () => props.interactive ?? true;
 
-  const areaId = useAtom(props.gameState.areaId);
+  const areaId = useObservable(props.gameState.areaId);
 
   const area = useAreaResource(areaId);
 

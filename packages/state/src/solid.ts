@@ -3,12 +3,7 @@ import { createSignal, onCleanup } from "solid-js";
 import type { ReactiveStorage } from "./create-storage";
 import type { ReadonlyObservable } from "./observable";
 
-/**
- * Temporary deprecation to help me understand what code to remove to decouple pixi.js from solid-js.
- * TODO rename to useObservable
- * @deprecated
- */
-export function useAtom<Value>(
+export function useObservable<Value>(
   observable: ReadonlyObservable<Value>,
 ): Accessor<Value> {
   const [value, setValue] = createSignal(observable.get());
@@ -17,7 +12,7 @@ export function useAtom<Value>(
 }
 
 export function useStorage<T>(storage: ReactiveStorage<T>) {
-  const value = useAtom(storage.value);
+  const value = useObservable(storage.value);
   onCleanup(storage.effect());
   function setValue(createNextValue: (currentValue: T) => T) {
     storage.value.set(createNextValue(storage.value.get()));

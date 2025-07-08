@@ -10,7 +10,7 @@ import { FrameEmitter, Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
-import { useAtom } from "@mp/state/solid";
+import { useObservable } from "@mp/state/solid";
 import { observable } from "@mp/state";
 import { useRpc } from "../../../../integrations/rpc";
 
@@ -78,7 +78,7 @@ function SpringTester() {
   const [mass, setMass] = createSignal(2);
   const [precision, setPrecision] = createSignal(1);
   const target = observable(0);
-  const targetValue = useAtom(target);
+  const targetValue = useObservable(target);
   const options = createMemo(() => ({
     stiffness: stiffness(),
     damping: damping(),
@@ -88,9 +88,9 @@ function SpringTester() {
 
   const frameEmitter = new FrameEmitter();
   const spring = new Spring(target, options);
-  const springState = useAtom(spring.state);
-  const springVelocity = useAtom(spring.velocity);
-  const springValue = useAtom(spring.value);
+  const springState = useObservable(spring.state);
+  const springVelocity = useObservable(spring.velocity);
+  const springValue = useObservable(spring.value);
 
   createEffect(() => {
     if (springState() === "moving") {
