@@ -32,7 +32,7 @@ export class AreaScene extends Container {
     private options: {
       area: AreaResource;
       spritesheets: TiledSpritesheetRecord;
-      debugSettings: AreaDebugSettings;
+      debugSettings: () => AreaDebugSettings;
     },
   ) {
     super({ sortableChildren: true });
@@ -51,7 +51,7 @@ export class AreaScene extends Container {
       options.area,
       this.state.actorList,
       () => this.myCoords(),
-      () => options.debugSettings,
+      options.debugSettings,
     );
 
     this.addChild(tileContainer);

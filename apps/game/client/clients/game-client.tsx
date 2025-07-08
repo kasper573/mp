@@ -126,7 +126,7 @@ export function GameClient(props: GameClientProps) {
                               new AreaScene({
                                 area,
                                 spritesheets,
-                                debugSettings: areaDebugSettings(),
+                                debugSettings: areaDebugSettings,
                               })
                             }
                           />
