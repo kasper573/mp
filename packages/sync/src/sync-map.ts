@@ -1,3 +1,5 @@
+import type { Atom, ReadonlyAtom } from "@mp/state";
+import { atom } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -8,7 +10,20 @@ import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V> extends Map<K, V> {
   #keysLastFlush = new Set<K>();
-  #subscribers = new Set<SyncMapChangeHandler<K, V>>();
+
+  /**
+   * Reactive interface for the map
+   */
+  #atom: Atom<ReadonlyMap<K, V>>;
+
+  get atom(): ReadonlyAtom<ReadonlyMap<K, V>> {
+    return this.#atom;
+  }
+
+  constructor(...args: ConstructorParameters<typeof Map<K, V>>) {
+    super(...args);
+    this.#atom = atom(this);
+  }
 
   // Cannot be a private field because it needs to be accessed by the `set` method,
   // which is an override and can thus not access private fields of the parent class.
@@ -31,14 +46,14 @@ export class SyncMap<K, V> extends Map<K, V> {
     for (const key of addedKeys) {
       const value = this.get(key) as V;
       patch.push([PatchType.Set, [...path, String(key)] as PatchPath, value]);
-      this.emit({ type: "add", key: key, value });
     }
 
     const removedKeys = this.#keysLastFlush.difference(currentKeys);
     for (const key of removedKeys) {
       patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
-      this.emit({ type: "remove", key: key });
     }
+
+    let didUpdateAnItem = false;
 
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
     for (const key of staleKeys) {
@@ -48,35 +63,23 @@ export class SyncMap<K, V> extends Map<K, V> {
         patch.push(...op);
       }
       if (this.dirtyKeys?.has(key)) {
-        this.emit({ type: "update", key: key, value: v });
+        didUpdateAnItem = true;
       }
     }
 
     this.#keysLastFlush = currentKeys;
     this.dirtyKeys?.clear();
 
-    return patch;
-  }
-
-  emit(event: SyncMapChangeEvent<K, V>) {
-    for (const handler of this.#subscribers) {
-      handler(event);
+    if (patch.length > 0 || didUpdateAnItem) {
+      console.log("Notifying", this.#atom.lc, "listeners", patch);
+      this.#atom.notify();
     }
-  }
 
-  subscribe(handler: SyncMapChangeHandler<K, V>) {
-    this.#subscribers.add(handler);
-    return () => {
-      this.#subscribers.delete(handler);
-    };
+    return patch;
   }
 }
 
-export type SyncMapChangeEvent<Key, Value> =
-  | { type: "add"; key: Key; value: Value }
-  | { type: "update"; key: Key; value: Value }
-  | { type: "remove"; key: Key };
-
-export type SyncMapChangeHandler<Key, Value> = (
-  event: SyncMapChangeEvent<Key, Value>,
-) => unknown;
+export type SyncMapChangeHandler<K, V> = (
+  value: ReadonlyMap<K, V>,
+  oldValue: ReadonlyMap<K, V>,
+) => void;

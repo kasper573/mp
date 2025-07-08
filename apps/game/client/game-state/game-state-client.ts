@@ -4,22 +4,18 @@ import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
 import type { Atom, ReadonlyAtom } from "@mp/state";
-import { atom, computed } from "@mp/state";
+import { atom, computed, selfNotifyEffect } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { Character, CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
 import { ctxGameRpcClient } from "../game-rpc-client";
-import type { Actor, ActorId } from "../../server/actor";
+import type { Actor } from "../../server/actor";
 import type { AreaId } from "../../server";
 import { ioc } from "../context";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 import type { GameActions } from "./game-actions";
 import { createGameActions } from "./game-actions";
-import {
-  syncEntityToAtomNotifyEffect,
-  syncMapToAtomNotifyEffect,
-} from "./sync-to-atom";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
@@ -45,8 +41,6 @@ export class GameStateClient {
   readonly character: ReadonlyAtom<Character | undefined>;
   readonly areaId: ReadonlyAtom<AreaId | undefined>;
 
-  private actorMapAtom: ReadonlyAtom<ReadonlyMap<ActorId, Actor>>;
-
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(() => this.options.settings());
     this.readyState = atom<WebSocket["readyState"]>(
@@ -59,20 +53,22 @@ export class GameStateClient {
     // and we only want to send one request for full state.
     this.refreshState = throttle(this.rpc.world.requestFullState, 5000);
 
-    this.actorMapAtom = atom(this.gameState.actors);
-
-    this.actorList = computed(this.actorMapAtom, (actors) =>
+    this.actorList = computed(this.gameState.actors.atom, (actors) =>
       actors.values().toArray(),
     );
 
     this.character = computed(
-      [this.actorMapAtom, this.characterId],
+      [this.gameState.actors.atom, this.characterId],
       (actors, myId) => {
-        return actors.get(myId as CharacterId) as Character | undefined;
+        const char = actors.get(myId as CharacterId) as Character | undefined;
+        return char;
       },
     );
 
-    this.areaId = computed(this.character, (char) => char?.areaId);
+    this.areaId = computed(this.character, (char) => {
+      console.log("computing new area id", char?.areaId);
+      return char?.areaId;
+    });
   }
 
   private refreshState: () => unknown;
@@ -80,9 +76,10 @@ export class GameStateClient {
   start = () => {
     const { socket } = this.options;
 
+    console.log("starting game state client");
+
     const subscriptions = [
-      syncMapToAtomNotifyEffect(this.gameState.actors, this.actorMapAtom),
-      syncEntityToAtomNotifyEffect(this.character),
+      selfNotifyEffect(this.character, (char) => char?.atom),
       subscribeToReadyState(socket, (newReadyState) =>
         this.readyState.set(newReadyState),
       ),
@@ -91,6 +88,8 @@ export class GameStateClient {
     socket.addEventListener("message", this.handleMessage);
 
     this.stop = () => {
+      console.log("stopping game state client");
+
       for (const unsubscribe of subscriptions) {
         unsubscribe();
       }

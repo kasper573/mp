@@ -73,8 +73,8 @@ describe("can collect changes from map of decorated entities", () => {
   });
 });
 
-describe("subscriptions", () => {
-  describe("can subscribe to", () => {
+describe("atom", () => {
+  describe("can react to", () => {
     it("additions", () => {
       class Entity extends SyncEntity {
         constructor(public name: string) {
@@ -84,18 +84,17 @@ describe("subscriptions", () => {
 
       const map = new SyncMap<string, Entity>();
 
-      const fn = vi.fn();
-      map.subscribe(fn);
+      let received: unknown;
+      const fn = vi.fn((arg) => {
+        received = arg;
+      });
+      map.atom.listen(fn);
 
       const john = new Entity("john");
       map.set("1", john);
       map.flush();
       expect(fn).toHaveBeenCalledTimes(1);
-      expect(fn).toHaveBeenNthCalledWith(1, {
-        type: "add",
-        key: "1",
-        value: john,
-      });
+      expect(received).toEqual(new SyncMap([["1", john]])); // should contain john
     });
 
     it("updates", () => {
@@ -110,18 +109,17 @@ describe("subscriptions", () => {
 
       map.flush(); // Discard initial state
 
-      const fn = vi.fn();
-      map.subscribe(fn);
+      let received: unknown;
+      const fn = vi.fn((arg) => {
+        received = arg;
+      });
+      map.atom.listen(fn);
 
       const jane = new Entity("jane");
       map.set("1", jane);
       map.flush();
       expect(fn).toHaveBeenCalledTimes(1);
-      expect(fn).toHaveBeenNthCalledWith(1, {
-        type: "update",
-        key: "1",
-        value: jane,
-      });
+      expect(received).toEqual(new SyncMap([["1", jane]])); // changed to jane
     });
 
     it("removals", () => {
@@ -136,16 +134,17 @@ describe("subscriptions", () => {
 
       map.flush(); // Discard initial state
 
-      const fn = vi.fn();
-      map.subscribe(fn);
+      let received: unknown;
+      const fn = vi.fn((arg) => {
+        received = arg;
+      });
+      map.atom.listen(fn);
 
       map.delete("1");
       map.flush();
+
       expect(fn).toHaveBeenCalledTimes(1);
-      expect(fn).toHaveBeenNthCalledWith(1, {
-        type: "remove",
-        key: "1",
-      });
+      expect(received).toEqual(new SyncMap()); // Empty after removal
     });
   });
 
@@ -157,7 +156,7 @@ describe("subscriptions", () => {
     const map = new SyncMap<string, Entity>();
 
     const fn = vi.fn();
-    const stop = map.subscribe(fn);
+    const stop = map.atom.listen(fn);
 
     map.set("1", new Entity("john"));
     map.flush();

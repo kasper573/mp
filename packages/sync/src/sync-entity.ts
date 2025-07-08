@@ -1,3 +1,5 @@
+import type { ReadonlyAtom } from "@mp/state";
+import { atom } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
@@ -5,19 +7,25 @@ import { PatchType, type Patch } from "./patch";
  * Base class for entities that has fields decorated with @collect.
  */
 export abstract class SyncEntity {
-  #meta = new SyncEntityMeta();
+  private meta = new SyncEntityMeta();
+  private atomBf = atom(this);
+
+  /**
+   * Reactive interface for the entity
+   */
+  get atom(): ReadonlyAtom<this> {
+    return this.atomBf;
+  }
 
   /**
    * Triggers event handlers and produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
-    const changes = this.#meta.changes;
+    const changes = this.meta.changes;
     if (changes) {
       const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
-      this.#meta.changes = undefined;
-      for (const handler of this.#meta.subscribers) {
-        handler(changes);
-      }
+      this.meta.changes = undefined;
+      this.atomBf.notify();
       return patch;
     }
 
@@ -25,21 +33,11 @@ export abstract class SyncEntity {
   }
 
   /**
-   * Subscribes to changes to @collect‐decorated fields.
-   */
-  subscribe(handler: SyncEntityChangeHandler<this>) {
-    this.#meta.subscribers.add(handler);
-    return () => {
-      this.#meta.subscribers.delete(handler);
-    };
-  }
-
-  /**
    * Returns a subset of the entity that contains only the properties that are decorated with @collect.
    */
   snapshot(): Partial<this> {
     const subset = Object.fromEntries(
-      this.#meta.collectedProperties
+      this.meta.collectedProperties
         .values()
         .map((name) => [name, this[name as keyof this]]),
     );
@@ -51,7 +49,7 @@ export abstract class SyncEntity {
    * @internal Should only be used by the collect decorator.
    */
   static accessMeta<Entity extends SyncEntity>(entity: Entity) {
-    return entity.#meta;
+    return entity.meta;
   }
 
   static shouldOptimizeCollects = false;
@@ -62,7 +60,6 @@ export abstract class SyncEntity {
  * Is only shared with the collect decorator.
  */
 class SyncEntityMeta {
-  subscribers = new Set<SyncEntityChangeHandler<object>>();
   changes: object | undefined;
   collectedProperties = new Set<PropertyKey>();
   assignedProperties = new Set<PropertyKey>();

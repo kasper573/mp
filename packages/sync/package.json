@@ -15,7 +15,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/encoding": "workspace:*"
+    "@mp/encoding": "workspace:*",
+    "@mp/state": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

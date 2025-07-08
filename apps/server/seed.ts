@@ -56,7 +56,7 @@ export async function seed(
         yield tx.insert(npcSpawnTable).values({
           npcType,
           areaId,
-          count: 10,
+          count: 0,
           id: String(`${areaId}-${i}`) as NpcSpawnId,
           npcId: soldier.id,
         });

@@ -37,6 +37,8 @@ export class AreaScene extends Container {
   ) {
     super({ sortableChildren: true });
 
+    console.log("Creating AreaScene");
+
     const lookup = createTiledTextureLookup(options.spritesheets);
     const factory = new LayerViewFactory(lookup);
     const tileContainer = factory.createLayerContainer(
@@ -147,6 +149,7 @@ export class AreaScene extends Container {
 
   override destroy(options?: DestroyOptions): void {
     super.destroy(options);
+    console.log("Destroying AreaScene");
     this.cleanupActorControllers();
   }
 
