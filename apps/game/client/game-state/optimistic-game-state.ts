@@ -43,7 +43,6 @@ export class OptimisticGameState implements GameState {
   };
 
   applyPatch = (patch: Patch, events: EventAccessFn<GameStateEvents>) => {
-    console.log("Applying patch", patch);
     if (this.settings().usePatchOptimizer) {
       applyPatchOptimized(this, patch, events);
     } else {
@@ -59,7 +58,6 @@ export class OptimisticGameState implements GameState {
       }
     }
 
-    console.log("Flushing actors");
     this.actors.flush();
   };
 }

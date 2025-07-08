@@ -65,7 +65,6 @@ export class GameStateClient {
       });
 
     this.areaId = this.character.derive((char) => {
-      console.log("computing new area id", char?.areaId);
       return char?.areaId;
     });
   }
@@ -74,8 +73,6 @@ export class GameStateClient {
 
   start = () => {
     const { socket } = this.options;
-
-    console.log("starting game state client");
 
     const subscriptions = [
       subscribeToReadyState(socket, (newReadyState) =>
@@ -86,8 +83,6 @@ export class GameStateClient {
     socket.addEventListener("message", this.handleMessage);
 
     this.stop = () => {
-      console.log("stopping game state client");
-
       for (const unsubscribe of subscriptions) {
         unsubscribe();
       }
