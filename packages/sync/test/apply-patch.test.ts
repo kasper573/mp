@@ -123,4 +123,20 @@ describe("maps", () => {
     expect(target.get("jane")).toBeUndefined();
     expect(target.get("john")).toEqual({ name: "johnny" });
   });
+
+  it("should retain the existing map instance but replace its entries for direct set operations", () => {
+    const john = { name: "john" };
+    const jane = { name: "jane" };
+    const originalMap = new Map([[john.name, john]]);
+    const replacementEntries = [[jane.name, jane]] as const;
+
+    const patch: Patch = [
+      [PatchType.Set, ["users"], new Map(replacementEntries)],
+    ];
+
+    const target = { users: originalMap };
+    applyPatch(target, patch);
+
+    expect(originalMap.entries().toArray()).toEqual(replacementEntries);
+  });
 });

@@ -69,6 +69,11 @@ function setValue(root: object, path: PatchPath, value: unknown): void {
   const lastKey = path.at(-1) as string;
   if (target instanceof Map) {
     target.set(lastKey, value);
+  } else if (target[lastKey] instanceof Map && value instanceof Map) {
+    target[lastKey].clear();
+    for (const [key, val] of value.entries()) {
+      target[lastKey].set(key, val);
+    }
   } else {
     target[lastKey] = value;
   }
