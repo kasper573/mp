@@ -10,7 +10,7 @@ import { FrameEmitter, Spring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ErrorFallback } from "@mp/ui";
 import { skipToken } from "@mp/rpc/solid";
-import { useObservable } from "@mp/state/solid";
+import { useObservable, useObservables } from "@mp/state/solid";
 import { observable } from "@mp/state";
 import { useRpc } from "../../../../integrations/rpc";
 
@@ -21,9 +21,79 @@ export const Route = createFileRoute("/_layout/admin/devtools/")({
 function RouteComponent() {
   return (
     <div style={{ padding: "20px" }}>
+      <ObservableTester />
       <ErrorTester />
       <SpringTester />
     </div>
+  );
+}
+
+function ObservableTester() {
+  const [log, setLog] = createSignal("");
+  const base = observable(1);
+  const multiplier = observable(1);
+  const product = base.compose(multiplier).derive(([b, m]) => b * m);
+  const [baseValue, multiplierValue, productValue] = useObservables(
+    base,
+    multiplier,
+    product,
+  );
+
+  const addLog = (message: string) => {
+    setLog((prev) => `${message}\n${prev}`);
+  };
+
+  onCleanup(
+    base.subscribe((value) => {
+      addLog(`Base changed: ${value}`);
+    }),
+  );
+
+  onCleanup(
+    multiplier.subscribe((value) => {
+      addLog(`Multiplier changed: ${value}`);
+    }),
+  );
+
+  onCleanup(
+    product.subscribe((value) => {
+      addLog(`Product changed: ${value}`);
+    }),
+  );
+
+  return (
+    <>
+      <h1>Observable Tester</h1>
+      <div
+        style={{
+          display: "flex",
+          "flex-direction": "row",
+          height: "125px",
+          gap: "10px",
+        }}
+      >
+        <div style={{ flex: 1 }}>
+          <div>
+            Base: {baseValue()}{" "}
+            <button onClick={() => base.set(base.get() - 1)}>-</button>
+            <button onClick={() => base.set(base.get() + 1)}>+</button>
+          </div>
+
+          <div>
+            Multiplier: {multiplierValue()}{" "}
+            <button onClick={() => multiplier.set(multiplier.get() - 1)}>
+              -
+            </button>
+            <button onClick={() => multiplier.set(multiplier.get() + 1)}>
+              +
+            </button>
+          </div>
+
+          <pre>Product: {productValue()}</pre>
+        </div>
+        <pre style={{ flex: 1, overflow: "auto" }}>{log()}</pre>
+      </div>
+    </>
   );
 }
 

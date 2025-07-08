@@ -1,19 +1,37 @@
 import type { Accessor } from "solid-js";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { ReactiveStorage } from "./create-storage";
-import type { ReadonlyObservable } from "./observable";
+import {
+  getObservableValue,
+  type ObservableLike,
+  type ObservableValue,
+} from "./observable";
 
 export function useObservable<Value>(
-  observable: ReadonlyObservable<Value>,
+  observable: ObservableLike<Value>,
 ): Accessor<Value> {
-  const [value, setValue] = createSignal(observable.get());
-  onCleanup(observable.subscribe(setValue));
+  const [value, setValue] = createSignal(getObservableValue(observable));
+  createEffect(() => {
+    onCleanup(observable.subscribe(setValue));
+  });
   return value;
+}
+
+export function useObservables<Observables extends ObservableLike<unknown>[]>(
+  ...observables: Observables
+): {
+  [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
+} {
+  return observables.map(useObservable) as never;
 }
 
 export function useStorage<T>(storage: ReactiveStorage<T>) {
   const value = useObservable(storage.value);
-  onCleanup(storage.effect());
+
+  createEffect(() => {
+    onCleanup(storage.effect());
+  });
+
   function setValue(createNextValue: (currentValue: T) => T) {
     storage.value.set(createNextValue(storage.value.get()));
   }

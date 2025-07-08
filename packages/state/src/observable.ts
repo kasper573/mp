@@ -48,7 +48,7 @@ export interface Observable<Value> extends NotifyingObservable<Value> {
 type ValueGetter<Value> = () => Value;
 type SubscribeHandler<Value> = (value: Value) => unknown;
 type UnsubscribeFn = () => void;
-type ObservableValue<T extends ObservableLike<unknown>> =
+export type ObservableValue<T extends ObservableLike<unknown>> =
   T extends ObservableLike<infer Value> ? Value : never;
 type ObservableValues<ObservableArray extends ObservableLike<unknown>[]> = {
   [Index in keyof ObservableArray]: ObservableValue<ObservableArray[Index]>;
