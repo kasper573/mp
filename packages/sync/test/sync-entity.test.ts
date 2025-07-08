@@ -48,7 +48,7 @@ it("can select collectable subset", () => {
   expect(subset).toEqual({ count: 1, name: "john" });
 });
 
-describe("atom", () => {
+describe("observable", () => {
   it("does not emit events on mutation", () => {
     class Entity extends SyncEntity {
       @collect()

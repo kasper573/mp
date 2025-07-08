@@ -73,7 +73,7 @@ describe("can collect changes from map of decorated entities", () => {
   });
 });
 
-describe("atom", () => {
+describe("observable", () => {
   describe("can react to", () => {
     it("additions", () => {
       class Entity extends SyncEntity {
