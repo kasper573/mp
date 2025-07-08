@@ -15,6 +15,7 @@ function DevtoolsLayout() {
         display: "flex",
         "flex-direction": "row",
         width: "100%",
+        flex: 1,
       }}
     >
       <div
@@ -30,8 +31,9 @@ function DevtoolsLayout() {
         <Link to="/admin/devtools/storage-tester">Storage Tester</Link>
         <Link to="/admin/devtools/error-tester">Error Tester</Link>
         <Link to="/admin/devtools/spring-tester">Spring Tester</Link>
+        <Link to="/admin/devtools/actor-tester">Actor Tester</Link>
       </div>
-      <div style={{ flex: 1 }}>
+      <div style={{ flex: 1, position: "relative" }}>
         <Outlet />
       </div>
     </div>

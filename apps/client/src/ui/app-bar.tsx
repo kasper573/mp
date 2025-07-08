@@ -22,7 +22,6 @@ export default function AppBar() {
 
       <Show when={auth.identity()?.roles.has(systemRoles.useDevTools)}>
         <Link to="/admin/devtools">Dev Tools</Link>
-        <Link to="/admin/devtools/actor-tester">Actor Tester</Link>
       </Show>
 
       <Show when={auth.identity()?.roles.has(worldRoles.spectate)}>
