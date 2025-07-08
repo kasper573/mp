@@ -11,7 +11,7 @@ export function PlayerClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
   const auth = useContext(AuthContext);
   const actions = createGameActions(rpc, () => props.gameState.characterId);
-  const isOpen = useObservable(() => props.gameState.isOpen);
+  const isOpen = useObservable(() => props.gameState.isConnected);
 
   createEffect(() => {
     const user = auth.identity();

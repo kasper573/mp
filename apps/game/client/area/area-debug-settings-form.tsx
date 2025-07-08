@@ -1,14 +1,13 @@
 import { StorageAdapter } from "@mp/state";
 import { Select } from "@mp/ui";
+import type { Setter } from "solid-js";
 
-export interface AreaDebugFormProps {
+export interface AreaDebugSettingsFormProps {
   value: AreaDebugSettings;
-  onChange: (
-    createSettings: (prev: AreaDebugSettings) => AreaDebugSettings,
-  ) => void;
+  onChange: Setter<AreaDebugSettings>;
 }
 
-export function AreaDebugForm(props: AreaDebugFormProps) {
+export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
   return (
     <>
       <div>
@@ -63,6 +62,20 @@ export function AreaDebugForm(props: AreaDebugFormProps) {
         />
         Show npc aggro range
       </label>
+      <br />
+      <label>
+        <input
+          type="checkbox"
+          checked={props.value.showActorPaths}
+          on:change={(e) =>
+            props.onChange((prev) => ({
+              ...prev,
+              showActorPaths: e.currentTarget.checked,
+            }))
+          }
+        />
+        Show actor paths
+      </label>
     </>
   );
 }
@@ -72,6 +85,7 @@ export interface AreaDebugSettings {
   showFogOfWar: boolean;
   showAttackRange: boolean;
   showAggroRange: boolean;
+  showActorPaths: boolean;
 }
 
 export const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
@@ -79,6 +93,7 @@ export const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
   "area-debug-settings",
   {
     visibleGraphType: "none",
+    showActorPaths: false,
     showFogOfWar: false,
     showAttackRange: false,
     showAggroRange: false,

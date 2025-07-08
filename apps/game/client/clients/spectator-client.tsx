@@ -25,7 +25,7 @@ export function SpectatorClient(props: GameClientProps) {
     ],
   }));
 
-  const isSocketOpen = useObservable(() => props.gameState.isOpen);
+  const isSocketOpen = useObservable(() => props.gameState.isConnected);
 
   createEffect(() => {
     const user = auth.identity();

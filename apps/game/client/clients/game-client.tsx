@@ -9,6 +9,7 @@ import {
   createMemo,
   createEffect,
   onCleanup,
+  useContext,
 } from "solid-js";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
@@ -81,7 +82,7 @@ export function GameClient(props: GameClientProps) {
     setEnabled: setDebugUiEnabled,
   };
 
-  const isOpen = useObservable(() => props.gameState.isOpen);
+  const isConnected = useObservable(() => props.gameState.isConnected);
 
   createEffect(() => {
     onCleanup(ioc.register(ctxGameStateClient, props.gameState));
@@ -123,7 +124,7 @@ export function GameClient(props: GameClientProps) {
                             }
                           />
                         </Suspense>
-                        <GameStateClientAnimations />
+                        <GameStateClientBindings />
                         {props.children}
                         <AreaUi
                           debugFormProps={{
@@ -143,7 +144,7 @@ export function GameClient(props: GameClientProps) {
           )}
         </Match>
 
-        <Match when={!isOpen()}>
+        <Match when={!isConnected()}>
           <LoadingSpinner>Connecting to game server</LoadingSpinner>
         </Match>
         <Match when={!areaId()}>
@@ -165,11 +166,22 @@ export function GameClient(props: GameClientProps) {
 
 // TODO refactor. This is a hack to workaround the problematic Application/EngineProvider pattern.
 // It would be better if we could instantiate the engine higher up the tree so we can do this without a component.
-function GameStateClientAnimations() {
+function GameStateClientBindings() {
+  const debugUi = useContext(GameDebugUiContext);
   const client = ioc.get(ctxGameStateClient);
   const engine = ioc.get(ctxEngine);
+
   createEffect(() => {
     onCleanup(engine.frameEmitter.subscribe(client.gameState.frameCallback));
   });
+
+  createEffect(() => {
+    onCleanup(
+      engine.keyboard.on("keydown", "F2", () =>
+        debugUi.setEnabled((prev) => !prev),
+      ),
+    );
+  });
+
   return null;
 }

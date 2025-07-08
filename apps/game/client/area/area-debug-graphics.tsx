@@ -19,6 +19,7 @@ import type {
 } from "./area-debug-settings-form";
 
 export class AreaDebugGraphics extends Container {
+  private actorPaths: ReactiveCollection<DebugPath>;
   private attackRanges: ReactiveCollection<Actor>;
   private aggroRanges: ReactiveCollection<NpcInstance>;
   private fogOfWar: DebugNetworkFogOfWar;
@@ -36,7 +37,7 @@ export class AreaDebugGraphics extends Container {
       () => this.settings().visibleGraphType,
     );
 
-    const actorPaths = new ReactiveCollection(
+    this.actorPaths = new ReactiveCollection(
       actors,
       (actor) =>
         new DebugPath(() => ({
@@ -75,7 +76,7 @@ export class AreaDebugGraphics extends Container {
       () => area.tiled,
     );
 
-    this.addChild(actorPaths);
+    this.addChild(this.actorPaths);
     this.addChild(debugTiled);
     this.addChild(this.attackRanges);
     this.addChild(this.aggroRanges);
@@ -85,6 +86,7 @@ export class AreaDebugGraphics extends Container {
   }
 
   #onRender = () => {
+    this.actorPaths.visible = this.settings().showActorPaths;
     this.attackRanges.visible = this.settings().showAttackRange;
     this.aggroRanges.visible = this.settings().showAggroRange;
     this.fogOfWar.visible = this.settings().showFogOfWar;
