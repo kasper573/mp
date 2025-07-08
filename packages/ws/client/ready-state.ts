@@ -9,6 +9,7 @@ export function subscribeToReadyState(
   socket.addEventListener("open", updateReadyState);
   socket.addEventListener("close", updateReadyState);
   socket.addEventListener("error", updateReadyState);
+  updateReadyState();
   return function cleanup() {
     socket.removeEventListener("open", updateReadyState);
     socket.removeEventListener("close", updateReadyState);

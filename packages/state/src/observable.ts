@@ -42,7 +42,7 @@ export interface NotifyingObservable<Value> extends ReadonlyObservable<Value> {
 }
 
 export interface Observable<Value> extends NotifyingObservable<Value> {
-  set(value: Value): void;
+  set: (value: Value) => void;
 }
 
 type ValueGetter<Value> = () => Value;
@@ -85,7 +85,7 @@ export function observable<Value>(
 
   const self: Observable<Value> = {
     ...abstractObservable(() => value, onMount, onCleanup),
-    set(newValue: Value) {
+    set: (newValue: Value) => {
       value = newValue;
       self.$notifySubscribers();
     },

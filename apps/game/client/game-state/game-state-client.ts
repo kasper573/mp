@@ -74,11 +74,7 @@ export class GameStateClient {
   start = () => {
     const { socket } = this.options;
 
-    const subscriptions = [
-      subscribeToReadyState(socket, (newReadyState) =>
-        this.readyState.set(newReadyState),
-      ),
-    ];
+    const subscriptions = [subscribeToReadyState(socket, this.readyState.set)];
 
     socket.addEventListener("message", this.handleMessage);
 
