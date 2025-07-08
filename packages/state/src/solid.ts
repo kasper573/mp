@@ -1,6 +1,6 @@
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { StorageAdapter } from "./storage-adapter";
+import type { StorageAdapter } from "./storage/storage-adapter";
 import {
   getObservableValue,
   type ObservableLike,
