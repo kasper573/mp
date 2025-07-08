@@ -25,7 +25,10 @@ export function Pixi(props: PixiProps) {
   const instance = props.as ?? new Container();
 
   onMount(() => parent.addChild(instance));
-  onCleanup(() => parent.removeChild(instance));
+  onCleanup(() => {
+    parent.removeChild(instance);
+    instance.destroy({ children: true });
+  });
 
   createEffect(() => {
     if (props.zIndex !== undefined) {
