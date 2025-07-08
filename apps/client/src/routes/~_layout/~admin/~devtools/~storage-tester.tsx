@@ -1,4 +1,4 @@
-import { createReactiveStorage } from "@mp/state";
+import { StorageAdapter } from "@mp/state";
 import { useStorage } from "@mp/state/solid";
 import { createFileRoute } from "@tanstack/solid-router";
 
@@ -6,11 +6,9 @@ export const Route = createFileRoute("/_layout/admin/devtools/storage-tester")({
   component: RouteComponent,
 });
 
-const storage = createReactiveStorage<{ text: string }>(
-  localStorage,
-  "test-storage",
-  { text: "Initial value" },
-);
+const storage = new StorageAdapter<{ text: string }>("local", "test-storage", {
+  text: "Initial value",
+});
 
 function RouteComponent() {
   return (

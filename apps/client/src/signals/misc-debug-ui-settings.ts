@@ -1,8 +1,8 @@
-import { createReactiveStorage } from "@mp/state";
+import { StorageAdapter } from "@mp/state";
 import type { OptimisticGameStateSettings } from "@mp/game/client";
 
-export const miscDebugStorage = createReactiveStorage<MiscDebugSettings>(
-  localStorage,
+export const miscDebugStorage = new StorageAdapter<MiscDebugSettings>(
+  "local",
   "misc-debug-settings",
   {
     useInterpolator: true,

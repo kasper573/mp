@@ -1,6 +1,6 @@
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import type { ReactiveStorage } from "./create-storage";
+import type { StorageAdapter } from "./storage-adapter";
 import {
   getObservableValue,
   type ObservableLike,
@@ -19,21 +19,16 @@ export function useObservable<Value>(
 
 export function useObservables<Observables extends ObservableLike<unknown>[]>(
   ...observables: Observables
-): {
-  [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
-} {
+): ObservableAccessors<Observables> {
   return observables.map(useObservable) as never;
 }
 
-export function useStorage<T>(storage: ReactiveStorage<T>) {
-  const value = useObservable(storage.value);
-
-  createEffect(() => {
-    onCleanup(storage.effect());
-  });
-
-  function setValue(createNextValue: (currentValue: T) => T) {
-    storage.value.set(createNextValue(storage.value.get()));
-  }
+export function useStorage<T>(storage: StorageAdapter<T>) {
+  const [value, setValue] = createSignal<T>(storage.load());
+  createEffect(() => storage.save(value()));
   return [value, setValue] as const;
 }
+
+type ObservableAccessors<Observables extends ObservableLike<unknown>[]> = {
+  [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
+};

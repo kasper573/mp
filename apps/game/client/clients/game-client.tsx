@@ -14,7 +14,6 @@ import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
 import { useObservable, useStorage } from "@mp/state/solid";
-import { createReactiveStorage } from "@mp/state";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -32,7 +31,7 @@ import { GameStateDebugInfo } from "../debug/game-state-debug-info";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
 import { AreaUi } from "../area/area-ui";
-import type { AreaDebugSettings } from "../area/area-debug-settings-form";
+import { areaDebugSettingsStorage } from "../area/area-debug-settings-form";
 
 export type GameClientProps = ParentProps<{
   gameState: GameStateClient;
@@ -87,16 +86,7 @@ export function GameClient(props: GameClientProps) {
   });
 
   const [areaDebugSettings, setAreaDebugSettings] = useStorage(
-    createReactiveStorage<AreaDebugSettings>(
-      localStorage,
-      "area-debug-settings",
-      {
-        visibleGraphType: "none",
-        showFogOfWar: false,
-        showAttackRange: false,
-        showAggroRange: false,
-      },
-    ),
+    areaDebugSettingsStorage,
   );
 
   return (

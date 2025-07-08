@@ -1,3 +1,4 @@
+import { StorageAdapter } from "@mp/state";
 import { Select } from "@mp/ui";
 
 export interface AreaDebugFormProps {
@@ -72,6 +73,17 @@ export interface AreaDebugSettings {
   showAttackRange: boolean;
   showAggroRange: boolean;
 }
+
+export const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
+  "local",
+  "area-debug-settings",
+  {
+    visibleGraphType: "none",
+    showFogOfWar: false,
+    showAttackRange: false,
+    showAggroRange: false,
+  },
+);
 
 export const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 export type VisibleGraphType = (typeof visibleGraphTypes)[number];
