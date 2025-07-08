@@ -16,6 +16,7 @@ import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~cont
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
 import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
 import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
+import { Route as LayoutAdminDevtoolsStorageTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~storage-tester'
 import { Route as LayoutAdminDevtoolsSpringTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~spring-tester'
 import { Route as LayoutAdminDevtoolsObservableTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~observable-tester'
 import { Route as LayoutAdminDevtoolsErrorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~error-tester'
@@ -56,6 +57,12 @@ const LayoutAdminDevtoolsRouteRoute =
     id: '/admin/devtools',
     path: '/admin/devtools',
     getParentRoute: () => LayoutRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsStorageTesterRoute =
+  LayoutAdminDevtoolsStorageTesterRouteImport.update({
+    id: '/storage-tester',
+    path: '/storage-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
   } as any)
 const LayoutAdminDevtoolsSpringTesterRoute =
   LayoutAdminDevtoolsSpringTesterRouteImport.update({
@@ -100,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
+  '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
 }
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
@@ -112,6 +120,7 @@ export interface FileRoutesByTo {
   '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
+  '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -127,6 +136,7 @@ export interface FileRoutesById {
   '/_layout/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/_layout/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/_layout/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
+  '/_layout/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -142,6 +152,7 @@ export interface FileRouteTypes {
     | '/admin/devtools/error-tester'
     | '/admin/devtools/observable-tester'
     | '/admin/devtools/spring-tester'
+    | '/admin/devtools/storage-tester'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-callback'
@@ -154,6 +165,7 @@ export interface FileRouteTypes {
     | '/admin/devtools/error-tester'
     | '/admin/devtools/observable-tester'
     | '/admin/devtools/spring-tester'
+    | '/admin/devtools/storage-tester'
   id:
     | '__root__'
     | '/_layout'
@@ -168,6 +180,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/devtools/error-tester'
     | '/_layout/admin/devtools/observable-tester'
     | '/_layout/admin/devtools/spring-tester'
+    | '/_layout/admin/devtools/storage-tester'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -226,6 +239,13 @@ declare module '@tanstack/solid-router' {
       preLoaderRoute: typeof LayoutAdminDevtoolsRouteRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/admin/devtools/storage-tester': {
+      id: '/_layout/admin/devtools/storage-tester'
+      path: '/storage-tester'
+      fullPath: '/admin/devtools/storage-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsStorageTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
     '/_layout/admin/devtools/spring-tester': {
       id: '/_layout/admin/devtools/spring-tester'
       path: '/spring-tester'
@@ -270,6 +290,7 @@ interface LayoutAdminDevtoolsRouteRouteChildren {
   LayoutAdminDevtoolsErrorTesterRoute: typeof LayoutAdminDevtoolsErrorTesterRoute
   LayoutAdminDevtoolsObservableTesterRoute: typeof LayoutAdminDevtoolsObservableTesterRoute
   LayoutAdminDevtoolsSpringTesterRoute: typeof LayoutAdminDevtoolsSpringTesterRoute
+  LayoutAdminDevtoolsStorageTesterRoute: typeof LayoutAdminDevtoolsStorageTesterRoute
 }
 
 const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildren =
@@ -280,6 +301,8 @@ const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildr
     LayoutAdminDevtoolsObservableTesterRoute:
       LayoutAdminDevtoolsObservableTesterRoute,
     LayoutAdminDevtoolsSpringTesterRoute: LayoutAdminDevtoolsSpringTesterRoute,
+    LayoutAdminDevtoolsStorageTesterRoute:
+      LayoutAdminDevtoolsStorageTesterRoute,
   }
 
 const LayoutAdminDevtoolsRouteRouteWithChildren =
