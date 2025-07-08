@@ -16,7 +16,7 @@ export class Spring<T extends number> implements SpringLike<T> {
     private options: () => SpringOptions,
     init?: T,
   ) {
-    this.#value.set(init ?? target.$getObservableValue());
+    this.#value.set(init ?? target.get());
     this.state = this.#value
       .compose(this.velocity, target)
       .derive(([value, velocity, target]) => {
@@ -31,22 +31,20 @@ export class Spring<T extends number> implements SpringLike<T> {
 
   update = (dt: TimeSpan) => {
     const { stiffness, damping, mass } = this.options();
-    const currentTarget = this.target.$getObservableValue();
-    const delta = currentTarget - this.#value.$getObservableValue();
+    const currentTarget = this.target.get();
+    const delta = currentTarget - this.#value.get();
     const force = stiffness * delta;
-    const dampingForce = -damping * this.velocity.$getObservableValue();
+    const dampingForce = -damping * this.velocity.get();
     const acceleration = (force + dampingForce) / mass;
 
     this.velocity.set(
-      (this.velocity.$getObservableValue() +
-        acceleration * dt.totalSeconds) as T,
+      (this.velocity.get() + acceleration * dt.totalSeconds) as T,
     );
     this.#value.set(
-      (this.#value.$getObservableValue() +
-        this.velocity.$getObservableValue() * dt.totalSeconds) as T,
+      (this.#value.get() + this.velocity.get() * dt.totalSeconds) as T,
     );
 
-    if (this.state.$getObservableValue() === "settled") {
+    if (this.state.get() === "settled") {
       this.#value.set(currentTarget);
       this.velocity.set(0 as T);
     }

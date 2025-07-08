@@ -191,13 +191,9 @@ class LookAtPointerActor extends SpecificActorAngle {
   constructor(options: () => ActorTestSettings) {
     super(() => {
       const engine = ioc.access(ctxEngine).unwrapOr(undefined);
-      const { x, y } = engine
-        ? engine.camera.cameraSize.$getObservableValue()
-        : Vector.zero();
+      const { x, y } = engine ? engine.camera.cameraSize.get() : Vector.zero();
       const center = new Vector(x / 2, y / 2);
-      const angle = engine
-        ? center.angle(engine.pointer.position.$getObservableValue())
-        : 0;
+      const angle = engine ? center.angle(engine.pointer.position.get()) : 0;
       return {
         ...options(),
         angle,

@@ -25,10 +25,8 @@ export class Camera {
   ): void {
     this.zoom = zoom;
 
-    const halfCameraWidth =
-      this.cameraSize.$getObservableValue().x / 2 / this.zoom;
-    const halfCameraHeight =
-      this.cameraSize.$getObservableValue().y / 2 / this.zoom;
+    const halfCameraWidth = this.cameraSize.get().x / 2 / this.zoom;
+    const halfCameraHeight = this.cameraSize.get().y / 2 / this.zoom;
 
     const clampedX = Math.max(
       halfCameraWidth,
@@ -58,22 +56,18 @@ export class Camera {
   }
 
   viewportToWorld(screenPos: Vector<Pixel>): Vector<Pixel> {
-    const { x, y } = this.position.$getObservableValue();
+    const { x, y } = this.position.get();
     return new Vector(
-      ((screenPos.x - this.cameraSize.$getObservableValue().x / 2) / this.zoom +
-        x) as Pixel,
-      ((screenPos.y - this.cameraSize.$getObservableValue().y / 2) / this.zoom +
-        y) as Pixel,
+      ((screenPos.x - this.cameraSize.get().x / 2) / this.zoom + x) as Pixel,
+      ((screenPos.y - this.cameraSize.get().y / 2) / this.zoom + y) as Pixel,
     );
   }
 
   worldToViewport(worldPos: Vector<Pixel>): Vector<Pixel> {
-    const { x, y } = this.position.$getObservableValue();
+    const { x, y } = this.position.get();
     return new Vector(
-      ((worldPos.x - x) * this.zoom +
-        this.cameraSize.$getObservableValue().x / 2) as Pixel,
-      ((worldPos.y - y) * this.zoom +
-        this.cameraSize.$getObservableValue().y / 2) as Pixel,
+      ((worldPos.x - x) * this.zoom + this.cameraSize.get().x / 2) as Pixel,
+      ((worldPos.y - y) * this.zoom + this.cameraSize.get().y / 2) as Pixel,
     );
   }
 }

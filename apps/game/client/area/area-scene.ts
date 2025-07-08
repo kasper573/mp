@@ -75,7 +75,7 @@ export class AreaScene extends Container {
   }
 
   myCoords() {
-    return this.state.character.$getObservableValue()?.coords ?? Vector.zero();
+    return this.state.character.get()?.coords ?? Vector.zero();
   }
 
   myWorldPos() {
@@ -96,21 +96,21 @@ export class AreaScene extends Container {
   cameraZoom() {
     return createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      this.engine.camera.cameraSize.$getObservableValue(),
+      this.engine.camera.cameraSize.get(),
       clientViewDistance.renderedTileCount,
     );
   }
 
   pointerTile() {
     return this.options.area.tiled.worldCoordToTile(
-      this.engine.pointer.worldPosition.$getObservableValue(),
+      this.engine.pointer.worldPosition.get(),
     );
   }
 
   entityAtPointer() {
     const tile = this.pointerTile();
     return this.state.actorList
-      .$getObservableValue()
+      .get()
       .find(
         (actor) =>
           actor.health > 0 && actor.hitBox.offset(actor.coords).contains(tile),
@@ -156,11 +156,9 @@ export class AreaScene extends Container {
       this.cameraZoom(),
       this.cameraPos(),
     );
-    this.setFromMatrix(
-      new Matrix(...this.engine.camera.transform.$getObservableValue().data),
-    );
+    this.setFromMatrix(new Matrix(...this.engine.camera.transform.get().data));
 
-    if (this.engine.pointer.isDown.$getObservableValue()) {
+    if (this.engine.pointer.isDown.get()) {
       const entity = this.entityAtPointer();
       if (entity) {
         void this.state.actions.attack(entity.id);
@@ -170,9 +168,7 @@ export class AreaScene extends Container {
         );
         if (tileNode) {
           const portal = this.options.area
-            .hitTestObjects([
-              this.engine.pointer.worldPosition.$getObservableValue(),
-            ])
+            .hitTestObjects([this.engine.pointer.worldPosition.get()])
             .find(getAreaIdFromObject);
 
           this.moveThrottled(tileNode.data.vector, portal?.id);

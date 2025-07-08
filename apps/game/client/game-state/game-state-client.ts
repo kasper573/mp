@@ -89,7 +89,7 @@ export class GameStateClient {
 
       socket.removeEventListener("message", this.handleMessage);
 
-      const id = this.characterId.$getObservableValue();
+      const id = this.characterId.get();
       if (id !== undefined) {
         void this.rpc.world.leave(id);
       }

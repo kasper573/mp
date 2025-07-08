@@ -112,7 +112,7 @@ class DebugTiledGraph extends Graphics {
       }
     } else if (this.visibleGraphType() === "tile") {
       const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(worldPosition.$getObservableValue()),
+        tiled.worldCoordToTile(worldPosition.get()),
       );
       if (tileNode) {
         drawGraphNode(this, tiled, graph, tileNode);
@@ -120,11 +120,9 @@ class DebugTiledGraph extends Graphics {
     } else if (this.visibleGraphType() === "coord") {
       drawStar(
         this,
-        worldPosition.$getObservableValue(),
+        worldPosition.get(),
         graph
-          .getAdjacentNodes(
-            tiled.worldCoordToTile(worldPosition.$getObservableValue()),
-          )
+          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.get()))
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }

@@ -36,7 +36,7 @@ export function reactiveCollectionBinding<Item>(
 
   let prevItems = new Set<Item>();
   function updateElements() {
-    const newItems = new Set(items.$getObservableValue());
+    const newItems = new Set(items.get());
     const addedItems = newItems.difference(prevItems);
     const removedItems = prevItems.difference(newItems);
     prevItems = newItems;

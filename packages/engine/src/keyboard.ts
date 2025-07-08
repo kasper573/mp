@@ -40,7 +40,7 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.$getObservableValue();
+    const current = this.#keysHeld.get();
     this.#keysHeld.set(
       current.has(key) ? current : current.union(new Set([key])),
     );
@@ -48,7 +48,7 @@ export class Keyboard {
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.$getObservableValue();
+    const current = this.#keysHeld.get();
     this.#keysHeld.set(
       current.has(key) ? current.difference(new Set([key])) : current,
     );

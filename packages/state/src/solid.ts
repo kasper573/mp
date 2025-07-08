@@ -11,7 +11,7 @@ import type { ReadonlyObservable } from "./observable";
 export function useAtom<Value>(
   observable: ReadonlyObservable<Value>,
 ): Accessor<Value> {
-  const [value, setValue] = createSignal(observable.$getObservableValue());
+  const [value, setValue] = createSignal(observable.get());
   onCleanup(observable.subscribe(setValue));
   return value;
 }
@@ -20,7 +20,7 @@ export function useStorage<T>(storage: ReactiveStorage<T>) {
   const value = useAtom(storage.value);
   onCleanup(storage.effect());
   function setValue(createNextValue: (currentValue: T) => T) {
-    storage.value.set(createNextValue(storage.value.$getObservableValue()));
+    storage.value.set(createNextValue(storage.value.get()));
   }
   return [value, setValue] as const;
 }

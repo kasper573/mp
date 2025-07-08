@@ -103,7 +103,7 @@ function SpringTester() {
   createRenderEffect(spring.update);
 
   function flipSpringTarget() {
-    target.set(target.$getObservableValue() ? 0 : 100);
+    target.set(target.get() ? 0 : 100);
   }
 
   const toggleAutoFlip = () => setAutoFlip((now) => !now);

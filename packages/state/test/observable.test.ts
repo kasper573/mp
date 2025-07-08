@@ -1,16 +1,29 @@
 import { describe, it, expect, vi } from "vitest";
-import { observable } from "../src/observable";
+import {
+  getObservableValue,
+  observable,
+  observableValueGetterSymbol,
+} from "../src/observable";
 
 describe("observable", () => {
   it("can get initial value", () => {
     const obs = observable(1);
-    expect(obs.$getObservableValue()).toBe(1);
+    expect(obs.get()).toBe(1);
+  });
+
+  it("can get value from an observable with a symbol based getter", () => {
+    const { get, ...rest } = observable(1);
+    const obs = {
+      ...rest,
+      [observableValueGetterSymbol]: get,
+    };
+    expect(getObservableValue(obs)).toBe(1);
   });
 
   it("can get changed value", () => {
     const obs = observable(1);
     obs.set(2);
-    expect(obs.$getObservableValue()).toBe(2);
+    expect(obs.get()).toBe(2);
   });
 
   it("does not notify immediately on subscription", () => {
@@ -70,7 +83,7 @@ describe("derive", () => {
   it("can get initial derived value", () => {
     const obs = observable(2);
     const derived = obs.derive((x) => x * 3);
-    expect(derived.$getObservableValue()).toBe(6);
+    expect(derived.get()).toBe(6);
   });
 
   it("emits derived value to subscriber when source changes", () => {
@@ -86,7 +99,7 @@ describe("derive", () => {
     const obs = observable(0);
     const derived = obs.derive((x) => x * 2);
     obs.set(3);
-    expect(derived.$getObservableValue()).toBe(6);
+    expect(derived.get()).toBe(6);
   });
 });
 
@@ -95,7 +108,7 @@ describe("compose", () => {
     const obsA = observable("a");
     const obsB = observable(1);
     const comp = obsA.compose(obsB);
-    expect(comp.$getObservableValue()).toEqual(["a", 1]);
+    expect(comp.get()).toEqual(["a", 1]);
   });
 
   it("can get the changed composed value", () => {
@@ -104,9 +117,9 @@ describe("compose", () => {
     const comp = obsA.compose(obsB);
 
     obsA.set("b");
-    expect(comp.$getObservableValue()).toEqual(["b", 1]);
+    expect(comp.get()).toEqual(["b", 1]);
     obsB.set(2);
-    expect(comp.$getObservableValue()).toEqual(["b", 2]);
+    expect(comp.get()).toEqual(["b", 2]);
   });
 
   it("manages subscriptions on mount and cleanup", () => {

@@ -13,7 +13,7 @@ export function createGameActions(
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
     return rpc.character.move({
-      characterId: assert(characterId().$getObservableValue()),
+      characterId: assert(characterId().get()),
       to,
       desiredPortalId,
     });
@@ -21,12 +21,11 @@ export function createGameActions(
 
   const attack = (targetId: ActorId) =>
     rpc.character.attack({
-      characterId: assert(characterId().$getObservableValue()),
+      characterId: assert(characterId().get()),
       targetId,
     });
 
-  const respawn = () =>
-    rpc.character.respawn(assert(characterId().$getObservableValue()));
+  const respawn = () => rpc.character.respawn(assert(characterId().get()));
 
   const join = async () => {
     const char = await rpc.world.join();
