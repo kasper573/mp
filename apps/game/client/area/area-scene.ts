@@ -1,4 +1,4 @@
-import { ctxEngine } from "@mp/engine";
+import { ctxEngine, VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
@@ -6,7 +6,8 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, LayerViewFactory } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { DestroyOptions } from "pixi.js";
-import { Container, Matrix } from "pixi.js";
+import { Container, Matrix, Ticker } from "pixi.js";
+import { TimeSpan } from "@mp/time";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -50,7 +51,7 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.area,
       this.state.actorList,
-      () => this.myCoords(),
+      () => this.myCoords.get(),
       options.debugSettings,
     );
 
@@ -60,7 +61,7 @@ export class AreaScene extends Container {
     if (this.engine.isInteractive) {
       const tileHighlight = new TileHighlight(() => ({
         area: options.area,
-        target: this.highlightTarget(),
+        target: this.highlightTarget.get(),
       }));
       this.addChild(tileHighlight);
     }
@@ -72,68 +73,66 @@ export class AreaScene extends Container {
       this.state.actorList,
       (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
+
+    this.cameraPos = new VectorSpring(this.myWorldPos, () => ({
+      stiffness: 80,
+      damping: 40,
+      mass: 1,
+      precision: 0.1,
+    }));
   }
 
-  myCoords() {
-    return this.state.character.get()?.coords ?? Vector.zero();
-  }
+  myCoords = this.state.character.derive(
+    (char) => char?.coords ?? Vector.zero<Tile>(),
+  );
 
-  myWorldPos() {
-    return this.options.area.tiled.tileCoordToWorld(this.myCoords());
-  }
+  myWorldPos = this.myCoords.derive((coords) =>
+    this.options.area.tiled.tileCoordToWorld(coords),
+  );
 
-  cameraPos() {
-    return this.myWorldPos();
-  }
+  cameraPos: VectorSpring<Pixel>;
 
-  // cameraPos = new VectorSpring<Pixel>(myWorldPosAtom, () => ({
-  //   stiffness: 80,
-  //   damping: 40,
-  //   mass: 1,
-  //   precision: 0.1,
-  // }))
-
-  cameraZoom() {
-    return createZoomLevelForViewDistance(
+  cameraZoom = this.engine.camera.cameraSize.derive((size) =>
+    createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      this.engine.camera.cameraSize.get(),
+      size,
       clientViewDistance.renderedTileCount,
-    );
-  }
+    ),
+  );
 
-  pointerTile() {
-    return this.options.area.tiled.worldCoordToTile(
-      this.engine.pointer.worldPosition.get(),
-    );
-  }
+  pointerTile = this.engine.pointer.worldPosition.derive((pos) =>
+    this.options.area.tiled.worldCoordToTile(pos),
+  );
 
-  entityAtPointer() {
-    const tile = this.pointerTile();
-    return this.state.actorList
-      .get()
-      .find(
+  entityAtPointer = this.pointerTile
+    .compose(this.state.actorList)
+    .derive(([tile, actors]) => {
+      return actors.find(
         (actor) =>
           actor.health > 0 && actor.hitBox.offset(actor.coords).contains(tile),
       );
-  }
+    });
 
-  highlightTarget(): TileHighlightTarget | undefined {
-    const entity = this.entityAtPointer();
-    if (entity) {
-      return {
-        type: "attack",
-        rect: entity.hitBox.offset(entity.coords),
-      };
-    }
+  highlightTarget = this.entityAtPointer.derive(
+    (entity): TileHighlightTarget | undefined => {
+      if (entity) {
+        return {
+          type: "attack",
+          rect: entity.hitBox.offset(entity.coords),
+        };
+      }
 
-    const tileNode = this.options.area.graph.getNearestNode(this.pointerTile());
-    if (tileNode) {
-      return {
-        rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
-        type: "move",
-      };
-    }
-  }
+      const tileNode = this.options.area.graph.getNearestNode(
+        this.pointerTile.get(),
+      );
+      if (tileNode) {
+        return {
+          rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
+          type: "move",
+        };
+      }
+    },
+  );
 
   moveThrottled = dedupe(
     throttle(
@@ -151,20 +150,21 @@ export class AreaScene extends Container {
   }
 
   #onRender = () => {
+    this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.elapsedMS));
     this.engine.camera.update(
       this.options.area.tiled.mapSize,
-      this.cameraZoom(),
-      this.cameraPos(),
+      this.cameraZoom.get(),
+      this.cameraPos.value.get(),
     );
     this.setFromMatrix(new Matrix(...this.engine.camera.transform.get().data));
 
     if (this.engine.pointer.isDown.get()) {
-      const entity = this.entityAtPointer();
+      const entity = this.entityAtPointer.get();
       if (entity) {
         void this.state.actions.attack(entity.id);
       } else {
         const tileNode = this.options.area.graph.getNearestNode(
-          this.pointerTile(),
+          this.pointerTile.get(),
         );
         if (tileNode) {
           const portal = this.options.area
