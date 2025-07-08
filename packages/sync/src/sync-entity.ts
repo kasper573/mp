@@ -1,5 +1,5 @@
-import { observable } from "@mp/state";
-import type { Observable } from "@mp/state";
+import { abstractObservable } from "@mp/state";
+import type { AbstractObservable } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
@@ -51,17 +51,19 @@ export abstract class SyncEntity {
   // type to the generic param of Observable, which is impossible with implements,
   // but if we make sure to define the entire interface here, it still counts as
   // implemented thanks to TypeScript's structural typing).
-  #observable = observable<this>(() => this);
-  derive: Observable<this>["derive"] = (...args) =>
+  #observable = abstractObservable<this>(() => this);
+  derive: AbstractObservable<this>["derive"] = (...args) =>
     this.#observable.derive(...args);
-  compose: Observable<this>["compose"] = (...args) =>
+  compose: AbstractObservable<this>["compose"] = (...args) =>
     this.#observable.compose(...args);
-  subscribe: Observable<this>["subscribe"] = (...args) =>
+  subscribe: AbstractObservable<this>["subscribe"] = (...args) =>
     this.#observable.subscribe(...args);
-  $notifySubscribers: Observable<this>["$notifySubscribers"] = (...args) =>
-    this.#observable.$notifySubscribers(...args);
-  $getObservableValue: Observable<this>["$getObservableValue"] = (...args) =>
-    this.#observable.$getObservableValue(...args);
+  $notifySubscribers: AbstractObservable<this>["$notifySubscribers"] = (
+    ...args
+  ) => this.#observable.$notifySubscribers(...args);
+  $getObservableValue: AbstractObservable<this>["$getObservableValue"] = (
+    ...args
+  ) => this.#observable.$getObservableValue(...args);
 }
 
 /**

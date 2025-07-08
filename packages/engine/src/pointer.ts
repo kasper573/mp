@@ -1,12 +1,12 @@
 import { Vector } from "@mp/math";
 import type { ReadonlyObservable } from "@mp/state";
-import { mutableObservable } from "@mp/state";
+import { observable } from "@mp/state";
 import type { Pixel } from "@mp/std";
 import type { Camera } from "./camera";
 
 export class Pointer {
-  readonly #isDown = mutableObservable(false);
-  readonly #position = mutableObservable(new Vector(0 as Pixel, 0 as Pixel));
+  readonly #isDown = observable(false);
+  readonly #position = observable(new Vector(0 as Pixel, 0 as Pixel));
 
   get position(): ReadonlyObservable<Vector<Pixel>> {
     return this.#position;

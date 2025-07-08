@@ -3,8 +3,8 @@ import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { MutableObservable, ReadonlyObservable } from "@mp/state";
-import { mutableObservable } from "@mp/state";
+import type { Observable, ReadonlyObservable } from "@mp/state";
+import { observable } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { Character, CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
@@ -33,8 +33,8 @@ export class GameStateClient {
 
   // State
   readonly gameState: OptimisticGameState;
-  readonly characterId = mutableObservable<CharacterId | undefined>(undefined);
-  readonly readyState: MutableObservable<WebSocket["readyState"]>;
+  readonly characterId = observable<CharacterId | undefined>(undefined);
+  readonly readyState: Observable<WebSocket["readyState"]>;
 
   // Derived state
   readonly actorList: ReadonlyObservable<Actor[]>;
@@ -43,7 +43,7 @@ export class GameStateClient {
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(() => this.options.settings());
-    this.readyState = mutableObservable<WebSocket["readyState"]>(
+    this.readyState = observable<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
 

@@ -1,8 +1,8 @@
 import type { ReadonlyObservable } from "@mp/state";
-import { mutableObservable } from "@mp/state";
+import { observable } from "@mp/state";
 
 export class Keyboard {
-  readonly #keysHeld = mutableObservable(new Set<KeyboardEventKey>());
+  readonly #keysHeld = observable(new Set<KeyboardEventKey>());
   #isRunning = false;
 
   constructor(private window: Window) {}

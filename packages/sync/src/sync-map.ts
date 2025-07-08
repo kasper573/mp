@@ -1,5 +1,5 @@
-import type { Observable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { AbstractObservable } from "@mp/state";
+import { abstractObservable } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -10,7 +10,7 @@ import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V>
   extends Map<K, V>
-  implements Observable<ReadonlyMap<K, V>>
+  implements AbstractObservable<ReadonlyMap<K, V>>
 {
   #keysLastFlush = new Set<K>();
 
@@ -67,19 +67,21 @@ export class SyncMap<K, V>
   }
 
   // Mixing in the Observable interface
-  #observable = observable<ReadonlyMap<K, V>>(() => this);
-  derive: Observable<ReadonlyMap<K, V>>["derive"] = (...args) =>
+  #observable = abstractObservable<ReadonlyMap<K, V>>(() => this);
+  derive: AbstractObservable<ReadonlyMap<K, V>>["derive"] = (...args) =>
     this.#observable.derive(...args);
-  compose: Observable<ReadonlyMap<K, V>>["compose"] = (...args) =>
+  compose: AbstractObservable<ReadonlyMap<K, V>>["compose"] = (...args) =>
     this.#observable.compose(...args);
-  subscribe: Observable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
+  subscribe: AbstractObservable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
     this.#observable.subscribe(...args);
-  $notifySubscribers: Observable<ReadonlyMap<K, V>>["$notifySubscribers"] = (
-    ...args
-  ) => this.#observable.$notifySubscribers(...args);
-  $getObservableValue: Observable<ReadonlyMap<K, V>>["$getObservableValue"] = (
-    ...args
-  ) => this.#observable.$getObservableValue(...args);
+  $notifySubscribers: AbstractObservable<
+    ReadonlyMap<K, V>
+  >["$notifySubscribers"] = (...args) =>
+    this.#observable.$notifySubscribers(...args);
+  $getObservableValue: AbstractObservable<
+    ReadonlyMap<K, V>
+  >["$getObservableValue"] = (...args) =>
+    this.#observable.$getObservableValue(...args);
 }
 
 export type SyncMapChangeHandler<K, V> = (

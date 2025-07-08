@@ -1,8 +1,8 @@
-import type { MutableObservable } from "./observable";
-import { mutableObservable } from "./observable";
+import type { Observable } from "./observable";
+import { observable } from "./observable";
 
 export interface ReactiveStorage<T> {
-  value: MutableObservable<T>;
+  value: Observable<T>;
   effect: () => () => void;
 }
 
@@ -11,9 +11,7 @@ export function createReactiveStorage<T>(
   key: string,
   defaultValue: T,
 ): ReactiveStorage<T> {
-  const value = mutableObservable(
-    loadFromStorage<T>(storage, key, defaultValue),
-  );
+  const value = observable(loadFromStorage<T>(storage, key, defaultValue));
 
   function createStorageEffect() {
     return value.subscribe((value) => {

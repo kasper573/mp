@@ -1,10 +1,10 @@
 import type { ReadonlyObservable } from "@mp/state";
-import { mutableObservable } from "@mp/state";
+import { observable } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring<T extends number> implements SpringLike<T> {
-  readonly velocity = mutableObservable<T>(0 as T);
-  readonly #value = mutableObservable<T>(0 as T);
+  readonly velocity = observable<T>(0 as T);
+  readonly #value = observable<T>(0 as T);
   readonly state: ReadonlyObservable<SpringState>;
 
   get value(): ReadonlyObservable<T> {

@@ -23,7 +23,7 @@ export interface ReadonlyObservable<Value> {
   $getObservableValue(): Value;
 }
 
-export interface Observable<Value> extends ReadonlyObservable<Value> {
+export interface AbstractObservable<Value> extends ReadonlyObservable<Value> {
   /**
    * Notify subscribers that the value has changed.
    * @internal
@@ -41,19 +41,22 @@ type ObservableValues<ObservableArray extends ReadonlyObservable<unknown>[]> = {
   [Index in keyof ObservableArray]: ObservableValue<ObservableArray[Index]>;
 };
 
-export interface MutableObservable<Value> extends Observable<Value> {
+export interface Observable<Value> extends AbstractObservable<Value> {
   set(value: Value): void;
 }
 
-export function mutableObservable<Value>(
+/**
+ * A stateful mutable observable.
+ */
+export function observable<Value>(
   initialValue: Value,
   onMount?: () => unknown,
   onCleanup?: () => unknown,
-): MutableObservable<Value> {
+): Observable<Value> {
   let value = initialValue;
 
-  const self: MutableObservable<Value> = {
-    ...observable(() => value, onMount, onCleanup),
+  const self: Observable<Value> = {
+    ...abstractObservable(() => value, onMount, onCleanup),
     set(newValue: Value) {
       value = newValue;
       self.$notifySubscribers();
@@ -63,14 +66,17 @@ export function mutableObservable<Value>(
   return self;
 }
 
-export function observable<Value>(
+/**
+ * A semi-mutable observable who can be told to notify its subscribers, but with abstract value storage.
+ */
+export function abstractObservable<Value>(
   getValue: () => Value,
   onMount?: () => unknown,
   onCleanup?: () => unknown,
-): Observable<Value> {
+): AbstractObservable<Value> {
   const subscribers = new Set<SubscribeHandler<Value>>();
 
-  const self: Observable<Value> = {
+  const self: AbstractObservable<Value> = {
     subscribe(handler) {
       if (subscribers.size === 0) {
         onMount?.();
@@ -116,7 +122,7 @@ function computed<
   compute: (values: ObservableValues<Observables>) => ComputedValue,
 ): ReadonlyObservable<ComputedValue> {
   const subs = new Set<UnsubscribeFn>();
-  const obs = observable<ComputedValue>(value, onMount, onCleanup);
+  const obs = abstractObservable<ComputedValue>(value, onMount, onCleanup);
 
   function value(): ComputedValue {
     return compute(

@@ -1,14 +1,14 @@
 import { Matrix } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { ReadonlyObservable } from "@mp/state";
-import { mutableObservable } from "@mp/state";
+import { observable } from "@mp/state";
 import type { Pixel } from "@mp/std";
 
 export class Camera {
-  private position = mutableObservable(new Vector(0 as Pixel, 0 as Pixel));
+  private position = observable(new Vector(0 as Pixel, 0 as Pixel));
   private zoom = 1;
-  readonly #transform = mutableObservable(new Matrix());
-  readonly cameraSize = mutableObservable(new Vector(0 as Pixel, 0 as Pixel));
+  readonly #transform = observable(new Matrix());
+  readonly cameraSize = observable(new Vector(0 as Pixel, 0 as Pixel));
 
   get transform(): ReadonlyObservable<Matrix> {
     return this.#transform;
