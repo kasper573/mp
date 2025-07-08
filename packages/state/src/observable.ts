@@ -18,10 +18,10 @@ export interface ObservableLike<Value> {
   subscribe(handler: SubscribeHandler<Value>): UnsubscribeFn;
 
   /**
-   * An observable may implement this symbol to provide a custom getter for its value.
-   * This is useful for observables that already have a "get" member with a different signature,
+   * Any observable may implement this symbol to provide a custom getter for its value.
+   * This is useful for implementing the observable interface in classes that already have a "get" member (ie. the Map class),
    * and therefore unable to implement the `ReadonlyObservable` interface.
-   * If you need to consistently access the value of ObservableLike instances, use the `getObservableValue` function.
+   * The observable mechanism will know to use this getter if its present.
    */
   [observableValueGetterSymbol]?: ValueGetter<Value>;
 }
@@ -33,7 +33,7 @@ export interface ReadonlyObservable<Value> extends ObservableLike<Value> {
   get: ValueGetter<Value>;
 }
 
-export interface NotifyableObservable<Value> extends ReadonlyObservable<Value> {
+export interface NotifyingObservable<Value> extends ReadonlyObservable<Value> {
   /**
    * Notify subscribers that the value has changed.
    * @internal
@@ -41,7 +41,7 @@ export interface NotifyableObservable<Value> extends ReadonlyObservable<Value> {
   $notifySubscribers: () => void;
 }
 
-export interface Observable<Value> extends NotifyableObservable<Value> {
+export interface Observable<Value> extends NotifyingObservable<Value> {
   set(value: Value): void;
 }
 
@@ -57,17 +57,20 @@ type ObservableValues<ObservableArray extends ObservableLike<unknown>[]> = {
 export const observableValueGetterSymbol = Symbol("observableValueGetter");
 
 export function getObservableValue<Value>(
-  observable: ObservableLike<Value>,
+  observable: ReadonlyObservable<Value> | ObservableLike<Value>,
 ): Value {
-  if (Reflect.has(observable, observableValueGetterSymbol)) {
-    const fn = Reflect.get(
-      observable,
-      observableValueGetterSymbol,
-    ) as ValueGetter<Value>;
-    return fn();
+  if ("get" in observable) {
+    return observable.get();
   }
 
-  return (observable as ReadonlyObservable<Value>).get();
+  if (observableValueGetterSymbol in observable) {
+    const fn = observable[observableValueGetterSymbol];
+    if (fn) {
+      return fn();
+    }
+  }
+
+  throw new Error("Observable does not have a value getter function.");
 }
 
 /**
@@ -95,13 +98,13 @@ export function observable<Value>(
  * A semi-mutable observable who can be told to notify its subscribers, but with abstract value storage.
  */
 export function abstractObservable<Value>(
-  getValue: () => Value,
+  get: ValueGetter<Value>,
   onMount?: () => unknown,
   onCleanup?: () => unknown,
-): NotifyableObservable<Value> {
+): NotifyingObservable<Value> {
   const subscribers = new Set<SubscribeHandler<Value>>();
 
-  const self: NotifyableObservable<Value> = {
+  const self: NotifyingObservable<Value> = {
     subscribe(handler) {
       if (subscribers.size === 0) {
         onMount?.();
@@ -116,9 +119,7 @@ export function abstractObservable<Value>(
       };
     },
 
-    get() {
-      return getValue();
-    },
+    get,
 
     $notifySubscribers() {
       const value = self.get();

@@ -1,4 +1,4 @@
-import type { NotifyableObservable, ObservableLike } from "@mp/state";
+import type { NotifyingObservable, ObservableLike } from "@mp/state";
 import { abstractObservable, observableValueGetterSymbol } from "@mp/state";
 import {
   type PatchPathStep,
@@ -68,19 +68,18 @@ export class SyncMap<K, V>
 
   // Mixing in the Observable interface
   #observable = abstractObservable<ReadonlyMap<K, V>>(() => this);
-  derive: NotifyableObservable<ReadonlyMap<K, V>>["derive"] = (...args) =>
+  derive: NotifyingObservable<ReadonlyMap<K, V>>["derive"] = (...args) =>
     this.#observable.derive(...args);
-  compose: NotifyableObservable<ReadonlyMap<K, V>>["compose"] = (...args) =>
+  compose: NotifyingObservable<ReadonlyMap<K, V>>["compose"] = (...args) =>
     this.#observable.compose(...args);
-  subscribe: NotifyableObservable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
+  subscribe: NotifyingObservable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
     this.#observable.subscribe(...args);
-  $notifySubscribers: NotifyableObservable<
+  $notifySubscribers: NotifyingObservable<
     ReadonlyMap<K, V>
   >["$notifySubscribers"] = (...args) =>
     this.#observable.$notifySubscribers(...args);
-  [observableValueGetterSymbol]: NotifyableObservable<
-    ReadonlyMap<K, V>
-  >["get"] = (...args) => this.#observable.get(...args);
+  [observableValueGetterSymbol]: NotifyingObservable<ReadonlyMap<K, V>>["get"] =
+    (...args) => this.#observable.get(...args);
 }
 
 export type SyncMapChangeHandler<K, V> = (
