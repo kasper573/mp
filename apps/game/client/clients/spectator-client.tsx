@@ -1,14 +1,9 @@
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { Select } from "@mp/ui";
-import {
-  createEffect,
-  createMemo,
-  createSignal,
-  Suspense,
-  useContext,
-} from "solid-js";
+import { createEffect, createSignal, Suspense, useContext } from "solid-js";
 import { AuthContext } from "@mp/auth/client";
+import { useObservable } from "@mp/state/solid";
 import type { CharacterId } from "../../server";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
@@ -30,9 +25,7 @@ export function SpectatorClient(props: GameClientProps) {
     ],
   }));
 
-  const isSocketOpen = createMemo(
-    () => props.gameState.readyState.get() === WebSocket.OPEN,
-  );
+  const isSocketOpen = useObservable(() => props.gameState.isOpen);
 
   createEffect(() => {
     const user = auth.identity();

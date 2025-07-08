@@ -46,7 +46,7 @@ export function GameClient(props: GameClientProps) {
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const interactive = () => props.interactive ?? true;
 
-  const areaId = useObservable(props.gameState.areaId);
+  const areaId = useObservable(() => props.gameState.areaId);
 
   const area = useAreaResource(areaId);
 
@@ -80,6 +80,8 @@ export function GameClient(props: GameClientProps) {
     enabled: isDebugUiEnabled,
     setEnabled: setDebugUiEnabled,
   };
+
+  const isOpen = useObservable(() => props.gameState.isOpen);
 
   createEffect(() => {
     onCleanup(ioc.register(ctxGameStateClient, props.gameState));
@@ -141,7 +143,7 @@ export function GameClient(props: GameClientProps) {
           )}
         </Match>
 
-        <Match when={props.gameState.readyState.get() !== WebSocket.OPEN}>
+        <Match when={!isOpen()}>
           <LoadingSpinner>Connecting to game server</LoadingSpinner>
         </Match>
         <Match when={!areaId()}>

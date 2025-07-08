@@ -8,19 +8,27 @@ import {
 } from "./observable";
 
 export function useObservable<Value>(
-  observable: ObservableLike<Value>,
+  observable: Accessor<ObservableLike<Value>> | ObservableLike<Value>,
 ): Accessor<Value> {
-  const [value, setValue] = createSignal(getObservableValue(observable));
+  const [value, setValue] = createSignal(
+    getObservableValue(accessObservable()),
+  );
+
+  function accessObservable() {
+    return typeof observable === "function" ? observable() : observable;
+  }
+
   createEffect(() => {
-    onCleanup(observable.subscribe(setValue));
+    onCleanup(accessObservable().subscribe(setValue));
   });
+
   return value;
 }
 
 export function useObservables<Observables extends ObservableLike<unknown>[]>(
   ...observables: Observables
 ): ObservableAccessors<Observables> {
-  return observables.map(useObservable) as never;
+  return observables.map((obs) => useObservable(() => obs)) as never;
 }
 
 export function useStorage<T>(storage: StorageAdapter<T>) {

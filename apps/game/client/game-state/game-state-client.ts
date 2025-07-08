@@ -35,6 +35,7 @@ export class GameStateClient {
   readonly gameState: OptimisticGameState;
   readonly characterId = observable<CharacterId | undefined>(undefined);
   readonly readyState: Observable<WebSocket["readyState"]>;
+  readonly isOpen: ReadonlyObservable<boolean>;
 
   // Derived state
   readonly actorList: ReadonlyObservable<Actor[]>;
@@ -46,6 +47,7 @@ export class GameStateClient {
     this.readyState = observable<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
+    this.isOpen = this.readyState.derive((state) => state === WebSocket.OPEN);
 
     this.actions = createGameActions(this.rpc, () => this.characterId);
 
@@ -74,7 +76,11 @@ export class GameStateClient {
   start = () => {
     const { socket } = this.options;
 
-    const subscriptions = [subscribeToReadyState(socket, this.readyState.set)];
+    const subscriptions = [
+      subscribeToReadyState(socket, (readyState) => {
+        this.readyState.set(readyState);
+      }),
+    ];
 
     socket.addEventListener("message", this.handleMessage);
 
