@@ -33,6 +33,9 @@ export class Engine {
     this.frameEmitter.start();
     this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);
     this.#viewportSizeObserver.observe(this.viewport);
+
+    // Return cleanup function for easy integration with effects
+    return () => this.stop();
   };
 
   stop = () => {

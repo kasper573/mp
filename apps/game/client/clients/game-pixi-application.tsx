@@ -42,10 +42,7 @@ export function GamePixiApplication(inputProps: GamePixiApplicationProps) {
 
   onCleanup(ioc.register(ctxEngine, engine));
 
-  createEffect(() => {
-    engine.start(props.interactive);
-    onCleanup(engine.stop);
-  });
+  createEffect(() => onCleanup(engine.start(props.interactive)));
 
   createEffect(() => {
     onCleanup(engine.frameEmitter.subscribe(props.gameState.frameCallback));

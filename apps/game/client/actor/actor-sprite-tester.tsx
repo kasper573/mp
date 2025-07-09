@@ -1,5 +1,5 @@
 import type { JSX } from "solid-js";
-import { createEffect, createSignal, Show } from "solid-js";
+import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import { Application, Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
@@ -8,6 +8,7 @@ import {
 } from "@mp/math";
 import { Select } from "@mp/ui";
 
+import { Engine } from "@mp/engine";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -73,12 +74,19 @@ export function ActorSpriteTester() {
 }
 
 function PixiApp(props: ActorTestSettings) {
+  const canvas = document.createElement("canvas");
+  const engine = new Engine(canvas);
+
+  onCleanup(engine.start(true));
+  onCleanup(ioc.register(ctxEngine, engine));
+
   async function createApp() {
     const app = new Application();
     await app.init({
       antialias: true,
       eventMode: "none",
       roundPixels: true,
+      canvas,
     });
     app.stage.addChild(new ActorSpriteList(() => props));
     return app;
@@ -196,10 +204,10 @@ class SpecificActorAngle extends Container {
 class LookAtPointerActor extends SpecificActorAngle {
   constructor(options: () => ActorTestSettings) {
     super(() => {
-      const engine = ioc.access(ctxEngine).unwrapOr(undefined);
-      const { x, y } = engine ? engine.camera.cameraSize.get() : Vector.zero();
+      const engine = ioc.get(ctxEngine);
+      const { x, y } = engine.camera.cameraSize.get();
       const center = new Vector(x / 2, y / 2);
-      const angle = engine ? center.angle(engine.pointer.position.get()) : 0;
+      const angle = center.angle(engine.pointer.position.get());
       return {
         ...options(),
         angle,
