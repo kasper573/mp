@@ -1,4 +1,3 @@
-/* eslint-disable unicorn/consistent-function-scoping */
 import { describe, it, expect, vi } from "vitest";
 import type {
   AnyFunction,
