@@ -1,3 +1,4 @@
+import type { JSX } from "solid-js";
 import { createEffect, createSignal, Show } from "solid-js";
 import { Application, Container, Text } from "pixi.js";
 import {
@@ -6,7 +7,6 @@ import {
   Vector,
 } from "@mp/math";
 import { Select } from "@mp/ui";
-import type { CSSProperties } from "@mp/style";
 
 import {
   actorAnimationNames,
@@ -51,10 +51,7 @@ export function ActorSpriteTester() {
             ioc.register(ctxActorSpritesheetLookup, allSpritesheets)
           }
         >
-          <Show when={modelId()}>
-            {(id) => <PixiApp animationName={animationName()} modelId={id()} />}
-          </Show>
-          <div style={styles.settingsForm}>
+          <div id="form" style={styles.settingsForm}>
             <Select
               value={animationName()}
               onChange={setAnimationName}
@@ -66,6 +63,9 @@ export function ActorSpriteTester() {
               options={allSpritesheets.keys().toArray()}
             />
           </div>
+          <Show when={modelId()}>
+            {(id) => <PixiApp animationName={animationName()} modelId={id()} />}
+          </Show>
         </Effect>
       )}
     </Show>
@@ -83,18 +83,21 @@ function PixiApp(props: ActorTestSettings) {
     app.stage.addChild(new ActorSpriteList(() => props));
     return app;
   }
-  return <SolidPixi createApp={createApp} />;
+  return <SolidPixi id="PixiApp" createApp={createApp} style={{ flex: 1 }} />;
 }
 
 const styles = {
-  settingsForm: {
-    position: "absolute",
-    top: "80px",
-    right: "16px",
-    background: "black",
-    color: "white",
+  container: {
+    display: "flex",
+    "flex-direction": "column",
+    flex: 1,
   },
-} satisfies Record<string, CSSProperties>;
+  settingsForm: {
+    display: "flex",
+    "justify-content": "flex-end",
+    "padding-bottom": "20px",
+  },
+} satisfies Record<string, JSX.CSSProperties>;
 
 class ActorSpriteList extends Container {
   constructor(options: () => ActorTestSettings) {
