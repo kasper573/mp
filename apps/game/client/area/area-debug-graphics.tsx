@@ -2,7 +2,6 @@ import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { type VectorGraph } from "@mp/path-finding";
 import { Container, Graphics } from "pixi.js";
-import { ctxEngine } from "@mp/engine";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import type { ReadonlyObservable } from "@mp/state";
@@ -13,6 +12,7 @@ import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import { ReactiveCollection } from "../pixi/reactive-collection";
 import { ioc } from "../context";
+import { ctxEngine } from "../engine-context";
 import type {
   AreaDebugSettings,
   VisibleGraphType,

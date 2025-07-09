@@ -25,13 +25,13 @@ export function SpectatorClient(props: GameClientProps) {
     ],
   }));
 
-  const isSocketOpen = useObservable(() => props.gameState.isConnected);
+  const isSocketOpen = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
     const user = auth.identity();
     const characterId = spectatedCharacterId();
     if (isSocketOpen() && user && characterId) {
-      props.gameState.characterId.set(characterId);
+      props.stateClient.characterId.set(characterId);
       void rpc.world.spectate(characterId);
     }
   });

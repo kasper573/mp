@@ -1,5 +1,3 @@
-import { ctxEngine, EngineProvider } from "@mp/engine";
-import { Application, Pixi } from "@mp/solid-pixi";
 import type { JSX, ParentProps } from "solid-js";
 import {
   Switch,
@@ -9,7 +7,6 @@ import {
   createMemo,
   createEffect,
   onCleanup,
-  useContext,
 } from "solid-js";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
@@ -19,10 +16,9 @@ import {
   ctxGameStateClient,
   type GameStateClient,
 } from "../game-state/game-state-client";
-import { AreaScene } from "../area/area-scene";
 import { useAreaResource } from "../area/use-area-resource";
 import {
-  ActorSpritesheetContextProvider,
+  ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "../actor/actor-spritesheet-lookup";
 import { GameDebugUi } from "../debug/game-debug-ui";
@@ -33,9 +29,11 @@ import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
 import { AreaUi } from "../area/area-ui";
 import { areaDebugSettingsStorage } from "../area/area-debug-settings-form";
+import { Effect } from "../effect";
+import { GamePixiApplication } from "./game-pixi-application";
 
 export type GameClientProps = ParentProps<{
-  gameState: GameStateClient;
+  stateClient: GameStateClient;
   interactive?: boolean;
   class?: string;
   style?: JSX.CSSProperties;
@@ -47,7 +45,7 @@ export function GameClient(props: GameClientProps) {
   const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
   const interactive = () => props.interactive ?? true;
 
-  const areaId = useObservable(() => props.gameState.areaId);
+  const areaId = useObservable(() => props.stateClient.areaId);
 
   const area = useAreaResource(areaId);
 
@@ -69,7 +67,7 @@ export function GameClient(props: GameClientProps) {
     if (area.data && areaSpritesheets.data && actorSpritesheets.data) {
       return {
         area: area.data,
-        spritesheets: areaSpritesheets.data,
+        areaSpritesheets: areaSpritesheets.data,
         actorSpritesheets: actorSpritesheets.data,
       };
     }
@@ -82,10 +80,10 @@ export function GameClient(props: GameClientProps) {
     setEnabled: setDebugUiEnabled,
   };
 
-  const isConnected = useObservable(() => props.gameState.isConnected);
+  const isConnected = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
-    onCleanup(ioc.register(ctxGameStateClient, props.gameState));
+    onCleanup(ioc.register(ctxGameStateClient, props.stateClient));
   });
 
   const [areaDebugSettings, setAreaDebugSettings] = useStorage(
@@ -96,50 +94,44 @@ export function GameClient(props: GameClientProps) {
     <>
       <Switch>
         <Match when={assets()} keyed>
-          {({ area, spritesheets, actorSpritesheets }) => (
+          {({ area, areaSpritesheets, actorSpritesheets }) => (
             <Suspense
               fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
             >
-              <Application class={props.class} style={props.style}>
-                {({ viewport }) => (
-                  <ActorSpritesheetContextProvider value={actorSpritesheets}>
-                    <EngineProvider
+              <Effect
+                effect={() =>
+                  ioc.register(ctxActorSpritesheetLookup, actorSpritesheets)
+                }
+              >
+                <GameDebugUiContext.Provider value={debugUiState}>
+                  <Suspense
+                    fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
+                  >
+                    <GamePixiApplication
+                      class={props.class}
+                      style={props.style}
                       interactive={interactive()}
-                      viewport={viewport}
-                      ioc={ioc}
-                    >
-                      <GameDebugUiContext.Provider value={debugUiState}>
-                        <Suspense
-                          fallback={
-                            <LoadingSpinner>Loading area</LoadingSpinner>
-                          }
-                        >
-                          <Pixi
-                            as={
-                              new AreaScene({
-                                area,
-                                spritesheets,
-                                debugSettings: areaDebugSettings,
-                              })
-                            }
-                          />
-                        </Suspense>
-                        <GameStateClientBindings />
-                        {props.children}
-                        <AreaUi
-                          debugFormProps={{
-                            value: areaDebugSettings(),
-                            onChange: setAreaDebugSettings,
-                          }}
-                        />
-                        <GameDebugUi>
-                          <GameStateDebugInfo tiled={area.tiled} />
-                        </GameDebugUi>
-                      </GameDebugUiContext.Provider>
-                    </EngineProvider>
-                  </ActorSpritesheetContextProvider>
-                )}
-              </Application>
+                      gameState={props.stateClient.gameState}
+                      debugUiState={debugUiState}
+                      areaSceneOptions={{
+                        area,
+                        spritesheets: areaSpritesheets,
+                        debugSettings: areaDebugSettings,
+                      }}
+                    />
+                  </Suspense>
+                  {props.children}
+                  <AreaUi
+                    debugFormProps={{
+                      value: areaDebugSettings(),
+                      onChange: setAreaDebugSettings,
+                    }}
+                  />
+                  <GameDebugUi>
+                    <GameStateDebugInfo tiled={area.tiled} />
+                  </GameDebugUi>
+                </GameDebugUiContext.Provider>
+              </Effect>
             </Suspense>
           )}
         </Match>
@@ -162,26 +154,4 @@ export function GameClient(props: GameClientProps) {
       </Switch>
     </>
   );
-}
-
-// TODO refactor. This is a hack to workaround the problematic Application/EngineProvider pattern.
-// It would be better if we could instantiate the engine higher up the tree so we can do this without a component.
-function GameStateClientBindings() {
-  const debugUi = useContext(GameDebugUiContext);
-  const client = ioc.get(ctxGameStateClient);
-  const engine = ioc.get(ctxEngine);
-
-  createEffect(() => {
-    onCleanup(engine.frameEmitter.subscribe(client.gameState.frameCallback));
-  });
-
-  createEffect(() => {
-    onCleanup(
-      engine.keyboard.on("keydown", "F2", () =>
-        debugUi.setEnabled((prev) => !prev),
-      ),
-    );
-  });
-
-  return null;
 }

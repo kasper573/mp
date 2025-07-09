@@ -1,4 +1,4 @@
-import { ctxEngine, VectorSpring } from "@mp/engine";
+import { VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
@@ -18,10 +18,17 @@ import { clientViewDistance } from "../../server";
 import { reactiveCollectionBinding } from "../pixi/reactive-collection";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
+import { ctxEngine } from "../engine-context";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
+
+export interface AreaSceneOptions {
+  area: AreaResource;
+  spritesheets: TiledSpritesheetRecord;
+  debugSettings: () => AreaDebugSettings;
+}
 
 export class AreaScene extends Container {
   private cleanupActorControllers: () => void;
@@ -29,13 +36,7 @@ export class AreaScene extends Container {
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
 
-  constructor(
-    private options: {
-      area: AreaResource;
-      spritesheets: TiledSpritesheetRecord;
-      debugSettings: () => AreaDebugSettings;
-    },
-  ) {
+  constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
 
     const lookup = createTiledTextureLookup(options.spritesheets);

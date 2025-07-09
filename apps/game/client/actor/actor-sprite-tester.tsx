@@ -1,14 +1,13 @@
-import { Application, Pixi } from "@mp/solid-pixi";
 import { createEffect, createSignal, Show } from "solid-js";
-import { Container, Text } from "pixi.js";
+import { Application, Container, Text } from "pixi.js";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import { ctxEngine, EngineProvider } from "@mp/engine";
 import { Select } from "@mp/ui";
 import type { CSSProperties } from "@mp/style";
+
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -16,9 +15,11 @@ import {
 } from "../../server/traits/appearance";
 import { ioc } from "../context";
 import { ctxGameRpcClient } from "../game-rpc-client";
+import { ctxEngine } from "../engine-context";
+import { SolidPixi } from "../pixi/solid-pixi";
+import { Effect } from "../effect";
 import { ActorSprite } from "./actor-sprite";
 import {
-  ActorSpritesheetContextProvider,
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "./actor-spritesheet-lookup";
@@ -45,26 +46,14 @@ export function ActorSpriteTester() {
   return (
     <Show when={spritesheets.data} keyed>
       {(allSpritesheets) => (
-        <ActorSpritesheetContextProvider value={allSpritesheets}>
-          <Application style={{ display: "flex", flex: 1 }}>
-            {({ viewport }) => (
-              <EngineProvider interactive viewport={viewport} ioc={ioc}>
-                <Show when={modelId()} keyed>
-                  {(id) => (
-                    <Pixi
-                      as={
-                        new ActorSpriteList(() => ({
-                          modelId: id,
-                          animationName: animationName(),
-                          allSpritesheets,
-                        }))
-                      }
-                    />
-                  )}
-                </Show>
-              </EngineProvider>
-            )}
-          </Application>
+        <Effect
+          effect={() =>
+            ioc.register(ctxActorSpritesheetLookup, allSpritesheets)
+          }
+        >
+          <Show when={modelId()}>
+            {(id) => <PixiApp animationName={animationName()} modelId={id()} />}
+          </Show>
           <div style={styles.settingsForm}>
             <Select
               value={animationName()}
@@ -77,10 +66,24 @@ export function ActorSpriteTester() {
               options={allSpritesheets.keys().toArray()}
             />
           </div>
-        </ActorSpritesheetContextProvider>
+        </Effect>
       )}
     </Show>
   );
+}
+
+function PixiApp(props: ActorTestSettings) {
+  async function createApp() {
+    const app = new Application();
+    await app.init({
+      antialias: true,
+      eventMode: "none",
+      roundPixels: true,
+    });
+    app.stage.addChild(new ActorSpriteList(() => props));
+    return app;
+  }
+  return <SolidPixi createApp={createApp} />;
 }
 
 const styles = {

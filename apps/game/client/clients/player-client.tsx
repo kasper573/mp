@@ -10,8 +10,8 @@ import { GameClient } from "./game-client";
 export function PlayerClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
   const auth = useContext(AuthContext);
-  const actions = createGameActions(rpc, () => props.gameState.characterId);
-  const isOpen = useObservable(() => props.gameState.isConnected);
+  const actions = createGameActions(rpc, () => props.stateClient.characterId);
+  const isOpen = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
     const user = auth.identity();

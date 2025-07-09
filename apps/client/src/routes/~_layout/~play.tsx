@@ -19,20 +19,23 @@ export const Route = createFileRoute("/_layout/play")({
 
 function PlayPage() {
   const [settings] = useStorage(miscDebugStorage);
-  const gameState = new GameStateClient({
+  const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
     logger: useContext(LoggerContext),
     settings,
   });
 
-  onCleanup(gameState.start());
+  onCleanup(stateClient.start());
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-      <PlayerClient gameState={gameState} style={{ display: "flex", flex: 1 }}>
+      <PlayerClient
+        stateClient={stateClient}
+        style={{ display: "flex", flex: 1 }}
+      >
         <GameDebugUiPortal>
           <MiscDebugUi />
         </GameDebugUiPortal>

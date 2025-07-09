@@ -180,9 +180,6 @@ importers:
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
-      '@mp/solid-pixi':
-        specifier: workspace:*
-        version: link:../../packages/solid-pixi
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -413,9 +410,6 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../time
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -577,19 +571,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
-
-  packages/solid-pixi:
-    dependencies:
-      pixi.js:
-        specifier: 'catalog:'
-        version: 8.3.3
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.5
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
 
   packages/state:
     dependencies:

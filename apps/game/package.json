@@ -25,7 +25,6 @@
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/rpc": "workspace:*",
-    "@mp/solid-pixi": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",

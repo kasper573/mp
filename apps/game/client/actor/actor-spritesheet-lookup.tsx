@@ -1,14 +1,11 @@
 import type { Texture } from "pixi.js";
 import { Assets } from "pixi.js";
 import { InjectionContext } from "@mp/ioc";
-import type { ParentProps } from "solid-js";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
 import {
   type ActorModelId,
   type ActorAnimationName,
 } from "../../server/traits/appearance";
 import type { ActorSpritesheetUrls } from "../../server";
-import { ioc } from "../context";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
 
@@ -48,22 +45,3 @@ export async function loadActorSpritesheets(
 
 export const ctxActorSpritesheetLookup =
   InjectionContext.new<ActorSpritesheetLookup>("ActorSpritesheetLookup");
-
-/**
- * Remove this once spritesheets can be loaded with suspense and can be registered easier inline without an effect.
- * @deprecated
- */
-export function ActorSpritesheetContextProvider(
-  props: ParentProps<{
-    value: ActorSpritesheetLookup;
-  }>,
-) {
-  const [isReady, setReady] = createSignal(false);
-
-  createEffect(() => {
-    onCleanup(ioc.register(ctxActorSpritesheetLookup, props.value));
-    setReady(true);
-  });
-
-  return <Show when={isReady()}>{props.children}</Show>;
-}

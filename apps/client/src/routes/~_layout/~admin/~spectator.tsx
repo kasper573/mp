@@ -22,13 +22,13 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 
 function RouteComponent() {
   const [settings] = useStorage(miscDebugStorage);
-  const gameState = new GameStateClient({
+  const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
     logger: useContext(LoggerContext),
     settings,
   });
 
-  onCleanup(gameState.start());
+  onCleanup(stateClient.start());
 
   return (
     <div
@@ -41,7 +41,7 @@ function RouteComponent() {
     >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
         <SpectatorClient
-          gameState={gameState}
+          stateClient={stateClient}
           style={{ display: "flex", flex: 1 }}
         >
           <GameDebugUiPortal>
