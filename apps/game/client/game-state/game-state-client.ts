@@ -11,7 +11,7 @@ import type { GameStateEvents } from "../../server/game-state-events";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import type { Actor } from "../../server/actor";
 import type { AreaId } from "../../server";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 import type { GameActions } from "./game-actions";

@@ -21,8 +21,8 @@ import {
   loadActorSpritesheets,
 } from "../actor/actor-spritesheet-lookup";
 import { ctxGameRpcClient } from "../game-rpc-client";
-import { ioc } from "../context";
-import { Effect } from "../effect";
+import { ioc } from "../context/ioc";
+import { Effect } from "../context/effect";
 import { GameRenderer } from "./game-renderer";
 
 export interface GameClientProps {

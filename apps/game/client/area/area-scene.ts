@@ -20,9 +20,9 @@ import {
 import { ActorController } from "../actor/actor-controller";
 import { clientViewDistance } from "../../server";
 
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
-import { ctxEngine } from "../engine-context";
+import { ctxEngine } from "../context/common";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";

@@ -2,8 +2,8 @@ import { createEffect } from "solid-js";
 import { useObservable } from "@mp/state/solid";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { createGameActions } from "../game-state/game-actions";
-import { ioc } from "../context";
-import { ctxAuthClient } from "../auth-context";
+import { ioc } from "../context/ioc";
+import { ctxAuthClient } from "../context/common";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 

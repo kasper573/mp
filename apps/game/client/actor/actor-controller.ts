@@ -9,7 +9,7 @@ import {
 import { TimeSpan } from "@mp/time";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ActorSprite } from "./actor-sprite";
 import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";

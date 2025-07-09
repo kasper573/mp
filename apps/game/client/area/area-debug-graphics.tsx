@@ -10,8 +10,8 @@ import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { AreaResource } from "../../shared/area/area-resource";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
-import { ioc } from "../context";
-import { ctxEngine } from "../engine-context";
+import { ioc } from "../context/ioc";
+import { ctxEngine } from "../context/common";
 import type {
   AreaDebugSettings,
   VisibleGraphType,

@@ -5,7 +5,7 @@ import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { AreaResource } from "../../shared/area/area-resource";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 
 export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
   const rpc = ioc.get(ctxGameRpcClient);

@@ -1,5 +1,5 @@
 import { useObservable } from "@mp/state/solid";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { RespawnDialog } from "./respawn-dialog";
 

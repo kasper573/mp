@@ -14,11 +14,11 @@ import {
   type ActorModelId,
   type ActorAnimationName,
 } from "../../server/traits/appearance";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 import { ctxGameRpcClient } from "../game-rpc-client";
-import { ctxEngine } from "../engine-context";
+import { ctxEngine } from "../context/common";
 import { useGraphics } from "../use-graphics";
-import { Effect } from "../effect";
+import { Effect } from "../context/effect";
 import { ActorSprite } from "./actor-sprite";
 import {
   ctxActorSpritesheetLookup,
