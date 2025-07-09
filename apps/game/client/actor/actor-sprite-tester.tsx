@@ -17,7 +17,7 @@ import {
 import { ioc } from "../context";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ctxEngine } from "../engine-context";
-import { usePixiApp } from "../pixi/use-pixi-app";
+import { useGraphics } from "../use-graphics";
 import { Effect } from "../effect";
 import { ActorSprite } from "./actor-sprite";
 import {
@@ -84,7 +84,7 @@ function PixiApp(props: ActorTestSettings) {
       return;
     }
 
-    usePixiApp(
+    useGraphics(
       async () => {
         const app = new Application();
         const engine = new Engine(canvas);

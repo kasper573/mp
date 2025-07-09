@@ -8,7 +8,7 @@ import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
 import { ioc } from "../context";
 import { ctxEngine } from "../engine-context";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";
-import { usePixiApp } from "../pixi/use-pixi-app";
+import { useGraphics } from "../use-graphics";
 import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
 import {
   AreaDebugSettingsForm,
@@ -40,7 +40,7 @@ export function GameRenderer(props: GameRendererProps) {
       return;
     }
 
-    usePixiApp(async () => {
+    useGraphics(async () => {
       const app = new Application();
       const engine = new Engine(canvas);
 

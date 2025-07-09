@@ -5,7 +5,7 @@ import { createEffect, createResource, onCleanup } from "solid-js";
 /**
  * solid-js and pixi.js integration
  */
-export function usePixiApp(
+export function useGraphics(
   /**
    * You have to call app.init before returning the app.
    */
