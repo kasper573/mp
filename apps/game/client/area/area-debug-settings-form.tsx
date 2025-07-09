@@ -1,4 +1,3 @@
-import { StorageAdapter } from "@mp/state";
 import { Select } from "@mp/ui";
 import type { Setter } from "solid-js";
 
@@ -87,18 +86,6 @@ export interface AreaDebugSettings {
   showAggroRange: boolean;
   showActorPaths: boolean;
 }
-
-export const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
-  "local",
-  "area-debug-settings",
-  {
-    visibleGraphType: "none",
-    showActorPaths: false,
-    showFogOfWar: false,
-    showAttackRange: false,
-    showAggroRange: false,
-  },
-);
 
 export const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
 export type VisibleGraphType = (typeof visibleGraphTypes)[number];

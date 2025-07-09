@@ -40,10 +40,7 @@ function RouteComponent() {
       }}
     >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
-        <SpectatorClient
-          stateClient={stateClient}
-          style={{ display: "flex", flex: 1 }}
-        >
+        <SpectatorClient stateClient={stateClient}>
           <GameDebugUiPortal>
             <MiscDebugUi />
           </GameDebugUiPortal>

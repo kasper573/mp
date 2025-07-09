@@ -1,4 +1,4 @@
-import type { JSX, ParentProps } from "solid-js";
+import type { ParentProps } from "solid-js";
 import {
   Switch,
   Match,
@@ -11,7 +11,7 @@ import {
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
-import { useObservable, useStorage } from "@mp/state/solid";
+import { useObservable } from "@mp/state/solid";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -21,22 +21,16 @@ import {
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "../actor/actor-spritesheet-lookup";
-import { GameDebugUi } from "../debug/game-debug-ui";
 import type { GameDebugUiState } from "../debug/game-debug-ui-state";
 import { GameDebugUiContext } from "../debug/game-debug-ui-state";
-import { GameStateDebugInfo } from "../debug/game-state-debug-info";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
-import { AreaUi } from "../area/area-ui";
-import { areaDebugSettingsStorage } from "../area/area-debug-settings-form";
 import { Effect } from "../effect";
-import { GamePixiApplication } from "./game-pixi-application";
+import { GameRenderer } from "./game-renderer";
 
 export type GameClientProps = ParentProps<{
   stateClient: GameStateClient;
   interactive?: boolean;
-  class?: string;
-  style?: JSX.CSSProperties;
 }>;
 
 export function GameClient(props: GameClientProps) {
@@ -86,10 +80,6 @@ export function GameClient(props: GameClientProps) {
     onCleanup(ioc.register(ctxGameStateClient, props.stateClient));
   });
 
-  const [areaDebugSettings, setAreaDebugSettings] = useStorage(
-    areaDebugSettingsStorage,
-  );
-
   return (
     <>
       <Switch>
@@ -107,29 +97,17 @@ export function GameClient(props: GameClientProps) {
                   <Suspense
                     fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
                   >
-                    <GamePixiApplication
-                      class={props.class}
-                      style={props.style}
+                    <GameRenderer
                       interactive={interactive()}
                       gameState={props.stateClient.gameState}
                       debugUiState={debugUiState}
                       areaSceneOptions={{
                         area,
                         spritesheets: areaSpritesheets,
-                        debugSettings: areaDebugSettings,
                       }}
                     />
                   </Suspense>
                   {props.children}
-                  <AreaUi
-                    debugFormProps={{
-                      value: areaDebugSettings(),
-                      onChange: setAreaDebugSettings,
-                    }}
-                  />
-                  <GameDebugUi>
-                    <GameStateDebugInfo tiled={area.tiled} />
-                  </GameDebugUi>
                 </GameDebugUiContext.Provider>
               </Effect>
             </Suspense>

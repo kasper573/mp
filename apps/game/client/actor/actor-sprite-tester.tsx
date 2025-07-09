@@ -17,7 +17,7 @@ import {
 import { ioc } from "../context";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ctxEngine } from "../engine-context";
-import { SolidPixi } from "../pixi/solid-pixi";
+import { usePixiApp } from "../pixi/use-pixi-app";
 import { Effect } from "../effect";
 import { ActorSprite } from "./actor-sprite";
 import {
@@ -74,24 +74,39 @@ export function ActorSpriteTester() {
 }
 
 function PixiApp(props: ActorTestSettings) {
-  const canvas = document.createElement("canvas");
-  const engine = new Engine(canvas);
+  const [getCanvas, setCanvas] = createSignal<HTMLCanvasElement>();
+  const [getContainer, setContainer] = createSignal<HTMLDivElement>();
 
-  onCleanup(engine.start(true));
-  onCleanup(ioc.register(ctxEngine, engine));
+  createEffect(() => {
+    const canvas = getCanvas();
+    const container = getContainer();
+    if (!canvas || !container) {
+      return;
+    }
 
-  async function createApp() {
-    const app = new Application();
-    await app.init({
-      antialias: true,
-      eventMode: "none",
-      roundPixels: true,
-      canvas,
+    usePixiApp(async () => {
+      const app = new Application();
+      const engine = new Engine(canvas);
+      onCleanup(engine.start(true));
+      onCleanup(ioc.register(ctxEngine, engine));
+      app.stage.addChild(new ActorSpriteList(() => props));
+
+      await app.init({
+        antialias: true,
+        eventMode: "none",
+        roundPixels: true,
+        canvas,
+        resizeTo: container,
+      });
+      return app;
     });
-    app.stage.addChild(new ActorSpriteList(() => props));
-    return app;
-  }
-  return <SolidPixi id="PixiApp" createApp={createApp} style={{ flex: 1 }} />;
+  });
+
+  return (
+    <div style={{ flex: 1 }} ref={setContainer}>
+      <canvas ref={setCanvas} />
+    </div>
+  );
 }
 
 const styles = {

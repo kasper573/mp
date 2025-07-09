@@ -32,10 +32,7 @@ function PlayPage() {
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-      <PlayerClient
-        stateClient={stateClient}
-        style={{ display: "flex", flex: 1 }}
-      >
+      <PlayerClient stateClient={stateClient}>
         <GameDebugUiPortal>
           <MiscDebugUi />
         </GameDebugUiPortal>
