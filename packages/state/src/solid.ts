@@ -12,11 +12,7 @@ export function useObservable<Value>(
 ): Accessor<Value> {
   const [value, setValue] = createSignal(
     getObservableValue(accessObservable()),
-    {
-      // The observable uses a notification system that should be trusted implicitly.
-      // If a change is notified, we always trust and accept the new value, without equality checks.
-      equals: never,
-    },
+    { equals: isSameObservableValue },
   );
 
   function accessObservable() {
@@ -46,6 +42,23 @@ type ObservableAccessors<Observables extends ObservableLike<unknown>[]> = {
   [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
 };
 
-function never() {
+// The observable uses a notification system that should be trusted implicitly.
+// If a change is notified, we always trust and accept the new value, even if the new value is the same object instance.
+// This is because we rely on mutations and the same instance has received mutations when a notification is received.
+// We can still equality check primitives though.
+function isSameObservableValue(a: unknown, b: unknown) {
+  if (isPrimitive(a) && isPrimitive(b)) {
+    return a === b;
+  }
   return false;
+}
+
+function isPrimitive(value: unknown): boolean {
+  return (
+    value === null ||
+    value === undefined ||
+    typeof value === "string" ||
+    typeof value === "number" ||
+    typeof value === "boolean"
+  );
 }
