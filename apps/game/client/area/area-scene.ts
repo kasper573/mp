@@ -5,8 +5,13 @@ import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, LayerViewFactory } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { DestroyOptions } from "pixi.js";
-import { Container, Matrix, Ticker } from "pixi.js";
+import type { DestroyOptions } from "@mp/graphics";
+import {
+  Container,
+  Matrix,
+  reactiveCollectionBinding,
+  Ticker,
+} from "@mp/graphics";
 import { TimeSpan } from "@mp/time";
 import {
   getAreaIdFromObject,
@@ -15,7 +20,6 @@ import {
 import { ActorController } from "../actor/actor-controller";
 import { clientViewDistance } from "../../server";
 
-import { reactiveCollectionBinding } from "../pixi/reactive-collection";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ctxEngine } from "../engine-context";

@@ -1,5 +1,5 @@
-import type { Texture } from "pixi.js";
-import { Assets } from "pixi.js";
+import type { Texture } from "@mp/graphics";
+import { Assets } from "@mp/graphics";
 import { InjectionContext } from "@mp/ioc";
 import {
   type ActorModelId,

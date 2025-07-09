@@ -1,12 +1,16 @@
 import { assert } from "@mp/std";
-import type { DestroyOptions } from "pixi.js";
-import { ColorMatrixFilter, Container, Text } from "pixi.js";
+import type { DestroyOptions } from "@mp/graphics";
+import {
+  ColorMatrixFilter,
+  Container,
+  createTintFilterMatrix,
+  Text,
+} from "@mp/graphics";
 import { TimeSpan } from "@mp/time";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { ioc } from "../context";
 import { ctxGameStateClient } from "../game-state/game-state-client";
-import { createTintFilterMatrix } from "../pixi/tint-filter";
 import { ActorSprite } from "./actor-sprite";
 import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 

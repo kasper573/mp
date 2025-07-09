@@ -1,4 +1,4 @@
-import { ColorMatrixFilter } from "pixi.js";
+import { ColorMatrixFilter } from "@mp/graphics";
 
 /**
  * Creates a ColorMatrixFilter that tints toward a given color.

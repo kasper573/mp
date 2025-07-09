@@ -1,8 +1,9 @@
 {
-  "name": "@mp/tiled-renderer",
+  "name": "@mp/graphics",
   "version": "0.0.0",
-  "private": true,
+  "sideEffects": false,
   "type": "module",
+  "license": "MIT",
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -11,8 +12,10 @@
     }
   },
   "dependencies": {
-    "@mp/graphics": "workspace:*",
-    "@mp/tiled-loader": "workspace:*"
+    "@mp/math": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@mp/time": "workspace:*",
+    "pixi.js": "8.11.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

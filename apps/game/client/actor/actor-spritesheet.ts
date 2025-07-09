@@ -5,8 +5,8 @@ import type {
   Texture,
   SpritesheetFrameData,
   SpritesheetData,
-} from "pixi.js";
-import { Spritesheet } from "pixi.js";
+} from "@mp/graphics";
+import { Spritesheet } from "@mp/graphics";
 import type { ActorAnimationName } from "../../server";
 
 export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;

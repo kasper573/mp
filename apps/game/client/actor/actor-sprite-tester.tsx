@@ -1,6 +1,6 @@
 import type { JSX } from "solid-js";
 import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { Application, Container, Text } from "pixi.js";
+import { Application, Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,

@@ -6,9 +6,9 @@ import {
   clamp,
 } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import type { SpriteOptions, Spritesheet, Texture } from "pixi.js";
-import { Ticker } from "pixi.js";
-import { Sprite } from "pixi.js";
+import type { SpriteOptions, Spritesheet, Texture } from "@mp/graphics";
+import { Ticker } from "@mp/graphics";
+import { Sprite } from "@mp/graphics";
 
 /**
  * Selects a texture from a set of spritesheets based on a current animation name and cardinal direction.

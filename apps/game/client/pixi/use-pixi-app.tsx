@@ -1,5 +1,5 @@
 import { assert } from "@mp/std";
-import { type Application } from "pixi.js";
+import { type Application } from "@mp/graphics";
 import { createEffect, createResource, onCleanup } from "solid-js";
 
 /**

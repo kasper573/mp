@@ -1,5 +1,5 @@
 import { Engine } from "@mp/engine";
-import { Application } from "pixi.js";
+import { Application } from "@mp/graphics";
 import type { JSX } from "solid-js";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import { useStorage } from "@mp/state/solid";

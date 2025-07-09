@@ -1,8 +1,8 @@
 import { type TimesPerSecond } from "@mp/std";
 import { TimeSpan } from "@mp/time";
+import type { Animation } from "@mp/graphics";
+import { AnimationController } from "@mp/graphics";
 import { type ActorAnimationName } from "../../server";
-import type { Animation } from "../pixi/animation-controller";
-import { AnimationController } from "../pixi/animation-controller";
 
 export class ActorSprite extends AnimationController<ActorAnimationName> {
   attackSpeed = 1 as TimesPerSecond;
