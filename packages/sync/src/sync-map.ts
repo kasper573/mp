@@ -42,7 +42,7 @@ export class SyncMap<K, V>
       patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
     }
 
-    let didUpdateAnItem = false;
+    let didCollectionChange = addedKeys.size > 0 || removedKeys.size > 0;
 
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
     for (const key of staleKeys) {
@@ -52,14 +52,14 @@ export class SyncMap<K, V>
         patch.push(...op);
       }
       if (this.dirtyKeys?.has(key)) {
-        didUpdateAnItem = true;
+        didCollectionChange = true;
       }
     }
 
     this.#keysLastFlush = currentKeys;
     this.dirtyKeys?.clear();
 
-    if (patch.length > 0 || didUpdateAnItem) {
+    if (didCollectionChange) {
       this.#observable.$notifySubscribers();
     }
 

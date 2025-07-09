@@ -168,4 +168,28 @@ describe("observable", () => {
     map.flush();
     expect(fn).toHaveBeenCalledTimes(1); // unchanged
   });
+
+  it("does not notify when entities are mutated", () => {
+    class Entity extends SyncEntity {
+      @collect()
+      accessor name: string;
+      constructor(name: string) {
+        super();
+        this.name = name;
+      }
+    }
+
+    const person = new Entity("john");
+    const map = new SyncMap<string, Entity>([["1", person]]);
+
+    map.flush(); // Discard added key
+    map.flush(); // Discard entity flush
+
+    const fn = vi.fn();
+    map.subscribe(fn);
+    person.name = "jane";
+    map.flush();
+
+    expect(fn).toHaveBeenCalledTimes(0);
+  });
 });
