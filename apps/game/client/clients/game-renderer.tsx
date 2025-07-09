@@ -75,6 +75,7 @@ export function GameRenderer(props: GameRendererProps) {
       <canvas ref={setCanvas} />
       <AreaUi />
       <GameDebugUi enabled={showDebugUi()}>
+        {props.additionalDebugUi}
         <AreaDebugSettingsForm
           value={areaDebugSettings()}
           onChange={setAreaDebugSettings}
