@@ -13,7 +13,6 @@
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/state": "workspace:*",
-    "@mp/ioc": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*"
   },

@@ -363,6 +363,9 @@ importers:
 
   packages/auth:
     dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
       '@mp/std':
         specifier: workspace:*
         version: link:../std
@@ -372,9 +375,6 @@ importers:
       oidc-client-ts:
         specifier: 3.1.0
         version: 3.1.0
-      solid-js:
-        specifier: 'catalog:'
-        version: 1.9.5
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -395,9 +395,6 @@ importers:
 
   packages/engine:
     dependencies:
-      '@mp/ioc':
-        specifier: workspace:*
-        version: link:../ioc
       '@mp/math':
         specifier: workspace:*
         version: link:../math

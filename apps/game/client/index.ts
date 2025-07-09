@@ -9,6 +9,7 @@ export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
 export * from "./game-state/optimistic-game-state";
 export * from "./context";
+export * from "./auth-context";
 export * from "./clients/spectator-client";
 export * from "../shared/encoder-extensions";
 export * from "../shared/client-view-distance-settings";
