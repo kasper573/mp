@@ -84,22 +84,24 @@ function PixiApp(props: ActorTestSettings) {
       return;
     }
 
-    usePixiApp(async () => {
-      const app = new Application();
-      const engine = new Engine(canvas);
-      onCleanup(engine.start(true));
-      onCleanup(ioc.register(ctxEngine, engine));
-      app.stage.addChild(new ActorSpriteList(() => props));
+    usePixiApp(
+      async () => {
+        const app = new Application();
+        const engine = new Engine(canvas);
+        onCleanup(engine.start(true));
+        onCleanup(ioc.register(ctxEngine, engine));
+        app.stage.addChild(new ActorSpriteList(() => props));
 
-      await app.init({
-        antialias: true,
-        eventMode: "none",
-        roundPixels: true,
-        canvas,
-        resizeTo: container,
-      });
-      return app;
-    });
+        await app.init({
+          antialias: true,
+          eventMode: "none",
+          roundPixels: true,
+          canvas,
+        });
+        return app;
+      },
+      { resizeTo: container },
+    );
   });
 
   return (

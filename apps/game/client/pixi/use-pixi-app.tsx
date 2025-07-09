@@ -1,3 +1,4 @@
+import { assert } from "@mp/std";
 import { type Application } from "pixi.js";
 import { createEffect, createResource, onCleanup } from "solid-js";
 
@@ -9,18 +10,31 @@ export function usePixiApp(
    * You have to call app.init before returning the app.
    */
   createApp: () => Promise<Application | undefined>,
+  options?: {
+    resizeTo?: HTMLElement;
+  },
 ) {
   const [appResource] = createResource(async () => {
-    onCleanup(() => {
+    let appPromise: Promise<Application | undefined> | undefined = undefined;
+    onCleanup(async () => {
+      const app = await appPromise;
       app?.destroy({}, { children: true });
     });
-    const app = await createApp();
-    return app;
+    appPromise = createApp();
+    return appPromise;
   });
 
-  // Must depend on the resource to ensure it's created
   createEffect(() => {
-    appResource();
+    const app = appResource();
+    if (app) {
+      // Resize to the given or parent element
+      app.resizeTo = options?.resizeTo ?? assert(app.canvas.parentElement);
+
+      // It seems that canvas need to be absolute positioned for resizing to work properly.
+      // (Without it resizing works when expanding, but not when shrinking.)
+      app.resizeTo.style.position = "relative";
+      app.canvas.style.position = "absolute";
+    }
   });
 
   return appResource;

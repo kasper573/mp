@@ -2,7 +2,6 @@ import { Engine } from "@mp/engine";
 import { Application } from "pixi.js";
 import type { JSX } from "solid-js";
 import { createEffect, createSignal, onCleanup } from "solid-js";
-import { assert } from "@mp/std";
 import { useStorage } from "@mp/state/solid";
 import { StorageAdapter } from "@mp/state";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
@@ -64,7 +63,6 @@ export function GameRenderer(props: GameRendererProps) {
         antialias: true,
         eventMode: "none",
         roundPixels: true,
-        resizeTo: assert(canvas.parentElement),
         canvas,
       });
 
