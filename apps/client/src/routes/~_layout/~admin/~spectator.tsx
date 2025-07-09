@@ -1,10 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import {
-  GameDebugUiPortal,
-  GameStateClient,
-  SpectatorClient,
-  worldRoles,
-} from "@mp/game/client";
+import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
 import { onCleanup, Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import { useStorage } from "@mp/state/solid";
@@ -40,11 +35,11 @@ function RouteComponent() {
       }}
     >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
-        <SpectatorClient stateClient={stateClient}>
-          <GameDebugUiPortal>
-            <MiscDebugUi />
-          </GameDebugUiPortal>
-        </SpectatorClient>
+        <SpectatorClient
+          stateClient={stateClient}
+          additionalDebugUi={<MiscDebugUi />}
+          interactive={false}
+        />
       </Suspense>
     </div>
   );

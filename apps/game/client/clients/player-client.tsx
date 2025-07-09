@@ -7,6 +7,9 @@ import { ioc } from "../context";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 
+/**
+ * A `GameClient` that joins the game as the authenticated user
+ */
 export function PlayerClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
   const auth = useContext(AuthContext);

@@ -10,6 +10,10 @@ import { ioc } from "../context";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 
+/**
+ * A `GameClient` that doesn't join the game, but instead spectates the selected player.
+ * Also has additional UI for selecting spectator options.
+ */
 export function SpectatorClient(props: GameClientProps) {
   const [spectatedCharacterId, setSpectatedCharacterId] =
     createSignal<CharacterId>();
@@ -45,7 +49,7 @@ export function SpectatorClient(props: GameClientProps) {
       />
 
       <Suspense fallback={<LoadingSpinner debugId="SpectatorClient" />}>
-        <GameClient {...props} interactive={props.interactive ?? false} />
+        <GameClient {...props} interactive={props.interactive} />
       </Suspense>
     </>
   );

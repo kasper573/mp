@@ -3,8 +3,8 @@ import { createSignal, onMount, onCleanup, batch, createMemo } from "solid-js";
 import { useObservable } from "@mp/state/solid";
 import type { Character, TiledResource } from "../../server";
 import { ioc } from "../context";
-import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ctxEngine } from "../engine-context";
+import { ctxGameStateClient } from "./game-state-client";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const client = ioc.get(ctxGameStateClient);

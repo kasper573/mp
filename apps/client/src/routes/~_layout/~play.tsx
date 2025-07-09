@@ -1,9 +1,5 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import {
-  GameDebugUiPortal,
-  GameStateClient,
-  PlayerClient,
-} from "@mp/game/client";
+import { GameStateClient, PlayerClient } from "@mp/game/client";
 import { onCleanup, Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
 import { useStorage } from "@mp/state/solid";
@@ -32,11 +28,11 @@ function PlayPage() {
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-      <PlayerClient stateClient={stateClient}>
-        <GameDebugUiPortal>
-          <MiscDebugUi />
-        </GameDebugUiPortal>
-      </PlayerClient>
+      <PlayerClient
+        stateClient={stateClient}
+        additionalDebugUi={<MiscDebugUi />}
+        interactive
+      />
     </Suspense>
   );
 }

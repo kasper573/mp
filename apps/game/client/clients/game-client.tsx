@@ -1,9 +1,8 @@
-import type { ParentProps } from "solid-js";
+import type { JSX } from "solid-js";
 import {
   Switch,
   Match,
   Suspense,
-  createSignal,
   createMemo,
   createEffect,
   onCleanup,
@@ -21,23 +20,24 @@ import {
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "../actor/actor-spritesheet-lookup";
-import type { GameDebugUiState } from "../debug/game-debug-ui-state";
-import { GameDebugUiContext } from "../debug/game-debug-ui-state";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ioc } from "../context";
 import { Effect } from "../effect";
 import { GameRenderer } from "./game-renderer";
 
-export type GameClientProps = ParentProps<{
+export interface GameClientProps {
   stateClient: GameStateClient;
-  interactive?: boolean;
-}>;
+  interactive: boolean;
+  additionalDebugUi?: JSX.Element;
+}
 
+/**
+ * A wrapper of `GameRenderer` that handles all async state loading and state management.
+ * This allows the `GameRenderer` to focus on rendering the game, while this component
+ * can focus on the data fetching and state management.
+ */
 export function GameClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
-  const [portalContainer, setPortalContainer] = createSignal<HTMLElement>();
-  const [isDebugUiEnabled, setDebugUiEnabled] = createSignal(false);
-  const interactive = () => props.interactive ?? true;
 
   const areaId = useObservable(() => props.stateClient.areaId);
 
@@ -67,13 +67,6 @@ export function GameClient(props: GameClientProps) {
     }
   });
 
-  const debugUiState: GameDebugUiState = {
-    portalContainer,
-    setPortalContainer,
-    enabled: isDebugUiEnabled,
-    setEnabled: setDebugUiEnabled,
-  };
-
   const isConnected = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
@@ -93,22 +86,19 @@ export function GameClient(props: GameClientProps) {
                   ioc.register(ctxActorSpritesheetLookup, actorSpritesheets)
                 }
               >
-                <GameDebugUiContext.Provider value={debugUiState}>
-                  <Suspense
-                    fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
-                  >
-                    <GameRenderer
-                      interactive={interactive()}
-                      gameState={props.stateClient.gameState}
-                      debugUiState={debugUiState}
-                      areaSceneOptions={{
-                        area,
-                        spritesheets: areaSpritesheets,
-                      }}
-                    />
-                  </Suspense>
-                  {props.children}
-                </GameDebugUiContext.Provider>
+                <Suspense
+                  fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
+                >
+                  <GameRenderer
+                    interactive={props.interactive}
+                    gameState={props.stateClient.gameState}
+                    additionalDebugUi={props.additionalDebugUi}
+                    areaSceneOptions={{
+                      area,
+                      spritesheets: areaSpritesheets,
+                    }}
+                  />
+                </Suspense>
               </Effect>
             </Suspense>
           )}
