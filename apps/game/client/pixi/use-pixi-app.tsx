@@ -34,6 +34,10 @@ export function usePixiApp(
       // (Without it resizing works when expanding, but not when shrinking.)
       app.resizeTo.style.position = "relative";
       app.canvas.style.position = "absolute";
+
+      // Must manually call resize when changing resizeTo target to immediately apply the size
+      // (otherwise it will only apply the new size on the next time the target is resized)
+      app.resize();
     }
   });
 
