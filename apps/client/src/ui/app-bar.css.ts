@@ -10,6 +10,7 @@ const row = atoms({
 export const nav = style([
   row,
   atoms({
+    visibility: "visible",
     backgroundColor: "info.base",
     color: "info.face",
     padding: "xl",

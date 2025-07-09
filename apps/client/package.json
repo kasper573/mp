@@ -29,6 +29,7 @@
     "solid-js": "catalog:"
   },
   "devDependencies": {
+    "@babel/plugin-proposal-decorators": "7.27.1",
     "@mp/tsconfig": "workspace:*",
     "@tanstack/router-plugin": "1.121.10",
     "@vanilla-extract/vite-plugin": "catalog:",

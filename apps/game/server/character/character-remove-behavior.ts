@@ -1,5 +1,4 @@
 import type { Logger } from "@mp/logger";
-import { recordValues } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { ClientRegistry } from "../user/client-registry";
@@ -22,9 +21,9 @@ export function characterRemoveBehavior(
   return ({ totalTimeElapsed }) => {
     const registeredCharacterIds = new Set(clients.characterIds.values());
 
-    for (const character of recordValues(state.actors).filter(
-      (a) => a.type === "character",
-    )) {
+    for (const character of state.actors
+      .values()
+      .filter((a) => a.type === "character")) {
       if (!registeredCharacterIds.has(character.id)) {
         if (removeSchedules.has(character.id)) {
           // Already scheduled for removal, nothing else to do
@@ -41,7 +40,7 @@ export function characterRemoveBehavior(
     for (const [characterId, removeTime] of removeSchedules.entries()) {
       if (totalTimeElapsed.compareTo(removeTime) >= 0) {
         logger.info(`Removing character ${characterId}`);
-        delete state.actors[characterId];
+        state.actors.delete(characterId);
         removeSchedules.delete(characterId);
       }
     }

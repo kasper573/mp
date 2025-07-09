@@ -5,14 +5,10 @@ import {
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
-import type { Logger } from "@mp/logger";
 import { createEffect } from "solid-js";
 import { env } from "../env";
 
-export function createFaroClient(
-  logger: Logger,
-  identity: () => UserIdentity | undefined,
-) {
+export function createFaroClient(identity: () => UserIdentity | undefined) {
   const faro = initializeFaro({
     url: env.faro.receiverUrl,
     isolate: true,

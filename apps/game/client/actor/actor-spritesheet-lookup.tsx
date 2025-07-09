@@ -1,6 +1,6 @@
-import type { Texture } from "pixi.js";
-import { Assets } from "pixi.js";
-import { createContext } from "solid-js";
+import type { Texture } from "@mp/graphics";
+import { Assets } from "@mp/graphics";
+import { InjectionContext } from "@mp/ioc";
 import {
   type ActorModelId,
   type ActorAnimationName,
@@ -43,16 +43,5 @@ export async function loadActorSpritesheets(
   );
 }
 
-export const ActorSpritesheetContext = createContext(
-  new Proxy(
-    {} as ReadonlyMap<
-      ActorModelId,
-      ReadonlyMap<ActorAnimationName, ActorSpritesheet>
-    >,
-    {
-      get() {
-        throw new Error("ActorSpritesheetContext is not initialized");
-      },
-    },
-  ),
-);
+export const ctxActorSpritesheetLookup =
+  InjectionContext.new<ActorSpritesheetLookup>("ActorSpritesheetLookup");

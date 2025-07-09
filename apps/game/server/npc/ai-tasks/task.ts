@@ -5,11 +5,11 @@ import type { NpcInstance } from "../types";
 import type { ActorId } from "../../actor";
 import type { NpcAiCombatMemory } from "../npc-ai-combat-memory";
 import type { GameState } from "../../game-state";
-import type { GameStateEmitter } from "../../game-state-emitter";
+import type { GameStateServer } from "../../game-state-server";
 
 export interface TaskInput {
   gameState: GameState;
-  gameStateEmitter: GameStateEmitter;
+  gameStateServer: GameStateServer;
   areas: AreaLookup;
   npc: NpcInstance;
   npcCombatMemories: ReadonlyMap<ActorId, NpcAiCombatMemory>;

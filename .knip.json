@@ -2,6 +2,7 @@
   "include": ["dependencies"],
   "ignoreDependencies": [
     "eslint-import-resolver-typescript",
+    "@babel/plugin-proposal-decorators",
     "@mp/tsconfig",
     "@mp/eslint",
     "pino-pretty"

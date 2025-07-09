@@ -4,8 +4,8 @@ import type {
   SpritesheetData,
   SpritesheetFrameData,
   Texture,
-} from "pixi.js";
-import { Assets, Spritesheet } from "pixi.js";
+} from "@mp/graphics";
+import { Assets, Spritesheet } from "@mp/graphics";
 import type { FilePath, LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
   localToGlobalId,
@@ -13,7 +13,6 @@ import {
   type TiledMap,
   type Tileset,
 } from "@mp/tiled-loader";
-import { recordValues } from "@mp/std";
 
 export async function loadTiledMapSpritesheets(
   tiledMap: TiledMap,
@@ -106,7 +105,7 @@ export function createTiledTextureLookup(
 ): TiledTextureLookup {
   return {
     texture(id) {
-      for (const ss of recordValues(spritesheets)) {
+      for (const ss of Object.values(spritesheets)) {
         const texture = ss.textures[id] as Texture | undefined;
         if (texture) {
           return texture;
@@ -117,7 +116,7 @@ export function createTiledTextureLookup(
       );
     },
     animation(id): FrameObject[] {
-      for (const ss of recordValues(spritesheets)) {
+      for (const ss of Object.values(spritesheets)) {
         const frames = ss.data.animationsWithDuration?.get(id);
         if (frames) {
           return frames.map(({ duration, id }) => ({

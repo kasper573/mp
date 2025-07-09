@@ -1,18 +1,13 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import {
-  createGameStateClient,
-  GameDebugUiPortal,
-  SpectatorClient,
-  useRpc,
-  worldRoles,
-} from "@mp/game/client";
-import { Suspense, useContext } from "solid-js";
+import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
+import { onCleanup, Suspense, useContext } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
+import { useStorage } from "@mp/state/solid";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
 import { LoggerContext } from "../../../logger";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import { miscDebugSettings } from "../../../signals/misc-debug-ui-settings";
+import { miscDebugStorage } from "../../../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -21,12 +16,14 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const gameState = createGameStateClient(
-    useRpc(),
-    useContext(SocketContext),
-    useContext(LoggerContext),
-    miscDebugSettings,
-  );
+  const [settings] = useStorage(miscDebugStorage);
+  const stateClient = new GameStateClient({
+    socket: useContext(SocketContext),
+    logger: useContext(LoggerContext),
+    settings,
+  });
+
+  onCleanup(stateClient.start());
 
   return (
     <div
@@ -39,13 +36,10 @@ function RouteComponent() {
     >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
         <SpectatorClient
-          gameState={gameState}
-          style={{ display: "flex", flex: 1 }}
-        >
-          <GameDebugUiPortal>
-            <MiscDebugUi />
-          </GameDebugUiPortal>
-        </SpectatorClient>
+          stateClient={stateClient}
+          additionalDebugUi={<MiscDebugUi />}
+          interactive={false}
+        />
       </Suspense>
     </div>
   );

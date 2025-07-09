@@ -1,11 +1,11 @@
 import { Vector, type VectorLike } from "@mp/math";
-import { type Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
 import { rpc } from "../rpc";
 import { roles } from "../user/auth";
-import { ctxGameStateEmitter } from "../game-state-emitter";
+import { ctxGameStateServer } from "../game-state-server";
 import { characterRoles } from "../../shared/roles";
 import { ctxCharacterService } from "./service";
 import { type CharacterId } from "./types";
@@ -50,10 +50,10 @@ export const characterRouter = rpc.router({
     .use(roles([characterRoles.kill]))
     .mutation(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameState);
-      const emitter = ctx.get(ctxGameStateEmitter);
-      const target = state.actors[targetId];
+      const server = ctx.get(ctxGameStateServer);
+      const target = assert(state.actors.get(targetId));
       target.health = 0;
-      emitter.addEvent("actor.death", target.id);
+      server.addEvent("actor.death", target.id);
     }),
 
   respawn: rpc.procedure

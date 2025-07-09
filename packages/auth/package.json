@@ -21,10 +21,10 @@
     }
   },
   "dependencies": {
+    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "jose": "5.9.6",
-    "oidc-client-ts": "3.1.0",
-    "solid-js": "catalog:"
+    "oidc-client-ts": "3.1.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

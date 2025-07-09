@@ -1,18 +1,18 @@
 import type { Tile } from "@mp/std";
-import { assert, recordValues } from "@mp/std";
+import { assert } from "@mp/std";
 import type { ActorId } from "../../actor";
 import type { Task, TaskInput } from "./task";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(input) {
-    const { npc, gameState, gameStateEmitter, areas, rng, npcCombatMemories } =
+    const { npc, gameState, gameStateServer, areas, rng, npcCombatMemories } =
       input;
 
-    const deadActorsThisTick = gameStateEmitter.peekEvent("actor.death");
+    const deadActorsThisTick = gameStateServer.peekEvent("actor.death");
     npcCombatMemories.get(npc.id)?.forgetCombatatants(deadActorsThisTick);
 
     if (npc.attackTargetId) {
-      const target = assert(gameState.actors[npc.attackTargetId]);
+      const target = assert(gameState.actors.get(npc.attackTargetId));
       if (npc.coords.distance(target.coords) > npc.aggroRange) {
         // Target out of range, lose aggro
         npc.attackTargetId = undefined;
@@ -54,22 +54,26 @@ export const defensiveHuntFilter: HuntFilter = ({
   npcCombatMemories,
 }) => {
   const combatMemory = npcCombatMemories.get(npc.id);
-  const target = recordValues(gameState.actors).find(
-    (candidate) =>
-      candidate.health > 0 &&
-      candidate.coords.distance(npc.coords) <= npc.aggroRange &&
-      combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
-  );
+  const target = gameState.actors
+    .values()
+    .find(
+      (candidate) =>
+        candidate.health > 0 &&
+        candidate.coords.distance(npc.coords) <= npc.aggroRange &&
+        combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
+    );
   return target?.id;
 };
 
 export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
-  const target = recordValues(gameState.actors).find(
-    (candidate) =>
-      candidate.health > 0 &&
-      candidate.type === "character" &&
-      candidate.coords.distance(npc.coords) <= npc.aggroRange,
-  );
+  const target = gameState.actors
+    .values()
+    .find(
+      (candidate) =>
+        candidate.health > 0 &&
+        candidate.type === "character" &&
+        candidate.coords.distance(npc.coords) <= npc.aggroRange,
+    );
   return target?.id;
 };
 
@@ -82,7 +86,8 @@ export const protectiveHuntFilter: HuntFilter = ({
 
   // Consider other npcs of the same spawn allies
   const allyIds = new Set(
-    recordValues(gameState.actors)
+    gameState.actors
+      .values()
       .filter(
         (actor) =>
           actor.id !== npc.id &&
@@ -104,7 +109,7 @@ export const protectiveHuntFilter: HuntFilter = ({
     }),
   );
 
-  const target = recordValues(gameState.actors).find((candidate) => {
+  const target = gameState.actors.values().find((candidate) => {
     if (
       candidate.health <= 0 ||
       candidate.coords.distance(npc.coords) > npc.aggroRange

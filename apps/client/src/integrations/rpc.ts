@@ -14,7 +14,7 @@ export type RpcClientMiddleware = () => Promise<unknown>;
 export function createRpcClient(
   socket: WebSocket,
   logger: Logger,
-  accessToken?: () => AccessToken | undefined,
+  accessToken: () => AccessToken | undefined,
 ): RpcClient {
   const transceiver = new BinaryRpcTransceiver({
     send: (data) => socket.send(data),
@@ -27,6 +27,7 @@ export function createRpcClient(
     transceiver.call,
     socket,
     accessToken,
+    logger,
   );
 
   return createSolidRpcInvoker<ServerRpcRouter>(async (...args) => {
@@ -69,18 +70,26 @@ export const SocketContext = createContext<WebSocket>(
 function createAccessTokenSyncBehavior(
   call: RpcCaller,
   socket: WebSocket,
-  accessToken?: () => AccessToken | undefined,
+  accessToken: () => AccessToken | undefined,
+  logger: Logger,
 ) {
   // We need a separate rpc invoker to actually call the auth procedure.
   // Calling the real rpc invoker that we're creating would cause an infinite loop.
   const rpc = createSolidRpcInvoker<ServerRpcRouter>(call);
 
   let hasSentAuthToken = false;
+  let currentAuthSendPromise: Promise<void> | undefined;
+
+  function reauthenticate() {
+    hasSentAuthToken = false;
+    currentAuthSendPromise = undefined;
+  }
 
   // If the token changes we need to re-authenticate.
   createEffect(() => {
-    if (accessToken?.()) {
-      hasSentAuthToken = false;
+    if (accessToken()) {
+      logger.debug("Access token changed, re-authenticating");
+      reauthenticate();
     }
   });
 
@@ -92,20 +101,20 @@ function createAccessTokenSyncBehavior(
     // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
     // 1000 = Abnormal closure
     if (e.code !== 1000) {
-      hasSentAuthToken = false;
+      logger.debug("WebSocket closed abnormally, re-authenticating");
+      reauthenticate();
     }
   }
 
   return async function ensureAuth() {
-    if (!hasSentAuthToken) {
-      const token = accessToken?.();
-      if (!token) {
-        throw new Error(
-          "Attempted to call a protected rpc procedure without an access token",
-        );
-      }
-      await rpc.world.auth(token);
-      hasSentAuthToken = true;
+    const token = accessToken();
+    if (!hasSentAuthToken && token && !currentAuthSendPromise) {
+      logger.debug("Sending auth token to rpc server");
+      currentAuthSendPromise = rpc.world.auth(token).then(() => {
+        hasSentAuthToken = true;
+        currentAuthSendPromise = undefined;
+      });
     }
+    await currentAuthSendPromise;
   };
 }

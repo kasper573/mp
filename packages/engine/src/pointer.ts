@@ -1,18 +1,18 @@
 import { Vector } from "@mp/math";
-import type { Computed } from "@mp/state";
-import { atom, computed } from "@mp/state";
+import type { ReadonlyObservable } from "@mp/state";
+import { observable } from "@mp/state";
 import type { Pixel } from "@mp/std";
 import type { Camera } from "./camera";
 
 export class Pointer {
-  readonly #isDown = atom(false);
-  readonly #position = atom(new Vector(0 as Pixel, 0 as Pixel));
+  readonly #isDown = observable(false);
+  readonly #position = observable(new Vector(0 as Pixel, 0 as Pixel));
 
-  get position(): Vector<Pixel> {
-    return this.#position.get();
+  get position(): ReadonlyObservable<Vector<Pixel>> {
+    return this.#position;
   }
-  get isDown(): boolean {
-    return this.#isDown.get();
+  get isDown(): ReadonlyObservable<boolean> {
+    return this.#isDown;
   }
 
   constructor(private target: HTMLElement) {}
@@ -32,21 +32,20 @@ export class Pointer {
   private onPointerDown = () => this.#isDown.set(true);
   private onPointerUp = () => this.#isDown.set(false);
   private onPointerMove = (e: PointerEvent) => {
-    const relativeX = (e.clientX - this.target.offsetLeft) as Pixel;
-    const relativeY = (e.clientY - this.target.offsetTop) as Pixel;
+    const targetBounds = this.target.getBoundingClientRect();
+    const relativeX = (e.clientX - targetBounds.left) as Pixel;
+    const relativeY = (e.clientY - targetBounds.top) as Pixel;
     this.#position.set(new Vector(relativeX, relativeY));
   };
 }
 
 export class PointerForCamera extends Pointer {
-  #worldPosition: Computed<Vector<Pixel>>;
-
-  get worldPosition(): Vector<Pixel> {
-    return this.#worldPosition();
-  }
+  worldPosition: ReadonlyObservable<Vector<Pixel>>;
 
   constructor(target: HTMLElement, camera: Camera) {
     super(target);
-    this.#worldPosition = computed(() => camera.viewportToWorld(this.position));
+    this.worldPosition = this.position.derive((pos) =>
+      camera.viewportToWorld(pos),
+    );
   }
 }

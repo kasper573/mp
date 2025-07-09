@@ -1,12 +1,10 @@
-import type { FillStyle } from "pixi.js";
-import { Graphics } from "pixi.js";
-import { createEffect } from "solid-js";
-import { Pixi } from "@mp/solid-pixi";
+import type { FillStyle } from "@mp/graphics";
+import { Graphics } from "@mp/graphics";
 import { type Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { AreaResource } from "../../shared/area/area-resource";
 
-export interface TileHighlightProps {
+export interface TileHighlightOptions {
   area: AreaResource;
   target?: TileHighlightTarget;
 }
@@ -16,28 +14,31 @@ export interface TileHighlightTarget {
   type: "attack" | "move";
 }
 
-export function TileHighlight(props: TileHighlightProps) {
-  const gfx = new Graphics();
+export class TileHighlight extends Graphics {
+  constructor(private options: () => TileHighlightOptions) {
+    super();
 
-  createEffect(() => {
-    gfx.clear();
-    if (!props.target) {
-      gfx.fillStyle = hiddenStyle;
+    this.onRender = this.#onRender;
+  }
+
+  #onRender = () => {
+    this.clear();
+    const { target, area } = this.options();
+    if (!target) {
+      this.fillStyle = hiddenStyle;
       return;
     }
 
-    const { tiled } = props.area;
-    const pos = tiled.tileCoordToWorld(props.target.rect.position);
-    const width = tiled.tileToWorldUnit(props.target.rect.size.x);
-    const height = tiled.tileToWorldUnit(props.target.rect.size.y);
+    const { tiled } = area;
+    const pos = tiled.tileCoordToWorld(target.rect.position);
+    const width = tiled.tileToWorldUnit(target.rect.size.x);
+    const height = tiled.tileToWorldUnit(target.rect.size.y);
 
-    gfx.fillStyle = visibleStyles[props.target.type];
-    gfx.position.set(pos.x, pos.y);
-    gfx.rect(0, 0, width, height);
-    gfx.fill();
-  });
-
-  return <Pixi as={gfx} />;
+    this.fillStyle = visibleStyles[target.type];
+    this.position.set(pos.x, pos.y);
+    this.rect(0, 0, width, height);
+    this.fill();
+  };
 }
 
 const visibleStyles: Record<TileHighlightTarget["type"], FillStyle> = {

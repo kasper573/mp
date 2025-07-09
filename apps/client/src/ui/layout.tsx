@@ -7,11 +7,21 @@ export default function Layout(props: ParentProps) {
   return (
     <>
       <AppBar />
-      <ErrorBoundary fallback={ErrorFallbackFn}>
-        <Suspense fallback={<LoadingSpinner debugId="Layout" />}>
-          {props.children}
-        </Suspense>
-      </ErrorBoundary>
+      <div
+        id="layout"
+        style={{
+          display: "flex",
+          "flex-direction": "column",
+          flex: 1,
+          position: "relative",
+        }}
+      >
+        <ErrorBoundary fallback={ErrorFallbackFn}>
+          <Suspense fallback={<LoadingSpinner debugId="Layout" />}>
+            {props.children}
+          </Suspense>
+        </ErrorBoundary>
+      </div>
     </>
   );
 }

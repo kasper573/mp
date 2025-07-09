@@ -1,23 +1,16 @@
-import { TimeSpan } from "@mp/time";
 import { Vector } from "@mp/math";
 import type { Pixel } from "@mp/std";
 import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
+import { FrameEmitter } from "./frame-emitter";
 
 export class Engine {
-  #previousFrameTime = performance.now();
-  #previousFrameDuration = TimeSpan.Zero;
-  #isRunning = false;
   #isInteractive = false;
+  #viewportSizeObserver?: ResizeObserver;
+  frameEmitter = new FrameEmitter();
   pointer: PointerForCamera;
   keyboard: Keyboard;
-  #viewportSizeObserver?: ResizeObserver;
-  #frameCallbacks = new Set<FrameCallback>();
-
-  get frameCallbackCount() {
-    return this.#frameCallbacks.size;
-  }
 
   get isInteractive() {
     return this.#isInteractive;
@@ -37,55 +30,24 @@ export class Engine {
       this.pointer.start();
       this.keyboard.start();
     }
-    this.#isRunning = true;
-    requestAnimationFrame(this.nextFrame);
+    this.frameEmitter.start();
     this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);
     this.#viewportSizeObserver.observe(this.viewport);
+
+    // Return cleanup function for easy integration with effects
+    return () => this.stop();
   };
 
   stop = () => {
     this.pointer.stop();
     this.keyboard.stop();
-    this.#isRunning = false;
+    this.frameEmitter.stop();
     this.#viewportSizeObserver?.disconnect();
     this.#viewportSizeObserver = undefined;
   };
 
-  // Note: Explicit callback based frame reactivity because implicit
-  // reactivity for rendering is error prone and hard to reason about.
-  addFrameCallback(callback: FrameCallback) {
-    this.#frameCallbacks.add(callback);
-    return () => this.#frameCallbacks.delete(callback);
-  }
-
-  private nextFrame: FrameRequestCallback = () => {
-    const thisFrameTime = performance.now();
-    const timeSinceLastFrame = TimeSpan.fromMilliseconds(
-      thisFrameTime - this.#previousFrameTime,
-    );
-    this.#previousFrameTime = thisFrameTime;
-    const currentTime = new Date(thisFrameTime);
-    const opt: FrameCallbackOptions = {
-      timeSinceLastFrame,
-      currentTime,
-      previousFrameDuration: this.#previousFrameDuration,
-    };
-
-    for (const callback of this.#frameCallbacks) {
-      callback(opt);
-    }
-
-    this.#previousFrameDuration = TimeSpan.fromMilliseconds(
-      performance.now() - thisFrameTime,
-    );
-
-    if (this.#isRunning) {
-      requestAnimationFrame(this.nextFrame);
-    }
-  };
-
   private onViewportResized = () => {
-    this.camera.cameraSize = elementSize(this.viewport);
+    this.camera.cameraSize.set(elementSize(this.viewport));
   };
 }
 
@@ -94,12 +56,4 @@ function elementSize(element: HTMLElement): Vector<Pixel> {
     element.clientWidth as Pixel,
     element.clientHeight as Pixel,
   );
-}
-
-export type FrameCallback = (opt: FrameCallbackOptions) => unknown;
-
-export interface FrameCallbackOptions {
-  timeSinceLastFrame: TimeSpan;
-  previousFrameDuration: TimeSpan;
-  currentTime: Date;
 }

@@ -14,8 +14,7 @@
     "@mp/math": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/time": "workspace:*",
-    "solid-js": "catalog:"
+    "@mp/time": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

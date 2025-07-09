@@ -1,2 +1,2 @@
-export * from "./renderer";
+export * from "./layer";
 export * from "./spritesheet";

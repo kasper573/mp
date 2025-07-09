@@ -1,7 +1,7 @@
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId, recordValues } from "@mp/std";
+import { assert, createShortId } from "@mp/std";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { InjectionContext } from "@mp/ioc";
@@ -9,13 +9,12 @@ import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
-import type { NpcInstance } from "./types";
+import { NpcInstance } from "./types";
 import {
   type Npc,
   type NpcType,
   type NpcInstanceId,
   type NpcSpawn,
-  NpcInstanceFactory,
 } from "./types";
 
 export class NpcSpawner {
@@ -32,7 +31,7 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of recordValues(state.actors)) {
+      for (const actor of state.actors.values()) {
         if (actor.type === "npc" && actor.health <= 0) {
           let cleanupTime = corpseCleanupTimers.get(actor.id);
           if (!cleanupTime) {
@@ -40,21 +39,22 @@ export class NpcSpawner {
             corpseCleanupTimers.set(actor.id, cleanupTime);
           }
           if (cleanupTime <= totalTimeElapsed) {
-            delete state.actors[actor.id];
+            state.actors.delete(actor.id);
             corpseCleanupTimers.delete(actor.id);
           }
         }
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = recordValues(state.actors)
+        const currentSpawnCount = state.actors
+          .values()
           .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
           .toArray().length;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {
           const instance = this.createInstance(npc, spawn);
-          state.actors[instance.id] = instance;
+          state.actors.set(instance.id, instance);
         }
       }
     };
@@ -66,8 +66,7 @@ export class NpcSpawner {
     const area = assert(this.areas.get(spawn.areaId));
     const coords = determineSpawnCoords(spawn, area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
-    return NpcInstanceFactory.create({
-      type: "npc",
+    return new NpcInstance({
       ...npc,
       id,
       npcId: npc.id,

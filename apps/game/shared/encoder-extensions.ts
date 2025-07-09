@@ -1,7 +1,11 @@
 import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
-import { TimeSpan } from "@mp/time";
+import { SyncMap } from "@mp/sync";
+// eslint-disable-next-line boundaries/element-types
+import { Character } from "../server/character/types";
+// eslint-disable-next-line boundaries/element-types
+import { NpcInstance } from "../server/npc/types";
 
 export function registerEncoderExtensions(): void {
   // All tags below this are reserved by @mp/encoding
@@ -45,10 +49,24 @@ export function registerEncoderExtensions(): void {
     },
   );
 
-  addEncoderExtension<TimeSpan, number>({
-    Class: TimeSpan as never,
+  addEncoderExtension<SyncMap<unknown, unknown>, Array<[unknown, unknown]>>({
+    Class: SyncMap,
     tag: nextTag(),
-    encode: (v, encode) => encode(v.totalMilliseconds),
-    decode: (v) => TimeSpan.fromMilliseconds(v),
+    encode: (map, encode) => encode(map.entries().toArray()),
+    decode: (entries) => new SyncMap(entries),
+  });
+
+  addEncoderExtension<Character, Partial<Character>>({
+    Class: Character as never,
+    tag: nextTag(),
+    encode: (character, encode) => encode(character.snapshot()),
+    decode: (snapshot) => new Character(snapshot as Character),
+  });
+
+  addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
+    Class: NpcInstance as never,
+    tag: nextTag(),
+    encode: (npc, encode) => encode(npc.snapshot()),
+    decode: (snapshot) => new NpcInstance(snapshot as NpcInstance),
   });
 }

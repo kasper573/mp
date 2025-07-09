@@ -8,7 +8,7 @@ import type {
   TileLayer,
   TileLayerTile,
 } from "@mp/tiled-loader";
-import { Container } from "pixi.js";
+import { Container } from "@mp/graphics";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TiledTextureLookup } from "./spritesheet";
@@ -28,7 +28,7 @@ export class LayerViewFactory {
     for (const [index, layer] of layers.entries()) {
       const view = this.createLayerView(layer);
       memorizeLayer(view, layer);
-      view.label = `${layer.type}: "${layer.name}"`;
+      view.label = layer.name;
       container.addChildAt(view, index);
     }
 

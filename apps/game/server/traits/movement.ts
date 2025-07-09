@@ -1,7 +1,7 @@
 import type { Vector } from "@mp/math";
 import { type CardinalDirection, type Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import { assert, recordValues, type Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state";
@@ -54,7 +54,7 @@ export function movementBehavior(
     // We need to make a first pass to set the weights for the path finding graph.
     // This helps promote more natural movement in avoiding walking over each other.
     tileNodeWeights.clear();
-    for (const actor of recordValues(state.actors)) {
+    for (const actor of state.actors.values()) {
       const area = assert(areas.get(actor.areaId));
       const node = area.graph.getNearestNode(actor.coords);
       if (node) {
@@ -63,7 +63,7 @@ export function movementBehavior(
       }
     }
 
-    for (const actor of recordValues(state.actors)) {
+    for (const actor of state.actors.values()) {
       // The dead don't move
       if (actor.health <= 0) {
         actor.path = undefined;
@@ -118,7 +118,11 @@ export function movementBehavior(
         const destinationArea = areas.get(
           getAreaIdFromObject(object) as AreaId,
         );
-        if (destinationArea && actor.desiredPortalId === object.id) {
+        if (
+          destinationArea &&
+          actor.type === "character" &&
+          actor.desiredPortalId === object.id
+        ) {
           actor.path = undefined;
           actor.desiredPortalId = undefined;
           actor.areaId = destinationArea.id;

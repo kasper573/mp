@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/solid-router";
-import { AuthContext } from "@mp/auth/client";
 import { useNavigate } from "@tanstack/solid-router";
-import { createResource, useContext } from "solid-js";
+import { createResource } from "solid-js";
+import { ctxAuthClient, ioc } from "@mp/game/client";
 
 /**
  * The auth callback route is intentionally placed outside the layout.
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/auth-callback")({
 
 function RouteComponent() {
   const navigate = useNavigate();
-  const auth = useContext(AuthContext);
+  const auth = ioc.get(ctxAuthClient);
 
   createResource(async () => {
     try {

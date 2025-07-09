@@ -1,6 +1,6 @@
-import type { FillStyle, StrokeStyle, ViewContainer } from "pixi.js";
-import { TextStyle } from "pixi.js";
-import { Graphics, Text } from "pixi.js";
+import type { FillStyle, StrokeStyle, ViewContainer } from "@mp/graphics";
+import { TextStyle } from "@mp/graphics";
+import { Graphics, Text } from "@mp/graphics";
 import type {
   EllipseObject,
   PointObject,
@@ -11,8 +11,6 @@ import type {
   TiledObject,
   TiledText,
 } from "@mp/tiled-loader";
-
-export * from "./renderer";
 
 export function createObjectView(obj: TiledObject): ViewContainer {
   switch (obj.objectType) {

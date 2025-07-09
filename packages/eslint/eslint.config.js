@@ -228,6 +228,9 @@ export default tseslint.config(
       // export default foo where foo is an import is useful inside worker thread files
       "unicorn/prefer-export-from": "off",
 
+      // Unicorn keeps making mistakes about this rule and says functions can be moved to an outer scope when it clearly can't
+      "unicorn/consistent-function-scoping": "off",
+
       // Typescript already catches these type of errors
       "unicorn/switch-case-braces": "off",
 

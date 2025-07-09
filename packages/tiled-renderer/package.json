@@ -11,11 +11,8 @@
     }
   },
   "dependencies": {
-    "@mp/solid-pixi": "workspace:*",
-    "@mp/std": "workspace:*",
-    "@mp/tiled-loader": "workspace:*",
-    "pixi.js": "catalog:",
-    "solid-js": "catalog:"
+    "@mp/graphics": "workspace:*",
+    "@mp/tiled-loader": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

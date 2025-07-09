@@ -1,5 +1,5 @@
 import type { ClientVisibilityFactory } from "@mp/sync";
-import { recordValues, type Tile } from "@mp/std";
+import { type Tile } from "@mp/std";
 import { clientViewDistanceRect } from "../../shared/client-view-distance-rect";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorId } from "../actor";
@@ -31,9 +31,9 @@ export function deriveClientVisibility(
     state: GameState,
     observerIds: Iterable<ActorId | undefined>,
   ): Generator<ActorId> {
-    for (const other of recordValues(state.actors)) {
+    for (const other of state.actors.values()) {
       for (const observerId of observerIds) {
-        const observer = observerId ? state.actors[observerId] : undefined;
+        const observer = observerId ? state.actors.get(observerId) : undefined;
         if (observer && canSeeSubject(observer, other)) {
           yield other.id;
         }

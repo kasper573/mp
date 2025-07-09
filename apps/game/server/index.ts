@@ -8,7 +8,7 @@ export * from "./character/rpc";
 export * from "./character/service";
 export * from "./character/types";
 export * from "./game-state";
-export * from "./game-state-emitter";
+export * from "./game-state-server";
 export * from "./user/client-visibility";
 export * from "./area/lookup";
 export * from "./area/rpc";

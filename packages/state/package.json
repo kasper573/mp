@@ -9,7 +9,16 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./solid": {
+      "types": "./src/solid.ts",
+      "import": "./src/solid.ts",
+      "require": "./src/solid.ts"
     }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
   },
   "dependencies": {
     "solid-js": "catalog:"

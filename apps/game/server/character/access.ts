@@ -1,5 +1,4 @@
 import type { GameRpcContext } from "../rpc";
-import type { Actor } from "../actor";
 import { ctxGameState } from "../game-state";
 import { ctxClientId } from "../user/client-id";
 import { ctxClientRegistry } from "../user/client-registry";
@@ -7,7 +6,7 @@ import type { CharacterId } from "./types";
 
 export function accessCharacter(ctx: GameRpcContext, characterId: CharacterId) {
   const state = ctx.get(ctxGameState);
-  const char = state.actors[characterId] as Actor | undefined;
+  const char = state.actors.get(characterId);
   const clientId = ctx.get(ctxClientId);
   const clients = ctx.get(ctxClientRegistry);
   const userId = clients.userIds.get(clientId);
