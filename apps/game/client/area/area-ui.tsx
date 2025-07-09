@@ -5,11 +5,7 @@ import { RespawnDialog } from "./respawn-dialog";
 
 export function AreaUi() {
   const client = ioc.get(ctxGameStateClient);
-  const character = useObservable(client.character);
+  const health = useObservable(client.character.derive((c) => c?.health ?? 0));
 
-  return (
-    <>
-      <RespawnDialog open={(character()?.health ?? 0) <= 0} />
-    </>
-  );
+  return <RespawnDialog open={health() <= 0} />;
 }
