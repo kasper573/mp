@@ -11,10 +11,10 @@ export function usePixiApp(
   createApp: () => Promise<Application | undefined>,
 ) {
   const [appResource] = createResource(async () => {
-    const app = await createApp();
     onCleanup(() => {
       app?.destroy({}, { children: true });
     });
+    const app = await createApp();
     return app;
   });
 
