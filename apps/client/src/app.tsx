@@ -38,7 +38,7 @@ export default function App() {
   const socket = createWebSocket(env.wsUrl);
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const faro = createFaroClient(logger, auth.identity);
+  const faro = createFaroClient(auth.identity);
   const rpc = createRpcClient(socket, logger, () => auth.identity()?.token);
   const query = new QueryClient({
     defaultOptions: {
