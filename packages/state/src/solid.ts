@@ -12,6 +12,11 @@ export function useObservable<Value>(
 ): Accessor<Value> {
   const [value, setValue] = createSignal(
     getObservableValue(accessObservable()),
+    {
+      // The observable uses a notification system that should be trusted implicitly.
+      // If a change is notified, we always trust and accept the new value, without equality checks.
+      equals: never,
+    },
   );
 
   function accessObservable() {
@@ -40,3 +45,7 @@ export function useStorage<T>(storage: StorageAdapter<T>) {
 type ObservableAccessors<Observables extends ObservableLike<unknown>[]> = {
   [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
 };
+
+function never() {
+  return false;
+}
