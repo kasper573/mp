@@ -32,8 +32,9 @@ export class Pointer {
   private onPointerDown = () => this.#isDown.set(true);
   private onPointerUp = () => this.#isDown.set(false);
   private onPointerMove = (e: PointerEvent) => {
-    const relativeX = (e.clientX - this.target.offsetLeft) as Pixel;
-    const relativeY = (e.clientY - this.target.offsetTop) as Pixel;
+    const targetBounds = this.target.getBoundingClientRect();
+    const relativeX = (e.clientX - targetBounds.left) as Pixel;
+    const relativeY = (e.clientY - targetBounds.top) as Pixel;
     this.#position.set(new Vector(relativeX, relativeY));
   };
 }
