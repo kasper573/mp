@@ -4,9 +4,7 @@ import { getObservableValue, type ObservableLike } from "./observable";
 
 export function useObservable<Value>(observable: ObservableLike<Value>): Value {
   const [value, setValue] = useState(() => getObservableValue(observable));
-
   useEffect(() => observable.subscribe(setValue), [observable]);
-
   return value;
 }
 

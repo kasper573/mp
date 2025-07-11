@@ -3,20 +3,39 @@ import type { ApplicationOptions } from "@mp/graphics";
 import { Application } from "@mp/graphics";
 import { useEffect } from "react";
 
+// We allow nullish for easier integration with react refs
+export interface UseGraphicsOptions
+  extends Omit<Partial<ApplicationOptions>, "canvas" | "resizeTo"> {
+  /**
+   * Must be provided for the pixi application to be initialized,
+   * but can be null or undefined to allow for integration with react refs.
+   */
+  canvas?: HTMLCanvasElement | null;
+  resizeTo?: HTMLElement | null;
+}
+
 /**
  * react and pixi.js integration
  */
 export function useGraphics(
-  options: MakeNullish<Partial<ApplicationOptions>, "canvas" | "resizeTo">,
-  configureApp: (app: Application) => undefined | CleanupFn | CleanupFn[],
+  options: UseGraphicsOptions,
+  configureApp: (
+    app: Application,
+    canvas: HTMLCanvasElement,
+  ) => undefined | CleanupFn | CleanupFn[],
 ) {
   useEffect(() => {
+    const { canvas, ...rest } = options;
+    if (!canvas) {
+      return;
+    }
+
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(configureApp(app));
+    const cleanupFns = normalizeCleanupFns(configureApp(app, canvas));
     const initPromise = app
       .init({
-        ...options,
-        canvas: options.canvas ?? undefined,
+        ...rest,
+        canvas,
         resizeTo: options.resizeTo ?? undefined,
       })
       .then(() => onInitialized(app));
@@ -31,8 +50,7 @@ export function useGraphics(
 
   function onInitialized(app: Application) {
     // Resize to the given or parent element
-    app.resizeTo = (options.resizeTo ??
-      assert(app.canvas.parentElement)) as HTMLElement;
+    app.resizeTo = options.resizeTo ?? assert(app.canvas.parentElement);
 
     // It seems that canvas need to be absolute positioned for resizing to work properly.
     // (Without it resizing works when expanding, but not when shrinking.)

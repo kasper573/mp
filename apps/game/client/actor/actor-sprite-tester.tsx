@@ -76,10 +76,11 @@ function PixiApp(props: ActorTestSettings) {
       eventMode: "none",
       roundPixels: true,
     },
-    (app) => {
+    (app, canvas) => {
+      const engine = new Engine(canvas);
+      const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
       app.stage.addChild(new ActorSpriteList(() => props));
-      const engine = new Engine(app.canvas);
-      return [engine.start(true), ioc.register(ctxEngine, engine)];
+      return subs;
     },
   );
 

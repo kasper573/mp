@@ -40,8 +40,8 @@ export function GameRenderer(props: GameRendererProps) {
       eventMode: "none",
       roundPixels: true,
     },
-    (app) => {
-      const engine = new Engine(app.canvas);
+    (app, canvas) => {
+      const engine = new Engine(canvas);
       const subscriptions = [
         engine.start(props.interactive),
         ioc.register(ctxEngine, engine),
