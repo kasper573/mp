@@ -1,7 +1,7 @@
 import { observable } from "@mp/state";
 import { useObservable } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/observable-tester",
@@ -11,9 +11,12 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const [log, setLog] = useState("");
-  const base = observable(1);
-  const multiplier = observable(1);
-  const product = base.compose(multiplier).derive(([b, m]) => b * m);
+  const base = useMemo(() => observable(1), []);
+  const multiplier = useMemo(() => observable(1), []);
+  const product = useMemo(
+    () => base.compose(multiplier).derive(([b, m]) => b * m),
+    [base, multiplier],
+  );
   const baseValue = useObservable(base);
   const multiplierValue = useObservable(multiplier);
   const productValue = useObservable(product);

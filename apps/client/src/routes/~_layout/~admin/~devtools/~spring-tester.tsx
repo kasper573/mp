@@ -14,16 +14,20 @@ function RouteComponent() {
   const [damping, setDamping] = useState(40);
   const [mass, setMass] = useState(2);
   const [precision, setPrecision] = useState(1);
-  const target = observable(0);
+  const target = useMemo(() => observable(0), []);
   const targetValue = useObservable(target);
 
   const frameEmitter = useMemo(() => new FrameEmitter(), []);
-  const spring = new Spring(target, () => ({
-    stiffness,
-    damping,
-    mass,
-    precision,
-  }));
+  const spring = useMemo(
+    () =>
+      new Spring(target, () => ({
+        stiffness,
+        damping,
+        mass,
+        precision,
+      })),
+    [],
+  );
   const springState = useObservable(spring.state);
   const springVelocity = useObservable(spring.velocity);
   const springValue = useObservable(spring.value);

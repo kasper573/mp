@@ -3,7 +3,7 @@ import type { StorageAdapter } from "./storage/storage-adapter";
 import { getObservableValue, type ObservableLike } from "./observable";
 
 export function useObservable<Value>(observable: ObservableLike<Value>): Value {
-  const [value, setValue] = useState(getObservableValue(observable));
+  const [value, setValue] = useState(() => getObservableValue(observable));
 
   useEffect(() => observable.subscribe(setValue), [observable]);
 
