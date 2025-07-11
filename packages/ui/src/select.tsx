@@ -64,7 +64,9 @@ export function Select<const Value>({
       {...selectProps}
     >
       {options.map((option, index) => (
-        <option value={index}>{option.label}</option>
+        <option key={index} value={index}>
+          {option.label}
+        </option>
       ))}
     </select>
   );
