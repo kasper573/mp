@@ -9,6 +9,8 @@ import {
 import { Select } from "@mp/ui";
 
 import { Engine } from "@mp/engine";
+import { useGraphics } from "@mp/graphics/react";
+import { assert } from "@mp/std";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -17,7 +19,6 @@ import {
 import { ioc } from "../context/ioc";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ctxEngine } from "../context/common";
-import { useGraphics } from "../use-graphics";
 import { ActorSprite } from "./actor-sprite";
 import {
   ctxActorSpritesheetLookup,
@@ -65,30 +66,24 @@ export function ActorSpriteTester() {
 }
 
 function PixiApp(props: ActorTestSettings) {
-  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
-  const [resizeTo, setResizeTo] = useState<HTMLDivElement | null>(null);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
 
   useGraphics(
+    container,
     {
-      canvas,
-      resizeTo,
       antialias: true,
       eventMode: "none",
       roundPixels: true,
     },
-    (app, canvas) => {
-      const engine = new Engine(canvas);
+    (app) => {
+      const engine = new Engine(assert(container));
       const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
       app.stage.addChild(new ActorSpriteList(() => props));
       return subs;
     },
   );
 
-  return (
-    <div style={{ flex: 1 }} ref={setResizeTo}>
-      <canvas ref={setCanvas} />
-    </div>
-  );
+  return <div style={{ flex: 1 }} ref={setContainer} />;
 }
 
 const styles = {

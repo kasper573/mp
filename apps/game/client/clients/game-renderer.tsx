@@ -3,11 +3,12 @@ import type { JSX } from "react";
 import { useState } from "react";
 import { useStorage } from "@mp/state/react";
 import { StorageAdapter } from "@mp/state";
+import { useGraphics } from "@mp/graphics/react";
+import { assert } from "@mp/std";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";
-import { useGraphics } from "../use-graphics";
 import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
 import {
   AreaDebugSettingsForm,
@@ -26,32 +27,41 @@ interface GameRendererProps {
 /**
  * Composes all game graphics and UI into a single component that renders the actual game.
  */
-export function GameRenderer(props: GameRendererProps) {
-  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+export function GameRenderer({
+  interactive,
+  areaSceneOptions: { area, spritesheets },
+  gameState,
+  additionalDebugUi,
+}: GameRendererProps) {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [showDebugUi, setShowDebugUi] = useState(false);
   const [areaDebugSettings, setAreaDebugSettings] = useStorage(
     areaDebugSettingsStorage,
   );
 
   useGraphics(
+    container,
     {
-      canvas,
       antialias: true,
       eventMode: "none",
       roundPixels: true,
+      interactive,
+      gameState,
+      area,
     },
-    (app, canvas) => {
-      const engine = new Engine(canvas);
+    (app, { interactive, gameState, area }) => {
+      const engine = new Engine(assert(container));
       const subscriptions = [
-        engine.start(props.interactive),
+        engine.start(interactive),
         ioc.register(ctxEngine, engine),
-        engine.frameEmitter.subscribe(props.gameState.frameCallback),
+        engine.frameEmitter.subscribe(gameState.frameCallback),
         engine.keyboard.on("keydown", "F2", () =>
           setShowDebugUi((prev) => !prev),
         ),
       ];
       const areaScene = new AreaScene({
-        ...props.areaSceneOptions,
+        area,
+        spritesheets,
         debugSettings: () => areaDebugSettings,
       });
       app.stage.addChild(areaScene);
@@ -61,16 +71,16 @@ export function GameRenderer(props: GameRendererProps) {
 
   return (
     <>
-      <canvas ref={setCanvas} />
+      <div ref={setContainer} style={{ flex: 1 }} />
       <AreaUi />
       {showDebugUi && (
         <GameDebugUi>
-          {props.additionalDebugUi}
+          {additionalDebugUi}
           <AreaDebugSettingsForm
             value={areaDebugSettings}
             onChange={setAreaDebugSettings}
           />
-          <GameStateDebugInfo tiled={props.areaSceneOptions.area.tiled} />
+          <GameStateDebugInfo tiled={area.tiled} />
         </GameDebugUi>
       )}
     </>

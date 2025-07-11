@@ -487,16 +487,25 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/time':
         specifier: workspace:*
         version: link:../time
       pixi.js:
         specifier: 8.11.0
         version: 8.11.0
+      react:
+        specifier: 'catalog:'
+        version: 19.1.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.1.8
 
   packages/ioc:
     dependencies:

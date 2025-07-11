@@ -47,9 +47,7 @@ export function SpectatorClient(props: GameClientProps) {
       />
 
       <Suspense fallback={<LoadingSpinner debugId="SpectatorClient" />}>
-        <div style={{ flex: 1, position: "relative" }}>
-          <GameClient {...props} interactive={props.interactive} />
-        </div>
+        <GameClient {...props} interactive={props.interactive} />
       </Suspense>
     </>
   );

@@ -1,60 +1,56 @@
-import { assert } from "@mp/std";
+import { useEffect } from "react";
 import type { ApplicationOptions } from "@mp/graphics";
 import { Application } from "@mp/graphics";
-import { useEffect } from "react";
 
-// We allow nullish for easier integration with react refs
 export interface UseGraphicsOptions
-  extends Omit<Partial<ApplicationOptions>, "canvas" | "resizeTo"> {
+  extends Omit<Partial<ApplicationOptions>, "canvas" | "resizeTo"> {}
+
+/**
+ * react and pixi.js integration.
+ * Will reinitialize whenever any of the options change.
+ */
+export function useGraphics<Options extends UseGraphicsOptions>(
   /**
    * Must be provided for the pixi application to be initialized,
    * but can be null or undefined to allow for integration with react refs.
    */
-  canvas?: HTMLCanvasElement | null;
-  resizeTo?: HTMLElement | null;
-}
-
-/**
- * react and pixi.js integration
- */
-export function useGraphics(
-  options: UseGraphicsOptions,
+  container: HTMLDivElement | null | undefined,
+  options: Options,
   configureApp: (
     app: Application,
-    canvas: HTMLCanvasElement,
+    options: Options,
   ) => undefined | CleanupFn | CleanupFn[],
 ) {
   useEffect(() => {
-    const { canvas, ...rest } = options;
-    if (!canvas) {
+    if (!container) {
       return;
     }
 
+    const canvas = document.createElement("canvas");
+    container.prepend(canvas);
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(configureApp(app, canvas));
+    const cleanupFns = normalizeCleanupFns(configureApp(app, options));
     const initPromise = app
-      .init({
-        ...rest,
-        canvas,
-        resizeTo: options.resizeTo ?? undefined,
-      })
+      .init({ ...options, canvas, resizeTo: container })
       .then(() => onInitialized(app));
 
     return () => {
+      canvas.remove();
       for (const cleanup of cleanupFns) {
         cleanup();
       }
-      void initPromise.then(() => app.destroy({}, { children: true }));
+      void initPromise.then(() =>
+        app.destroy({ removeView: false }, { children: true }),
+      );
     };
-  }, Object.values(options));
+  }, [container, ...Object.values(options)]);
 
   function onInitialized(app: Application) {
-    // Resize to the given or parent element
-    app.resizeTo = options.resizeTo ?? assert(app.canvas.parentElement);
-
     // It seems that canvas need to be absolute positioned for resizing to work properly.
     // (Without it resizing works when expanding, but not when shrinking.)
-    app.resizeTo.style.position = "relative";
+    if (container) {
+      container.style.position = "relative";
+    }
     app.canvas.style.position = "absolute";
 
     // Must manually call resize when changing resizeTo target to immediately apply the size
@@ -73,7 +69,3 @@ function normalizeCleanupFns(
   }
   return Array.isArray(cleanup) ? cleanup : [cleanup];
 }
-
-type MakeNullish<T, K extends keyof T> = Omit<T, K> & {
-  [P in K]?: T[P] | null | undefined;
-};

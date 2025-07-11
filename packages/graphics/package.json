@@ -9,15 +9,23 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./react": {
+      "types": "./src/react.ts",
+      "import": "./src/react.ts",
+      "require": "./src/react.ts"
     }
   },
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
-    "pixi.js": "8.11.0"
+    "pixi.js": "8.11.0",
+    "react": "catalog:"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/react": "catalog:"
   }
 }
