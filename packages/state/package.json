@@ -24,7 +24,7 @@
     "react": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "catalog:",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/react": "catalog:"
   }
 }

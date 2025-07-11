@@ -17,7 +17,7 @@
     "react-error-boundary": "6.0.0"
   },
   "devDependencies": {
-    "@types/react": "catalog:",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/react": "catalog:"
   }
 }

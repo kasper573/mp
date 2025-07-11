@@ -21,7 +21,6 @@
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/telemetry": "workspace:*",
-    "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
     "@tanstack/react-router": "1.126.2",
@@ -30,14 +29,14 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
     "@babel/plugin-proposal-decorators": "7.27.1",
     "@mp/tsconfig": "workspace:*",
     "@tanstack/router-plugin": "1.126.2",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@vanilla-extract/vite-plugin": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-checker": "0.9.3",
-    "@vitejs/plugin-react": "catalog:"
+    "vite-plugin-checker": "0.9.3"
   }
 }
