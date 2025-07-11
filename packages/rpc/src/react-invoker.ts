@@ -1,5 +1,5 @@
 import * as tanstack from "@tanstack/react-query";
-import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query";
+import type { UseMutationResult } from "@tanstack/react-query";
 import { skipToken } from "@tanstack/react-query";
 import type {
   AnyMutationNode,
@@ -42,7 +42,7 @@ function createUseQuery(
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
-  ): UseQueryResult {
+  ): tanstack.UseQueryResult {
     const { input, map, ...tanstackOptions } = options ?? {};
     return tanstack.useQuery({
       queryKey: [path, input],
@@ -69,11 +69,11 @@ function createUseSuspenseQuery(
 ): UseQuery<AnyQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
-  ): UseQueryResult {
+  ): tanstack.UseSuspenseQueryResult {
     const { input, map, ...tanstackOptions } = options ?? {};
-    return tanstack.useQuery({
+    return tanstack.useSuspenseQuery({
       queryKey: [path, input],
-      queryFn: input === skipToken ? skipToken : queryFn,
+      queryFn,
       ...tanstackOptions,
     });
 
@@ -149,7 +149,7 @@ export interface UseQuery<Node extends AnyQueryNode> {
       InferOutput<Node["handler"]>,
       MappedOutput
     >,
-  ): UseQueryResult<MappedOutput, unknown>;
+  ): tanstack.UseQueryResult<MappedOutput, unknown>;
 }
 
 export interface UseSuspenseQuery<Node extends AnyQueryNode> {
