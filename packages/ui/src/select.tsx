@@ -1,8 +1,8 @@
-import type { JSX } from "solid-js";
-import { createMemo, Index } from "solid-js";
+import type { JSX, ReactNode } from "react";
+import { useMemo } from "react";
 
 export interface SelectOption<Value> {
-  label: JSX.Element;
+  label: ReactNode;
   value: Value;
 }
 
@@ -15,7 +15,7 @@ export type SelectProps<Value> =
   | RequiredSelectProps<Value>;
 
 interface BaseSelectProps<Value, InputValue, OutputValue>
-  extends Pick<JSX.HTMLAttributes<HTMLSelectElement>, "class" | "style"> {
+  extends Pick<JSX.IntrinsicElements["select"], "className" | "style"> {
   options: SelectOptionsInput<Value>;
   value: InputValue;
   onChange: (value: OutputValue) => void;
@@ -36,29 +36,36 @@ export interface RequiredSelectProps<Value>
   required: true;
 }
 
-export function Select<const Value>(props: SelectProps<Value>) {
-  const options = createMemo(() => normalizeOptionsInput(props.options));
-  const isSameValue = (a: Value, b: Value) =>
-    props.isSameValue?.(a, b) ?? a === b;
-  const selectedIndex = createMemo(() =>
-    options().findIndex((option) =>
-      isSameValue(option.value, props.value as Value),
-    ),
+export function Select<const Value>({
+  options: inputOptions,
+  value,
+  isSameValue = refEquals,
+  onChange,
+  ...selectProps
+}: SelectProps<Value>) {
+  const options = useMemo(
+    () => normalizeOptionsInput(inputOptions),
+    [inputOptions],
+  );
+
+  const selectedIndex = useMemo(
+    () =>
+      options.findIndex((option) => isSameValue(option.value, value as Value)),
+    [options, value],
   );
 
   return (
     <select
-      value={selectedIndex()}
+      value={selectedIndex}
       onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
-        props.onChange(options()[optionIndex].value);
+        onChange(options[optionIndex].value);
       }}
-      style={props.style}
-      class={props.class}
+      {...selectProps}
     >
-      <Index each={options()}>
-        {(option, index) => <option value={index}>{option().label}</option>}
-      </Index>
+      {options.map((option, index) => (
+        <option value={index}>{option.label}</option>
+      ))}
     </select>
   );
 }
@@ -79,4 +86,8 @@ function isSelectOption<Value>(option: unknown): option is SelectOption<Value> {
     return false;
   }
   return "label" in option && "value" in option;
+}
+
+function refEquals<T>(a: T, b: T): boolean {
+  return a === b;
 }

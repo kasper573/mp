@@ -1,9 +1,9 @@
 import { Select } from "@mp/ui";
-import type { Setter } from "solid-js";
+import type { Dispatch, SetStateAction } from "react";
 
 export interface AreaDebugSettingsFormProps {
   value: AreaDebugSettings;
-  onChange: Setter<AreaDebugSettings>;
+  onChange: Dispatch<SetStateAction<AreaDebugSettings>>;
 }
 
 export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
@@ -24,7 +24,7 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
         <input
           type="checkbox"
           checked={props.value.showFogOfWar}
-          on:change={(e) =>
+          onChange={(e) =>
             props.onChange((prev) => ({
               ...prev,
               showFogOfWar: e.currentTarget.checked,
@@ -38,7 +38,7 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
         <input
           type="checkbox"
           checked={props.value.showAttackRange}
-          on:change={(e) =>
+          onChange={(e) =>
             props.onChange((prev) => ({
               ...prev,
               showAttackRange: e.currentTarget.checked,
@@ -52,7 +52,7 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
         <input
           type="checkbox"
           checked={props.value.showAggroRange}
-          on:change={(e) =>
+          onChange={(e) =>
             props.onChange((prev) => ({
               ...prev,
               showAggroRange: e.currentTarget.checked,
@@ -66,7 +66,7 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
         <input
           type="checkbox"
           checked={props.value.showActorPaths}
-          on:change={(e) =>
+          onChange={(e) =>
             props.onChange((prev) => ({
               ...prev,
               showActorPaths: e.currentTarget.checked,

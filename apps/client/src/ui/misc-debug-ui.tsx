@@ -1,8 +1,8 @@
 import { Button } from "@mp/ui";
 import { ctxGameStateClient, ioc } from "@mp/game/client";
-import { createEffect, createSignal } from "solid-js";
+import { useEffect, useState } from "react";
 import { assert } from "@mp/std";
-import { useStorage } from "@mp/state/solid";
+import { useStorage } from "@mp/state/react";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugStorage } from "../signals/misc-debug-ui-settings";
@@ -11,7 +11,7 @@ export function MiscDebugUi() {
   const [settings, setSettings] = useStorage(miscDebugStorage);
   const rpc = useRpc();
   const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
-    createServerPatchOptimizerSignal();
+    useServerPatchOptimizerState();
 
   const serverVersion = rpc.system.buildVersion.useQuery();
   const gameState = ioc.get(ctxGameStateClient);
@@ -21,11 +21,11 @@ export function MiscDebugUi() {
       <div>Client version: {env.buildVersion}</div>
       <div>Server version: {serverVersion.data ?? "unknown"}</div>
       <div>
-        <Button on:click={() => void rpc.npc.spawnRandomNpc()}>
+        <Button onClick={() => void rpc.npc.spawnRandomNpc()}>
           Spawn random NPC
         </Button>
         <Button
-          on:click={() =>
+          onClick={() =>
             void rpc.character.kill({
               targetId: assert(gameState.characterId.get()),
             })
@@ -38,8 +38,8 @@ export function MiscDebugUi() {
         Use server side patch optimizer:{" "}
         <input
           type="checkbox"
-          checked={isServerPatchOptimizerEnabled()}
-          on:change={(e) =>
+          checked={isServerPatchOptimizerEnabled}
+          onChange={(e) =>
             setServerPatchOptimizerEnabled(e.currentTarget.checked)
           }
         />
@@ -48,8 +48,8 @@ export function MiscDebugUi() {
         Use client side patch optimizer:{" "}
         <input
           type="checkbox"
-          checked={settings().usePatchOptimizer}
-          on:change={(e) =>
+          checked={settings.usePatchOptimizer}
+          onChange={(e) =>
             setSettings((prev) => ({
               ...prev,
               usePatchOptimizer: e.currentTarget.checked,
@@ -61,8 +61,8 @@ export function MiscDebugUi() {
         Use client side game state interpolator:{" "}
         <input
           type="checkbox"
-          checked={settings().useInterpolator}
-          on:change={(e) =>
+          checked={settings.useInterpolator}
+          onChange={(e) =>
             setSettings((prev) => ({
               ...prev,
               useInterpolator: e.currentTarget.checked,
@@ -74,20 +74,20 @@ export function MiscDebugUi() {
   );
 }
 
-function createServerPatchOptimizerSignal() {
+function useServerPatchOptimizerState() {
   const rpc = useRpc();
-  const [enabled, setEnabled] = createSignal(true);
+  const [enabled, setEnabled] = useState(true);
   const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
 
-  createEffect(() => {
-    void rpc.system.setPatchOptimizerEnabled(enabled());
-  });
+  useEffect(() => {
+    void rpc.system.setPatchOptimizerEnabled(enabled);
+  }, [enabled]);
 
-  createEffect(() => {
+  useEffect(() => {
     if (isRemoteEnabled.data !== undefined) {
       setEnabled(isRemoteEnabled.data);
     }
-  });
+  }, [isRemoteEnabled.data]);
 
   return [enabled, setEnabled] as const;
 }

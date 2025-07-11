@@ -1,39 +1,40 @@
-import { createMemo, Show, Suspense } from "solid-js";
+import { Suspense } from "react";
 import { dock } from "@mp/style";
-import { useRouterState } from "@tanstack/solid-router";
+import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
 import { ctxAuthClient, ioc, systemRoles, worldRoles } from "@mp/game/client";
-import { useObservables } from "@mp/state/solid";
+import { useObservable } from "@mp/state/react";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
 
 export default function AppBar() {
   const state = useRouterState();
-  const isNavigating = createMemo(() => state().status === "pending");
+  const isNavigating = state.status === "pending";
 
   const auth = ioc.get(ctxAuthClient);
-  const [identity, isSignedIn] = useObservables(auth.identity, auth.isSignedIn);
+  const isSignedIn = useObservable(auth.isSignedIn);
+  const identity = useObservable(auth.identity);
 
   return (
-    <nav class={styles.nav}>
+    <nav className={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
       <Link to="/contact">Contact</Link>
 
-      <Show when={identity()?.roles.has(systemRoles.useDevTools)}>
+      {identity?.roles.has(systemRoles.useDevTools) && (
         <Link to="/admin/devtools">Dev Tools</Link>
-      </Show>
+      )}
 
-      <Show when={identity()?.roles.has(worldRoles.spectate)}>
+      {identity?.roles.has(worldRoles.spectate) && (
         <Link to="/admin/spectator">Spectate</Link>
-      </Show>
+      )}
 
       <LinearProgress
-        class={dock({ position: "top" })}
-        active={isNavigating()}
+        className={dock({ position: "top" })}
+        active={isNavigating}
       />
-      <div class={styles.right}>
+      <div className={styles.right}>
         {/* 
           Suspending into nothing is okay since a pending 
           version notice isn't very interesting to the user
@@ -42,7 +43,7 @@ export default function AppBar() {
           <VersionNotice />
         </Suspense>
 
-        {isSignedIn() ? (
+        {isSignedIn ? (
           <Button role="link" onClick={() => void auth.signOutRedirect()}>
             Sign out
           </Button>
@@ -58,10 +59,14 @@ export default function AppBar() {
 
 function VersionNotice() {
   const versionCompatibility = useVersionCompatibility();
-  return (
-    <Show when={versionCompatibility() === "incompatible"}>
-      There is a new version available{" "}
-      <Button onClick={() => window.location.reload()}>Reload</Button>
-    </Show>
-  );
+  if (versionCompatibility === "incompatible") {
+    return (
+      <>
+        There is a new version available{" "}
+        <Button onClick={() => window.location.reload()}>Reload</Button>
+      </>
+    );
+  }
+
+  return null;
 }

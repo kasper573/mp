@@ -1,8 +1,7 @@
 import { Engine } from "@mp/engine";
-import { Application } from "@mp/graphics";
-import type { JSX } from "solid-js";
-import { createEffect, createSignal, onCleanup } from "solid-js";
-import { useStorage } from "@mp/state/solid";
+import type { JSX } from "react";
+import { useState } from "react";
+import { useStorage } from "@mp/state/react";
 import { StorageAdapter } from "@mp/state";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
 import { ioc } from "../context/ioc";
@@ -28,60 +27,52 @@ interface GameRendererProps {
  * Composes all game graphics and UI into a single component that renders the actual game.
  */
 export function GameRenderer(props: GameRendererProps) {
-  const [getCanvas, setCanvas] = createSignal<HTMLCanvasElement>();
-  const [showDebugUi, setShowDebugUi] = createSignal(false);
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [showDebugUi, setShowDebugUi] = useState(false);
   const [areaDebugSettings, setAreaDebugSettings] = useStorage(
     areaDebugSettingsStorage,
   );
 
-  createEffect(() => {
-    const canvas = getCanvas();
-    if (!canvas) {
-      return;
-    }
-
-    useGraphics(async () => {
-      const app = new Application();
-      const engine = new Engine(canvas);
-
-      onCleanup(engine.start(props.interactive));
-      onCleanup(ioc.register(ctxEngine, engine));
-      onCleanup(engine.frameEmitter.subscribe(props.gameState.frameCallback));
-      onCleanup(
+  useGraphics(
+    {
+      canvas,
+      antialias: true,
+      eventMode: "none",
+      roundPixels: true,
+    },
+    (app) => {
+      const engine = new Engine(app.canvas);
+      const subscriptions = [
+        engine.start(props.interactive),
+        ioc.register(ctxEngine, engine),
+        engine.frameEmitter.subscribe(props.gameState.frameCallback),
         engine.keyboard.on("keydown", "F2", () =>
           setShowDebugUi((prev) => !prev),
         ),
-      );
-
+      ];
       const areaScene = new AreaScene({
         ...props.areaSceneOptions,
-        debugSettings: areaDebugSettings,
+        debugSettings: () => areaDebugSettings,
       });
       app.stage.addChild(areaScene);
-
-      await app.init({
-        antialias: true,
-        eventMode: "none",
-        roundPixels: true,
-        canvas,
-      });
-
-      return app;
-    });
-  });
+      return subscriptions;
+    },
+  );
 
   return (
     <>
       <canvas ref={setCanvas} />
       <AreaUi />
-      <GameDebugUi enabled={showDebugUi()}>
-        {props.additionalDebugUi}
-        <AreaDebugSettingsForm
-          value={areaDebugSettings()}
-          onChange={setAreaDebugSettings}
-        />
-        <GameStateDebugInfo tiled={props.areaSceneOptions.area.tiled} />
-      </GameDebugUi>
+      {showDebugUi && (
+        <GameDebugUi>
+          {props.additionalDebugUi}
+          <AreaDebugSettingsForm
+            value={areaDebugSettings}
+            onChange={setAreaDebugSettings}
+          />
+          <GameStateDebugInfo tiled={props.areaSceneOptions.area.tiled} />
+        </GameDebugUi>
+      )}
     </>
   );
 }

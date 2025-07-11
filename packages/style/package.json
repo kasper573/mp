@@ -21,10 +21,11 @@
     "@vanilla-extract/recipes": "0.5.5",
     "@vanilla-extract/sprinkles": "1.6.3",
     "clsx": "2.1.1",
-    "solid-js": "catalog:"
+    "react": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@types/react": "catalog:",
     "csstype": "3.1.3"
   }
 }

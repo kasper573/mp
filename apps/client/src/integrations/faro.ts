@@ -1,15 +1,15 @@
 import type { UserIdentity } from "@mp/auth";
-import type { FaroUser } from "@mp/telemetry/faro";
+import type { Faro, FaroUser } from "@mp/telemetry/faro";
 import {
   getWebInstrumentations,
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
-import { createEffect } from "solid-js";
+import type { ReadonlyObservable } from "@mp/state";
 import { env } from "../env";
 
-export function createFaroClient(identity: () => UserIdentity | undefined) {
-  const faro = initializeFaro({
+export function createFaroClient() {
+  return initializeFaro({
     url: env.faro.receiverUrl,
     isolate: true,
     app: {
@@ -21,9 +21,18 @@ export function createFaroClient(identity: () => UserIdentity | undefined) {
       new TracingInstrumentation({ instrumentationOptions: env.faro }),
     ],
   });
+}
 
-  createEffect(() => faro.api.setUser(deriveFaroUser(identity())));
-  return faro;
+export function createFaroBindings(
+  faro: Faro,
+  identity: ReadonlyObservable<UserIdentity | undefined>,
+) {
+  function update() {
+    faro.api.setUser(deriveFaroUser(identity.get()));
+  }
+
+  update();
+  return identity.subscribe(update);
 }
 
 function deriveFaroUser(user?: UserIdentity): FaroUser {

@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
-import { onCleanup, Suspense, useContext } from "solid-js";
+import { Suspense, useContext, useEffect } from "react";
 import { LoadingSpinner } from "@mp/ui";
-import { useStorage } from "@mp/state/solid";
+import { useStorage } from "@mp/state/react";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
 import { LoggerContext } from "../../../logger";
@@ -23,14 +23,14 @@ function RouteComponent() {
     settings,
   });
 
-  onCleanup(stateClient.start());
+  useEffect(() => stateClient.start(), [stateClient]);
 
   return (
     <div
       style={{
         padding: "32px",
         display: "flex",
-        "flex-direction": "column",
+        flexDirection: "column",
         flex: 1,
       }}
     >

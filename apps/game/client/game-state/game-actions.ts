@@ -5,38 +5,34 @@ import type { ObjectId } from "@mp/tiled-loader";
 import type { CharacterId, ActorId } from "../../server";
 import type { GameRpcClient } from "../game-rpc-client";
 
-export type GameActions = ReturnType<typeof createGameActions>;
+export class GameActions {
+  constructor(
+    private rpc: GameRpcClient,
+    private characterId: Observable<CharacterId | undefined>,
+  ) {}
 
-export function createGameActions(
-  rpc: GameRpcClient,
-  characterId: () => Observable<CharacterId | undefined>,
-) {
-  const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
-    return rpc.character.move({
-      characterId: assert(characterId().get()),
+  move(to: Vector<Tile>, desiredPortalId?: ObjectId) {
+    return this.rpc.character.move({
+      characterId: assert(this.characterId.get()),
       to,
       desiredPortalId,
     });
-  };
+  }
 
-  const attack = (targetId: ActorId) =>
-    rpc.character.attack({
-      characterId: assert(characterId().get()),
+  attack(targetId: ActorId) {
+    return this.rpc.character.attack({
+      characterId: assert(this.characterId.get()),
       targetId,
     });
+  }
 
-  const respawn = () => rpc.character.respawn(assert(characterId().get()));
+  respawn() {
+    return this.rpc.character.respawn(assert(this.characterId.get()));
+  }
 
-  const join = async () => {
-    const char = await rpc.world.join();
-    characterId().set(char.id);
+  async join() {
+    const char = await this.rpc.world.join();
+    this.characterId.set(char.id);
     return char;
-  };
-
-  return {
-    respawn,
-    join,
-    move,
-    attack,
-  };
+  }
 }

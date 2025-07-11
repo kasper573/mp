@@ -10,10 +10,10 @@
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     },
-    "./solid": {
-      "types": "./src/solid.ts",
-      "import": "./src/solid.ts",
-      "require": "./src/solid.ts"
+    "./react": {
+      "types": "./src/react.ts",
+      "import": "./src/react.ts",
+      "require": "./src/react.ts"
     }
   },
   "scripts": {
@@ -21,9 +21,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "solid-js": "catalog:"
+    "react": "catalog:"
   },
   "devDependencies": {
+    "@types/react": "catalog:",
     "@mp/tsconfig": "workspace:*"
   }
 }

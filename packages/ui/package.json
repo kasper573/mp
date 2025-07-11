@@ -13,9 +13,11 @@
   },
   "dependencies": {
     "@mp/style": "workspace:*",
-    "solid-js": "catalog:"
+    "react": "catalog:",
+    "react-error-boundary": "6.0.0"
   },
   "devDependencies": {
+    "@types/react": "catalog:",
     "@mp/tsconfig": "workspace:*"
   }
 }

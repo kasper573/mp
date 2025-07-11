@@ -1,6 +1,6 @@
-import type { JSX } from "solid-js";
-import { createEffect, createSignal, onCleanup, Show } from "solid-js";
-import { Application, Container, Text } from "@mp/graphics";
+import type { CSSProperties } from "react";
+import { useEffect, useState } from "react";
+import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
@@ -18,7 +18,6 @@ import { ioc } from "../context/ioc";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { ctxEngine } from "../context/common";
 import { useGraphics } from "../use-graphics";
-import { Effect } from "../context/effect";
 import { ActorSprite } from "./actor-sprite";
 import {
   ctxActorSpritesheetLookup,
@@ -27,85 +26,65 @@ import {
 
 export function ActorSpriteTester() {
   const rpc = ioc.get(ctxGameRpcClient);
-  const spritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
-    input: void 0,
-    map: loadActorSpritesheets,
-  }));
-  const [animationName, setAnimationName] =
-    createSignal<ActorAnimationName>("walk-normal");
-  const [modelId, setModelId] = createSignal<ActorModelId>();
+  const { data: spritesheets } = rpc.area.actorSpritesheetUrls.useSuspenseQuery(
+    {
+      input: void 0,
+      map: loadActorSpritesheets,
+    },
+  );
 
-  createEffect(() => {
-    const firstModelId = spritesheets.data
-      ? Array.from(spritesheets.data.keys())[0]
-      : undefined;
-    if (modelId() === undefined && firstModelId) {
-      setModelId(firstModelId);
-    }
-  });
+  const allModelIds = Array.from(spritesheets.keys());
+
+  const [animationName, setAnimationName] =
+    useState<ActorAnimationName>("walk-normal");
+  const [modelId, setModelId] = useState<ActorModelId>(allModelIds[0]);
+
+  useEffect(() => ioc.register(ctxActorSpritesheetLookup, spritesheets));
 
   return (
-    <Show when={spritesheets.data} keyed>
-      {(allSpritesheets) => (
-        <Effect
-          effect={() =>
-            ioc.register(ctxActorSpritesheetLookup, allSpritesheets)
-          }
-        >
-          <div id="form" style={styles.settingsForm}>
-            <Select
-              value={animationName()}
-              onChange={setAnimationName}
-              options={actorAnimationNames}
-            />
-            <Select
-              value={modelId()}
-              onChange={setModelId}
-              options={allSpritesheets.keys().toArray()}
-            />
-          </div>
-          <Show when={modelId()}>
-            {(id) => <PixiApp animationName={animationName()} modelId={id()} />}
-          </Show>
-        </Effect>
-      )}
-    </Show>
+    <>
+      <div id="form" style={styles.settingsForm}>
+        <Select
+          value={animationName}
+          onChange={setAnimationName}
+          options={actorAnimationNames}
+          required
+        />
+        <Select
+          value={modelId}
+          onChange={setModelId}
+          options={allModelIds}
+          required
+        />
+      </div>
+      {modelId ? (
+        <PixiApp animationName={animationName} modelId={modelId} />
+      ) : null}
+    </>
   );
 }
 
 function PixiApp(props: ActorTestSettings) {
-  const [getCanvas, setCanvas] = createSignal<HTMLCanvasElement>();
-  const [getContainer, setContainer] = createSignal<HTMLDivElement>();
+  const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null);
+  const [resizeTo, setResizeTo] = useState<HTMLDivElement | null>(null);
 
-  createEffect(() => {
-    const canvas = getCanvas();
-    const container = getContainer();
-    if (!canvas || !container) {
-      return;
-    }
-
-    useGraphics(
-      async () => {
-        const app = new Application();
-        const engine = new Engine(canvas);
-        onCleanup(engine.start(true));
-        onCleanup(ioc.register(ctxEngine, engine));
-        app.stage.addChild(new ActorSpriteList(() => props));
-
-        await app.init({
-          antialias: true,
-          eventMode: "none",
-          roundPixels: true,
-          canvas,
-        });
-        return app;
-      },
-      { resizeTo: container },
-    );
-  });
+  useGraphics(
+    {
+      canvas,
+      resizeTo,
+      antialias: true,
+      eventMode: "none",
+      roundPixels: true,
+    },
+    (app) => {
+      app.stage.addChild(new ActorSpriteList(() => props));
+      const engine = new Engine(app.canvas);
+      return [engine.start(true), ioc.register(ctxEngine, engine)];
+    },
+  );
 
   return (
-    <div style={{ flex: 1 }} ref={setContainer}>
+    <div style={{ flex: 1 }} ref={setResizeTo}>
       <canvas ref={setCanvas} />
     </div>
   );
@@ -114,15 +93,15 @@ function PixiApp(props: ActorTestSettings) {
 const styles = {
   container: {
     display: "flex",
-    "flex-direction": "column",
+    flexDirection: "column",
     flex: 1,
   },
   settingsForm: {
     display: "flex",
-    "justify-content": "flex-end",
-    "padding-bottom": "20px",
+    justifyContent: "flex-end",
+    paddingBottom: "20px",
   },
-} satisfies Record<string, JSX.CSSProperties>;
+} satisfies Record<string, CSSProperties>;
 
 class ActorSpriteList extends Container {
   constructor(options: () => ActorTestSettings) {

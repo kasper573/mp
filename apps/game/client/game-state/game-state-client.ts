@@ -14,15 +14,14 @@ import type { AreaId } from "../../server";
 import { ioc } from "../context/ioc";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
-import type { GameActions } from "./game-actions";
-import { createGameActions } from "./game-actions";
+import { GameActions } from "./game-actions";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
   socket: WebSocket;
   logger: Logger;
-  settings: () => OptimisticGameStateSettings;
+  settings: OptimisticGameStateSettings;
 }
 
 export class GameStateClient {
@@ -43,7 +42,7 @@ export class GameStateClient {
   readonly areaId: ReadonlyObservable<AreaId | undefined>;
 
   constructor(public options: GameStateClientOptions) {
-    this.gameState = new OptimisticGameState(() => this.options.settings());
+    this.gameState = new OptimisticGameState(this.options.settings);
     this.readyState = observable<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
@@ -51,7 +50,7 @@ export class GameStateClient {
       (state) => state === WebSocket.OPEN,
     );
 
-    this.actions = createGameActions(this.rpc, () => this.characterId);
+    this.actions = new GameActions(this.rpc, this.characterId);
 
     // We throttle because when stale patches are detected, they usually come in batches,
     // and we only want to send one request for full state.

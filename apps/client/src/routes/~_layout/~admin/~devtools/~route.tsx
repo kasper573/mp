@@ -1,4 +1,4 @@
-import { createFileRoute, Link, Outlet } from "@tanstack/solid-router";
+import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
 import { systemRoles } from "@mp/game/client";
 import { AuthBoundary } from "../../../../ui/auth-boundary";
 
@@ -14,21 +14,21 @@ function DevtoolsLayout() {
       id="devtools-layout"
       style={{
         display: "flex",
-        "flex-direction": "row",
+        flexDirection: "row",
         width: "100%",
         flex: 1,
         padding: "20px",
         gap: "20px",
-        "box-sizing": "border-box",
+        boxSizing: "border-box",
       }}
     >
       <div
         id="devtools-sidebar"
         style={{
           display: "flex",
-          "flex-direction": "column",
+          flexDirection: "column",
           gap: "10px",
-          "white-space": "nowrap",
+          whiteSpace: "nowrap",
         }}
       >
         <Link to="/admin/devtools/observable-tester">Observable Tester</Link>
@@ -41,7 +41,7 @@ function DevtoolsLayout() {
         id="devtools-content"
         style={{
           display: "flex",
-          "flex-direction": "column",
+          flexDirection: "column",
           flex: 1,
           position: "relative",
         }}

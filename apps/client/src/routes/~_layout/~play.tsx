@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, PlayerClient } from "@mp/game/client";
-import { onCleanup, Suspense, useContext } from "solid-js";
+import { Suspense, useContext, useEffect } from "react";
 import { LoadingSpinner } from "@mp/ui";
-import { useStorage } from "@mp/state/solid";
+import { useStorage } from "@mp/state/react";
 import { SocketContext } from "../../integrations/rpc";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { LoggerContext } from "../../logger";
@@ -21,7 +21,7 @@ function PlayPage() {
     settings,
   });
 
-  onCleanup(stateClient.start());
+  useEffect(() => stateClient.start(), [stateClient]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,

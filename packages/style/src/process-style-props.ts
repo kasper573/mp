@@ -1,11 +1,10 @@
-import type { RuntimeFn } from "@vanilla-extract/recipes";
+import { type RuntimeFn } from "@vanilla-extract/recipes";
 import clsx from "clsx";
-import { splitProps } from "solid-js";
 
 export type StyledComponentProps<Recipe> =
   Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
 
-export function processStyleProps<Props extends { class?: string }>(
+export function processStyleProps<Props extends { className?: string }>(
   props: Props,
   classOrRecipe: string | string[] | AnyRecipe,
 ): Props {
@@ -18,17 +17,21 @@ export function processStyleProps<Props extends { class?: string }>(
     spreadProps = props;
     additionalClasses = [classOrRecipe];
   } else {
-    const [recipeProps, otherProps] = splitProps(
-      props,
-      classOrRecipe.variants() as Array<keyof Props>,
-    );
-    // eslint-disable-next-line solid/reactivity
-    spreadProps = otherProps;
+    const recipeProps: AnyProps = {};
+    spreadProps = {};
+    const variants = classOrRecipe.variants() as Array<keyof Props>;
+    for (const key in props) {
+      if (variants.includes(key)) {
+        recipeProps[key] = props[key];
+      } else {
+        spreadProps[key] = props[key];
+      }
+    }
     additionalClasses = [classOrRecipe(recipeProps as never)];
   }
   return {
     ...spreadProps,
-    class: clsx(props.class, ...additionalClasses),
+    className: clsx(props.className, ...additionalClasses),
   } as Props;
 }
 

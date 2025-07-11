@@ -1,22 +1,18 @@
-import { createContext, createEffect, Show, useContext } from "solid-js";
-
-export function ErrorFallbackFn(error: unknown, reset?: () => void) {
-  return <ErrorFallback error={error} reset={reset} />;
-}
+import { createContext, useContext, useEffect } from "react";
 
 export function ErrorFallback(props: { error: unknown; reset?: () => void }) {
   const context = useContext(ErrorFallbackContext);
 
-  createEffect(() => context.handleError(props.error));
+  useEffect(() => context.handleError(props.error), [context, props.error]);
 
   return (
     <>
       <h1>Oops! Something went wrong.</h1>
-      <Show when={props.error}>
+      {props.error && (
         <pre>
           <ErrorToString error={props.error} />
         </pre>
-      </Show>
+      )}
       {props.reset && (
         <div>
           <button onClick={props.reset}>Try again</button>
@@ -41,9 +37,9 @@ export function ErrorToString(props: { error: unknown }) {
     <>
       {props.error instanceof Error ? (
         <>
-          <Show when={!props.error.stack?.includes(props.error.message)}>
-            {props.error.message + "\n"}
-          </Show>
+          {props.error.stack?.includes(props.error.message)
+            ? null
+            : props.error.message + "\n"}
           {props.error.stack}
           {props.error.cause ? (
             <ErrorToString error={props.error.cause} />

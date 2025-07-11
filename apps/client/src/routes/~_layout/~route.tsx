@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet } from "@tanstack/solid-router";
+import { createFileRoute, Outlet } from "@tanstack/react-router";
 import Layout from "../../ui/layout";
 
 export const Route = createFileRoute("/_layout")({

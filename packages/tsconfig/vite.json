@@ -6,7 +6,6 @@
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "types": ["vite/client"],
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "jsx": "react-jsx"
   }
 }

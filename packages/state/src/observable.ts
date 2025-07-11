@@ -50,7 +50,9 @@ type SubscribeHandler<Value> = (value: Value) => unknown;
 type UnsubscribeFn = () => void;
 export type ObservableValue<T extends ObservableLike<unknown>> =
   T extends ObservableLike<infer Value> ? Value : never;
-type ObservableValues<ObservableArray extends ObservableLike<unknown>[]> = {
+export type ObservableValues<
+  ObservableArray extends ObservableLike<unknown>[],
+> = {
   [Index in keyof ObservableArray]: ObservableValue<ObservableArray[Index]>;
 };
 

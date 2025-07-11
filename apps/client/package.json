@@ -24,17 +24,20 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
-    "@tanstack/solid-router": "1.121.3",
-    "@tanstack/solid-router-devtools": "1.121.8",
-    "solid-js": "catalog:"
+    "@tanstack/react-router": "1.126.2",
+    "@tanstack/react-router-devtools": "1.126.2",
+    "react": "catalog:",
+    "react-dom": "catalog:"
   },
   "devDependencies": {
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "@babel/plugin-proposal-decorators": "7.27.1",
     "@mp/tsconfig": "workspace:*",
-    "@tanstack/router-plugin": "1.121.10",
+    "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.9.3",
-    "vite-plugin-solid": "catalog:"
+    "@vitejs/plugin-react": "catalog:"
   }
 }

@@ -12,7 +12,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - 2d graphics: [pixi.js](https://pixijs.com/)
 - maps: [tiled](https://www.mapeditor.org/) (+custom
   [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
-- ui: [solid-js](https://www.solidjs.com/)
+- ui: [react](https://www.react.dev/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
 - network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))

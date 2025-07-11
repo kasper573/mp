@@ -17,15 +17,16 @@
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/ws": "workspace:*",
-    "solid-js": "catalog:"
+    "react": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "17.0.33",
+    "@types/react": "catalog:",
     "@vanilla-extract/vite-plugin": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-solid": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
     "yargs": "17.7.2"
   }
 }
