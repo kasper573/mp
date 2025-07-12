@@ -82,7 +82,7 @@ export class AreaScene extends Container {
 
     this.cameraPos = new VectorSpring(this.myWorldPos, () => ({
       stiffness: 80,
-      damping: 40,
+      damping: 34,
       mass: 1,
       precision: 0.1,
     }));
