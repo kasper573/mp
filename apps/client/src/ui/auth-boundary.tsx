@@ -2,7 +2,6 @@ import type { Component, JSX, ParentProps } from "solid-js";
 import { Switch, Match, createMemo } from "solid-js";
 import type { RoleDefinition } from "@mp/auth";
 import { ioc, ctxAuthClient } from "@mp/game/client";
-import { useObservables } from "@mp/state/solid";
 import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {
@@ -13,13 +12,12 @@ export function AuthBoundary(
   props: ParentProps<AuthBoundaryProps>,
 ): JSX.Element {
   const auth = ioc.get(ctxAuthClient);
-  const [identity, isSignedIn] = useObservables(auth.identity, auth.isSignedIn);
 
   const isPermitted = createMemo(() => {
-    if (!isSignedIn()) {
+    if (!auth.isSignedIn.get()) {
       return false;
     }
-    const existingSet = identity()?.roles ?? new Set();
+    const existingSet = auth.identity.get()?.roles ?? new Set();
     const requiredSet = new Set(props.requiredRoles);
     return requiredSet.isSubsetOf(existingSet);
   });

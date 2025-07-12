@@ -1,6 +1,5 @@
 import { FrameEmitter, Spring } from "@mp/engine";
 import { signal } from "@mp/state";
-import { useObservable } from "@mp/state/solid";
 import { TimeSpan } from "@mp/time";
 import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, createMemo, createEffect, onCleanup } from "solid-js";
@@ -16,7 +15,6 @@ function RouteComponent() {
   const [mass, setMass] = createSignal(2);
   const [precision, setPrecision] = createSignal(1);
   const target = signal(0);
-  const targetValue = useObservable(target);
   const options = createMemo(() => ({
     stiffness: stiffness(),
     damping: damping(),
@@ -26,12 +24,9 @@ function RouteComponent() {
 
   const frameEmitter = new FrameEmitter();
   const spring = new Spring(target, options);
-  const springState = useObservable(spring.state);
-  const springVelocity = useObservable(spring.velocity);
-  const springValue = useObservable(spring.value);
 
   createEffect(() => {
-    if (springState() === "moving") {
+    if (spring.state.get() === "moving") {
       onCleanup(
         frameEmitter.subscribe((opt) => spring.update(opt.timeSinceLastFrame)),
       );
@@ -47,7 +42,7 @@ function RouteComponent() {
   const toggleAutoFlip = () => setAutoFlip((now) => !now);
 
   createEffect(() => {
-    if (autoFlip() && springState() === "settled") {
+    if (autoFlip() && spring.state.get() === "settled") {
       flipSpringTarget();
     }
   });
@@ -94,7 +89,7 @@ function RouteComponent() {
         min={0}
         max={100}
         step={1}
-        value={targetValue()}
+        value={target.get()}
         onChange={(value) => target.set(value)}
       />
 
@@ -105,9 +100,9 @@ function RouteComponent() {
       <pre>
         {JSON.stringify(
           {
-            value: springValue(),
-            state: springState(),
-            velocity: springVelocity(),
+            value: spring.value.get(),
+            state: spring.state.get(),
+            velocity: spring.velocity.get(),
           },
           null,
           2,
@@ -127,7 +122,7 @@ function RouteComponent() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${springValue() / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${spring.value.get() / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />

@@ -10,7 +10,6 @@ import {
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/solid";
-import { useObservable } from "@mp/state/solid";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -39,7 +38,8 @@ export interface GameClientProps {
 export function GameClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
 
-  const areaId = useObservable(() => props.stateClient.areaId);
+  const areaId = () => props.stateClient.areaId.get();
+  const isConnected = () => props.stateClient.isConnected.get();
 
   const area = useAreaResource(areaId);
 
@@ -66,8 +66,6 @@ export function GameClient(props: GameClientProps) {
       };
     }
   });
-
-  const isConnected = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
     onCleanup(ioc.register(ctxGameStateClient, props.stateClient));

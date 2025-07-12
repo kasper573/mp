@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "solid-js": "catalog:",
-    "@preact/signals-core": "1.11.0"
+    "usignal": "0.10.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

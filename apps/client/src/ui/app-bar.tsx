@@ -3,7 +3,7 @@ import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/solid-router";
 import { Button, LinearProgress } from "@mp/ui";
 import { ctxAuthClient, ioc, systemRoles, worldRoles } from "@mp/game/client";
-import { useObservables } from "@mp/state/solid";
+
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
@@ -13,7 +13,6 @@ export default function AppBar() {
   const isNavigating = createMemo(() => state().status === "pending");
 
   const auth = ioc.get(ctxAuthClient);
-  const [identity, isSignedIn] = useObservables(auth.identity, auth.isSignedIn);
 
   return (
     <nav class={styles.nav}>
@@ -21,11 +20,11 @@ export default function AppBar() {
       <Link to="/play">Play</Link>
       <Link to="/contact">Contact</Link>
 
-      <Show when={identity()?.roles.has(systemRoles.useDevTools)}>
+      <Show when={auth.identity.get()?.roles.has(systemRoles.useDevTools)}>
         <Link to="/admin/devtools">Dev Tools</Link>
       </Show>
 
-      <Show when={identity()?.roles.has(worldRoles.spectate)}>
+      <Show when={auth.identity.get()?.roles.has(worldRoles.spectate)}>
         <Link to="/admin/spectator">Spectate</Link>
       </Show>
 
@@ -42,7 +41,7 @@ export default function AppBar() {
           <VersionNotice />
         </Suspense>
 
-        {isSignedIn() ? (
+        {auth.isSignedIn.get() ? (
           <Button role="link" onClick={() => void auth.signOutRedirect()}>
             Sign out
           </Button>

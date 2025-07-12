@@ -1,7 +1,6 @@
-import { computed, effect, signal } from "@mp/state";
-import { useObservables } from "@mp/state/solid";
+import { computed, signal } from "@mp/state";
 import { createFileRoute } from "@tanstack/solid-router";
-import { createSignal, onCleanup } from "solid-js";
+import { createEffect, createSignal } from "solid-js";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/observable-tester",
@@ -14,33 +13,22 @@ function RouteComponent() {
   const base = signal(1);
   const multiplier = signal(1);
   const product = computed(() => base.get() * multiplier.get());
-  const [baseValue, multiplierValue, productValue] = useObservables(
-    base,
-    multiplier,
-    product,
-  );
 
   const addLog = (message: string) => {
     setLog((prev) => `${message}\n${prev}`);
   };
 
-  onCleanup(
-    effect(() => {
-      addLog(`Base changed: ${base.get()}`);
-    }),
-  );
+  createEffect(() => {
+    addLog(`Base changed: ${base.get()}`);
+  });
 
-  onCleanup(
-    effect(() => {
-      addLog(`Multiplier changed: ${multiplier.get()}`);
-    }),
-  );
+  createEffect(() => {
+    addLog(`Multiplier changed: ${multiplier.get()}`);
+  });
 
-  onCleanup(
-    effect(() => {
-      addLog(`Product changed: ${product.get()}`);
-    }),
-  );
+  createEffect(() => {
+    addLog(`Product changed: ${product.get()}`);
+  });
 
   return (
     <>
@@ -54,13 +42,13 @@ function RouteComponent() {
       >
         <div style={{ flex: 1 }}>
           <div>
-            Base: {baseValue()}{" "}
+            Base: {base.get()}{" "}
             <button onClick={() => base.set(base.get() - 1)}>-</button>
             <button onClick={() => base.set(base.get() + 1)}>+</button>
           </div>
 
           <div>
-            Multiplier: {multiplierValue()}{" "}
+            Multiplier: {multiplier.get()}{" "}
             <button onClick={() => multiplier.set(multiplier.get() - 1)}>
               -
             </button>
@@ -69,7 +57,7 @@ function RouteComponent() {
             </button>
           </div>
 
-          <pre>Product: {productValue()}</pre>
+          <pre>Product: {product.get()}</pre>
         </div>
         <pre style={{ flex: 1 }}>{log()}</pre>
       </div>

@@ -1,4 +1,4 @@
-import { effect, type ReadonlySignal } from "@mp/state";
+import { disposableEffect, type ReadonlySignal } from "@mp/state";
 import type { DestroyOptions } from "@mp/graphics";
 import { Container } from "@mp/graphics";
 
@@ -56,7 +56,7 @@ export function reactiveCollectionBinding<Item>(
     }
   }
 
-  const unsubscribe = effect(updateElements);
+  const unsubscribe = disposableEffect(updateElements);
 
   return function cleanupCollectionBinding() {
     unsubscribe();

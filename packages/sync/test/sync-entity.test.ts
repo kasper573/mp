@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { effect } from "@mp/state";
+import { disposableEffect, effect } from "@mp/state";
 import { collect, SyncEntity } from "../src/sync-entity";
 import { PatchType } from "../src/patch";
 
@@ -80,7 +80,7 @@ describe("effects", () => {
     });
     const e = new Entity();
 
-    const stop = effect(() => fn(e.value));
+    const stop = disposableEffect(() => fn(e.value));
 
     e.value = "first";
 

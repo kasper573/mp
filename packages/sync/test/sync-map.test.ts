@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { effect } from "@mp/state";
+import { disposableEffect, effect } from "@mp/state";
 import { collect, SyncEntity } from "../src/sync-entity";
 import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
@@ -130,7 +130,7 @@ describe("effects", () => {
 
     let calls = 0;
     const fn = (val: unknown) => calls++;
-    const stop = effect(() => fn(map.get("1")));
+    const stop = disposableEffect(() => fn(map.get("1")));
 
     const callsBeforeStop = calls;
     stop();

@@ -101,14 +101,14 @@ export function collect<V>({
         let shouldCollectValue = true;
 
         const meta = SyncEntity.accessMeta(this);
-        const obs = meta.observables[context.name];
+        const obs = meta.observables[context.name] as Signal<V>;
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
         if (
           SyncEntity.shouldOptimizeCollects &&
           meta.assignedProperties.has(context.name)
         ) {
-          const prevValue = obs.get() as V;
+          const prevValue = obs.get();
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
         }

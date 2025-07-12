@@ -1,11 +1,11 @@
-import * as preact from "@preact/signals-core";
+import * as solid from "solid-js";
 
 export interface ReadonlySignal<Value> {
   get: () => Value;
 }
 
 export interface Signal<Value> extends ReadonlySignal<Value> {
-  set: (value: Value) => void;
+  set: (value: Value | ((prev: Value) => Value)) => void;
 }
 
 export interface NotifyableSignal<Value> extends ReadonlySignal<Value> {
@@ -15,42 +15,46 @@ export interface NotifyableSignal<Value> extends ReadonlySignal<Value> {
 export type SignalValue<T extends ReadonlySignal<unknown>> =
   T extends ReadonlySignal<infer Value> ? Value : never;
 
-type UnsubscribeFn = () => void;
-
 export function signal<Value>(initialValue: Value): Signal<Value> {
-  const signal = preact.signal(initialValue);
+  const [get, set] = solid.createSignal(initialValue);
   return {
-    get: () => signal.value,
-    set: (newValue) => {
-      signal.value = newValue;
-    },
+    get,
+    set,
   };
 }
 
 export function notifyableSignal<Value>(
   initialValue: Value,
 ): NotifyableSignal<Value> {
-  const signal = preact.signal(initialValue);
-  const epoch = preact.signal(0);
+  const value = signal(initialValue);
+  const epoch = signal(0);
   return {
     get: () => {
-      // eslint-disable-next-line @typescript-eslint/no-unused-expressions
-      epoch.value; // Add epoch to dependency to ensure signal updates when notified
-      return signal.value;
+      epoch.get(); // Add epoch to dependency to ensure signal updates when notified
+      return value.get();
     },
     notify: () => {
-      epoch.value++;
+      epoch.set((n) => n + 1);
     },
   };
 }
 
-export function effect(handler: () => unknown): UnsubscribeFn {
-  return preact.effect(() => void handler());
+/**
+ * Creates an effect in the current tracking context.
+ */
+export function effect(handler: () => unknown): void {
+  solid.createEffect(handler);
+}
+
+export function disposableEffect(handler: () => unknown): () => void {
+  return solid.createRoot((dispose) => {
+    solid.createEffect(handler);
+    return dispose;
+  });
 }
 
 export function computed<Return>(
   handler: () => Return,
 ): ReadonlySignal<Return> {
-  const signal = preact.computed(handler);
-  return { get: () => signal.value };
+  return { get: handler };
 }

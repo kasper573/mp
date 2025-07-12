@@ -587,12 +587,12 @@ importers:
 
   packages/state:
     dependencies:
-      '@preact/signals-core':
-        specifier: 1.11.0
-        version: 1.11.0
       solid-js:
         specifier: 'catalog:'
         version: 1.9.5
+      usignal:
+        specifier: 0.10.0
+        version: 0.10.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -2572,9 +2572,6 @@ packages:
   '@pnpm/npm-conf@2.3.1':
     resolution: {integrity: sha512-c83qWb22rNRuB0UaVCI0uRPNRr8Z0FWnEIvT47jiHAmOIUHbBOg5XvV7pM5x+rKn9HRpjxquDbXYSXr3fAKFcw==}
     engines: {node: '>=12'}
-
-  '@preact/signals-core@1.11.0':
-    resolution: {integrity: sha512-jglbibeWHuFRzEWVFY/TT7wB1PppJxmcSfUHcK+2J9vBRtiooMfw6tAPttojNYrrpdGViqAYCbPpmWYlMm+eMQ==}
 
   '@protobufjs/aspromise@1.1.2':
     resolution: {integrity: sha512-j+gKExEuLmKwvz3OgROXtrJ2UG2x8Ch2YZUxahh+s1F2HZ+wAceUNLkvy6zKCPVRkU++ZWQrdxsUeQXmcg4uoQ==}
@@ -5607,6 +5604,9 @@ packages:
     resolution: {integrity: sha512-4oszoaEKE/mQOtAmdMWqIRHmkxWkUZMnXFnjQ5i01CuRSK3uluxcH1MRVVVWmhlnzT1SCDfKxxficm2G37qzCA==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
 
+  usignal@0.10.0:
+    resolution: {integrity: sha512-6yf3+3POTVYHXin2ukCRS0Xx8hIplPD0yPZhBkvSxUXrZjl9KKzWpRLoEX4+m9vmmgn06w6mJTPG22O2EFdjBQ==}
+
   utils-merge@1.0.1:
     resolution: {integrity: sha512-pMZTvIkT1d+TFGvDOqodOclx0QWkkgi6Tdoa8gC8ffGAAqz9pzPTZWAybbsHHoED/ztMtkv/VoYTYyShUn81hA==}
     engines: {node: '>= 0.4.0'}
@@ -7772,8 +7772,6 @@ snapshots:
       '@pnpm/config.env-replace': 1.1.0
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
-
-  '@preact/signals-core@1.11.0': {}
 
   '@protobufjs/aspromise@1.1.2': {}
 
@@ -11114,6 +11112,8 @@ snapshots:
     optional: true
 
   url-template@3.1.1: {}
+
+  usignal@0.10.0: {}
 
   utils-merge@1.0.1: {}
 

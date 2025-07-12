@@ -1,5 +1,5 @@
 import { createEffect } from "solid-js";
-import { useObservable } from "@mp/state/solid";
+
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { createGameActions } from "../game-state/game-actions";
 import { ioc } from "../context";
@@ -13,13 +13,11 @@ import { GameClient } from "./game-client";
 export function PlayerClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
   const auth = ioc.get(ctxAuthClient);
-  const identity = useObservable(auth.identity);
   const actions = createGameActions(rpc, () => props.stateClient.characterId);
-  const isOpen = useObservable(() => props.stateClient.isConnected);
 
   createEffect(() => {
-    const user = identity();
-    if (isOpen() && user) {
+    const user = auth.identity.get();
+    if (props.stateClient.isConnected.get() && user) {
       void actions.join();
     }
   });

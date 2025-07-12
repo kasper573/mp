@@ -1,6 +1,5 @@
 import type { TimeSpan } from "@mp/time";
 import { createSignal, onMount, onCleanup, batch, createMemo } from "solid-js";
-import { useObservable } from "@mp/state/solid";
 import type { Character, TiledResource } from "../../server";
 import { ioc } from "../context";
 import { ctxEngine } from "../engine-context";
@@ -9,13 +8,9 @@ import { ctxGameStateClient } from "./game-state-client";
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const client = ioc.get(ctxGameStateClient);
   const engine = ioc.get(ctxEngine);
-  const pointerPosition = useObservable(engine.pointer.position);
-  const pointerWorldPosition = useObservable(engine.pointer.worldPosition);
-  const cameraTransform = useObservable(engine.camera.transform);
+
   const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
   const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
-
-  const character = useObservable(client.character);
 
   onMount(() =>
     onCleanup(
@@ -30,17 +25,19 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   );
 
   const info = createMemo(() => {
-    const tilePos = props.tiled.worldCoordToTile(pointerWorldPosition());
+    const tilePos = props.tiled.worldCoordToTile(
+      engine.pointer.worldPosition.get(),
+    );
     return {
-      viewport: pointerPosition(),
-      world: pointerWorldPosition(),
+      viewport: engine.pointer.position.get(),
+      world: engine.pointer.worldPosition.get(),
       tile: tilePos,
       tileSnapped: tilePos.round(),
-      cameraTransform: cameraTransform().data,
+      cameraTransform: engine.camera.transform.get().data,
       frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
       frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
       frameCallbacks: engine.frameEmitter.callbackCount,
-      character: trimCharacterInfo(character()),
+      character: trimCharacterInfo(client.character.get()),
     };
   });
 

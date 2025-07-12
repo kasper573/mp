@@ -7,7 +7,7 @@ import {
   Text,
 } from "@mp/graphics";
 import { TimeSpan } from "@mp/time";
-import { effect } from "@mp/state";
+import { disposableEffect } from "@mp/state";
 import type { TiledResource } from "../../shared/area/tiled-resource";
 import type { Actor } from "../../server/actor";
 import { ioc } from "../context";
@@ -47,7 +47,7 @@ export class ActorController extends Container {
     const state = ioc.get(ctxGameStateClient);
 
     this.subscriptions = [
-      effect(
+      disposableEffect(
         diffCallback(
           () => actorAnimationState(actor),
           this.switchAnimationToMovingOrIdle,
