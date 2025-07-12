@@ -1,6 +1,6 @@
 import { defineConfig } from "vite";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import react from "@vitejs/plugin-react";
+import preact from "@preact/preset-vite";
 
 const babelPlugins = [
   // esbuild already supports stage 3 decorators, but preact uses babel and not esbuild, so we need this plugin
@@ -13,6 +13,6 @@ export default defineConfig({
   },
   plugins: [
     vanillaExtractPlugin(),
-    react({ babel: { plugins: babelPlugins } }),
+    preact({ babel: { plugins: babelPlugins } }),
   ],
 });
