@@ -1,10 +1,8 @@
 import { ioc, ctxAuthClient } from "@mp/game/client";
-import { useObservable } from "@mp/state/react";
 import { Button } from "@mp/ui";
 
 export default function PermissionDenied() {
   const auth = ioc.get(ctxAuthClient);
-  const isSignedIn = useObservable(auth.isSignedIn);
 
   return (
     <div
@@ -16,7 +14,7 @@ export default function PermissionDenied() {
         textAlign: "center",
       }}
     >
-      {isSignedIn ? (
+      {auth.isSignedIn.get() ? (
         <>
           <h1>Permission Denied</h1>
           <p>

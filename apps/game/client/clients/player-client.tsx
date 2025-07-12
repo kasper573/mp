@@ -1,5 +1,4 @@
-import { useEffect } from "react";
-import { useObservable } from "@mp/state/react";
+import { useSignalEffect } from "@mp/state/react";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { GameActions } from "../game-state/game-actions";
 import { ioc } from "../context/ioc";
@@ -13,15 +12,13 @@ import { GameClient } from "./game-client";
 export function PlayerClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
   const auth = ioc.get(ctxAuthClient);
-  const identity = useObservable(auth.identity);
-  const isOpen = useObservable(props.stateClient.isConnected);
 
-  useEffect(() => {
-    if (isOpen && identity) {
+  useSignalEffect(() => {
+    if (props.stateClient.isConnected.get() && auth.identity.get()) {
       const actions = new GameActions(rpc, props.stateClient.characterId);
       void actions.join();
     }
-  }, [isOpen, identity]);
+  });
 
   return <GameClient {...props} />;
 }

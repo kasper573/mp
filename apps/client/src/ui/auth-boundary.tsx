@@ -1,8 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from "react";
-import { useMemo } from "react";
 import type { RoleDefinition } from "@mp/auth";
 import { ioc, ctxAuthClient } from "@mp/game/client";
-import { useObservable } from "@mp/state/react";
+import { useComputed } from "@mp/state/react";
 import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {
@@ -12,19 +11,17 @@ interface AuthBoundaryProps {
 
 export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
   const auth = ioc.get(ctxAuthClient);
-  const identity = useObservable(auth.identity);
-  const isSignedIn = useObservable(auth.isSignedIn);
 
-  const isPermitted = useMemo(() => {
-    if (!isSignedIn) {
+  const isPermitted = useComputed(() => {
+    if (!auth.isSignedIn.get()) {
       return false;
     }
-    const existingSet = identity?.roles ?? new Set();
+    const existingSet = auth.identity.get()?.roles ?? new Set();
     const requiredSet = new Set(props.requiredRoles);
     return requiredSet.isSubsetOf(existingSet);
-  }, [identity, isSignedIn, props.requiredRoles]);
+  });
 
-  if (!isPermitted) {
+  if (!isPermitted.value) {
     return <PermissionDenied />;
   }
   return <>{props.children}</>;

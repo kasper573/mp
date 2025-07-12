@@ -31,7 +31,7 @@ function DevtoolsLayout() {
           whiteSpace: "nowrap",
         }}
       >
-        <Link to="/admin/devtools/observable-tester">Observable Tester</Link>
+        <Link to="/admin/devtools/observable-tester">Signal Tester</Link>
         <Link to="/admin/devtools/storage-tester">Storage Tester</Link>
         <Link to="/admin/devtools/error-tester">Error Tester</Link>
         <Link to="/admin/devtools/spring-tester">Spring Tester</Link>

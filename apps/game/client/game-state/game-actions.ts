@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import type { Observable } from "@mp/state";
+import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { CharacterId, ActorId } from "../../server";
@@ -8,7 +8,7 @@ import type { GameRpcClient } from "../game-rpc-client";
 export class GameActions {
   constructor(
     private rpc: GameRpcClient,
-    private characterId: Observable<CharacterId | undefined>,
+    private characterId: Signal<CharacterId | undefined>,
   ) {}
 
   move(to: Vector<Tile>, desiredPortalId?: ObjectId) {

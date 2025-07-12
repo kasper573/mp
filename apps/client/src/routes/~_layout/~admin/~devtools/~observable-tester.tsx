@@ -1,7 +1,6 @@
-import { observable } from "@mp/state";
-import { useObservable } from "@mp/state/react";
+import { useComputed, useSignal, useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useState } from "react";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/observable-tester",
@@ -11,47 +10,20 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const [log, setLog] = useState("");
-  const base = useMemo(() => observable(1), []);
-  const multiplier = useMemo(() => observable(1), []);
-  const product = useMemo(
-    () => base.compose(multiplier).derive(([b, m]) => b * m),
-    [base, multiplier],
-  );
-  const baseValue = useObservable(base);
-  const multiplierValue = useObservable(multiplier);
-  const productValue = useObservable(product);
-
+  const base = useSignal(1);
+  const multiplier = useSignal(1);
+  const product = useComputed(() => base.value * multiplier.value);
   const addLog = (message: string) => {
     setLog((prev) => `${message}\n${prev}`);
   };
 
-  useEffect(
-    () =>
-      base.subscribe((value) => {
-        addLog(`Base changed: ${value}`);
-      }),
-    [],
-  );
-
-  useEffect(
-    () =>
-      multiplier.subscribe((value) => {
-        addLog(`Multiplier changed: ${value}`);
-      }),
-    [],
-  );
-
-  useEffect(
-    () =>
-      product.subscribe((value) => {
-        addLog(`Product changed: ${value}`);
-      }),
-    [],
-  );
+  useSignalEffect(() => addLog(`Base changed: ${base.value}`));
+  useSignalEffect(() => addLog(`Multiplier changed: ${multiplier.value}`));
+  useSignalEffect(() => addLog(`Product changed: ${product.value}`));
 
   return (
     <>
-      <h1>Observable Tester</h1>
+      <h1>Signal Tester</h1>
       <div
         style={{
           display: "flex",
@@ -61,22 +33,17 @@ function RouteComponent() {
       >
         <div style={{ flex: 1 }}>
           <div>
-            Base: {baseValue}{" "}
-            <button onClick={() => base.set(base.get() - 1)}>-</button>
-            <button onClick={() => base.set(base.get() + 1)}>+</button>
+            Base: {base.value} <button onClick={() => base.value--}>-</button>
+            <button onClick={() => base.value++}>+</button>
           </div>
 
           <div>
-            Multiplier: {multiplierValue}{" "}
-            <button onClick={() => multiplier.set(multiplier.get() - 1)}>
-              -
-            </button>
-            <button onClick={() => multiplier.set(multiplier.get() + 1)}>
-              +
-            </button>
+            Multiplier: {multiplier.value}{" "}
+            <button onClick={() => multiplier.value--}>-</button>
+            <button onClick={() => multiplier.value++}>+</button>
           </div>
 
-          <pre>Product: {productValue}</pre>
+          <pre>Product: {product.value}</pre>
         </div>
         <pre style={{ flex: 1 }}>{log}</pre>
       </div>

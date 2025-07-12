@@ -16,15 +16,13 @@
       "require": "./src/react.ts"
     }
   },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
   "dependencies": {
+    "@preact/signals-core": "1.11.0",
+    "@preact/signals": "2.2.1",
     "react": "catalog:"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "catalog:"
+    "@types/react": "catalog:",
+    "@mp/tsconfig": "workspace:*"
   }
 }

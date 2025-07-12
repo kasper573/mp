@@ -1,17 +1,17 @@
 import { Vector } from "@mp/math";
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { computed, signal } from "@mp/state";
 import type { Pixel } from "@mp/std";
 import type { Camera } from "./camera";
 
 export class Pointer {
-  readonly #isDown = observable(false);
-  readonly #position = observable(new Vector(0 as Pixel, 0 as Pixel));
+  readonly #isDown = signal(false);
+  readonly #position = signal(new Vector(0 as Pixel, 0 as Pixel));
 
-  get position(): ReadonlyObservable<Vector<Pixel>> {
+  get position(): ReadonlySignal<Vector<Pixel>> {
     return this.#position;
   }
-  get isDown(): ReadonlyObservable<boolean> {
+  get isDown(): ReadonlySignal<boolean> {
     return this.#isDown;
   }
 
@@ -40,12 +40,12 @@ export class Pointer {
 }
 
 export class PointerForCamera extends Pointer {
-  worldPosition: ReadonlyObservable<Vector<Pixel>>;
+  worldPosition: ReadonlySignal<Vector<Pixel>>;
 
   constructor(target: HTMLElement, camera: Camera) {
     super(target);
-    this.worldPosition = this.position.derive((pos) =>
-      camera.viewportToWorld(pos),
+    this.worldPosition = computed(() =>
+      camera.viewportToWorld(this.position.get()),
     );
   }
 }

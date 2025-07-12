@@ -1,4 +1,4 @@
-import type { ReadonlyObservable } from "@mp/state";
+import { effect, type ReadonlySignal } from "@mp/state";
 import type { DestroyOptions } from "@mp/graphics";
 import { Container } from "@mp/graphics";
 
@@ -6,7 +6,7 @@ export class ReactiveCollection<Item> extends Container {
   private unsubscribe: () => void;
 
   constructor(
-    items: ReadonlyObservable<Iterable<Item>>,
+    items: ReadonlySignal<Iterable<Item>>,
     createElement: (item: Item) => Container,
   ) {
     super();
@@ -28,13 +28,12 @@ export class ReactiveCollection<Item> extends Container {
  */
 export function reactiveCollectionBinding<Item>(
   container: Container,
-  items: ReadonlyObservable<Iterable<Item>>,
+  items: ReadonlySignal<Iterable<Item>>,
   createElement: (item: Item) => Container,
 ) {
   const elementsByItem = new Map<Item, Container>();
-  const unsubscribe = items.subscribe(updateElements);
-
   let prevItems = new Set<Item>();
+
   function updateElements() {
     const newItems = new Set(items.get());
     const addedItems = newItems.difference(prevItems);
@@ -57,7 +56,7 @@ export function reactiveCollectionBinding<Item>(
     }
   }
 
-  updateElements();
+  const unsubscribe = effect(updateElements);
 
   return function cleanupCollectionBinding() {
     unsubscribe();

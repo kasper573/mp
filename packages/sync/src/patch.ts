@@ -67,9 +67,9 @@ export function applyOperation(
 function setValue(root: object, path: PatchPath, value: unknown): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  if (target instanceof Map) {
+  if (isMapLike(target)) {
     target.set(lastKey, value);
-  } else if (target[lastKey] instanceof Map && value instanceof Map) {
+  } else if (isMapLike(target[lastKey]) && isMapLike(value)) {
     target[lastKey].clear();
     for (const [key, val] of value.entries()) {
       target[lastKey].set(key, val);
@@ -92,7 +92,7 @@ function updateValue(root: object, path: PatchPath, value: unknown): void {
 function removeValue(root: object, path: PatchPath): void {
   const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
   const lastKey = path.at(-1) as string;
-  if (target instanceof Map) {
+  if (isMapLike(target)) {
     target.delete(lastKey);
   } else {
     delete target[lastKey];
@@ -101,7 +101,7 @@ function removeValue(root: object, path: PatchPath): void {
 
 function getValue(target: object, path: unknown[]): unknown {
   for (const key of path) {
-    if (target instanceof Map) {
+    if (isMapLike(target)) {
       target = target.get(key) as never;
     } else {
       target = target[key as keyof typeof target];
@@ -109,3 +109,16 @@ function getValue(target: object, path: unknown[]): unknown {
   }
   return target;
 }
+
+function isMapLike<K, V>(value: unknown): value is Map<K, V> {
+  return (
+    value instanceof Map ||
+    (typeof value === "object" &&
+      value !== null &&
+      mapLikeProps.every((prop) => prop in value))
+  );
+}
+
+const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
+  keyof Map<unknown, unknown>
+>;

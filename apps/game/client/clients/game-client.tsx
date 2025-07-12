@@ -3,7 +3,6 @@ import { Suspense, useEffect } from "react";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/react";
-import { useObservable } from "@mp/state/react";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -31,8 +30,7 @@ export interface GameClientProps {
 export function GameClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
 
-  const areaId = useObservable(props.stateClient.areaId);
-  const isConnected = useObservable(props.stateClient.isConnected);
+  const areaId = props.stateClient.areaId.get();
   const area = useAreaResource(areaId);
   const areaSpritesheets = useQuery({
     queryKey: ["areaSpritesheets", area.data?.id],
@@ -59,7 +57,7 @@ export function GameClient(props: GameClientProps) {
     [actorSpritesheets],
   );
 
-  if (!isConnected) {
+  if (!props.stateClient.isConnected.get()) {
     return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
   }
 

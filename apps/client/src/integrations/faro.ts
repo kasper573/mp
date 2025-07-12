@@ -5,7 +5,7 @@ import {
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
-import type { ReadonlyObservable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
 import { env } from "../env";
 
 export function createFaroClient() {
@@ -25,7 +25,7 @@ export function createFaroClient() {
 
 export function createFaroBindings(
   faro: Faro,
-  identity: ReadonlyObservable<UserIdentity | undefined>,
+  identity: ReadonlySignal<UserIdentity | undefined>,
 ) {
   function update() {
     faro.api.setUser(deriveFaroUser(identity.get()));

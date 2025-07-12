@@ -1,36 +1,31 @@
 import { FrameEmitter, Spring } from "@mp/engine";
-import { observable } from "@mp/state";
-import { useObservable } from "@mp/state/react";
+import { useSignal, useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "react";
 
 export const Route = createFileRoute("/_layout/admin/devtools/spring-tester")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  const [autoFlip, setAutoFlip] = useState(false);
-  const [stiffness, setStiffness] = useState(200);
-  const [damping, setDamping] = useState(40);
-  const [mass, setMass] = useState(2);
-  const [precision, setPrecision] = useState(1);
-  const target = useMemo(() => observable(0), []);
-  const targetValue = useObservable(target);
+  const autoFlip = useSignal(false);
+  const stiffness = useSignal(200);
+  const damping = useSignal(40);
+  const mass = useSignal(2);
+  const precision = useSignal(1);
+  const target = useSignal(0);
 
   const frameEmitter = useMemo(() => new FrameEmitter(), []);
   const spring = useMemo(
     () =>
       new Spring(target, () => ({
-        stiffness,
-        damping,
-        mass,
-        precision,
+        stiffness: stiffness.value,
+        damping: damping.value,
+        mass: mass.value,
+        precision: precision.value,
       })),
     [],
   );
-  const springState = useObservable(spring.state);
-  const springVelocity = useObservable(spring.velocity);
-  const springValue = useObservable(spring.value);
 
   useEffect(() => {
     const unsub = frameEmitter.subscribe((opt) =>
@@ -44,16 +39,16 @@ function RouteComponent() {
   }, [frameEmitter, spring]);
 
   function flipSpringTarget() {
-    target.set(target.get() ? 0 : 100);
+    target.value = target.value ? 0 : 100;
   }
 
-  const toggleAutoFlip = () => setAutoFlip((now) => !now);
+  const toggleAutoFlip = () => (autoFlip.value = !autoFlip.value);
 
-  useEffect(() => {
-    if (autoFlip && springState === "settled") {
+  useSignalEffect(() => {
+    if (autoFlip.value && spring.state.get() === "settled") {
       flipSpringTarget();
     }
-  }, [autoFlip, springState]);
+  });
 
   return (
     <>
@@ -63,52 +58,52 @@ function RouteComponent() {
         min={50}
         max={1000}
         step={1}
-        value={stiffness}
-        onChange={setStiffness}
+        value={stiffness.value}
+        onChange={(v) => (stiffness.value = v)}
       />
       <Range
         label="Damping"
         min={1}
         max={100}
         step={1}
-        value={damping}
-        onChange={setDamping}
+        value={damping.value}
+        onChange={(v) => (damping.value = v)}
       />
       <Range
         label="Mass"
         min={0.1}
         max={10}
         step={0.1}
-        value={mass}
-        onChange={setMass}
+        value={mass.value}
+        onChange={(v) => (mass.value = v)}
       />
       <Range
         label="Precision"
         min={0.01}
         max={1}
         step={0.01}
-        value={precision}
-        onChange={setPrecision}
+        value={precision.value}
+        onChange={(v) => (precision.value = v)}
       />
       <Range
         label="Target"
         min={0}
         max={100}
         step={1}
-        value={targetValue}
-        onChange={(value) => target.set(value)}
+        value={target.value}
+        onChange={(v) => (target.value = v)}
       />
 
       <button onClick={flipSpringTarget}>Flip Target</button>
       <button onClick={toggleAutoFlip}>
-        {autoFlip ? "Disable auto flip" : "Enable auto flip"}
+        {autoFlip.value ? "Disable auto flip" : "Enable auto flip"}
       </button>
       <pre>
         {JSON.stringify(
           {
-            value: springValue,
-            state: springState,
-            velocity: springVelocity,
+            value: spring.value.get(),
+            state: spring.state.get(),
+            velocity: spring.velocity.get(),
           },
           null,
           2,
@@ -128,7 +123,7 @@ function RouteComponent() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${springValue / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${spring.value.get() / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />
