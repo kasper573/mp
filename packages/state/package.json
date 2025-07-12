@@ -19,10 +19,9 @@
   "dependencies": {
     "@preact/signals-core": "1.11.0",
     "@preact/signals": "2.2.1",
-    "react": "catalog:"
+    "preact": "catalog:"
   },
   "devDependencies": {
-    "@types/react": "catalog:",
     "@mp/tsconfig": "workspace:*"
   }
 }

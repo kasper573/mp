@@ -25,17 +25,14 @@
     "@mp/ws": "workspace:*",
     "@tanstack/react-router": "1.126.2",
     "@tanstack/react-router-devtools": "1.126.2",
-    "react": "catalog:",
-    "react-dom": "catalog:"
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "7.27.1",
     "@mp/tsconfig": "workspace:*",
     "@tanstack/router-plugin": "1.126.2",
-    "@types/react": "catalog:",
-    "@types/react-dom": "catalog:",
     "@vanilla-extract/vite-plugin": "catalog:",
-    "@vitejs/plugin-react": "catalog:",
+    "@preact/preset-vite": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.9.3"
   }

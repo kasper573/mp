@@ -1,5 +1,5 @@
 import type { TimeSpan } from "@mp/time";
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "preact/hooks";
 import type { Character, TiledResource } from "../../server";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";

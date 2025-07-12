@@ -1,8 +1,8 @@
 import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import react from "@vitejs/plugin-react";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
+import preact from "@preact/preset-vite";
 
 import type { Plugin } from "vite";
 
@@ -20,7 +20,7 @@ export default defineConfig({
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    react(),
+    preact(),
     checker({ typescript: true }),
     ...(process.env.MP_CLIENT_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

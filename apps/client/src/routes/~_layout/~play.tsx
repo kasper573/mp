@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, PlayerClient } from "@mp/game/client";
-import { Suspense, useContext, useEffect } from "react";
+import { useContext, useEffect } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { useStorage } from "@mp/state/react";
+import { Suspense } from "preact/compat";
 import { SocketContext } from "../../integrations/rpc";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { LoggerContext } from "../../logger";

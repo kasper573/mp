@@ -1,11 +1,11 @@
-import type { ReactNode } from "react";
+import type { ComponentChildren } from "preact";
 import { dots, dot1, dot2, dot3, dot4, container } from "./loading-spinner.css";
 import { Dock } from "./dock";
 
 export type LoadingSpinnerProps =
   // Children is user facing descriptive text or other contentent that communicates to the user what is being loaded.
   // If provided, this should always be displayed.
-  | { children: ReactNode }
+  | { children: ComponentChildren }
 
   // If no children are provided we must provide a debug id so that
   // it's easy to see where the loading spinner comes from in development

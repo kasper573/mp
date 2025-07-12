@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from "preact/hooks";
 import type { StorageAdapter } from "./storage/storage-adapter";
 
 export function useStorage<T>(storage: StorageAdapter<T>) {

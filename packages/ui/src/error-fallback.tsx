@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect } from "react";
+import { createContext } from "preact";
+import { useContext, useEffect } from "preact/hooks";
 
 export function ErrorFallback(props: { error: unknown; reset?: () => void }) {
   const context = useContext(ErrorFallbackContext);

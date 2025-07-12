@@ -1,7 +1,7 @@
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { Select } from "@mp/ui";
-import { Suspense } from "react";
+import { Suspense } from "preact/compat";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CharacterId } from "../../server";
 import { ctxGameRpcClient } from "../game-rpc-client";

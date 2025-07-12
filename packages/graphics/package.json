@@ -22,10 +22,9 @@
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
     "pixi.js": "8.11.0",
-    "react": "catalog:"
+    "preact": "catalog:"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

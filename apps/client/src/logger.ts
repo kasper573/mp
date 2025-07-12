@@ -1,5 +1,5 @@
 import type { Logger } from "@mp/logger";
-import { createContext } from "react";
+import { createContext } from "preact";
 
 export const LoggerContext = createContext<Logger>(
   new Proxy({} as Logger, {

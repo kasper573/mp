@@ -13,11 +13,10 @@
   },
   "dependencies": {
     "@mp/style": "workspace:*",
-    "react": "catalog:",
+    "preact": "catalog:",
     "react-error-boundary": "6.0.0"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

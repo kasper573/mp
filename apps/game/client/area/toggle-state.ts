@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState } from "preact/hooks";
 
 export function toggleState(initialValue = false) {
   const [value, setValue] = useState(initialValue);

@@ -1,7 +1,7 @@
 import { FrameEmitter, Spring } from "@mp/engine";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo } from "preact/hooks";
 
 export const Route = createFileRoute("/_layout/admin/devtools/spring-tester")({
   component: RouteComponent,

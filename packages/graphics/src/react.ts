@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect } from "preact/hooks";
 import type { ApplicationOptions } from "@mp/graphics";
 import { Application } from "@mp/graphics";
 

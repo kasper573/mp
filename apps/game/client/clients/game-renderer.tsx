@@ -1,6 +1,6 @@
 import { Engine } from "@mp/engine";
-import type { JSX } from "react";
-import { useState } from "react";
+import type { JSX } from "preact";
+import { useState } from "preact/hooks";
 import { useStorage } from "@mp/state/react";
 import { StorageAdapter } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";

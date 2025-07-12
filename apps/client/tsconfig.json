@@ -3,6 +3,10 @@
   "include": ["src", "*.ts"],
   "exclude": ["../server/public"],
   "compilerOptions": {
-    "allowJs": true
+    "allowJs": true,
+    "paths": {
+      "react": ["./node_modules/preact/compat/"],
+      "react-dom": ["./node_modules/preact/compat/"]
+    }
   }
 }

@@ -1,5 +1,4 @@
-import type { CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "preact/hooks";
 import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
@@ -24,6 +23,7 @@ import {
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "./actor-spritesheet-lookup";
+import { CSSProperties } from "@mp/style";
 
 export function ActorSpriteTester() {
   const rpc = ioc.get(ctxGameRpcClient);
@@ -40,7 +40,10 @@ export function ActorSpriteTester() {
     useState<ActorAnimationName>("walk-normal");
   const [modelId, setModelId] = useState<ActorModelId>(allModelIds[0]);
 
-  useEffect(() => ioc.register(ctxActorSpritesheetLookup, spritesheets));
+  useEffect(
+    () => ioc.register(ctxActorSpritesheetLookup, spritesheets),
+    [spritesheets],
+  );
 
   return (
     <>

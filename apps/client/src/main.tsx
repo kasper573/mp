@@ -1,7 +1,7 @@
 import "./assets/fonts";
 import { dark } from "@mp/style/themes/dark.css";
-import { lazy, Suspense } from "react";
-import { createRoot } from "react-dom/client";
+import { lazy, Suspense } from "preact/compat";
+import { render } from "preact";
 import { ErrorBoundary, ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { assert } from "@mp/std";
 import * as styles from "./main.css";
@@ -16,7 +16,7 @@ document.documentElement.classList.add(dark);
 const rootElement = assert(document.querySelector("div#root"));
 rootElement.classList.add(styles.root);
 
-createRoot(rootElement).render(<Root />);
+render(<Root />, rootElement);
 
 function handleError(error: unknown) {
   // eslint-disable-next-line no-console

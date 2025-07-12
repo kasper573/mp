@@ -35,11 +35,10 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
-    "react": "catalog:",
+    "preact": "catalog:",
     "uniqolor": "1.1.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/react": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

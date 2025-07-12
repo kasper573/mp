@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import type { ComponentChildren } from "preact";
 import * as styles from "./game-debug-ui.css";
 
-export function GameDebugUi({ children }: { children?: ReactNode }) {
+export function GameDebugUi({ children }: { children?: ComponentChildren }) {
   return (
     <div className={styles.debugMenu}>
       {/* Intentionally only stop propagation for the controls and not the debug info since 

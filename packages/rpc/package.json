@@ -25,11 +25,10 @@
     "@mp/std": "workspace:*",
     "@tanstack/react-query": "5.82.0",
     "@tanstack/react-query-devtools": "5.82.0",
-    "react": "catalog:"
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/react": "catalog:",
     "vitest": "catalog:"
   }
 }

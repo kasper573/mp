@@ -4,7 +4,7 @@ import clsx from "clsx";
 export type StyledComponentProps<Recipe> =
   Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
 
-export function processStyleProps<Props extends { className?: string }>(
+export function processStyleProps<Props extends { className?: unknown }>(
   props: Props,
   classOrRecipe: string | string[] | AnyRecipe,
 ): Props {
@@ -31,7 +31,7 @@ export function processStyleProps<Props extends { className?: string }>(
   }
   return {
     ...spreadProps,
-    className: clsx(props.className, ...additionalClasses),
+    className: clsx(props.className as never, ...additionalClasses),
   } as Props;
 }
 

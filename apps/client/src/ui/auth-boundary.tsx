@@ -1,4 +1,4 @@
-import type { ComponentType, JSX, ReactNode } from "react";
+import type { ComponentType, JSX, ComponentChildren } from "preact";
 import type { RoleDefinition } from "@mp/auth";
 import { ioc, ctxAuthClient } from "@mp/game/client";
 import { useComputed } from "@mp/state/react";
@@ -6,7 +6,7 @@ import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {
   requiredRoles?: Iterable<RoleDefinition>;
-  children?: ReactNode;
+  children?: ComponentChildren;
 }
 
 export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {

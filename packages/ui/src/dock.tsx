@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from "preact";
 import type { StyledComponentProps } from "@mp/style";
 import { processStyleProps } from "@mp/style";
 import * as styles from "./dock.css";

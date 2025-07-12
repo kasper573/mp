@@ -15,7 +15,7 @@ import {
   ReactQueryDevtools,
 } from "@mp/rpc/react";
 import { createWebSocket } from "@mp/ws/client";
-import { useEffect } from "react";
+import { useEffect } from "preact/hooks";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {

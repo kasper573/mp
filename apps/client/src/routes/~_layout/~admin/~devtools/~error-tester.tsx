@@ -1,7 +1,7 @@
 import { skipToken } from "@mp/rpc/react";
 import { ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState } from "preact/hooks";
 import { useRpc } from "../../../../integrations/rpc";
 
 export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({

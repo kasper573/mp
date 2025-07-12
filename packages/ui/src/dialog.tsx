@@ -1,4 +1,4 @@
-import type { JSX } from "react";
+import type { JSX } from "preact";
 import { processStyleProps, type StyledComponentProps } from "@mp/style";
 import * as styles from "./dialog.css";
 

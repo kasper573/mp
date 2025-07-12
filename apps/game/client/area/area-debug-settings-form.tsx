@@ -1,9 +1,9 @@
 import { Select } from "@mp/ui";
-import type { Dispatch, SetStateAction } from "react";
+import type { Dispatch, StateUpdater } from "preact/hooks";
 
 export interface AreaDebugSettingsFormProps {
   value: AreaDebugSettings;
-  onChange: Dispatch<SetStateAction<AreaDebugSettings>>;
+  onChange: Dispatch<StateUpdater<AreaDebugSettings>>;
 }
 
 export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {

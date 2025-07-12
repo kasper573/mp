@@ -1,5 +1,6 @@
-import type { JSX } from "react";
-import { Suspense, useEffect } from "react";
+import type { JSX } from "preact";
+import { useEffect } from "preact/hooks";
+import { Suspense } from "preact/compat";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 import { skipToken, useQuery } from "@mp/rpc/react";

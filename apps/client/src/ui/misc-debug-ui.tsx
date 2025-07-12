@@ -1,8 +1,8 @@
 import { Button } from "@mp/ui";
 import { ctxGameStateClient, ioc } from "@mp/game/client";
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "preact/hooks";
 import { assert } from "@mp/std";
-import { useStorage } from "@mp/state/react";
+import { useSignalEffect, useStorage } from "@mp/state/react";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugStorage } from "../signals/misc-debug-ui-settings";
@@ -83,11 +83,11 @@ function useServerPatchOptimizerState() {
     void rpc.system.setPatchOptimizerEnabled(enabled);
   }, [enabled]);
 
-  useEffect(() => {
+  useSignalEffect(() => {
     if (isRemoteEnabled.data !== undefined) {
       setEnabled(isRemoteEnabled.data);
     }
-  }, [isRemoteEnabled.data]);
+  });
 
   return [enabled, setEnabled] as const;
 }

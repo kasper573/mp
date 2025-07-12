@@ -1,9 +1,9 @@
-import type { ReactNode } from "react";
-import { Suspense } from "react";
+import { Suspense } from "preact/compat";
 import { ErrorBoundary, ErrorFallback, LoadingSpinner } from "@mp/ui";
+import type { ComponentChildren } from "preact";
 import AppBar from "./app-bar";
 
-export default function Layout(props: { children?: ReactNode }) {
+export default function Layout(props: { children?: ComponentChildren }) {
   return (
     <>
       <AppBar />

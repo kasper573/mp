@@ -1,11 +1,12 @@
 import type { ServerRpcRouter } from "@mp/server";
 import type { ReactRpcInvoker } from "@mp/rpc/react";
 import { createReactRpcInvoker } from "@mp/rpc/react";
-import { createContext, useContext } from "react";
+import { useContext } from "preact/hooks";
 import type { Logger } from "@mp/logger";
 import type { RpcCaller } from "@mp/rpc";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import type { AccessToken } from "@mp/auth";
+import { createContext } from "preact";
 
 export type RpcClient = ReactRpcInvoker<ServerRpcRouter>;
 

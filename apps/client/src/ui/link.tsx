@@ -1,5 +1,5 @@
 import { createLink } from "@tanstack/react-router";
-import type { JSX } from "react";
+import type { JSX } from "preact";
 import { clsx } from "@mp/style";
 import * as styles from "./link.css";
 

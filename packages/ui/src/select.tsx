@@ -1,8 +1,8 @@
-import type { JSX, ReactNode } from "react";
-import { useMemo } from "react";
+import type { JSX, ComponentChildren } from "preact";
+import { useMemo } from "preact/hooks";
 
 export interface SelectOption<Value> {
-  label: ReactNode;
+  label: ComponentChildren;
   value: Value;
 }
 

@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+import { Suspense } from "preact/compat";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
@@ -36,7 +36,7 @@ export default function AppBar() {
           Suspending into nothing is okay since a pending 
           version notice isn't very interesting to the user
           */}
-        <Suspense>
+        <Suspense fallback="">
           <VersionNotice />
         </Suspense>
 

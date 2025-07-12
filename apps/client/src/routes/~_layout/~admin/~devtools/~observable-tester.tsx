@@ -1,6 +1,6 @@
 import { useComputed, useSignal, useSignalEffect } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState } from "preact/hooks";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/observable-tester",
