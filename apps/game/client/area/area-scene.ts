@@ -57,7 +57,7 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.area,
       this.state.actorList,
-      () => this.myCoords.value,
+      () => this.state.character.value?.coords,
       options.debugSettings,
     );
 
@@ -80,21 +80,34 @@ export class AreaScene extends Container {
       (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
 
-    this.cameraPos = new VectorSpring(this.myWorldPos, () => ({
-      stiffness: 80,
-      damping: 34,
-      mass: 1,
-      precision: 0.1,
-    }));
+    this.cameraPos = new VectorSpring(
+      computed(() => {
+        const myCoords = this.state.character.value?.coords;
+        if (myCoords) {
+          return this.options.area.tiled.tileCoordToWorld(myCoords);
+        }
+
+        // Retaining the current position if the player coordinate is lost (ie. connection loss).
+        const current = this.cameraPos as VectorSpring<Pixel> | undefined;
+        if (current?.value.value) {
+          // eslint-disable-next-line no-console
+          console.debug("Camera position lost, retaining last known position.");
+          return current.value.value;
+        }
+
+        // Falling back to zero if initializing before a player coordinate is known.
+        // eslint-disable-next-line no-console
+        console.debug("Camera position is not set, using zero vector.");
+        return Vector.zero();
+      }),
+      () => ({
+        stiffness: 80,
+        damping: 34,
+        mass: 1,
+        precision: 0.1,
+      }),
+    );
   }
-
-  myCoords = computed(
-    () => this.state.character.value?.coords ?? Vector.zero<Tile>(),
-  );
-
-  myWorldPos = computed(() =>
-    this.options.area.tiled.tileCoordToWorld(this.myCoords.value),
-  );
 
   cameraPos: VectorSpring<Pixel>;
 
@@ -196,3 +209,5 @@ function createZoomLevelForViewDistance(
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
 }
+
+const cameraUnavailablePos = new Vector(-1000 as Pixel, -1000 as Pixel);
