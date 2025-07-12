@@ -129,7 +129,7 @@ describe("effects", () => {
     const map = new SyncMap<string, Entity>();
 
     let calls = 0;
-    const fn = (val: unknown) => calls++;
+    const fn = (_: unknown) => calls++;
     const stop = effect(() => void fn(map.get("1")));
 
     const callsBeforeStop = calls;

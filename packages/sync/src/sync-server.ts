@@ -77,7 +77,7 @@ export class SyncServer<
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(([type, [entityName, entityId]]) => {
+        ...serverPatch.filter(([_, [entityName, entityId]]) => {
           return entityId === undefined
             ? false
             : nextVisibility[entityName].has(entityId as never);
@@ -229,7 +229,7 @@ export type inferEntityId<Entities> =
   Entities extends PatchableEntities<infer Id, infer _> ? Id : never;
 
 export type inferEntityValue<Entities> =
-  Entities extends PatchableEntities<infer Id, infer Entity> ? Entity : never;
+  Entities extends PatchableEntities<infer _, infer Entity> ? Entity : never;
 
 export type PatchableState = {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

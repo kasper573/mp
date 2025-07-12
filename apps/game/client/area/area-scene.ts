@@ -195,5 +195,3 @@ function createZoomLevelForViewDistance(
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
 }
-
-const cameraUnavailablePos = new Vector(-1000 as Pixel, -1000 as Pixel);

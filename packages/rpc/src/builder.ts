@@ -173,10 +173,10 @@ export interface RpcMiddleware<Context, MwContext, PipedMwContext>
 }
 
 export type InferInput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? I : never;
+  T extends ProcedureHandler<infer I, infer _, infer _, infer _> ? I : never;
 
 export type InferOutput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer I, infer O, infer C, infer MW> ? O : never;
+  T extends ProcedureHandler<infer _, infer O, infer _, infer _> ? O : never;
 
 export type InferContext<T extends AnyRpcNode> =
   T extends AnyRpcNode<infer C> ? C : never;

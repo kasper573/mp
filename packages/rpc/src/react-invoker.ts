@@ -5,7 +5,7 @@ import type {
   AnyMutationNode,
   AnyQueryNode,
   AnyRouterNode,
-  AnyRpcNode as AnyRpcNode,
+  AnyRpcNode,
   InferInput,
   InferOutput,
 } from "./builder";
@@ -43,6 +43,7 @@ function createUseQuery(
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): tanstack.UseQueryResult {
+    // oxlint-disable-next-line no-unused-vars Needs to be omitted to not pass to tanstack
     const { input, map, ...tanstackOptions } = options ?? {};
     return tanstack.useQuery({
       queryKey: [path, input],
@@ -70,6 +71,7 @@ function createUseSuspenseQuery(
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): tanstack.UseSuspenseQueryResult {
+    // oxlint-disable-next-line no-unused-vars Needs to be omitted to not pass to tanstack
     const { input, map, ...tanstackOptions } = options ?? {};
     return tanstack.useSuspenseQuery({
       queryKey: [path, input],
