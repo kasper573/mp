@@ -1,5 +1,4 @@
-import type { NotifyingObservable, ObservableLike } from "@mp/state";
-import { abstractObservable, observableValueGetterSymbol } from "@mp/state";
+import { NotifiableSignal } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -8,24 +7,69 @@ import {
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
 
-export class SyncMap<K, V>
-  extends Map<K, V>
-  implements ObservableLike<ReadonlyMap<K, V>>
-{
+export class SyncMap<K, V> implements Map<K, V> {
   #keysLastFlush = new Set<K>();
+  #signal: NotifiableSignal<Map<K, V>>;
 
-  // Cannot be a private field because it needs to be accessed by the `set` method,
-  // which is an override and can thus not access private fields of the parent class.
-  dirtyKeys?: Set<K>;
+  constructor(entries?: Iterable<readonly [K, V]> | null) {
+    this.#signal = new NotifiableSignal(new Map<K, V>(entries));
+  }
 
-  override set(key: K, value: V): this {
-    this.dirtyKeys ??= new Set();
-    this.dirtyKeys.add(key);
-    return super.set(key, value);
+  // Reactive Map implementation
+
+  clear(): void {
+    const map = this.#signal.value;
+    if (map.size > 0) {
+      map.clear();
+      this.#signal.notify();
+    }
+  }
+  delete(key: K): boolean {
+    const deleted = this.#signal.value.delete(key);
+    if (deleted) {
+      this.#signal.notify();
+    }
+    return deleted;
+  }
+  forEach<ThisArg>(
+    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
+    thisArg?: ThisArg,
+  ): void {
+    // eslint-disable-next-line unicorn/no-array-for-each
+    this.#signal.value.forEach(callbackfn, thisArg);
+  }
+  get(key: K): V | undefined {
+    return this.#signal.value.get(key);
+  }
+  has(key: K): boolean {
+    return this.#signal.value.has(key);
+  }
+  set(key: K, value: V): this {
+    this.#signal.value.set(key, value);
+    this.#signal.notify();
+    return this;
+  }
+  get size(): number {
+    return this.#signal.value.size;
+  }
+  entries(): MapIterator<[K, V]> {
+    return this.#signal.value.entries();
+  }
+  keys(): MapIterator<K> {
+    return this.#signal.value.keys();
+  }
+  values(): MapIterator<V> {
+    return this.#signal.value.values();
+  }
+  [Symbol.iterator](): MapIterator<[K, V]> {
+    return this.#signal.value[Symbol.iterator]();
+  }
+  get [Symbol.toStringTag](): string {
+    return this.#signal.value[Symbol.toStringTag];
   }
 
   /**
-   * Triggers event handlers and produces a patch that represents all changes since the last flush.
+   * Produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
     const patch: Patch = [];
@@ -42,8 +86,6 @@ export class SyncMap<K, V>
       patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
     }
 
-    let didCollectionChange = addedKeys.size > 0 || removedKeys.size > 0;
-
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
     for (const key of staleKeys) {
       const v = this.get(key) as V;
@@ -51,35 +93,12 @@ export class SyncMap<K, V>
       if (op?.length) {
         patch.push(...op);
       }
-      if (this.dirtyKeys?.has(key)) {
-        didCollectionChange = true;
-      }
     }
 
     this.#keysLastFlush = currentKeys;
-    this.dirtyKeys?.clear();
-
-    if (didCollectionChange) {
-      this.#observable.$notifySubscribers();
-    }
 
     return patch;
   }
-
-  // Mixing in the Observable interface
-  #observable = abstractObservable<ReadonlyMap<K, V>>(() => this);
-  derive: NotifyingObservable<ReadonlyMap<K, V>>["derive"] = (...args) =>
-    this.#observable.derive(...args);
-  compose: NotifyingObservable<ReadonlyMap<K, V>>["compose"] = (...args) =>
-    this.#observable.compose(...args);
-  subscribe: NotifyingObservable<ReadonlyMap<K, V>>["subscribe"] = (...args) =>
-    this.#observable.subscribe(...args);
-  $notifySubscribers: NotifyingObservable<
-    ReadonlyMap<K, V>
-  >["$notifySubscribers"] = (...args) =>
-    this.#observable.$notifySubscribers(...args);
-  [observableValueGetterSymbol]: NotifyingObservable<ReadonlyMap<K, V>>["get"] =
-    (...args) => this.#observable.get(...args);
 }
 
 export type SyncMapChangeHandler<K, V> = (

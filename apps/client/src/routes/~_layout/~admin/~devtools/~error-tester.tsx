@@ -1,7 +1,8 @@
-import { skipToken } from "@mp/rpc/solid";
-import { ErrorFallback } from "@mp/ui";
-import { createFileRoute } from "@tanstack/solid-router";
-import { createSignal, Show } from "solid-js";
+import { skipToken } from "@mp/rpc/react";
+import { Checkbox, ErrorFallback } from "@mp/ui";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "preact/hooks";
+import { useSignal } from "@mp/state/react";
 import { useRpc } from "../../../../integrations/rpc";
 
 export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({
@@ -10,39 +11,34 @@ export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({
 
 function RouteComponent() {
   const rpc = useRpc();
-  const [uiError, setUiError] = createSignal(false);
-  const [rpcError, setRpcError] = createSignal(false);
-  const [errorBoundary, setErrorBoundary] = createSignal(false);
+  const [uiError, setUiError] = useState(false);
+  const [rpcError, setRpcError] = useState(false);
+  const errorBoundary = useSignal(false);
 
-  const query = rpc.system.testError.useQuery(() => ({
-    input: rpcError() ? void 0 : skipToken,
-    throwOnError: errorBoundary(),
-  }));
+  const query = rpc.system.testError.useQuery({
+    input: rpcError ? void 0 : skipToken,
+    throwOnError: errorBoundary.value,
+  });
 
   return (
     <div>
       <h1>Error Tester</h1>
       <button onClick={() => setUiError(true)}>Trigger UI error</button>
       <div>
-        <button disabled={rpcError()} onClick={() => setRpcError(true)}>
+        <button disabled={rpcError} onClick={() => setRpcError(true)}>
           Trigger RPC error
         </button>
         <label>
-          <input
-            type="checkbox"
-            checked={errorBoundary()}
-            disabled={rpcError()}
-            onChange={(e) => setErrorBoundary(e.currentTarget.checked)}
-          />
+          <Checkbox signal={errorBoundary} disabled={rpcError} />
           Use error boundary
         </label>
       </div>
-      <Show when={!errorBoundary() && query.error}>
+      {!errorBoundary.value && query.error ? (
         <pre>
           <ErrorFallback error={query.error} />
         </pre>
-      </Show>
-      {uiError() && <ForcedError />}
+      ) : null}
+      {uiError && <ForcedError />}
     </div>
   );
 }

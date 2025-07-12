@@ -1,9 +1,9 @@
-import type { ParentProps } from "solid-js";
-import { ErrorBoundary, Suspense } from "solid-js";
-import { ErrorFallbackFn, LoadingSpinner } from "@mp/ui";
+import { Suspense } from "preact/compat";
+import { ErrorBoundary, ErrorFallback, LoadingSpinner } from "@mp/ui";
+import type { ComponentChildren } from "preact";
 import AppBar from "./app-bar";
 
-export default function Layout(props: ParentProps) {
+export default function Layout(props: { children?: ComponentChildren }) {
   return (
     <>
       <AppBar />
@@ -11,12 +11,12 @@ export default function Layout(props: ParentProps) {
         id="layout"
         style={{
           display: "flex",
-          "flex-direction": "column",
+          flexDirection: "column",
           flex: 1,
           position: "relative",
         }}
       >
-        <ErrorBoundary fallback={ErrorFallbackFn}>
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
           <Suspense fallback={<LoadingSpinner debugId="Layout" />}>
             {props.children}
           </Suspense>

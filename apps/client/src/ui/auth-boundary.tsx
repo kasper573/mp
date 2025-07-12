@@ -1,40 +1,33 @@
-import type { Component, JSX, ParentProps } from "solid-js";
-import { Switch, Match, createMemo } from "solid-js";
+import type { ComponentType, JSX, ComponentChildren } from "preact";
 import type { RoleDefinition } from "@mp/auth";
 import { ioc, ctxAuthClient } from "@mp/game/client";
-import { useObservables } from "@mp/state/solid";
+import { useComputed } from "@mp/state/react";
 import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {
   requiredRoles?: Iterable<RoleDefinition>;
+  children?: ComponentChildren;
 }
 
-export function AuthBoundary(
-  props: ParentProps<AuthBoundaryProps>,
-): JSX.Element {
+export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
   const auth = ioc.get(ctxAuthClient);
-  const [identity, isSignedIn] = useObservables(auth.identity, auth.isSignedIn);
 
-  const isPermitted = createMemo(() => {
-    if (!isSignedIn()) {
+  const isPermitted = useComputed(() => {
+    if (!auth.isSignedIn.value) {
       return false;
     }
-    const existingSet = identity()?.roles ?? new Set();
+    const existingSet = auth.identity.value?.roles ?? new Set();
     const requiredSet = new Set(props.requiredRoles);
     return requiredSet.isSubsetOf(existingSet);
   });
 
-  return (
-    <Switch>
-      <Match when={isPermitted()}>{props.children}</Match>
-      <Match when={!isPermitted()}>
-        <PermissionDenied />
-      </Match>
-    </Switch>
-  );
+  if (!isPermitted.value) {
+    return <PermissionDenied />;
+  }
+  return <>{props.children}</>;
 }
 
-AuthBoundary.wrap = (Component: Component, props?: AuthBoundaryProps) => {
+AuthBoundary.wrap = (Component: ComponentType, props?: AuthBoundaryProps) => {
   return () => (
     <AuthBoundary {...props}>
       <Component />

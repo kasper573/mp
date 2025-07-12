@@ -188,7 +188,7 @@ export interface RootRouteChildren {
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
 
-declare module '@tanstack/solid-router' {
+declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
     '/auth-callback': {
       id: '/auth-callback'

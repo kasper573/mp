@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { effect } from "@mp/state";
 import { collect, SyncEntity } from "../src/sync-entity";
 import { PatchType } from "../src/patch";
 
@@ -48,64 +49,46 @@ it("can select collectable subset", () => {
   expect(subset).toEqual({ count: 1, name: "john" });
 });
 
-describe("observable", () => {
-  it("does not emit events on mutation", () => {
-    class Entity extends SyncEntity {
-      @collect()
-      accessor count: number = 0;
-    }
-
-    const fn = vi.fn();
-    const e = new Entity();
-    e.subscribe(fn);
-    e.count = 1;
-    e.count = 2;
-    expect(fn).toHaveBeenCalledTimes(0);
-  });
-
+describe("effects", () => {
   it("can listen to changes on class instances", () => {
     class Entity extends SyncEntity {
       @collect()
-      accessor count: number = 0;
+      accessor value: string = "initial";
     }
 
-    let receivedCount: number;
+    let received: unknown;
     const fn = vi.fn((arg) => {
-      receivedCount = (arg as Entity).count;
+      received = arg;
     });
     const e = new Entity();
-    e.count = 1;
-    e.count = 2;
-
-    e.subscribe(fn);
-    e.flush();
-    expect(fn).toHaveBeenCalledTimes(1);
-    expect(receivedCount!).toEqual(2);
+    effect(() => fn(e.value));
+    e.value = "first";
+    e.value = "second";
+    expect(fn).toHaveBeenCalledTimes(3);
+    expect(received).toEqual("second");
   });
 
   it("can stop listening to changes on class instances", () => {
     class Entity extends SyncEntity {
       @collect()
-      accessor count: number = 0;
+      accessor value: string = "initial";
     }
 
-    let receivedCount: number;
+    let received: unknown;
     const fn = vi.fn((arg) => {
-      receivedCount = (arg as Entity).count;
+      received = arg;
     });
     const e = new Entity();
 
-    const stop = e.subscribe(fn);
+    const stop = effect(() => fn(e.value));
 
-    e.count = 1;
-    e.flush();
+    e.value = "first";
 
     stop();
 
-    e.count = 2;
-    e.flush();
+    e.value = "second";
 
-    expect(fn).toHaveBeenCalledTimes(1);
-    expect(receivedCount!).toEqual(1);
+    expect(fn).toHaveBeenCalledTimes(2); // one when effect inits, another when e.count = "first"
+    expect(received).toEqual("first");
   });
 });

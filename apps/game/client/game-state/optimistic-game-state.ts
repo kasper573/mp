@@ -12,10 +12,10 @@ import type { GameStateEvents } from "../../server/game-state-events";
 export class OptimisticGameState implements GameState {
   actors = new SyncMap<ActorId, Actor>();
 
-  constructor(private settings: () => OptimisticGameStateSettings) {}
+  constructor(private settings: OptimisticGameStateSettings) {}
 
   frameCallback = (opt: FrameCallbackOptions) => {
-    if (!this.settings().useInterpolator) {
+    if (!this.settings.useInterpolator) {
       return;
     }
 
@@ -43,7 +43,7 @@ export class OptimisticGameState implements GameState {
   };
 
   applyPatch = (patch: Patch, events: EventAccessFn<GameStateEvents>) => {
-    if (this.settings().usePatchOptimizer) {
+    if (this.settings.usePatchOptimizer) {
       applyPatchOptimized(this, patch, events);
     } else {
       applyPatch(this, patch);

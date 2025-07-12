@@ -1,8 +1,13 @@
 import "./assets/fonts";
 import { dark } from "@mp/style/themes/dark.css";
-import { ErrorBoundary, lazy, Suspense } from "solid-js";
-import { render } from "solid-js/web";
-import { LoadingSpinner } from "@mp/ui";
+import { lazy, Suspense } from "preact/compat";
+import { render } from "preact";
+import {
+  ErrorBoundary,
+  ErrorFallback,
+  ErrorFallbackContext,
+  LoadingSpinner,
+} from "@mp/ui";
 import { assert } from "@mp/std";
 import * as styles from "./main.css";
 
@@ -16,13 +21,7 @@ document.documentElement.classList.add(dark);
 const rootElement = assert(document.querySelector("div#root"));
 rootElement.classList.add(styles.root);
 
-render(Root, rootElement);
-
-function handleError(error: unknown) {
-  // eslint-disable-next-line no-console
-  console.error(error);
-  return String(error);
-}
+render(<Root />, rootElement);
 
 function Root() {
   return (
@@ -32,11 +31,18 @@ function Root() {
         but it's here for safety so that if the error fallbacks in the inner error boundaries should fall, 
         this serves as a final bastion of hope to display our error message! 
         */}
-      <ErrorBoundary fallback={handleError}>
-        <Suspense fallback={<LoadingSpinner debugId="main" />}>
-          <App />
-        </Suspense>
-      </ErrorBoundary>
+      <ErrorFallbackContext.Provider
+        value={{
+          // eslint-disable-next-line no-console
+          handleError: console.error,
+        }}
+      >
+        <ErrorBoundary FallbackComponent={ErrorFallback}>
+          <Suspense fallback={<LoadingSpinner debugId="main" />}>
+            <App />
+          </Suspense>
+        </ErrorBoundary>
+      </ErrorFallbackContext.Provider>
     </>
   );
 }

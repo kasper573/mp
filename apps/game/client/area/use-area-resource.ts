@@ -1,19 +1,18 @@
 import { createTiledLoader } from "@mp/tiled-loader";
-import { skipToken } from "@mp/rpc/solid";
-import { type Accessor } from "solid-js";
+import { skipToken } from "@mp/rpc/react";
 import type { AreaId } from "../../shared/area/area-id";
 import { TiledResource } from "../../shared/area/tiled-resource";
 import { ctxGameRpcClient } from "../game-rpc-client";
 import { AreaResource } from "../../shared/area/area-resource";
-import { ioc } from "../context";
+import { ioc } from "../context/ioc";
 
-export function useAreaResource(areaId: Accessor<AreaId | undefined>) {
+export function useAreaResource(areaId: AreaId | undefined) {
   const rpc = ioc.get(ctxGameRpcClient);
-  return rpc.area.areaFileUrl.useQuery(() => ({
-    input: areaId() ?? skipToken,
+  return rpc.area.areaFileUrl.useQuery({
+    input: areaId ?? skipToken,
     staleTime: Infinity,
     map: loadAreaResource,
-  }));
+  });
 }
 
 export async function loadAreaResource(

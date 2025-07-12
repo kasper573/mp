@@ -1,52 +1,49 @@
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { computed, signal } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring<T extends number> implements SpringLike<T> {
-  readonly velocity = observable<T>(0 as T);
-  readonly #value = observable<T>(0 as T);
-  readonly state: ReadonlyObservable<SpringState>;
+  readonly velocity = signal<T>(0 as T);
+  readonly #value = signal<T>(0 as T);
+  readonly state: ReadonlySignal<SpringState>;
 
-  get value(): ReadonlyObservable<T> {
+  get value(): ReadonlySignal<T> {
     return this.#value;
   }
 
   constructor(
-    public readonly target: ReadonlyObservable<T>,
+    public readonly target: ReadonlySignal<T>,
     private options: () => SpringOptions,
     init?: T,
   ) {
-    this.#value.set(init ?? target.get());
-    this.state = this.#value
-      .compose(this.velocity, target)
-      .derive(([value, velocity, target]) => {
-        const { precision } = this.options();
-        const isSettled =
-          Math.abs(target - value) < precision &&
-          Math.abs(velocity) < precision;
+    this.#value.value = init ?? target.value;
+    this.state = computed(() => {
+      const { precision } = this.options();
+      const isSettled =
+        Math.abs(target.value - this.#value.value) < precision &&
+        Math.abs(this.velocity.value) < precision;
 
-        return isSettled ? "settled" : "moving";
-      });
+      return isSettled ? "settled" : "moving";
+    });
   }
 
   update = (dt: TimeSpan) => {
     const { stiffness, damping, mass } = this.options();
-    const currentTarget = this.target.get();
-    const delta = currentTarget - this.#value.get();
+    const currentTarget = this.target.value;
+    const delta = currentTarget - this.#value.value;
     const force = stiffness * delta;
-    const dampingForce = -damping * this.velocity.get();
+    const dampingForce = -damping * this.velocity.value;
     const acceleration = (force + dampingForce) / mass;
 
-    this.velocity.set(
-      (this.velocity.get() + acceleration * dt.totalSeconds) as T,
-    );
-    this.#value.set(
-      (this.#value.get() + this.velocity.get() * dt.totalSeconds) as T,
-    );
+    this.velocity.value = (this.velocity.value +
+      acceleration * dt.totalSeconds) as T;
 
-    if (this.state.get() === "settled") {
-      this.#value.set(currentTarget);
-      this.velocity.set(0 as T);
+    this.#value.value = (this.#value.value +
+      this.velocity.value * dt.totalSeconds) as T;
+
+    if (this.state.value === "settled") {
+      this.#value.value = currentTarget;
+      this.velocity.value = 0 as T;
     }
   };
 }
@@ -61,7 +58,7 @@ export interface SpringOptions {
 export type SpringState = "settled" | "moving";
 
 export interface SpringLike<T> {
-  value: ReadonlyObservable<T>;
-  state: ReadonlyObservable<SpringState>;
+  value: ReadonlySignal<T>;
+  state: ReadonlySignal<SpringState>;
   update: (dt: TimeSpan) => void;
 }

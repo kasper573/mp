@@ -1,1 +1,9 @@
-{ "extends": "@mp/tsconfig/vite.json" }
+{
+  "extends": "@mp/tsconfig/vite.json",
+  "compilerOptions": {
+    "paths": {
+      "react": ["./node_modules/preact/compat/"],
+      "react-dom": ["./node_modules/preact/compat/"]
+    }
+  }
+}

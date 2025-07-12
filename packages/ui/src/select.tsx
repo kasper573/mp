@@ -1,8 +1,10 @@
-import type { JSX } from "solid-js";
-import { createMemo, Index } from "solid-js";
+import type { Signal } from "@mp/state";
+import { useComputed } from "@mp/state/react";
+import type { JSX, ComponentChildren } from "preact";
+import { useMemo } from "preact/hooks";
 
 export interface SelectOption<Value> {
-  label: JSX.Element;
+  label: ComponentChildren;
   value: Value;
 }
 
@@ -10,55 +12,42 @@ type SelectOptionsInput<Value> =
   | readonly SelectOption<Value>[]
   | readonly Value[];
 
-export type SelectProps<Value> =
-  | OptionalSelectProps<Value>
-  | RequiredSelectProps<Value>;
-
-interface BaseSelectProps<Value, InputValue, OutputValue>
-  extends Pick<JSX.HTMLAttributes<HTMLSelectElement>, "class" | "style"> {
+interface SelectProps<Value>
+  extends Pick<JSX.IntrinsicElements["select"], "className" | "style"> {
   options: SelectOptionsInput<Value>;
-  value: InputValue;
-  onChange: (value: OutputValue) => void;
-  isSameValue?: (a: NoInfer<Value>, b: NoInfer<Value>) => boolean;
+  signal: Signal<Value>;
+  isSameValue?: (a: Value, b: Value) => boolean;
 }
 
-export interface OptionalSelectProps<Value>
-  extends BaseSelectProps<
-    Value,
-    NoInfer<Value> | undefined,
-    NoInfer<Value> | undefined
-  > {
-  required?: false;
-}
+export function Select<const Value>({
+  options: inputOptions,
+  signal,
+  isSameValue = refEquals,
+  ...selectProps
+}: SelectProps<Value>) {
+  const options = useMemo(
+    () => normalizeOptionsInput(inputOptions),
+    [inputOptions],
+  );
 
-export interface RequiredSelectProps<Value>
-  extends BaseSelectProps<Value, NoInfer<Value>, NoInfer<Value>> {
-  required: true;
-}
-
-export function Select<const Value>(props: SelectProps<Value>) {
-  const options = createMemo(() => normalizeOptionsInput(props.options));
-  const isSameValue = (a: Value, b: Value) =>
-    props.isSameValue?.(a, b) ?? a === b;
-  const selectedIndex = createMemo(() =>
-    options().findIndex((option) =>
-      isSameValue(option.value, props.value as Value),
-    ),
+  const selectedIndex = useComputed(() =>
+    options.findIndex((option) => isSameValue(option.value, signal.value)),
   );
 
   return (
     <select
-      value={selectedIndex()}
+      value={selectedIndex}
       onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
-        props.onChange(options()[optionIndex].value);
+        signal.value = options[optionIndex].value;
       }}
-      style={props.style}
-      class={props.class}
+      {...selectProps}
     >
-      <Index each={options()}>
-        {(option, index) => <option value={index}>{option().label}</option>}
-      </Index>
+      {options.map((option, index) => (
+        <option key={index} value={index}>
+          {option.label}
+        </option>
+      ))}
     </select>
   );
 }
@@ -79,4 +68,8 @@ function isSelectOption<Value>(option: unknown): option is SelectOption<Value> {
     return false;
   }
   return "label" in option && "value" in option;
+}
+
+function refEquals<T>(a: T, b: T): boolean {
+  return a === b;
 }

@@ -1,13 +1,13 @@
 import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import solid from "vite-plugin-solid";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
+import preact from "@preact/preset-vite";
 
 import type { Plugin } from "vite";
 
 const babelPlugins = [
-  // esbuild already supports stage 3 decorators, but solid uses babel and not esbuild, so we need this plugin
+  // esbuild already supports stage 3 decorators, but preact uses babel and not esbuild, so we need this plugin
   ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
 ];
 
@@ -17,7 +17,7 @@ export default defineConfig({
   },
   plugins: [
     tanstackRouterPlugin({
-      target: "solid",
+      target: "react",
       routeFilePrefix: "~",
       routesDirectory: "src/routes",
       generatedRouteTree: "src/integrations/router/routeTree.gen.ts",
@@ -25,7 +25,7 @@ export default defineConfig({
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    solid({ babel: { plugins: babelPlugins } }),
+    preact({ babel: { plugins: babelPlugins } }),
     checker({ typescript: true }),
     ...(process.env.MP_CLIENT_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

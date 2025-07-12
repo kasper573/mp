@@ -9,15 +9,37 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 ## Stack
 
-- 2d graphics: [pixi.js](https://pixijs.com/)
+- graphics: [pixi.js](https://pixijs.com/)
 - maps: [tiled](https://www.mapeditor.org/) (+custom
   [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
-- ui: [solid-js](https://www.solidjs.com/)
+- ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
 - network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
+
+### Note on state management
+
+To keep things consistent we use signals as a reusable state management system across all systems.
+However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
+We do this to not directly couple all systems with preact.
+
+```text
+              +-----------------------------+
+              |         @mp/state           |
+              |   (@preact/signals-core)    |
+              +-------------+---------------+
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
++----------------+  +----------------+  +---------------+
+|   Game Server  |  |   Graphics     |  |      UI       |
+|      Logic     |  |   (pixi.js)    |  |   (preact)    |
++----------------+  +----------------+  +---------------+
+```
+
+> If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
 
 ## Design goals
 

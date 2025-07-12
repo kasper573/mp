@@ -1,11 +1,11 @@
 import type { RouterNode } from "@mp/rpc";
-import type { SolidRpcInvoker } from "@mp/rpc/solid";
+import type { ReactRpcInvoker } from "@mp/rpc/react";
 import { InjectionContext } from "@mp/ioc";
 import type { gameServerRpcSlice } from "../server/rpc.slice";
 
 export const ctxGameRpcClient =
   InjectionContext.new<GameRpcClient>("GameRpcClient");
 
-export type GameRpcClient = SolidRpcInvoker<
+export type GameRpcClient = ReactRpcInvoker<
   RouterNode<typeof gameServerRpcSlice>
 >;

@@ -1,16 +1,9 @@
-import type { JSX } from "solid-js";
-import {
-  Switch,
-  Match,
-  Suspense,
-  createMemo,
-  createEffect,
-  onCleanup,
-} from "solid-js";
+import type { JSX } from "preact";
+import { useEffect } from "preact/hooks";
+import { Suspense } from "preact/compat";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
-import { skipToken, useQuery } from "@mp/rpc/solid";
-import { useObservable } from "@mp/state/solid";
+import { skipToken, useQuery } from "@mp/rpc/react";
 import {
   ctxGameStateClient,
   type GameStateClient,
@@ -21,8 +14,7 @@ import {
   loadActorSpritesheets,
 } from "../actor/actor-spritesheet-lookup";
 import { ctxGameRpcClient } from "../game-rpc-client";
-import { ioc } from "../context";
-import { Effect } from "../effect";
+import { ioc } from "../context/ioc";
 import { GameRenderer } from "./game-renderer";
 
 export interface GameClientProps {
@@ -39,87 +31,65 @@ export interface GameClientProps {
 export function GameClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
 
-  const areaId = useObservable(() => props.stateClient.areaId);
-
+  const areaId = props.stateClient.areaId.value;
   const area = useAreaResource(areaId);
-
-  const areaSpritesheets = useQuery(() => ({
+  const areaSpritesheets = useQuery({
     queryKey: ["areaSpritesheets", area.data?.id],
     staleTime: Infinity,
     queryFn: area.data
       ? () => loadTiledMapSpritesheets(area.data.tiled.map)
       : skipToken,
-  }));
-
-  const actorSpritesheets = rpc.area.actorSpritesheetUrls.useQuery(() => ({
-    input: void 0,
-    map: loadActorSpritesheets,
-    staleTime: Infinity,
-  }));
-
-  const assets = createMemo(() => {
-    if (area.data && areaSpritesheets.data && actorSpritesheets.data) {
-      return {
-        area: area.data,
-        areaSpritesheets: areaSpritesheets.data,
-        actorSpritesheets: actorSpritesheets.data,
-      };
-    }
   });
 
-  const isConnected = useObservable(() => props.stateClient.isConnected);
+  const { data: actorSpritesheets } =
+    rpc.area.actorSpritesheetUrls.useSuspenseQuery({
+      input: void 0,
+      map: loadActorSpritesheets,
+      staleTime: Infinity,
+    });
 
-  createEffect(() => {
-    onCleanup(ioc.register(ctxGameStateClient, props.stateClient));
-  });
+  useEffect(
+    () => ioc.register(ctxGameStateClient, props.stateClient),
+    [props.stateClient],
+  );
+
+  useEffect(
+    () => ioc.register(ctxActorSpritesheetLookup, actorSpritesheets),
+    [actorSpritesheets],
+  );
+
+  if (!props.stateClient.isConnected.value) {
+    return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
+  }
+
+  if (!areaId) {
+    return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
+  }
+
+  if (area.isLoading || areaSpritesheets.isLoading) {
+    return <LoadingSpinner>Loading area</LoadingSpinner>;
+  }
+
+  if (!area.data || !areaSpritesheets.data) {
+    return (
+      <ErrorFallback
+        error="Could not load area data"
+        reset={() => void area.refetch()}
+      />
+    );
+  }
 
   return (
-    <>
-      <Switch>
-        <Match when={assets()} keyed>
-          {({ area, areaSpritesheets, actorSpritesheets }) => (
-            <Suspense
-              fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}
-            >
-              <Effect
-                effect={() =>
-                  ioc.register(ctxActorSpritesheetLookup, actorSpritesheets)
-                }
-              >
-                <Suspense
-                  fallback={<LoadingSpinner>Loading area</LoadingSpinner>}
-                >
-                  <GameRenderer
-                    interactive={props.interactive}
-                    gameState={props.stateClient.gameState}
-                    additionalDebugUi={props.additionalDebugUi}
-                    areaSceneOptions={{
-                      area,
-                      spritesheets: areaSpritesheets,
-                    }}
-                  />
-                </Suspense>
-              </Effect>
-            </Suspense>
-          )}
-        </Match>
-
-        <Match when={!isConnected()}>
-          <LoadingSpinner>Connecting to game server</LoadingSpinner>
-        </Match>
-        <Match when={!areaId()}>
-          <LoadingSpinner>Waiting for game state</LoadingSpinner>
-        </Match>
-        <Match when={area.isLoading}>
-          <LoadingSpinner>Loading area</LoadingSpinner>
-        </Match>
-        <Match when={!area.data}>
-          <ErrorFallback
-            error="Could not load area data"
-            reset={() => void area.refetch()}
-          />
-        </Match>
-      </Switch>
-    </>
+    <Suspense fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}>
+      <GameRenderer
+        interactive={props.interactive}
+        gameState={props.stateClient.gameState}
+        additionalDebugUi={props.additionalDebugUi}
+        areaSceneOptions={{
+          area: area.data,
+          spritesheets: areaSpritesheets.data,
+        }}
+      />
+    </Suspense>
   );
 }

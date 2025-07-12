@@ -1,13 +1,13 @@
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { signal } from "@mp/state";
 
 export class Keyboard {
-  readonly #keysHeld = observable(new Set<KeyboardEventKey>());
+  readonly #keysHeld = signal(new Set<KeyboardEventKey>());
   #isRunning = false;
 
   constructor(private window: Window) {}
 
-  get keysHeld(): ReadonlyObservable<ReadonlySet<KeyboardEventKey>> {
+  get keysHeld(): ReadonlySignal<ReadonlySet<KeyboardEventKey>> {
     return this.#keysHeld;
   }
 
@@ -40,18 +40,18 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
-    this.#keysHeld.set(
-      current.has(key) ? current : current.union(new Set([key])),
-    );
+    const current = this.#keysHeld.value;
+    this.#keysHeld.value = current.has(key)
+      ? current
+      : current.union(new Set([key]));
   };
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
-    this.#keysHeld.set(
-      current.has(key) ? current.difference(new Set([key])) : current,
-    );
+    const current = this.#keysHeld.value;
+    this.#keysHeld.value = current.has(key)
+      ? current.difference(new Set([key]))
+      : current;
   };
 }
 

@@ -4,7 +4,9 @@
   "exclude": ["../server/public"],
   "compilerOptions": {
     "allowJs": true,
-    "jsx": "preserve",
-    "jsxImportSource": "solid-js"
+    "paths": {
+      "react": ["./node_modules/preact/compat/"],
+      "react-dom": ["./node_modules/preact/compat/"]
+    }
   }
 }

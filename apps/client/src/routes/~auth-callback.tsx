@@ -1,7 +1,9 @@
-import { createFileRoute } from "@tanstack/solid-router";
-import { useNavigate } from "@tanstack/solid-router";
-import { createResource } from "solid-js";
+import type { UseNavigateResult } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
+import { useEffect } from "preact/hooks";
 import { ctxAuthClient, ioc } from "@mp/game/client";
+import type { AuthClient } from "@mp/auth/client";
 
 /**
  * The auth callback route is intentionally placed outside the layout.
@@ -21,15 +23,22 @@ function RouteComponent() {
   const navigate = useNavigate();
   const auth = ioc.get(ctxAuthClient);
 
-  createResource(async () => {
-    try {
-      const state = await auth.signInCallback();
-      void navigate({ to: state?.returnUrl ?? "/" });
-    } catch {
-      // If visiting the callback URL without a sign-in attempt
-      void navigate({ to: "/" });
-    }
-  });
+  useEffect(() => {
+    void handleAuthCallback(auth, navigate);
+  }, [auth, navigate]);
 
   return null;
+}
+
+async function handleAuthCallback(
+  auth: AuthClient,
+  navigate: UseNavigateResult<string>,
+) {
+  try {
+    const state = await auth.signInCallback();
+    void navigate({ to: state?.returnUrl ?? "/" });
+  } catch {
+    // If visiting the callback URL without a sign-in attempt
+    void navigate({ to: "/" });
+  }
 }

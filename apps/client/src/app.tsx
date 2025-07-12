@@ -1,21 +1,22 @@
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/auth/client";
 import { ErrorFallbackContext } from "@mp/ui";
-import { RouterProvider } from "@tanstack/solid-router";
-import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
+import { RouterProvider } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   ctxAuthClient,
   ctxGameRpcClient,
+  ctxLogger,
   ioc,
   registerEncoderExtensions,
 } from "@mp/game/client";
 import {
   QueryClient,
   QueryClientProvider,
-  SolidQueryDevtools,
-} from "@mp/rpc/solid";
+  ReactQueryDevtools,
+} from "@mp/rpc/react";
 import { createWebSocket } from "@mp/ws/client";
-import { onCleanup } from "solid-js";
+import { useEffect, useMemo } from "preact/hooks";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -23,24 +24,54 @@ import {
   RpcClientContext,
   SocketContext,
 } from "./integrations/rpc";
-import { LoggerContext } from "./logger";
-import { createFaroClient } from "./integrations/faro";
+import { createFaroBindings, createFaroClient } from "./integrations/faro";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
-// They should be passed down to the solidjs tree via context.
+// They should be passed down to the component tree via context.
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
 
 registerEncoderExtensions();
 
 export default function App() {
+  const systems = useMemo(createSystems, []);
+  useEffect(() => systems.initialize(), [systems]);
+  return (
+    <QueryClientProvider client={systems.query}>
+      <ErrorFallbackContext.Provider
+        value={{
+          handleError: (e) => systems.logger.error(e, "Preact error"),
+        }}
+      >
+        <SocketContext.Provider value={systems.socket}>
+          <RpcClientContext.Provider value={systems.rpc}>
+            <RouterProvider router={systems.router} />
+            {showDevTools && (
+              <>
+                <TanStackRouterDevtools router={systems.router} />
+                <ReactQueryDevtools client={systems.query} />
+              </>
+            )}
+          </RpcClientContext.Provider>
+        </SocketContext.Provider>
+      </ErrorFallbackContext.Provider>
+    </QueryClientProvider>
+  );
+}
+
+function createSystems() {
   const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const faro = createFaroClient(() => auth.identity.get());
-  const rpc = createRpcClient(socket, logger, () => auth.identity.get()?.token);
+  const faro = createFaroClient();
+  const [rpc, initializeRpc] = createRpcClient(
+    socket,
+    logger,
+    () => auth.identity.value?.token,
+  );
+
   const query = new QueryClient({
     defaultOptions: {
       queries: {
@@ -50,39 +81,36 @@ export default function App() {
     },
   });
 
-  socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
-  onCleanup(() => socket.close());
-  onCleanup(auth.initialize());
-  onCleanup(ioc.register(ctxGameRpcClient, rpc));
-  onCleanup(ioc.register(ctxAuthClient, auth));
+  function initialize() {
+    void auth.refresh();
+    socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
+    const subscriptions = [
+      auth.initialize(),
+      ioc.register(ctxGameRpcClient, rpc),
+      ioc.register(ctxAuthClient, auth),
+      ioc.register(ctxLogger, logger),
+      initializeRpc(),
+      createFaroBindings(faro, auth.identity),
+    ];
 
-  void auth.refresh();
+    return () => {
+      socket.close();
+      for (const unsubscribe of subscriptions) {
+        unsubscribe();
+      }
+    };
+  }
 
-  return (
-    <>
-      <QueryClientProvider client={query}>
-        <LoggerContext.Provider value={logger}>
-          <ErrorFallbackContext.Provider
-            value={{
-              handleError: (e) => logger.error(e, "SolidJS error"),
-            }}
-          >
-            <SocketContext.Provider value={socket}>
-              <RpcClientContext.Provider value={rpc}>
-                <RouterProvider router={router} />
-                {showDevTools && (
-                  <>
-                    <TanStackRouterDevtools router={router} />
-                    <SolidQueryDevtools client={query} />
-                  </>
-                )}
-              </RpcClientContext.Provider>
-            </SocketContext.Provider>
-          </ErrorFallbackContext.Provider>
-        </LoggerContext.Provider>
-      </QueryClientProvider>
-    </>
-  );
+  return {
+    auth,
+    rpc,
+    socket,
+    logger,
+    router,
+    faro,
+    query,
+    initialize,
+  };
 }
 
 const showDevTools = import.meta.env.DEV;

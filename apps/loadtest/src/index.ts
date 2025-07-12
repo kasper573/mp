@@ -5,7 +5,7 @@ import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
 import { loadAreaResource } from "@mp/game/client";
-import { createSolidRpcInvoker } from "@mp/rpc/solid";
+import { createReactRpcInvoker } from "@mp/rpc/react";
 import { readCliOptions } from "./cli";
 
 const logger = createPinoLogger();
@@ -76,7 +76,7 @@ async function testOneGameClient(n: number) {
   const transceiver = new BinaryRpcTransceiver<void>({
     send: socket.send.bind(socket),
   });
-  const rpc = createSolidRpcInvoker<ServerRpcRouter>(transceiver.call);
+  const rpc = createReactRpcInvoker<ServerRpcRouter>(transceiver.call);
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 

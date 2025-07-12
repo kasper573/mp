@@ -1,14 +1,13 @@
 import { Engine } from "@mp/engine";
-import { Application } from "@mp/graphics";
-import type { JSX } from "solid-js";
-import { createEffect, createSignal, onCleanup } from "solid-js";
-import { useStorage } from "@mp/state/solid";
-import { StorageAdapter } from "@mp/state";
+import type { JSX } from "preact";
+import { useState } from "preact/hooks";
+import { StorageSignal } from "@mp/state";
+import { useGraphics } from "@mp/graphics/react";
+import { assert } from "@mp/std";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
-import { ioc } from "../context";
-import { ctxEngine } from "../engine-context";
+import { ioc } from "../context/ioc";
+import { ctxEngine } from "../context/common";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";
-import { usePixiApp } from "../pixi/use-pixi-app";
 import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
 import {
   AreaDebugSettingsForm,
@@ -27,66 +26,61 @@ interface GameRendererProps {
 /**
  * Composes all game graphics and UI into a single component that renders the actual game.
  */
-export function GameRenderer(props: GameRendererProps) {
-  const [getCanvas, setCanvas] = createSignal<HTMLCanvasElement>();
-  const [showDebugUi, setShowDebugUi] = createSignal(false);
-  const [areaDebugSettings, setAreaDebugSettings] = useStorage(
-    areaDebugSettingsStorage,
-  );
+export function GameRenderer({
+  interactive,
+  areaSceneOptions: { area, spritesheets },
+  gameState,
+  additionalDebugUi,
+}: GameRendererProps) {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [showDebugUi, setShowDebugUi] = useState(false);
 
-  createEffect(() => {
-    const canvas = getCanvas();
-    if (!canvas) {
-      return;
-    }
-
-    usePixiApp(async () => {
-      const app = new Application();
-      const engine = new Engine(canvas);
-
-      onCleanup(engine.start(props.interactive));
-      onCleanup(ioc.register(ctxEngine, engine));
-      onCleanup(engine.frameEmitter.subscribe(props.gameState.frameCallback));
-      onCleanup(
+  useGraphics(
+    container,
+    {
+      antialias: true,
+      eventMode: "none",
+      roundPixels: true,
+      interactive,
+      gameState,
+      area,
+    },
+    (app, { interactive, gameState, area }) => {
+      const engine = new Engine(assert(container));
+      const subscriptions = [
+        engine.start(interactive),
+        ioc.register(ctxEngine, engine),
+        engine.frameEmitter.subscribe(gameState.frameCallback),
         engine.keyboard.on("keydown", "F2", () =>
           setShowDebugUi((prev) => !prev),
         ),
-      );
-
+      ];
       const areaScene = new AreaScene({
-        ...props.areaSceneOptions,
-        debugSettings: areaDebugSettings,
+        area,
+        spritesheets,
+        debugSettings: () => areaDebugSettingsStorage.value,
       });
       app.stage.addChild(areaScene);
-
-      await app.init({
-        antialias: true,
-        eventMode: "none",
-        roundPixels: true,
-        canvas,
-      });
-
-      return app;
-    });
-  });
+      return subscriptions;
+    },
+  );
 
   return (
     <>
-      <canvas ref={setCanvas} />
+      <div ref={setContainer} style={{ flex: 1 }} />
       <AreaUi />
-      <GameDebugUi enabled={showDebugUi()}>
-        {props.additionalDebugUi}
-        <AreaDebugSettingsForm
-          value={areaDebugSettings()}
-          onChange={setAreaDebugSettings}
-        />
-        <GameStateDebugInfo tiled={props.areaSceneOptions.area.tiled} />
-      </GameDebugUi>
+      {showDebugUi && (
+        <GameDebugUi>
+          {additionalDebugUi}
+          <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
+          <GameStateDebugInfo tiled={area.tiled} />
+        </GameDebugUi>
+      )}
     </>
   );
 }
 
-const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
+const areaDebugSettingsStorage = new StorageSignal<AreaDebugSettings>(
   "local",
   "area-debug-settings",
   {

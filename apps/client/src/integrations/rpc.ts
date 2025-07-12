@@ -1,13 +1,14 @@
 import type { ServerRpcRouter } from "@mp/server";
-import type { SolidRpcInvoker } from "@mp/rpc/solid";
-import { createSolidRpcInvoker } from "@mp/rpc/solid";
-import { createContext, createEffect, onCleanup, useContext } from "solid-js";
+import type { ReactRpcInvoker } from "@mp/rpc/react";
+import { createReactRpcInvoker } from "@mp/rpc/react";
+import { useContext } from "preact/hooks";
 import type { Logger } from "@mp/logger";
 import type { RpcCaller } from "@mp/rpc";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import type { AccessToken } from "@mp/auth";
+import { createContext } from "preact";
 
-export type RpcClient = SolidRpcInvoker<ServerRpcRouter>;
+export type RpcClient = ReactRpcInvoker<ServerRpcRouter>;
 
 export type RpcClientMiddleware = () => Promise<unknown>;
 
@@ -15,25 +16,34 @@ export function createRpcClient(
   socket: WebSocket,
   logger: Logger,
   accessToken: () => AccessToken | undefined,
-): RpcClient {
+) {
   const transceiver = new BinaryRpcTransceiver({
     send: (data) => socket.send(data),
   });
-  const handleMessage = transceiver.messageEventHandler(logger.error);
-  socket.addEventListener("message", handleMessage);
-  onCleanup(() => socket.removeEventListener("message", handleMessage));
 
-  const syncAccessToken = createAccessTokenSyncBehavior(
+  const syncBehavior = createAccessTokenSyncBehavior(
     transceiver.call,
     socket,
     accessToken,
     logger,
   );
 
-  return createSolidRpcInvoker<ServerRpcRouter>(async (...args) => {
-    await syncAccessToken();
+  const invoker = createReactRpcInvoker<ServerRpcRouter>(async (...args) => {
+    await syncBehavior.ensureAuth();
     return transceiver.call(...args);
   });
+
+  function initialize() {
+    const handleMessage = transceiver.messageEventHandler(logger.error);
+    socket.addEventListener("message", handleMessage);
+    const stopBehavior = syncBehavior.createEffect();
+    return () => {
+      socket.removeEventListener("message", handleMessage);
+      stopBehavior();
+    };
+  }
+
+  return [invoker, initialize] as const;
 }
 
 export function useRpc() {
@@ -75,46 +85,46 @@ function createAccessTokenSyncBehavior(
 ) {
   // We need a separate rpc invoker to actually call the auth procedure.
   // Calling the real rpc invoker that we're creating would cause an infinite loop.
-  const rpc = createSolidRpcInvoker<ServerRpcRouter>(call);
+  const rpc = createReactRpcInvoker<ServerRpcRouter>(call);
 
-  let hasSentAuthToken = false;
+  let lastSeenToken: AccessToken | undefined;
   let currentAuthSendPromise: Promise<void> | undefined;
 
-  function reauthenticate() {
-    hasSentAuthToken = false;
-    currentAuthSendPromise = undefined;
+  function createEffect() {
+    // Abnormal closure means the server may have restarted,
+    // which means we need to re-authenticate.
+    function handleCloseEvent(e: CloseEvent) {
+      // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
+      // 1000 = Abnormal closure
+      if (e.code !== 1000) {
+        logger.debug(
+          "WebSocket closed abnormally, will re-authenticate on next rpc call",
+        );
+        lastSeenToken = undefined;
+        currentAuthSendPromise = undefined;
+      }
+    }
+
+    socket.addEventListener("close", handleCloseEvent);
+
+    return function cleanup() {
+      socket.removeEventListener("close", handleCloseEvent);
+    };
   }
 
-  // If the token changes we need to re-authenticate.
-  createEffect(() => {
-    if (accessToken()) {
-      logger.debug("Access token changed, re-authenticating");
-      reauthenticate();
-    }
-  });
-
-  // Abnormal closure means the server may have restarted,
-  // which means we need to re-authenticate.
-  socket.addEventListener("close", handleCloseEvent);
-  onCleanup(() => socket.removeEventListener("close", handleCloseEvent));
-  function handleCloseEvent(e: CloseEvent) {
-    // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent/code
-    // 1000 = Abnormal closure
-    if (e.code !== 1000) {
-      logger.debug("WebSocket closed abnormally, re-authenticating");
-      reauthenticate();
-    }
-  }
-
-  return async function ensureAuth() {
+  async function ensureAuth() {
     const token = accessToken();
-    if (!hasSentAuthToken && token && !currentAuthSendPromise) {
+    const didTokenChange = token !== lastSeenToken;
+    lastSeenToken = token;
+
+    if (didTokenChange && token && !currentAuthSendPromise) {
       logger.debug("Sending auth token to rpc server");
       currentAuthSendPromise = rpc.world.auth(token).then(() => {
-        hasSentAuthToken = true;
         currentAuthSendPromise = undefined;
       });
     }
     await currentAuthSendPromise;
-  };
+  }
+
+  return { ensureAuth, createEffect };
 }

@@ -5,7 +5,6 @@ import eslint from "@eslint/js";
 import tseslint from "typescript-eslint";
 import importPlugin from "eslint-plugin-import";
 import unusedImportsPlugin from "eslint-plugin-unused-imports";
-import solid from "eslint-plugin-solid/configs/typescript";
 import * as tsParser from "@typescript-eslint/parser";
 import boundariesPlugin from "eslint-plugin-boundaries";
 import eslintPluginUnicorn from "eslint-plugin-unicorn";
@@ -198,13 +197,6 @@ export default tseslint.config(
           alwaysTryTypes: true,
         },
       },
-    },
-  },
-  {
-    files: ["**/*.{ts,tsx}"],
-    ...solid,
-    languageOptions: {
-      parser: tsParser,
     },
   },
   {
