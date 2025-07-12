@@ -1,5 +1,4 @@
-import type { NotifiableSignal } from "@mp/state";
-import { notifiableSignal } from "@mp/state";
+import { NotifiableSignal } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -13,7 +12,7 @@ export class SyncMap<K, V> implements Map<K, V> {
   #signal: NotifiableSignal<Map<K, V>>;
 
   constructor(entries?: Iterable<readonly [K, V]> | null) {
-    this.#signal = notifiableSignal(new Map<K, V>(entries));
+    this.#signal = new NotifiableSignal(new Map<K, V>(entries));
   }
 
   // Reactive Map implementation
