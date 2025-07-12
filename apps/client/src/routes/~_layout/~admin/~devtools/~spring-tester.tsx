@@ -1,5 +1,6 @@
 import { FrameEmitter, Spring } from "@mp/engine";
 import { useSignal, useSignalEffect } from "@mp/state/react";
+import { Range } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo } from "preact/hooks";
 
@@ -133,29 +134,3 @@ function RouteComponent() {
 }
 
 const cubeSize = "50px";
-
-interface RangeProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (newValue: number) => void;
-}
-
-function Range(props: RangeProps) {
-  return (
-    <div style={{ display: "flex" }}>
-      <label>{props.label}</label>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onInput={(e) => props.onChange(+e.currentTarget.value)}
-      />
-      {props.value}
-    </div>
-  );
-}
