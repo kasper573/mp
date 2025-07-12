@@ -1,8 +1,7 @@
 import { Engine } from "@mp/engine";
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
-import { useStorage } from "@mp/state/react";
-import { StorageAdapter } from "@mp/state";
+import { StorageSignal } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";
 import { assert } from "@mp/std";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
@@ -35,9 +34,6 @@ export function GameRenderer({
 }: GameRendererProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const [showDebugUi, setShowDebugUi] = useState(false);
-  const [areaDebugSettings, setAreaDebugSettings] = useStorage(
-    areaDebugSettingsStorage,
-  );
 
   useGraphics(
     container,
@@ -62,7 +58,7 @@ export function GameRenderer({
       const areaScene = new AreaScene({
         area,
         spritesheets,
-        debugSettings: () => areaDebugSettings,
+        debugSettings: () => areaDebugSettingsStorage.value,
       });
       app.stage.addChild(areaScene);
       return subscriptions;
@@ -76,10 +72,7 @@ export function GameRenderer({
       {showDebugUi && (
         <GameDebugUi>
           {additionalDebugUi}
-          <AreaDebugSettingsForm
-            value={areaDebugSettings}
-            onChange={setAreaDebugSettings}
-          />
+          <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
           <GameStateDebugInfo tiled={area.tiled} />
         </GameDebugUi>
       )}
@@ -87,7 +80,7 @@ export function GameRenderer({
   );
 }
 
-const areaDebugSettingsStorage = new StorageAdapter<AreaDebugSettings>(
+const areaDebugSettingsStorage = new StorageSignal<AreaDebugSettings>(
   "local",
   "area-debug-settings",
   {

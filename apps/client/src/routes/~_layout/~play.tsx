@@ -2,24 +2,22 @@ import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, PlayerClient } from "@mp/game/client";
 import { useContext, useEffect } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
-import { useStorage } from "@mp/state/react";
 import { Suspense } from "preact/compat";
 import { SocketContext } from "../../integrations/rpc";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { LoggerContext } from "../../logger";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
-import { miscDebugStorage } from "../../signals/misc-debug-ui-settings";
+import { miscDebugSettingsSignal } from "../../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
 });
 
 function PlayPage() {
-  const [settings] = useStorage(miscDebugStorage);
   const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
     logger: useContext(LoggerContext),
-    settings,
+    settings: miscDebugSettingsSignal.value,
   });
 
   useEffect(() => stateClient.start(), [stateClient]);

@@ -1,12 +1,11 @@
-import { StorageAdapter } from "@mp/state";
-import { useStorage } from "@mp/state/react";
+import { StorageSignal } from "@mp/state";
 import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_layout/admin/devtools/storage-tester")({
   component: RouteComponent,
 });
 
-const storage = new StorageAdapter<{ text: string }>("local", "test-storage", {
+const storage = new StorageSignal<{ text: string }>("local", "test-storage", {
   text: "Initial value",
 });
 
@@ -40,20 +39,18 @@ function RouteComponent() {
 }
 
 function StorageTester() {
-  const [storageValue, updateStorage] = useStorage(storage);
-
   const setText = (newText: string) => {
-    updateStorage((prev) => ({ ...prev, text: newText }));
+    storage.value = { ...storage.value, text: newText };
   };
   return (
     <>
       <input
         type="text"
-        value={storageValue.text}
+        value={storage.value.text}
         onInput={(e) => setText(e.currentTarget.value)}
       />
       <h2>Storage value</h2>
-      <pre>{JSON.stringify(storageValue, null, 2)}</pre>
+      <pre>{JSON.stringify(storage.value, null, 2)}</pre>
     </>
   );
 }

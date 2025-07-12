@@ -1,12 +1,11 @@
+import type { Signal } from "@mp/state";
 import { Select } from "@mp/ui";
-import type { Dispatch, StateUpdater } from "preact/hooks";
 
 export interface AreaDebugSettingsFormProps {
-  value: AreaDebugSettings;
-  onChange: Dispatch<StateUpdater<AreaDebugSettings>>;
+  signal: Signal<AreaDebugSettings>;
 }
 
-export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
+export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
   return (
     <>
       <div>
@@ -14,22 +13,22 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
         <Select
           required
           options={visibleGraphTypes}
-          value={props.value.visibleGraphType}
-          onChange={(visibleGraphType) =>
-            props.onChange((prev) => ({ ...prev, visibleGraphType }))
-          }
+          value={signal.value.visibleGraphType}
+          onChange={(visibleGraphType) => {
+            signal.value = { ...signal.value, visibleGraphType };
+          }}
         />
       </div>
       <label>
         <input
           type="checkbox"
-          checked={props.value.showFogOfWar}
-          onChange={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
+          checked={signal.value.showFogOfWar}
+          onChange={(e) => {
+            signal.value = {
+              ...signal.value,
               showFogOfWar: e.currentTarget.checked,
-            }))
-          }
+            };
+          }}
         />
         Visualize network fog of war
       </label>
@@ -37,13 +36,13 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
       <label>
         <input
           type="checkbox"
-          checked={props.value.showAttackRange}
-          onChange={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
+          checked={signal.value.showAttackRange}
+          onChange={(e) => {
+            signal.value = {
+              ...signal.value,
               showAttackRange: e.currentTarget.checked,
-            }))
-          }
+            };
+          }}
         />
         Show actor attack range
       </label>
@@ -51,13 +50,13 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
       <label>
         <input
           type="checkbox"
-          checked={props.value.showAggroRange}
-          onChange={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
+          checked={signal.value.showAggroRange}
+          onChange={(e) => {
+            signal.value = {
+              ...signal.value,
               showAggroRange: e.currentTarget.checked,
-            }))
-          }
+            };
+          }}
         />
         Show npc aggro range
       </label>
@@ -65,13 +64,13 @@ export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
       <label>
         <input
           type="checkbox"
-          checked={props.value.showActorPaths}
-          onChange={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
+          checked={signal.value.showActorPaths}
+          onChange={(e) => {
+            signal.value = {
+              ...signal.value,
               showActorPaths: e.currentTarget.checked,
-            }))
-          }
+            };
+          }}
         />
         Show actor paths
       </label>
