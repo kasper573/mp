@@ -1,4 +1,3 @@
-import { Suspense } from "preact/compat";
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
@@ -12,6 +11,7 @@ export default function AppBar() {
   const isNavigating = state.status === "pending";
 
   const auth = ioc.get(ctxAuthClient);
+  const versionCompatibility = useVersionCompatibility();
 
   return (
     <nav className={styles.nav}>
@@ -32,13 +32,7 @@ export default function AppBar() {
         active={isNavigating}
       />
       <div className={styles.right}>
-        {/* 
-          Suspending into nothing is okay since a pending 
-          version notice isn't very interesting to the user
-          */}
-        <Suspense fallback="">
-          <VersionNotice />
-        </Suspense>
+        {versionCompatibility === "incompatible" ? <VersionNotice /> : null}
 
         {auth.isSignedIn.value ? (
           <Button role="link" onClick={() => void auth.signOutRedirect()}>
@@ -55,15 +49,10 @@ export default function AppBar() {
 }
 
 function VersionNotice() {
-  const versionCompatibility = useVersionCompatibility();
-  if (versionCompatibility === "incompatible") {
-    return (
-      <>
-        There is a new version available{" "}
-        <Button onClick={() => window.location.reload()}>Reload</Button>
-      </>
-    );
-  }
-
-  return null;
+  return (
+    <>
+      There is a new version available{" "}
+      <Button onClick={() => window.location.reload()}>Reload</Button>
+    </>
+  );
 }
