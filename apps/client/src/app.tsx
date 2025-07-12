@@ -28,7 +28,7 @@ import { createFaroBindings, createFaroClient } from "./integrations/faro";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
-// They should be passed down to the react tree via context.
+// They should be passed down to the component tree via context.
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
 
@@ -81,7 +81,7 @@ export default function App() {
         <LoggerContext.Provider value={logger}>
           <ErrorFallbackContext.Provider
             value={{
-              handleError: (e) => logger.error(e, "ReactJS error"),
+              handleError: (e) => logger.error(e, "Preact error"),
             }}
           >
             <SocketContext.Provider value={socket}>
