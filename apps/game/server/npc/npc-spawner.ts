@@ -10,11 +10,11 @@ import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../../shared/area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
 import { NpcInstance } from "./types";
-import {
-  type Npc,
-  type NpcType,
-  type NpcInstanceId,
-  type NpcSpawn,
+import type {
+  Npc,
+  NpcType,
+  NpcInstanceId,
+  NpcSpawn,
 } from "./types";
 
 export class NpcSpawner {

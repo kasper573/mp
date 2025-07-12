@@ -24,9 +24,7 @@ export interface TokenResolverOption {
   onResolve?: (result: TokenResolverResult) => void;
 }
 
-export interface TokenResolver {
-  (token?: AccessToken): Promise<TokenResolverResult>;
-}
+export type TokenResolver = (token?: AccessToken) => Promise<TokenResolverResult>;
 
 export function createTokenResolver({
   jwksUri,

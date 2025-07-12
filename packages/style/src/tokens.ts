@@ -233,10 +233,10 @@ export const durations = {
   extraLong5: "1500ms",
 } as const;
 
-export type Transition = {
+export interface Transition {
   duration: (typeof durations)[Duration];
   easing: (typeof easings)[Easing];
-};
+}
 
 export type Transitions = typeof transitions;
 export const transitions = {

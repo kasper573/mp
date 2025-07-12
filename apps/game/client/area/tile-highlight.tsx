@@ -1,6 +1,6 @@
 import type { FillStyle } from "@mp/graphics";
 import { Graphics } from "@mp/graphics";
-import { type Rect } from "@mp/math";
+import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { AreaResource } from "../../shared/area/area-resource";
 

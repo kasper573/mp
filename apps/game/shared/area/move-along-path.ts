@@ -34,7 +34,7 @@ export function moveAlongPath<T extends number>(
     return [newCoords, undefined];
   } else if (newPath.length === path.length) {
     return [newCoords, path];
-  } else {
-    return [newCoords, newPath];
   }
+    return [newCoords, newPath];
+  
 }

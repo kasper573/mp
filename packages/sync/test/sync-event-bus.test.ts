@@ -1,11 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SyncEventBus } from "../src/sync-event";
 
-type TestEvents = {
+interface TestEvents {
   foo: number;
   bar: { x: string };
   baz: undefined;
-};
+}
 
 describe("SyncEventBus", () => {
   let bus: SyncEventBus<TestEvents>;

@@ -36,7 +36,7 @@ describe("builder and invoker", () => {
   });
 
   it("passes the context to the handler", async () => {
-    type Ctx = { value: number };
+    interface Ctx { value: number }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure
@@ -128,7 +128,7 @@ describe("builder and invoker", () => {
   });
 
   it("allows middleware to provide a custom context to the handler", async () => {
-    type Ctx = { userId: number };
+    interface Ctx { userId: number }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure
@@ -149,7 +149,7 @@ describe("builder and invoker", () => {
   });
 
   it("can use two middlewares and pass combined contexts", async () => {
-    type Ctx = { userId: number };
+    interface Ctx { userId: number }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure

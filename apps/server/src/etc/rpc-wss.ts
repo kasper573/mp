@@ -1,4 +1,4 @@
-import { type WebSocket } from "@mp/ws/server";
+import type { WebSocket } from "@mp/ws/server";
 import {
   BinaryRpcTransceiver,
   createRpcInvoker,

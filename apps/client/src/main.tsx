@@ -23,6 +23,8 @@ rootElement.classList.add(styles.root);
 
 render(<Root />, rootElement);
 
+console.error();
+
 function Root() {
   return (
     <>

@@ -27,7 +27,7 @@ export function parseEnv<
 
 type Primitive = string | number | boolean | null | undefined;
 export type FlatObject = Record<string, Primitive>;
-type NestedObject = { [key: string]: Primitive | NestedObject };
+interface NestedObject { [key: string]: Primitive | NestedObject }
 
 function selectProperties(flat: FlatObject, prefix: string): FlatObject {
   const res: FlatObject = {};

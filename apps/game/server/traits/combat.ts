@@ -1,5 +1,5 @@
 import { type Vector, type Rect, clamp } from "@mp/math";
-import { type Tile, type TimesPerSecond } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import type { GameState } from "../game-state";
 import type { AreaLookup } from "../area/lookup";

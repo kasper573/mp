@@ -1,6 +1,6 @@
 import type { ActorId } from "./actor";
 
-export type GameStateEvents = {
+export interface GameStateEvents {
   "combat.attack": {
     actorId: ActorId;
     targetId: ActorId;
@@ -11,4 +11,4 @@ export type GameStateEvents = {
    * It needs to know that it's okay to stop immediately and not let the interpolation finish.
    */
   "movement.stop": ActorId;
-};
+}

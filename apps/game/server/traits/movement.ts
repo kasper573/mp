@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import { type CardinalDirection, type Path } from "@mp/math";
+import type { CardinalDirection, Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";

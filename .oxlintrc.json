@@ -73,7 +73,7 @@
     "no-void": "off",
     "no-async-await": "off",
     "no-rest-spread-properties": "off",
-    "no-console": "off",
+    "no-console": "error",
     "no-undefined": "off",
     "default-case": "off",
     "no-barrel-file": "off",

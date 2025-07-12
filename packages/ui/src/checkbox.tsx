@@ -1,5 +1,5 @@
 import type { JSX } from "preact";
-import { type Signal } from "@mp/state";
+import type { Signal } from "@mp/state";
 
 export interface CheckboxProps
   extends Pick<

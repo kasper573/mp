@@ -1,4 +1,4 @@
-import { type RuntimeFn } from "@vanilla-extract/recipes";
+import type { RuntimeFn } from "@vanilla-extract/recipes";
 import clsx from "clsx";
 
 export type StyledComponentProps<Recipe> =

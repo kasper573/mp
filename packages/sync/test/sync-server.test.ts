@@ -4,13 +4,13 @@ import { SyncServer } from "../src/sync-server";
 import { SyncMap } from "../src/sync-map";
 import { collect, SyncEntity } from "../src/sync-entity";
 
-type TestState = {
+interface TestState {
   items: SyncMap<string, number>;
-};
+}
 
-type TestEventMap = {
+interface TestEventMap {
   message: string;
-};
+}
 
 it("sends full state patch on initial flush and respects client visibility config", () => {
   const server = new SyncServer<TestState, TestEventMap>({
@@ -83,9 +83,9 @@ it("can collect patches", () => {
     }
   }
 
-  type TestState = {
+  interface TestState {
     persons: SyncMap<Person["id"], Person>;
-  };
+  }
 
   const server = new SyncServer<TestState, {}>({
     clientIds: () => ["client"],

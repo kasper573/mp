@@ -5,7 +5,7 @@ import { ctxTokenResolver, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 import type { Character } from "../character/types";
-import { type CharacterId } from "../character/types";
+import type { CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateServer } from "../game-state-server";
 import { worldRoles } from "../../shared/roles";

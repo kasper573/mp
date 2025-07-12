@@ -9,7 +9,7 @@ import { SyncMap } from "./sync-map";
 
 import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";
-import { type SyncEvent, type SyncEventMap } from "./sync-event";
+import type { SyncEvent, SyncEventMap } from "./sync-event";
 
 export class SyncServer<
   State extends PatchableState,
@@ -231,9 +231,9 @@ export type inferEntityId<Entities> =
 export type inferEntityValue<Entities> =
   Entities extends PatchableEntities<infer _, infer Entity> ? Entity : never;
 
-export type PatchableState = {
+export interface PatchableState {
   [entityName: string]: PatchableEntities<PatchableEntityId, any>;
-};
+}
 
 export type ClientId = Registry extends { clientId: infer T } ? T : string;
 

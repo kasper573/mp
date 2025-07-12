@@ -1,7 +1,7 @@
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { Table } from "drizzle-orm";
-import { type ColumnBaseConfig } from "drizzle-orm";
+import type { ColumnBaseConfig } from "drizzle-orm";
 import { PgPointObject, PgPointObjectBuilder } from "drizzle-orm/pg-core";
 
 /**

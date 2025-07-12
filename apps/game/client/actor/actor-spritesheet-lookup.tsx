@@ -1,9 +1,9 @@
 import type { Texture } from "@mp/graphics";
 import { Assets } from "@mp/graphics";
 import { InjectionContext } from "@mp/ioc";
-import {
-  type ActorModelId,
-  type ActorAnimationName,
+import type {
+  ActorModelId,
+  ActorAnimationName,
 } from "../../server/traits/appearance";
 import type { ActorSpritesheetUrls } from "../../server";
 import type { ActorSpritesheet } from "./actor-spritesheet";

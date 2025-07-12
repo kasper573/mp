@@ -36,15 +36,11 @@ export interface RpcFactories<Context> {
   middleware: MiddlewareBuilder<Context, unknown>;
 }
 
-export interface RouterBuilder {
-  <Routes extends AnyRouteRecord>(routes: Routes): RouterNode<Routes>;
-}
+export type RouterBuilder = <Routes extends AnyRouteRecord>(routes: Routes) => RouterNode<Routes>;
 
-export interface MiddlewareBuilder<Context, PipedMwContext> {
-  <MwContext>(
+export type MiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
     middlewareFn: RpcMiddlewareHandler<Context, MwContext, PipedMwContext>,
-  ): RpcMiddleware<Context, MwContext, PipedMwContext>;
-}
+  ) => RpcMiddleware<Context, MwContext, PipedMwContext>;
 
 interface RpcNode<Type extends string> {
   type: Type;
@@ -152,8 +148,7 @@ export class ProcedureBuilder<Input, Output, Context, MwContext> {
   }
 }
 
-export interface RpcMiddlewareHandler<Context, MwContext, PipedMwContext> {
-  (opt: {
+export type RpcMiddlewareHandler<Context, MwContext, PipedMwContext> = (opt: {
     /**
      * The global rpc context
      */
@@ -162,8 +157,7 @@ export interface RpcMiddlewareHandler<Context, MwContext, PipedMwContext> {
      * The middleware context output by the piped middleware (if any)
      */
     mwc: PipedMwContext;
-  }): ProcedureResult<MwContext>;
-}
+  }) => ProcedureResult<MwContext>;
 
 export interface RpcMiddleware<Context, MwContext, PipedMwContext>
   extends RpcMiddlewareHandler<Context, MwContext, PipedMwContext> {

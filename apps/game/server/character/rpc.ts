@@ -8,7 +8,7 @@ import { roles } from "../user/auth";
 import { ctxGameStateServer } from "../game-state-server";
 import { characterRoles } from "../../shared/roles";
 import { ctxCharacterService } from "./service";
-import { type CharacterId } from "./types";
+import type { CharacterId } from "./types";
 import { accessCharacter } from "./access";
 
 export type CharacterRouter = typeof characterRouter;
