@@ -9,7 +9,7 @@ export abstract class SyncEntity {
   #meta = new SyncEntityMeta();
 
   /**
-   * Triggers event handlers and produces a patch that represents all changes since the last flush.
+   * Produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
     const changes = this.#meta.changes;

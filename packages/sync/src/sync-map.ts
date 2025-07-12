@@ -16,6 +16,8 @@ export class SyncMap<K, V> implements Map<K, V> {
     this.#signal = notifyableSignal(new Map<K, V>(entries));
   }
 
+  // Reactive Map implementation
+
   clear(): void {
     const map = this.#signal.value;
     if (map.size > 0) {
@@ -68,7 +70,7 @@ export class SyncMap<K, V> implements Map<K, V> {
   }
 
   /**
-   * Triggers event handlers and produces a patch that represents all changes since the last flush.
+   * Produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
     const patch: Patch = [];
