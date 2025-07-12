@@ -1,32 +1,33 @@
 import { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
-import type { ReadonlyObservable } from "@mp/state";
+import { computed, type ReadonlySignal } from "@mp/state";
 import type { SpringLike, SpringOptions } from "./spring";
 import { Spring } from "./spring";
 
 export class VectorSpring<T extends number> implements SpringLike<Vector<T>> {
   private xSpring: Spring<T>;
   private ySpring: Spring<T>;
-  readonly state: ReadonlyObservable<"settled" | "moving">;
-  readonly value: ReadonlyObservable<Vector<T>>;
+  readonly state: ReadonlySignal<"settled" | "moving">;
+  readonly value: ReadonlySignal<Vector<T>>;
 
   constructor(
-    target: ReadonlyObservable<Vector<T>>,
+    target: ReadonlySignal<Vector<T>>,
     options: () => SpringOptions,
     init?: Vector<T>,
   ) {
-    const targetX = target.derive((v) => v.x);
-    const targetY = target.derive((v) => v.y);
+    const targetX = computed(() => target.value.x);
+    const targetY = computed(() => target.value.y);
     this.xSpring = new Spring(targetX, options, init?.x);
     this.ySpring = new Spring(targetY, options, init?.y);
-    this.state = this.xSpring.state
-      .compose(this.ySpring.state)
-      .derive(([xState, yState]) =>
-        xState === "settled" && yState === "settled" ? "settled" : "moving",
-      );
-    this.value = this.xSpring.value
-      .compose(this.ySpring.value)
-      .derive(([x, y]) => new Vector(x, y));
+    this.state = computed(() => {
+      return this.xSpring.state.value === "settled" &&
+        this.ySpring.state.value === "settled"
+        ? "settled"
+        : "moving";
+    });
+    this.value = computed(
+      () => new Vector(this.xSpring.value.value, this.ySpring.value.value),
+    );
   }
 
   update = (dt: TimeSpan) => {

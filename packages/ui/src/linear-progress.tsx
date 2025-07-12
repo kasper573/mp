@@ -1,4 +1,4 @@
-import type { JSX } from "solid-js";
+import type { JSX } from "preact";
 import type { StyledComponentProps } from "@mp/style";
 import { processStyleProps } from "@mp/style";
 import * as styles from "./linear-progress.css";

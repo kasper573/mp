@@ -10,10 +10,10 @@
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     },
-    "./solid": {
-      "types": "./src/solid-invoker.ts",
-      "import": "./src/solid-invoker.ts",
-      "require": "./src/solid-invoker.ts"
+    "./react": {
+      "types": "./src/react-invoker.ts",
+      "import": "./src/react-invoker.ts",
+      "require": "./src/react-invoker.ts"
     }
   },
   "scripts": {
@@ -23,9 +23,8 @@
   "dependencies": {
     "@mp/encoding": "workspace:*",
     "@mp/std": "workspace:*",
-    "@tanstack/solid-query": "5.74.3",
-    "@tanstack/solid-query-devtools": "5.74.3",
-    "solid-js": "catalog:"
+    "@tanstack/react-query": "5.82.0",
+    "@tanstack/react-query-devtools": "5.82.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

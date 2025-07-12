@@ -1,58 +1,55 @@
 import { FrameEmitter, Spring } from "@mp/engine";
-import { observable } from "@mp/state";
-import { useObservable } from "@mp/state/solid";
-import { TimeSpan } from "@mp/time";
-import { createFileRoute } from "@tanstack/solid-router";
-import { createSignal, createMemo, createEffect, onCleanup } from "solid-js";
+import { useSignal, useSignalEffect } from "@mp/state/react";
+import { Range } from "@mp/ui";
+import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useMemo } from "preact/hooks";
 
 export const Route = createFileRoute("/_layout/admin/devtools/spring-tester")({
   component: RouteComponent,
 });
 
 function RouteComponent() {
-  const [autoFlip, setAutoFlip] = createSignal(false);
-  const [stiffness, setStiffness] = createSignal(200);
-  const [damping, setDamping] = createSignal(40);
-  const [mass, setMass] = createSignal(2);
-  const [precision, setPrecision] = createSignal(1);
-  const target = observable(0);
-  const targetValue = useObservable(target);
-  const options = createMemo(() => ({
-    stiffness: stiffness(),
-    damping: damping(),
-    mass: mass(),
-    precision: precision(),
-  }));
+  const autoFlip = useSignal(false);
+  const stiffness = useSignal(200);
+  const damping = useSignal(40);
+  const mass = useSignal(2);
+  const precision = useSignal(1);
+  const target = useSignal(0);
 
-  const frameEmitter = new FrameEmitter();
-  const spring = new Spring(target, options);
-  const springState = useObservable(spring.state);
-  const springVelocity = useObservable(spring.velocity);
-  const springValue = useObservable(spring.value);
+  const frameEmitter = useMemo(() => new FrameEmitter(), []);
+  const spring = useMemo(
+    () =>
+      new Spring(target, () => ({
+        stiffness: stiffness.value,
+        damping: damping.value,
+        mass: mass.value,
+        precision: precision.value,
+      })),
+    [],
+  );
 
-  createEffect(() => {
-    if (springState() === "moving") {
-      onCleanup(
-        frameEmitter.subscribe((opt) => spring.update(opt.timeSinceLastFrame)),
-      );
-    }
-  });
-
-  createRenderEffect(spring.update);
+  useEffect(() => {
+    const unsub = frameEmitter.subscribe((opt) =>
+      spring.update(opt.timeSinceLastFrame),
+    );
+    frameEmitter.start();
+    return () => {
+      unsub();
+      frameEmitter.stop();
+    };
+  }, [frameEmitter, spring]);
 
   function flipSpringTarget() {
-    target.set(target.get() ? 0 : 100);
+    target.value = target.value ? 0 : 100;
   }
 
-  const toggleAutoFlip = () => setAutoFlip((now) => !now);
+  const toggleAutoFlip = () => (autoFlip.value = !autoFlip.value);
 
-  createEffect(() => {
-    if (autoFlip() && springState() === "settled") {
+  useSignalEffect(() => {
+    if (autoFlip.value && spring.state.value === "settled") {
       flipSpringTarget();
     }
   });
-
-  onCleanup(frameEmitter.start());
 
   return (
     <>
@@ -62,52 +59,29 @@ function RouteComponent() {
         min={50}
         max={1000}
         step={1}
-        value={stiffness()}
-        onChange={setStiffness}
+        signal={stiffness}
       />
-      <Range
-        label="Damping"
-        min={1}
-        max={100}
-        step={1}
-        value={damping()}
-        onChange={setDamping}
-      />
-      <Range
-        label="Mass"
-        min={0.1}
-        max={10}
-        step={0.1}
-        value={mass()}
-        onChange={setMass}
-      />
+      <Range label="Damping" min={1} max={100} step={1} signal={damping} />
+      <Range label="Mass" min={0.1} max={10} step={0.1} signal={mass} />
       <Range
         label="Precision"
         min={0.01}
         max={1}
         step={0.01}
-        value={precision()}
-        onChange={setPrecision}
+        signal={precision}
       />
-      <Range
-        label="Target"
-        min={0}
-        max={100}
-        step={1}
-        value={targetValue()}
-        onChange={(value) => target.set(value)}
-      />
+      <Range label="Target" min={0} max={100} step={1} signal={target} />
 
       <button onClick={flipSpringTarget}>Flip Target</button>
       <button onClick={toggleAutoFlip}>
-        {autoFlip() ? "Disable auto flip" : "Enable auto flip"}
+        {autoFlip.value ? "Disable auto flip" : "Enable auto flip"}
       </button>
       <pre>
         {JSON.stringify(
           {
-            value: springValue(),
-            state: springState(),
-            velocity: springVelocity(),
+            value: spring.value.value,
+            state: spring.state.value,
+            velocity: spring.velocity.value,
           },
           null,
           2,
@@ -127,7 +101,7 @@ function RouteComponent() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${springValue() / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${spring.value.value / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />
@@ -137,47 +111,3 @@ function RouteComponent() {
 }
 
 const cubeSize = "50px";
-
-interface RangeProps {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (newValue: number) => void;
-}
-
-function Range(props: RangeProps) {
-  return (
-    <div style={{ display: "flex" }}>
-      <label>{props.label}</label>
-      <input
-        type="range"
-        min={props.min}
-        max={props.max}
-        step={props.step}
-        value={props.value}
-        onInput={(e) => props.onChange(+e.currentTarget.value)}
-      />
-      {props.value}
-    </div>
-  );
-}
-
-function createRenderEffect(update: (dt: TimeSpan) => void) {
-  let isRendering = true;
-  let prevFrameTime = performance.now();
-
-  render();
-  onCleanup(() => (isRendering = false));
-
-  function render() {
-    const now = performance.now();
-    const dt = TimeSpan.fromMilliseconds(now - prevFrameTime);
-    prevFrameTime = now;
-    update(dt);
-    if (isRendering) {
-      requestAnimationFrame(render);
-    }
-  }
-}

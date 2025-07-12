@@ -10,18 +10,16 @@
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     },
-    "./solid": {
-      "types": "./src/solid.ts",
-      "import": "./src/solid.ts",
-      "require": "./src/solid.ts"
+    "./react": {
+      "types": "./src/react.ts",
+      "import": "./src/react.ts",
+      "require": "./src/react.ts"
     }
   },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
   "dependencies": {
-    "solid-js": "catalog:"
+    "@preact/signals": "2.2.1",
+    "@preact/signals-core": "1.11.0",
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

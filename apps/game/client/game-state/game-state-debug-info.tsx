@@ -1,52 +1,45 @@
 import type { TimeSpan } from "@mp/time";
-import { createSignal, onMount, onCleanup, batch, createMemo } from "solid-js";
-import { useObservable } from "@mp/state/solid";
+import { useState, useEffect } from "preact/hooks";
 import type { Character, TiledResource } from "../../server";
-import { ioc } from "../context";
-import { ctxEngine } from "../engine-context";
+import { ioc } from "../context/ioc";
+import { ctxEngine } from "../context/common";
 import { ctxGameStateClient } from "./game-state-client";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const client = ioc.get(ctxGameStateClient);
   const engine = ioc.get(ctxEngine);
-  const pointerPosition = useObservable(engine.pointer.position);
-  const pointerWorldPosition = useObservable(engine.pointer.worldPosition);
-  const cameraTransform = useObservable(engine.camera.transform);
-  const [frameInterval, setFrameInterval] = createSignal<TimeSpan>();
-  const [frameDuration, setFrameDuration] = createSignal<TimeSpan>();
+  const [frameInterval, setFrameInterval] = useState<TimeSpan>();
+  const [frameDuration, setFrameDuration] = useState<TimeSpan>();
 
-  const character = useObservable(client.character);
-
-  onMount(() =>
-    onCleanup(
+  useEffect(
+    () =>
       engine.frameEmitter.subscribe(
-        ({ timeSinceLastFrame, previousFrameDuration }) =>
-          batch(() => {
-            setFrameInterval(timeSinceLastFrame);
-            setFrameDuration(previousFrameDuration);
-          }),
+        ({ timeSinceLastFrame, previousFrameDuration }) => {
+          setFrameInterval(timeSinceLastFrame);
+          setFrameDuration(previousFrameDuration);
+        },
       ),
-    ),
+    [engine.frameEmitter],
   );
 
-  const info = createMemo(() => {
-    const tilePos = props.tiled.worldCoordToTile(pointerWorldPosition());
-    return {
-      viewport: pointerPosition(),
-      world: pointerWorldPosition(),
-      tile: tilePos,
-      tileSnapped: tilePos.round(),
-      cameraTransform: cameraTransform().data,
-      frameInterval: frameInterval()?.totalMilliseconds.toFixed(2),
-      frameDuration: frameDuration()?.totalMilliseconds.toFixed(2),
-      frameCallbacks: engine.frameEmitter.callbackCount,
-      character: trimCharacterInfo(character()),
-    };
-  });
+  const tilePos = props.tiled.worldCoordToTile(
+    engine.pointer.worldPosition.value,
+  );
+  const info = {
+    viewport: engine.pointer.position.value,
+    world: engine.pointer.worldPosition.value,
+    tile: tilePos,
+    tileSnapped: tilePos.round(),
+    cameraTransform: engine.camera.transform.value.data,
+    frameInterval: frameInterval?.totalMilliseconds.toFixed(2),
+    frameDuration: frameDuration?.totalMilliseconds.toFixed(2),
+    frameCallbacks: engine.frameEmitter.callbackCount,
+    character: trimCharacterInfo(client.character.value),
+  };
 
   return (
-    <pre style={{ overflow: "auto", "max-height": "70vh" }}>
-      {JSON.stringify(info(), null, 2)}
+    <pre style={{ overflow: "auto", maxHeight: "70vh" }}>
+      {JSON.stringify(info, null, 2)}
     </pre>
   );
 }
@@ -54,7 +47,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
 function trimCharacterInfo(char?: Character) {
   return (
     char && {
-      ...char,
+      ...char.snapshot(),
       coords: char.coords.toString(),
       path: char.path,
     }

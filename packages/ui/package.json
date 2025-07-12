@@ -12,8 +12,10 @@
     }
   },
   "dependencies": {
+    "@mp/state": "workspace:*",
     "@mp/style": "workspace:*",
-    "solid-js": "catalog:"
+    "preact": "catalog:",
+    "react-error-boundary": "6.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

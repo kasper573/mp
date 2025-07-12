@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { effect } from "@mp/state";
 import { collect, SyncEntity } from "../src/sync-entity";
 import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
@@ -73,78 +74,50 @@ describe("can collect changes from map of decorated entities", () => {
   });
 });
 
-describe("observable", () => {
+describe("effects", () => {
   describe("can react to", () => {
-    it("additions", () => {
-      class Entity extends SyncEntity {
-        constructor(public name: string) {
-          super();
-        }
-      }
-
-      const map = new SyncMap<string, Entity>();
-
-      let received: unknown;
-      const fn = vi.fn((arg) => {
-        received = arg;
+    it("Map.clear", () => {
+      testEffect({
+        initialize: () => new SyncMap<string, string>([["1", "a"]]),
+        mutate: (map) => map.clear(),
+        getKey: "1",
+        getResultExpectation: undefined,
+        sizeExpectation: 0,
       });
-      map.subscribe(fn);
-
-      const john = new Entity("john");
-      map.set("1", john);
-      map.flush();
-      expect(fn).toHaveBeenCalledTimes(1);
-      expect(received).toEqual(new SyncMap([["1", john]])); // should contain john
     });
 
-    it("updates", () => {
-      class Entity extends SyncEntity {
-        constructor(public name: string) {
-          super();
-        }
-      }
-
-      const john = new Entity("john");
-      const map = new SyncMap<string, Entity>([["1", john]]);
-
-      map.flush(); // Discard initial state
-
-      let received: unknown;
-      const fn = vi.fn((arg) => {
-        received = arg;
+    it("Map.delete", () => {
+      testEffect({
+        initialize: () =>
+          new SyncMap<string, string>([
+            ["1", "a"],
+            ["2", "b"],
+          ]),
+        mutate: (map) => map.delete("1"),
+        getKey: "1",
+        getResultExpectation: undefined,
+        sizeExpectation: 1,
       });
-      map.subscribe(fn);
-
-      const jane = new Entity("jane");
-      map.set("1", jane);
-      map.flush();
-      expect(fn).toHaveBeenCalledTimes(1);
-      expect(received).toEqual(new SyncMap([["1", jane]])); // changed to jane
     });
 
-    it("removals", () => {
-      class Entity extends SyncEntity {
-        constructor(public name: string) {
-          super();
-        }
-      }
-
-      const john = new Entity("john");
-      const map = new SyncMap<string, Entity>([["1", john]]);
-
-      map.flush(); // Discard initial state
-
-      let received: unknown;
-      const fn = vi.fn((arg) => {
-        received = arg;
+    it("Map.set (overwrite existing)", () => {
+      testEffect({
+        initialize: () => new SyncMap<string, string>([["1", "a"]]),
+        mutate: (map) => map.set("1", "b"),
+        getKey: "1",
+        getResultExpectation: "b",
+        sizeExpectation: 1,
       });
-      map.subscribe(fn);
+    });
 
-      map.delete("1");
-      map.flush();
-
-      expect(fn).toHaveBeenCalledTimes(1);
-      expect(received).toEqual(new SyncMap()); // Empty after removal
+    it("Map.set (new key)", () => {
+      testEffect({
+        initialize: () => new SyncMap<string, string>([["1", "a"]]),
+        mutate: (map) => map.set("2", "b"),
+        getKey: "2",
+        getResultExpectation: "b",
+        sizeExpectation: 2,
+      });
     });
   });
 
@@ -155,18 +128,15 @@ describe("observable", () => {
 
     const map = new SyncMap<string, Entity>();
 
-    const fn = vi.fn();
-    const stop = map.subscribe(fn);
+    let calls = 0;
+    const fn = (val: unknown) => calls++;
+    const stop = effect(() => void fn(map.get("1")));
 
-    map.set("1", new Entity("john"));
-    map.flush();
-    expect(fn).toHaveBeenCalledTimes(1);
-
+    const callsBeforeStop = calls;
     stop();
 
     map.set("1", new Entity("jane"));
-    map.flush();
-    expect(fn).toHaveBeenCalledTimes(1); // unchanged
+    expect(calls).toBe(callsBeforeStop);
   });
 
   it("does not notify when entities are mutated", () => {
@@ -182,14 +152,54 @@ describe("observable", () => {
     const person = new Entity("john");
     const map = new SyncMap<string, Entity>([["1", person]]);
 
-    map.flush(); // Discard added key
-    map.flush(); // Discard entity flush
-
     const fn = vi.fn();
-    map.subscribe(fn);
+    effect(() => void fn(map.get("1")));
     person.name = "jane";
-    map.flush();
 
-    expect(fn).toHaveBeenCalledTimes(0);
+    expect(fn).toHaveBeenCalledTimes(1); // only the init call
   });
 });
+
+function testEffect<K, V>(opt: {
+  initialize: () => SyncMap<K, V>;
+  mutate: (map: SyncMap<K, V>) => void;
+  getKey: K;
+  getResultExpectation: V | undefined;
+  sizeExpectation: number;
+}) {
+  const map = opt.initialize();
+
+  const sizeFn = vi.fn();
+  effect(() => void sizeFn(map.size));
+
+  const valuesFn = vi.fn();
+  effect(() => void valuesFn(map.values()));
+
+  const entriesFn = vi.fn();
+  effect(() => void entriesFn(map.entries()));
+
+  const keysFn = vi.fn();
+  effect(() => void keysFn(map.keys()));
+
+  const hasFn = vi.fn();
+  effect(() => void hasFn(map.has(opt.getKey)));
+
+  const getFn = vi.fn();
+  effect(() => void getFn(map.get(opt.getKey)));
+
+  opt.mutate(map);
+
+  // 2 = initial call + change
+
+  expect(sizeFn).toHaveBeenCalledTimes(2);
+  expect(sizeFn).toHaveBeenLastCalledWith(opt.sizeExpectation);
+  expect(getFn).toHaveBeenCalledTimes(2);
+  expect(getFn).toHaveBeenLastCalledWith(opt.getResultExpectation);
+  expect(hasFn).toHaveBeenCalledTimes(2);
+  expect(hasFn).toHaveBeenLastCalledWith(
+    opt.getResultExpectation !== undefined,
+  );
+  expect(valuesFn).toHaveBeenCalledTimes(2);
+  expect(entriesFn).toHaveBeenCalledTimes(2);
+  expect(keysFn).toHaveBeenCalledTimes(2);
+}

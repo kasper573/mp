@@ -1,13 +1,12 @@
-import { createFileRoute } from "@tanstack/solid-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
-import { onCleanup, Suspense, useContext } from "solid-js";
+import { useContext, useEffect } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
-import { useStorage } from "@mp/state/solid";
+import { Suspense } from "preact/compat";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
-import { LoggerContext } from "../../../logger";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import { miscDebugStorage } from "../../../signals/misc-debug-ui-settings";
+import { miscDebugSettingsSignal } from "../../../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -16,21 +15,19 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const [settings] = useStorage(miscDebugStorage);
   const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
-    logger: useContext(LoggerContext),
-    settings,
+    settings: miscDebugSettingsSignal.value,
   });
 
-  onCleanup(stateClient.start());
+  useEffect(() => stateClient.start(), [stateClient]);
 
   return (
     <div
       style={{
         padding: "32px",
         display: "flex",
-        "flex-direction": "column",
+        flexDirection: "column",
         flex: 1,
       }}
     >

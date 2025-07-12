@@ -1,4 +1,4 @@
-import { createRouter } from "@tanstack/solid-router";
+import { createRouter } from "@tanstack/react-router";
 import { ErrorFallback, LoadingSpinner } from "@mp/ui";
 import { PageNotFound } from "../../routes/page-not-found";
 import { routeTree } from "./routeTree.gen";
@@ -15,7 +15,7 @@ export function createClientRouter() {
   });
 }
 
-declare module "@tanstack/solid-router" {
+declare module "@tanstack/react-router" {
   interface Register {
     router: ReturnType<typeof createClientRouter>;
   }

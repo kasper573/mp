@@ -1,78 +1,37 @@
-import { Select } from "@mp/ui";
-import type { Setter } from "solid-js";
+import { PropertySignal, type Signal } from "@mp/state";
+import { Checkbox, Select } from "@mp/ui";
 
 export interface AreaDebugSettingsFormProps {
-  value: AreaDebugSettings;
-  onChange: Setter<AreaDebugSettings>;
+  signal: Signal<AreaDebugSettings>;
 }
 
-export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
+export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
   return (
     <>
       <div>
         Visible Graph lines:{" "}
         <Select
-          required
           options={visibleGraphTypes}
-          value={props.value.visibleGraphType}
-          onChange={(visibleGraphType) =>
-            props.onChange((prev) => ({ ...prev, visibleGraphType }))
-          }
+          signal={new PropertySignal(signal, "visibleGraphType")}
         />
       </div>
       <label>
-        <input
-          type="checkbox"
-          checked={props.value.showFogOfWar}
-          on:change={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
-              showFogOfWar: e.currentTarget.checked,
-            }))
-          }
-        />
+        <Checkbox signal={new PropertySignal(signal, "showFogOfWar")} />
         Visualize network fog of war
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={props.value.showAttackRange}
-          on:change={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
-              showAttackRange: e.currentTarget.checked,
-            }))
-          }
-        />
+        <Checkbox signal={new PropertySignal(signal, "showAttackRange")} />
         Show actor attack range
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={props.value.showAggroRange}
-          on:change={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
-              showAggroRange: e.currentTarget.checked,
-            }))
-          }
-        />
+        <Checkbox signal={new PropertySignal(signal, "showAggroRange")} />
         Show npc aggro range
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={props.value.showActorPaths}
-          on:change={(e) =>
-            props.onChange((prev) => ({
-              ...prev,
-              showActorPaths: e.currentTarget.checked,
-            }))
-          }
-        />
+        <Checkbox signal={new PropertySignal(signal, "showActorPaths")} />
         Show actor paths
       </label>
     </>

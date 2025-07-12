@@ -1,7 +1,7 @@
 import type { User } from "oidc-client-ts";
 import { UserManager } from "oidc-client-ts";
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { computed, signal } from "@mp/state";
 import {
   extractRolesFromJwtPayload,
   isOurJwtPayload,
@@ -12,8 +12,8 @@ import {
 } from "./shared";
 
 export interface AuthClient {
-  identity: ReadonlyObservable<UserIdentity | undefined>;
-  isSignedIn: ReadonlyObservable<boolean>;
+  identity: ReadonlySignal<UserIdentity | undefined>;
+  isSignedIn: ReadonlySignal<boolean>;
   refresh: () => Promise<void>;
   signOutRedirect: (returnUri?: string) => Promise<void>;
   redirectToSignIn: (state?: SignInState) => Promise<void>;
@@ -41,14 +41,14 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     scope: "openid profile email roles", // A bit hacky to hardcode scope, but i don't need generic scope right now. This allows us to have built in support for ie. roles and profiles.
     loadUserInfo: true,
   });
-  const identity = observable<UserIdentity | undefined>(undefined);
-  const isSignedIn = identity.derive((id) => !!id);
+  const identity = signal<UserIdentity | undefined>(undefined);
+  const isSignedIn = computed(() => identity.value !== undefined);
 
   function handleUpdatedUser(updatedUser?: User | null) {
     const updatedIdentity = extractIdentity(updatedUser);
-    const prevIdentity = identity.get();
+    const prevIdentity = identity.value;
     if (!isEqual(updatedIdentity, prevIdentity)) {
-      identity.set(updatedIdentity);
+      identity.value = updatedIdentity;
     }
   }
 
