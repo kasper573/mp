@@ -10,23 +10,23 @@ import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V> implements Map<K, V> {
   #keysLastFlush = new Set<K>();
-  #observable: NotifyableSignal<Map<K, V>>;
+  #signal: NotifyableSignal<Map<K, V>>;
 
   constructor(entries?: Iterable<readonly [K, V]> | null) {
-    this.#observable = notifyableSignal(new Map<K, V>(entries));
+    this.#signal = notifyableSignal(new Map<K, V>(entries));
   }
 
   clear(): void {
-    const map = this.#observable.get();
+    const map = this.#signal.value;
     if (map.size > 0) {
       map.clear();
-      this.#observable.notify();
+      this.#signal.notify();
     }
   }
   delete(key: K): boolean {
-    const deleted = this.#observable.get().delete(key);
+    const deleted = this.#signal.value.delete(key);
     if (deleted) {
-      this.#observable.notify();
+      this.#signal.notify();
     }
     return deleted;
   }
@@ -35,36 +35,36 @@ export class SyncMap<K, V> implements Map<K, V> {
     thisArg?: ThisArg,
   ): void {
     // eslint-disable-next-line unicorn/no-array-for-each
-    this.#observable.get().forEach(callbackfn, thisArg);
+    this.#signal.value.forEach(callbackfn, thisArg);
   }
   get(key: K): V | undefined {
-    return this.#observable.get().get(key);
+    return this.#signal.value.get(key);
   }
   has(key: K): boolean {
-    return this.#observable.get().has(key);
+    return this.#signal.value.has(key);
   }
   set(key: K, value: V): this {
-    this.#observable.get().set(key, value);
-    this.#observable.notify();
+    this.#signal.value.set(key, value);
+    this.#signal.notify();
     return this;
   }
   get size(): number {
-    return this.#observable.get().size;
+    return this.#signal.value.size;
   }
   entries(): MapIterator<[K, V]> {
-    return this.#observable.get().entries();
+    return this.#signal.value.entries();
   }
   keys(): MapIterator<K> {
-    return this.#observable.get().keys();
+    return this.#signal.value.keys();
   }
   values(): MapIterator<V> {
-    return this.#observable.get().values();
+    return this.#signal.value.values();
   }
   [Symbol.iterator](): MapIterator<[K, V]> {
-    return this.#observable.get()[Symbol.iterator]();
+    return this.#signal.value[Symbol.iterator]();
   }
   get [Symbol.toStringTag](): string {
-    return this.#observable.get()[Symbol.toStringTag];
+    return this.#signal.value[Symbol.toStringTag];
   }
 
   /**

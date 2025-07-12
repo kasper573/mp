@@ -19,11 +19,11 @@ export default function AppBar() {
       <Link to="/play">Play</Link>
       <Link to="/contact">Contact</Link>
 
-      {auth.identity.get()?.roles.has(systemRoles.useDevTools) && (
+      {auth.identity.value?.roles.has(systemRoles.useDevTools) && (
         <Link to="/admin/devtools">Dev Tools</Link>
       )}
 
-      {auth.identity.get()?.roles.has(worldRoles.spectate) && (
+      {auth.identity.value?.roles.has(worldRoles.spectate) && (
         <Link to="/admin/spectator">Spectate</Link>
       )}
 
@@ -40,7 +40,7 @@ export default function AppBar() {
           <VersionNotice />
         </Suspense>
 
-        {auth.isSignedIn.get() ? (
+        {auth.isSignedIn.value ? (
           <Button role="link" onClick={() => void auth.signOutRedirect()}>
             Sign out
           </Button>

@@ -30,7 +30,7 @@ export interface GameClientProps {
 export function GameClient(props: GameClientProps) {
   const rpc = ioc.get(ctxGameRpcClient);
 
-  const areaId = props.stateClient.areaId.get();
+  const areaId = props.stateClient.areaId.value;
   const area = useAreaResource(areaId);
   const areaSpritesheets = useQuery({
     queryKey: ["areaSpritesheets", area.data?.id],
@@ -57,7 +57,7 @@ export function GameClient(props: GameClientProps) {
     [actorSpritesheets],
   );
 
-  if (!props.stateClient.isConnected.get()) {
+  if (!props.stateClient.isConnected.value) {
     return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
   }
 

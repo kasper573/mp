@@ -43,7 +43,7 @@ export default function App() {
   const [rpc, initializeRpc] = createRpcClient(
     socket,
     logger,
-    () => auth.identity.get()?.token,
+    () => auth.identity.value?.token,
   );
 
   const query = new QueryClient({

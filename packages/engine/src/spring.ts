@@ -16,12 +16,12 @@ export class Spring<T extends number> implements SpringLike<T> {
     private options: () => SpringOptions,
     init?: T,
   ) {
-    this.#value.set(init ?? target.get());
+    this.#value.value = init ?? target.value;
     this.state = computed(() => {
       const { precision } = this.options();
       const isSettled =
-        Math.abs(target.get() - this.#value.get()) < precision &&
-        Math.abs(this.velocity.get()) < precision;
+        Math.abs(target.value - this.#value.value) < precision &&
+        Math.abs(this.velocity.value) < precision;
 
       return isSettled ? "settled" : "moving";
     });
@@ -29,22 +29,21 @@ export class Spring<T extends number> implements SpringLike<T> {
 
   update = (dt: TimeSpan) => {
     const { stiffness, damping, mass } = this.options();
-    const currentTarget = this.target.get();
-    const delta = currentTarget - this.#value.get();
+    const currentTarget = this.target.value;
+    const delta = currentTarget - this.#value.value;
     const force = stiffness * delta;
-    const dampingForce = -damping * this.velocity.get();
+    const dampingForce = -damping * this.velocity.value;
     const acceleration = (force + dampingForce) / mass;
 
-    this.velocity.set(
-      (this.velocity.get() + acceleration * dt.totalSeconds) as T,
-    );
-    this.#value.set(
-      (this.#value.get() + this.velocity.get() * dt.totalSeconds) as T,
-    );
+    this.velocity.value = (this.velocity.value +
+      acceleration * dt.totalSeconds) as T;
 
-    if (this.state.get() === "settled") {
-      this.#value.set(currentTarget);
-      this.velocity.set(0 as T);
+    this.#value.value = (this.#value.value +
+      this.velocity.value * dt.totalSeconds) as T;
+
+    if (this.state.value === "settled") {
+      this.#value.value = currentTarget;
+      this.velocity.value = 0 as T;
     }
   };
 }

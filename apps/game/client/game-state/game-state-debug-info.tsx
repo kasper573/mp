@@ -23,18 +23,18 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   );
 
   const tilePos = props.tiled.worldCoordToTile(
-    engine.pointer.worldPosition.get(),
+    engine.pointer.worldPosition.value,
   );
   const info = {
-    viewport: engine.pointer.position.get(),
-    world: engine.pointer.worldPosition.get(),
+    viewport: engine.pointer.position.value,
+    world: engine.pointer.worldPosition.value,
     tile: tilePos,
     tileSnapped: tilePos.round(),
-    cameraTransform: engine.camera.transform.get().data,
+    cameraTransform: engine.camera.transform.value.data,
     frameInterval: frameInterval?.totalMilliseconds.toFixed(2),
     frameDuration: frameDuration?.totalMilliseconds.toFixed(2),
     frameCallbacks: engine.frameEmitter.callbackCount,
-    character: trimCharacterInfo(client.character.get()),
+    character: trimCharacterInfo(client.character.value),
   };
 
   return (

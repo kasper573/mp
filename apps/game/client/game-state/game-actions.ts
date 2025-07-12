@@ -13,7 +13,7 @@ export class GameActions {
 
   move(to: Vector<Tile>, desiredPortalId?: ObjectId) {
     return this.rpc.character.move({
-      characterId: assert(this.characterId.get()),
+      characterId: assert(this.characterId.value),
       to,
       desiredPortalId,
     });
@@ -21,18 +21,18 @@ export class GameActions {
 
   attack(targetId: ActorId) {
     return this.rpc.character.attack({
-      characterId: assert(this.characterId.get()),
+      characterId: assert(this.characterId.value),
       targetId,
     });
   }
 
   respawn() {
-    return this.rpc.character.respawn(assert(this.characterId.get()));
+    return this.rpc.character.respawn(assert(this.characterId.value));
   }
 
   async join() {
     const char = await this.rpc.world.join();
-    this.characterId.set(char.id);
+    this.characterId.value = char.id;
     return char;
   }
 }

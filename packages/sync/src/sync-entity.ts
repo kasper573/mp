@@ -94,7 +94,7 @@ export function collect<V>({
       get() {
         const meta = SyncEntity.accessMeta(this);
         const obs = meta.observables[context.name];
-        return obs.get() as V;
+        return obs.value as V;
       },
       set(newValue) {
         let collectedValue = newValue;
@@ -108,7 +108,7 @@ export function collect<V>({
           SyncEntity.shouldOptimizeCollects &&
           meta.assignedProperties.has(context.name)
         ) {
-          const prevValue = obs.get();
+          const prevValue = obs.value;
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
         }
@@ -118,7 +118,7 @@ export function collect<V>({
           meta.changes[context.name] = collectedValue;
         }
 
-        obs.set(newValue);
+        obs.value = newValue;
         meta.assignedProperties.add(context.name);
       },
     };

@@ -46,7 +46,7 @@ export class GameStateClient {
     this.readyState = signal<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
-    this.isConnected = computed(() => this.readyState.get() === WebSocket.OPEN);
+    this.isConnected = computed(() => this.readyState.value === WebSocket.OPEN);
 
     this.actions = new GameActions(this.rpc, this.characterId);
 
@@ -58,12 +58,12 @@ export class GameStateClient {
 
     this.character = computed(() => {
       const char = this.gameState.actors.get(
-        this.characterId.get() as CharacterId,
+        this.characterId.value as CharacterId,
       ) as Character | undefined;
       return char;
     });
 
-    this.areaId = computed(() => this.character.get()?.areaId);
+    this.areaId = computed(() => this.character.value?.areaId);
   }
 
   private refreshState: () => unknown;
@@ -73,7 +73,7 @@ export class GameStateClient {
 
     const subscriptions = [
       subscribeToReadyState(socket, (readyState) => {
-        this.readyState.set(readyState);
+        this.readyState.value = readyState;
       }),
     ];
 
@@ -86,7 +86,7 @@ export class GameStateClient {
 
       socket.removeEventListener("message", this.handleMessage);
 
-      const id = this.characterId.get();
+      const id = this.characterId.value;
       if (id !== undefined) {
         void this.rpc.world.leave(id);
       }

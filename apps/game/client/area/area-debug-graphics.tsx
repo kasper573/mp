@@ -58,7 +58,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(() => actors.get().filter((actor) => actor.type === "npc")),
+      computed(() => actors.value.filter((actor) => actor.type === "npc")),
       (npc) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
@@ -113,7 +113,7 @@ class DebugTiledGraph extends Graphics {
       }
     } else if (this.visibleGraphType() === "tile") {
       const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(worldPosition.get()),
+        tiled.worldCoordToTile(worldPosition.value),
       );
       if (tileNode) {
         drawGraphNode(this, tiled, graph, tileNode);
@@ -121,9 +121,9 @@ class DebugTiledGraph extends Graphics {
     } else if (this.visibleGraphType() === "coord") {
       drawStar(
         this,
-        worldPosition.get(),
+        worldPosition.value,
         graph
-          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.get()))
+          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }

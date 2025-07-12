@@ -40,18 +40,18 @@ export class Keyboard {
 
   private onDown = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
-    this.#keysHeld.set(
-      current.has(key) ? current : current.union(new Set([key])),
-    );
+    const current = this.#keysHeld.value;
+    this.#keysHeld.value = current.has(key)
+      ? current
+      : current.union(new Set([key]));
   };
 
   private onUp = (e: KeyboardEvent) => {
     const key = e.key as KeyboardEventKey;
-    const current = this.#keysHeld.get();
-    this.#keysHeld.set(
-      current.has(key) ? current.difference(new Set([key])) : current,
-    );
+    const current = this.#keysHeld.value;
+    this.#keysHeld.value = current.has(key)
+      ? current.difference(new Set([key]))
+      : current;
   };
 }
 

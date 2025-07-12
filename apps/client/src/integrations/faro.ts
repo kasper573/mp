@@ -28,7 +28,7 @@ export function createFaroBindings(
   identity: ReadonlySignal<UserIdentity | undefined>,
 ) {
   function update() {
-    faro.api.setUser(deriveFaroUser(identity.get()));
+    faro.api.setUser(deriveFaroUser(identity.value));
   }
 
   update();

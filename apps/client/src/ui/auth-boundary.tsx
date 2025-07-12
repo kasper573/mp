@@ -13,10 +13,10 @@ export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
   const auth = ioc.get(ctxAuthClient);
 
   const isPermitted = useComputed(() => {
-    if (!auth.isSignedIn.get()) {
+    if (!auth.isSignedIn.value) {
       return false;
     }
-    const existingSet = auth.identity.get()?.roles ?? new Set();
+    const existingSet = auth.identity.value?.roles ?? new Set();
     const requiredSet = new Set(props.requiredRoles);
     return requiredSet.isSubsetOf(existingSet);
   });

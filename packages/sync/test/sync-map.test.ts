@@ -130,7 +130,7 @@ describe("effects", () => {
 
     let calls = 0;
     const fn = (val: unknown) => calls++;
-    const stop = effect(() => fn(map.get("1")));
+    const stop = effect(() => void fn(map.get("1")));
 
     const callsBeforeStop = calls;
     stop();
@@ -153,7 +153,7 @@ describe("effects", () => {
     const map = new SyncMap<string, Entity>([["1", person]]);
 
     const fn = vi.fn();
-    effect(() => fn(map.get("1")));
+    effect(() => void fn(map.get("1")));
     person.name = "jane";
 
     expect(fn).toHaveBeenCalledTimes(1); // only the init call
@@ -170,22 +170,22 @@ function testEffect<K, V>(opt: {
   const map = opt.initialize();
 
   const sizeFn = vi.fn();
-  effect(() => sizeFn(map.size));
+  effect(() => void sizeFn(map.size));
 
   const valuesFn = vi.fn();
-  effect(() => valuesFn(map.values()));
+  effect(() => void valuesFn(map.values()));
 
   const entriesFn = vi.fn();
-  effect(() => entriesFn(map.entries()));
+  effect(() => void entriesFn(map.entries()));
 
   const keysFn = vi.fn();
-  effect(() => keysFn(map.keys()));
+  effect(() => void keysFn(map.keys()));
 
   const hasFn = vi.fn();
-  effect(() => hasFn(map.has(opt.getKey)));
+  effect(() => void hasFn(map.has(opt.getKey)));
 
   const getFn = vi.fn();
-  effect(() => getFn(map.get(opt.getKey)));
+  effect(() => void getFn(map.get(opt.getKey)));
 
   opt.mutate(map);
 

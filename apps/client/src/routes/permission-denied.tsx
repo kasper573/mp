@@ -14,7 +14,7 @@ export default function PermissionDenied() {
         textAlign: "center",
       }}
     >
-      {auth.isSignedIn.get() ? (
+      {auth.isSignedIn.value ? (
         <>
           <h1>Permission Denied</h1>
           <p>

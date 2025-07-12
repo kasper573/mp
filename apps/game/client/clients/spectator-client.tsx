@@ -21,7 +21,7 @@ export function SpectatorClient(props: GameClientProps) {
   const characterOptions = rpc.world.characterList.useQuery({
     input: void 0,
     refetchInterval: 5000,
-    enabled: !!auth.identity.get(),
+    enabled: !!auth.identity.value,
     map: (result): SelectOption<CharacterId>[] => [
       { value: undefined as unknown as CharacterId, label: "Select character" },
       ...result.items.map(({ id, name }) => ({ value: id, label: name })),
@@ -30,11 +30,11 @@ export function SpectatorClient(props: GameClientProps) {
 
   useSignalEffect(() => {
     if (
-      props.stateClient.isConnected.get() &&
-      auth.identity.get() &&
+      props.stateClient.isConnected.value &&
+      auth.identity.value &&
       spectatedCharacterId.value
     ) {
-      props.stateClient.characterId.set(spectatedCharacterId.value);
+      props.stateClient.characterId.value = spectatedCharacterId.value;
       void rpc.world.spectate(spectatedCharacterId.value);
     }
   });

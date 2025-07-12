@@ -45,7 +45,7 @@ function RouteComponent() {
   const toggleAutoFlip = () => (autoFlip.value = !autoFlip.value);
 
   useSignalEffect(() => {
-    if (autoFlip.value && spring.state.get() === "settled") {
+    if (autoFlip.value && spring.state.value === "settled") {
       flipSpringTarget();
     }
   });
@@ -101,9 +101,9 @@ function RouteComponent() {
       <pre>
         {JSON.stringify(
           {
-            value: spring.value.get(),
-            state: spring.state.get(),
-            velocity: spring.velocity.get(),
+            value: spring.value.value,
+            state: spring.state.value,
+            velocity: spring.velocity.value,
           },
           null,
           2,
@@ -123,7 +123,7 @@ function RouteComponent() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${spring.value.get() / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${spring.value.value / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />

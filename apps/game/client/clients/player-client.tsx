@@ -14,7 +14,7 @@ export function PlayerClient(props: GameClientProps) {
   const auth = ioc.get(ctxAuthClient);
 
   useSignalEffect(() => {
-    if (props.stateClient.isConnected.get() && auth.identity.get()) {
+    if (props.stateClient.isConnected.value && auth.identity.value) {
       const actions = new GameActions(rpc, props.stateClient.characterId);
       void actions.join();
     }

@@ -57,7 +57,7 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.area,
       this.state.actorList,
-      () => this.myCoords.get(),
+      () => this.myCoords.value,
       options.debugSettings,
     );
 
@@ -67,7 +67,7 @@ export class AreaScene extends Container {
     if (this.engine.isInteractive) {
       const tileHighlight = new TileHighlight(() => ({
         area: options.area,
-        target: this.highlightTarget.get(),
+        target: this.highlightTarget.value,
       }));
       this.addChild(tileHighlight);
     }
@@ -89,11 +89,11 @@ export class AreaScene extends Container {
   }
 
   myCoords = computed(
-    () => this.state.character.get()?.coords ?? Vector.zero<Tile>(),
+    () => this.state.character.value?.coords ?? Vector.zero<Tile>(),
   );
 
   myWorldPos = computed(() =>
-    this.options.area.tiled.tileCoordToWorld(this.myCoords.get()),
+    this.options.area.tiled.tileCoordToWorld(this.myCoords.value),
   );
 
   cameraPos: VectorSpring<Pixel>;
@@ -101,29 +101,27 @@ export class AreaScene extends Container {
   cameraZoom = computed(() =>
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      this.engine.camera.cameraSize.get(),
+      this.engine.camera.cameraSize.value,
       clientViewDistance.renderedTileCount,
     ),
   );
 
   pointerTile = computed(() =>
     this.options.area.tiled.worldCoordToTile(
-      this.engine.pointer.worldPosition.get(),
+      this.engine.pointer.worldPosition.value,
     ),
   );
 
   entityAtPointer = computed(() => {
-    return this.state.actorList
-      .get()
-      .find(
-        (actor) =>
-          actor.health > 0 &&
-          actor.hitBox.offset(actor.coords).contains(this.pointerTile.get()),
-      );
+    return this.state.actorList.value.find(
+      (actor) =>
+        actor.health > 0 &&
+        actor.hitBox.offset(actor.coords).contains(this.pointerTile.value),
+    );
   });
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
-    const entity = this.entityAtPointer.get();
+    const entity = this.entityAtPointer.value;
     if (entity) {
       return {
         type: "attack",
@@ -132,7 +130,7 @@ export class AreaScene extends Container {
     }
 
     const tileNode = this.options.area.graph.getNearestNode(
-      this.pointerTile.get(),
+      this.pointerTile.value,
     );
     if (tileNode) {
       return {
@@ -161,22 +159,22 @@ export class AreaScene extends Container {
     this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.elapsedMS));
     this.engine.camera.update(
       this.options.area.tiled.mapSize,
-      this.cameraZoom.get(),
-      this.cameraPos.value.get(),
+      this.cameraZoom.value,
+      this.cameraPos.value.value,
     );
-    this.setFromMatrix(new Matrix(...this.engine.camera.transform.get().data));
+    this.setFromMatrix(new Matrix(...this.engine.camera.transform.value.data));
 
-    if (this.engine.pointer.isDown.get()) {
-      const entity = this.entityAtPointer.get();
+    if (this.engine.pointer.isDown.value) {
+      const entity = this.entityAtPointer.value;
       if (entity) {
         void this.state.actions.attack(entity.id);
       } else {
         const tileNode = this.options.area.graph.getNearestNode(
-          this.pointerTile.get(),
+          this.pointerTile.value,
         );
         if (tileNode) {
           const portal = this.options.area
-            .hitTestObjects([this.engine.pointer.worldPosition.get()])
+            .hitTestObjects([this.engine.pointer.worldPosition.value])
             .find(getAreaIdFromObject);
 
           this.moveThrottled(tileNode.data.vector, portal?.id);
