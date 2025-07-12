@@ -126,6 +126,7 @@ export class RpcRemoteError extends Error {
   }
 }
 
+// oxlint-disable-next-line no-explicit-any
 export type AnyRpcTransceiver = RpcTransceiver<any>;
 
 export type RcpResponse<Output> = [

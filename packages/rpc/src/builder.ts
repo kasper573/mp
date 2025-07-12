@@ -1,3 +1,4 @@
+// oxlint-disable no-explicit-any
 export class RpcBuilder<Context = void> {
   context<Context>() {
     return new RpcBuilder<Context>();

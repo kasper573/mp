@@ -34,21 +34,17 @@ export const ErrorFallbackContext = createContext<ErrorFallbackContextValue>({
 });
 
 export function ErrorToString(props: { error: unknown }) {
-  return (
-    <>
-      {props.error instanceof Error ? (
-        <>
-          {props.error.stack?.includes(props.error.message)
-            ? null
-            : props.error.message + "\n"}
-          {props.error.stack}
-          {props.error.cause ? (
-            <ErrorToString error={props.error.cause} />
-          ) : null}
-        </>
-      ) : (
-        String(props.error)
-      )}
-    </>
-  );
+  if (props.error instanceof Error) {
+    return (
+      <>
+        {props.error.stack?.includes(props.error.message)
+          ? null
+          : props.error.message + "\n"}
+        {props.error.stack}
+        {props.error.cause ? <ErrorToString error={props.error.cause} /> : null}
+      </>
+    );
+  }
+
+  return String(props.error);
 }

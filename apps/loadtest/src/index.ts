@@ -1,3 +1,4 @@
+// oxlint-disable no-await-in-loop
 import { createPinoLogger } from "@mp/logger";
 import type { ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver } from "@mp/rpc";

@@ -84,5 +84,23 @@
     "react/react-in-jsx-scope": "off",
     "react/button-has-type": "off",
     "react/no-array-index-key": "off"
-  }
+  },
+  "overrides": [
+    // Tests don't require the same strictness as production code due to them testing themselves.
+    // If mistakes break something, the tests will catch it.
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "ban-ts-comment": "off",
+        "no-non-null-assertion": "off"
+      }
+    },
+    // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
+    {
+      "files": ["**/packages/graphics/**"],
+      "rules": {
+        "extensions": "off"
+      }
+    }
+  ]
 }

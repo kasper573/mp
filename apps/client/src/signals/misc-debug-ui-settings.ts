@@ -1,7 +1,7 @@
 import { StorageSignal } from "@mp/state";
 import type { OptimisticGameStateSettings } from "@mp/game/client";
 
-export const miscDebugSettingsSignal = new StorageSignal<MiscDebugSettings>(
+export const miscDebugSettings = new StorageSignal<MiscDebugSettings>(
   "local",
   "misc-debug-settings",
   {

@@ -1,4 +1,4 @@
-import type { ComponentType, JSX, ComponentChildren } from "preact";
+import type { ComponentType, ComponentChildren } from "preact";
 import type { RoleDefinition } from "@mp/auth";
 import { ioc, ctxAuthClient } from "@mp/game/client";
 import { useComputed } from "@mp/state/react";
@@ -9,7 +9,7 @@ interface AuthBoundaryProps {
   children?: ComponentChildren;
 }
 
-export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
+export function AuthBoundary(props: AuthBoundaryProps): ComponentChildren {
   const auth = ioc.get(ctxAuthClient);
 
   const isPermitted = useComputed(() => {
@@ -24,7 +24,7 @@ export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
   if (!isPermitted.value) {
     return <PermissionDenied />;
   }
-  return <>{props.children}</>;
+  return props.children;
 }
 
 AuthBoundary.wrap = (Component: ComponentType, props?: AuthBoundaryProps) => {

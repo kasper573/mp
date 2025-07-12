@@ -23,8 +23,6 @@ rootElement.classList.add(styles.root);
 
 render(<Root />, rootElement);
 
-console.error();
-
 function Root() {
   return (
     <>
@@ -35,6 +33,7 @@ function Root() {
         */}
       <ErrorFallbackContext.Provider
         value={{
+          // oxlint-disable-next-line no-console
           handleError: console.error,
         }}
       >

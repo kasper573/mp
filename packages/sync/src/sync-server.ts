@@ -17,7 +17,7 @@ export class SyncServer<
 > {
   private events: ServerSyncEvent<State>[] = [];
   private hasBeenGivenFullState = new Set<ClientId>();
-  private visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
+  private visibilities = new Map<ClientId, ClientVisibility<State>>();
 
   constructor(private options: SyncServerOptions<State>) {}
 
@@ -232,6 +232,7 @@ export type inferEntityValue<Entities> =
   Entities extends PatchableEntities<infer _, infer Entity> ? Entity : never;
 
 export interface PatchableState {
+  // oxlint-disable-next-line no-explicit-any
   [entityName: string]: PatchableEntities<PatchableEntityId, any>;
 }
 
