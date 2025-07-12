@@ -24,7 +24,6 @@ import {
   RpcClientContext,
   SocketContext,
 } from "./integrations/rpc";
-import { LoggerContext } from "./logger";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
 
 // This is effectively the composition root of the application.
@@ -40,25 +39,23 @@ export default function App() {
   useEffect(() => systems.initialize(), [systems]);
   return (
     <QueryClientProvider client={systems.query}>
-      <LoggerContext.Provider value={systems.logger}>
-        <ErrorFallbackContext.Provider
-          value={{
-            handleError: (e) => systems.logger.error(e, "Preact error"),
-          }}
-        >
-          <SocketContext.Provider value={systems.socket}>
-            <RpcClientContext.Provider value={systems.rpc}>
-              <RouterProvider router={systems.router} />
-              {showDevTools && (
-                <>
-                  <TanStackRouterDevtools router={systems.router} />
-                  <ReactQueryDevtools client={systems.query} />
-                </>
-              )}
-            </RpcClientContext.Provider>
-          </SocketContext.Provider>
-        </ErrorFallbackContext.Provider>
-      </LoggerContext.Provider>
+      <ErrorFallbackContext.Provider
+        value={{
+          handleError: (e) => systems.logger.error(e, "Preact error"),
+        }}
+      >
+        <SocketContext.Provider value={systems.socket}>
+          <RpcClientContext.Provider value={systems.rpc}>
+            <RouterProvider router={systems.router} />
+            {showDevTools && (
+              <>
+                <TanStackRouterDevtools router={systems.router} />
+                <ReactQueryDevtools client={systems.query} />
+              </>
+            )}
+          </RpcClientContext.Provider>
+        </SocketContext.Provider>
+      </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
 }
