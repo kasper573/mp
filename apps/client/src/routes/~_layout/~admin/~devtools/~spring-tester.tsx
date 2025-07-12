@@ -1,5 +1,5 @@
 import { FrameEmitter, Spring } from "@mp/engine";
-import { observable } from "@mp/state";
+import { signal } from "@mp/state";
 import { useObservable } from "@mp/state/solid";
 import { TimeSpan } from "@mp/time";
 import { createFileRoute } from "@tanstack/solid-router";
@@ -15,7 +15,7 @@ function RouteComponent() {
   const [damping, setDamping] = createSignal(40);
   const [mass, setMass] = createSignal(2);
   const [precision, setPrecision] = createSignal(1);
-  const target = observable(0);
+  const target = signal(0);
   const targetValue = useObservable(target);
   const options = createMemo(() => ({
     stiffness: stiffness(),

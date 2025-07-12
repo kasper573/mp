@@ -3,8 +3,8 @@ import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Logger } from "@mp/logger";
-import type { Observable, ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { Signal, ReadonlySignal } from "@mp/state";
+import { computed, signal } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { Character, CharacterId } from "../../server/character/types";
 import type { GameStateEvents } from "../../server/game-state-events";
@@ -33,23 +33,21 @@ export class GameStateClient {
 
   // State
   readonly gameState: OptimisticGameState;
-  readonly characterId = observable<CharacterId | undefined>(undefined);
-  readonly readyState: Observable<WebSocket["readyState"]>;
-  readonly isConnected: ReadonlyObservable<boolean>;
+  readonly characterId = signal<CharacterId | undefined>(undefined);
+  readonly readyState: Signal<WebSocket["readyState"]>;
+  readonly isConnected: ReadonlySignal<boolean>;
 
   // Derived state
-  readonly actorList: ReadonlyObservable<Actor[]>;
-  readonly character: ReadonlyObservable<Character | undefined>;
-  readonly areaId: ReadonlyObservable<AreaId | undefined>;
+  readonly actorList: ReadonlySignal<Actor[]>;
+  readonly character: ReadonlySignal<Character | undefined>;
+  readonly areaId: ReadonlySignal<AreaId | undefined>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(() => this.options.settings());
-    this.readyState = observable<WebSocket["readyState"]>(
+    this.readyState = signal<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
-    this.isConnected = this.readyState.derive(
-      (state) => state === WebSocket.OPEN,
-    );
+    this.isConnected = computed(() => this.readyState.get() === WebSocket.OPEN);
 
     this.actions = createGameActions(this.rpc, () => this.characterId);
 
@@ -57,20 +55,16 @@ export class GameStateClient {
     // and we only want to send one request for full state.
     this.refreshState = throttle(this.rpc.world.requestFullState, 5000);
 
-    this.actorList = this.gameState.actors.derive((actors) =>
-      actors.values().toArray(),
-    );
+    this.actorList = computed(() => this.gameState.actors.values().toArray());
 
-    this.character = this.gameState.actors
-      .compose(this.characterId)
-      .derive(([actors, myId]) => {
-        const char = actors.get(myId as CharacterId) as Character | undefined;
-        return char;
-      });
-
-    this.areaId = this.character.derive((char) => {
-      return char?.areaId;
+    this.character = computed(() => {
+      const char = this.gameState.actors.get(
+        this.characterId.get() as CharacterId,
+      ) as Character | undefined;
+      return char;
     });
+
+    this.areaId = computed(() => this.character.get()?.areaId);
   }
 
   private refreshState: () => unknown;

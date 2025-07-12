@@ -4,7 +4,7 @@ import { type VectorGraph } from "@mp/path-finding";
 import { Container, Graphics, ReactiveCollection } from "@mp/graphics";
 import { type Tile, type Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import type { ReadonlyObservable } from "@mp/state";
+import { computed, type ReadonlySignal } from "@mp/state";
 import type { NpcInstance } from "../../server";
 import { clientViewDistance, type Actor } from "../../server";
 import type { TiledResource } from "../../shared/area/tiled-resource";
@@ -25,7 +25,7 @@ export class AreaDebugGraphics extends Container {
 
   constructor(
     area: AreaResource,
-    actors: ReadonlyObservable<Actor[]>,
+    actors: ReadonlySignal<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
   ) {
@@ -58,7 +58,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      actors.derive((actors) => actors.filter((actor) => actor.type === "npc")),
+      computed(() => actors.get().filter((actor) => actor.type === "npc")),
       (npc) =>
         new DebugCircle(() => ({
           tiled: area.tiled,

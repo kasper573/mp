@@ -1,32 +1,28 @@
 import type { Accessor } from "solid-js";
 import { createEffect, createSignal, onCleanup } from "solid-js";
 import type { StorageAdapter } from "./storage/storage-adapter";
-import {
-  getObservableValue,
-  type ObservableLike,
-  type ObservableValue,
-} from "./observable";
+import type { ReadonlySignal } from "./signal";
+import { effect, type SignalValue } from "./signal";
 
 export function useObservable<Value>(
-  observable: Accessor<ObservableLike<Value>> | ObservableLike<Value>,
+  observable: Accessor<ReadonlySignal<Value>> | ReadonlySignal<Value>,
 ): Accessor<Value> {
-  const [value, setValue] = createSignal(
-    getObservableValue(accessObservable()),
-    { equals: isSameObservableValue },
-  );
+  const [value, setValue] = createSignal<Value>(accessObservable().get(), {
+    equals: isSameObservableValue,
+  });
 
   function accessObservable() {
     return typeof observable === "function" ? observable() : observable;
   }
 
   createEffect(() => {
-    onCleanup(accessObservable().subscribe(setValue));
+    onCleanup(effect(() => setValue(accessObservable().get)));
   });
 
   return value;
 }
 
-export function useObservables<Observables extends ObservableLike<unknown>[]>(
+export function useObservables<Observables extends ReadonlySignal<unknown>[]>(
   ...observables: Observables
 ): ObservableAccessors<Observables> {
   return observables.map((obs) => useObservable(() => obs)) as never;
@@ -38,8 +34,8 @@ export function useStorage<T>(storage: StorageAdapter<T>) {
   return [value, setValue] as const;
 }
 
-type ObservableAccessors<Observables extends ObservableLike<unknown>[]> = {
-  [Index in keyof Observables]: Accessor<ObservableValue<Observables[Index]>>;
+type ObservableAccessors<Observables extends ReadonlySignal<unknown>[]> = {
+  [Index in keyof Observables]: Accessor<SignalValue<Observables[Index]>>;
 };
 
 // The observable uses a notification system that should be trusted implicitly.

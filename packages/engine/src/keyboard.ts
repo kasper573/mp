@@ -1,13 +1,13 @@
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { signal } from "@mp/state";
 
 export class Keyboard {
-  readonly #keysHeld = observable(new Set<KeyboardEventKey>());
+  readonly #keysHeld = signal(new Set<KeyboardEventKey>());
   #isRunning = false;
 
   constructor(private window: Window) {}
 
-  get keysHeld(): ReadonlyObservable<ReadonlySet<KeyboardEventKey>> {
+  get keysHeld(): ReadonlySignal<ReadonlySet<KeyboardEventKey>> {
     return this.#keysHeld;
   }
 

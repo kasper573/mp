@@ -13,6 +13,7 @@ import {
   Ticker,
 } from "@mp/graphics";
 import { TimeSpan } from "@mp/time";
+import { computed } from "@mp/state";
 import {
   getAreaIdFromObject,
   type AreaResource,
@@ -87,57 +88,59 @@ export class AreaScene extends Container {
     }));
   }
 
-  myCoords = this.state.character.derive(
-    (char) => char?.coords ?? Vector.zero<Tile>(),
+  myCoords = computed(
+    () => this.state.character.get()?.coords ?? Vector.zero<Tile>(),
   );
 
-  myWorldPos = this.myCoords.derive((coords) =>
-    this.options.area.tiled.tileCoordToWorld(coords),
+  myWorldPos = computed(() =>
+    this.options.area.tiled.tileCoordToWorld(this.myCoords.get()),
   );
 
   cameraPos: VectorSpring<Pixel>;
 
-  cameraZoom = this.engine.camera.cameraSize.derive((size) =>
+  cameraZoom = computed(() =>
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      size,
+      this.engine.camera.cameraSize.get(),
       clientViewDistance.renderedTileCount,
     ),
   );
 
-  pointerTile = this.engine.pointer.worldPosition.derive((pos) =>
-    this.options.area.tiled.worldCoordToTile(pos),
+  pointerTile = computed(() =>
+    this.options.area.tiled.worldCoordToTile(
+      this.engine.pointer.worldPosition.get(),
+    ),
   );
 
-  entityAtPointer = this.pointerTile
-    .compose(this.state.actorList)
-    .derive(([tile, actors]) => {
-      return actors.find(
+  entityAtPointer = computed(() => {
+    return this.state.actorList
+      .get()
+      .find(
         (actor) =>
-          actor.health > 0 && actor.hitBox.offset(actor.coords).contains(tile),
+          actor.health > 0 &&
+          actor.hitBox.offset(actor.coords).contains(this.pointerTile.get()),
       );
-    });
+  });
 
-  highlightTarget = this.entityAtPointer.derive(
-    (entity): TileHighlightTarget | undefined => {
-      if (entity) {
-        return {
-          type: "attack",
-          rect: entity.hitBox.offset(entity.coords),
-        };
-      }
+  highlightTarget = computed((): TileHighlightTarget | undefined => {
+    const entity = this.entityAtPointer.get();
+    if (entity) {
+      return {
+        type: "attack",
+        rect: entity.hitBox.offset(entity.coords),
+      };
+    }
 
-      const tileNode = this.options.area.graph.getNearestNode(
-        this.pointerTile.get(),
-      );
-      if (tileNode) {
-        return {
-          rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
-          type: "move",
-        };
-      }
-    },
-  );
+    const tileNode = this.options.area.graph.getNearestNode(
+      this.pointerTile.get(),
+    );
+    if (tileNode) {
+      return {
+        rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
+        type: "move",
+      };
+    }
+  });
 
   moveThrottled = dedupe(
     throttle(

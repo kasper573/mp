@@ -1,4 +1,4 @@
-import { observable } from "@mp/state";
+import { computed, effect, signal } from "@mp/state";
 import { useObservables } from "@mp/state/solid";
 import { createFileRoute } from "@tanstack/solid-router";
 import { createSignal, onCleanup } from "solid-js";
@@ -11,9 +11,9 @@ export const Route = createFileRoute(
 
 function RouteComponent() {
   const [log, setLog] = createSignal("");
-  const base = observable(1);
-  const multiplier = observable(1);
-  const product = base.compose(multiplier).derive(([b, m]) => b * m);
+  const base = signal(1);
+  const multiplier = signal(1);
+  const product = computed(() => base.get() * multiplier.get());
   const [baseValue, multiplierValue, productValue] = useObservables(
     base,
     multiplier,
@@ -25,20 +25,20 @@ function RouteComponent() {
   };
 
   onCleanup(
-    base.subscribe((value) => {
-      addLog(`Base changed: ${value}`);
+    effect(() => {
+      addLog(`Base changed: ${base.get()}`);
     }),
   );
 
   onCleanup(
-    multiplier.subscribe((value) => {
-      addLog(`Multiplier changed: ${value}`);
+    effect(() => {
+      addLog(`Multiplier changed: ${multiplier.get()}`);
     }),
   );
 
   onCleanup(
-    product.subscribe((value) => {
-      addLog(`Product changed: ${value}`);
+    effect(() => {
+      addLog(`Product changed: ${product.get()}`);
     }),
   );
 

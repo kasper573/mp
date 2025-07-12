@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import type { Observable } from "@mp/state";
+import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { CharacterId, ActorId } from "../../server";
@@ -9,7 +9,7 @@ export type GameActions = ReturnType<typeof createGameActions>;
 
 export function createGameActions(
   rpc: GameRpcClient,
-  characterId: () => Observable<CharacterId | undefined>,
+  characterId: () => Signal<CharacterId | undefined>,
 ) {
   const move = (to: Vector<Tile>, desiredPortalId?: ObjectId) => {
     return rpc.character.move({

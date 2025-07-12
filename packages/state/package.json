@@ -16,12 +16,9 @@
       "require": "./src/solid.ts"
     }
   },
-  "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
-  },
   "dependencies": {
-    "solid-js": "catalog:"
+    "solid-js": "catalog:",
+    "@preact/signals-core": "1.11.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

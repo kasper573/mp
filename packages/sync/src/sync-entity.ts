@@ -1,5 +1,4 @@
-import { abstractObservable, observableValueGetterSymbol } from "@mp/state";
-import type { NotifyingObservable } from "@mp/state";
+import { signal, type Signal } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
@@ -17,7 +16,6 @@ export abstract class SyncEntity {
     if (changes) {
       const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
       this.meta.changes = undefined;
-      this.#observable.$notifySubscribers();
       return patch;
     }
 
@@ -29,9 +27,10 @@ export abstract class SyncEntity {
    */
   snapshot(): Partial<this> {
     const subset = Object.fromEntries(
-      this.meta.collectedProperties
-        .values()
-        .map((name) => [name, this[name as keyof this]]),
+      Object.keys(this.meta.observables).map((name) => [
+        name,
+        this[name as keyof this],
+      ]),
     );
     return subset as Partial<this>;
   }
@@ -40,29 +39,16 @@ export abstract class SyncEntity {
    * Accesses the private metadata of a SyncEntity instance.
    * @internal Should only be used by the collect decorator.
    */
-  static accessMeta<Entity extends SyncEntity>(entity: Entity) {
+  static accessMeta(entity: unknown) {
+    if (!(entity instanceof SyncEntity)) {
+      throw new TypeError(
+        `SyncEntity.accessMeta can only be used on instances of SyncEntity.`,
+      );
+    }
     return entity.meta;
   }
 
   static shouldOptimizeCollects = false;
-
-  // Mixing in the Observable interface
-  // (SyncEntity does not use the implements keyword because we must pass the "this"
-  // type to the generic param of Observable, which is impossible with implements,
-  // but if we make sure to define the entire interface here, it still counts as
-  // implemented thanks to TypeScript's structural typing).
-  #observable = abstractObservable<this>(() => this);
-  derive: NotifyingObservable<this>["derive"] = (...args) =>
-    this.#observable.derive(...args);
-  compose: NotifyingObservable<this>["compose"] = (...args) =>
-    this.#observable.compose(...args);
-  subscribe: NotifyingObservable<this>["subscribe"] = (...args) =>
-    this.#observable.subscribe(...args);
-  $notifySubscribers: NotifyingObservable<this>["$notifySubscribers"] = (
-    ...args
-  ) => this.#observable.$notifySubscribers(...args);
-  [observableValueGetterSymbol]: NotifyingObservable<this>["get"] = (...args) =>
-    this.#observable.get(...args);
 }
 
 /**
@@ -70,8 +56,8 @@ export abstract class SyncEntity {
  * Is only shared with the collect decorator.
  */
 class SyncEntityMeta {
-  changes: object | undefined;
-  collectedProperties = new Set<PropertyKey>();
+  changes: Record<PropertyKey, unknown> | undefined;
+  observables: Record<PropertyKey, Signal<unknown>> = {};
   assignedProperties = new Set<PropertyKey>();
 }
 
@@ -96,47 +82,44 @@ export function collect<V>({
   filter = refDiff,
 }: CollectDecoratorOptions<V> = {}) {
   return <T extends object>(
-    value: ClassAccessorDecoratorTarget<T, V>,
+    instanceValue: ClassAccessorDecoratorTarget<T, V>,
     context: ClassAccessorDecoratorContext<T, V>,
   ): ClassAccessorDecoratorResult<T, V> => {
     return {
       init(initialValue) {
-        if (!(this instanceof SyncEntity)) {
-          throw new TypeError(
-            `@collect can only be used on properties of classes that extend SyncEntity.`,
-          );
-        }
         const meta = SyncEntity.accessMeta(this);
-        meta.collectedProperties.add(context.name as keyof T);
+        meta.observables[context.name] ??= signal(initialValue as unknown);
         return initialValue;
       },
       get() {
-        return value.get.call(this);
+        const meta = SyncEntity.accessMeta(this);
+        const obs = meta.observables[context.name];
+        return obs.get() as V;
       },
       set(newValue) {
         let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        const meta = SyncEntity.accessMeta(this as T & SyncEntity);
+        const meta = SyncEntity.accessMeta(this);
+        const obs = meta.observables[context.name];
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
         if (
           SyncEntity.shouldOptimizeCollects &&
-          meta.assignedProperties.has(context.name as keyof T)
+          meta.assignedProperties.has(context.name)
         ) {
-          const prevValue = value.get.call(this);
+          const prevValue = obs.get() as V;
           collectedValue = transform(newValue);
           shouldCollectValue = filter(collectedValue, transform(prevValue));
         }
 
         if (shouldCollectValue) {
           meta.changes ??= {};
-          meta.changes[context.name as keyof typeof meta.changes] =
-            collectedValue as never;
+          meta.changes[context.name] = collectedValue;
         }
 
-        value.set.call(this, newValue);
-        meta.assignedProperties.add(context.name as keyof T);
+        obs.set(newValue);
+        meta.assignedProperties.add(context.name);
       },
     };
   };

@@ -1,32 +1,30 @@
-import type { ReadonlyObservable } from "@mp/state";
-import { observable } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
+import { computed, signal } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring<T extends number> implements SpringLike<T> {
-  readonly velocity = observable<T>(0 as T);
-  readonly #value = observable<T>(0 as T);
-  readonly state: ReadonlyObservable<SpringState>;
+  readonly velocity = signal<T>(0 as T);
+  readonly #value = signal<T>(0 as T);
+  readonly state: ReadonlySignal<SpringState>;
 
-  get value(): ReadonlyObservable<T> {
+  get value(): ReadonlySignal<T> {
     return this.#value;
   }
 
   constructor(
-    public readonly target: ReadonlyObservable<T>,
+    public readonly target: ReadonlySignal<T>,
     private options: () => SpringOptions,
     init?: T,
   ) {
     this.#value.set(init ?? target.get());
-    this.state = this.#value
-      .compose(this.velocity, target)
-      .derive(([value, velocity, target]) => {
-        const { precision } = this.options();
-        const isSettled =
-          Math.abs(target - value) < precision &&
-          Math.abs(velocity) < precision;
+    this.state = computed(() => {
+      const { precision } = this.options();
+      const isSettled =
+        Math.abs(target.get() - this.#value.get()) < precision &&
+        Math.abs(this.velocity.get()) < precision;
 
-        return isSettled ? "settled" : "moving";
-      });
+      return isSettled ? "settled" : "moving";
+    });
   }
 
   update = (dt: TimeSpan) => {
@@ -61,7 +59,7 @@ export interface SpringOptions {
 export type SpringState = "settled" | "moving";
 
 export interface SpringLike<T> {
-  value: ReadonlyObservable<T>;
-  state: ReadonlyObservable<SpringState>;
+  value: ReadonlySignal<T>;
+  state: ReadonlySignal<SpringState>;
   update: (dt: TimeSpan) => void;
 }
