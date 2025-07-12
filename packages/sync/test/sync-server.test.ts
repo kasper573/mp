@@ -4,13 +4,15 @@ import { SyncServer } from "../src/sync-server";
 import { SyncMap } from "../src/sync-map";
 import { collect, SyncEntity } from "../src/sync-entity";
 
-interface TestState {
+// oxlint-disable-next-line consistent-type-definitions
+type TestState = {
   items: SyncMap<string, number>;
-}
+};
 
-interface TestEventMap {
+// oxlint-disable-next-line consistent-type-definitions
+type TestEventMap = {
   message: string;
-}
+};
 
 it("sends full state patch on initial flush and respects client visibility config", () => {
   const server = new SyncServer<TestState, TestEventMap>({
@@ -83,9 +85,10 @@ it("can collect patches", () => {
     }
   }
 
-  interface TestState {
+  // oxlint-disable-next-line consistent-type-definitions
+  type TestState = {
     persons: SyncMap<Person["id"], Person>;
-  }
+  };
 
   const server = new SyncServer<TestState, {}>({
     clientIds: () => ["client"],
