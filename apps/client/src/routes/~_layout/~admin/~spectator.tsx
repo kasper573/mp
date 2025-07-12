@@ -5,7 +5,6 @@ import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
-import { LoggerContext } from "../../../logger";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
 import { miscDebugSettingsSignal } from "../../../signals/misc-debug-ui-settings";
 
@@ -18,7 +17,6 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 function RouteComponent() {
   const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
-    logger: useContext(LoggerContext),
     settings: miscDebugSettingsSignal.value,
   });
 

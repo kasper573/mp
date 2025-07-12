@@ -5,7 +5,6 @@ import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import { SocketContext } from "../../integrations/rpc";
 import { AuthBoundary } from "../../ui/auth-boundary";
-import { LoggerContext } from "../../logger";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 import { miscDebugSettingsSignal } from "../../signals/misc-debug-ui-settings";
 
@@ -16,7 +15,6 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const stateClient = new GameStateClient({
     socket: useContext(SocketContext),
-    logger: useContext(LoggerContext),
     settings: miscDebugSettingsSignal.value,
   });
 

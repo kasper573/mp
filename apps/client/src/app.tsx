@@ -6,6 +6,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   ctxAuthClient,
   ctxGameRpcClient,
+  ctxLogger,
   ioc,
   registerEncoderExtensions,
 } from "@mp/game/client";
@@ -90,6 +91,7 @@ function createSystems() {
       auth.initialize(),
       ioc.register(ctxGameRpcClient, rpc),
       ioc.register(ctxAuthClient, auth),
+      ioc.register(ctxLogger, logger),
       initializeRpc(),
       createFaroBindings(faro, auth.identity),
     ];

@@ -2,7 +2,6 @@ import { throttle } from "@mp/std";
 import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
-import type { Logger } from "@mp/logger";
 import type { Signal, ReadonlySignal } from "@mp/state";
 import { computed, signal } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
@@ -12,6 +11,7 @@ import { ctxGameRpcClient } from "../game-rpc-client";
 import type { Actor } from "../../server/actor";
 import type { AreaId } from "../../server";
 import { ioc } from "../context/ioc";
+import { ctxLogger } from "../context/common";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 import { GameActions } from "./game-actions";
@@ -20,7 +20,6 @@ const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
   socket: WebSocket;
-  logger: Logger;
   settings: OptimisticGameStateSettings;
 }
 
@@ -29,6 +28,7 @@ export class GameStateClient {
   readonly actions: GameActions;
 
   private rpc = ioc.get(ctxGameRpcClient);
+  private logger = ioc.get(ctxLogger);
 
   // State
   readonly gameState: OptimisticGameState;
@@ -107,7 +107,7 @@ export class GameStateClient {
 
       const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
       if (lag.compareTo(stalePatchThreshold) > 0) {
-        this.options.logger.warn(
+        this.logger.warn(
           `Stale patch detected, requesting full state refresh (lag: ${lag.totalMilliseconds}ms)`,
         );
         this.refreshState();
