@@ -17,7 +17,7 @@ export function Range(props: RangeProps) {
         min={props.min}
         max={props.max}
         step={props.step}
-        value={props.signal}
+        value={props.signal.value}
         onInput={(e) => {
           props.signal.value = e.currentTarget.valueAsNumber;
         }}
