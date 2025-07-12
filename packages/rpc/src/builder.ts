@@ -36,11 +36,13 @@ export interface RpcFactories<Context> {
   middleware: MiddlewareBuilder<Context, unknown>;
 }
 
-export type RouterBuilder = <Routes extends AnyRouteRecord>(routes: Routes) => RouterNode<Routes>;
+export type RouterBuilder = <Routes extends AnyRouteRecord>(
+  routes: Routes,
+) => RouterNode<Routes>;
 
 export type MiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
-    middlewareFn: RpcMiddlewareHandler<Context, MwContext, PipedMwContext>,
-  ) => RpcMiddleware<Context, MwContext, PipedMwContext>;
+  middlewareFn: RpcMiddlewareHandler<Context, MwContext, PipedMwContext>,
+) => RpcMiddleware<Context, MwContext, PipedMwContext>;
 
 interface RpcNode<Type extends string> {
   type: Type;
@@ -149,15 +151,15 @@ export class ProcedureBuilder<Input, Output, Context, MwContext> {
 }
 
 export type RpcMiddlewareHandler<Context, MwContext, PipedMwContext> = (opt: {
-    /**
-     * The global rpc context
-     */
-    ctx: Context;
-    /**
-     * The middleware context output by the piped middleware (if any)
-     */
-    mwc: PipedMwContext;
-  }) => ProcedureResult<MwContext>;
+  /**
+   * The global rpc context
+   */
+  ctx: Context;
+  /**
+   * The middleware context output by the piped middleware (if any)
+   */
+  mwc: PipedMwContext;
+}) => ProcedureResult<MwContext>;
 
 export interface RpcMiddleware<Context, MwContext, PipedMwContext>
   extends RpcMiddlewareHandler<Context, MwContext, PipedMwContext> {
@@ -165,10 +167,14 @@ export interface RpcMiddleware<Context, MwContext, PipedMwContext>
 }
 
 export type InferInput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer I, infer _, infer _, infer _> ? I : never;
+  T extends ProcedureHandler<infer I, infer _O, infer _C, infer _MW>
+    ? I
+    : never;
 
 export type InferOutput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer _, infer O, infer _, infer _> ? O : never;
+  T extends ProcedureHandler<infer _I, infer O, infer _C, infer _MW>
+    ? O
+    : never;
 
 export type InferContext<T extends AnyRpcNode> =
   T extends AnyRpcNode<infer C> ? C : never;
