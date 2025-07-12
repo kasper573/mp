@@ -34,9 +34,9 @@ export interface AuthClientOptions {
 export function createAuthClient(settings: AuthClientOptions): AuthClient {
   const userManager = new UserManager({
     authority: settings.authority,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     client_id: settings.audience,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     redirect_uri: settings.redirectUri,
     scope: "openid profile email roles", // A bit hacky to hardcode scope, but i don't need generic scope right now. This allows us to have built in support for ie. roles and profiles.
     loadUserInfo: true,
@@ -79,7 +79,6 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     refresh,
     signOutRedirect: (returnUri = defaultReturnUrl()) =>
       userManager.signoutRedirect({
-        // eslint-disable-next-line @typescript-eslint/naming-convention
         post_logout_redirect_uri: new URL(
           returnUri,
           window.location.origin,

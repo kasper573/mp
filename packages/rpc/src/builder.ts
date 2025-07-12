@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-explicit-any */
-
 export class RpcBuilder<Context = void> {
   context<Context>() {
     return new RpcBuilder<Context>();

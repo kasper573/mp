@@ -37,5 +37,4 @@ export function processStyleProps<Props extends { className?: unknown }>(
 
 type AnyProps = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyRecipe = RuntimeFn<any>;

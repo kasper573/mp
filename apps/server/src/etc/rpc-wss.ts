@@ -39,7 +39,6 @@ export function setupRpcTransceivers<Context>({
     transceivers.set(socketId, transceiver);
     socket.addEventListener("close", () => transceivers.delete(socketId));
 
-    // eslint-disable-next-line @typescript-eslint/no-misused-promises
     socket.addEventListener("message", async (msg) => {
       const context = createContext(socket);
       const buffer = msg.data as ArrayBuffer;

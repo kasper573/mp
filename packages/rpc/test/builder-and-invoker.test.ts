@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect } from "vitest";
 import type { RpcCall, RpcCallId } from "../src";
 import { RpcBuilder, createRpcInvoker, RpcInvokerError } from "../src";

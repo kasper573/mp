@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/naming-convention */
 import { createThemeContract } from "@vanilla-extract/css";
 
 export const themeContract = createThemeContract({

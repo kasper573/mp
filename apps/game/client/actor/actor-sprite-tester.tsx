@@ -101,7 +101,6 @@ class ActorSpriteList extends Container {
   constructor(options: () => ActorTestSettings) {
     super();
 
-    // eslint-disable-next-line unicorn/no-array-for-each
     Object.entries(cardinalDirectionAngles).forEach(([name, angle], index) => {
       this.addChild(
         new SpecificActorAngle(() => ({

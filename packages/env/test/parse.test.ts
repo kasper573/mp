@@ -21,11 +21,10 @@ it("can parse nesting convention", () => {
   });
 
   const env = {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     FOO__BAR__BAZ: 42,
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     FOO__BAR_HELLO: "cool",
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     ROOT: true,
   };
 

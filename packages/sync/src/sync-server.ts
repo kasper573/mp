@@ -232,7 +232,6 @@ export type inferEntityValue<Entities> =
   Entities extends PatchableEntities<infer _, infer Entity> ? Entity : never;
 
 export type PatchableState = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [entityName: string]: PatchableEntities<PatchableEntityId, any>;
 };
 

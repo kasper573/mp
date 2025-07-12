@@ -126,7 +126,6 @@ export class RpcRemoteError extends Error {
   }
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type AnyRpcTransceiver = RpcTransceiver<any>;
 
 export type RcpResponse<Output> = [
