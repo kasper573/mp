@@ -15,7 +15,7 @@ import {
   ReactQueryDevtools,
 } from "@mp/rpc/react";
 import { createWebSocket } from "@mp/ws/client";
-import { useEffect } from "preact/hooks";
+import { useEffect, useMemo } from "preact/hooks";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import {
@@ -35,6 +35,36 @@ import { createFaroBindings, createFaroClient } from "./integrations/faro";
 registerEncoderExtensions();
 
 export default function App() {
+  const systems = useMemo(createSystems, []);
+  useEffect(() => systems.initialize(), [systems]);
+  return (
+    <>
+      <QueryClientProvider client={systems.query}>
+        <LoggerContext.Provider value={systems.logger}>
+          <ErrorFallbackContext.Provider
+            value={{
+              handleError: (e) => systems.logger.error(e, "Preact error"),
+            }}
+          >
+            <SocketContext.Provider value={systems.socket}>
+              <RpcClientContext.Provider value={systems.rpc}>
+                <RouterProvider router={systems.router} />
+                {showDevTools && (
+                  <>
+                    <TanStackRouterDevtools router={systems.router} />
+                    <ReactQueryDevtools client={systems.query} />
+                  </>
+                )}
+              </RpcClientContext.Provider>
+            </SocketContext.Provider>
+          </ErrorFallbackContext.Provider>
+        </LoggerContext.Provider>
+      </QueryClientProvider>
+    </>
+  );
+}
+
+function createSystems() {
   const logger = createConsoleLogger();
   const socket = createWebSocket(env.wsUrl);
   const auth = createAuthClient(env.auth);
@@ -55,7 +85,8 @@ export default function App() {
     },
   });
 
-  useEffect(() => {
+  function initialize() {
+    void auth.refresh();
     socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
     const subscriptions = [
       auth.initialize(),
@@ -71,35 +102,18 @@ export default function App() {
         unsubscribe();
       }
     };
-  }, []);
+  }
 
-  void auth.refresh();
-
-  return (
-    <>
-      <QueryClientProvider client={query}>
-        <LoggerContext.Provider value={logger}>
-          <ErrorFallbackContext.Provider
-            value={{
-              handleError: (e) => logger.error(e, "Preact error"),
-            }}
-          >
-            <SocketContext.Provider value={socket}>
-              <RpcClientContext.Provider value={rpc}>
-                <RouterProvider router={router} />
-                {showDevTools && (
-                  <>
-                    <TanStackRouterDevtools router={router} />
-                    <ReactQueryDevtools client={query} />
-                  </>
-                )}
-              </RpcClientContext.Provider>
-            </SocketContext.Provider>
-          </ErrorFallbackContext.Provider>
-        </LoggerContext.Provider>
-      </QueryClientProvider>
-    </>
-  );
+  return {
+    auth,
+    rpc,
+    socket,
+    logger,
+    router,
+    faro,
+    query,
+    initialize,
+  };
 }
 
 const showDevTools = import.meta.env.DEV;
