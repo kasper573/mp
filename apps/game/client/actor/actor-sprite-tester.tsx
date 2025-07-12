@@ -48,8 +48,8 @@ export function ActorSpriteTester() {
   return (
     <>
       <div id="form" style={styles.settingsForm}>
-        <Select signal={animationName} options={actorAnimationNames} required />
-        <Select signal={modelId} options={allModelIds} required />
+        <Select signal={animationName} options={actorAnimationNames} />
+        <Select signal={modelId} options={allModelIds} />
       </div>
       {modelId.value ? (
         <PixiApp

@@ -12,25 +12,11 @@ type SelectOptionsInput<Value> =
   | readonly SelectOption<Value>[]
   | readonly Value[];
 
-export type SelectProps<Value> =
-  | OptionalSelectProps<Value>
-  | RequiredSelectProps<Value>;
-
-interface BaseSelectProps<Value, SignalValue>
+interface SelectProps<Value>
   extends Pick<JSX.IntrinsicElements["select"], "className" | "style"> {
   options: SelectOptionsInput<Value>;
-  signal: Signal<SignalValue>;
+  signal: Signal<Value>;
   isSameValue?: (a: Value, b: Value) => boolean;
-}
-
-export interface OptionalSelectProps<Value>
-  extends BaseSelectProps<Value, Value | undefined> {
-  required?: false;
-}
-
-export interface RequiredSelectProps<Value>
-  extends BaseSelectProps<Value, Exclude<Value, undefined>> {
-  required: true;
 }
 
 export function Select<const Value>({
@@ -45,9 +31,7 @@ export function Select<const Value>({
   );
 
   const selectedIndex = useComputed(() =>
-    options.findIndex((option) =>
-      isSameValue(option.value, signal.value as Value),
-    ),
+    options.findIndex((option) => isSameValue(option.value, signal.value)),
   );
 
   return (

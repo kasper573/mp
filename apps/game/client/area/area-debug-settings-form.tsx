@@ -11,7 +11,6 @@ export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
       <div>
         Visible Graph lines:{" "}
         <Select
-          required
           options={visibleGraphTypes}
           signal={new PropertySignal(signal, "visibleGraphType")}
         />
