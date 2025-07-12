@@ -59,41 +59,18 @@ function RouteComponent() {
         min={50}
         max={1000}
         step={1}
-        value={stiffness.value}
-        onChange={(v) => (stiffness.value = v)}
+        signal={stiffness}
       />
-      <Range
-        label="Damping"
-        min={1}
-        max={100}
-        step={1}
-        value={damping.value}
-        onChange={(v) => (damping.value = v)}
-      />
-      <Range
-        label="Mass"
-        min={0.1}
-        max={10}
-        step={0.1}
-        value={mass.value}
-        onChange={(v) => (mass.value = v)}
-      />
+      <Range label="Damping" min={1} max={100} step={1} signal={damping} />
+      <Range label="Mass" min={0.1} max={10} step={0.1} signal={mass} />
       <Range
         label="Precision"
         min={0.01}
         max={1}
         step={0.01}
-        value={precision.value}
-        onChange={(v) => (precision.value = v)}
+        signal={precision}
       />
-      <Range
-        label="Target"
-        min={0}
-        max={100}
-        step={1}
-        value={target.value}
-        onChange={(v) => (target.value = v)}
-      />
+      <Range label="Target" min={0} max={100} step={1} signal={target} />
 
       <button onClick={flipSpringTarget}>Flip Target</button>
       <button onClick={toggleAutoFlip}>

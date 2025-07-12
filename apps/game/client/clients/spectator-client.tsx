@@ -43,8 +43,7 @@ export function SpectatorClient(props: GameClientProps) {
     <>
       <Select
         options={characterOptions.data ?? []}
-        value={spectatedCharacterId.value}
-        onChange={(v) => (spectatedCharacterId.value = v)}
+        signal={spectatedCharacterId}
       />
 
       <Suspense fallback={<LoadingSpinner debugId="SpectatorClient" />}>

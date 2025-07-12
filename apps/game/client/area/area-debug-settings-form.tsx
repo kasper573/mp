@@ -1,5 +1,5 @@
-import type { Signal } from "@mp/state";
-import { Select } from "@mp/ui";
+import { PropertySignal, type Signal } from "@mp/state";
+import { Checkbox, Select } from "@mp/ui";
 
 export interface AreaDebugSettingsFormProps {
   signal: Signal<AreaDebugSettings>;
@@ -13,65 +13,26 @@ export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
         <Select
           required
           options={visibleGraphTypes}
-          value={signal.value.visibleGraphType}
-          onChange={(visibleGraphType) => {
-            signal.value = { ...signal.value, visibleGraphType };
-          }}
+          signal={new PropertySignal(signal, "visibleGraphType")}
         />
       </div>
       <label>
-        <input
-          type="checkbox"
-          checked={signal.value.showFogOfWar}
-          onChange={(e) => {
-            signal.value = {
-              ...signal.value,
-              showFogOfWar: e.currentTarget.checked,
-            };
-          }}
-        />
+        <Checkbox signal={new PropertySignal(signal, "showFogOfWar")} />
         Visualize network fog of war
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={signal.value.showAttackRange}
-          onChange={(e) => {
-            signal.value = {
-              ...signal.value,
-              showAttackRange: e.currentTarget.checked,
-            };
-          }}
-        />
+        <Checkbox signal={new PropertySignal(signal, "showAttackRange")} />
         Show actor attack range
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={signal.value.showAggroRange}
-          onChange={(e) => {
-            signal.value = {
-              ...signal.value,
-              showAggroRange: e.currentTarget.checked,
-            };
-          }}
-        />
+        <Checkbox signal={new PropertySignal(signal, "showAggroRange")} />
         Show npc aggro range
       </label>
       <br />
       <label>
-        <input
-          type="checkbox"
-          checked={signal.value.showActorPaths}
-          onChange={(e) => {
-            signal.value = {
-              ...signal.value,
-              showActorPaths: e.currentTarget.checked,
-            };
-          }}
-        />
+        <Checkbox signal={new PropertySignal(signal, "showActorPaths")} />
         Show actor paths
       </label>
     </>

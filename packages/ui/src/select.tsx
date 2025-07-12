@@ -1,3 +1,5 @@
+import type { Signal } from "@mp/state";
+import { useComputed } from "@mp/state/react";
 import type { JSX, ComponentChildren } from "preact";
 import { useMemo } from "preact/hooks";
 
@@ -14,33 +16,27 @@ export type SelectProps<Value> =
   | OptionalSelectProps<Value>
   | RequiredSelectProps<Value>;
 
-interface BaseSelectProps<Value, InputValue, OutputValue>
+interface BaseSelectProps<Value, SignalValue>
   extends Pick<JSX.IntrinsicElements["select"], "className" | "style"> {
   options: SelectOptionsInput<Value>;
-  value: InputValue;
-  onChange: (value: OutputValue) => void;
-  isSameValue?: (a: NoInfer<Value>, b: NoInfer<Value>) => boolean;
+  signal: Signal<SignalValue>;
+  isSameValue?: (a: Value, b: Value) => boolean;
 }
 
 export interface OptionalSelectProps<Value>
-  extends BaseSelectProps<
-    Value,
-    NoInfer<Value> | undefined,
-    NoInfer<Value> | undefined
-  > {
+  extends BaseSelectProps<Value, Value | undefined> {
   required?: false;
 }
 
 export interface RequiredSelectProps<Value>
-  extends BaseSelectProps<Value, NoInfer<Value>, NoInfer<Value>> {
+  extends BaseSelectProps<Value, Exclude<Value, undefined>> {
   required: true;
 }
 
 export function Select<const Value>({
   options: inputOptions,
-  value,
+  signal,
   isSameValue = refEquals,
-  onChange,
   ...selectProps
 }: SelectProps<Value>) {
   const options = useMemo(
@@ -48,10 +44,10 @@ export function Select<const Value>({
     [inputOptions],
   );
 
-  const selectedIndex = useMemo(
-    () =>
-      options.findIndex((option) => isSameValue(option.value, value as Value)),
-    [options, value],
+  const selectedIndex = useComputed(() =>
+    options.findIndex((option) =>
+      isSameValue(option.value, signal.value as Value),
+    ),
   );
 
   return (
@@ -59,7 +55,7 @@ export function Select<const Value>({
       value={selectedIndex}
       onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
-        onChange(options[optionIndex].value);
+        signal.value = options[optionIndex].value;
       }}
       {...selectProps}
     >

@@ -1,5 +1,5 @@
-import type { NotifyableSignal } from "@mp/state";
-import { notifyableSignal } from "@mp/state";
+import type { NotifiableSignal } from "@mp/state";
+import { notifiableSignal } from "@mp/state";
 import {
   type PatchPathStep,
   type Patch,
@@ -10,10 +10,10 @@ import { SyncEntity } from "./sync-entity";
 
 export class SyncMap<K, V> implements Map<K, V> {
   #keysLastFlush = new Set<K>();
-  #signal: NotifyableSignal<Map<K, V>>;
+  #signal: NotifiableSignal<Map<K, V>>;
 
   constructor(entries?: Iterable<readonly [K, V]> | null) {
-    this.#signal = notifyableSignal(new Map<K, V>(entries));
+    this.#signal = notifiableSignal(new Map<K, V>(entries));
   }
 
   // Reactive Map implementation

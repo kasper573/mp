@@ -11,6 +11,7 @@ import { Engine } from "@mp/engine";
 import { useGraphics } from "@mp/graphics/react";
 import { assert } from "@mp/std";
 import type { CSSProperties } from "@mp/style";
+import { useSignal } from "@mp/state/react";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -36,9 +37,8 @@ export function ActorSpriteTester() {
 
   const allModelIds = Array.from(spritesheets.keys());
 
-  const [animationName, setAnimationName] =
-    useState<ActorAnimationName>("walk-normal");
-  const [modelId, setModelId] = useState<ActorModelId>(allModelIds[0]);
+  const animationName = useSignal<ActorAnimationName>("walk-normal");
+  const modelId = useSignal<ActorModelId>(allModelIds[0]);
 
   useEffect(
     () => ioc.register(ctxActorSpritesheetLookup, spritesheets),
@@ -48,27 +48,22 @@ export function ActorSpriteTester() {
   return (
     <>
       <div id="form" style={styles.settingsForm}>
-        <Select
-          value={animationName}
-          onChange={setAnimationName}
-          options={actorAnimationNames}
-          required
-        />
-        <Select
-          value={modelId}
-          onChange={setModelId}
-          options={allModelIds}
-          required
-        />
+        <Select signal={animationName} options={actorAnimationNames} required />
+        <Select signal={modelId} options={allModelIds} required />
       </div>
-      {modelId ? (
-        <PixiApp animationName={animationName} modelId={modelId} />
+      {modelId.value ? (
+        <PixiApp
+          settings={() => ({
+            animationName: animationName.value,
+            modelId: modelId.value,
+          })}
+        />
       ) : null}
     </>
   );
 }
 
-function PixiApp(props: ActorTestSettings) {
+function PixiApp({ settings }: { settings: () => ActorTestSettings }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
 
   useGraphics(
@@ -81,7 +76,7 @@ function PixiApp(props: ActorTestSettings) {
     (app) => {
       const engine = new Engine(assert(container));
       const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
-      app.stage.addChild(new ActorSpriteList(() => props));
+      app.stage.addChild(new ActorSpriteList(settings));
       return subs;
     },
   );

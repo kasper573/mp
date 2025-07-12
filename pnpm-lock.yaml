@@ -760,6 +760,9 @@ importers:
 
   packages/ui:
     dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
       '@mp/style':
         specifier: workspace:*
         version: link:../style

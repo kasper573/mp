@@ -1,10 +1,11 @@
+import type { Signal } from "@mp/state";
+
 export interface RangeProps {
   label: string;
-  value: number;
   min: number;
   max: number;
   step: number;
-  onChange: (newValue: number) => void;
+  signal: Signal<number>;
 }
 
 export function Range(props: RangeProps) {
@@ -16,10 +17,9 @@ export function Range(props: RangeProps) {
         min={props.min}
         max={props.max}
         step={props.step}
-        value={props.value}
-        onInput={(e) => props.onChange(+e.currentTarget.value)}
+        value={props.signal}
       />
-      {props.value}
+      {props.signal.value}
     </div>
   );
 }

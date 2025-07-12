@@ -1,16 +1,15 @@
-import { Button } from "@mp/ui";
+import { Button, Checkbox } from "@mp/ui";
 import { ctxGameStateClient, ioc } from "@mp/game/client";
-import { useEffect, useState } from "preact/hooks";
 import { assert } from "@mp/std";
-import { useSignalEffect } from "@mp/state/react";
+import { useSignal, useSignalEffect } from "@mp/state/react";
+import { PropertySignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugSettingsSignal } from "../signals/misc-debug-ui-settings";
 
 export function MiscDebugUi() {
   const rpc = useRpc();
-  const [isServerPatchOptimizerEnabled, setServerPatchOptimizerEnabled] =
-    useServerPatchOptimizerState();
+  const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
 
   const serverVersion = rpc.system.buildVersion.useQuery();
   const gameState = ioc.get(ctxGameStateClient);
@@ -35,58 +34,42 @@ export function MiscDebugUi() {
       </div>
       <div>
         Use server side patch optimizer:{" "}
-        <input
-          type="checkbox"
-          checked={isServerPatchOptimizerEnabled}
-          onChange={(e) =>
-            setServerPatchOptimizerEnabled(e.currentTarget.checked)
-          }
-        />
+        <Checkbox signal={isServerPatchOptimizerEnabled} />
       </div>
       <div>
         Use client side patch optimizer:{" "}
-        <input
-          type="checkbox"
-          checked={miscDebugSettingsSignal.value.usePatchOptimizer}
-          onChange={(e) =>
-            (miscDebugSettingsSignal.value = {
-              ...miscDebugSettingsSignal.value,
-              usePatchOptimizer: e.currentTarget.checked,
-            })
+        <Checkbox
+          signal={
+            new PropertySignal(miscDebugSettingsSignal, "usePatchOptimizer")
           }
         />
       </div>
       <div>
         Use client side game state interpolator:{" "}
-        <input
-          type="checkbox"
-          checked={miscDebugSettingsSignal.value.useInterpolator}
-          onChange={(e) => {
-            miscDebugSettingsSignal.value = {
-              ...miscDebugSettingsSignal.value,
-              useInterpolator: e.currentTarget.checked,
-            };
-          }}
+        <Checkbox
+          signal={
+            new PropertySignal(miscDebugSettingsSignal, "useInterpolator")
+          }
         />
       </div>
     </>
   );
 }
 
-function useServerPatchOptimizerState() {
+function useServerPatchOptimizerSignal() {
   const rpc = useRpc();
-  const [enabled, setEnabled] = useState(true);
+  const enabled = useSignal(true);
   const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
 
-  useEffect(() => {
-    void rpc.system.setPatchOptimizerEnabled(enabled);
-  }, [enabled]);
+  useSignalEffect(() => {
+    void rpc.system.setPatchOptimizerEnabled(enabled.value);
+  });
 
   useSignalEffect(() => {
     if (isRemoteEnabled.data !== undefined) {
-      setEnabled(isRemoteEnabled.data);
+      enabled.value = isRemoteEnabled.data;
     }
   });
 
-  return [enabled, setEnabled] as const;
+  return enabled;
 }

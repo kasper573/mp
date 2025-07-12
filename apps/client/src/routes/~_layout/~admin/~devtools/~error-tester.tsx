@@ -1,7 +1,8 @@
 import { skipToken } from "@mp/rpc/react";
-import { ErrorFallback } from "@mp/ui";
+import { Checkbox, ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "preact/hooks";
+import { useSignal } from "@mp/state/react";
 import { useRpc } from "../../../../integrations/rpc";
 
 export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({
@@ -12,11 +13,11 @@ function RouteComponent() {
   const rpc = useRpc();
   const [uiError, setUiError] = useState(false);
   const [rpcError, setRpcError] = useState(false);
-  const [errorBoundary, setErrorBoundary] = useState(false);
+  const errorBoundary = useSignal(false);
 
   const query = rpc.system.testError.useQuery({
     input: rpcError ? void 0 : skipToken,
-    throwOnError: errorBoundary,
+    throwOnError: errorBoundary.value,
   });
 
   return (
@@ -28,16 +29,11 @@ function RouteComponent() {
           Trigger RPC error
         </button>
         <label>
-          <input
-            type="checkbox"
-            checked={errorBoundary}
-            disabled={rpcError}
-            onChange={(e) => setErrorBoundary(e.currentTarget.checked)}
-          />
+          <Checkbox signal={errorBoundary} disabled={rpcError} />
           Use error boundary
         </label>
       </div>
-      {!errorBoundary && query.error ? (
+      {!errorBoundary.value && query.error ? (
         <pre>
           <ErrorFallback error={query.error} />
         </pre>

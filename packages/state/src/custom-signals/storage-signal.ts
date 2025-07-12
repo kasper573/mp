@@ -1,6 +1,6 @@
-import { Signal } from "@preact/signals-core";
-import type { StorageType } from "./universal-storage";
-import { getStorage } from "./universal-storage";
+import { Signal } from "../signal";
+import type { StorageType } from "../universal-storage";
+import { getStorage } from "../universal-storage";
 
 export class StorageSignal<T> extends Signal<T> {
   private storage: Storage;
