@@ -141,31 +141,35 @@ export interface ReactRpcQueryInvoker<Node extends AnyQueryNode>
   [useSuspenseQueryProperty]: UseSuspenseQuery<Node>;
 }
 
-export type UseQuery<Node extends AnyQueryNode> = <MappedOutput = InferOutput<Node["handler"]>>(
-    options?: ReactRpcQueryOptions<
-      InferInput<Node["handler"]>,
-      InferOutput<Node["handler"]>,
-      MappedOutput
-    >,
-  ) => tanstack.UseQueryResult<MappedOutput, unknown>;
+export type UseQuery<Node extends AnyQueryNode> = <
+  MappedOutput = InferOutput<Node["handler"]>,
+>(
+  options?: ReactRpcQueryOptions<
+    InferInput<Node["handler"]>,
+    InferOutput<Node["handler"]>,
+    MappedOutput
+  >,
+) => tanstack.UseQueryResult<MappedOutput, unknown>;
 
-export type UseSuspenseQuery<Node extends AnyQueryNode> = <MappedOutput = InferOutput<Node["handler"]>>(
-    options?: ReactRpcSuspenseQueryOptions<
-      InferInput<Node["handler"]>,
-      InferOutput<Node["handler"]>,
-      MappedOutput
-    >,
-  ) => tanstack.UseSuspenseQueryResult<MappedOutput, unknown>;
+export type UseSuspenseQuery<Node extends AnyQueryNode> = <
+  MappedOutput = InferOutput<Node["handler"]>,
+>(
+  options?: ReactRpcSuspenseQueryOptions<
+    InferInput<Node["handler"]>,
+    InferOutput<Node["handler"]>,
+    MappedOutput
+  >,
+) => tanstack.UseSuspenseQueryResult<MappedOutput, unknown>;
 
 const useSuspenseQueryProperty = "useSuspenseQuery";
 const useQueryProperty = "useQuery";
 const useMutationProperty = "useMutation";
 
 export type UseMutation<Node extends AnyMutationNode> = () => UseMutationResult<
-    InferInput<Node["handler"]>,
-    unknown,
-    InferOutput<Node["handler"]>
-  >;
+  InferInput<Node["handler"]>,
+  unknown,
+  InferOutput<Node["handler"]>
+>;
 export interface ReactRpcMutationInvoker<Node extends AnyMutationNode>
   extends RpcProcedureInvoker<Node> {
   [useMutationProperty]: UseMutation<Node>;

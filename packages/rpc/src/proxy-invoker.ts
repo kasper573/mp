@@ -53,4 +53,6 @@ export interface RpcQueryOptions<Input, Output, MappedOutput> {
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export type RpcProcedureInvoker<Node extends AnyProcedureNode> = (input: InferInput<Node["handler"]>) => Promise<InferOutput<Node["handler"]>>;
+export type RpcProcedureInvoker<Node extends AnyProcedureNode> = (
+  input: InferInput<Node["handler"]>,
+) => Promise<InferOutput<Node["handler"]>>;

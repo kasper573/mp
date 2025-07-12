@@ -42,6 +42,8 @@ export class SyncEventBus<EventMap extends SyncEventMap> {
   }
 }
 
-export type EventAccessFn<EventMap extends SyncEventMap> = <EventName extends keyof EventMap>(
-    name: EventName,
-  ) => Array<EventMap[EventName]>;
+export type EventAccessFn<EventMap extends SyncEventMap> = <
+  EventName extends keyof EventMap,
+>(
+  name: EventName,
+) => Array<EventMap[EventName]>;
