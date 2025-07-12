@@ -3,7 +3,7 @@ import { type Signal } from "@mp/state";
 
 export interface CheckboxProps
   extends Pick<
-    JSX.IntrinsicElements["select"],
+    JSX.IntrinsicElements["input"],
     "className" | "style" | "disabled" | "children"
   > {
   signal: Signal<boolean>;
