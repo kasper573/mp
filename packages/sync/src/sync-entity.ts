@@ -119,7 +119,6 @@ export function collect<V>({
         }
 
         obs.set(newValue);
-        instanceValue.set.call(this, newValue);
         meta.assignedProperties.add(context.name);
       },
     };
