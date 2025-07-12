@@ -6,16 +6,16 @@ import { PatchType, type Patch } from "./patch";
  * Base class for entities that has fields decorated with @collect.
  */
 export abstract class SyncEntity {
-  private meta = new SyncEntityMeta();
+  #meta = new SyncEntityMeta();
 
   /**
    * Triggers event handlers and produces a patch that represents all changes since the last flush.
    */
   flush(...path: PatchPathStep[]): Patch {
-    const changes = this.meta.changes;
+    const changes = this.#meta.changes;
     if (changes) {
       const patch: Patch = [[PatchType.Update, path as PatchPath, changes]];
-      this.meta.changes = undefined;
+      this.#meta.changes = undefined;
       return patch;
     }
 
@@ -27,7 +27,7 @@ export abstract class SyncEntity {
    */
   snapshot(): Partial<this> {
     const subset = Object.fromEntries(
-      Object.keys(this.meta.observables).map((name) => [
+      Object.keys(this.#meta.observables).map((name) => [
         name,
         this[name as keyof this],
       ]),
@@ -45,7 +45,7 @@ export abstract class SyncEntity {
         `SyncEntity.accessMeta can only be used on instances of SyncEntity.`,
       );
     }
-    return entity.meta;
+    return entity.#meta;
   }
 
   static shouldOptimizeCollects = false;
@@ -119,6 +119,7 @@ export function collect<V>({
         }
 
         obs.set(newValue);
+        instanceValue.set.call(this, newValue);
         meta.assignedProperties.add(context.name);
       },
     };
