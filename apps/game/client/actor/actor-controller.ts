@@ -47,12 +47,7 @@ export class ActorController extends Container {
     const state = ioc.get(ctxGameStateClient);
 
     this.subscriptions = [
-      effect(() =>
-        diffCallback(
-          () => actorAnimationState(actor),
-          this.switchAnimationToMovingOrIdle,
-        ),
-      ),
+      effect(this.switchAnimationToMovingOrIdle),
       state.eventBus.subscribe("combat.attack", (attack) => {
         if (attack.actorId === actor.id) {
           void this.sprite
@@ -127,16 +122,3 @@ function actorAnimationState(actor: Actor) {
     isAlive: actor.health > 0,
   };
 }
-
-function diffCallback<T>(getValue: () => T, callback: () => void): () => void {
-  let oldValue: T | undefined;
-  return () => {
-    const newValue = getValue();
-    if (!oldValue || !isEqual(newValue, oldValue)) {
-      callback();
-    }
-    oldValue = newValue;
-  };
-}
-
-const isEqual = <T>(a: T, b: T) => JSON.stringify(a) === JSON.stringify(b);
