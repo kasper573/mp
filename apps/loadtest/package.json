@@ -22,6 +22,7 @@
     "@mp/tsconfig": "workspace:*",
     "@types/yargs": "17.0.33",
     "@vanilla-extract/vite-plugin": "catalog:",
+    "@babel/plugin-proposal-decorators": "catalog:",
     "@preact/preset-vite": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",

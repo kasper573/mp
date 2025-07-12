@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@babel/plugin-proposal-decorators':
+      specifier: 7.27.1
+      version: 7.27.1
     '@preact/preset-vite':
       specifier: 2.10.2
       version: 2.10.2
@@ -115,7 +118,7 @@ importers:
         version: 10.26.9
     devDependencies:
       '@babel/plugin-proposal-decorators':
-        specifier: 7.27.1
+        specifier: 'catalog:'
         version: 7.27.1(@babel/core@7.27.4)
       '@mp/tsconfig':
         specifier: workspace:*
@@ -242,6 +245,9 @@ importers:
         specifier: workspace:*
         version: link:../../packages/ws
     devDependencies:
+      '@babel/plugin-proposal-decorators':
+        specifier: 'catalog:'
+        version: 7.27.1(@babel/core@7.28.0)
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -6111,9 +6117,23 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
+  '@babel/plugin-proposal-decorators@7.27.1(@babel/core@7.28.0)':
+    dependencies:
+      '@babel/core': 7.28.0
+      '@babel/helper-create-class-features-plugin': 7.27.1(@babel/core@7.28.0)
+      '@babel/helper-plugin-utils': 7.27.1
+      '@babel/plugin-syntax-decorators': 7.27.1(@babel/core@7.28.0)
+    transitivePeerDependencies:
+      - supports-color
+
   '@babel/plugin-syntax-decorators@7.27.1(@babel/core@7.27.4)':
     dependencies:
       '@babel/core': 7.27.4
+      '@babel/helper-plugin-utils': 7.27.1
+
+  '@babel/plugin-syntax-decorators@7.27.1(@babel/core@7.28.0)':
+    dependencies:
+      '@babel/core': 7.28.0
       '@babel/helper-plugin-utils': 7.27.1
 
   '@babel/plugin-syntax-jsx@7.27.1(@babel/core@7.27.4)':

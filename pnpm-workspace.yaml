@@ -6,6 +6,7 @@ catalog:
   preact: 10.26.9
   typescript: 5.8.2
   vitest: 3.1.4
+  "@babel/plugin-proposal-decorators": 7.27.1
   "@vanilla-extract/vite-plugin": 5.0.6
   vite: 6.3.5
   "@preact/preset-vite": 2.10.2

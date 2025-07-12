@@ -28,7 +28,7 @@
     "preact": "catalog:"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-decorators": "7.27.1",
+    "@babel/plugin-proposal-decorators": "catalog:",
     "@mp/tsconfig": "workspace:*",
     "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
