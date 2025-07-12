@@ -1,7 +1,7 @@
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import type { AreaId } from "../../shared/area/area-id";
-import { rpc } from "../rpc";
+import { rpc } from "../rpc-definition";
 import {
   ctxActorModelLookup,
   type ActorModelId,

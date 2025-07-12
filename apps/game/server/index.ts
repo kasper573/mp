@@ -29,5 +29,5 @@ export * from "../shared/roles";
 export * from "./user/client-id";
 export * from "./user/auth";
 export * from "./rng";
-export * from "./rpc";
-export * from "./rpc.slice";
+export * from "./rpc-definition";
+export * from "./rpc-definition.slice";

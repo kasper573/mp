@@ -1,4 +1,4 @@
-import type { GameRpcContext } from "../rpc";
+import type { GameRpcContext } from "../rpc-definition";
 import { ctxGameState } from "../game-state";
 import { ctxClientId } from "../user/client-id";
 import { ctxClientRegistry } from "../user/client-registry";

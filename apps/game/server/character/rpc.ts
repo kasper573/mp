@@ -3,7 +3,7 @@ import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { ActorId } from "../actor";
 import { ctxGameState } from "../game-state";
-import { rpc } from "../rpc";
+import { rpc } from "../rpc-definition";
 import { roles } from "../user/auth";
 import { ctxGameStateServer } from "../game-state-server";
 import { characterRoles } from "../../shared/roles";

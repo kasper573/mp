@@ -1,6 +1,6 @@
 import type { AccessToken } from "@mp/auth";
 import { ctxGameState } from "../game-state";
-import { rpc } from "../rpc";
+import { rpc } from "../rpc-definition";
 import { ctxTokenResolver, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";

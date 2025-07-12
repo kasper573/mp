@@ -1,5 +1,5 @@
 import { ctxGameState } from "../game-state";
-import { rpc } from "../rpc";
+import { rpc } from "../rpc-definition";
 import { roles } from "../user/auth";
 import { ctxRng } from "../rng";
 import { npcRoles } from "../../shared/roles";

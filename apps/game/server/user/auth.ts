@@ -1,7 +1,7 @@
 import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserId } from "@mp/auth";
 import type { TokenResolver } from "@mp/auth/server";
-import { rpc } from "../rpc";
+import { rpc } from "../rpc-definition";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
 import { ctxUserService } from "./service";
