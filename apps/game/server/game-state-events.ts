@@ -1,6 +1,7 @@
 import type { ActorId } from "./actor";
 
-export interface GameStateEvents {
+// oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
+export type GameStateEvents = {
   "combat.attack": {
     actorId: ActorId;
     targetId: ActorId;
@@ -11,4 +12,4 @@ export interface GameStateEvents {
    * It needs to know that it's okay to stop immediately and not let the interpolation finish.
    */
   "movement.stop": ActorId;
-}
+};
