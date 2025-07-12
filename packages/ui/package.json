@@ -12,8 +12,8 @@
     }
   },
   "dependencies": {
-    "@mp/style": "workspace:*",
     "@mp/state": "workspace:*",
+    "@mp/style": "workspace:*",
     "preact": "catalog:",
     "react-error-boundary": "6.0.0"
   },
