@@ -54,7 +54,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
 function trimCharacterInfo(char?: Character) {
   return (
     char && {
-      ...char,
+      ...char.snapshot(),
       coords: char.coords.toString(),
       path: char.path,
     }
