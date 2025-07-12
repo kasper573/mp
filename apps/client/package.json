@@ -30,9 +30,9 @@
   "devDependencies": {
     "@babel/plugin-proposal-decorators": "catalog:",
     "@mp/tsconfig": "workspace:*",
+    "@preact/preset-vite": "catalog:",
     "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
-    "@preact/preset-vite": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.9.3"
   }

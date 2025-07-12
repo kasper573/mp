@@ -17,8 +17,8 @@
     }
   },
   "dependencies": {
-    "@preact/signals-core": "1.11.0",
     "@preact/signals": "2.2.1",
+    "@preact/signals-core": "1.11.0",
     "preact": "catalog:"
   },
   "devDependencies": {

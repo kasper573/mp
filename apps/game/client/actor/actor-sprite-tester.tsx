@@ -10,6 +10,7 @@ import { Select } from "@mp/ui";
 import { Engine } from "@mp/engine";
 import { useGraphics } from "@mp/graphics/react";
 import { assert } from "@mp/std";
+import type { CSSProperties } from "@mp/style";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -23,7 +24,6 @@ import {
   ctxActorSpritesheetLookup,
   loadActorSpritesheets,
 } from "./actor-spritesheet-lookup";
-import { CSSProperties } from "@mp/style";
 
 export function ActorSpriteTester() {
   const rpc = ioc.get(ctxGameRpcClient);

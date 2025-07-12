@@ -19,7 +19,6 @@
   "dependencies": {
     "@mp/math": "workspace:*",
     "@mp/state": "workspace:*",
-    "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
     "pixi.js": "8.11.0",
     "preact": "catalog:"
