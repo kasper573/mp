@@ -23,7 +23,7 @@ import { clientViewDistance } from "../../server";
 
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
-import { ctxEngine, ctxLogger } from "../context/common";
+import { ctxEngine } from "../context/common";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
@@ -80,26 +80,12 @@ export class AreaScene extends Container {
       (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
 
-    const logger = ioc.get(ctxLogger);
-
     this.cameraPos = new VectorSpring(
-      computed(() => {
-        const myCoords = this.state.character.value?.coords;
-        if (myCoords) {
-          return this.options.area.tiled.tileCoordToWorld(myCoords);
-        }
-
-        // Retaining the current position if the player coordinate is lost (ie. connection loss).
-        const current = this.cameraPos as VectorSpring<Pixel> | undefined;
-        if (current?.value.value) {
-          logger.debug("Camera position lost, retaining last known position.");
-          return current.value.value;
-        }
-
-        // Falling back to zero if initializing before a player coordinate is known.
-        logger.debug("Camera position is not set, using zero vector.");
-        return Vector.zero();
-      }),
+      computed(() =>
+        options.area.tiled.tileCoordToWorld(
+          this.state.character.value?.coords ?? Vector.zero(),
+        ),
+      ),
       () => ({
         stiffness: 80,
         damping: 34,
