@@ -67,10 +67,6 @@ function useServerPatchOptimizerSignal() {
 
   useEffect(() => {
     if (isRemoteEnabled.data !== undefined) {
-      console.log(
-        "Updating local signal to remote value",
-        isRemoteEnabled.data,
-      );
       enabled.value = isRemoteEnabled.data;
     }
   }, [isRemoteEnabled.data, enabled]);
