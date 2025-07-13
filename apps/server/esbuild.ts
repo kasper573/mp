@@ -14,6 +14,7 @@ const buildOptions: esbuild.BuildOptions = {
   entryPoints: {
     index: "./src/main.ts",
     provision: "./src/keycloak-provision.ts",
+    schema: "./src/db/schema.ts",
   },
   outdir: outDir,
   bundle: true,

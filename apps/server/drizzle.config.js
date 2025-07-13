@@ -3,7 +3,7 @@
 
 /** @type { import("drizzle-kit").Config } */
 export default {
-  schema: "./src/db/schema.ts",
+  schema: "./dist/schema.js", // Requires the server to have been built first
   dialect: "postgresql",
   dbCredentials: {
     url: process.env.MP_SERVER_DATABASE_URL,
