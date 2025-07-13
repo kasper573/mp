@@ -329,9 +329,6 @@ importers:
       express:
         specifier: 4.19.2
         version: 4.19.2
-      import-in-the-middle:
-        specifier: 1.12.0
-        version: 1.12.0
       pg:
         specifier: 8.13.1
         version: 8.13.1

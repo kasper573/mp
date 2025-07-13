@@ -2,7 +2,9 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { createConsoleLogger } from "@mp/logger";
 import { assert } from "@mp/std";
-import { groupedRoles, playerGroup } from "../roles";
+import { groupedRoles, playerGroup } from "./roles";
+
+// Note that this file is an entrypoint and should not have any exports
 
 const logger = createConsoleLogger();
 

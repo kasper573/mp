@@ -40,33 +40,34 @@ import {
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
-
 import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
-import { seed } from "../../seed";
+import { seed } from "../seed";
 import type { GameStateEvents } from "@mp/game/server";
-import { collectProcessMetrics } from "../metrics/process";
-import { metricsMiddleware } from "../express/metrics-middleware";
-import { collectUserMetrics } from "../metrics/user";
-import { createTickMetricsObserver } from "../metrics/tick";
-import { createExpressLogger } from "../express/logger";
-import { collectPathFindingMetrics } from "../metrics/path-finding";
-import { opt } from "../options";
-import { rateLimiterMiddleware } from "../etc/rate-limiter-middleware";
-import { serverFileToPublicUrl } from "../etc/server-file-to-public-url";
-import { serverRpcRouter } from "../rpc";
-import { setupRpcTransceivers } from "../etc/rpc-wss";
-import { loadAreas } from "../etc/load-areas";
-import { getSocketId } from "../etc/get-socket-id";
-import { createGameStateFlusher } from "../etc/flush-game-state";
-import { loadActorModels } from "../etc/load-actor-models";
-import { playerRoles } from "../roles";
-import { ctxUpdateTicker } from "../etc/system-rpc";
-import { createNpcService } from "../db/services/npc-service";
-import { createDbClient } from "../db/client";
-import { createCharacterService } from "../db/services/character-service";
-import { deriveNpcSpawnsFromAreas } from "../etc/derive-npc-spawns-from-areas";
-import { createUserService } from "../db/services/user-service";
-import { createGameStateService } from "../db/services/game-service";
+import { collectProcessMetrics } from "./metrics/process";
+import { metricsMiddleware } from "./express/metrics-middleware";
+import { collectUserMetrics } from "./metrics/user";
+import { createTickMetricsObserver } from "./metrics/tick";
+import { createExpressLogger } from "./express/logger";
+import { collectPathFindingMetrics } from "./metrics/path-finding";
+import { opt } from "./options";
+import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
+import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
+import { serverRpcRouter } from "./rpc";
+import { setupRpcTransceivers } from "./etc/rpc-wss";
+import { loadAreas } from "./etc/load-areas";
+import { getSocketId } from "./etc/get-socket-id";
+import { createGameStateFlusher } from "./etc/flush-game-state";
+import { loadActorModels } from "./etc/load-actor-models";
+import { playerRoles } from "./roles";
+import { ctxUpdateTicker } from "./etc/system-rpc";
+import { createNpcService } from "./db/services/npc-service";
+import { createDbClient } from "./db/client";
+import { createCharacterService } from "./db/services/character-service";
+import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
+import { createUserService } from "./db/services/user-service";
+import { createGameStateService } from "./db/services/game-service";
+
+// Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 

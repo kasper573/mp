@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import esbuild from "esbuild";
 import builtinModules from "builtin-modules";
 import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
+import { vanillaExtractPlugin } from "@vanilla-extract/esbuild-plugin";
 
 const isDevMode = process.argv.includes("--dev");
 const isProd = !!isDevMode;
@@ -11,8 +12,8 @@ const outDir = path.resolve(import.meta.dirname, "dist");
 
 const buildOptions: esbuild.BuildOptions = {
   entryPoints: {
-    index: "./src/entrypoints/server.ts",
-    provision: "./src/entrypoints/keycloak-provision.ts",
+    index: "./src/main.ts",
+    provision: "./src/keycloak-provision.ts",
   },
   outdir: outDir,
   bundle: true,
@@ -35,7 +36,7 @@ const buildOptions: esbuild.BuildOptions = {
       `const require = createRequireGlobal(import.meta.url);`,
     ].join("\n"),
   },
-  plugins: [typecheckPlugin({ watch: isDevMode })],
+  plugins: [typecheckPlugin({ watch: isDevMode }), vanillaExtractPlugin()],
 };
 
 if (isDevMode) {
