@@ -1,5 +1,5 @@
 // oxlint-disable no-await-in-loop
-import { createPinoLogger } from "@mp/logger";
+import { createConsoleLogger } from "@mp/logger";
 import type { ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
@@ -9,7 +9,7 @@ import { loadAreaResource } from "@mp/game/client";
 import { createReactRpcInvoker } from "@mp/rpc/react";
 import { readCliOptions } from "./cli";
 
-const logger = createPinoLogger();
+const logger = createConsoleLogger();
 
 const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
   readCliOptions();
