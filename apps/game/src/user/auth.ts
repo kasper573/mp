@@ -25,8 +25,12 @@ export function roles(requiredRoles: RoleDefinition[]) {
   return auth().pipe(async ({ ctx, mwc }) => {
     const userService = ctx.get(ctxUserService);
     const roles = await userService.getRoles(mwc.userId);
-    if (!new Set(requiredRoles).isSubsetOf(roles)) {
-      throw new Error("Insufficient permissions");
+    const requiredRolesSet = new Set(requiredRoles);
+    if (!requiredRolesSet.isSubsetOf(roles)) {
+      const missingRoles = requiredRolesSet.difference(roles);
+      throw new Error(
+        "Missing permissions: " + missingRoles.values().toArray().join(", "),
+      );
     }
 
     return mwc;
