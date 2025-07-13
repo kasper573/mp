@@ -1,3 +1,3 @@
 # time
 
-Time management and scheduling utilities.
+Time management utilities and data structures.
