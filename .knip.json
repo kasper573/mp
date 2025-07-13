@@ -1,8 +1,4 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": [
-    "@babel/plugin-proposal-decorators",
-    "@mp/tsconfig",
-    "pino-pretty"
-  ]
+  "ignoreDependencies": ["@babel/plugin-proposal-decorators", "@mp/tsconfig"]
 }

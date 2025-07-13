@@ -1,23 +1,5 @@
+// oxlint-disable no-explicit-any
 // oxlint-disable no-console
-import pino, { type Logger as PinoLogger } from "pino";
-
-export function createPinoLogger(pretty = true): Logger {
-  return pino({
-    transport: pretty
-      ? {
-          target: "pino-pretty",
-          options: {
-            colorize: true,
-          },
-        }
-      : {
-          // Outputs to stdout, not file
-          // https://getpino.io/#/docs/transports?id=writing-to-a-custom-transport-amp-stdout
-          target: "pino/file",
-          options: { destination: 1 },
-        },
-  });
-}
 
 export function createConsoleLogger(): Logger {
   return {
@@ -28,4 +10,15 @@ export function createConsoleLogger(): Logger {
   };
 }
 
-export type Logger = Pick<PinoLogger, "info" | "warn" | "error" | "debug">;
+export interface Logger {
+  info: LogFn;
+  warn: LogFn;
+  error: LogFn;
+  debug: LogFn;
+}
+
+interface LogFn {
+  <T extends object>(obj: T, msg?: string, ...args: any[]): void;
+  (obj: unknown, msg?: string, ...args: any[]): void;
+  (msg: string, ...args: any[]): void;
+}
