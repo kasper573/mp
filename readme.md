@@ -119,7 +119,7 @@ Building images: You can build docker images from source, and it will depend on 
 
 Starting containers: You can also start containers for prebuilt docker images, in which case only the `/docker` folder is required to be present. You can do so by running `dockerctl.sh` with `prod` or `test` environment. In fact, this is how the production environment is managed: The CI uploads the `/docker` folder to the production server as a runtime dependency, and runs `dockerctl.sh prod <docker compose command>`.
 
-# Production deployment
+## Production deployment
 
 This repository comes with a github actions workflow that performs automatic
 deployments whenever the main branch receives updates. It's a simple deploy
@@ -130,7 +130,7 @@ provided via github action variables and secrets.
 
 Review the workflow to see which variables and secrets you need to provide.
 
-# Monorepo package convention
+## Monorepo package convention
 
 This repository utilizes pnpm workspaces to organize and separate concerns.
 
@@ -138,13 +138,13 @@ Lower level workspaces may not depend on higher level workspaces.
 
 These are the workspaces, in order:
 
-## apps
+### apps
 
 Compositions of packages. Often has deployable artifacts, but is not required to. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
 The apps are responsible for bundling.
 
-## packages
+### packages
 
 Generic and low level systems.
 
@@ -154,6 +154,6 @@ Optimally each package is standalone and has no dependencies on other packages i
 
 Does not need to handle bundling, package.json may directly export untranspiled code, ie. typescript.
 
-# Credits
+## Credits
 
 [Adventurer character model by @sscary](https://sscary.itch.io/the-adventurer-male)
