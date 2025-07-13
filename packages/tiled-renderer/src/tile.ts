@@ -1,4 +1,4 @@
-import { AnimatedSprite, Matrix, Sprite } from "@mp/graphics";
+import { AutoplayAnimatedSprite, Matrix, Sprite } from "@mp/graphics";
 import type { GlobalIdFlags, TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
 
@@ -8,13 +8,12 @@ export function createTileSprite(
 ): Sprite {
   let sprite: Sprite;
   if (tile.animation) {
-    const anim = new AnimatedSprite({
+    const anim = new AutoplayAnimatedSprite({
       width,
       height,
       anchor: center,
-      textures: lookup.animation(id),
+      frames: lookup.animation(id),
     });
-    anim.play();
     sprite = anim;
   } else {
     sprite = new Sprite({

@@ -1,5 +1,4 @@
 import type {
-  AnimatedSpriteFrames,
   FrameObject,
   SpritesheetData,
   SpritesheetFrameData,
@@ -134,7 +133,7 @@ export function createTiledTextureLookup(
 
 export interface TiledTextureLookup {
   texture: (gid: GlobalTileId) => Texture;
-  animation: (gid: GlobalTileId) => AnimatedSpriteFrames;
+  animation: (gid: GlobalTileId) => FrameObject[];
 }
 
 export interface TiledSpritesheetRecord {
