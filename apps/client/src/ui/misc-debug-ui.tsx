@@ -1,4 +1,5 @@
-import { Button, Checkbox } from "@mp/ui";
+import type { CheckboxState } from "@mp/ui";
+import { Button, Checkbox, CheckboxProps } from "@mp/ui";
 import { ctxGameStateClient, ioc } from "@mp/game";
 import { assert } from "@mp/std";
 import { useSignal, useSignalEffect } from "@mp/state/react";
@@ -6,6 +7,7 @@ import { PropertySignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
+import { useEffect } from "preact/hooks";
 
 export function MiscDebugUi() {
   const rpc = useRpc();
@@ -54,18 +56,24 @@ export function MiscDebugUi() {
 
 function useServerPatchOptimizerSignal() {
   const rpc = useRpc();
-  const enabled = useSignal(true);
+  const enabled = useSignal<CheckboxState>("indeterminate");
   const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
 
   useSignalEffect(() => {
-    void rpc.system.setPatchOptimizerEnabled(enabled.value);
-  });
-
-  useSignalEffect(() => {
-    if (isRemoteEnabled.data !== undefined) {
-      enabled.value = isRemoteEnabled.data;
+    if (enabled.value !== "indeterminate") {
+      void rpc.system.setPatchOptimizerEnabled(enabled.value);
     }
   });
+
+  useEffect(() => {
+    if (isRemoteEnabled.data !== undefined) {
+      console.log(
+        "Updating local signal to remote value",
+        isRemoteEnabled.data,
+      );
+      enabled.value = isRemoteEnabled.data;
+    }
+  }, [isRemoteEnabled.data, enabled]);
 
   return enabled;
 }
