@@ -17,7 +17,8 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 function RouteComponent() {
   const socket = useContext(SocketContext);
   const stateClient = useMemo(
-    () => new GameStateClient({ socket, settings: miscDebugSettings.value }),
+    () =>
+      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
     [socket],
   );
 

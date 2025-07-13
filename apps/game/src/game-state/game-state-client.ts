@@ -20,7 +20,7 @@ const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
   socket: WebSocket;
-  settings: OptimisticGameStateSettings;
+  settings: () => OptimisticGameStateSettings;
 }
 
 export class GameStateClient {

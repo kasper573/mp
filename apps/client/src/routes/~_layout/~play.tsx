@@ -15,7 +15,8 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const socket = useContext(SocketContext);
   const stateClient = useMemo(
-    () => new GameStateClient({ socket, settings: miscDebugSettings.value }),
+    () =>
+      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
     [socket],
   );
 
