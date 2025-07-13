@@ -8,11 +8,13 @@ import { typecheckPlugin } from "@jgoz/esbuild-plugin-typecheck";
 const isDevMode = process.argv.includes("--dev");
 const isProd = !!isDevMode;
 const outDir = path.resolve(import.meta.dirname, "dist");
-const outFile = path.resolve(outDir, "index.js");
 
 const buildOptions: esbuild.BuildOptions = {
-  entryPoints: ["./src/main.ts"],
-  outfile: outFile,
+  entryPoints: {
+    index: "./src/entrypoints/server.ts",
+    provision: "./src/entrypoints/keycloak-provision.ts",
+  },
+  outdir: outDir,
   bundle: true,
   minify: isProd,
   platform: "node",

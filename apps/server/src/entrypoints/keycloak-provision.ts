@@ -2,7 +2,7 @@
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { createConsoleLogger } from "@mp/logger";
 import { assert } from "@mp/std";
-import { groupedRoles, playerGroup } from "./src/roles";
+import { groupedRoles, playerGroup } from "../roles";
 
 const logger = createConsoleLogger();
 
