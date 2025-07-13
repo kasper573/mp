@@ -43,7 +43,6 @@ export function setupRpcTransceivers<Context>({
       const context = createContext(socket);
       const buffer = msg.data as ArrayBuffer;
       const out = await transceiver.handleMessage(buffer, context);
-      const info: Record<string, unknown> = { socketId };
       if (out?.call) {
         const [path, , callId] = out.call;
         logger.info(
@@ -56,13 +55,13 @@ export function setupRpcTransceivers<Context>({
           `[rpc]`,
         );
         if (out.result.isErr()) {
-          logger.error(info.error, `[rpc] ${path.join(".")}`);
+          logger.error(out.result.error, `[rpc] ${path.join(".")}`);
         }
       } else if (out?.response) {
         const [callId] = out.response;
         logger.info({ socketId, callId }, `[rpc response]`);
         if (out.result.isErr()) {
-          logger.error(info.error, `[rpc response] (callId: ${callId})`);
+          logger.error(out.result.error, `[rpc response] (callId: ${callId})`);
         }
       }
     });
