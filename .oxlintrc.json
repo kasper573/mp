@@ -101,6 +101,22 @@
       "rules": {
         "extensions": "off"
       }
+    },
+    {
+      "files": ["**/apps/game/**"],
+      "rules": {
+        "no-restricted-imports": [
+          "error",
+          {
+            "patterns": [
+              {
+                "regex": "/package$",
+                "message": "Don't import from package.ts. It's the definition file for the game package and nothing should depend on it."
+              }
+            ]
+          }
+        ]
+      }
     }
   ]
 }

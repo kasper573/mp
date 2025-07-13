@@ -3,6 +3,6 @@
   "ignoreDependencies": [
     "@babel/plugin-proposal-decorators",
     "@mp/tsconfig",
-    "pino-pretty"
+    "@mp/keycloak-provision"
   ]
 }

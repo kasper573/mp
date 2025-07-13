@@ -1,7 +1,7 @@
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
-import { createPinoLogger } from "@mp/logger";
+import { createConsoleLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
@@ -40,10 +40,9 @@ import {
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
-
 import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
-import type { GameStateEvents } from "../../game/server/game-state-events";
+import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
@@ -68,10 +67,12 @@ import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
 
+// Note that this file is an entrypoint and should not have any exports
+
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = createPinoLogger(opt.prettyLogs);
+const logger = createConsoleLogger();
 logger.info(opt, `Server started `);
 
 RateLimiter.enabled = opt.rateLimit;

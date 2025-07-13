@@ -6,14 +6,14 @@
   "license": "MIT",
   "exports": {
     "./client": {
-      "types": "./client/index.ts",
-      "import": "./client/index.ts",
-      "require": "./client/index.ts"
+      "types": "./src/package.ts",
+      "import": "./src/package.ts",
+      "require": "./src/package.ts"
     },
     "./server": {
-      "types": "./server/index.ts",
-      "import": "./server/index.ts",
-      "require": "./server/index.ts"
+      "types": "./src/package.ts",
+      "import": "./src/package.ts",
+      "require": "./src/package.ts"
     }
   },
   "dependencies": {
