@@ -10,13 +10,12 @@ ls:
     .*: regex:~?(__)?[a-z0-9\-]+
 
 ignore:
-  # Node dependencies is idiotic to lint
-  - "**/node_modules"
-  # Dockerfiles have their own naming convention
-  - "**/Dockerfile*"
-  # Generated code should not be linted
+  - node_modules
   - .git
-  - "**/.tanstack"
-  - "**/.playwright"
-  - "**/dist"
+  - "./*/Dockerfile*"
   - "apps/server/drizzle/**"
+  - "apps/e2e/.playwright"
+  - "apps/client/.tanstack"
+  - "./{apps,packages}/*/.turbo"
+  - "./{apps,packages}/*/dist"
+  - "./{apps,packages}/*/node_modules"
