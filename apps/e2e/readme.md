@@ -1,5 +1,5 @@
 # e2e
 
-End-to-end test suite for the application
+This app provides end-to-end testing using Playwright. It needs the rest of the stack to be up and running. See the package scripts for how to run the tests depending on the environment you want to test against.
 
-This application provides comprehensive end-to-end testing using Playwright. It tests the complete user flows from authentication through gameplay, ensuring all components work together correctly. The tests can run against both development and testing environments, simulating real user interactions with the web client and verifying server responses. It includes utilities for generating test data and handles the complexity of testing real-time multiplayer interactions.
+See [Playwright docs](https://playwright.dev/) for more details.

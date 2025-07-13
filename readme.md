@@ -144,9 +144,9 @@ Compositions of packages. Often has deployable artifacts, but is not required to
 
 Generic and low level systems.
 
-Should be highly configurable and may not contain hard coded configuration or depend on dependency injection.
+Should be highly configurable and modular.
 
-Dependencies must instead be provided as arguments.
+Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many packages will have to depend on really core stuff like [@mp/std](/packages/std) and [@mp/time](/packages/time), but in general you should decouple packages and instead compose them together inside an app.
 
 # Credits
 

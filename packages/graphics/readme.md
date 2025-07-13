@@ -1,5 +1,5 @@
 # graphics
 
-Graphics utilities and components built on PixiJS
+An encapsulation of [PixiJS](https://pixijs.com/), but also additional general purpose but custom built pixi.js components and mechanisms.
 
-This package extends PixiJS with additional functionality for game development and React integration. It provides an animation controller for managing sprite animations, reactive collections that automatically sync with PixiJS container children, and custom filters like TintFilter for color manipulation. The React integration (`/react` export) includes a `useGraphics` hook that simplifies PixiJS application setup with automatic canvas management, responsive resizing, and proper cleanup. The package re-exports all PixiJS functionality while adding these convenience layers.
+Mostly an encapsulation package to collect implementation details in, ie. which npm dependencies and versions to use, so that doesn't have to be specified in every package that needs pixi.js.
