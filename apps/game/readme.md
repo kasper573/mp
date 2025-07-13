@@ -13,3 +13,7 @@ This package or organized by domain and allow you to mix client and server side 
 While it's recommended to separate client and server concerns into at least separate files, it's not a requiement, since organizing by domain inevitably will blur the lines between client and server and some code will leak across the client server boundary in either direction, and we're fine with that.
 
 Secrets should not exist in code anyway, and we don't care if the client bundle becomes slightly larger if some of the server code ends up in the
+
+## Abstract persistence
+
+All database queries and mutations should be abstracted away using a service pattern. The domains in the game package are responsible for defining service interfaces and an [injection context](../../packages/ioc) for each, while the implementation code and service instances will be defined in the [server](../server/) app and passed down to the game via context.
