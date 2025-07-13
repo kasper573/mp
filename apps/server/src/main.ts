@@ -20,11 +20,11 @@ import {
   ctxUserService,
   NpcAi,
   NpcSpawner,
-} from "@mp/game/server";
+} from "@mp/game";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, type LocalFile } from "@mp/std";
-import { ctxGlobalMiddleware } from "@mp/game/server";
-import type { GameState } from "@mp/game/server";
+import { ctxGlobalMiddleware } from "@mp/game";
+import type { GameState } from "@mp/game";
 import {
   ctxRng,
   ctxAreaFileUrlResolver,
@@ -37,12 +37,12 @@ import {
   ctxNpcService,
   ctxGameState,
   deriveClientVisibility,
-} from "@mp/game/server";
-import { registerEncoderExtensions } from "@mp/game/server";
-import { clientViewDistance } from "@mp/game/server";
+} from "@mp/game";
+import { registerEncoderExtensions } from "@mp/game";
+import { clientViewDistance } from "@mp/game";
 import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
-import type { GameStateEvents } from "@mp/game/server";
+import type { GameStateEvents } from "@mp/game";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";

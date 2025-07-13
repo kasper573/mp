@@ -5,12 +5,7 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./client": {
-      "types": "./src/package.ts",
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
-    },
-    "./server": {
+    ".": {
       "types": "./src/package.ts",
       "import": "./src/package.ts",
       "require": "./src/package.ts"

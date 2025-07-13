@@ -1,5 +1,5 @@
 import { syncMessageEncoding } from "@mp/sync";
-import type { GameState, GameStateServer } from "@mp/game/server";
+import type { GameState, GameStateServer } from "@mp/game";
 import type { WebSocket } from "@mp/ws/server";
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";

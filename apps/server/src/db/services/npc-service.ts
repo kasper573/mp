@@ -1,5 +1,5 @@
 import { eq } from "drizzle-orm";
-import type { NpcSpawn, Npc, NpcService } from "@mp/game/server";
+import type { NpcSpawn, Npc, NpcService } from "@mp/game";
 import { npcSpawnTable, npcTable } from "../schema";
 import type { DbClient } from "../client";
 

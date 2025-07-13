@@ -2,7 +2,7 @@ import type { UseNavigateResult } from "@tanstack/react-router";
 import { createFileRoute } from "@tanstack/react-router";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect } from "preact/hooks";
-import { ctxAuthClient, ioc } from "@mp/game/client";
+import { ctxAuthClient, ioc } from "@mp/game";
 import type { AuthClient } from "@mp/auth/client";
 
 /**

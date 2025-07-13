@@ -1,7 +1,7 @@
 import path from "node:path";
 import fs from "node:fs/promises";
-import type { AreaLookup, AreaId } from "@mp/game/server";
-import { AreaResource, TiledResource } from "@mp/game/server";
+import type { AreaLookup, AreaId } from "@mp/game";
+import { AreaResource, TiledResource } from "@mp/game";
 import type { LocalFile } from "@mp/std";
 import { createTiledLoader } from "@mp/tiled-loader";
 

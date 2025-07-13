@@ -1,4 +1,4 @@
-import { ioc, ctxAuthClient } from "@mp/game/client";
+import { ioc, ctxAuthClient } from "@mp/game";
 import { Button } from "@mp/ui";
 
 export default function PermissionDenied() {

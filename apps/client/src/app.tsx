@@ -9,7 +9,7 @@ import {
   ctxLogger,
   ioc,
   registerEncoderExtensions,
-} from "@mp/game/client";
+} from "@mp/game";
 import {
   QueryClient,
   QueryClientProvider,

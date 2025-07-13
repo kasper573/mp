@@ -1,4 +1,4 @@
-import type { Character, GameState } from "@mp/game/server";
+import type { Character, GameState } from "@mp/game";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
 

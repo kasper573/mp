@@ -5,8 +5,8 @@ import type {
   CharacterId,
   NpcId,
   NpcSpawnId,
-} from "@mp/game/server";
-import { npcTypes } from "@mp/game/server";
+} from "@mp/game";
+import { npcTypes } from "@mp/game";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
 import { varchar, real, uuid, pgTable, integer } from "drizzle-orm/pg-core";

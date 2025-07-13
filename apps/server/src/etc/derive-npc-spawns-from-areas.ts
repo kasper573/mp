@@ -4,7 +4,7 @@ import type {
   Npc,
   NpcSpawn,
   NpcSpawnId,
-} from "@mp/game/server";
+} from "@mp/game";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
 import type { TiledClass, TiledObject } from "@mp/tiled-loader";

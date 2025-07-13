@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
+import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";

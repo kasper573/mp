@@ -1,7 +1,7 @@
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
-import { ctxAuthClient, ioc, systemRoles, worldRoles } from "@mp/game/client";
+import { ctxAuthClient, ioc, systemRoles, worldRoles } from "@mp/game";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";

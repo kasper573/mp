@@ -1,5 +1,5 @@
 import { Button, Checkbox } from "@mp/ui";
-import { ctxGameStateClient, ioc } from "@mp/game/client";
+import { ctxGameStateClient, ioc } from "@mp/game";
 import { assert } from "@mp/std";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal } from "@mp/state";

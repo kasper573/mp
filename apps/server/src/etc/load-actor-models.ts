@@ -5,7 +5,7 @@ import type {
   ActorModelId,
   ActorAnimationName,
   ActorModelLookup,
-} from "@mp/game/server";
+} from "@mp/game";
 import type { LocalFile, PublicUrl, Tile } from "@mp/std";
 import { Rect } from "@mp/math";
 import { serverFileToPublicUrl } from "./server-file-to-public-url";

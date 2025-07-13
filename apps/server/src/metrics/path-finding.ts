@@ -1,7 +1,7 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
 import { beginMeasuringTimeSpan } from "@mp/time";
-import { AreaResource } from "@mp/game/server";
+import { AreaResource } from "@mp/game";
 import { msBuckets } from "./shared";
 
 export function collectPathFindingMetrics(registry: MetricsRegistry): void {

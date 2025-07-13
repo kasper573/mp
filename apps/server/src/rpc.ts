@@ -1,5 +1,5 @@
-import { rpc } from "@mp/game/server";
-import { gameServerRpcSlice } from "@mp/game/server";
+import { rpc } from "@mp/game";
+import { gameServerRpcSlice } from "@mp/game";
 import { systemRouter } from "./etc/system-rpc";
 
 export type ServerRpcRouter = typeof serverRpcRouter;

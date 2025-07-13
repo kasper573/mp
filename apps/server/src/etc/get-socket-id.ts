@@ -1,4 +1,4 @@
-import type { ClientId } from "@mp/game/server";
+import type { ClientId } from "@mp/game";
 import { createShortId } from "@mp/std";
 import type { WebSocket } from "@mp/ws/server";
 

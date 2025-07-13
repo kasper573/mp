@@ -10,7 +10,7 @@ import {
   type CharacterService,
   type UserService,
   Character,
-} from "@mp/game/server";
+} from "@mp/game";
 import { eq } from "drizzle-orm";
 import type { DbClient } from "../client";
 import { characterTable } from "../schema";
