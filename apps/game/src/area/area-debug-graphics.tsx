@@ -15,7 +15,8 @@ import type {
   VisibleGraphType,
 } from "./area-debug-settings-form";
 import { clientViewDistance } from "../client-view-distance-settings";
-import type { Actor, NpcInstance } from "../package";
+import type { Actor } from "../actor/actor";
+import type { NpcInstance } from "../npc/types";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;

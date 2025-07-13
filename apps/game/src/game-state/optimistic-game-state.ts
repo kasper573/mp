@@ -6,8 +6,8 @@ import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import { typedKeys } from "@mp/std";
 import { moveAlongPath } from "../area/move-along-path";
 import type { GameStateEvents } from "./game-state-events";
-import type { ActorId, Actor } from "../package";
 import type { GameState } from "./game-state";
+import type { Actor, ActorId } from "../actor/actor";
 
 export class OptimisticGameState implements GameState {
   actors = new SyncMap<ActorId, Actor>();
