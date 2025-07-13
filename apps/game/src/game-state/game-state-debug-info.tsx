@@ -1,0 +1,56 @@
+import type { TimeSpan } from "@mp/time";
+import { useState, useEffect } from "preact/hooks";
+import { ioc } from "../context/ioc";
+import { ctxEngine } from "../context/common";
+import { ctxGameStateClient } from "./game-state-client";
+import type { TiledResource } from "../area/tiled-resource";
+import type { Character } from "../character/types";
+
+export function GameStateDebugInfo(props: { tiled: TiledResource }) {
+  const client = ioc.get(ctxGameStateClient);
+  const engine = ioc.get(ctxEngine);
+  const [frameInterval, setFrameInterval] = useState<TimeSpan>();
+  const [frameDuration, setFrameDuration] = useState<TimeSpan>();
+
+  useEffect(
+    () =>
+      engine.frameEmitter.subscribe(
+        ({ timeSinceLastFrame, previousFrameDuration }) => {
+          setFrameInterval(timeSinceLastFrame);
+          setFrameDuration(previousFrameDuration);
+        },
+      ),
+    [engine.frameEmitter],
+  );
+
+  const tilePos = props.tiled.worldCoordToTile(
+    engine.pointer.worldPosition.value,
+  );
+  const info = {
+    viewport: engine.pointer.position.value,
+    world: engine.pointer.worldPosition.value,
+    tile: tilePos,
+    tileSnapped: tilePos.round(),
+    cameraTransform: engine.camera.transform.value.data,
+    frameInterval: frameInterval?.totalMilliseconds.toFixed(2),
+    frameDuration: frameDuration?.totalMilliseconds.toFixed(2),
+    frameCallbacks: engine.frameEmitter.callbackCount,
+    character: trimCharacterInfo(client.character.value),
+  };
+
+  return (
+    <pre style={{ overflow: "auto", maxHeight: "70vh" }}>
+      {JSON.stringify(info, null, 2)}
+    </pre>
+  );
+}
+
+function trimCharacterInfo(char?: Character) {
+  return (
+    char && {
+      ...char.snapshot(),
+      coords: char.coords.toString(),
+      path: char.path,
+    }
+  );
+}

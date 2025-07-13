@@ -1,8 +1,1 @@
-{
-  "extends": "@mp/tsconfig/universal.json",
-  "compilerOptions": {
-    "types": ["vite/client"],
-    "jsx": "react-jsx",
-    "jsxImportSource": "preact"
-  }
-}
+{ "extends": "@mp/tsconfig/vite.json" }
