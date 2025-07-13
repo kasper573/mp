@@ -24,8 +24,7 @@ WORKDIR /workdir
 RUN npm install \
     @opentelemetry/auto-instrumentations-node \
     @opentelemetry/instrumentation \
-    @opentelemetry/api \
-    drizzle-kit
+    @opentelemetry/api
 
 COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
@@ -43,7 +42,6 @@ ENV OTEL_NODE_DISABLED_INSTRUMENTATIONS="nothing-should-be-disabled"
 # Add start script
 COPY <<EOF /workdir/start.sh
 cd /workdir/server
-npx drizzle-kit migrate
 node ./provision.js
 node \\
   --import @opentelemetry/auto-instrumentations-node/register \\

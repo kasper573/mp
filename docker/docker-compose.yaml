@@ -38,17 +38,21 @@ services:
       timeout: 5s
       retries: 20
     depends_on:
+      mp-migrations:
+        condition: service_started
       keycloak-healthcheck:
         condition: service_healthy
 
-  # This service only exists to aid the CI deployment script with a non zero exit code
-  # if mp-server fails to start properly (usually related to migrations failing).
-  mp-server-healthcheck:
-    image: alpine
-    restart: no
+  mp-migrations:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ../../docker/Dockerfile.mp-migrations
+      context: ../apps/server
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
     depends_on:
-      mp-server:
+      postgres:
         condition: service_healthy
 
   keycloak:
