@@ -24,10 +24,6 @@ const buildOptions: esbuild.BuildOptions = {
   sourcemap: true,
   format: "esm",
   logLevel: "info",
-  loader: {
-    ".ts": "ts",
-    ".wasm": "file",
-  },
   external: [...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
   mainFields: ["module", "main"],
   // Fix for https://github.com/evanw/esbuild/pull/2067
@@ -37,7 +33,14 @@ const buildOptions: esbuild.BuildOptions = {
       `const require = createRequireGlobal(import.meta.url);`,
     ].join("\n"),
   },
-  plugins: [typecheckPlugin({ watch: isDevMode }), vanillaExtractPlugin()],
+  plugins: [
+    typecheckPlugin({ watch: isDevMode }),
+    vanillaExtractPlugin({
+      // We only need to be able to transpile vanilla extract.
+      // The server isn't interested in the output css files.
+      outputCss: false,
+    }),
+  ],
 };
 
 if (isDevMode) {
