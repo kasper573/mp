@@ -1,10 +1,11 @@
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { VectorGraph } from "@mp/path-finding";
+import type { DestroyOptions } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection } from "@mp/graphics";
 import type { Tile, Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import { computed, type ReadonlySignal } from "@mp/state";
+import { computed, effect, type ReadonlySignal } from "@mp/state";
 import type { TiledResource } from "./tiled-resource";
 import type { AreaResource } from "./area-resource";
 import { clientViewDistanceRect } from "../client-view-distance-rect";
@@ -94,15 +95,21 @@ export class AreaDebugGraphics extends Container {
 }
 
 class DebugTiledGraph extends Graphics {
+  private cleanup: () => void;
   constructor(
     private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
   ) {
     super();
-    this.onRender = this.#onRender;
+    this.cleanup = effect(this.update);
   }
 
-  #onRender = () => {
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    this.cleanup();
+  }
+
+  private update = () => {
     this.clear();
     const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
