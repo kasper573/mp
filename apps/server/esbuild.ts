@@ -11,7 +11,7 @@ const outDir = path.resolve(import.meta.dirname, "dist");
 const outFile = path.resolve(outDir, "index.js");
 
 const buildOptions: esbuild.BuildOptions = {
-  entryPoints: ["src/main.ts"],
+  entryPoints: ["./src/main.ts"],
   outfile: outFile,
   bundle: true,
   minify: isProd,
