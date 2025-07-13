@@ -1,5 +1,5 @@
-import { type RuntimeFn } from "@vanilla-extract/recipes";
-import clsx from "clsx";
+import type { RuntimeFn } from "@vanilla-extract/recipes";
+import { clsx } from "clsx";
 
 export type StyledComponentProps<Recipe> =
   Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
@@ -37,5 +37,5 @@ export function processStyleProps<Props extends { className?: unknown }>(
 
 type AnyProps = Record<string, unknown>;
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
+// oxlint-disable-next-line no-explicit-any
 type AnyRecipe = RuntimeFn<any>;

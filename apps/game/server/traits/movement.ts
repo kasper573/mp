@@ -1,5 +1,5 @@
 import type { Vector } from "@mp/math";
-import { type CardinalDirection, type Path } from "@mp/math";
+import type { CardinalDirection, Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraphNodeId } from "@mp/path-finding";
@@ -44,7 +44,7 @@ export function movementBehavior(
 ): TickEventHandler {
   const nextPathFinds = new Map<ActorId, TimeSpan>();
   const stalePathInterval = TimeSpan.fromSeconds(1 / 3);
-  const tileNodeWeights: Map<VectorGraphNodeId, number> = new Map();
+  const tileNodeWeights = new Map<VectorGraphNodeId, number>();
 
   for (const area of areas.values()) {
     area.graph.bindNodeWeightFn((node) => tileNodeWeights.get(node.id) ?? 0);

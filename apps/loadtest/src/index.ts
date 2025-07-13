@@ -1,5 +1,6 @@
+// oxlint-disable no-await-in-loop
 import { createPinoLogger } from "@mp/logger";
-import { type ServerRpcRouter } from "@mp/server";
+import type { ServerRpcRouter } from "@mp/server";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";

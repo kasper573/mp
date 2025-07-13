@@ -1,4 +1,4 @@
-import { ColorMatrixFilter } from "@mp/graphics";
+import { ColorMatrixFilter } from "pixi.js";
 
 /**
  * Creates a ColorMatrixFilter that tints toward a given color.
@@ -17,7 +17,7 @@ export function createTintFilter(
 
 export function createTintFilterMatrix(
   color: number,
-  strength: number = 0.25,
+  strength = 0.25,
 ): ColorMatrixFilter["matrix"] {
   const r = ((color >> 16) & 0xff) / 255;
   const g = ((color >> 8) & 0xff) / 255;

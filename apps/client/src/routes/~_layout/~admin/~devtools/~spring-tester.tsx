@@ -25,7 +25,7 @@ function RouteComponent() {
         mass: mass.value,
         precision: precision.value,
       })),
-    [],
+    [target, stiffness, damping, mass, precision],
   );
 
   useEffect(() => {

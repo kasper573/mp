@@ -2,7 +2,7 @@ import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
-import preact from "@preact/preset-vite";
+import { preact } from "@preact/preset-vite";
 
 import type { Plugin } from "vite";
 
@@ -55,7 +55,8 @@ function disallowExternalizingPlugin(): Plugin {
         if (message.includes("has been externalized")) {
           throw new Error(`Externalizing is not allowed: ${message}`);
         }
-        // eslint-disable-next-line no-console
+
+        // oxlint-disable-next-line no-console
         console.warn(message); // Preserve other warnings
       };
     },

@@ -1,4 +1,3 @@
-/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 import { describe, it, expect } from "vitest";
 import type { RpcCall, RpcCallId } from "../src";
 import { RpcBuilder, createRpcInvoker, RpcInvokerError } from "../src";
@@ -37,7 +36,9 @@ describe("builder and invoker", () => {
   });
 
   it("passes the context to the handler", async () => {
-    type Ctx = { value: number };
+    interface Ctx {
+      value: number;
+    }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure
@@ -129,7 +130,9 @@ describe("builder and invoker", () => {
   });
 
   it("allows middleware to provide a custom context to the handler", async () => {
-    type Ctx = { userId: number };
+    interface Ctx {
+      userId: number;
+    }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure
@@ -150,7 +153,9 @@ describe("builder and invoker", () => {
   });
 
   it("can use two middlewares and pass combined contexts", async () => {
-    type Ctx = { userId: number };
+    interface Ctx {
+      userId: number;
+    }
     const rpc = new RpcBuilder<Ctx>().build();
 
     const node = rpc.procedure

@@ -5,7 +5,7 @@ import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
-import { miscDebugSettingsSignal } from "../signals/misc-debug-ui-settings";
+import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 
 export function MiscDebugUi() {
   const rpc = useRpc();
@@ -39,17 +39,13 @@ export function MiscDebugUi() {
       <div>
         Use client side patch optimizer:{" "}
         <Checkbox
-          signal={
-            new PropertySignal(miscDebugSettingsSignal, "usePatchOptimizer")
-          }
+          signal={new PropertySignal(miscDebugSettings, "usePatchOptimizer")}
         />
       </div>
       <div>
         Use client side game state interpolator:{" "}
         <Checkbox
-          signal={
-            new PropertySignal(miscDebugSettingsSignal, "useInterpolator")
-          }
+          signal={new PropertySignal(miscDebugSettings, "useInterpolator")}
         />
       </div>
     </>

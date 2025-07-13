@@ -65,7 +65,7 @@ export function createCharacterService(
           userId,
           xp: 0,
           name,
-          ...characterAppearance(userId),
+          ...characterAppearance(),
         };
 
         const insertResult = await db
@@ -91,6 +91,6 @@ export function createCharacterService(
   };
 }
 
-function characterAppearance(userId: UserId): Omit<AppearanceTrait, "name"> {
+function characterAppearance(): Omit<AppearanceTrait, "name"> {
   return { color: undefined, modelId: "adventurer" as ActorModelId };
 }

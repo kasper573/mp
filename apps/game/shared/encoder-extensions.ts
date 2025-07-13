@@ -2,9 +2,9 @@ import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
 import { SyncMap } from "@mp/sync";
-// eslint-disable-next-line boundaries/element-types
+
 import { Character } from "../server/character/types";
-// eslint-disable-next-line boundaries/element-types
+
 import { NpcInstance } from "../server/npc/types";
 
 export function registerEncoderExtensions(): void {

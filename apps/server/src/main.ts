@@ -145,7 +145,7 @@ wss.on("connection", (socket) => {
   );
 });
 
-const rpcTransceivers = setupRpcTransceivers({
+setupRpcTransceivers({
   wss,
   logger,
   router: serverRpcRouter,

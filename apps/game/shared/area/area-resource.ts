@@ -3,7 +3,7 @@ import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
-import { type TiledResource } from "./tiled-resource";
+import type { TiledResource } from "./tiled-resource";
 import { graphFromTiled } from "./graph-from-tiled";
 import { TiledFixture } from "./tiled-fixture";
 import { hitTestTiledObject } from "./hit-test-tiled-object";

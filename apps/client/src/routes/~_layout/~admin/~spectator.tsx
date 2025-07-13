@@ -1,12 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
-import { useContext, useEffect } from "preact/hooks";
+import { useContext, useEffect, useMemo } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { SocketContext } from "../../../integrations/rpc";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import { miscDebugSettingsSignal } from "../../../signals/misc-debug-ui-settings";
+import { miscDebugSettings } from "../../../signals/misc-debug-ui-settings";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -15,10 +15,11 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const stateClient = new GameStateClient({
-    socket: useContext(SocketContext),
-    settings: miscDebugSettingsSignal.value,
-  });
+  const socket = useContext(SocketContext);
+  const stateClient = useMemo(
+    () => new GameStateClient({ socket, settings: miscDebugSettings.value }),
+    [socket],
+  );
 
   useEffect(() => stateClient.start(), [stateClient]);
 

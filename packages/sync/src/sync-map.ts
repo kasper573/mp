@@ -35,7 +35,6 @@ export class SyncMap<K, V> implements Map<K, V> {
     callbackfn: (value: V, key: K, map: Map<K, V>) => void,
     thisArg?: ThisArg,
   ): void {
-    // eslint-disable-next-line unicorn/no-array-for-each
     this.#signal.value.forEach(callbackfn, thisArg);
   }
   get(key: K): V | undefined {

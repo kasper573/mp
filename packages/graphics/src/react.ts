@@ -43,6 +43,7 @@ export function useGraphics<Options extends UseGraphicsOptions>(
         app.destroy({ removeView: false }, { children: true }),
       );
     };
+    // oxlint-disable-next-line exhaustive-deps A bit hacky but it works. Trust my judgement.
   }, [container, ...Object.values(options)]);
 
   function onInitialized(app: Application) {

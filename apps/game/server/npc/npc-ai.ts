@@ -6,7 +6,7 @@ import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor";
 import type { GameStateServer } from "../game-state-server";
 import type { NpcInstance, NpcInstanceId } from "./types";
-import { type Task, type TaskInput } from "./ai-tasks/task";
+import type { Task, TaskInput } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
 import { createIdleTask } from "./ai-tasks/idle";

@@ -33,7 +33,7 @@ function Root() {
         */}
       <ErrorFallbackContext.Provider
         value={{
-          // eslint-disable-next-line no-console
+          // oxlint-disable-next-line no-console
           handleError: console.error,
         }}
       >

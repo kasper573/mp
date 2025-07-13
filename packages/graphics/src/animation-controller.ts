@@ -6,9 +6,9 @@ import {
   clamp,
 } from "@mp/math";
 import { TimeSpan } from "@mp/time";
-import type { SpriteOptions, Spritesheet, Texture } from "@mp/graphics";
-import { Ticker } from "@mp/graphics";
-import { Sprite } from "@mp/graphics";
+import type { SpriteOptions, Spritesheet, Texture } from "pixi.js";
+import { Ticker } from "pixi.js";
+import { Sprite } from "pixi.js";
 
 /**
  * Selects a texture from a set of spritesheets based on a current animation name and cardinal direction.
@@ -128,7 +128,7 @@ export class AnimationController<AnimationName extends string> extends Sprite {
     }
   }
 
-  async playToEndAndStop(name: AnimationName) {
+  playToEndAndStop(name: AnimationName) {
     delete this.fixed;
     delete this.smooth;
 

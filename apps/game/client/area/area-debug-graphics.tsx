@@ -1,8 +1,8 @@
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
-import { type VectorGraph } from "@mp/path-finding";
+import type { VectorGraph } from "@mp/path-finding";
 import { Container, Graphics, ReactiveCollection } from "@mp/graphics";
-import { type Tile, type Pixel } from "@mp/std";
+import type { Tile, Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { computed, type ReadonlySignal } from "@mp/state";
 import type { NpcInstance } from "../../server";

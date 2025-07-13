@@ -1,6 +1,6 @@
 import { effect, type ReadonlySignal } from "@mp/state";
-import type { DestroyOptions } from "@mp/graphics";
-import { Container } from "@mp/graphics";
+import type { DestroyOptions } from "pixi.js";
+import { Container } from "pixi.js";
 
 export class ReactiveCollection<Item> extends Container {
   private unsubscribe: () => void;

@@ -6,7 +6,7 @@ import type { TimeSpan } from "@mp/time";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
-import { type AppearanceTrait } from "../traits/appearance";
+import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import * as patchOptimizers from "../patch-optimizers";
 import type { AreaId } from "../../shared/area/area-id";

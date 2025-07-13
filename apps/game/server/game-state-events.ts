@@ -1,5 +1,6 @@
 import type { ActorId } from "./actor";
 
+// oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameStateEvents = {
   "combat.attack": {
     actorId: ActorId;

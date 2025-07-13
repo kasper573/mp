@@ -42,12 +42,8 @@ export class SyncEventBus<EventMap extends SyncEventMap> {
   }
 }
 
-export interface EventAccessFn<EventMap extends SyncEventMap> {
-  /**
-   * Peek into the current event list and select all the events of the given type.
-   * Useful if you want to react to events that have occurred since the last flush without performing a flush.
-   */
-  <EventName extends keyof EventMap>(
-    name: EventName,
-  ): Array<EventMap[EventName]>;
-}
+export type EventAccessFn<EventMap extends SyncEventMap> = <
+  EventName extends keyof EventMap,
+>(
+  name: EventName,
+) => Array<EventMap[EventName]>;

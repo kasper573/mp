@@ -1,6 +1,6 @@
 import { VectorGraph } from "@mp/path-finding";
 import type { Tile } from "@mp/std";
-import { type TiledResource } from "./tiled-resource";
+import type { TiledResource } from "./tiled-resource";
 
 export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   const graph = new VectorGraph<Tile>();

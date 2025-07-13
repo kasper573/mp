@@ -9,7 +9,7 @@ import { SyncMap } from "./sync-map";
 
 import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn } from "./sync-event";
-import { type SyncEvent, type SyncEventMap } from "./sync-event";
+import type { SyncEvent, SyncEventMap } from "./sync-event";
 
 export class SyncServer<
   State extends PatchableState,
@@ -17,7 +17,7 @@ export class SyncServer<
 > {
   private events: ServerSyncEvent<State>[] = [];
   private hasBeenGivenFullState = new Set<ClientId>();
-  private visibilities: Map<ClientId, ClientVisibility<State>> = new Map();
+  private visibilities = new Map<ClientId, ClientVisibility<State>>();
 
   constructor(private options: SyncServerOptions<State>) {}
 
@@ -77,7 +77,7 @@ export class SyncServer<
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(([type, [entityName, entityId]]) => {
+        ...serverPatch.filter(([_, [entityName, entityId]]) => {
           return entityId === undefined
             ? false
             : nextVisibility[entityName].has(entityId as never);
@@ -229,12 +229,12 @@ export type inferEntityId<Entities> =
   Entities extends PatchableEntities<infer Id, infer _> ? Id : never;
 
 export type inferEntityValue<Entities> =
-  Entities extends PatchableEntities<infer Id, infer Entity> ? Entity : never;
+  Entities extends PatchableEntities<infer _, infer Entity> ? Entity : never;
 
-export type PatchableState = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface PatchableState {
+  // oxlint-disable-next-line no-explicit-any
   [entityName: string]: PatchableEntities<PatchableEntityId, any>;
-};
+}
 
 export type ClientId = Registry extends { clientId: infer T } ? T : string;
 

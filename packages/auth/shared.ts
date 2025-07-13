@@ -12,7 +12,6 @@ export interface UserIdentity {
 }
 
 export interface OurJwtPayload extends JWTPayload {
-  // eslint-disable-next-line @typescript-eslint/naming-convention
   realm_access: {
     roles: string[];
   };

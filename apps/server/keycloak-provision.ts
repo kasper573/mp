@@ -1,3 +1,4 @@
+// oxlint-disable no-await-in-loop
 import { KeycloakAdminClient } from "@mp/keycloak-provision";
 import { createConsoleLogger } from "@mp/logger";
 import { assert } from "@mp/std";

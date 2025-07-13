@@ -1,0 +1,106 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "import", "node", "promise", "typescript", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "perf": "error",
+    "restriction": "error"
+  },
+  "rules": {
+    "no-unused-vars": "error",
+    "eqeqeq": "error",
+    "max-depth": "error",
+    "max-nested-callbacks": "error",
+    "no-array-constructor": "error",
+    "no-case-declarations": "error",
+    "no-constructor-return": "error",
+    "no-else-return": "error",
+    "no-fallthrough": "error",
+    "no-inner-declarations": "error",
+    "no-lonely-if": "error",
+    "no-new-wrappers": "error",
+    "no-object-constructor": "error",
+    "no-prototype-builtins": "error",
+    "no-redeclare": "error",
+    "no-self-compare": "error",
+    "no-throw-literal": "error",
+    "radix": "error",
+    "require-await": "error",
+    "symbol-description": "error",
+    "checked-requires-onchange-or-readonly": "error",
+    "jsx-no-useless-fragment": "error",
+    "rules-of-hooks": "error",
+    "ban-ts-comment": [
+      "error",
+      {
+        "ts-expect-error": true,
+        "ts-ignore": true,
+        "ts-nocheck": true,
+        "ts-check": true
+      }
+    ],
+    "no-unsafe-function-type": "error",
+    "prefer-enum-initializers": "error",
+    "prefer-ts-expect-error": "error",
+    "adjacent-overload-signatures": "error",
+    "ban-tslint-comment": "error",
+    "consistent-generic-constructors": "error",
+    "consistent-type-definitions": "error",
+    "consistent-type-imports": "error",
+    "no-inferrable-types": "error",
+    "prefer-for-of": "error",
+    "prefer-function-type": "error",
+    "prefer-namespace-keyword": "error",
+    "self-closing-comp": "error",
+    "jsx-boolean-value": "error",
+    "jsx-curly-brace-presence": "error",
+    "no-danger": "error",
+    "react/jsx-filename-extension": [
+      "error",
+      { "extensions": [".jsx", ".tsx"] }
+    ],
+
+    "no-promise-in-callback": "off",
+    "namespace": "off",
+    "no-bitwise": "off",
+    "no-dynamic-delete": "off",
+    "no-empty-function": "off",
+    "no-plusplus": "off",
+    "no-empty-object-type": "off",
+    "explicit-function-return-type": "off",
+    "no-optional-chaining": "off",
+    "no-void": "off",
+    "no-async-await": "off",
+    "no-rest-spread-properties": "off",
+    "no-console": "error",
+    "no-undefined": "off",
+    "default-case": "off",
+    "no-barrel-file": "off",
+    "no-default-export": "off",
+    "no-unassigned-import": "off",
+    "no-alert": "off",
+    "catch-or-return": "off",
+    "react/react-in-jsx-scope": "off",
+    "react/button-has-type": "off",
+    "react/no-array-index-key": "off"
+  },
+  "overrides": [
+    // Tests don't require the same strictness as production code due to them testing themselves.
+    // If mistakes break something, the tests will catch it.
+    {
+      "files": ["**/*.test.ts"],
+      "rules": {
+        "ban-ts-comment": "off",
+        "no-non-null-assertion": "off"
+      }
+    },
+    // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
+    {
+      "files": ["**/packages/graphics/**"],
+      "rules": {
+        "extensions": "off"
+      }
+    }
+  ]
+}

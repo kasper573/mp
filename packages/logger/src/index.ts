@@ -1,5 +1,4 @@
-/* eslint-disable no-console */
-
+// oxlint-disable no-console
 import pino, { type Logger as PinoLogger } from "pino";
 
 export function createPinoLogger(pretty = true): Logger {

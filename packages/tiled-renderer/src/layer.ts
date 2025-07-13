@@ -72,7 +72,7 @@ export class LayerViewFactory {
     return container;
   }
 
-  private createImageLayerView(layer: ImageLayer): LayerView {
+  private createImageLayerView(_: ImageLayer): LayerView {
     throw new Error("Not implemented");
   }
 

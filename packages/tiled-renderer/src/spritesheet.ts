@@ -137,7 +137,9 @@ export interface TiledTextureLookup {
   animation: (gid: GlobalTileId) => AnimatedSpriteFrames;
 }
 
-export type TiledSpritesheetRecord = { [image: string]: TiledSpritesheet };
+export interface TiledSpritesheetRecord {
+  [image: string]: TiledSpritesheet;
+}
 
 export type TiledSpritesheet = Spritesheet<TiledSpritesheetData>;
 

@@ -21,12 +21,11 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [htmlReporter, ["github"]] : [htmlReporter],
   use: {
-    // eslint-disable-next-line @typescript-eslint/naming-convention
     baseURL: `https://${process.env.MP_CLIENT_DOMAIN}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",
-    // eslint-disable-next-line @typescript-eslint/naming-convention
+
     ignoreHTTPSErrors: true,
   },
 

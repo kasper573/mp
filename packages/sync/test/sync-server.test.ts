@@ -4,10 +4,12 @@ import { SyncServer } from "../src/sync-server";
 import { SyncMap } from "../src/sync-map";
 import { collect, SyncEntity } from "../src/sync-entity";
 
+// oxlint-disable-next-line consistent-type-definitions
 type TestState = {
   items: SyncMap<string, number>;
 };
 
+// oxlint-disable-next-line consistent-type-definitions
 type TestEventMap = {
   message: string;
 };
@@ -83,6 +85,7 @@ it("can collect patches", () => {
     }
   }
 
+  // oxlint-disable-next-line consistent-type-definitions
   type TestState = {
     persons: SyncMap<Person["id"], Person>;
   };

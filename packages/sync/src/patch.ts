@@ -21,9 +21,9 @@ export type PatchPath =
 export type Operation = SetOperation | UpdateOperation | RemoveOperation;
 
 export enum PatchType {
-  Set,
-  Update,
-  Remove,
+  Set = 1,
+  Update = 2,
+  Remove = 3,
 }
 
 export type SetOperation = [PatchType.Set, path: PatchPath, value: unknown];

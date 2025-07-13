@@ -27,7 +27,7 @@ export class RateLimiter {
    * Enable or disable all rate limiting.
    * @internal This is a development feature and should not be used in production.
    */
-  static enabled: boolean = true;
+  static enabled = true;
 }
 
 export type RateLimiterOk = "skipped-due-to-disabled" | "accepted";

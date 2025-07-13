@@ -4,7 +4,7 @@ import { collect, SyncEntity } from "@mp/sync";
 import type { TimeSpan } from "@mp/time";
 import type { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
-import { type AppearanceTrait } from "../traits/appearance";
+import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../../shared/area/area-id";
 import * as patchOptimizers from "../patch-optimizers";

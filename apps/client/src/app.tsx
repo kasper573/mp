@@ -35,7 +35,7 @@ import { createFaroBindings, createFaroClient } from "./integrations/faro";
 registerEncoderExtensions();
 
 export default function App() {
-  const systems = useMemo(createSystems, []);
+  const systems = useMemo(() => createSystems(), []);
   useEffect(() => systems.initialize(), [systems]);
   return (
     <QueryClientProvider client={systems.query}>

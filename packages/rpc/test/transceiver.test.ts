@@ -33,7 +33,7 @@ describe("RpcTransceiver", () => {
     it("sends the call and resolves with output when requiresResponse returns true", async () => {
       const promise = transceiver.call(["method"], { foo: "bar" });
       expect(sendCall).toHaveBeenCalledOnce();
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+
       const [[path, input, id]] = sendCall.mock.calls[0];
       expect(path).toEqual(["method"]);
       expect(input).toEqual({ foo: "bar" });

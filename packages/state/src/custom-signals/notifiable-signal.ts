@@ -4,7 +4,7 @@ export class NotifiableSignal<T> extends Signal<T> {
   private epoch = signal(0);
 
   override get value(): T {
-    // eslint-disable-next-line @typescript-eslint/no-unused-expressions
+    // oxlint-disable-next-line no-unused-expressions
     this.epoch.value; // Add epoch to dependency to ensure signal updates when notified
     return super.value;
   }

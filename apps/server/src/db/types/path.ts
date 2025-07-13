@@ -1,6 +1,6 @@
 import { type PathLike, type Path, Vector } from "@mp/math";
 import type { Table } from "drizzle-orm";
-import { type ColumnBaseConfig } from "drizzle-orm";
+import type { ColumnBaseConfig } from "drizzle-orm";
 import { PgJsonb, PgJsonbBuilder } from "drizzle-orm/pg-core";
 
 /**
