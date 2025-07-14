@@ -12,10 +12,10 @@
   },
   "scripts": {
     "build": "tsx esbuild.ts",
-    "dev": "pnpm devenv tsx esbuild.ts --dev",
+    "dev": "pnpm devenv tsx src/main.ts",
     "db": "drizzle-kit",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
-    "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 node dist/provision.js"
+    "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/keycloak-provision.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
