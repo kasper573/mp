@@ -47,7 +47,7 @@ export function useGraphics<Options extends UseGraphicsOptions>(
       );
     };
     // oxlint-disable-next-line exhaustive-deps A bit hacky but it works. Trust my judgement.
-  }, [container, ...Object.values(options)]);
+  }, [container, configureApp, ...Object.values(options)]);
 
   function onInitialized(app: Application) {
     // It seems that canvas need to be absolute positioned for resizing to work properly.
