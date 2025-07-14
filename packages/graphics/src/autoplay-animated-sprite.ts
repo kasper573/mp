@@ -1,6 +1,5 @@
 import { clamp } from "@mp/math";
 import type { FrameObject, SpriteOptions } from "pixi.js";
-import { Ticker } from "pixi.js";
 import { Sprite } from "pixi.js";
 
 export interface AutoplayAnimatedSpriteOptions
@@ -13,8 +12,6 @@ export interface AutoplayAnimatedSpriteOptions
  * always plays and loops without any ability to pause or stop.
  */
 export class AutoplayAnimatedSprite extends Sprite {
-  private currentTimeMs = 0;
-  private previousFrame = 0;
   private strategy: FrameStrategy;
 
   constructor(private options: AutoplayAnimatedSpriteOptions) {
@@ -24,23 +21,15 @@ export class AutoplayAnimatedSprite extends Sprite {
   }
 
   #onRender = () => {
-    this.currentTimeMs += Ticker.shared.deltaMS;
-
-    const currentFrame = this.strategy.currentFrame(this.currentTimeMs);
-    if (currentFrame !== this.previousFrame) {
-      this.texture = this.options.frames[currentFrame].texture;
-      this.previousFrame = currentFrame;
-    }
-
-    if (this.currentTimeMs >= this.strategy.endTimeMs) {
-      this.currentTimeMs = 0;
-    }
+    const currentTime = performance.now() % this.strategy.durationMs;
+    const currentFrame = this.strategy.currentFrame(currentTime);
+    this.texture = this.options.frames[currentFrame].texture;
   };
 }
 
 interface FrameStrategy {
   currentFrame: (currentTimeMs: number) => number;
-  readonly endTimeMs: number;
+  readonly durationMs: number;
 }
 
 function determineFrameStrategy(frames: FrameObject[]): FrameStrategy {
@@ -58,17 +47,17 @@ function evenDistributionStrategy(
   frameCount: number,
   frameTimeMs: number,
 ): FrameStrategy {
-  const endTimeMs = frameTimeMs * frameCount;
+  const durationMs = frameTimeMs * frameCount;
   return {
     currentFrame(currentTimeMs) {
       return clamp(Math.floor(currentTimeMs / frameTimeMs), 0, frameCount - 1);
     },
-    endTimeMs,
+    durationMs,
   };
 }
 
 function unevenDistributionStrategy(frames: FrameObject[]): FrameStrategy {
-  const endTimeMs = frames.reduce((sum, frame) => sum + frame.time, 0);
+  const durationMs = frames.reduce((sum, frame) => sum + frame.time, 0);
   return {
     currentFrame(currentTimeMs) {
       let totalMS = 0;
@@ -80,6 +69,6 @@ function unevenDistributionStrategy(frames: FrameObject[]): FrameStrategy {
       }
       return frames.length - 1;
     },
-    endTimeMs,
+    durationMs,
   };
 }
