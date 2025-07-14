@@ -124,11 +124,9 @@ interface ActorTestSettings {
 class SpecificActorAngle extends Container {
   private sprite: ActorSprite;
   private text: Text;
-  private frameNumberText: Text;
 
   constructor(
     private options: () => ActorTestSettings & {
-      showFrameNumber?: boolean;
       angle: number;
       name?: string;
       pos: Vector<number>;
@@ -141,30 +139,16 @@ class SpecificActorAngle extends Container {
 
     this.text = new Text({ style: { fill: "white", fontSize: "14px" } });
     this.text.scale.set(0.5);
-    this.frameNumberText = new Text({
-      style: { fill: "white", fontSize: "14px" },
-    });
-    this.frameNumberText.scale.set(0.5);
-    this.frameNumberText.position.set(-10, 16);
 
     this.addChild(this.sprite);
     this.addChild(this.text);
-    this.addChild(this.frameNumberText);
     this.scale.set(2);
 
     this.onRender = this.#onRender;
   }
 
   #onRender = () => {
-    const {
-      modelId,
-      angle,
-      name,
-      pos,
-      anchor,
-      showFrameNumber,
-      animationName,
-    } = this.options();
+    const { modelId, angle, name, pos, anchor, animationName } = this.options();
 
     const spritesheets = ioc
       .access(ctxActorSpritesheetLookup)
@@ -185,7 +169,6 @@ class SpecificActorAngle extends Container {
     }
     this.text.position.set(64, 32);
     this.position.set(pos.x, pos.y);
-    this.frameNumberText.visible = showFrameNumber ?? false;
     this.sprite.anchor.set(anchor?.x ?? 0, anchor?.y ?? 0);
   };
 }
@@ -202,7 +185,6 @@ class LookAtPointerActor extends SpecificActorAngle {
         angle,
         pos: center,
         anchor: new Vector(0.5, 0.5),
-        showFrameNumber: true,
         animationName: options().animationName,
       };
     });
