@@ -1,5 +1,4 @@
 export * from "./actor/actor";
-export * from "./actor/actor-sprite-tester";
 export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
 export * from "./npc/npc-ai";
