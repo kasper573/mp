@@ -12,3 +12,4 @@ export * from "./clients/player-client";
 export * from "./rpc/encoder-extensions";
 export * from "./rpc/game-rpc-client";
 export * from "./client-view-distance-settings";
+export * from "./particle-tester";
