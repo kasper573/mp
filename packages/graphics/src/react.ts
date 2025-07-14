@@ -19,7 +19,8 @@ export function useGraphics<Options extends UseGraphicsOptions>(
   configureApp: (
     app: Application,
     options: Options,
-  ) => undefined | CleanupFn | CleanupFn[],
+    container: HTMLDivElement,
+  ) => void | CleanupFn | CleanupFn[],
 ) {
   useEffect(() => {
     if (!container) {
@@ -29,7 +30,9 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(configureApp(app, options));
+    const cleanupFns = normalizeCleanupFns(
+      configureApp(app, options, container),
+    );
     const initPromise = app
       .init({ ...options, canvas, resizeTo: container })
       .then(() => onInitialized(app));
@@ -63,9 +66,9 @@ export function useGraphics<Options extends UseGraphicsOptions>(
 type CleanupFn = () => void;
 
 function normalizeCleanupFns(
-  cleanup: undefined | CleanupFn | CleanupFn[],
+  cleanup: void | CleanupFn | CleanupFn[],
 ): CleanupFn[] {
-  if (cleanup === undefined) {
+  if (!cleanup) {
     return [];
   }
   return Array.isArray(cleanup) ? cleanup : [cleanup];
