@@ -12,6 +12,8 @@ This package or organized by domain and allow you to mix client and server side 
 
 However, the package itself still exports two buckets: one for the client and one for the server. This allows for better DX in that the server doesn't restart in development when you modify client-only code, and also lets us finetune what code gets exposed to either the client or server, either for security or technical concerns (technical being ie. not exposing vanilla-extract css to the server, allowing it to not have to be able to parse those files).
 
+So in short: organize by domain, but re-export the relevant code in [package.client.ts](src/package.client.ts) and [package.server.ts](src/package.server.ts).
+
 ## Abstract persistence
 
 All database queries and mutations should be abstracted away using a service pattern. The domains in the game package are responsible for defining service interfaces and an [injection context](../../packages/ioc) for each, while the implementation code and service instances will be defined in the [server](../server/) app and passed down to the game via context.
