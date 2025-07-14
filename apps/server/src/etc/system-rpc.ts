@@ -1,4 +1,4 @@
-import { roles, rpc, systemRoles } from "@mp/game";
+import { roles, rpc, systemRoles } from "@mp/game/server";
 import type { Ticker } from "@mp/time";
 import { InjectionContext } from "@mp/ioc";
 import { SyncEntity } from "@mp/sync";

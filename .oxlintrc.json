@@ -110,8 +110,8 @@
           {
             "patterns": [
               {
-                "regex": "/package$",
-                "message": "Don't import from package.ts. It's the definition file for the game package and nothing should depend on it."
+                "regex": "/package",
+                "message": "Don't import from package.ts. It's a definition file for the game package and nothing should depend on it."
               }
             ]
           }

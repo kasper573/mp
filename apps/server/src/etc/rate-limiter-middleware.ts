@@ -1,4 +1,4 @@
-import { ctxClientId, rpc } from "@mp/game";
+import { ctxClientId, rpc } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 
 const globalRequestLimit = new RateLimiter({ points: 20, duration: 1 });

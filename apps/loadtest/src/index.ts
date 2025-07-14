@@ -5,7 +5,7 @@ import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
-import { loadAreaResource } from "@mp/game";
+import { loadAreaResource } from "@mp/game/client";
 import { createReactRpcInvoker } from "@mp/rpc/react";
 import { readCliOptions } from "./cli";
 
