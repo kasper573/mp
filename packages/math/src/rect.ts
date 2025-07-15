@@ -18,7 +18,9 @@ export class Rect<T extends number> implements RectLike<T> {
   constructor(
     public readonly position: Vector<T>,
     public readonly size: Vector<T>,
-  ) {}
+  ) {
+    Object.freeze(this);
+  }
 
   contains(v: Vector<T>): boolean {
     return (
