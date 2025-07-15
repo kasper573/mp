@@ -96,7 +96,8 @@ export class AreaDebugGraphics extends Container {
   };
 }
 
-class DebugTiledGraph extends Graphics {
+class DebugTiledGraph extends Container {
+  private gfx = new Graphics();
   private cleanups: Array<() => void> = [];
   private walkableScoreText = new Text({
     style: {
@@ -116,6 +117,7 @@ class DebugTiledGraph extends Graphics {
   ) {
     super();
 
+    this.addChild(this.gfx);
     this.walkableChecker = new WalkableChecker(area.tiled);
     this.addChild(this.walkableScoreText);
 
@@ -133,25 +135,25 @@ class DebugTiledGraph extends Graphics {
   }
 
   private redrawGraph = () => {
-    this.clear();
+    this.gfx.clear();
     const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
     const { worldPosition } = engine.pointer;
 
     if (this.visibleGraphType() === "all") {
       for (const node of graph.getNodes()) {
-        drawGraphNode(this, tiled, graph, node);
+        drawGraphNode(this.gfx, tiled, graph, node);
       }
     } else if (this.visibleGraphType() === "tile") {
       const tileNode = graph.getNearestNode(
         tiled.worldCoordToTile(worldPosition.value),
       );
       if (tileNode) {
-        drawGraphNode(this, tiled, graph, tileNode);
+        drawGraphNode(this.gfx, tiled, graph, tileNode);
       }
     } else if (this.visibleGraphType() === "coord") {
       drawStar(
-        this,
+        this.gfx,
         worldPosition.value,
         graph
           .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
