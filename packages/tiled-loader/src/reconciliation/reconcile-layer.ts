@@ -28,7 +28,7 @@ export async function reconcileLayer(
       break;
     case "objectgroup":
       for (const [i, object] of layer.objects.entries()) {
-        layer.objects[i] = reconcileObject(object, map.tileheight);
+        layer.objects[i] = reconcileObject(object);
       }
       break;
     case "group":
