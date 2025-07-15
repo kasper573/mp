@@ -1,3 +1,4 @@
+import type { Rect } from "@mp/math";
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { VectorGraph } from "@mp/path-finding";
@@ -140,25 +141,39 @@ class DebugTiledGraph extends Container {
     const { tiled, graph } = this.area;
     const { worldPosition } = engine.pointer;
 
-    if (this.visibleGraphType() === "all") {
-      for (const node of graph.getNodes()) {
-        drawGraphNode(this.gfx, tiled, graph, node);
+    switch (this.visibleGraphType()) {
+      case "all":
+        for (const node of graph.getNodes()) {
+          drawGraphNode(this.gfx, tiled, graph, node);
+        }
+        break;
+      case "tile": {
+        const tileNode = graph.getNearestNode(
+          tiled.worldCoordToTile(worldPosition.value),
+        );
+        if (tileNode) {
+          drawGraphNode(this.gfx, tiled, graph, tileNode);
+        }
+        break;
       }
-    } else if (this.visibleGraphType() === "tile") {
-      const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(worldPosition.value),
-      );
-      if (tileNode) {
-        drawGraphNode(this.gfx, tiled, graph, tileNode);
+      case "coord":
+        drawStar(
+          this.gfx,
+          worldPosition.value,
+          graph
+            .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
+            .map((node) => tiled.tileCoordToWorld(node.data.vector)),
+        );
+        break;
+      case "obscured": {
+        for (const rect of this.walkableChecker.obscuringRects) {
+          drawRect(
+            this.gfx,
+            rect.scale(tiled.tileSize),
+            "rgba(255, 0, 0, 0.5)",
+          );
+        }
       }
-    } else if (this.visibleGraphType() === "coord") {
-      drawStar(
-        this.gfx,
-        worldPosition.value,
-        graph
-          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
-          .map((node) => tiled.tileCoordToWorld(node.data.vector)),
-      );
     }
   };
 
@@ -293,6 +308,11 @@ function drawStar(
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
+}
+
+function drawRect(ctx: Graphics, rect: Rect<Pixel>, color: string) {
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fill({ color });
 }
 
 function hexColorFromInt(color: number): string {

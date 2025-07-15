@@ -52,5 +52,11 @@ export interface AreaDebugSettings {
   showWalkableScore: boolean;
 }
 
-export const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
+export const visibleGraphTypes = [
+  "none",
+  "all",
+  "tile",
+  "coord",
+  "obscured",
+] as const;
 export type VisibleGraphType = (typeof visibleGraphTypes)[number];
