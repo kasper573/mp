@@ -1,12 +1,17 @@
-import type { TileTransform } from "@mp/tiled-loader";
-import { createTileMatrix } from "@mp/tiled-loader";
+import type { MatrixData } from "@mp/math";
 
-export function createTileMeshData(tiles: TileTransform[]) {
+export interface TileMeshInput {
+  width: number;
+  height: number;
+  transform: MatrixData;
+}
+
+export function createTileMeshData(tiles: TileMeshInput[]) {
   const N = tiles.length;
 
   const vertices = new Float32Array(N * 4 * 2);
   const uvs = new Float32Array(N * 4 * 2);
-  const indices = new Uint32Array(N * 6); // Uint16 is sufficient unless you truly exceed 65535 verts
+  const indices = new Uint32Array(N * 6);
 
   // standard [0,0],[1,0],[1,1],[0,1]
   const uvPattern = [0, 0, 1, 0, 1, 1, 0, 1];
@@ -17,7 +22,7 @@ export function createTileMeshData(tiles: TileTransform[]) {
     //  • rotates by (rotation + optional 90° if diagonal)
     //  • then scales by (±1, ±1) to do the horizontal/vertical flips
     const tile = tiles[i];
-    const [a, b, c, d, tx, ty] = createTileMatrix(tile);
+    const [a, b, c, d, tx, ty] = tile.transform;
 
     // now lay out our quad at origin [0,0]→[width,height], *then*
     // transform with our 2×3 matrix (a,b,c,d,tx,ty)

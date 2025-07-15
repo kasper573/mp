@@ -1,11 +1,12 @@
 import type { Texture, Mesh, FrameObject } from "@mp/graphics";
 import { Container, MeshSimple } from "@mp/graphics";
-import type { GlobalTileId, TileTransform } from "@mp/tiled-loader";
+import type { GlobalTileId } from "@mp/tiled-loader";
 import { localToGlobalId, type TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
 import type { Branded } from "../../std/src/types";
 import { AnimatedMesh } from "./animated-mesh";
 import { assert, upsertMap } from "@mp/std";
+import type { TileMeshInput } from "./tile-mesh-data";
 import { createTileMeshData } from "./tile-mesh-data";
 
 /**
@@ -20,24 +21,15 @@ export function createTileRenderer(
   lookupTexture: TiledTextureLookup,
 ): Container {
   // Group tiles by their texture or animation
-  const staticGroups = new Map<GlobalTileId, TileTransform[]>();
-  const animatedGroups = new Map<AnimationKey, TileTransform[]>();
+  const staticGroups = new Map<GlobalTileId, TileMeshInput[]>();
+  const animatedGroups = new Map<AnimationKey, TileMeshInput[]>();
   for (const layerTile of tiles) {
-    const renderData: TileTransform = {
-      x: layerTile.x * layerTile.width,
-      y: layerTile.y * layerTile.height,
-      width: layerTile.width,
-      height: layerTile.height,
-      flags: layerTile.flags,
-      originX: 0.5,
-      originY: 0.5,
-      rotation: 0,
-    };
+    const meshInput = createTileMeshInput(layerTile);
 
     if (layerTile.tile.animation) {
-      upsertMap(animatedGroups, uniqueAnimationKey(layerTile), renderData);
+      upsertMap(animatedGroups, uniqueAnimationKey(layerTile), meshInput);
     } else {
-      upsertMap(staticGroups, layerTile.id, renderData);
+      upsertMap(staticGroups, layerTile.id, meshInput);
     }
   }
 
@@ -55,7 +47,7 @@ export function createTileRenderer(
 }
 
 export function* renderStaticTiles(
-  staticGroups: Map<GlobalTileId, TileTransform[]>,
+  staticGroups: Map<GlobalTileId, TileMeshInput[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
   for (const [textureTileId, renderData] of staticGroups) {
@@ -65,7 +57,7 @@ export function* renderStaticTiles(
 }
 
 export function* renderAnimatedTiles(
-  animatedGroups: Map<AnimationKey, TileTransform[]>,
+  animatedGroups: Map<AnimationKey, TileMeshInput[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
   for (const [animationId, renderData] of animatedGroups) {
@@ -80,14 +72,14 @@ export function* renderAnimatedTiles(
 
 function createStaticTileRenderer(
   texture: Texture,
-  tiles: TileTransform[],
+  tiles: TileMeshInput[],
 ): Mesh {
   return new MeshSimple({ texture, ...createTileMeshData(tiles) });
 }
 
 function createAnimatedTileRenderer(
   frames: FrameObject[],
-  tiles: TileTransform[],
+  tiles: TileMeshInput[],
 ): Mesh {
   return new AnimatedMesh(frames, createTileMeshData(tiles));
 }
@@ -112,4 +104,49 @@ function uniqueAnimationKey(tile: TileLayerTile): AnimationKey {
 
 function parseAnimationKey(id: AnimationKey): AnimationIdData[] {
   return JSON.parse(id) as AnimationIdData[];
+}
+
+function createTileMeshInput({
+  flags,
+  width,
+  height,
+  x,
+  y,
+}: TileLayerTile): TileMeshInput {
+  /// 1) figure out flips + rot
+  let sx = flags?.flippedHorizontally ? -1 : 1;
+  let sy = flags?.flippedVertically ? -1 : 1;
+  let rot = 0;
+
+  if (flags?.flippedDiagonally) {
+    rot += Math.PI / 2;
+    [width, height] = [height, width];
+    [sx, sy] = [sy, sx];
+  }
+
+  // 2) compute the “true” pivot point in world-space
+  //    (x,y) is your raw object.x/y; add the fractional origin * size
+  const px = x * width + 0.5 * width;
+  const py = y * height + 0.5 * height;
+
+  // 3) standard a/b/c/d from R·S
+  const cos = Math.cos(rot),
+    sin = Math.sin(rot);
+  const a = cos * sx;
+  const b = sin * sx;
+  const c = -sin * sy;
+  const d = cos * sy;
+
+  // 4) figure out the final tx/ty so that
+  //    M ⋅ [ox*width, oy*height, 1] = [px,py]
+  const ox = 0.5 * width,
+    oy = 0.5 * height;
+  const tx = px - (a * ox + c * oy);
+  const ty = py - (b * ox + d * oy);
+
+  return {
+    width,
+    height,
+    transform: [a, b, c, d, tx, ty],
+  };
 }

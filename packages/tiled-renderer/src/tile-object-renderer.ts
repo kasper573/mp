@@ -1,22 +1,19 @@
-import { Container } from "@mp/graphics";
+import { Container, Matrix } from "@mp/graphics";
 import { upsertMap } from "@mp/std";
-import type {
-  GlobalTileId,
-  TileTransform,
-  TiledObject,
-} from "@mp/tiled-loader";
+import type { GlobalTileId, TiledObject } from "@mp/tiled-loader";
 import { renderStaticTiles } from "./tile-renderer";
 import type { TiledTextureLookup } from "./spritesheet";
+import type { TileMeshInput } from "./tile-mesh-data";
 
 export function createObjectRenderer(
   objects: TiledObject[],
   textureLookup: TiledTextureLookup,
 ): Container {
   // We only render objects that reference tiles via gid
-  const renderGroups = new Map<GlobalTileId, TileTransform[]>();
+  const renderGroups = new Map<GlobalTileId, TileMeshInput[]>();
   for (const obj of objects) {
     if (obj.gid !== undefined) {
-      upsertMap(renderGroups, obj.gid, tiledObjectTransform(obj));
+      upsertMap(renderGroups, obj.gid, tiledObjectMeshInput(obj));
     }
   }
 
@@ -28,15 +25,18 @@ export function createObjectRenderer(
   return container;
 }
 
-export function tiledObjectTransform(obj: TiledObject): TileTransform {
+export function tiledObjectMeshInput(t: TiledObject): TileMeshInput {
+  const m = new Matrix();
+  // Rotate around the bottom left corner (special requirement for tiled objects)
+  m.translate(0, -t.height);
+  m.rotate((t.rotation / 180) * Math.PI);
+
+  // Now we can translate to the object position
+  m.translate(t.x, t.y);
+
   return {
-    width: obj.width,
-    height: obj.height,
-    x: obj.x,
-    y: obj.y,
-    flags: obj.flags,
-    rotation: (obj.rotation / 180) * Math.PI, // Convert degrees to radians
-    originX: 0,
-    originY: 1, // Objects are anchored at the bottom left corner
+    width: t.width,
+    height: t.height,
+    transform: [m.a, m.b, m.c, m.d, m.tx, m.ty],
   };
 }
