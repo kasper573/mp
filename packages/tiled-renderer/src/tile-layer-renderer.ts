@@ -21,6 +21,7 @@ export function createTileLayerRenderer(
 
   const otherContainer = createTileRenderer(other, textureLookup);
   otherContainer.label = "Ungrouped tiles";
+  otherContainer.zIndex = 0;
   container.addChild(otherContainer);
 
   // Some tiles are grouped with the intention of being sorted
