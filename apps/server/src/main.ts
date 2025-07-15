@@ -73,7 +73,7 @@ registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
 const logger = createConsoleLogger();
-logger.info(opt, `Server started `);
+logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;
 
@@ -109,11 +109,13 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
+logger.info(`Loading areas and actor models...`);
 const [areas, actorModels] = await Promise.all([
   loadAreas(path.resolve(opt.publicDir, "areas")),
   loadActorModels(opt.publicDir),
 ]);
 
+logger.info(`Seeding database...`);
 await seed(db, areas, actorModels);
 
 const wss = new WebSocketServer({
@@ -179,6 +181,7 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(metrics),
 });
 
+logger.info(`Getting all NPCs and spawns...`);
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
 const spawnsFromDbAndAreas = [
   ...allNpcsAndSpawns,
@@ -236,6 +239,7 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 
+logger.info(`Attempting to listen on ${opt.hostname}:${opt.port}...`);
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });
