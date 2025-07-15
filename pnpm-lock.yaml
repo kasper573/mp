@@ -667,6 +667,9 @@ importers:
       '@mp/graphics':
         specifier: workspace:*
         version: link:../graphics
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
       '@mp/std':
         specifier: workspace:*
         version: link:../std

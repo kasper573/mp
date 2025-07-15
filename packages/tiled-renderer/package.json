@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/tiled-loader": "workspace:*"
   },

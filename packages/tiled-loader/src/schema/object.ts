@@ -16,7 +16,7 @@ export interface SharedObjectProperties {
   /**
    * If the gid was set, these are the flags that it contained.
    */
-  gidFlags?: GlobalIdFlags;
+  flags?: GlobalIdFlags;
   id: ObjectId;
   name: string;
   x: Pixel;

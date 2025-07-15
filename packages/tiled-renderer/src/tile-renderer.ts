@@ -1,12 +1,12 @@
-import type { Texture, Matrix, Mesh, FrameObject } from "@mp/graphics";
+import type { Texture, Mesh, FrameObject } from "@mp/graphics";
 import { Container, MeshSimple } from "@mp/graphics";
 import type { GlobalTileId } from "@mp/tiled-loader";
 import { localToGlobalId, type TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
-import { createTileTransform } from "./tile-transform";
-import type { Branded } from "../../std/src/types";
+import type { Branded, Pixel } from "../../std/src/types";
 import { AnimatedMesh } from "./animated-mesh";
 import { assert, upsertMap } from "@mp/std";
+import { createTileMeshData, type TileRenderData } from "./tile-mesh-data";
 
 /**
  * "dumb" but highly performant renderer that groups tiles by their
@@ -24,9 +24,11 @@ export function createTileRenderer(
   const animatedGroups = new Map<AnimationKey, TileRenderData[]>();
   for (const layerTile of tiles) {
     const renderData: TileRenderData = {
+      x: (layerTile.x * layerTile.width) as Pixel,
+      y: (layerTile.y * layerTile.height) as Pixel,
       width: layerTile.width,
       height: layerTile.height,
-      transform: createTileTransform(layerTile),
+      flags: layerTile.flags,
     };
 
     if (layerTile.tile.animation) {
@@ -38,90 +40,53 @@ export function createTileRenderer(
 
   const tileMap = new Container({ isRenderGroup: true });
 
-  for (const [textureTileId, renderData] of staticGroups) {
-    const texture = assert(lookupTexture(textureTileId));
-    tileMap.addChild(createStaticTileRenderer(texture, renderData));
+  for (const mesh of renderStaticTiles(staticGroups, lookupTexture)) {
+    tileMap.addChild(mesh);
   }
 
+  for (const mesh of renderAnimatedTiles(animatedGroups, lookupTexture)) {
+    tileMap.addChild(mesh);
+  }
+
+  return tileMap;
+}
+
+export function* renderStaticTiles(
+  staticGroups: Map<GlobalTileId, TileRenderData[]>,
+  lookupTexture: TiledTextureLookup,
+): Generator<Mesh> {
+  for (const [textureTileId, renderData] of staticGroups) {
+    const texture = assert(lookupTexture(textureTileId));
+    yield createStaticTileRenderer(texture, renderData);
+  }
+}
+
+export function* renderAnimatedTiles(
+  animatedGroups: Map<AnimationKey, TileRenderData[]>,
+  lookupTexture: TiledTextureLookup,
+): Generator<Mesh> {
   for (const [animationId, renderData] of animatedGroups) {
     const tiledFrames = parseAnimationKey(animationId);
     const rendererFrames = tiledFrames.map((f) => ({
       time: f.duration,
       texture: assert(lookupTexture(f.gid)),
     }));
-    tileMap.addChild(createAnimatedTileRenderer(rendererFrames, renderData));
+    yield createAnimatedTileRenderer(rendererFrames, renderData);
   }
-
-  return tileMap;
 }
 
 function createStaticTileRenderer(
   texture: Texture,
   tiles: TileRenderData[],
-): Container {
-  return new MeshSimple({ texture, ...createMeshInput(tiles) });
+): Mesh {
+  return new MeshSimple({ texture, ...createTileMeshData(tiles) });
 }
 
 function createAnimatedTileRenderer(
   frames: FrameObject[],
   tiles: TileRenderData[],
 ): Mesh {
-  return new AnimatedMesh(frames, createMeshInput(tiles));
-}
-
-interface TileRenderData {
-  width: number;
-  height: number;
-  transform: Matrix;
-}
-
-/**
- * AI code. I don't understand shaders enough to know if the code or comments are sane,
- * but it seems reasonable and it works.
- */
-function createMeshInput(tiles: TileRenderData[]) {
-  const N = tiles.length;
-
-  // 4 verts per tile, 2 components (x,y) each
-  const vertices = new Float32Array(N * 4 * 2);
-  // same size for UVs
-  const uvs = new Float32Array(N * 4 * 2);
-  // 6 indices per quad
-  const indices = new Uint32Array(N * 6);
-
-  // Normalized UV pattern for a full-texture quad
-  const uvPattern = [0, 0, 1, 0, 1, 1, 0, 1];
-
-  for (let i = 0; i < N; i++) {
-    const { width, height, transform } = tiles[i];
-    const { a, b, c, d, tx, ty } = transform;
-
-    // Transform the four corners of a rectangle [0,0]→[width,height]
-    const vOff = i * 8;
-    vertices[vOff] = tx; // x0
-    vertices[vOff + 1] = ty; // y0
-    vertices[vOff + 2] = a * width + tx; // x1
-    vertices[vOff + 3] = b * width + ty; // y1
-    vertices[vOff + 4] = a * width + c * height + tx; // x2
-    vertices[vOff + 5] = b * width + d * height + ty; // y2
-    vertices[vOff + 6] = c * height + tx; // x3
-    vertices[vOff + 7] = d * height + ty; // y3
-
-    // copy the same normalized UVs for each tile
-    uvs.set(uvPattern, vOff);
-
-    const iOff = i * 6;
-    const base = i * 4;
-    // two triangles: (0,1,2) and (0,2,3)
-    indices[iOff] = base;
-    indices[iOff + 1] = base + 1;
-    indices[iOff + 2] = base + 2;
-    indices[iOff + 3] = base;
-    indices[iOff + 4] = base + 2;
-    indices[iOff + 5] = base + 3;
-  }
-
-  return { vertices, uvs, indices };
+  return new AnimatedMesh(frames, createTileMeshData(tiles));
 }
 
 type AnimationKey = Branded<string, "AnimationKey">;

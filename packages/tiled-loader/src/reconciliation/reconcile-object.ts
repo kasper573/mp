@@ -13,7 +13,7 @@ export function reconcileObject(
   if (obj.gid !== undefined) {
     const { gid, flags } = readGlobalIdInteger(obj.gid);
     obj.gid = gid;
-    obj.gidFlags = flags;
+    obj.flags = flags;
   }
 
   reconcileProperties(obj);

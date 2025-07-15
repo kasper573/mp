@@ -1,13 +1,15 @@
 import { Container } from "@mp/graphics";
-import type { TileLayer, TileLayerTile } from "@mp/tiled-loader";
+import type { TileLayerTile } from "@mp/tiled-loader";
 import { createTileRenderer } from "./tile-renderer";
 import type { TiledTextureLookup } from "./spritesheet";
+import type { VectorKey } from "@mp/math";
+import { Vector } from "@mp/math";
 
 /**
  * An extension of the tile-renderer that adds sorting.
  */
 export function createTileLayerRenderer(
-  layer: TileLayer,
+  tiles: TileLayerTile[],
   textureLookup: TiledTextureLookup,
 ): Container {
   const container = new Container({
@@ -15,7 +17,7 @@ export function createTileLayerRenderer(
     sortableChildren: true,
   });
 
-  const { groups, other } = groupTiles(layer);
+  const { groups, other } = groupTiles(tiles);
 
   const otherContainer = createTileRenderer(other, textureLookup);
   otherContainer.label = "Ungrouped tiles";
@@ -37,10 +39,10 @@ export function createTileLayerRenderer(
 /**
  * Group tiles by their "Group" property and whether they are adjacent to each other.
  */
-function groupTiles(layer: TileLayer) {
-  const posMap = new Map<string, TileLayerTile>();
-  for (const tile of layer.tiles) {
-    posMap.set(posKey(tile.x, tile.y), tile);
+function groupTiles(tiles: TileLayerTile[]) {
+  const posMap = new Map<VectorKey, TileLayerTile>();
+  for (const tile of tiles) {
+    posMap.set(Vector.key(tile.x, tile.y), tile);
   }
 
   const getGroup = (t: TileLayerTile) =>
@@ -49,7 +51,7 @@ function groupTiles(layer: TileLayer) {
   const visited = new Set<TileLayerTile>();
   const groups: Array<{ tiles: TileLayerTile[]; id: number }> = [];
 
-  for (const startTile of layer.tiles) {
+  for (const startTile of tiles) {
     const groupId = getGroup(startTile);
     if (groupId === undefined || visited.has(startTile)) {
       continue;
@@ -64,7 +66,7 @@ function groupTiles(layer: TileLayer) {
       group.push(tile);
 
       for (const [dx, dy] of cardinalDeltas) {
-        const key = posKey(tile.x + dx, tile.y + dy);
+        const key = Vector.key(tile.x + dx, tile.y + dy);
         const adjacent = posMap.get(key);
         if (
           adjacent &&
@@ -80,7 +82,7 @@ function groupTiles(layer: TileLayer) {
     groups.push({ id: groupId, tiles: group });
   }
 
-  const other = layer.tiles.filter((tile) => !visited.has(tile));
+  const other = tiles.filter((tile) => !visited.has(tile));
 
   return { groups, other };
 }
@@ -91,7 +93,3 @@ const cardinalDeltas = [
   [0, 1],
   [0, -1],
 ] as const;
-
-function posKey(x: number, y: number) {
-  return `${x},${y}`;
-}
