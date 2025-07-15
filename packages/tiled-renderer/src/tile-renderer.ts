@@ -6,7 +6,7 @@ import type { TiledTextureLookup } from "./spritesheet";
 import { createTileTransform } from "./tile-transform";
 import type { Branded } from "../../std/src/types";
 import { AnimatedMesh } from "./animated-mesh";
-import { assert } from "@mp/std";
+import { assert, upsertMap } from "@mp/std";
 
 /**
  * "dumb" but highly performant renderer that groups tiles by their
@@ -122,14 +122,6 @@ function createMeshInput(tiles: TileRenderData[]) {
   }
 
   return { vertices, uvs, indices };
-}
-
-function upsertMap<K, V>(map: Map<K, V[]>, key: K, value: V): void {
-  if (map.has(key)) {
-    map.get(key)?.push(value);
-  } else {
-    map.set(key, [value]);
-  }
 }
 
 type AnimationKey = Branded<string, "AnimationKey">;
