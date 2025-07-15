@@ -19,6 +19,7 @@ export function createTiledRenderer(opt: {
     // layers are already in the draw order in the tiled data
     for (const [index, layer] of layers.entries()) {
       const layerRenderer = createLayerRenderer(layer);
+      layerRenderer.position.set(layer.offsetx, layer.offsety);
       layerRenderer.label = layer.name;
       container.addChildAt(layerRenderer, index);
     }
