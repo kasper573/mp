@@ -1,5 +1,4 @@
 import type {
-  FrameObject,
   SpritesheetData,
   SpritesheetFrameData,
   Texture,
@@ -102,39 +101,20 @@ function createTileFrameData(
 export function createTiledTextureLookup(
   spritesheets: TiledSpritesheetRecord,
 ): TiledTextureLookup {
-  return {
-    texture(id) {
-      for (const ss of Object.values(spritesheets)) {
-        const texture = ss.textures[id] as Texture | undefined;
-        if (texture) {
-          return texture;
-        }
+  return (id) => {
+    for (const ss of Object.values(spritesheets)) {
+      const texture = ss.textures[id] as Texture | undefined;
+      if (texture) {
+        return texture;
       }
-      throw new Error(
-        `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
-      );
-    },
-    animation(id): FrameObject[] {
-      for (const ss of Object.values(spritesheets)) {
-        const frames = ss.data.animationsWithDuration?.get(id);
-        if (frames) {
-          return frames.map(({ duration, id }) => ({
-            texture: ss.textures[id],
-            time: duration,
-          }));
-        }
-      }
-      throw new Error(
-        `TiledSpritesheetRecord does not contain an animation for GID ${id}`,
-      );
-    },
+    }
+    throw new Error(
+      `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
+    );
   };
 }
 
-export interface TiledTextureLookup {
-  texture: (gid: GlobalTileId) => Texture;
-  animation: (gid: GlobalTileId) => FrameObject[];
-}
+export type TiledTextureLookup = (gid: GlobalTileId) => Texture;
 
 export interface TiledSpritesheetRecord {
   [image: string]: TiledSpritesheet;

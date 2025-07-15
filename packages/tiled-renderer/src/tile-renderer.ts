@@ -1,20 +1,11 @@
-import type {
-  Texture,
-  Matrix,
-  FrameObject as RendererFrame,
-  Mesh,
-  SimpleMeshOptions,
-  FrameObject,
-} from "@mp/graphics";
-import { Container, MeshSimple, Ticker } from "@mp/graphics";
-import type { GlobalTileId, Tileset } from "@mp/tiled-loader";
-import {
-  localToGlobalId,
-  type Frame as TiledFrame,
-  type TileLayerTile,
-} from "@mp/tiled-loader";
+import type { Texture, Matrix, Mesh, FrameObject } from "@mp/graphics";
+import { Container, MeshSimple } from "@mp/graphics";
+import type { GlobalTileId } from "@mp/tiled-loader";
+import { localToGlobalId, type TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
 import { createTileTransform } from "./tile-transform";
+import type { Branded } from "../../std/src/types";
+import { AnimatedMesh } from "./animated-mesh";
 
 /**
  * "dumb" but highly performant renderer that groups tiles by their
@@ -25,35 +16,20 @@ import { createTileTransform } from "./tile-transform";
  */
 export function createTileRenderer(
   tiles: TileLayerTile[],
-  lookup: TiledTextureLookup,
+  lookupTexture: TiledTextureLookup,
 ): Container {
+  // Group tiles by their texture or animation
   const staticGroups = new Map<GlobalTileId, TileRenderData[]>();
-  const animations = new Map<AnimationId, RendererFrame[]>();
-  const animatedGroups = new Map<AnimationId, TileRenderData[]>();
+  const animatedGroups = new Map<AnimationKey, TileRenderData[]>();
   for (const layerTile of tiles) {
     const renderData: TileRenderData = {
       width: layerTile.width,
       height: layerTile.height,
       transform: createTileTransform(layerTile),
     };
+
     if (layerTile.tile.animation) {
-      const animationId = getAnimationId(layerTile.tile.animation);
-      if (!animations.has(animationId)) {
-        animations.set(
-          animationId,
-          tiledAnimationToRendererFrames(
-            layerTile.tile.animation,
-            layerTile.tileset,
-            lookup,
-          ),
-        );
-      }
-      if (animatedGroups.has(animationId)) {
-        animatedGroups.get(animationId)?.push(renderData);
-      } else {
-        animatedGroups.set(animationId, [renderData]);
-      }
-      upsertMap(animatedGroups, animationId, renderData);
+      upsertMap(animatedGroups, uniqueAnimationKey(layerTile), renderData);
     } else {
       upsertMap(staticGroups, layerTile.id, renderData);
     }
@@ -62,15 +38,17 @@ export function createTileRenderer(
   const tileMap = new Container({ isRenderGroup: true });
 
   for (const [textureTileId, renderData] of staticGroups) {
-    const texture = lookup.texture(textureTileId);
+    const texture = lookupTexture(textureTileId);
     tileMap.addChild(createStaticTileRenderer(texture, renderData));
   }
 
   for (const [animationId, renderData] of animatedGroups) {
-    const frames = animations.get(animationId);
-    if (frames) {
-      tileMap.addChild(createAnimatedTileRenderer(frames, renderData));
-    }
+    const tiledFrames = parseAnimationKey(animationId);
+    const rendererFrames = tiledFrames.map((f) => ({
+      time: f.duration,
+      texture: lookupTexture(f.gid),
+    }));
+    tileMap.addChild(createAnimatedTileRenderer(rendererFrames, renderData));
   }
 
   return tileMap;
@@ -90,36 +68,16 @@ function createAnimatedTileRenderer(
   return new AnimatedMesh(frames, createMeshInput(tiles));
 }
 
-class AnimatedMesh extends MeshSimple {
-  private frameIndex = 0;
-  private elapsed = 0;
-
-  constructor(
-    private frames: FrameObject[],
-    options: Omit<SimpleMeshOptions, "texture">,
-  ) {
-    super({ texture: frames[0].texture, ...options });
-    this.onRender = this.#onRender;
-  }
-
-  #onRender = (): void => {
-    this.elapsed += Ticker.shared.deltaMS;
-
-    const frameObj = this.frames[this.frameIndex];
-    if (this.elapsed >= frameObj.time) {
-      this.elapsed -= frameObj.time;
-      this.frameIndex = (this.frameIndex + 1) % this.frames.length;
-      this.texture = this.frames[this.frameIndex].texture;
-    }
-  };
-}
-
 interface TileRenderData {
   width: number;
   height: number;
   transform: Matrix;
 }
 
+/**
+ * AI code. I don't understand shaders enough to know if the code or comments are sane,
+ * but it seems reasonable and it works.
+ */
 function createMeshInput(tiles: TileRenderData[]) {
   const N = tiles.length;
 
@@ -173,23 +131,24 @@ function upsertMap<K, V>(map: Map<K, V[]>, key: K, value: V): void {
   }
 }
 
-function tiledAnimationToRendererFrames(
-  animation: TiledFrame[],
-  tileset: Tileset,
-  lookup: TiledTextureLookup,
-): RendererFrame[] {
-  return animation.map(
-    (f): RendererFrame => ({
-      time: f.duration,
-      texture: lookup.texture(localToGlobalId(tileset.firstgid, f.tileid)),
-    }),
-  );
+type AnimationKey = Branded<string, "AnimationKey">;
+
+interface AnimationIdData {
+  gid: GlobalTileId;
+  duration: number;
 }
 
-type AnimationId = string;
+function uniqueAnimationKey(tile: TileLayerTile): AnimationKey {
+  return JSON.stringify(
+    (tile.tile.animation ?? []).map(
+      (f): AnimationIdData => ({
+        gid: localToGlobalId(tile.tileset.firstgid, f.tileid),
+        duration: f.duration,
+      }),
+    ),
+  ) as AnimationKey;
+}
 
-function getAnimationId(frames: TiledFrame[]): AnimationId {
-  // This is safe to do since a frame is just a texture id and a duration.
-  // It gives us a unique identifier for an animation. It's quick and dirty but works well for our purposes.
-  return JSON.stringify(frames);
+function parseAnimationKey(id: AnimationKey): AnimationIdData[] {
+  return JSON.parse(id) as AnimationIdData[];
 }
