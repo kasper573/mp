@@ -41,6 +41,18 @@ export function readGlobalIdBuffer(
   };
 }
 
+export function readGlobalIdInteger(n: number) {
+  return readGlobalIdBuffer(
+    new Uint8Array([
+      n & 0xff,
+      (n >> 8) & 0xff,
+      (n >> 16) & 0xff,
+      (n >> 24) & 0xff,
+    ]),
+    0,
+  );
+}
+
 export interface GlobalIdFlags {
   flippedHorizontally: boolean;
   flippedVertically: boolean;

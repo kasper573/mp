@@ -1,3 +1,4 @@
+import { readGlobalIdInteger } from "../gid";
 import type { TiledObject } from "../schema/object";
 import type { Tileset } from "../schema/tileset";
 import { reconcileProperties } from "./reconcile-properties";
@@ -7,6 +8,12 @@ export function reconcileObject(
 ): TiledObject {
   if ("object" in obj) {
     throw new Error("Object template reconciliation not implemented");
+  }
+
+  if (obj.gid !== undefined) {
+    const { gid, flags } = readGlobalIdInteger(obj.gid);
+    obj.gid = gid;
+    obj.gidFlags = flags;
   }
 
   reconcileProperties(obj);
