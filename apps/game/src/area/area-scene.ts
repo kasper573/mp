@@ -3,7 +3,10 @@ import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
+import {
+  renderTiledLayers,
+  createTiledTextureLookup,
+} from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { DestroyOptions } from "@mp/graphics";
 import {
@@ -41,10 +44,10 @@ export class AreaScene extends Container {
 
     const lookup = createTiledTextureLookup(options.spritesheets);
 
-    const tiledRenderer = new TiledRenderer({
-      layers: options.area.tiled.map.layers,
-      textureLookup: lookup,
-    });
+    const tiledRenderer = renderTiledLayers(
+      options.area.tiled.map.layers,
+      lookup,
+    );
 
     const dynamicLayerView = assert(
       tiledRenderer.getChildByLabel(options.area.dynamicLayer.name),
