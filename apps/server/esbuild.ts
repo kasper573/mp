@@ -1,7 +1,6 @@
 import path from "node:path";
 import esbuild from "esbuild";
 import builtinModules from "builtin-modules";
-import { vanillaExtractPlugin } from "@vanilla-extract/esbuild-plugin";
 
 const buildOptions: esbuild.BuildOptions = {
   entryPoints: {
@@ -25,13 +24,6 @@ const buildOptions: esbuild.BuildOptions = {
       `const require = createRequireGlobal(import.meta.url);`,
     ].join("\n"),
   },
-  plugins: [
-    vanillaExtractPlugin({
-      // We only need to be able to transpile vanilla extract.
-      // The server isn't interested in the output css files.
-      outputCss: false,
-    }),
-  ],
 };
 
 void esbuild.build(buildOptions);
