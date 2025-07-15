@@ -15,10 +15,6 @@ export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
           signal={new PropertySignal(signal, "visibleGraphType")}
         />
       </div>
-      <label>
-        <Checkbox signal={new PropertySignal(signal, "showWalkableScore")} />
-        Show walkable score
-      </label>
       <br />
       <label>
         <Checkbox signal={new PropertySignal(signal, "showFogOfWar")} />
@@ -49,7 +45,6 @@ export interface AreaDebugSettings {
   showAttackRange: boolean;
   showAggroRange: boolean;
   showActorPaths: boolean;
-  showWalkableScore: boolean;
 }
 
 export const visibleGraphTypes = [

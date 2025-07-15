@@ -38,7 +38,6 @@ export class AreaDebugGraphics extends Container {
     const debugTiled = new DebugTiledGraph(
       area,
       () => this.settings().visibleGraphType,
-      () => this.settings().showWalkableScore,
     );
 
     this.actorPaths = new ReactiveCollection(
@@ -99,8 +98,8 @@ export class AreaDebugGraphics extends Container {
 
 class DebugTiledGraph extends Container {
   private gfx = new Graphics();
-  private cleanups: Array<() => void> = [];
-  private walkableScoreText = new Text({
+  private cleanup: () => void;
+  private text = new Text({
     style: {
       fill: "white",
       fontSize: 28,
@@ -114,25 +113,19 @@ class DebugTiledGraph extends Container {
   constructor(
     private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
-    private shouldShowWalkableScore: () => boolean,
   ) {
     super();
 
     this.addChild(this.gfx);
     this.walkableChecker = new WalkableChecker(area.tiled);
-    this.addChild(this.walkableScoreText);
+    this.addChild(this.text);
 
-    this.cleanups = [
-      effect(this.redrawGraph),
-      effect(this.updateWalkableScoreText),
-    ];
+    this.cleanup = effect(this.redrawGraph);
   }
 
   override destroy(options?: DestroyOptions): void {
     super.destroy(options);
-    for (const cleanup of this.cleanups) {
-      cleanup();
-    }
+    this.cleanup();
   }
 
   private redrawGraph = () => {
@@ -140,6 +133,7 @@ class DebugTiledGraph extends Container {
     const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
     const { worldPosition } = engine.pointer;
+    this.text.visible = false;
 
     switch (this.visibleGraphType()) {
       case "all":
@@ -173,26 +167,17 @@ class DebugTiledGraph extends Container {
             "rgba(255, 0, 0, 0.5)",
           );
         }
+
+        const obscureAmount = this.walkableChecker.obscureAmount(
+          tiled.worldCoordToTile(worldPosition.value).round(),
+        );
+
+        this.text.visible = true;
+        this.text.position.copyFrom(worldPosition.value);
+        this.text.position.x += 5;
+        this.text.text = `${(obscureAmount * 100).toFixed(2)}% obscured`;
       }
     }
-  };
-
-  private updateWalkableScoreText = () => {
-    if (!this.shouldShowWalkableScore()) {
-      this.walkableScoreText.visible = false;
-      return;
-    }
-
-    this.walkableScoreText.visible = true;
-    const engine = ioc.get(ctxEngine);
-    const { tiled } = this.area;
-    const { worldPosition } = engine.pointer;
-    const score = this.walkableChecker.score(
-      tiled.worldCoordToTile(worldPosition.value).round(),
-    );
-    this.walkableScoreText.position.copyFrom(worldPosition.value);
-    this.walkableScoreText.position.x += 5;
-    this.walkableScoreText.text = `${(score * 100).toFixed(2)}% walkable`;
   };
 }
 

@@ -1,7 +1,7 @@
 import type { VectorKey } from "@mp/math";
-import { Matrix, Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
-import type { Pixel, Tile } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { upsertMap } from "@mp/std";
 import {
   type TileLayerTile,
@@ -66,27 +66,32 @@ export class WalkableChecker {
     }
   }
 
-  score(coord: Vector<Tile>): number {
+  isWalkable(coord: Vector<Tile>): boolean {
     const tilesAtCoord = this.#tilesByCoord.get(coord.key);
     if (!tilesAtCoord) {
-      return 0; // No tiles exist at this coordinate at all
+      return false; // No tiles exist at this coordinate at all
     }
 
     if (!isWalkable(...tilesAtCoord.map((t) => t.tile.properties))) {
-      return 0; // Tiles exist but have been configured to not be walkable
-    }
-
-    if (!this.#obscuringRects.length) {
-      return 1; // No obscuring objects exist, always fully walkable
+      return false; // Tiles exist but have been configured to not be walkable
     }
 
     // Tiles exist and are walkable, but may be obscured by objects.
+    // 25% obscured is still considered walkable
+    return this.obscureAmount(coord) < 0.25;
+  }
+
+  obscureAmount(coord: Vector<Tile>): number {
+    if (!this.#obscuringRects.length) {
+      return 0; // No obscuring rects exist to obscure anything
+    }
+
     const rectAtCoord = new Rect(coord, oneTile);
     const tileObscuredAmount = Math.max(
       ...this.#obscuringRects.map((obscure) => rectAtCoord.overlap(obscure)),
     );
 
-    return 1 - tileObscuredAmount;
+    return tileObscuredAmount;
   }
 }
 

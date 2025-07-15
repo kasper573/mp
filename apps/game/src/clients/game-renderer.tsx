@@ -105,7 +105,6 @@ const areaDebugSettingsStorage = new StorageSignal<AreaDebugSettings>(
   "area-debug-settings",
   {
     visibleGraphType: "none",
-    showWalkableScore: false,
     showActorPaths: false,
     showFogOfWar: false,
     showAttackRange: false,

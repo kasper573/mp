@@ -10,8 +10,7 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   const walkableCoords = new Map<string, Vector<Tile>>();
   const walkableChecker = new WalkableChecker(tiled);
   for (const tileCoord of gridCoords(tiled.map)) {
-    const score = walkableChecker.score(tileCoord);
-    if (score > 0.9) {
+    if (walkableChecker.isWalkable(tileCoord)) {
       walkableCoords.set(tileCoord.key, tileCoord);
       graph.addNode(tileCoord);
     }
