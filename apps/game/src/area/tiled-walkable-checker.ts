@@ -57,7 +57,7 @@ export class WalkableChecker {
           // Use same transform as the renderer to ensure it's correct
           const objTransform = tiledObjectMeshInput(obj).transform;
           this.#obscuringRects.push(
-            new Rect(Vector.zero(), Vector.from(obj))
+            new Rect(Vector.zero(), new Vector(obj.width, obj.height))
               .apply(objTransform)
               .divide(this.tiled.tileSize) as unknown as Rect<Tile>,
           );
