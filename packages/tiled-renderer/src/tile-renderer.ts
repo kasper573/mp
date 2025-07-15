@@ -52,7 +52,7 @@ export function* renderStaticTiles(
 ): Generator<Mesh> {
   for (const [textureTileId, meshInput] of staticGroups) {
     const texture = assert(lookupTexture(textureTileId));
-    yield renderStaticTile(texture, ...meshInput);
+    yield renderStaticTile(texture, meshInput);
   }
 }
 
@@ -66,20 +66,20 @@ export function* renderAnimatedTiles(
       time: f.duration,
       texture: assert(lookupTexture(f.gid)),
     }));
-    yield renderAnimatedTile(rendererFrames, ...meshInput);
+    yield renderAnimatedTile(rendererFrames, meshInput);
   }
 }
 
 export function renderStaticTile(
   texture: Texture,
-  ...tiles: TileMeshInput[]
+  tiles: TileMeshInput[],
 ): Mesh {
   return new MeshSimple({ texture, ...createTileMeshData(tiles) });
 }
 
 export function renderAnimatedTile(
   frames: FrameObject[],
-  ...tiles: TileMeshInput[]
+  tiles: TileMeshInput[],
 ): Mesh {
   return new AnimatedMesh(frames, createTileMeshData(tiles));
 }

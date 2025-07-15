@@ -19,7 +19,7 @@ export function renderTileObjects(
     if (texture) {
       // We can't utilize the batched rendering since it doesn't support depth sorting.
       // So we render one mesh per object so we can assign the zIndex of each mesh.
-      const mesh = renderStaticTile(texture, tiledObjectMeshInput(obj));
+      const mesh = renderStaticTile(texture, [tiledObjectMeshInput(obj)]);
       mesh.zIndex = obj.y / texture.height; // Pixel -> Tile space
       container.addChild(mesh);
     }
