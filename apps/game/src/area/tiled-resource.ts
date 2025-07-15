@@ -59,8 +59,10 @@ function tilesInLayer(layer: Layer): TileLayerTile[] {
       return layer.layers.flatMap(tilesInLayer);
     case "tilelayer":
       return layer.tiles;
+    case "objectgroup":
+    case "imagelayer":
+      return [];
   }
-  return [];
 }
 
 function createObjectMap(map: TiledMap) {
@@ -84,6 +86,8 @@ function objectsInLayer(layer: Layer): TiledObject[] {
       return layer.layers.flatMap(objectsInLayer);
     case "objectgroup":
       return layer.objects;
+    case "tilelayer":
+    case "imagelayer":
+      return [];
   }
-  return [];
 }
