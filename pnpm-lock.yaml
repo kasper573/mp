@@ -664,6 +664,9 @@ importers:
       '@mp/graphics':
         specifier: workspace:*
         version: link:../graphics
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader

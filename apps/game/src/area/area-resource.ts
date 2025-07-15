@@ -11,7 +11,6 @@ import type { AreaId } from "./area-id";
 
 export class AreaResource {
   readonly start: Vector<Tile>;
-  private objects: Iterable<TiledObject>;
   readonly graph: VectorGraph<Tile>;
   /**
    * The dynamic layer is a layer that expects the renderer
@@ -28,18 +27,15 @@ export class AreaResource {
     readonly tiled: TiledResource,
   ) {
     this.dynamicLayer = assert(
-      this.tiled.getTileLayers(dynamicLayerName)[0] as Layer | undefined,
+      this.tiled.map.layers.find((l) => l.name === dynamicLayerName),
       `Map must have a '${dynamicLayerName}' layer`,
     );
 
-    this.objects = this.tiled.getObjects();
     this.graph = graphFromTiled(tiled);
     this.#findPath = this.graph.createPathFinder();
 
     const startObj = assert(
-      tiled.getObjectsByClassName(TiledFixture.start)[0] as
-        | TiledObject
-        | undefined,
+      tiled.objects().find((obj) => obj.type === TiledFixture.start),
       "Invalid area data: must have a start location",
     );
 
@@ -62,13 +58,14 @@ export class AreaResource {
   }
 
   *hitTestObjects(candidates: Iterable<Vector<Pixel>>): Generator<TiledObject> {
-    for (const coord of candidates) {
-      for (const object of this.objects) {
-        if (hitTestTiledObject(object, coord)) {
-          yield object;
+    yield* this.tiled.objects((obj) => {
+      for (const coord of candidates) {
+        if (hitTestTiledObject(obj, coord)) {
+          return true;
         }
       }
-    }
+      return false;
+    });
   }
 
   static findPathMiddleware = (
