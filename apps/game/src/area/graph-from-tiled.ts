@@ -1,6 +1,9 @@
 import { VectorGraph } from "@mp/path-finding";
+import type { Branded } from "@mp/std";
 import { upsertMap, type Tile } from "@mp/std";
 import type { TiledResource } from "./tiled-resource";
+import type { VectorLike } from "@mp/math";
+import { Rect } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { GlobalTileId, TiledObject } from "@mp/tiled-loader";
 import type { TileLayerTile } from "@mp/tiled-loader";
@@ -10,40 +13,66 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   const tilesByCoord = new Map<string, TileLayerTile[]>();
   for (const tile of tiled.tiles) {
     upsertMap(tilesByGid, tile.id, tile);
-    upsertMap(tilesByCoord, `${tile.x}|${tile.y}`, tile);
+    upsertMap(tilesByCoord, vectorKey(tile), tile);
   }
 
+  console.log("tilesByGid", tilesByGid.size);
+  console.log(tilesByGid.keys().toArray());
   // The gid in objects refer to tiles that are actually rendered,
   // so we need to consider them for collission as well (if the tile they reference is not walkable)
-  const obscuringObjects = new Map<TiledObject, TileLayerTile>();
+  const obscuringRects: Rect<Tile>[] = [];
   for (const obj of tiled.objects.values()) {
     if (obj.gid !== undefined) {
       const referencedTiles = tilesByGid.get(obj.gid);
+      console.log(
+        "Discovered referencing object",
+        obj.id,
+        "->",
+        obj.gid,
+        referencedTiles?.length,
+      );
       if (referencedTiles?.length && !isTileWalkable(...referencedTiles)) {
-        obscuringObjects.set(obj, referencedTiles[0]);
+        console.log("Discovered obscuring object", obj.id);
+        const { x, y, width, height } = referencedTiles[0];
+        obscuringRects.push(
+          Rect.fromComponents(
+            x,
+            y,
+            (width / tiled.tileSize.x) as Tile,
+            (height / tiled.tileSize.y) as Tile,
+          ),
+        );
       }
     }
   }
 
-  const walkableCoords: Vector<Tile>[] = [];
+  const graph = new VectorGraph<Tile>();
+  const walkableCoords = new Map<string, Vector<Tile>>();
   for (const tilesAtCoord of tilesByCoord.values()) {
-    if (
-      isTileWalkable(...tilesAtCoord) &&
-      !isObscured(tilesAtCoord[0], obscuringObjects.values())
-    ) {
-      walkableCoords.push(Vector.from(tilesAtCoord[0]));
+    const tile = tilesAtCoord[0];
+    const tileRect = new Rect(Vector.from(tile), oneTile);
+    const overlapSum = obscuringRects.reduce(
+      (sum, obj) => sum + obj.overlap(tileRect),
+      0,
+    );
+    if (isTileWalkable(...tilesAtCoord) && overlapSum < 0.3) {
+      walkableCoords.set(
+        vectorKey(tilesAtCoord[0]),
+        Vector.from(tilesAtCoord[0]),
+      );
+      graph.addNode(Vector.from(tilesAtCoord[0]));
     }
   }
 
-  const graph = new VectorGraph<Tile>();
-  for (const from of walkableCoords) {
-    graph.addNode(from);
-
-    for (const to of walkableCoords) {
-      // Only consider tiles that are one tile away to be neighbors
-      // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
-      const distance = from.distance(to);
-      if (distance === 1 || distance === Math.SQRT2) {
+  for (const coord of walkableCoords.values()) {
+    for (const [offsetX, offsetY] of neighborOffsets) {
+      const neighborKey = vectorKey({
+        x: coord.x + offsetX,
+        y: coord.y + offsetY,
+      });
+      const from = walkableCoords.get(vectorKey(coord));
+      const to = walkableCoords.get(neighborKey);
+      if (from && to) {
         graph.addLink(from, to);
       }
     }
@@ -52,12 +81,22 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   return graph;
 }
 
-function isObscured(
-  tile: TileLayerTile,
-  collidingObjects: Iterable<TileLayerTile>,
-): boolean {
-  return false;
-}
+const neighborOffsets: [number, number][] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+];
+
+const oneTile = new Vector(1 as Tile, 1 as Tile);
+
+type VectorKey = Branded<string, "VectorKey">;
+const vectorKey = <T extends number>(v: VectorLike<T>): string =>
+  `${v.x}|${v.y}` as VectorKey;
 
 function isTileWalkable(...tiles: TileLayerTile[]): boolean {
   let walkable = false;
