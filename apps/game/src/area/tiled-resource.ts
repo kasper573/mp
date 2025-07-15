@@ -1,28 +1,17 @@
 import { Vector } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
-import type {
-  TiledMap,
-  TileLayerTile,
-  Layer,
-  TiledObject,
+import {
+  type TiledMap,
+  type TileLayerTile,
+  type Layer,
+  type TiledObject,
+  type TilesetTile,
+  type GlobalTileId,
+  localToGlobalId,
 } from "@mp/tiled-loader";
 
 export class TiledResource {
-  #objects = new Map<TiledObject["id"], TiledObject>();
-  #tileList: TileLayerTile[];
-
-  get objects(): ReadonlyMap<TiledObject["id"], TiledObject> {
-    return this.#objects;
-  }
-
-  get tiles(): ReadonlyArray<TileLayerTile> {
-    return this.#tileList;
-  }
-
-  constructor(public readonly map: TiledMap) {
-    this.#objects = createObjectMap(map);
-    this.#tileList = map.layers.flatMap(tilesInLayer);
-  }
+  constructor(public readonly map: TiledMap) {}
 
   get tileSize() {
     return new Vector(this.map.tilewidth, this.map.tileheight);
@@ -51,43 +40,55 @@ export class TiledResource {
   };
 
   tileToWorldUnit = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
-}
 
-function tilesInLayer(layer: Layer): TileLayerTile[] {
-  switch (layer.type) {
-    case "group":
-      return layer.layers.flatMap(tilesInLayer);
-    case "tilelayer":
-      return layer.tiles;
-    case "objectgroup":
-    case "imagelayer":
-      return [];
-  }
-}
-
-function createObjectMap(map: TiledMap) {
-  const objectMap = new Map<TiledObject["id"], TiledObject>();
-  for (const layer of map.layers) {
-    for (const object of objectsInLayer(layer)) {
-      if (objectMap.has(object.id)) {
-        throw new Error(
-          `Duplicate object id "${object.id}" found in layer "${layer.name}"`,
-        );
+  *tilesetTiles(): Generator<TilesetTile & { gid: GlobalTileId }> {
+    for (const tileset of this.map.tilesets) {
+      for (const tile of tileset.tiles.values()) {
+        const gid = localToGlobalId(tileset.firstgid, tile.id);
+        yield { gid, ...tile };
       }
-      objectMap.set(object.id, object);
     }
   }
-  return objectMap;
+
+  *layerTiles(): Generator<TileLayerTile> {
+    for (const layer of this.map.layers) {
+      yield* tileLayerTiles(layer);
+    }
+  }
+
+  *objects(): Generator<TiledObject> {
+    for (const layer of this.map.layers) {
+      yield* objectsInLayer(layer);
+    }
+  }
 }
 
-function objectsInLayer(layer: Layer): TiledObject[] {
+function* tileLayerTiles(layer: Layer): Generator<TileLayerTile> {
   switch (layer.type) {
     case "group":
-      return layer.layers.flatMap(objectsInLayer);
-    case "objectgroup":
-      return layer.objects;
+      for (const subLayer of layer.layers) {
+        yield* tileLayerTiles(subLayer);
+      }
+      break;
     case "tilelayer":
-    case "imagelayer":
-      return [];
+      for (const tile of layer.tiles) {
+        yield tile;
+      }
+      break;
+  }
+}
+
+function* objectsInLayer(layer: Layer): Generator<TiledObject> {
+  switch (layer.type) {
+    case "group":
+      for (const subLayer of layer.layers) {
+        yield* objectsInLayer(subLayer);
+      }
+      break;
+    case "objectgroup":
+      for (const obj of layer.objects) {
+        yield obj;
+      }
+      break;
   }
 }
