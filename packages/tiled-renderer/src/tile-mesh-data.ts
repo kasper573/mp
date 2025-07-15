@@ -14,41 +14,43 @@ export interface TileRenderData {
 export function createTileMeshData(tiles: TileRenderData[]) {
   const N = tiles.length;
 
-  // 4 verts per tile, 2 components (x,y) each
   const vertices = new Float32Array(N * 4 * 2);
-  // same size for UVs
   const uvs = new Float32Array(N * 4 * 2);
-  // 6 indices per quad
-  const indices = new Uint32Array(N * 6);
+  const indices = new Uint32Array(N * 6); // Uint16 is sufficient unless you truly exceed 65535 verts
 
-  // Normalized UV pattern for a full-texture quad
+  // standard [0,0],[1,0],[1,1],[0,1]
   const uvPattern = [0, 0, 1, 0, 1, 1, 0, 1];
 
   for (let i = 0; i < N; i++) {
-    const { width, height } = tiles[i];
+    // build a transform matrix that:
+    //  • translates to (dx,dy)
+    //  • rotates by (rotation + optional 90° if diagonal)
+    //  • then scales by (±1, ±1) to do the horizontal/vertical flips
     const { a, b, c, d, tx, ty } = createTileTransform(tiles[i]);
 
-    // Transform the four corners of a rectangle [0,0]→[width,height]
+    // now lay out our quad at origin [0,0]→[width,height], *then*
+    // transform with our 2×3 matrix (a,b,c,d,tx,ty)
+    const { width, height } = tiles[i];
     const vOff = i * 8;
-    vertices[vOff] = tx; // x0
-    vertices[vOff + 1] = ty; // y0
-    vertices[vOff + 2] = a * width + tx; // x1
-    vertices[vOff + 3] = b * width + ty; // y1
-    vertices[vOff + 4] = a * width + c * height + tx; // x2
-    vertices[vOff + 5] = b * width + d * height + ty; // y2
-    vertices[vOff + 6] = c * height + tx; // x3
-    vertices[vOff + 7] = d * height + ty; // y3
+    vertices[vOff + 0] = tx;
+    vertices[vOff + 1] = ty;
+    vertices[vOff + 2] = a * width + tx;
+    vertices[vOff + 3] = b * width + ty;
+    vertices[vOff + 4] = a * width + c * height + tx;
+    vertices[vOff + 5] = b * width + d * height + ty;
+    vertices[vOff + 6] = c * height + tx;
+    vertices[vOff + 7] = d * height + ty;
 
-    // copy the same normalized UVs for each tile
+    // UVs stay the same
     uvs.set(uvPattern, vOff);
 
+    // two triangles per quad
     const iOff = i * 6;
     const base = i * 4;
-    // two triangles: (0,1,2) and (0,2,3)
-    indices[iOff] = base;
+    indices[iOff + 0] = base + 0;
     indices[iOff + 1] = base + 1;
     indices[iOff + 2] = base + 2;
-    indices[iOff + 3] = base;
+    indices[iOff + 3] = base + 0;
     indices[iOff + 4] = base + 2;
     indices[iOff + 5] = base + 3;
   }
@@ -56,39 +58,49 @@ export function createTileMeshData(tiles: TileRenderData[]) {
   return { vertices, uvs, indices };
 }
 
-function createTileTransform({
+export function createTileTransform({
+  width,
+  height,
   x,
   y,
   flags,
   rotation = 0,
 }: TileRenderData): Matrix {
-  const m = new Matrix();
+  // base translate target:
+  let dx: number = x;
+  let dy: number = y;
 
-  // 1) Build the flip‐swap matrix F
-  let sx = 1,
-    sy = 1,
-    swap = false;
-  if (flags?.flippedDiagonally) swap = true;
-  if (flags?.flippedHorizontally) sx = -1;
-  if (flags?.flippedVertically) sy = -1;
+  // start with any diagonal flip: that is really a 90° (π/2) rotation plus
+  // swapping your width/height *and* swapping which axis you flip for H/V.
+  let rot = rotation;
+  let sx = flags?.flippedHorizontally ? -1 : 1;
+  let sy = flags?.flippedVertically ? -1 : 1;
 
-  // Tiled “diagonal” flip = reflect across y=x ⟹ swap axes:
-  const aF = swap ? 0 : sx;
-  const bF = swap ? sy : 0;
-  const cF = swap ? sx : 0;
-  const dF = swap ? 0 : sy;
-  const F = new Matrix(aF, bF, cF, dF, 0, 0);
+  if (flags?.flippedDiagonally) {
+    // rotate tile by +90°
+    rot += Math.PI / 2;
+    // swap dimensions
+    [width, height] = [height, width];
+    // swap your H/V scale
+    [sx, sy] = [sy, sx];
+  }
 
-  // 2) Rotation matrix R:
-  const cos = Math.cos(rotation);
-  const sin = Math.sin(rotation);
+  // now if either scale is negative, we need to shift the origin
+  // by the full width/height so that the flip happens *about* the cell,
+  // not off into the void.
+  if (sx < 0) dx += width;
+  if (sy < 0) dy += height;
+
+  // build our M = T · R · S
+  const T = new Matrix(1, 0, 0, 1, dx, dy);
+  const cos = Math.cos(rot);
+  const sin = Math.sin(rot);
   const R = new Matrix(cos, sin, -sin, cos, 0, 0);
+  const S = new Matrix(sx, 0, 0, sy, 0, 0);
 
-  // 3) Translation T:
-  const T = new Matrix(1, 0, 0, 1, x, y);
-
-  // Prepend builds M = T·R·F·I
-  m.prepend(F).prepend(R).prepend(T);
-
-  return m;
+  // append order: this = T × R × S
+  return new Matrix()
+    .prepend(S) // S
+    .prepend(R) // R · S
+    .prepend(T); // T · R · S
 }
