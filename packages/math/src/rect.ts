@@ -1,3 +1,4 @@
+import type { MatrixData } from "./matrix";
 import { Vector } from "./vector";
 
 export class Rect<T extends number> implements RectLike<T> {
@@ -76,6 +77,36 @@ export class Rect<T extends number> implements RectLike<T> {
 
   divide<B extends number>(b: Vector<B>): Rect<B> {
     return new Rect(this.position.divide(b), this.size.divide(b));
+  }
+
+  apply([a, b, c, d, tx, ty]: MatrixData): Rect<T> {
+    const { x, y, width, height } = this;
+
+    // Transform all four corners
+    const x0 = a * x + c * y + tx;
+    const y0 = b * x + d * y + ty;
+
+    const x1 = a * (x + width) + c * y + tx;
+    const y1 = b * (x + width) + d * y + ty;
+
+    const x2 = a * x + c * (y + height) + tx;
+    const y2 = b * x + d * (y + height) + ty;
+
+    const x3 = a * (x + width) + c * (y + height) + tx;
+    const y3 = b * (x + width) + d * (y + height) + ty;
+
+    // Compute axis-aligned bounding box of transformed points
+    const newX = Math.min(x0, x1, x2, x3);
+    const newY = Math.min(y0, y1, y2, y3);
+    const newWidth = Math.max(x0, x1, x2, x3) - newX;
+    const newHeight = Math.max(y0, y1, y2, y3) - newY;
+
+    return Rect.fromComponents(
+      newX as T,
+      newY as T,
+      newWidth as T,
+      newHeight as T,
+    );
   }
 
   static fromDiameter<T extends number>(

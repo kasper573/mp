@@ -1,7 +1,7 @@
 import type { VectorKey } from "@mp/math";
 import { Matrix, Vector } from "@mp/math";
 import { Rect } from "@mp/math";
-import type { Tile } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import { upsertMap } from "@mp/std";
 import {
   type TileLayerTile,
@@ -10,10 +10,9 @@ import {
   type GlobalTileId,
   type TilesetTile,
   localToGlobalId,
-  createTileMatrix,
 } from "@mp/tiled-loader";
 import type { TiledResource } from "./tiled-resource";
-import { tiledObjectTransformInput } from "@mp/tiled-renderer";
+import { tiledObjectMeshInput } from "@mp/tiled-renderer";
 
 /**
  * Checks for the "Walkable" property in the tiled data and determines a score
@@ -24,13 +23,17 @@ import { tiledObjectTransformInput } from "@mp/tiled-renderer";
  * and the value represents the percentage of the tile that is obscured.
  */
 export class WalkableChecker {
-  private obscuringRects: Rect<Tile>[] = [];
-  private tilesByCoord = new Map<VectorKey, TileLayerTile[]>();
+  #obscuringRects: Rect<Tile>[] = [];
+  #tilesByCoord = new Map<VectorKey, TileLayerTile[]>();
+
+  get obscuringRects(): ReadonlyArray<Rect<Tile>> {
+    return this.#obscuringRects;
+  }
 
   constructor(private tiled: TiledResource) {
     for (const layer of this.tiled.map.layers) {
       for (const tile of tileLayerTiles(layer)) {
-        upsertMap(this.tilesByCoord, Vector.key(tile.x, tile.y), tile);
+        upsertMap(this.#tilesByCoord, Vector.key(tile.x, tile.y), tile);
       }
     }
 
@@ -51,10 +54,11 @@ export class WalkableChecker {
       if (obj.gid !== undefined) {
         const tile = tilesetTiles.get(obj.gid);
         if (tile && !isWalkable(tile.properties)) {
-          const objTransform = tiledObjectTransformInput(obj);
-          this.obscuringRects.push(
-            Rect.from(obj)
-              //.apply(new Matrix(objTransform))
+          // Use same transform as the renderer to ensure it's correct
+          const objTransform = tiledObjectMeshInput(obj).transform;
+          this.#obscuringRects.push(
+            new Rect(Vector.zero(), Vector.from(obj))
+              .apply(objTransform)
               .divide(this.tiled.tileSize) as unknown as Rect<Tile>,
           );
         }
@@ -63,7 +67,7 @@ export class WalkableChecker {
   }
 
   score(coord: Vector<Tile>): number {
-    const tilesAtCoord = this.tilesByCoord.get(coord.key);
+    const tilesAtCoord = this.#tilesByCoord.get(coord.key);
     if (!tilesAtCoord) {
       return 0; // No tiles exist at this coordinate at all
     }
@@ -72,14 +76,14 @@ export class WalkableChecker {
       return 0; // Tiles exist but have been configured to not be walkable
     }
 
-    if (!this.obscuringRects.length) {
+    if (!this.#obscuringRects.length) {
       return 1; // No obscuring objects exist, always fully walkable
     }
 
     // Tiles exist and are walkable, but may be obscured by objects.
     const rectAtCoord = new Rect(coord, oneTile);
     const tileObscuredAmount = Math.max(
-      ...this.obscuringRects.map((obscure) => rectAtCoord.overlap(obscure)),
+      ...this.#obscuringRects.map((obscure) => rectAtCoord.overlap(obscure)),
     );
 
     return 1 - tileObscuredAmount;
