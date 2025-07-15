@@ -4,7 +4,7 @@ import { Rect } from "@mp/math";
 import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import {
-  createNestedLayerRenderer,
+  createTiledRenderer,
   createTiledTextureLookup,
 } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
@@ -45,13 +45,13 @@ export class AreaScene extends Container {
     super({ sortableChildren: true });
 
     const lookup = createTiledTextureLookup(options.spritesheets);
-    const tileContainer = createNestedLayerRenderer(
-      options.area.tiled.map.layers,
-      lookup,
-    );
+    const tiledRenderer = createTiledRenderer({
+      map: options.area.tiled.map,
+      textureLookup: lookup,
+    });
 
     const dynamicLayerView = assert(
-      tileContainer.getChildByLabel(options.area.dynamicLayer.name),
+      tiledRenderer.getChildByLabel(options.area.dynamicLayer.name),
     );
 
     const areaDebug = new AreaDebugGraphics(
@@ -61,7 +61,7 @@ export class AreaScene extends Container {
       options.debugSettings,
     );
 
-    this.addChild(tileContainer);
+    this.addChild(tiledRenderer);
     this.addChild(areaDebug);
 
     if (this.engine.isInteractive) {

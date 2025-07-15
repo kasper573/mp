@@ -102,19 +102,19 @@ export function createTiledTextureLookup(
   spritesheets: TiledSpritesheetRecord,
 ): TiledTextureLookup {
   return (id) => {
+    if (id === undefined) {
+      return;
+    }
     for (const ss of Object.values(spritesheets)) {
       const texture = ss.textures[id] as Texture | undefined;
       if (texture) {
         return texture;
       }
     }
-    throw new Error(
-      `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
-    );
   };
 }
 
-export type TiledTextureLookup = (gid: GlobalTileId) => Texture;
+export type TiledTextureLookup = (gid?: GlobalTileId) => Texture | undefined;
 
 export interface TiledSpritesheetRecord {
   [image: string]: TiledSpritesheet;

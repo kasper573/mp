@@ -6,6 +6,7 @@ import type { TiledTextureLookup } from "./spritesheet";
 import { createTileTransform } from "./tile-transform";
 import type { Branded } from "../../std/src/types";
 import { AnimatedMesh } from "./animated-mesh";
+import { assert } from "@mp/std";
 
 /**
  * "dumb" but highly performant renderer that groups tiles by their
@@ -38,7 +39,7 @@ export function createTileRenderer(
   const tileMap = new Container({ isRenderGroup: true });
 
   for (const [textureTileId, renderData] of staticGroups) {
-    const texture = lookupTexture(textureTileId);
+    const texture = assert(lookupTexture(textureTileId));
     tileMap.addChild(createStaticTileRenderer(texture, renderData));
   }
 
@@ -46,7 +47,7 @@ export function createTileRenderer(
     const tiledFrames = parseAnimationKey(animationId);
     const rendererFrames = tiledFrames.map((f) => ({
       time: f.duration,
-      texture: lookupTexture(f.gid),
+      texture: assert(lookupTexture(f.gid)),
     }));
     tileMap.addChild(createAnimatedTileRenderer(rendererFrames, renderData));
   }
