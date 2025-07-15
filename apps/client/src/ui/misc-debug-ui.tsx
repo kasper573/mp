@@ -34,22 +34,24 @@ export function MiscDebugUi() {
           Die
         </Button>
       </div>
-      <div>
+      <label>
         Use server side patch optimizer:{" "}
         <Checkbox signal={isServerPatchOptimizerEnabled} />
-      </div>
-      <div>
+      </label>
+      <br />
+      <label>
         Use client side patch optimizer:{" "}
         <Checkbox
           signal={new PropertySignal(miscDebugSettings, "usePatchOptimizer")}
         />
-      </div>
-      <div>
+      </label>
+      <br />
+      <label>
         Use client side game state interpolator:{" "}
         <Checkbox
           signal={new PropertySignal(miscDebugSettings, "useInterpolator")}
         />
-      </div>
+      </label>
     </>
   );
 }

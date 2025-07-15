@@ -1,8 +1,8 @@
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { VectorGraph } from "@mp/path-finding";
-import type { DestroyOptions } from "@mp/graphics";
-import { Container, Graphics, ReactiveCollection } from "@mp/graphics";
+import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
+import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Tile, Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
 import { computed, effect, type ReadonlySignal } from "@mp/state";
@@ -18,6 +18,7 @@ import type {
 import { clientViewDistance } from "../client-view-distance-settings";
 import type { Actor } from "../actor/actor";
 import type { NpcInstance } from "../npc/types";
+import { WalkableChecker } from "./tiled-walkable-checker";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;
@@ -36,6 +37,7 @@ export class AreaDebugGraphics extends Container {
     const debugTiled = new DebugTiledGraph(
       area,
       () => this.settings().visibleGraphType,
+      () => this.settings().showWalkableScore,
     );
 
     this.actorPaths = new ReactiveCollection(
@@ -95,21 +97,42 @@ export class AreaDebugGraphics extends Container {
 }
 
 class DebugTiledGraph extends Graphics {
-  private cleanup: () => void;
+  private cleanups: Array<() => void> = [];
+  private walkableScoreText = new Text({
+    style: {
+      fill: "white",
+      fontSize: 28,
+      fontWeight: "bold",
+      stroke: { color: "black", width: 4 } satisfies Partial<StrokeStyle>,
+    } satisfies Partial<TextStyle>,
+    scale: 0.25,
+  });
+  private walkableChecker: WalkableChecker;
+
   constructor(
     private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
+    private shouldShowWalkableScore: () => boolean,
   ) {
     super();
-    this.cleanup = effect(this.update);
+
+    this.walkableChecker = new WalkableChecker(area.tiled);
+    this.addChild(this.walkableScoreText);
+
+    this.cleanups = [
+      effect(this.redrawGraph),
+      effect(this.updateWalkableScoreText),
+    ];
   }
 
   override destroy(options?: DestroyOptions): void {
     super.destroy(options);
-    this.cleanup();
+    for (const cleanup of this.cleanups) {
+      cleanup();
+    }
   }
 
-  private update = () => {
+  private redrawGraph = () => {
     this.clear();
     const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
@@ -135,6 +158,24 @@ class DebugTiledGraph extends Graphics {
           .map((node) => tiled.tileCoordToWorld(node.data.vector)),
       );
     }
+  };
+
+  private updateWalkableScoreText = () => {
+    if (!this.shouldShowWalkableScore()) {
+      this.walkableScoreText.visible = false;
+      return;
+    }
+
+    this.walkableScoreText.visible = true;
+    const engine = ioc.get(ctxEngine);
+    const { tiled } = this.area;
+    const { worldPosition } = engine.pointer;
+    const score = this.walkableChecker.score(
+      tiled.worldCoordToTile(worldPosition.value).round(),
+    );
+    this.walkableScoreText.position.copyFrom(worldPosition.value);
+    this.walkableScoreText.position.x += 5;
+    this.walkableScoreText.text = `${(score * 100).toFixed(2)}% walkable`;
   };
 }
 
