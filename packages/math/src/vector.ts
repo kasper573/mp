@@ -18,6 +18,10 @@ export class Vector<T extends number> implements VectorLike<T> {
     return new Vector<B>((this.x * b.x) as B, (this.y * b.y) as B);
   }
 
+  divide<B extends number>(b: Vector<B>): Vector<B> {
+    return new Vector<B>((this.x / b.x) as B, (this.y / b.y) as B);
+  }
+
   equals(b: Vector<T>): boolean {
     return this.x === b.x && this.y === b.y;
   }

@@ -74,6 +74,10 @@ export class Rect<T extends number> implements RectLike<T> {
     return new Rect(this.position.scale(b), this.size.scale(b));
   }
 
+  divide<B extends number>(b: Vector<B>): Rect<B> {
+    return new Rect(this.position.divide(b), this.size.divide(b));
+  }
+
   static fromDiameter<T extends number>(
     center: Vector<T>,
     diameter: T,
