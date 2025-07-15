@@ -3,10 +3,7 @@ import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import {
-  createTiledRenderer,
-  createTiledTextureLookup,
-} from "@mp/tiled-renderer";
+import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { DestroyOptions } from "@mp/graphics";
 import {
@@ -19,7 +16,6 @@ import { TimeSpan } from "@mp/time";
 import { computed } from "@mp/state";
 import { getAreaIdFromObject, type AreaResource } from "./area-resource";
 import { ActorController } from "../actor/actor-controller";
-
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ctxEngine } from "../context/common";
@@ -37,7 +33,6 @@ export interface AreaSceneOptions {
 
 export class AreaScene extends Container {
   private cleanupActorControllers: () => void;
-
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
 
@@ -45,8 +40,9 @@ export class AreaScene extends Container {
     super({ sortableChildren: true });
 
     const lookup = createTiledTextureLookup(options.spritesheets);
-    const tiledRenderer = createTiledRenderer({
-      map: options.area.tiled.map,
+
+    const tiledRenderer = new TiledRenderer({
+      layers: options.area.tiled.map.layers,
       textureLookup: lookup,
     });
 

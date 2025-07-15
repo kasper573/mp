@@ -16,7 +16,7 @@ import { createTileMeshData } from "./tile-mesh-data";
  * Does not handle any sorting, just brute force rendering.
  * Sorting should be handled by the parent container.
  */
-export function createTileRenderer(
+export function renderLayerTiles(
   tiles: TileLayerTile[],
   lookupTexture: TiledTextureLookup,
 ): Container {
@@ -50,9 +50,9 @@ export function* renderStaticTiles(
   staticGroups: Map<GlobalTileId, TileMeshInput[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
-  for (const [textureTileId, renderData] of staticGroups) {
+  for (const [textureTileId, meshInput] of staticGroups) {
     const texture = assert(lookupTexture(textureTileId));
-    yield createStaticTileRenderer(texture, renderData);
+    yield renderStaticTile(texture, ...meshInput);
   }
 }
 
@@ -60,26 +60,26 @@ export function* renderAnimatedTiles(
   animatedGroups: Map<AnimationKey, TileMeshInput[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
-  for (const [animationId, renderData] of animatedGroups) {
+  for (const [animationId, meshInput] of animatedGroups) {
     const tiledFrames = parseAnimationKey(animationId);
     const rendererFrames = tiledFrames.map((f) => ({
       time: f.duration,
       texture: assert(lookupTexture(f.gid)),
     }));
-    yield createAnimatedTileRenderer(rendererFrames, renderData);
+    yield renderAnimatedTile(rendererFrames, ...meshInput);
   }
 }
 
-function createStaticTileRenderer(
+export function renderStaticTile(
   texture: Texture,
-  tiles: TileMeshInput[],
+  ...tiles: TileMeshInput[]
 ): Mesh {
   return new MeshSimple({ texture, ...createTileMeshData(tiles) });
 }
 
-function createAnimatedTileRenderer(
+export function renderAnimatedTile(
   frames: FrameObject[],
-  tiles: TileMeshInput[],
+  ...tiles: TileMeshInput[]
 ): Mesh {
   return new AnimatedMesh(frames, createTileMeshData(tiles));
 }
