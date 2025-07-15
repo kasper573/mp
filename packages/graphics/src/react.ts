@@ -1,6 +1,6 @@
 import { useEffect } from "preact/hooks";
 import type { ApplicationOptions } from "@mp/graphics";
-import { Application } from "@mp/graphics";
+import { Application, Text } from "@mp/graphics";
 
 export interface UseGraphicsOptions
   extends Omit<Partial<ApplicationOptions>, "canvas" | "resizeTo"> {}
@@ -30,8 +30,19 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(
-      configureApp(app, options, container),
+    const cleanupFns = withErrorFallback(
+      () => normalizeCleanupFns(configureApp(app, options, container)),
+      (error) => {
+        // oxlint-disable-next-line no-console
+        console.error("Error initializing graphics:", error);
+        app.stage.addChild(
+          new Text({
+            text: "Error in renderer",
+            style: { fill: "red", fontSize: 24 },
+          }),
+        );
+        return [];
+      },
     );
     const initPromise = app
       .init({ ...options, canvas, resizeTo: container })
@@ -72,4 +83,15 @@ function normalizeCleanupFns(
     return [];
   }
   return Array.isArray(cleanup) ? cleanup : [cleanup];
+}
+
+function withErrorFallback<Result>(
+  init: () => Result,
+  fallback: (error: unknown) => Result,
+): Result {
+  try {
+    return init();
+  } catch (error) {
+    return fallback(error);
+  }
 }
