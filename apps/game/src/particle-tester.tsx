@@ -4,6 +4,7 @@ import kittenUrl from "./kitten.png";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
 import { useQuery } from "@mp/rpc/react";
+import { Rng } from "@mp/std";
 
 export function ParticleTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -31,6 +32,8 @@ function buildStage(app: Application, opt: { texture?: Texture }) {
     return;
   }
 
+  const rng = new Rng(1337);
+
   const container = new ParticleContainer({
     dynamicProperties: {
       position: true, // default
@@ -40,13 +43,13 @@ function buildStage(app: Application, opt: { texture?: Texture }) {
     },
   });
 
-  for (let i = 0; i < 1000; i++) {
+  for (let i = 0; i < 32000; i++) {
     const particle = new Particle({
       texture: opt.texture,
-      x: Math.random() * 800,
-      y: Math.random() * 600,
-      scaleX: 0.2,
-      scaleY: 0.2,
+      x: rng.next() * 800,
+      y: rng.next() * 600,
+      scaleX: 0.1,
+      scaleY: 0.1,
     });
 
     container.addParticle(particle);
