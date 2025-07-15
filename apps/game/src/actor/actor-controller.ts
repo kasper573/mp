@@ -109,9 +109,8 @@ export class ActorController extends Container {
       this.text.text += `\n${actor.xp}xp`;
     }
 
-    this.zIndex = actor.coords.y;
-
     this.position.copyFrom(tiled.tileCoordToWorld(actor.coords));
+    this.zIndex = this.position.y;
   };
 }
 

@@ -6,7 +6,7 @@ import type { VectorKey } from "@mp/math";
 import { Vector } from "@mp/math";
 
 /**
- * An extension of the tile-renderer that adds sorting.
+ * An extension of the tile-renderer that detects groups of tiles and sorts them by their shared y position
  */
 export function renderLayerTilesSorted(
   tiles: TileLayerTile[],
@@ -32,8 +32,11 @@ export function renderLayerTilesSorted(
     groupContainer.label = `Tile group ${group.id}`;
     for (const mesh of renderLayerTiles(group.tiles, textureLookup)) {
       groupContainer.addChild(mesh);
-      groupContainer.zIndex = Math.max(groupContainer.zIndex, mesh.y);
     }
+    groupContainer.zIndex = group.tiles.reduce(
+      (zIndex, tile) => Math.max(zIndex, tile.y * tile.height),
+      groupContainer.zIndex,
+    );
     container.addChild(groupContainer);
   }
 

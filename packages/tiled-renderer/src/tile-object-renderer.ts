@@ -1,32 +1,21 @@
-import { Container } from "@mp/graphics";
+import type { Mesh } from "@mp/graphics";
 import { Matrix } from "@mp/graphics";
 import type { TiledObject } from "@mp/tiled-loader";
 import { renderStaticTile } from "./tile-renderer";
 import type { TiledTextureLookup } from "./spritesheet";
 import type { TileMeshInput } from "./tile-mesh-data";
 
-export function renderTileObjects(
-  objects: TiledObject[],
+export function renderTileObject(
+  obj: TiledObject,
   textureLookup: TiledTextureLookup,
-): Container {
-  const container = new Container({
-    isRenderGroup: true,
-    sortableChildren: true,
-  });
-
-  for (const obj of objects) {
-    // We only render objects that reference tiles via gid
-    const texture = textureLookup(obj.gid);
-    if (texture) {
-      // We can't utilize the batched rendering since it doesn't support depth sorting.
-      // So we render one mesh per object so we can assign the zIndex of each mesh.
-      const mesh = renderStaticTile(texture, [tiledObjectMeshInput(obj)]);
-      mesh.zIndex = obj.y / texture.height; // Pixel -> Tile space
-      container.addChild(mesh);
-    }
+): Mesh | undefined {
+  // We only render objects that reference tiles via gid
+  const texture = textureLookup(obj.gid);
+  if (texture) {
+    // We can't utilize the batched rendering since our mesh renderer doesn't support depth sorting.
+    // So we render one mesh per object so we can assign the zIndex of each mesh.
+    return renderStaticTile(texture, [tiledObjectMeshInput(obj)]);
   }
-
-  return container;
 }
 
 export function tiledObjectMeshInput(t: TiledObject): TileMeshInput {

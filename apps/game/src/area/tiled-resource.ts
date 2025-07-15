@@ -1,6 +1,10 @@
 import { Vector } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
-import type { TiledMap, Layer, TiledObject } from "@mp/tiled-loader";
+import {
+  type TiledMap,
+  type TiledObject,
+  objectsInLayers,
+} from "@mp/tiled-loader";
 
 export class TiledResource {
   constructor(public readonly map: TiledMap) {}
@@ -34,23 +38,6 @@ export class TiledResource {
   tileToWorldUnit = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
 
   *objects(): Generator<TiledObject> {
-    for (const layer of this.map.layers) {
-      yield* objectsInLayer(layer);
-    }
-  }
-}
-
-function* objectsInLayer(layer: Layer): Generator<TiledObject> {
-  switch (layer.type) {
-    case "group":
-      for (const subLayer of layer.layers) {
-        yield* objectsInLayer(subLayer);
-      }
-      break;
-    case "objectgroup":
-      for (const obj of layer.objects) {
-        yield obj;
-      }
-      break;
+    yield* objectsInLayers(this.map.layers);
   }
 }
