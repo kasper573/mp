@@ -38,6 +38,8 @@ export function tiledObjectMeshInput(t: TiledObject): TileMeshInput {
   // Now we can translate to the object position
   m.translate(t.x, t.y);
 
+  // TODO process flags
+
   return {
     width: t.width,
     height: t.height,
