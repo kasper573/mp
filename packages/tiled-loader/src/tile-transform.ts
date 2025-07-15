@@ -11,21 +11,13 @@ export interface TileTransform {
   flags?: GlobalIdFlags;
 }
 
-export function createTileMatrix({
-  x,
-  y,
-  width,
-  height,
-  rotation,
-  originX,
-  originY,
-  flags,
-}: TileTransform) {
+export function createTileMatrix(t: TileTransform) {
   // 1) figure out flips + rot
-  let sx = flags?.flippedHorizontally ? -1 : 1;
-  let sy = flags?.flippedVertically ? -1 : 1;
-  let rot = rotation;
-  if (flags?.flippedDiagonally) {
+  let { width, height } = t;
+  let sx = t.flags?.flippedHorizontally ? -1 : 1;
+  let sy = t.flags?.flippedVertically ? -1 : 1;
+  let rot = t.rotation;
+  if (t.flags?.flippedDiagonally) {
     rot += Math.PI / 2;
     [width, height] = [height, width];
     [sx, sy] = [sy, sx];
@@ -33,8 +25,8 @@ export function createTileMatrix({
 
   // 2) compute the “true” pivot point in world-space
   //    (x,y) is your raw object.x/y; add the fractional origin * size
-  const px = x + originX * width;
-  const py = y + originY * height;
+  const px = t.x + t.originX * width;
+  const py = t.y + t.originY * height;
 
   // 3) standard a/b/c/d from R·S
   const cos = Math.cos(rot),
@@ -46,8 +38,8 @@ export function createTileMatrix({
 
   // 4) figure out the final tx/ty so that
   //    M ⋅ [ox*width, oy*height, 1] = [px,py]
-  const ox = originX * width,
-    oy = originY * height;
+  const ox = t.originX * width,
+    oy = t.originY * height;
   const tx = px - (a * ox + c * oy);
   const ty = py - (b * ox + d * oy);
 
