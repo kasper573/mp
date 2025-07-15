@@ -1,4 +1,5 @@
-import { Container, Matrix } from "@mp/graphics";
+import { Container } from "@mp/graphics";
+import { Matrix } from "@mp/graphics";
 import type { TiledObject } from "@mp/tiled-loader";
 import { renderStaticTile } from "./tile-renderer";
 import type { TiledTextureLookup } from "./spritesheet";

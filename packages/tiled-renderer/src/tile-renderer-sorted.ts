@@ -16,18 +16,24 @@ export function renderLayerTilesSorted(
 
   const { groups, other } = groupTiles(tiles);
 
-  const otherContainer = renderLayerTiles(other, textureLookup);
+  const otherContainer = new Container({ isRenderGroup: true });
   otherContainer.label = "Ungrouped tiles";
   otherContainer.zIndex = 0;
+  for (const mesh of renderLayerTiles(other, textureLookup)) {
+    otherContainer.addChild(mesh);
+  }
   container.addChild(otherContainer);
 
   // Some tiles are grouped with the intention of being sorted
   // on the same zIndex. This helps give them the appearance of
   // being a single object, ie. the crown of a tree.
   for (const group of groups) {
-    const groupContainer = renderLayerTiles(group.tiles, textureLookup);
+    const groupContainer = new Container({ isRenderGroup: true });
     groupContainer.label = `Tile group ${group.id}`;
-    groupContainer.zIndex = Math.max(...group.tiles.map((t) => t.y));
+    for (const mesh of renderLayerTiles(group.tiles, textureLookup)) {
+      groupContainer.addChild(mesh);
+      groupContainer.zIndex = Math.max(groupContainer.zIndex, mesh.y);
+    }
     container.addChild(groupContainer);
   }
 

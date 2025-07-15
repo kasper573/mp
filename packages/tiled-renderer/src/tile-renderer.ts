@@ -1,5 +1,5 @@
 import type { Texture, Mesh, FrameObject } from "@mp/graphics";
-import { Container, MeshSimple } from "@mp/graphics";
+import { MeshSimple } from "@mp/graphics";
 import type { GlobalTileId } from "@mp/tiled-loader";
 import { localToGlobalId, type TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
@@ -16,10 +16,10 @@ import { createTileMeshData } from "./tile-mesh-data";
  * Does not handle any sorting, just brute force rendering.
  * Sorting should be handled by the parent container.
  */
-export function renderLayerTiles(
+export function* renderLayerTiles(
   tiles: TileLayerTile[],
   lookupTexture: TiledTextureLookup,
-): Container {
+): Generator<Mesh> {
   // Group tiles by their texture or animation
   const staticGroups = new Map<GlobalTileId, TileMeshInput[]>();
   const animatedGroups = new Map<AnimationKey, TileMeshInput[]>();
@@ -33,17 +33,8 @@ export function renderLayerTiles(
     }
   }
 
-  const tileMap = new Container({ isRenderGroup: true });
-
-  for (const mesh of renderStaticTiles(staticGroups, lookupTexture)) {
-    tileMap.addChild(mesh);
-  }
-
-  for (const mesh of renderAnimatedTiles(animatedGroups, lookupTexture)) {
-    tileMap.addChild(mesh);
-  }
-
-  return tileMap;
+  yield* renderStaticTiles(staticGroups, lookupTexture);
+  yield* renderAnimatedTiles(animatedGroups, lookupTexture);
 }
 
 export function* renderStaticTiles(
