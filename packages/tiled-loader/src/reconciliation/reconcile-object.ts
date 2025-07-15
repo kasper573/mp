@@ -1,13 +1,19 @@
+import type { Pixel } from "@mp/std";
 import type { TiledObject } from "../schema/object";
 import type { Tileset } from "../schema/tileset";
 import { reconcileProperties } from "./reconcile-properties";
 
 export function reconcileObject(
   obj: TiledObject | ObjectTemplate,
+  tileHeight: Pixel,
 ): TiledObject {
   if ("object" in obj) {
     throw new Error("Object template reconciliation not implemented");
   }
+
+  // For some reason tile objects are achored to the bottom of the tile.
+  // We prefer it anchored to the top left, so we adjust.
+  obj.y = (obj.y - tileHeight) as Pixel;
 
   reconcileProperties(obj);
 

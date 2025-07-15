@@ -17,11 +17,7 @@ export function createObjectRenderer(
     return;
   }
 
-  const { x, width, height, rotation } = obj;
-
-  // For some reason tile objects are achored to the bottom of the tile
-  // so we need to adjust the position to match the top left corner to align with the tile renderer.
-  const y = obj.y - opt.tileHeight;
+  const { x, y, width, height, rotation } = obj;
 
   switch (obj.objectType) {
     case "rectangle": {
