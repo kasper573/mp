@@ -1,5 +1,5 @@
 import type { VectorKey } from "@mp/math";
-import { Vector } from "@mp/math";
+import { Matrix, Vector } from "@mp/math";
 import { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { upsertMap } from "@mp/std";
@@ -10,8 +10,10 @@ import {
   type GlobalTileId,
   type TilesetTile,
   localToGlobalId,
+  createTileMatrix,
 } from "@mp/tiled-loader";
 import type { TiledResource } from "./tiled-resource";
+import { tiledObjectTransformInput } from "@mp/tiled-renderer";
 
 /**
  * Checks for the "Walkable" property in the tiled data and determines a score
@@ -49,8 +51,11 @@ export class WalkableChecker {
       if (obj.gid !== undefined) {
         const tile = tilesetTiles.get(obj.gid);
         if (tile && !isWalkable(tile.properties)) {
+          const objTransform = tiledObjectTransformInput(obj);
           this.obscuringRects.push(
-            Rect.from(obj).divide(this.tiled.tileSize) as unknown as Rect<Tile>,
+            Rect.from(obj)
+              //.apply(new Matrix(objTransform))
+              .divide(this.tiled.tileSize) as unknown as Rect<Tile>,
           );
         }
       }

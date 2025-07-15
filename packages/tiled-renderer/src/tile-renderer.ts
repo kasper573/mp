@@ -1,12 +1,12 @@
 import type { Texture, Mesh, FrameObject } from "@mp/graphics";
 import { Container, MeshSimple } from "@mp/graphics";
-import type { GlobalTileId } from "@mp/tiled-loader";
+import type { GlobalTileId, TileTransform } from "@mp/tiled-loader";
 import { localToGlobalId, type TileLayerTile } from "@mp/tiled-loader";
 import type { TiledTextureLookup } from "./spritesheet";
-import type { Branded, Pixel } from "../../std/src/types";
+import type { Branded } from "../../std/src/types";
 import { AnimatedMesh } from "./animated-mesh";
 import { assert, upsertMap } from "@mp/std";
-import { createTileMeshData, type TileRenderData } from "./tile-mesh-data";
+import { createTileMeshData } from "./tile-mesh-data";
 
 /**
  * "dumb" but highly performant renderer that groups tiles by their
@@ -20,15 +20,18 @@ export function createTileRenderer(
   lookupTexture: TiledTextureLookup,
 ): Container {
   // Group tiles by their texture or animation
-  const staticGroups = new Map<GlobalTileId, TileRenderData[]>();
-  const animatedGroups = new Map<AnimationKey, TileRenderData[]>();
+  const staticGroups = new Map<GlobalTileId, TileTransform[]>();
+  const animatedGroups = new Map<AnimationKey, TileTransform[]>();
   for (const layerTile of tiles) {
-    const renderData: TileRenderData = {
-      x: (layerTile.x * layerTile.width) as Pixel,
-      y: (layerTile.y * layerTile.height) as Pixel,
+    const renderData: TileTransform = {
+      x: layerTile.x * layerTile.width,
+      y: layerTile.y * layerTile.height,
       width: layerTile.width,
       height: layerTile.height,
       flags: layerTile.flags,
+      originX: 0.5,
+      originY: 0.5,
+      rotation: 0,
     };
 
     if (layerTile.tile.animation) {
@@ -52,7 +55,7 @@ export function createTileRenderer(
 }
 
 export function* renderStaticTiles(
-  staticGroups: Map<GlobalTileId, TileRenderData[]>,
+  staticGroups: Map<GlobalTileId, TileTransform[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
   for (const [textureTileId, renderData] of staticGroups) {
@@ -62,7 +65,7 @@ export function* renderStaticTiles(
 }
 
 export function* renderAnimatedTiles(
-  animatedGroups: Map<AnimationKey, TileRenderData[]>,
+  animatedGroups: Map<AnimationKey, TileTransform[]>,
   lookupTexture: TiledTextureLookup,
 ): Generator<Mesh> {
   for (const [animationId, renderData] of animatedGroups) {
@@ -77,14 +80,14 @@ export function* renderAnimatedTiles(
 
 function createStaticTileRenderer(
   texture: Texture,
-  tiles: TileRenderData[],
+  tiles: TileTransform[],
 ): Mesh {
   return new MeshSimple({ texture, ...createTileMeshData(tiles) });
 }
 
 function createAnimatedTileRenderer(
   frames: FrameObject[],
-  tiles: TileRenderData[],
+  tiles: TileTransform[],
 ): Mesh {
   return new AnimatedMesh(frames, createTileMeshData(tiles));
 }

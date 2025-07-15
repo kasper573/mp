@@ -11,6 +11,7 @@ export type * from "./schema/tileset";
 export type * from "./schema/transformations";
 export type * from "./schema/wang";
 
+export * from "./tile-transform";
 export * from "./schema/common";
 export * from "./loader";
 export * from "./gid";
