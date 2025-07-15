@@ -15,9 +15,9 @@ export function deriveNpcSpawnsFromAreas(
 ) {
   const derived: Array<{ npc: Npc; spawn: NpcSpawn }> = [];
   for (const area of areas.values()) {
-    const npcObjects = area.tiled.objects(
-      (obj) => obj.type === ("npc" as TiledClass),
-    );
+    const npcObjects = area.tiled.objects
+      .values()
+      .filter((obj) => obj.type === ("npc" as TiledClass));
     for (const npcObject of npcObjects) {
       const idProperty = npcObject.properties.get("npc-id");
       if (!idProperty) {

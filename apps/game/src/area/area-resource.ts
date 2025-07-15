@@ -35,7 +35,7 @@ export class AreaResource {
     this.#findPath = this.graph.createPathFinder();
 
     const startObj = assert(
-      tiled.objects().find((obj) => obj.type === TiledFixture.start),
+      tiled.objects.values().find((obj) => obj.type === TiledFixture.start),
       "Invalid area data: must have a start location",
     );
 
@@ -58,14 +58,13 @@ export class AreaResource {
   }
 
   *hitTestObjects(candidates: Iterable<Vector<Pixel>>): Generator<TiledObject> {
-    yield* this.tiled.objects((obj) => {
+    for (const obj of this.tiled.objects.values()) {
       for (const coord of candidates) {
         if (hitTestTiledObject(obj, coord)) {
-          return true;
+          yield obj;
         }
       }
-      return false;
-    });
+    }
   }
 
   static findPathMiddleware = (

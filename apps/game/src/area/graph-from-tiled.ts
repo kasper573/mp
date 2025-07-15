@@ -24,8 +24,6 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
     },
   );
 
-  //tiled.getObjects().filter((obj) => obj.gid !== undefined);
-
   for (const from of walkableTileCoords) {
     graph.addNode(from);
 
@@ -55,7 +53,7 @@ function getMatchingTileCoords<T>(
   coordinateTest: (values: NoInfer<T>[]) => boolean,
 ): Vector<Tile>[] {
   const tilesPerCoordinate = groupBy(
-    tiled.tiles().map((layerTile) => ({
+    tiled.tiles.values().map((layerTile) => ({
       pos: new Vector(layerTile.x, layerTile.y),
       propertyValue: getValue(layerTile),
     })),

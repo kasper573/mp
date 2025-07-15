@@ -5,10 +5,36 @@ import type {
   TileLayerTile,
   Layer,
   TiledObject,
+  GlobalTileId,
 } from "@mp/tiled-loader";
 
 export class TiledResource {
-  constructor(public readonly map: TiledMap) {}
+  #tiles = new Map<GlobalTileId, TileLayerTile>();
+  #objects = new Map<TiledObject["id"], TiledObject>();
+
+  get tiles(): ReadonlyMap<GlobalTileId, TileLayerTile> {
+    return this.#tiles;
+  }
+
+  get objects(): ReadonlyMap<TiledObject["id"], TiledObject> {
+    return this.#objects;
+  }
+
+  constructor(public readonly map: TiledMap) {
+    for (const layer of this.map.layers) {
+      for (const tile of tilesInLayer(layer, all)) {
+        this.#tiles.set(tile.id, tile);
+      }
+      for (const object of objectsInLayer(layer, all)) {
+        if (this.#objects.has(object.id)) {
+          throw new Error(
+            `Duplicate object id "${object.id}" found in layer "${layer.name}"`,
+          );
+        }
+        this.#objects.set(object.id, object);
+      }
+    }
+  }
 
   get tileSize() {
     return new Vector(this.map.tilewidth, this.map.tileheight);
@@ -37,22 +63,6 @@ export class TiledResource {
   };
 
   tileToWorldUnit = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
-
-  *objects(
-    predicate: (obj: TiledObject) => boolean = all,
-  ): Generator<TiledObject> {
-    for (const layer of this.map.layers) {
-      yield* objectsInLayer(layer, predicate);
-    }
-  }
-
-  *tiles(
-    predicate: (obj: TileLayerTile) => boolean = all,
-  ): Generator<TileLayerTile> {
-    for (const layer of this.map.layers) {
-      yield* tilesInLayer(layer, predicate);
-    }
-  }
 }
 
 function* tilesInLayer(
