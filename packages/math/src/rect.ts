@@ -28,6 +28,35 @@ export class Rect<T extends number> implements RectLike<T> {
     );
   }
 
+  /**
+   * 1 = fully obscured by `other`
+   * 0.5 = half of the area is obscured by `other`
+   * 0 = no intersection at all
+   */
+  overlap(other: Rect<T>): number {
+    if (
+      this.x + this.width < other.x ||
+      this.x > other.x + other.width ||
+      this.y + this.height < other.y ||
+      this.y > other.y + other.height
+    ) {
+      return 0;
+    }
+
+    const xOverlap = Math.max(
+      0,
+      Math.min(this.x + this.width, other.x + other.width) -
+        Math.max(this.x, other.x),
+    );
+    const yOverlap = Math.max(
+      0,
+      Math.min(this.y + this.height, other.y + other.height) -
+        Math.max(this.y, other.y),
+    );
+
+    return (xOverlap * yOverlap) / (this.width * this.height);
+  }
+
   offset(offset: Vector<T>): Rect<T> {
     return new Rect(this.position.add(offset), this.size);
   }
