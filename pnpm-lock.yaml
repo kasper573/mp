@@ -490,6 +490,9 @@ importers:
 
   packages/math:
     devDependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig

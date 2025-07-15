@@ -1,7 +1,7 @@
+import type { VectorKey } from "@mp/math";
 import { Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import { aStar } from "ngraph.path";
-import type { Branded } from "@mp/std";
 
 export class VectorGraph<T extends number> {
   private nodeIds = new Set<VectorGraphNodeId>();
@@ -56,7 +56,7 @@ export class VectorGraph<T extends number> {
       from.add(new Vector<T>(0 as T, yOffset as T)),
       from.add(new Vector<T>(xOffset as T, yOffset as T)),
     ]
-      .map(nodeIdFromVector)
+      .map((v) => v.key)
       .filter(this.hasNode)
       .map(this.getNode);
   }
@@ -70,13 +70,12 @@ export class VectorGraph<T extends number> {
   }
 
   readonly addNode = (vector: Vector<T>) => {
-    const id = nodeIdFromVector(vector);
-    this.nodeIds.add(id);
-    this.ng.addNode(id, { vector });
+    this.nodeIds.add(vector.key);
+    this.ng.addNode(vector.key, { vector });
   };
 
   readonly addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
-    this.ng.addLink(nodeIdFromVector(fromVector), nodeIdFromVector(toVector), {
+    this.ng.addLink(fromVector.key, toVector.key, {
       distance: fromVector.distance(toVector),
     });
   };
@@ -137,11 +136,4 @@ interface NodeData<T extends number> {
   readonly vector: Vector<T>;
 }
 
-export type VectorGraphNodeId = Branded<string, "NodeId">;
-
-function nodeIdFromVector<T extends number>({
-  x,
-  y,
-}: Vector<T>): VectorGraphNodeId {
-  return `${x}:${y}` as VectorGraphNodeId;
-}
+export type VectorGraphNodeId = VectorKey;

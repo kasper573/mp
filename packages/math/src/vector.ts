@@ -1,8 +1,13 @@
+import type { Branded } from "@mp/std";
+
 export class Vector<T extends number> implements VectorLike<T> {
+  readonly key: VectorKey;
+
   constructor(
     public readonly x: T,
     public readonly y: T,
   ) {
+    this.key = Vector.key(x, y);
     Object.freeze(this);
   }
 
@@ -54,7 +59,16 @@ export class Vector<T extends number> implements VectorLike<T> {
   static from<T extends number>(obj: VectorLike<T>): Vector<T> {
     return new Vector<T>(obj.x, obj.y);
   }
+
+  static key(x: number, y: number): VectorKey {
+    return `${x}|${y}` as VectorKey;
+  }
 }
+
+/**
+ * A unique key for a vector, useful for hashing.
+ */
+export type VectorKey = Branded<string, "VectorKey">;
 
 const vecZeroConst = new Vector(0, 0);
 
