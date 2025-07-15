@@ -10,8 +10,8 @@ import type { TileMeshInput } from "./tile-mesh-data";
 import { createTileMeshData } from "./tile-mesh-data";
 
 /**
- * "dumb" but highly performant renderer that groups tiles by their
- * texture or animation and renders them as a single mesh.
+ * Highly performant renderer that groups tiles by their
+ * texture or animation and renders them as a single mesh per group.
  *
  * Does not handle any sorting, just brute force rendering.
  * Sorting should be handled by the parent container.
@@ -125,7 +125,6 @@ function createTileMeshInput({
   }
 
   // 2) compute the “true” pivot point in world-space
-  //    (x,y) is your raw object.x/y; add the fractional origin * size
   const px = x * width + 0.5 * width;
   const py = y * height + 0.5 * height;
 
