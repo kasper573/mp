@@ -1,33 +1,45 @@
 import { VectorGraph } from "@mp/path-finding";
-import type { Tile } from "@mp/std";
+import { upsertMap, type Tile } from "@mp/std";
 import type { TiledResource } from "./tiled-resource";
 import { Vector } from "@mp/math";
+import type { GlobalTileId, TiledObject } from "@mp/tiled-loader";
 import type { TileLayerTile } from "@mp/tiled-loader";
 
 export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
-  const graph = new VectorGraph<Tile>();
+  const tilesByGid = new Map<GlobalTileId, TileLayerTile[]>();
+  const tilesByCoord = new Map<string, TileLayerTile[]>();
+  for (const tile of tiled.tiles) {
+    upsertMap(tilesByGid, tile.id, tile);
+    upsertMap(tilesByCoord, `${tile.x}|${tile.y}`, tile);
+  }
 
-  const walkableTileCoords = getMatchingTileCoords(
-    tiled,
-    ({ tile }) => tile.properties.get("Walkable")?.value,
-    (valuesPerTile) => {
-      let walkable = false;
-      for (const value of valuesPerTile) {
-        if (value === false) {
-          return false;
-        }
-        if (value === true) {
-          walkable = true;
-        }
+  // The gid in objects refer to tiles that are actually rendered,
+  // so we need to consider them for collission as well (if the tile they reference is not walkable)
+  const obscuringObjects = new Map<TiledObject, TileLayerTile>();
+  for (const obj of tiled.objects.values()) {
+    if (obj.gid !== undefined) {
+      const referencedTiles = tilesByGid.get(obj.gid);
+      if (referencedTiles?.length && !isTileWalkable(...referencedTiles)) {
+        obscuringObjects.set(obj, referencedTiles[0]);
       }
-      return walkable;
-    },
-  );
+    }
+  }
 
-  for (const from of walkableTileCoords) {
+  const walkableCoords: Vector<Tile>[] = [];
+  for (const tilesAtCoord of tilesByCoord.values()) {
+    if (
+      isTileWalkable(...tilesAtCoord) &&
+      !isObscured(tilesAtCoord[0], obscuringObjects.values())
+    ) {
+      walkableCoords.push(Vector.from(tilesAtCoord[0]));
+    }
+  }
+
+  const graph = new VectorGraph<Tile>();
+  for (const from of walkableCoords) {
     graph.addNode(from);
 
-    for (const to of walkableTileCoords) {
+    for (const to of walkableCoords) {
       // Only consider tiles that are one tile away to be neighbors
       // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
       const distance = from.distance(to);
@@ -37,49 +49,28 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
     }
   }
 
-  // objects with gid are tile references that are rendered, and thus should be considered
-  // for (const candidate of tiled.queryObjects()) {
-  //   if (candidate.gid !== undefined {
-  //     graph.addNode(tiled.getTile(candidate.gid).coord);
-  //   }
-  // }
-
   return graph;
 }
 
-function getMatchingTileCoords<T>(
-  tiled: TiledResource,
-  getValue: (tile: TileLayerTile) => T,
-  coordinateTest: (values: NoInfer<T>[]) => boolean,
-): Vector<Tile>[] {
-  const tilesPerCoordinate = groupBy(
-    tiled.tiles.values().map((layerTile) => ({
-      pos: new Vector(layerTile.x, layerTile.y),
-      propertyValue: getValue(layerTile),
-    })),
-    ({ pos: { x, y } }) => `${String(x)}|${String(y)}`,
-  );
-
-  const coordinates: Vector<Tile>[] = [];
-  for (const tiles of tilesPerCoordinate.values()) {
-    const values = tiles.map((t) => t.propertyValue);
-    if (coordinateTest(values)) {
-      coordinates.push(tiles[0].pos);
-    }
-  }
-
-  return coordinates;
+function isObscured(
+  tile: TileLayerTile,
+  collidingObjects: Iterable<TileLayerTile>,
+): boolean {
+  return false;
 }
-function groupBy<T, K>(array: Iterable<T>, key: (item: T) => K): Map<K, T[]> {
-  const map = new Map<K, T[]>();
-  for (const item of array) {
-    const k = key(item);
-    let items = map.get(k);
-    if (!items) {
-      items = [];
-      map.set(k, items);
+
+function isTileWalkable(...tiles: TileLayerTile[]): boolean {
+  let walkable = false;
+  for (const tile of tiles) {
+    const val = tile.tile.properties.get("Walkable")?.value as
+      | boolean
+      | undefined;
+    if (val === false) {
+      return false;
     }
-    items.push(item);
+    if (val === true) {
+      walkable = true;
+    }
   }
-  return map;
+  return walkable;
 }
