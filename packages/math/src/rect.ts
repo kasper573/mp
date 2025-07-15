@@ -35,6 +35,15 @@ export class Rect<T extends number> implements RectLike<T> {
    */
   overlap(other: Rect<T>): number {
     if (
+      this.width <= 0 ||
+      this.height <= 0 ||
+      other.width <= 0 ||
+      other.height <= 0
+    ) {
+      return 0;
+    }
+
+    if (
       this.x + this.width < other.x ||
       this.x > other.x + other.width ||
       this.y + this.height < other.y ||
