@@ -56,6 +56,7 @@ export class AreaScene extends Container {
 
     this.addChild(tiledRenderer);
     this.addChild(areaDebug);
+    sortingLayer.attach(areaDebug);
     this.addChild(sortingLayer);
 
     if (this.engine.isInteractive) {
