@@ -10,6 +10,7 @@ import {
   Container,
   Matrix,
   reactiveCollectionBinding,
+  RenderLayer,
   Ticker,
 } from "@mp/graphics";
 import { TimeSpan } from "@mp/time";
@@ -37,18 +38,13 @@ export class AreaScene extends Container {
   private cleanup: () => void;
 
   constructor(private options: AreaSceneOptions) {
-    super({ sortableChildren: true });
+    super();
 
+    const sortingLayer = new RenderLayer({ sortableChildren: true });
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
-      options.area.dynamicLayer.name,
+      sortingLayer,
       createTiledTextureLookup(options.spritesheets),
-    );
-
-    this.cleanup = reactiveCollectionBinding(
-      tiledRenderer.dynamicLayer,
-      this.state.actorList,
-      (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
 
     const areaDebug = new AreaDebugGraphics(
@@ -60,19 +56,26 @@ export class AreaScene extends Container {
 
     this.addChild(tiledRenderer);
     this.addChild(areaDebug);
+    this.addChild(sortingLayer);
 
     if (this.engine.isInteractive) {
       const tileHighlight = new TileHighlight(() => ({
         area: options.area,
         target: this.highlightTarget.value,
       }));
+      tileHighlight.zIndex = Number.MAX_SAFE_INTEGER; // Always on top
       this.addChild(tileHighlight);
+      sortingLayer.attach(tileHighlight);
     }
 
     this.cleanup = reactiveCollectionBinding(
-      tiledRenderer.dynamicLayer,
+      this,
       this.state.actorList,
-      (actor) => new ActorController({ actor, tiled: options.area.tiled }),
+      (actor) => {
+        const ac = new ActorController({ actor, tiled: options.area.tiled });
+        sortingLayer.attach(ac);
+        return ac;
+      },
     );
 
     this.onRender = this.#onRender;
