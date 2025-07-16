@@ -30,21 +30,23 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(
-      configureApp(app, options, container),
-    );
+    let cleanupFns: Array<() => void>;
     const initPromise = app
       .init({ ...options, canvas, resizeTo: container })
-      .then(() => onInitialized(app));
+      .then(() => {
+        cleanupFns = normalizeCleanupFns(configureApp(app, options, container));
+        onInitialized(app);
+      });
 
     return () => {
       canvas.remove();
-      for (const cleanup of cleanupFns) {
-        cleanup();
-      }
-      void initPromise.then(() =>
-        app.destroy({ removeView: false }, { children: true }),
-      );
+
+      void initPromise.then(() => {
+        for (const cleanup of cleanupFns) {
+          cleanup();
+        }
+        app.destroy({ removeView: false }, { children: true });
+      });
     };
     // oxlint-disable-next-line exhaustive-deps A bit hacky but it works. Trust my judgement.
   }, [container, configureApp, ...Object.values(options)]);
