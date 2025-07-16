@@ -78,4 +78,4 @@ export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
   return prop ? (prop.value as AreaId) : undefined;
 }
 
-const dynamicLayerName = "Dynamic";
+export const dynamicLayerName = "Dynamic";

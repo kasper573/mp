@@ -16,9 +16,9 @@ import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~cont
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
 import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
 import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
+import { Route as LayoutAdminDevtoolsTileRendererTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~tile-renderer-tester'
 import { Route as LayoutAdminDevtoolsStorageTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~storage-tester'
 import { Route as LayoutAdminDevtoolsSpringTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~spring-tester'
-import { Route as LayoutAdminDevtoolsParticleTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~particle-tester'
 import { Route as LayoutAdminDevtoolsObservableTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~observable-tester'
 import { Route as LayoutAdminDevtoolsErrorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~error-tester'
 import { Route as LayoutAdminDevtoolsActorTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~actor-tester'
@@ -59,6 +59,12 @@ const LayoutAdminDevtoolsRouteRoute =
     path: '/admin/devtools',
     getParentRoute: () => LayoutRouteRoute,
   } as any)
+const LayoutAdminDevtoolsTileRendererTesterRoute =
+  LayoutAdminDevtoolsTileRendererTesterRouteImport.update({
+    id: '/tile-renderer-tester',
+    path: '/tile-renderer-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
+  } as any)
 const LayoutAdminDevtoolsStorageTesterRoute =
   LayoutAdminDevtoolsStorageTesterRouteImport.update({
     id: '/storage-tester',
@@ -69,12 +75,6 @@ const LayoutAdminDevtoolsSpringTesterRoute =
   LayoutAdminDevtoolsSpringTesterRouteImport.update({
     id: '/spring-tester',
     path: '/spring-tester',
-    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
-  } as any)
-const LayoutAdminDevtoolsParticleTesterRoute =
-  LayoutAdminDevtoolsParticleTesterRouteImport.update({
-    id: '/particle-tester',
-    path: '/particle-tester',
     getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
   } as any)
 const LayoutAdminDevtoolsObservableTesterRoute =
@@ -113,9 +113,9 @@ export interface FileRoutesByFullPath {
   '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
   '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
-  '/admin/devtools/particle-tester': typeof LayoutAdminDevtoolsParticleTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
@@ -127,9 +127,9 @@ export interface FileRoutesByTo {
   '/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
   '/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
-  '/admin/devtools/particle-tester': typeof LayoutAdminDevtoolsParticleTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -144,9 +144,9 @@ export interface FileRoutesById {
   '/_layout/admin/devtools/actor-tester': typeof LayoutAdminDevtoolsActorTesterRoute
   '/_layout/admin/devtools/error-tester': typeof LayoutAdminDevtoolsErrorTesterRoute
   '/_layout/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
-  '/_layout/admin/devtools/particle-tester': typeof LayoutAdminDevtoolsParticleTesterRoute
   '/_layout/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/_layout/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/_layout/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -161,9 +161,9 @@ export interface FileRouteTypes {
     | '/admin/devtools/actor-tester'
     | '/admin/devtools/error-tester'
     | '/admin/devtools/observable-tester'
-    | '/admin/devtools/particle-tester'
     | '/admin/devtools/spring-tester'
     | '/admin/devtools/storage-tester'
+    | '/admin/devtools/tile-renderer-tester'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-callback'
@@ -175,9 +175,9 @@ export interface FileRouteTypes {
     | '/admin/devtools/actor-tester'
     | '/admin/devtools/error-tester'
     | '/admin/devtools/observable-tester'
-    | '/admin/devtools/particle-tester'
     | '/admin/devtools/spring-tester'
     | '/admin/devtools/storage-tester'
+    | '/admin/devtools/tile-renderer-tester'
   id:
     | '__root__'
     | '/_layout'
@@ -191,9 +191,9 @@ export interface FileRouteTypes {
     | '/_layout/admin/devtools/actor-tester'
     | '/_layout/admin/devtools/error-tester'
     | '/_layout/admin/devtools/observable-tester'
-    | '/_layout/admin/devtools/particle-tester'
     | '/_layout/admin/devtools/spring-tester'
     | '/_layout/admin/devtools/storage-tester'
+    | '/_layout/admin/devtools/tile-renderer-tester'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -252,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminDevtoolsRouteRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/admin/devtools/tile-renderer-tester': {
+      id: '/_layout/admin/devtools/tile-renderer-tester'
+      path: '/tile-renderer-tester'
+      fullPath: '/admin/devtools/tile-renderer-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsTileRendererTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
     '/_layout/admin/devtools/storage-tester': {
       id: '/_layout/admin/devtools/storage-tester'
       path: '/storage-tester'
@@ -264,13 +271,6 @@ declare module '@tanstack/react-router' {
       path: '/spring-tester'
       fullPath: '/admin/devtools/spring-tester'
       preLoaderRoute: typeof LayoutAdminDevtoolsSpringTesterRouteImport
-      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
-    }
-    '/_layout/admin/devtools/particle-tester': {
-      id: '/_layout/admin/devtools/particle-tester'
-      path: '/particle-tester'
-      fullPath: '/admin/devtools/particle-tester'
-      preLoaderRoute: typeof LayoutAdminDevtoolsParticleTesterRouteImport
       parentRoute: typeof LayoutAdminDevtoolsRouteRoute
     }
     '/_layout/admin/devtools/observable-tester': {
@@ -309,9 +309,9 @@ interface LayoutAdminDevtoolsRouteRouteChildren {
   LayoutAdminDevtoolsActorTesterRoute: typeof LayoutAdminDevtoolsActorTesterRoute
   LayoutAdminDevtoolsErrorTesterRoute: typeof LayoutAdminDevtoolsErrorTesterRoute
   LayoutAdminDevtoolsObservableTesterRoute: typeof LayoutAdminDevtoolsObservableTesterRoute
-  LayoutAdminDevtoolsParticleTesterRoute: typeof LayoutAdminDevtoolsParticleTesterRoute
   LayoutAdminDevtoolsSpringTesterRoute: typeof LayoutAdminDevtoolsSpringTesterRoute
   LayoutAdminDevtoolsStorageTesterRoute: typeof LayoutAdminDevtoolsStorageTesterRoute
+  LayoutAdminDevtoolsTileRendererTesterRoute: typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 
 const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildren =
@@ -321,11 +321,11 @@ const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildr
     LayoutAdminDevtoolsErrorTesterRoute: LayoutAdminDevtoolsErrorTesterRoute,
     LayoutAdminDevtoolsObservableTesterRoute:
       LayoutAdminDevtoolsObservableTesterRoute,
-    LayoutAdminDevtoolsParticleTesterRoute:
-      LayoutAdminDevtoolsParticleTesterRoute,
     LayoutAdminDevtoolsSpringTesterRoute: LayoutAdminDevtoolsSpringTesterRoute,
     LayoutAdminDevtoolsStorageTesterRoute:
       LayoutAdminDevtoolsStorageTesterRoute,
+    LayoutAdminDevtoolsTileRendererTesterRoute:
+      LayoutAdminDevtoolsTileRendererTesterRoute,
   }
 
 const LayoutAdminDevtoolsRouteRouteWithChildren =

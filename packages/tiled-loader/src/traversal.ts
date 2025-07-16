@@ -1,4 +1,4 @@
-import type { Layer } from "./schema/layer";
+import type { Layer, TileLayerTile } from "./schema/layer";
 import type { TiledObject } from "./schema/object";
 
 export function* objectsInLayers(
@@ -37,3 +37,18 @@ export type TiledObjectTransformer = (
   obj: TiledObject,
   ancestry: Layer[],
 ) => TiledObject;
+
+export function* tilesInLayers(layers: Layer[]): Generator<TileLayerTile> {
+  for (const layer of layers) {
+    switch (layer.type) {
+      case "group":
+        yield* tilesInLayers(layer.layers);
+        break;
+      case "tilelayer":
+        for (const tile of layer.tiles) {
+          yield tile;
+        }
+        break;
+    }
+  }
+}
