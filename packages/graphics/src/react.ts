@@ -34,8 +34,8 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     const initPromise = app
       .init({ ...options, canvas, resizeTo: container })
       .then(() => {
+        adjustCanvasSize(app);
         cleanupFns = normalizeCleanupFns(configureApp(app, options, container));
-        onInitialized(app);
       });
 
     return () => {
@@ -51,7 +51,7 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     // oxlint-disable-next-line exhaustive-deps A bit hacky but it works. Trust my judgement.
   }, [container, configureApp, ...Object.values(options)]);
 
-  function onInitialized(app: Application) {
+  function adjustCanvasSize(app: Application) {
     // It seems that canvas need to be absolute positioned for resizing to work properly.
     // (Without it resizing works when expanding, but not when shrinking.)
     if (container) {
