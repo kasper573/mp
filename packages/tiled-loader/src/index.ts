@@ -9,8 +9,11 @@ export type * from "./schema/terrain";
 export type * from "./schema/text";
 export type * from "./schema/tileset";
 export type * from "./schema/transformations";
+export type * from "./schema/vector-types";
 export type * from "./schema/wang";
 
 export * from "./schema/common";
+export * from "./schema/validators";
 export * from "./loader";
+export * from "./vector-loader";
 export * from "./gid";

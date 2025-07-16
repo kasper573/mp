@@ -16,6 +16,9 @@ export type Milliseconds = Branded<number, "Milliseconds">;
 
 export type Degrees = Branded<number, "Degrees">;
 
+/**
+ * @deprecated Use Vector<Pixel> instead
+ */
 export interface Coord {
   x: Pixel;
   y: Pixel;
