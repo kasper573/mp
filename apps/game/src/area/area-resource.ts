@@ -1,5 +1,5 @@
 import { Vector } from "@mp/math";
-import type { TiledObject } from "@mp/tiled-loader";
+import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraph, VectorPathFinder } from "@mp/path-finding";
@@ -12,12 +12,25 @@ import type { AreaId } from "./area-id";
 export class AreaResource {
   readonly start: Vector<Tile>;
   readonly graph: VectorGraph<Tile>;
+  /**
+   * The dynamic layer is a layer that expects the renderer
+   * to dynamically sort its children based on their y position.
+   * This is where moving entities like players and NPCs should be added,
+   * but also static groups like large trees, houses, etc, anything that
+   * should be grouped by their kind and then sorted by their combined y position.
+   */
+  readonly dynamicLayer: Layer;
   #findPath: VectorPathFinder<Tile>;
 
   constructor(
     readonly id: AreaId,
     readonly tiled: TiledResource,
   ) {
+    this.dynamicLayer = assert(
+      this.tiled.map.layers.find((l) => l.name === dynamicLayerName),
+      `Map must have a '${dynamicLayerName}' layer`,
+    );
+
     this.graph = graphFromTiled(tiled);
     this.#findPath = this.graph.createPathFinder();
 
@@ -64,3 +77,5 @@ export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
   const prop = object.properties.get("goto");
   return prop ? (prop.value as AreaId) : undefined;
 }
+
+export const dynamicLayerName = "Dynamic";

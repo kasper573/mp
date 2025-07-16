@@ -1,4 +1,3 @@
-import type { IRenderLayer } from "@mp/graphics";
 import { Container } from "@mp/graphics";
 import type { TileLayerTile } from "@mp/tiled-loader";
 import { renderLayerTiles } from "./tile-renderer";
@@ -11,7 +10,6 @@ import { Vector } from "@mp/math";
  */
 export function renderLayerTilesSorted(
   tiles: TileLayerTile[],
-  renderLayer: IRenderLayer,
   textureLookup: TiledTextureLookup,
 ): Container {
   const container = new Container({ isRenderGroup: true });
@@ -25,7 +23,6 @@ export function renderLayerTilesSorted(
     otherContainer.addChild(mesh);
   }
   container.addChild(otherContainer);
-  renderLayer.attach(otherContainer);
 
   // Some tiles are grouped with the intention of being sorted
   // on the same zIndex. This helps give them the appearance of
@@ -41,7 +38,6 @@ export function renderLayerTilesSorted(
       groupContainer.zIndex,
     );
     container.addChild(groupContainer);
-    renderLayer.attach(groupContainer);
   }
 
   return container;

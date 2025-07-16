@@ -1,5 +1,5 @@
 import type { Container, Size } from "@mp/graphics";
-import { FpsIndicator, RenderLayer, type Application } from "@mp/graphics";
+import { FpsIndicator, type Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
 import { skipToken, useQuery } from "@mp/rpc/react";
@@ -11,6 +11,7 @@ import {
 } from "@mp/tiled-renderer";
 import { useTiledMap } from "./area/use-area-resource";
 import type { AreaId } from "./area/area-id";
+import { dynamicLayerName } from "./area/area-resource";
 import type { LayerId, Ratio, TileLayer } from "@mp/tiled-loader";
 import { tilesInLayers, type TiledMap } from "@mp/tiled-loader";
 import type { Pixel, Tile } from "@mp/std";
@@ -92,10 +93,9 @@ function buildStage(
       new Vector(mapSize.value, mapSize.value),
     );
 
-    const renderLayer = new RenderLayer({ sortableChildren: true });
     const renderer = new TiledRenderer(
       scaledMap.layers,
-      renderLayer,
+      dynamicLayerName,
       createTiledTextureLookup(spritesheets),
     );
 
@@ -104,7 +104,6 @@ function buildStage(
     }
 
     app.stage.addChild(renderer);
-    app.stage.addChild(renderLayer);
     return function cleanup() {
       renderer.destroy({ children: true });
       app.stage.removeChild(renderer);
