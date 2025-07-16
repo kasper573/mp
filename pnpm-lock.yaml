@@ -642,18 +642,12 @@ importers:
 
   packages/tiled-loader:
     dependencies:
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../math
       '@mp/std':
         specifier: workspace:*
         version: link:../std
       pako:
         specifier: 2.1.0
         version: 2.1.0
-      zod:
-        specifier: ^3.24.2
-        version: 3.24.2
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
