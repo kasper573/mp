@@ -13,7 +13,6 @@ import type { AreaId } from "./area/area-id";
 import { dynamicLayerName } from "./area/area-resource";
 import type { LayerId, Ratio, TileLayer } from "@mp/tiled-loader";
 import { tilesInLayers, type TiledMap } from "@mp/tiled-loader";
-import { produce } from "immer";
 import type { Pixel, Tile } from "@mp/std";
 import { assert } from "@mp/std";
 import { Vector } from "@mp/math";
