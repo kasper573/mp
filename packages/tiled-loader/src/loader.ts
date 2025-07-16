@@ -1,7 +1,6 @@
 import { err, ok, type Result } from "@mp/std";
 import type { LoaderContext } from "./context";
 import type { TiledMap } from "./schema/map";
-import { reconcileTiledMap } from "./reconciliation/reconcile-tiled-map";
 
 export type CreateTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 
@@ -14,7 +13,7 @@ export function createTiledLoader(options: CreateTiledLoaderOptions) {
 
     try {
       const tiledMap = (await context.loadJson(mapPath)) as TiledMap;
-      await reconcileTiledMap(context, tiledMap);
+      // TODO: Reconciliation removed for now - use vector loader for new functionality
       return ok(tiledMap);
     } catch (error) {
       return err(error);
