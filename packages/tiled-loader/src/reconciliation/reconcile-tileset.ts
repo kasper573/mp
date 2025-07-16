@@ -1,6 +1,7 @@
 import type { LoaderContext } from "../context";
 import type { LocalTileId } from "../schema/common";
-import type { Tileset, TilesetTile } from "../schema/tileset";
+import type { Frame } from "../schema/frame";
+import type { TileAnimationKey, Tileset, TilesetTile } from "../schema/tileset";
 import { reconcileFilePath } from "./reconcile-file-path";
 import { reconcileProperties } from "./reconcile-properties";
 
@@ -41,7 +42,7 @@ export async function reconcileTileset(
   const tiles = new Map<LocalTileId, TilesetTile>();
   for (const tile of (tileset as unknown as UnresolvedTileset).tiles ?? []) {
     reconcileProperties(tile);
-    tiles.set(tile.id, tile);
+    tiles.set(tile.id, reconcileTilesetTile(tile as UnresolvedTilesetTile));
   }
 
   // The original data also omits empty tiles, so we need to fill in the gaps.
@@ -56,6 +57,24 @@ export async function reconcileTileset(
   return tileset;
 }
 
+function reconcileTilesetTile({
+  animation,
+  ...rest
+}: UnresolvedTilesetTile): TilesetTile {
+  const tile: TilesetTile = { ...rest };
+  if (animation) {
+    tile.animation = {
+      key: determineAnimationKey(animation),
+      frames: animation,
+    };
+  }
+  return tile;
+}
+
+type UnresolvedTilesetTile = Omit<TilesetTile, "animation"> & {
+  animation?: Frame[];
+};
+
 type UnresolvedTileset = Omit<Tileset, "tiles"> & {
   tiles?: TilesetTile[];
 };
@@ -63,4 +82,8 @@ type UnresolvedTileset = Omit<Tileset, "tiles"> & {
 interface TilesetFile {
   source: string;
   firstgid: number;
+}
+
+function determineAnimationKey(frames: Frame[]): TileAnimationKey {
+  return JSON.stringify(frames) as TileAnimationKey;
 }
