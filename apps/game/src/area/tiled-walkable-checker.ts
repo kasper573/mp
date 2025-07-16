@@ -78,7 +78,7 @@ export class WalkableChecker {
 
     // Tiles exist and are walkable, but may be obscured by objects.
     // 25% obscured is still considered walkable
-    return this.obscureAmount(coord) < 0.25;
+    return this.obscureAmount(coord) < 0.4;
   }
 
   obscureAmount(coord: Vector<Tile>): number {
