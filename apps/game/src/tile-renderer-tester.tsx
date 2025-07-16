@@ -1,3 +1,4 @@
+import type { Container, Size } from "@mp/graphics";
 import { FpsIndicator, type Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
@@ -16,13 +17,14 @@ import { tilesInLayers, type TiledMap } from "@mp/tiled-loader";
 import type { Pixel, Tile } from "@mp/std";
 import { assert } from "@mp/std";
 import { Vector } from "@mp/math";
-import { Range } from "@mp/ui";
+import { Checkbox, Select } from "@mp/ui";
 import { useSignal } from "@mp/state/react";
 import { effect, type Signal } from "@mp/state";
 
 export function TileRendererTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const mapSize = useSignal(1 as Tile);
+  const fitToStage = useSignal(false);
   const tiledMap = useTiledMap("single-water-tile" as AreaId);
   const spritesheets = useQuery({
     queryKey: ["test-renderer-area-spritesheets"],
@@ -38,7 +40,8 @@ export function TileRendererTester() {
       antialias: true,
       eventMode: "none",
       roundPixels: true,
-      mapSize: mapSize,
+      mapSize,
+      fitToStage,
       tiledMap: tiledMap.data,
       spritesheets: spritesheets.data,
     },
@@ -47,24 +50,34 @@ export function TileRendererTester() {
 
   return (
     <>
-      <div>
-        <Range label="map size" min={1} max={1000} step={1} signal={mapSize} />{" "}
-        (tile count: {mapSize.value * mapSize.value})
+      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+        <label>
+          Map size
+          <Select options={sizeOptions} signal={mapSize} />
+        </label>
+        <span>(tile count: {mapSize.value * mapSize.value})</span>
+        <label>
+          fit tilemap to stage
+          <Checkbox signal={fitToStage} />
+        </label>
       </div>
       <div style={{ flex: 1 }} ref={setContainer} />
     </>
   );
 }
 
+const sizeOptions = [1, 10, 50, 100, 500, 1000, 2000, 4000];
+
 interface StageOptions {
   spritesheets?: TiledSpritesheetRecord;
   tiledMap?: TiledMap;
   mapSize: Signal<Tile>;
+  fitToStage: Signal<boolean>;
 }
 
 function buildStage(
   app: Application,
-  { spritesheets, tiledMap, mapSize }: StageOptions,
+  { spritesheets, tiledMap, mapSize, fitToStage }: StageOptions,
 ) {
   if (!spritesheets || !tiledMap) {
     return;
@@ -85,6 +98,10 @@ function buildStage(
       dynamicLayerName,
       createTiledTextureLookup(spritesheets),
     );
+
+    if (fitToStage.value) {
+      fitObjectInto(renderer, app.canvas);
+    }
 
     app.stage.addChild(renderer);
     return function cleanup() {
@@ -137,4 +154,15 @@ function scaleUpTiledMap(
   // 4. replace existing layers with the new layer
   newTiledMap.layers = [newTileLayer];
   return newTiledMap;
+}
+
+function fitObjectInto(target: Container, container: Size): void {
+  const xScale = container.width / target.width;
+  const yScale = container.height / target.height;
+
+  if (xScale < yScale) {
+    target.scale.set(xScale);
+  } else {
+    target.scale.set(yScale);
+  }
 }
