@@ -47,18 +47,16 @@ export function renderLayerTilesSorted(
  * Group tiles by their "Group" property and whether they are adjacent to each other.
  */
 function groupTiles(tiles: TileLayerTile[]) {
+  const tilesWithGroup = tiles.filter(getGroup);
   const posMap = new Map<VectorKey, TileLayerTile>();
-  for (const tile of tiles) {
+  for (const tile of tilesWithGroup) {
     posMap.set(Vector.key(tile.x, tile.y), tile);
   }
-
-  const getGroup = (t: TileLayerTile) =>
-    t.tile.properties.get("Group")?.value as number | undefined;
 
   const visited = new Set<TileLayerTile>();
   const groups: Array<{ tiles: TileLayerTile[]; id: number }> = [];
 
-  for (const startTile of tiles) {
+  for (const startTile of tilesWithGroup) {
     const groupId = getGroup(startTile);
     if (groupId === undefined || visited.has(startTile)) {
       continue;
@@ -92,6 +90,10 @@ function groupTiles(tiles: TileLayerTile[]) {
   const other = tiles.filter((tile) => !visited.has(tile));
 
   return { groups, other };
+}
+
+function getGroup(t: TileLayerTile) {
+  return t.tile.properties.get("Group")?.value as number | undefined;
 }
 
 const cardinalDeltas = [
