@@ -6,28 +6,26 @@ export interface TileMeshInput {
   transform: MatrixData;
 }
 
+// typed UV template
+const uvPattern = new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]);
+
 export function createTileMeshData(tiles: TileMeshInput[]) {
   const N = tiles.length;
-
   const vertices = new Float32Array(N * 4 * 2);
   const uvs = new Float32Array(N * 4 * 2);
   const indices = new Uint32Array(N * 6);
 
-  // standard [0,0],[1,0],[1,1],[0,1]
-  const uvPattern = [0, 0, 1, 0, 1, 1, 0, 1];
+  // running offsets
+  let vOff = 0; // += 8
+  let uvOff = 0; // += 8
+  let iOff = 0; // += 6
+  let base = 0; // += 4
 
   for (let i = 0; i < N; i++) {
-    // build a transform matrix that:
-    //  • translates to (dx,dy)
-    //  • rotates by (rotation + optional 90° if diagonal)
-    //  • then scales by (±1, ±1) to do the horizontal/vertical flips
-    const tile = tiles[i];
-    const [a, b, c, d, tx, ty] = tile.transform;
+    const { width, height, transform } = tiles[i];
+    const [a, b, c, d, tx, ty] = transform;
 
-    // now lay out our quad at origin [0,0]→[width,height], *then*
-    // transform with our 2×3 matrix (a,b,c,d,tx,ty)
-    const { width, height } = tile;
-    const vOff = i * 8;
+    // lay out quad + transform
     vertices[vOff + 0] = tx;
     vertices[vOff + 1] = ty;
     vertices[vOff + 2] = a * width + tx;
@@ -37,18 +35,22 @@ export function createTileMeshData(tiles: TileMeshInput[]) {
     vertices[vOff + 6] = c * height + tx;
     vertices[vOff + 7] = d * height + ty;
 
-    // UVs stay the same
-    uvs.set(uvPattern, vOff);
+    // copy UVs via typed-array set (fast memcpy)
+    uvs.set(uvPattern, uvOff);
 
-    // two triangles per quad
-    const iOff = i * 6;
-    const base = i * 4;
+    // two triangles
     indices[iOff + 0] = base + 0;
     indices[iOff + 1] = base + 1;
     indices[iOff + 2] = base + 2;
     indices[iOff + 3] = base + 0;
     indices[iOff + 4] = base + 2;
     indices[iOff + 5] = base + 3;
+
+    // advance all offsets
+    vOff += 8;
+    uvOff += 8;
+    iOff += 6;
+    base += 4;
   }
 
   return { vertices, uvs, indices };
