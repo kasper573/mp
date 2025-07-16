@@ -1,4 +1,4 @@
-import type { Application } from "@mp/graphics";
+import { FpsIndicator, type Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
 import { skipToken, useQuery } from "@mp/rpc/react";
@@ -48,7 +48,7 @@ export function TileRendererTester() {
   return (
     <>
       <div>
-        <Range label="map size" min={1} max={500} step={1} signal={mapSize} />{" "}
+        <Range label="map size" min={1} max={1000} step={1} signal={mapSize} />{" "}
         (tile count: {mapSize.value * mapSize.value})
       </div>
       <div style={{ flex: 1 }} ref={setContainer} />
@@ -69,6 +69,10 @@ function buildStage(
   if (!spritesheets || !tiledMap) {
     return;
   }
+
+  const fps = new FpsIndicator();
+  fps.zIndex = Number.MAX_SAFE_INTEGER;
+  app.stage.addChild(fps);
 
   return effect(() => {
     const scaledMap = scaleUpTiledMap(
