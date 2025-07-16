@@ -65,7 +65,7 @@ export function TileRendererTester() {
   );
 }
 
-const sizeOptions = [1, 10, 50, 100, 500, 1000, 2000, 4000];
+const sizeOptions = [1, 10, 50, 100, 500, 1000, 2500];
 
 interface StageOptions {
   spritesheets?: TiledSpritesheetRecord;
