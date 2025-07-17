@@ -6,6 +6,7 @@ import {
   type PatchPath,
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
+import type { Branded } from "../../std/src/types";
 
 export class SyncMap<K, V> implements Map<K, V> {
   #keysLastFlush = new Set<K>();
@@ -98,6 +99,65 @@ export class SyncMap<K, V> implements Map<K, V> {
 
     return patch;
   }
+
+  // Indexing capabilities
+
+  #indexCache = new Map<IndexKey, ReadonlyMap<K, V>>();
+  #suspendHandlers = new Set<object>();
+
+  /**
+   * Basic indexing functionality. Only supports equality checks.
+   * Use this to query the map for entities that match a specific set of properties.
+   * You can suspend index updates to avoid recalculating indices during a batch of operations.
+   * This is useful for performance optimizations in scenarios where multiple updates are made at once.
+   */
+  index<Query extends IndexQuery<V>>(
+    query: Query,
+  ): ReadonlyMap<K, Extract<V, Query>> {
+    const indexKey = indexKeyFromQuery(query);
+    if (this.#suspendHandlers.size) {
+      const cachedResult = this.#indexCache.get(indexKey) as
+        | Map<K, Extract<V, Query>>
+        | undefined;
+      if (cachedResult) {
+        return cachedResult;
+      }
+    }
+    const matchingEntities = new Map<K, Extract<V, Query>>();
+    const indexKeys = Object.keys(query) as (keyof V)[];
+    for (const [entityId, entity] of this.entries()) {
+      const match = indexKeys.every(
+        (key) => (entity[key] as unknown) === query[key],
+      );
+      if (match) {
+        matchingEntities.set(entityId, entity as Extract<V, Query>);
+      }
+    }
+    this.#indexCache.set(indexKey, matchingEntities);
+    return matchingEntities;
+  }
+
+  /**
+   * Suspends index updates. This is useful when you want to perform multiple operations
+   * on the map without recalculating indices after each operation.
+   * Call the returned function to resume index updates.
+   */
+  suspendIndexUpdates(): () => void {
+    const handle = {};
+    this.#suspendHandlers.add(handle);
+    return () => {
+      this.#suspendHandlers.delete(handle);
+      this.#indexCache.clear();
+    };
+  }
+}
+
+type IndexKey = Branded<string, "IndexKey">;
+
+type IndexQuery<V> = { [K in keyof V]?: V[K] };
+
+function indexKeyFromQuery<V>(query: IndexQuery<V>): IndexKey {
+  return JSON.stringify(query) as IndexKey;
 }
 
 export type SyncMapChangeHandler<K, V> = (
