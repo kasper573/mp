@@ -39,12 +39,7 @@ export abstract class SyncEntity {
    * Accesses the private metadata of a SyncEntity instance.
    * @internal Should only be used by the collect decorator.
    */
-  static accessMeta(entity: unknown) {
-    if (!(entity instanceof SyncEntity)) {
-      throw new TypeError(
-        `SyncEntity.accessMeta can only be used on instances of SyncEntity.`,
-      );
-    }
+  static accessMeta(entity: SyncEntity) {
     return entity.#meta;
   }
 
@@ -87,12 +82,12 @@ export function collect<V>({
   ): ClassAccessorDecoratorResult<T, V> => {
     return {
       init(initialValue) {
-        const meta = SyncEntity.accessMeta(this);
+        const meta = SyncEntity.accessMeta(this as SyncEntity);
         meta.observables[context.name] ??= signal(initialValue as unknown);
         return initialValue;
       },
       get() {
-        const meta = SyncEntity.accessMeta(this);
+        const meta = SyncEntity.accessMeta(this as SyncEntity);
         const obs = meta.observables[context.name];
         return obs.value as V;
       },
@@ -100,7 +95,7 @@ export function collect<V>({
         let collectedValue = newValue;
         let shouldCollectValue = true;
 
-        const meta = SyncEntity.accessMeta(this);
+        const meta = SyncEntity.accessMeta(this as SyncEntity);
         const obs = meta.observables[context.name] as Signal<V>;
 
         // We can't guarantee that the prevValue exists until a value has been assigned at least once.
