@@ -8,6 +8,7 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   const graph = new VectorGraph<Tile>();
   const walkableChecker = new WalkableChecker(tiled);
 
+  graph.beginUpdate();
   for (const from of walkableChecker.walkableCoords.values()) {
     graph.addNode(from);
     for (const [offsetX, offsetY] of neighborOffsets) {
@@ -18,6 +19,7 @@ export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
       }
     }
   }
+  graph.endUpdate();
 
   return graph;
 }

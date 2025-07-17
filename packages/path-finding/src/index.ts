@@ -69,6 +69,9 @@ export class VectorGraph<T extends number> {
       .toArray();
   }
 
+  readonly beginUpdate = this.ng.beginUpdate.bind(this);
+  readonly endUpdate = this.ng.endUpdate.bind(this);
+
   readonly addNode = (vector: Vector<T>) => {
     this.nodeIds.add(vector.key);
     this.ng.addNode(vector.key, { vector });
