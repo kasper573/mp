@@ -38,7 +38,7 @@ export class WalkableChecker {
   constructor(private tiled: TiledResource) {
     for (const layer of this.tiled.map.layers) {
       for (const tile of tileLayerTiles(layer)) {
-        const coordKey = Vector.key(tile.x, tile.y);
+        const coordKey = Vector.keyFrom(tile);
         if (this.#nonWalkableCoords.has(coordKey)) {
           continue;
         }
@@ -104,7 +104,7 @@ export class WalkableChecker {
           const remove =
             new Rect(coord, oneTile).overlap(rect) >= this.obscuringCutoff;
           if (remove) {
-            this.#walkableCoords.delete(coord.key);
+            this.#walkableCoords.delete(Vector.keyFrom(coord));
           }
         }
       }
