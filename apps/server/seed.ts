@@ -1,9 +1,5 @@
 import type { AreaId, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
-import {
-  npcTypes,
-  type ActorModelLookup,
-  type AreaLookup,
-} from "@mp/game/server";
+import { npcTypes, type ActorModelLookup } from "@mp/game/server";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import type { DbClient } from "./src/db/client";
 import { npcSpawnTable, npcTable } from "./src/db/schema";
@@ -17,11 +13,7 @@ import { npcSpawnTable, npcTable } from "./src/db/schema";
  *
  * @deprecated
  */
-export async function seed(
-  db: DbClient,
-  areaLookup: AreaLookup,
-  actorModelLookup: ActorModelLookup,
-) {
+export async function seed(db: DbClient, actorModelLookup: ActorModelLookup) {
   await db.transaction((tx) => {
     return Promise.all(Array.from(generateNpcsAndSpawns()));
 

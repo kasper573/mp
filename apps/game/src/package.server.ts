@@ -5,6 +5,7 @@ export * from "./npc/npc-ai";
 export * from "./npc/npc-spawner";
 export * from "./npc/rpc";
 export * from "./npc/service";
+export * from "./npc/derive-npc-spawns-from-areas";
 export * from "./npc/types";
 export * from "./character/character-remove-behavior";
 export * from "./character/rpc";

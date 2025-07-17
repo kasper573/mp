@@ -63,7 +63,6 @@ import { ctxUpdateTicker } from "./etc/system-rpc";
 import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { createCharacterService } from "./db/services/character-service";
-import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
 
@@ -116,7 +115,7 @@ const [areas, actorModels] = await Promise.all([
 ]);
 
 logger.info(`Seeding database...`);
-await seed(db, areas, actorModels);
+await seed(db, actorModels);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
@@ -168,7 +167,7 @@ const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   ),
 });
 
-const npcService = createNpcService(db);
+const npcService = createNpcService(db, areas);
 const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
@@ -183,13 +182,6 @@ const updateTicker = new Ticker({
 
 logger.info(`Getting all NPCs and spawns...`);
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
-const spawnsFromDbAndAreas = [
-  ...allNpcsAndSpawns,
-  ...deriveNpcSpawnsFromAreas(
-    areas,
-    allNpcsAndSpawns.map(({ npc }) => npc),
-  ),
-];
 
 const characterService = createCharacterService(
   db,
@@ -198,12 +190,7 @@ const characterService = createCharacterService(
   actorModels,
   rng,
 );
-const npcSpawner = new NpcSpawner(
-  areas,
-  actorModels,
-  spawnsFromDbAndAreas,
-  rng,
-);
+const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)

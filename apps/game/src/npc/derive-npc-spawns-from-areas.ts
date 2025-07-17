@@ -1,13 +1,9 @@
-import type {
-  AreaLookup,
-  AreaResource,
-  Npc,
-  NpcSpawn,
-  NpcSpawnId,
-} from "@mp/game/server";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
 import type { TiledClass, TiledObject } from "@mp/tiled-loader";
+import type { Npc, NpcSpawn, NpcSpawnId } from "./types";
+import type { AreaLookup } from "../area/lookup";
+import type { AreaResource } from "../area/area-resource";
 
 export function deriveNpcSpawnsFromAreas(
   areas: AreaLookup,
