@@ -1,6 +1,5 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
-import { beginMeasuringTimeSpan } from "@mp/time";
 import { AreaResource } from "@mp/game/server";
 import { msBuckets } from "./shared";
 
@@ -13,9 +12,10 @@ export function collectPathFindingMetrics(registry: MetricsRegistry): void {
   });
 
   AreaResource.findPathMiddleware = (args, next) => {
-    const getMeasurement = beginMeasuringTimeSpan();
+    const before = performance.now();
     const result = next(...args);
-    pathFinderHistogram.observe(getMeasurement().totalMilliseconds);
+    const deltaMs = performance.now() - before;
+    pathFinderHistogram.observe(deltaMs);
     return result;
   };
 }

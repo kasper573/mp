@@ -1,63 +1,50 @@
 import { TimeSpan } from "timespan-ts";
-import { beginMeasuringTimeSpan } from "./measure";
 
 export class Ticker {
-  private subscriptions = new Set<TickEventHandler>();
-  private getTotalTimeElapsed: () => TimeSpan;
-  private getTimeSinceLastTick: () => TimeSpan;
-  private intervalId?: NodeJS.Timeout;
+  #subs = new Set<TickEventHandler>();
+  #intervalId?: NodeJS.Timeout;
 
-  constructor(public options: TickerOptions) {
-    this.getTotalTimeElapsed = () => TimeSpan.Zero;
-    this.getTimeSinceLastTick = () => TimeSpan.Zero;
-  }
+  constructor(public options: TickerOptions) {}
 
   subscribe(fn: TickEventHandler): Unsubscribe {
-    this.subscriptions.add(fn);
-    return () => this.subscriptions.delete(fn);
+    this.#subs.add(fn);
+    return () => this.#subs.delete(fn);
   }
 
   start(interval: TimeSpan) {
-    if (this.intervalId !== undefined) {
+    if (this.#intervalId !== undefined) {
       throw new Error("Ticker is already running");
     }
-    this.getTotalTimeElapsed = beginMeasuringTimeSpan();
-    this.getTimeSinceLastTick = () => TimeSpan.Zero;
-    this.intervalId = setInterval(this.tick, interval.totalMilliseconds);
-  }
 
-  stop() {
-    this.getTotalTimeElapsed = () => TimeSpan.Zero;
-    this.getTimeSinceLastTick = () => TimeSpan.Zero;
-    clearInterval(this.intervalId);
-    this.intervalId = undefined;
-  }
+    const { middleware = noopMiddleware, onError = rethrow } = this.options;
+    let startTime = performance.now();
+    let lastTime = startTime;
 
-  private tick = () => {
-    try {
-      const timeSinceLastTick = this.getTimeSinceLastTick();
-      const middleware = this.options.middleware ?? noopMiddleware;
-      middleware({
-        timeSinceLastTick,
-        totalTimeElapsed: this.getTotalTimeElapsed(),
-        next: this.emit,
-      });
-    } catch (error) {
-      if (this.options.onError) {
-        this.options.onError(error);
-      } else {
-        throw error;
+    const tickFn = () => {
+      const now = performance.now();
+      const timeSinceLastTick = TimeSpan.fromMilliseconds(now - lastTime);
+      const totalTimeElapsed = TimeSpan.fromMilliseconds(now - startTime);
+      lastTime = now;
+      try {
+        middleware({ timeSinceLastTick, totalTimeElapsed, next: this.emit });
+      } catch (err) {
+        onError(err);
       }
-    } finally {
-      this.getTimeSinceLastTick = beginMeasuringTimeSpan();
-    }
-  };
+    };
 
-  private emit: TickEventHandler = (...args) => {
-    for (const fn of this.subscriptions) {
-      fn(...args);
+    this.#intervalId = setInterval(tickFn, interval.totalMilliseconds);
+  }
+  private emit: TickEventHandler = (event) => {
+    for (const fn of this.#subs) {
+      fn(event);
     }
   };
+  stop() {
+    if (this.#intervalId !== undefined) {
+      clearInterval(this.#intervalId);
+      this.#intervalId = undefined;
+    }
+  }
 }
 
 export interface TickEvent {
@@ -77,7 +64,10 @@ export interface TickerOptions {
 }
 
 export type Unsubscribe = () => void;
-
 export type TickEventHandler = (event: TickEvent) => void;
 
-const noopMiddleware: TickMiddleware = ({ next, ...event }) => next(event);
+function rethrow(err: unknown) {
+  throw err;
+}
+
+const noopMiddleware: TickMiddleware = (opt) => opt.next(opt);
