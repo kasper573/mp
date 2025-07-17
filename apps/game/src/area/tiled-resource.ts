@@ -11,11 +11,13 @@ export class TiledResource {
   readonly tileSize: Vector<Pixel>;
   readonly mapSize: Vector<Pixel>;
   readonly tileCount: Vector<Tile>;
+  readonly objects: ReadonlyArray<TiledObject>;
 
   constructor(public readonly map: TiledMap) {
     this.tileSize = new Vector(this.map.tilewidth, this.map.tileheight);
     this.tileCount = new Vector(this.map.width, this.map.height);
     this.mapSize = this.tileCount.scale(this.tileSize);
+    this.objects = objectsInLayers(this.map.layers);
   }
 
   worldCoordToTile = ({ x, y }: VectorLike<Pixel>): Vector<Tile> => {
@@ -33,8 +35,4 @@ export class TiledResource {
   };
 
   tileToWorldUnit = (n: Tile): Pixel => (n * this.map.tilewidth) as Pixel;
-
-  *objects(): Generator<TiledObject> {
-    yield* objectsInLayers(this.map.layers);
-  }
 }

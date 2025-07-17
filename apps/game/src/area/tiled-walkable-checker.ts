@@ -69,7 +69,7 @@ export class WalkableChecker {
      * in which case that means the object is "obscuring" a portion of the map.
      * This function yields the rectangles that represent the obscured areas.
      */
-    for (const obj of this.tiled.objects()) {
+    for (const obj of this.tiled.objects) {
       // Object is not representing a tile at all
       const tile = obj.gid !== undefined && tilesetTiles.get(obj.gid);
       if (!tile) {
