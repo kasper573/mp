@@ -25,13 +25,20 @@ export class Ticker {
     let startTime = performance.now();
     let lastTime = startTime;
 
+    // Safe to reuse and mutate the same otions object across ticks thanks to single threaded js
+    const opt: TickMiddlewareOpts = {
+      timeSinceLastTick: TimeSpan.Zero,
+      totalTimeElapsed: TimeSpan.Zero,
+      next: this.emit,
+    };
+
     const tickFn = () => {
       const now = performance.now();
-      const timeSinceLastTick = TimeSpan.fromMilliseconds(now - lastTime);
-      const totalTimeElapsed = TimeSpan.fromMilliseconds(now - startTime);
+      opt.timeSinceLastTick = TimeSpan.fromMilliseconds(now - lastTime);
+      opt.totalTimeElapsed = TimeSpan.fromMilliseconds(now - startTime);
       lastTime = now;
       try {
-        middleware({ timeSinceLastTick, totalTimeElapsed, next: this.emit });
+        middleware(opt);
       } catch (err) {
         onError(err);
       }
