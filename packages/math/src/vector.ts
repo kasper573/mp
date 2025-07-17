@@ -1,13 +1,10 @@
 import type { Branded } from "@mp/std";
 
 export class Vector<T extends number> implements VectorLike<T> {
-  readonly key: VectorKey;
-
   constructor(
     public readonly x: T,
     public readonly y: T,
   ) {
-    this.key = Vector.key(x, y);
     Object.freeze(this);
   }
 
@@ -62,6 +59,10 @@ export class Vector<T extends number> implements VectorLike<T> {
 
   static key(x: number, y: number): VectorKey {
     return `${x}|${y}` as VectorKey;
+  }
+
+  static keyFrom(v: VectorLike<number>): VectorKey {
+    return Vector.key(v.x, v.y);
   }
 }
 

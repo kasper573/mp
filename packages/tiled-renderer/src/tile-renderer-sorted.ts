@@ -50,7 +50,7 @@ function groupTiles(tiles: TileLayerTile[]) {
   const tilesWithGroup = tiles.filter(getGroup);
   const posMap = new Map<VectorKey, TileLayerTile>();
   for (const tile of tilesWithGroup) {
-    posMap.set(Vector.key(tile.x, tile.y), tile);
+    posMap.set(Vector.keyFrom(tile), tile);
   }
 
   const visited = new Set<TileLayerTile>();

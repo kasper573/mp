@@ -56,7 +56,7 @@ export class VectorGraph<T extends number> {
       from.add(new Vector<T>(0 as T, yOffset as T)),
       from.add(new Vector<T>(xOffset as T, yOffset as T)),
     ]
-      .map((v) => v.key)
+      .map(Vector.keyFrom)
       .filter(this.hasNode)
       .map(this.getNode);
   }
@@ -73,12 +73,15 @@ export class VectorGraph<T extends number> {
   readonly endUpdate = this.ng.endUpdate.bind(this);
 
   readonly addNode = (vector: Vector<T>) => {
-    this.nodeIds.add(vector.key);
-    this.ng.addNode(vector.key, { vector });
+    const key = Vector.keyFrom(vector);
+    this.nodeIds.add(key);
+    this.ng.addNode(key, { vector });
   };
 
   readonly addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
-    this.ng.addLink(fromVector.key, toVector.key, {
+    const fromKey = Vector.keyFrom(fromVector);
+    const toKey = Vector.keyFrom(toVector);
+    this.ng.addLink(fromKey, toKey, {
       distance: fromVector.distance(toVector),
     });
   };
