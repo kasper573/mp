@@ -1,5 +1,5 @@
 import type { MatrixData } from "./matrix";
-import type { Vector, VectorLike } from "./vector";
+import type { VectorLike } from "./vector";
 
 export class Rect<T extends number> implements RectLike<T> {
   constructor(
@@ -11,7 +11,7 @@ export class Rect<T extends number> implements RectLike<T> {
     Object.freeze(this);
   }
 
-  contains(v: Vector<T>): boolean {
+  contains(v: VectorLike<T>): boolean {
     return (
       v.x >= this.x &&
       v.x <= this.x + this.width &&
@@ -25,7 +25,7 @@ export class Rect<T extends number> implements RectLike<T> {
    * 0.5 = half of the area is obscured by `other`
    * 0 = no intersection at all
    */
-  overlap(other: Rect<T>): number {
+  overlap(other: RectLike<T>): number {
     if (
       this.width <= 0 ||
       this.height <= 0 ||
@@ -58,7 +58,7 @@ export class Rect<T extends number> implements RectLike<T> {
     return (xOverlap * yOverlap) / (this.width * this.height);
   }
 
-  offset(offset: Vector<T>): Rect<T> {
+  offset(offset: VectorLike<T>): Rect<T> {
     return new Rect(
       (this.x + offset.x) as T,
       (this.y + offset.y) as T,
@@ -67,7 +67,7 @@ export class Rect<T extends number> implements RectLike<T> {
     );
   }
 
-  scale<B extends number>(b: Vector<B>): Rect<B> {
+  scale<B extends number>(b: VectorLike<B>): Rect<B> {
     return new Rect<B>(
       (this.x * b.x) as B,
       (this.y * b.y) as B,
@@ -76,7 +76,7 @@ export class Rect<T extends number> implements RectLike<T> {
     );
   }
 
-  divide<B extends number>(b: Vector<B>): Rect<B> {
+  divide<B extends number>(b: VectorLike<B>): Rect<B> {
     return new Rect<B>(
       (this.x / b.x) as B,
       (this.y / b.y) as B,
@@ -111,7 +111,7 @@ export class Rect<T extends number> implements RectLike<T> {
   }
 
   static fromDiameter<T extends number>(
-    center: Vector<T>,
+    center: VectorLike<T>,
     diameter: T,
   ): Rect<T> {
     return new Rect(
