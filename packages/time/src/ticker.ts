@@ -1,14 +1,19 @@
 import { TimeSpan } from "timespan-ts";
 
 export class Ticker {
-  #subs = new Set<TickEventHandler>();
+  #subs: TickEventHandler[] = [];
   #intervalId?: NodeJS.Timeout;
 
   constructor(public options: TickerOptions) {}
 
   subscribe(fn: TickEventHandler): Unsubscribe {
-    this.#subs.add(fn);
-    return () => this.#subs.delete(fn);
+    this.#subs.push(fn);
+    return () => {
+      const index = this.#subs.indexOf(fn);
+      if (index !== -1) {
+        this.#subs.splice(index, 1);
+      }
+    };
   }
 
   start(interval: TimeSpan) {
@@ -35,8 +40,9 @@ export class Ticker {
     this.#intervalId = setInterval(tickFn, interval.totalMilliseconds);
   }
   private emit: TickEventHandler = (event) => {
-    for (const fn of this.#subs) {
-      fn(event);
+    const max = this.#subs.length;
+    for (let i = 0; i < max; i++) {
+      this.#subs[i](event);
     }
   };
   stop() {

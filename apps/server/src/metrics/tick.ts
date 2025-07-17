@@ -21,11 +21,11 @@ export function createTickMetricsObserver(
     buckets: msBuckets,
   });
 
-  return ({ next, ...event }) => {
-    interval.observe(event.timeSinceLastTick.totalMilliseconds);
+  return (opt) => {
+    interval.observe(opt.timeSinceLastTick.totalMilliseconds);
 
     const before = performance.now();
-    next(event);
+    opt.next(opt);
     const deltaMs = performance.now() - before;
     duration.observe(deltaMs);
   };
