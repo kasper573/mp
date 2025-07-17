@@ -94,13 +94,18 @@ export class WalkableChecker {
       this.#obscuringRects.push(rect);
 
       // Look at the nearest tiles around the obscuring rect
-      const expanded = expandToNearestInteger(rect);
-
-      for (const coord of tileCoordsInRect(expanded)) {
-        const remove =
-          new Rect(coord, oneTile).overlap(rect) >= this.obscuringCutoff;
-        if (remove) {
-          this.#walkableCoords.delete(coord.key);
+      const expandedRect = expandToNearestInteger(rect);
+      for (let xStep = 0; xStep < expandedRect.width; xStep++) {
+        for (let yStep = 0; yStep < expandedRect.height; yStep++) {
+          const coord = new Vector(
+            (expandedRect.x + xStep) as Tile,
+            (expandedRect.y + yStep) as Tile,
+          );
+          const remove =
+            new Rect(coord, oneTile).overlap(rect) >= this.obscuringCutoff;
+          if (remove) {
+            this.#walkableCoords.delete(coord.key);
+          }
         }
       }
     }
@@ -124,34 +129,18 @@ function isOneTileWalkable(props: PropertyMap) {
   return props.get("Walkable")?.value as boolean | undefined;
 }
 
-function* tileLayerTiles(layer: Layer): Generator<TileLayerTile> {
+function tileLayerTiles(layer: Layer): TileLayerTile[] {
   switch (layer.type) {
     case "group":
-      for (const subLayer of layer.layers) {
-        yield* tileLayerTiles(subLayer);
-      }
-      break;
+      return layer.layers.flatMap(tileLayerTiles);
     case "tilelayer":
-      for (const tile of layer.tiles) {
-        yield tile;
-      }
-      break;
+      return layer.tiles;
+    default:
+      return [];
   }
 }
 
 const oneTile = new Vector(1 as Tile, 1 as Tile);
-
-function* tileCoordsInRect<T extends number>(
-  rect: Rect<T>,
-): Generator<Vector<T>> {
-  for (let xStep = 0; xStep < rect.width; xStep++) {
-    for (let yStep = 0; yStep < rect.height; yStep++) {
-      const x = rect.x + xStep;
-      const y = rect.y + yStep;
-      yield new Vector(x as T, y as T);
-    }
-  }
-}
 
 function expandToNearestInteger<T extends number>(rect: Rect<T>): Rect<T> {
   const left = Math.floor(rect.x);
