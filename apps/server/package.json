@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsx esbuild.ts",
+    "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
     "db": "drizzle-kit",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
