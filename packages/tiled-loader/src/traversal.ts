@@ -1,33 +1,31 @@
 import type { Layer, TileLayerTile } from "./schema/layer";
 import type { TiledObject } from "./schema/object";
 
-export function* objectsInLayers(
+export function objectsInLayers(
   layers: Layer[],
   transform = noopTransformer,
-): Generator<TiledObject> {
-  yield* objectsInLayersImpl(layers, [], transform);
+): TiledObject[] {
+  return layers.flatMap((layer) =>
+    objectsInLayer(layer, emptyLayerList, transform),
+  );
 }
 
-function* objectsInLayersImpl(
-  layers: Layer[],
+export function objectsInLayer(
+  layer: Layer,
   ancestry: Layer[],
   transform: TiledObjectTransformer,
-): Generator<TiledObject> {
-  for (const layer of layers) {
-    switch (layer.type) {
-      case "group":
-        yield* objectsInLayersImpl(
-          layer.layers,
-          [...ancestry, layer],
-          transform,
-        );
-        break;
-      case "objectgroup":
-        for (const obj of layer.objects) {
-          yield transform(obj, ancestry);
-        }
-        break;
+): TiledObject[] {
+  switch (layer.type) {
+    case "group": {
+      const newAncestry = ancestry.concat(layer);
+      return layer.layers.flatMap((subLayer) =>
+        objectsInLayer(subLayer, newAncestry, transform),
+      );
     }
+    case "objectgroup":
+      return layer.objects.map((obj) => transform(obj, ancestry));
+    default:
+      return [];
   }
 }
 
@@ -38,17 +36,20 @@ export type TiledObjectTransformer = (
   ancestry: Layer[],
 ) => TiledObject;
 
-export function* tilesInLayers(layers: Layer[]): Generator<TileLayerTile> {
-  for (const layer of layers) {
-    switch (layer.type) {
-      case "group":
-        yield* tilesInLayers(layer.layers);
-        break;
-      case "tilelayer":
-        for (const tile of layer.tiles) {
-          yield tile;
-        }
-        break;
-    }
+export function tilesInLayers(layers: Layer[]): TileLayerTile[] {
+  return layers.flatMap(tilesInLayer);
+}
+
+export function tilesInLayer(layer: Layer): TileLayerTile[] {
+  switch (layer.type) {
+    case "group":
+      return tilesInLayers(layer.layers);
+    case "tilelayer":
+      return layer.tiles;
+    default:
+      return emptyTileList;
   }
 }
+
+const emptyTileList = Object.freeze([]) as unknown as TileLayerTile[];
+const emptyLayerList = Object.freeze([]) as unknown as Layer[];
