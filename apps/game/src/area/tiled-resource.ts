@@ -1,3 +1,4 @@
+import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { Pixel, Tile } from "@mp/std";
 import {
@@ -17,14 +18,14 @@ export class TiledResource {
     this.mapSize = this.tileCount.scale(this.tileSize);
   }
 
-  worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<Tile> => {
+  worldCoordToTile = ({ x, y }: VectorLike<Pixel>): Vector<Tile> => {
     return new Vector(
       (x / this.map.tilewidth - 0.5) as Tile,
       (y / this.map.tileheight - 0.5) as Tile,
     );
   };
 
-  tileCoordToWorld = ({ x, y }: Vector<Tile>): Vector<Pixel> => {
+  tileCoordToWorld = ({ x, y }: VectorLike<Tile>): Vector<Pixel> => {
     return new Vector(
       ((x + 0.5) * this.map.tilewidth) as Pixel,
       ((y + 0.5) * this.map.tileheight) as Pixel,

@@ -14,7 +14,7 @@ export function hitTestTiledObject(
 ): boolean {
   switch (obj.objectType) {
     case "point":
-      return Vector.from(obj).equals(pos);
+      return Vector.prototype.equals.call(obj, pos);
     case "ellipse":
       return ellipseHitTest(Rect.from(obj), pos);
     case "rectangle":

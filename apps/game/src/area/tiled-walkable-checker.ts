@@ -1,7 +1,7 @@
 import type { VectorKey } from "@mp/math";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
-import type { Tile } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import type { PropertyMap } from "@mp/tiled-loader";
 import {
   type TileLayerTile,
@@ -86,7 +86,7 @@ export class WalkableChecker {
 
       // Use same transform as the renderer to ensure it's correct
       const objTransform = tiledObjectMeshInput(obj).transform;
-      const rect = new Rect(Vector.zero(), new Vector(obj.width, obj.height))
+      const rect = new Rect(0 as Pixel, 0 as Pixel, obj.width, obj.height)
         .apply(objTransform)
         .divide(this.tiled.tileSize) as unknown as Rect<Tile>;
 
@@ -102,7 +102,8 @@ export class WalkableChecker {
             (expandedRect.y + yStep) as Tile,
           );
           const remove =
-            new Rect(coord, oneTile).overlap(rect) >= this.obscuringCutoff;
+            Rect.fromVectors(coord, oneTile).overlap(rect) >=
+            this.obscuringCutoff;
           if (remove) {
             this.#walkableCoords.delete(Vector.keyFrom(coord));
           }
@@ -116,7 +117,7 @@ export class WalkableChecker {
       return 0; // No obscuring rects exist to obscure anything
     }
 
-    const rectAtCoord = new Rect(coord, oneTile);
+    const rectAtCoord = Rect.fromVectors(coord, oneTile);
     const tileObscuredAmount = Math.max(
       ...this.#obscuringRects.map((obscure) => rectAtCoord.overlap(obscure)),
     );
@@ -149,7 +150,9 @@ function expandToNearestInteger<T extends number>(rect: Rect<T>): Rect<T> {
   const bottom = Math.ceil(rect.y + rect.height);
 
   return new Rect(
-    new Vector(left as T, top as T),
-    new Vector((right - left) as T, (bottom - top) as T),
+    left as T,
+    top as T,
+    (right - left) as T,
+    (bottom - top) as T,
   );
 }

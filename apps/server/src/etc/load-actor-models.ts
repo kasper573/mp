@@ -43,7 +43,7 @@ export async function loadActorModels(
           spritesheets,
           // TODO should be read from some meta data on file
           // These values are based on the adventurer model
-          hitBox: Rect.fromComponents(-0.5, -1.5, 1, 2) as Rect<Tile>,
+          hitBox: new Rect(-0.5, -1.5, 1, 2) as Rect<Tile>,
         };
         return [modelId, model] as const;
       }),

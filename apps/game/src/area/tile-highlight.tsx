@@ -30,9 +30,9 @@ export class TileHighlight extends Graphics {
     }
 
     const { tiled } = area;
-    const pos = tiled.tileCoordToWorld(target.rect.position);
-    const width = tiled.tileToWorldUnit(target.rect.size.x);
-    const height = tiled.tileToWorldUnit(target.rect.size.y);
+    const pos = tiled.tileCoordToWorld(target.rect);
+    const width = tiled.tileToWorldUnit(target.rect.width);
+    const height = tiled.tileToWorldUnit(target.rect.height);
 
     this.fillStyle = visibleStyles[target.type];
     this.position.set(pos.x, pos.y);

@@ -1,23 +1,12 @@
 import type { MatrixData } from "./matrix";
-import { Vector } from "./vector";
+import type { Vector, VectorLike } from "./vector";
 
 export class Rect<T extends number> implements RectLike<T> {
-  get x(): T {
-    return this.position.x;
-  }
-  get y(): T {
-    return this.position.y;
-  }
-  get width(): T {
-    return this.size.x;
-  }
-  get height(): T {
-    return this.size.y;
-  }
-
   constructor(
-    public readonly position: Vector<T>,
-    public readonly size: Vector<T>,
+    public readonly x: T,
+    public readonly y: T,
+    public readonly width: T,
+    public readonly height: T,
   ) {
     Object.freeze(this);
   }
@@ -70,15 +59,30 @@ export class Rect<T extends number> implements RectLike<T> {
   }
 
   offset(offset: Vector<T>): Rect<T> {
-    return new Rect(this.position.add(offset), this.size);
+    return new Rect(
+      (this.x + offset.x) as T,
+      (this.y + offset.y) as T,
+      this.width,
+      this.height,
+    );
   }
 
   scale<B extends number>(b: Vector<B>): Rect<B> {
-    return new Rect(this.position.scale(b), this.size.scale(b));
+    return new Rect<B>(
+      (this.x * b.x) as B,
+      (this.y * b.y) as B,
+      (this.width * b.x) as B,
+      (this.height * b.y) as B,
+    );
   }
 
   divide<B extends number>(b: Vector<B>): Rect<B> {
-    return new Rect(this.position.divide(b), this.size.divide(b));
+    return new Rect<B>(
+      (this.x / b.x) as B,
+      (this.y / b.y) as B,
+      (this.width / b.x) as B,
+      (this.height / b.y) as B,
+    );
   }
 
   apply([a, b, c, d, tx, ty]: MatrixData): Rect<T> {
@@ -103,19 +107,14 @@ export class Rect<T extends number> implements RectLike<T> {
     const newWidth = Math.max(x0, x1, x2, x3) - newX;
     const newHeight = Math.max(y0, y1, y2, y3) - newY;
 
-    return Rect.fromComponents(
-      newX as T,
-      newY as T,
-      newWidth as T,
-      newHeight as T,
-    );
+    return new Rect(newX as T, newY as T, newWidth as T, newHeight as T);
   }
 
   static fromDiameter<T extends number>(
     center: Vector<T>,
     diameter: T,
   ): Rect<T> {
-    return Rect.fromComponents(
+    return new Rect(
       (center.x - diameter / 2) as T,
       (center.y - diameter / 2) as T,
       diameter,
@@ -123,14 +122,15 @@ export class Rect<T extends number> implements RectLike<T> {
     );
   }
 
-  static fromComponents<T extends number>(
-    ...[x, y, width, height]: RectComponents<T>
+  static fromVectors<T extends number>(
+    position: VectorLike<T>,
+    size: VectorLike<T>,
   ): Rect<T> {
-    return new Rect(new Vector(x, y), new Vector(width, height));
+    return new Rect(position.x, position.y, size.x, size.y);
   }
 
   static from<T extends number>(like: RectLike<T>): Rect<T> {
-    return Rect.fromComponents(like.x, like.y, like.width, like.height);
+    return new Rect(like.x, like.y, like.width, like.height);
   }
 }
 
