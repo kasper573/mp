@@ -46,13 +46,14 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
   };
 }
 
-export type HuntFilter = (input: TaskInput) => ActorId | undefined;
+type HuntFilter = (input: TaskInput) => ActorId | undefined;
+type HuntFilterOutput = ActorId | undefined;
 
-export const defensiveHuntFilter: HuntFilter = ({
+export function defensiveHuntFilter({
   gameState,
   npc,
   npcCombatMemories,
-}) => {
+}: TaskInput): HuntFilterOutput {
   const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors
     .values()
@@ -63,9 +64,12 @@ export const defensiveHuntFilter: HuntFilter = ({
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
     );
   return target?.id;
-};
+}
 
-export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
+export function aggressiveHuntFilter({
+  gameState,
+  npc,
+}: TaskInput): HuntFilterOutput {
   const target = gameState.actors
     .values()
     .find(
@@ -75,13 +79,13 @@ export const aggressiveHuntFilter: HuntFilter = ({ gameState, npc }) => {
         candidate.coords.distance(npc.coords) <= npc.aggroRange,
     );
   return target?.id;
-};
+}
 
-export const protectiveHuntFilter: HuntFilter = ({
+export function protectiveHuntFilter({
   gameState,
   npc,
   npcCombatMemories,
-}) => {
+}: TaskInput): HuntFilterOutput {
   const combatMemory = npcCombatMemories.get(npc.id);
 
   // Consider other npcs of the same spawn allies
@@ -124,4 +128,4 @@ export const protectiveHuntFilter: HuntFilter = ({
   });
 
   return target?.id;
-};
+}
