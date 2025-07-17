@@ -2,7 +2,7 @@ import type { Vector } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
-import type { VectorGraphNodeId } from "@mp/path-finding";
+import type { VectorGraphNode, VectorGraphNodeId } from "@mp/path-finding";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state/game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -47,7 +47,11 @@ export function movementBehavior(
   const tileNodeWeights = new Map<VectorGraphNodeId, number>();
 
   for (const area of areas.values()) {
-    area.graph.bindNodeWeightFn((node) => tileNodeWeights.get(node.id) ?? 0);
+    area.graph.bindNodeWeightFn(getNodeWeightFromMovementBehavior);
+  }
+
+  function getNodeWeightFromMovementBehavior(node: VectorGraphNode<Tile>) {
+    return tileNodeWeights.get(node.id) ?? 0;
   }
 
   return ({ timeSinceLastTick, totalTimeElapsed }) => {

@@ -7,7 +7,7 @@ export class VectorGraph<T extends number> {
   private nodeIds = new Set<VectorGraphNodeId>();
   private ng = createGraph<NodeData<T>, LinkData>();
 
-  readonly getNode = (id: VectorGraphNodeId): VectorGraphNode<T> => {
+  getNode(id: VectorGraphNodeId): VectorGraphNode<T> {
     const node = this.ng.getNode(id);
 
     if (!node) {
@@ -18,11 +18,11 @@ export class VectorGraph<T extends number> {
     // and we want to avoid allocating new objects. The VectorGraphNode type should have a matching
     // shape to the ngraph node, except with stricter id types, so this should be a safe assert, albeit fragile.
     return node as unknown as VectorGraphNode<T>;
-  };
+  }
 
-  readonly getNodes = (): Iterable<VectorGraphNode<T>> => {
-    return this.nodeIds.values().map(this.getNode);
-  };
+  getNodes(): Iterable<VectorGraphNode<T>> {
+    return this.nodeIds.values().map((n) => this.getNode(n));
+  }
 
   getNearestNode(vector?: Vector<T>): VectorGraphNode<T> | undefined {
     if (!vector) {
@@ -51,51 +51,55 @@ export class VectorGraph<T extends number> {
     const yOffset = (v.y - 0.5) % 1 < 0.5 ? -1 : 1;
 
     return [
-      from,
-      from.add(new Vector<T>(xOffset as T, 0 as T)),
-      from.add(new Vector<T>(0 as T, yOffset as T)),
-      from.add(new Vector<T>(xOffset as T, yOffset as T)),
+      Vector.keyFrom(from),
+      Vector.key(from.x + xOffset, from.y),
+      Vector.key(from.x, from.y + yOffset),
+      Vector.key(from.x + xOffset, from.y + yOffset),
     ]
-      .map(Vector.keyFrom)
-      .filter(this.hasNode)
-      .map(this.getNode);
+      .filter((key) => this.hasNode(key))
+      .map((key) => this.getNode(key));
   }
 
   getLinkedNodes(v: VectorGraphNode<T>): VectorGraphNode<T>[] {
     return v.links
       .values()
       .map((link) => (link.fromId === v.id ? link.toId : link.fromId))
-      .map(this.getNode)
+      .map((n) => this.getNode(n))
       .toArray();
   }
 
-  readonly beginUpdate = this.ng.beginUpdate.bind(this);
-  readonly endUpdate = this.ng.endUpdate.bind(this);
+  beginUpdate() {
+    this.ng.beginUpdate();
+  }
 
-  readonly addNode = (vector: Vector<T>) => {
+  endUpdate() {
+    this.ng.endUpdate();
+  }
+
+  addNode(vector: Vector<T>) {
     const key = Vector.keyFrom(vector);
     this.nodeIds.add(key);
     this.ng.addNode(key, { vector });
-  };
+  }
 
-  readonly addLink = (fromVector: Vector<T>, toVector: Vector<T>) => {
+  addLink(fromVector: Vector<T>, toVector: Vector<T>) {
     const fromKey = Vector.keyFrom(fromVector);
     const toKey = Vector.keyFrom(toVector);
     this.ng.addLink(fromKey, toKey, {
       distance: fromVector.distance(toVector),
     });
-  };
+  }
 
-  readonly hasNode = (id: VectorGraphNodeId): boolean => {
+  hasNode(id: VectorGraphNodeId): boolean {
     return this.ng.hasNode(id) !== undefined;
-  };
+  }
 
-  readonly removeNode = (id: VectorGraphNodeId) => {
+  removeNode(id: VectorGraphNodeId) {
     this.nodeIds.delete(id);
     this.ng.removeNode(id);
-  };
+  }
 
-  readonly createPathFinder = (): VectorPathFinder<T> => {
+  createPathFinder(): VectorPathFinder<T> {
     const pathFinder = aStar(this.ng, {
       distance: (fromNode, toNode, link) => {
         const base = link.data.distance;
@@ -112,7 +116,7 @@ export class VectorGraph<T extends number> {
         .map((node) => node.data.vector);
       return path;
     };
-  };
+  }
 }
 
 export type VectorPathFinder<T extends number> = (
