@@ -21,18 +21,10 @@ export class OptimisticGameState implements GameState {
 
     for (const actor of this.actors.values()) {
       if (actor.path && actor.health > 0) {
-        const [newCoords, newPath] = moveAlongPath(
-          actor.coords,
-          actor.path,
-          actor.speed,
-          opt.timeSinceLastFrame,
-        );
-
-        actor.coords = newCoords;
-        actor.path = newPath;
+        moveAlongPath(actor, opt.timeSinceLastFrame);
 
         // Face the direction the actor is moving towards
-        const target = newPath?.[0];
+        const target = actor.path?.[0];
         if (target) {
           actor.dir = nearestCardinalDirection(actor.coords.angle(target));
         }

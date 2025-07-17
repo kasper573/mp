@@ -98,17 +98,7 @@ export function movementBehavior(
         actor.moveTarget = undefined;
       }
 
-      if (actor.path) {
-        const [newCoords, newPath] = moveAlongPath(
-          actor.coords,
-          actor.path,
-          actor.speed,
-          timeSinceLastTick,
-        );
-
-        actor.coords = newCoords;
-        actor.path = newPath;
-      }
+      moveAlongPath(actor, timeSinceLastTick);
 
       // Process portals
       const area = assert(areas.get(actor.areaId));
