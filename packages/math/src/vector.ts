@@ -8,23 +8,23 @@ export class Vector<T extends number> implements VectorLike<T> {
     Object.freeze(this);
   }
 
-  distance(b: Vector<T>): T {
+  distance(b: VectorLike<T>): T {
     return Math.hypot(this.x - b.x, this.y - b.y) as T;
   }
 
-  add(b: Vector<T>): Vector<T> {
+  add(b: VectorLike<T>): Vector<T> {
     return new Vector<T>((this.x + b.x) as T, (this.y + b.y) as T);
   }
 
-  scale<B extends number>(b: Vector<B>): Vector<B> {
+  scale<B extends number>(b: VectorLike<B>): Vector<B> {
     return new Vector<B>((this.x * b.x) as B, (this.y * b.y) as B);
   }
 
-  divide<B extends number>(b: Vector<B>): Vector<B> {
+  divide<B extends number>(b: VectorLike<B>): Vector<B> {
     return new Vector<B>((this.x / b.x) as B, (this.y / b.y) as B);
   }
 
-  equals(b: Vector<T>): boolean {
+  equals(b: VectorLike<T>): boolean {
     return this.x === b.x && this.y === b.y;
   }
 
@@ -32,7 +32,7 @@ export class Vector<T extends number> implements VectorLike<T> {
     return new Vector<T>(Math.round(this.x) as T, Math.round(this.y) as T);
   }
 
-  angle(other: Vector<T>): number {
+  angle(other: VectorLike<T>): number {
     const dx = other.x - this.x;
     const dy = other.y - this.y;
     return Math.atan2(dy, dx);
