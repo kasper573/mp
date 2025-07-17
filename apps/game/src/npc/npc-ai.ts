@@ -65,8 +65,10 @@ export class NpcAi {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
           const combatant = assert(this.gameState.actors.get(combatantId));
-          const distance = observer.coords.distance(combatant.coords);
-          return distance <= observer.aggroRange;
+          return observer.coords.isWithinDistance(
+            combatant.coords,
+            observer.aggroRange,
+          );
         },
       );
 

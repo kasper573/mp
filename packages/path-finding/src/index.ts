@@ -29,7 +29,11 @@ export class VectorGraph<T extends number> {
       return;
     }
     const [nearestNode] = this.getAdjacentNodes(vector).toSorted(
-      (a, b) => a.data.vector.distance(vector) - b.data.vector.distance(vector),
+      (a, b) =>
+        // We dont need the real distance since we're only sorting.
+        // Squared distance is faster to calculate.
+        a.data.vector.squaredDistance(vector) -
+        b.data.vector.squaredDistance(vector),
     );
     return nearestNode;
   }
@@ -86,7 +90,8 @@ export class VectorGraph<T extends number> {
     const fromKey = Vector.keyFrom(fromVector);
     const toKey = Vector.keyFrom(toVector);
     this.ng.addLink(fromKey, toKey, {
-      distance: fromVector.distance(toVector),
+      // Use square distance to avoid the square root operation
+      distance: fromVector.squaredDistance(toVector),
     });
   }
 
@@ -103,11 +108,13 @@ export class VectorGraph<T extends number> {
     const pathFinder = aStar(this.ng, {
       distance: (fromNode, toNode, link) => {
         const base = link.data.distance;
-        const w =
-          this.nodeWeight?.(toNode as unknown as VectorGraphNode<T>) ?? 0;
+        const w = Math.pow(
+          this.nodeWeight?.(toNode as unknown as VectorGraphNode<T>) ?? 0,
+          2, // Square the weight to align weight with our distance value, which is squared distances
+        );
         return base + w;
       },
-      heuristic: (from, to) => from.data.vector.distance(to.data.vector),
+      heuristic: (from, to) => from.data.vector.squaredDistance(to.data.vector),
     });
     return (start, end) => {
       // Skip the first node since it's the start node

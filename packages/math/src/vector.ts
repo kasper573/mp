@@ -8,8 +8,28 @@ export class Vector<T extends number> implements VectorLike<T> {
     Object.freeze(this);
   }
 
+  // Note on squared distance checking:
+  // Use these functions in favor of calling .distance(b) and comparing with some amount.
+  // These function avoids the square root operation, which saves on performance.
+
+  squaredDistance(b: VectorLike<T>): T {
+    const dx = this.x - b.x;
+    const dy = this.y - b.y;
+    return (dx * dx + dy * dy) as T;
+  }
+
+  isWithinDistance(b: VectorLike<T>, distance: number): boolean {
+    const squaredDistance = this.squaredDistance(b);
+    return squaredDistance <= distance * distance;
+  }
+
+  isOutOfReach(b: VectorLike<T>, distance: number): boolean {
+    const squaredDistance = this.squaredDistance(b);
+    return squaredDistance > distance * distance;
+  }
+
   distance(b: VectorLike<T>): T {
-    return Math.hypot(this.x - b.x, this.y - b.y) as T;
+    return Math.sqrt(this.squaredDistance(b)) as T;
   }
 
   add(b: VectorLike<T>): Vector<T> {

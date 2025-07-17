@@ -101,7 +101,10 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
         return true; // Always trust new coord when area changes
       }
       const threshold = actor.speed * teleportThreshold.totalSeconds;
-      if (update.coords && update.coords.distance(actor.coords) >= threshold) {
+      if (
+        update.coords &&
+        !update.coords.isWithinDistance(actor.coords, threshold)
+      ) {
         return true; // Snap to new coords if the distance is too large
       }
 
@@ -122,7 +125,7 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
       const lastRemainingLocalStep = actor.path?.[0];
       if (
         lastRemainingLocalStep &&
-        lastRemainingLocalStep.distance(actor.coords) <= tileMargin
+        lastRemainingLocalStep.isWithinDistance(actor.coords, tileMargin)
       ) {
         // The last remaining step is within the tile margin,
         // which means the stop command was likely due to the movement completing,

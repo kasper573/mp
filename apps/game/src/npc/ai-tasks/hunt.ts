@@ -13,7 +13,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
 
     if (npc.attackTargetId) {
       const target = assert(gameState.actors.get(npc.attackTargetId));
-      if (npc.coords.distance(target.coords) > npc.aggroRange) {
+      if (!npc.coords.isWithinDistance(target.coords, npc.aggroRange)) {
         // Target out of range, lose aggro
         npc.attackTargetId = undefined;
         npc.moveTarget = undefined;
@@ -60,7 +60,7 @@ export function defensiveHuntFilter({
     .find(function isDefensiveHuntTarget(candidate) {
       return (
         candidate.health > 0 &&
-        candidate.coords.distance(npc.coords) <= npc.aggroRange &&
+        candidate.coords.isWithinDistance(npc.coords, npc.aggroRange) &&
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id)
       );
     });
@@ -77,7 +77,7 @@ export function aggressiveHuntFilter({
       return (
         candidate.health > 0 &&
         candidate.type === "character" &&
-        candidate.coords.distance(npc.coords) <= npc.aggroRange
+        candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)
       );
     });
   return target?.id;
@@ -124,7 +124,7 @@ export function protectiveHuntFilter({
     .find(function isProtectiveHuntTarget(candidate) {
       if (
         candidate.health <= 0 ||
-        candidate.coords.distance(npc.coords) > npc.aggroRange
+        !candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)
       ) {
         return false;
       }
