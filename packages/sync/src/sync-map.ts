@@ -127,7 +127,7 @@ export class SyncMap<K, V> implements Map<K, V> {
     const indexKeys = Object.keys(query) as (keyof V)[];
     for (const [entityId, entity] of this.entries()) {
       const match = indexKeys.every(
-        (key) => (entity[key] as unknown) === query[key],
+        (key) => entity[key] === query[key as never],
       );
       if (match) {
         matchingEntities.set(entityId, entity as Extract<V, Query>);
@@ -154,10 +154,19 @@ export class SyncMap<K, V> implements Map<K, V> {
 
 type IndexKey = Branded<string, "IndexKey">;
 
-type IndexQuery<V> = { [K in keyof V]?: V[K] };
+// Only support indexing on primitive values for now
+type SupportedIndexKeys<V> = {
+  [K in keyof V]: V[K] extends string | number | boolean ? K : never;
+}[keyof V];
+
+type IndexQuery<V> = { [K in SupportedIndexKeys<V>]?: V[K] };
 
 function indexKeyFromQuery<V>(query: IndexQuery<V>): IndexKey {
-  return JSON.stringify(query) as IndexKey;
+  let parts: unknown[] = [];
+  for (const k in query) {
+    parts.push(k, query[k as never]);
+  }
+  return parts.join("_") as IndexKey;
 }
 
 export type SyncMapChangeHandler<K, V> = (
