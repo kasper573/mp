@@ -57,12 +57,13 @@ export function defensiveHuntFilter({
   const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors
     .values()
-    .find(
-      (candidate) =>
+    .find(function isDefensiveHuntTarget(candidate) {
+      return (
         candidate.health > 0 &&
         candidate.coords.distance(npc.coords) <= npc.aggroRange &&
-        combatMemory?.hasAttackedEachOther(candidate.id, npc.id),
-    );
+        combatMemory?.hasAttackedEachOther(candidate.id, npc.id)
+      );
+    });
   return target?.id;
 }
 
@@ -72,12 +73,13 @@ export function aggressiveHuntFilter({
 }: TaskInput): HuntFilterOutput {
   const target = gameState.actors
     .values()
-    .find(
-      (candidate) =>
+    .find(function isAggressiveHuntTarget(candidate) {
+      return (
         candidate.health > 0 &&
         candidate.type === "character" &&
-        candidate.coords.distance(npc.coords) <= npc.aggroRange,
-    );
+        candidate.coords.distance(npc.coords) <= npc.aggroRange
+      );
+    });
   return target?.id;
 }
 
@@ -92,18 +94,22 @@ export function protectiveHuntFilter({
   const allyIds = new Set(
     gameState.actors
       .values()
-      .filter(
-        (actor) =>
+      .filter(function isProtectiveHuntAlly(actor) {
+        return (
           actor.id !== npc.id &&
           actor.type === "npc" &&
-          actor.spawnId === npc.spawnId,
-      )
+          actor.spawnId === npc.spawnId
+        );
+      })
       .map((actor) => actor.id),
   );
 
   // Actors attacking allies are considered enemies
   const enemyIds = new Set(
-    combatMemory?.combats.flatMap(([actor1, actor2]) => {
+    combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
+      actor1,
+      actor2,
+    ]) {
       if (allyIds.has(actor1)) {
         return [actor2];
       } else if (allyIds.has(actor2)) {
@@ -113,19 +119,21 @@ export function protectiveHuntFilter({
     }),
   );
 
-  const target = gameState.actors.values().find((candidate) => {
-    if (
-      candidate.health <= 0 ||
-      candidate.coords.distance(npc.coords) > npc.aggroRange
-    ) {
-      return false;
-    }
+  const target = gameState.actors
+    .values()
+    .find(function isProtectiveHuntTarget(candidate) {
+      if (
+        candidate.health <= 0 ||
+        candidate.coords.distance(npc.coords) > npc.aggroRange
+      ) {
+        return false;
+      }
 
-    return (
-      combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
-      enemyIds.has(candidate.id)
-    );
-  });
+      return (
+        combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
+        enemyIds.has(candidate.id)
+      );
+    });
 
   return target?.id;
 }

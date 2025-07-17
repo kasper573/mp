@@ -54,7 +54,10 @@ export function movementBehavior(
     return tileNodeWeights.get(node.id) ?? 0;
   }
 
-  return ({ timeSinceLastTick, totalTimeElapsed }) => {
+  return function movementBehaviorTick({
+    timeSinceLastTick,
+    totalTimeElapsed,
+  }) {
     // We need to make a first pass to set the weights for the path finding graph.
     // This helps promote more natural movement in avoiding walking over each other.
     tileNodeWeights.clear();
