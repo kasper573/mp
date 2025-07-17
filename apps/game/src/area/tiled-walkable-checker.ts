@@ -91,10 +91,10 @@ export class WalkableChecker {
         .divide(this.tiled.tileSize) as unknown as Rect<Tile>;
 
       // Remember the obscuring rect for debugging
+      this.#obscuringRects.push(rect);
 
       // Look at the nearest tiles around the obscuring rect
       const expanded = expandToNearestInteger(rect);
-      this.#obscuringRects.push(expanded);
 
       for (const coord of tileCoordsInRect(expanded)) {
         const remove =
