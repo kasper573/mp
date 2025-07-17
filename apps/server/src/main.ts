@@ -46,7 +46,6 @@ import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
-import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
 import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
@@ -65,6 +64,7 @@ import { createDbClient } from "./db/client";
 import { createCharacterService } from "./db/services/character-service";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
+import { createTickMetricsObserver } from "./metrics/tick";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -175,9 +175,16 @@ const persistTicker = new Ticker({
   middleware: () => gameService.persist(gameState),
 });
 
+const observeTick = createTickMetricsObserver(metrics);
+
 const updateTicker = new Ticker({
   onError: logger.error,
-  middleware: createTickMetricsObserver(metrics),
+  middleware(opt) {
+    // Suspend index updates during the tick to effectively cache index access per tick.
+    const resumeIndexUpdates = gameState.actors.suspendIndexUpdates();
+    observeTick(opt);
+    resumeIndexUpdates();
+  },
 });
 
 logger.info(`Getting all NPCs and spawns...`);

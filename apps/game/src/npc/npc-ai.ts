@@ -32,8 +32,10 @@ export class NpcAi {
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
-      for (const subject of this.gameState.actors.values()) {
-        if (subject.type !== "npc" || subject.health <= 0) {
+      for (const subject of this.gameState.actors
+        .index({ type: "npc" })
+        .values()) {
+        if (subject.health <= 0) {
           continue;
         }
 

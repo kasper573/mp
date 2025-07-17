@@ -26,8 +26,8 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of state.actors.values()) {
-        if (actor.type === "npc" && actor.health <= 0) {
+      for (const actor of state.actors.index({ type: "npc" }).values()) {
+        if (actor.health <= 0) {
           let cleanupTime = corpseCleanupTimers.get(actor.id);
           if (!cleanupTime) {
             cleanupTime = totalTimeElapsed.add(corpseDuration);

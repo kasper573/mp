@@ -56,6 +56,7 @@ export function defensiveHuntFilter({
 }: TaskInput): HuntFilterOutput {
   const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors
+    .index({ type: "character" })
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
       return (
@@ -72,11 +73,11 @@ export function aggressiveHuntFilter({
   npc,
 }: TaskInput): HuntFilterOutput {
   const target = gameState.actors
+    .index({ type: "character" })
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
       return (
         candidate.health > 0 &&
-        candidate.type === "character" &&
         candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)
       );
     });
@@ -91,15 +92,12 @@ export function protectiveHuntFilter({
   const combatMemory = npcCombatMemories.get(npc.id);
 
   // Consider other npcs of the same spawn allies
-  const allyIds = new Set(
+  const allyIds = new Set<ActorId>(
     gameState.actors
+      .index({ type: "npc", spawnId: npc.spawnId })
       .values()
       .filter(function isProtectiveHuntAlly(actor) {
-        return (
-          actor.id !== npc.id &&
-          actor.type === "npc" &&
-          actor.spawnId === npc.spawnId
-        );
+        return actor.id !== npc.id;
       })
       .map((actor) => actor.id),
   );
