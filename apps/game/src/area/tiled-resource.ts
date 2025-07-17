@@ -7,18 +7,14 @@ import {
 } from "@mp/tiled-loader";
 
 export class TiledResource {
-  constructor(public readonly map: TiledMap) {}
+  readonly tileSize: Vector<Pixel>;
+  readonly mapSize: Vector<Pixel>;
+  readonly tileCount: Vector<Tile>;
 
-  get tileSize() {
-    return new Vector(this.map.tilewidth, this.map.tileheight);
-  }
-
-  get mapSize(): Vector<Pixel> {
-    return this.tileCount.scale(this.tileSize);
-  }
-
-  get tileCount(): Vector<Tile> {
-    return new Vector(this.map.width, this.map.height);
+  constructor(public readonly map: TiledMap) {
+    this.tileSize = new Vector(this.map.tilewidth, this.map.tileheight);
+    this.tileCount = new Vector(this.map.width, this.map.height);
+    this.mapSize = this.tileCount.scale(this.tileSize);
   }
 
   worldCoordToTile = ({ x, y }: Vector<Pixel>): Vector<Tile> => {
