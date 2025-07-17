@@ -102,9 +102,9 @@ export function movementBehavior(
 
       // Process portals
       const area = assert(areas.get(actor.areaId));
-      for (const object of area.hitTestObjects([
+      for (const object of area.hitTestObjects(
         area.tiled.tileCoordToWorld(actor.coords),
-      ])) {
+      )) {
         const destinationArea = areas.get(
           getAreaIdFromObject(object) as AreaId,
         );

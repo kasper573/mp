@@ -57,14 +57,14 @@ export class AreaResource {
     return this.findPath(startNode.id, endNode.id);
   }
 
-  *hitTestObjects(candidates: Iterable<Vector<Pixel>>): Generator<TiledObject> {
+  hitTestObjects(coord: Vector<Pixel>): TiledObject[] {
+    const matches: TiledObject[] = [];
     for (const obj of this.tiled.objects()) {
-      for (const coord of candidates) {
-        if (hitTestTiledObject(obj, coord)) {
-          yield obj;
-        }
+      if (hitTestTiledObject(obj, coord)) {
+        matches.push(obj);
       }
     }
+    return matches;
   }
 
   static findPathMiddleware = (

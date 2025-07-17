@@ -170,7 +170,7 @@ export class AreaScene extends Container {
         );
         if (tileNode) {
           const portal = this.options.area
-            .hitTestObjects([this.engine.pointer.worldPosition.value])
+            .hitTestObjects(this.engine.pointer.worldPosition.value)
             .find(getAreaIdFromObject);
 
           this.moveThrottled(tileNode.data.vector, portal?.id);
