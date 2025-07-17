@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsx esbuild.ts",
+    "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
     "db": "drizzle-kit",
