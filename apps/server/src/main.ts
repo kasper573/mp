@@ -114,7 +114,7 @@ const [areas, actorModels] = await Promise.all([
 ]);
 
 logger.info(`Seeding database...`);
-await seed(db, actorModels);
+await seed(db, areas, actorModels);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
