@@ -52,7 +52,7 @@ export async function seed(
           yield tx.insert(npcSpawnTable).values({
             npcType,
             areaId,
-            count: 25,
+            count: 6,
             id: createShortId() as NpcSpawnId,
             npcId: soldier.id,
           });
