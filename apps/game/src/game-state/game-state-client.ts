@@ -6,29 +6,32 @@ import type { Signal, ReadonlySignal } from "@mp/state";
 import { computed, signal } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { GameStateEvents } from "./game-state-events";
-import { ctxGameRpcClient } from "../rpc/game-rpc-client";
+import { ctxGameRpcClient, type GameRpcClient } from "../rpc/game-rpc-client";
 import type { Actor } from "../actor/actor";
-import { ioc } from "../context/ioc";
-import { ctxLogger } from "../context/common";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 import { GameActions } from "./game-actions";
 import type { Character, CharacterId } from "../character/types";
 import type { AreaId } from "../area/area-id";
+import type { Logger } from "@mp/logger";
+import { ioc } from "../context/ioc";
+import { ctxLogger } from "../context/common";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
   socket: WebSocket;
   settings: () => OptimisticGameStateSettings;
+  rpc?: GameRpcClient;
+  logger?: Logger;
 }
 
 export class GameStateClient {
   readonly eventBus = new SyncEventBus<GameStateEvents>();
   readonly actions: GameActions;
 
-  private rpc = ioc.get(ctxGameRpcClient);
-  private logger = ioc.get(ctxLogger);
+  private rpc: GameRpcClient;
+  private logger: Logger;
 
   // State
   readonly gameState: OptimisticGameState;
@@ -47,6 +50,8 @@ export class GameStateClient {
       this.options.socket.readyState,
     );
     this.isConnected = computed(() => this.readyState.value === WebSocket.OPEN);
+    this.rpc = this.options.rpc ?? ioc.get(ctxGameRpcClient);
+    this.logger = this.options.logger ?? ioc.get(ctxLogger);
 
     this.actions = new GameActions(this.rpc, this.characterId);
 
@@ -113,18 +118,22 @@ export class GameStateClient {
         this.refreshState();
       }
 
-      if (patch) {
-        this.gameState.applyPatch(patch, (desiredEventName) => {
-          return (events ?? [])
-            .filter(([eventName]) => eventName === desiredEventName)
-            .map(([, payload]) => payload as never);
-        });
-      }
-
-      if (events) {
-        for (const event of events) {
-          this.eventBus.dispatch(event);
+      try {
+        if (patch) {
+          this.gameState.applyPatch(patch, (desiredEventName) => {
+            return (events ?? [])
+              .filter(([eventName]) => eventName === desiredEventName)
+              .map(([, payload]) => payload as never);
+          });
         }
+
+        if (events) {
+          for (const event of events) {
+            this.eventBus.dispatch(event);
+          }
+        }
+      } catch (error) {
+        this.logger.error(error, `Error applying patch`);
       }
     }
   };

@@ -5,9 +5,15 @@ import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
-import { loadAreaResource } from "@mp/game/client";
+import {
+  GameStateClient,
+  loadAreaResource,
+  registerEncoderExtensions,
+} from "@mp/game/client";
 import { createReactRpcInvoker } from "@mp/rpc/react";
 import { readCliOptions } from "./cli";
+
+registerEncoderExtensions();
 
 const logger = createConsoleLogger();
 
@@ -84,7 +90,20 @@ async function testOneGameClient(n: number, rng: Rng) {
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 
+  let stopClient = () => {};
   try {
+    const client = new GameStateClient({
+      socket,
+      rpc,
+      logger,
+      settings: () => ({
+        useInterpolator: false,
+        usePatchOptimizer: false,
+      }),
+    });
+
+    stopClient = client.start();
+
     await waitForOpen(socket);
     if (verbose) {
       logger.info(`Socket ${n} connected`);
@@ -95,22 +114,25 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} authenticated`);
     }
 
-    const character = await rpc.world.join();
+    const { areaId, id: characterId } = await client.actions.join();
     if (verbose) {
-      logger.info({ character }, `Socket ${n} joined`);
+      logger.info({ characterId }, `Socket ${n} joined`);
     }
 
-    const url = await rpc.area.areaFileUrl(character.areaId);
-    const area = await loadAreaResource(url, character.areaId);
+    const url = await rpc.area.areaFileUrl(areaId);
+    const area = await loadAreaResource(url, areaId);
     const tiles = Array.from(area.graph.nodeIds)
       .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
       .filter((v) => v !== undefined);
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {
+      if (client.character.value && !client.character.value.health) {
+        await client.actions.respawn();
+      }
       try {
         const to = rng.oneOf(tiles);
-        await rpc.character.move({ characterId: character.id, to });
+        await rpc.character.move({ characterId, to });
         logger.info(`Moving character for socket ${n} to ${to}`);
         await wait(1000 + rng.next() * 6000);
       } catch (error) {
@@ -127,6 +149,7 @@ async function testOneGameClient(n: number, rng: Rng) {
     }
     throw error;
   } finally {
+    stopClient();
     socket.close();
     socket.removeEventListener("message", handleMessage);
   }
