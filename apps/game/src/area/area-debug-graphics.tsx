@@ -137,8 +137,11 @@ class DebugTiledGraph extends Container {
 
     switch (this.visibleGraphType()) {
       case "all":
-        for (const node of graph.getNodes()) {
-          drawGraphNode(this.gfx, tiled, graph, node);
+        for (const nodeId of graph.nodeIds) {
+          const node = graph.getNode(nodeId);
+          if (node) {
+            drawGraphNode(this.gfx, tiled, graph, node);
+          }
         }
         break;
       case "tile": {
@@ -150,15 +153,17 @@ class DebugTiledGraph extends Container {
         }
         break;
       }
-      case "coord":
-        drawStar(
-          this.gfx,
-          worldPosition.value,
-          graph
-            .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
-            .map((node) => tiled.tileCoordToWorld(node.data.vector)),
+      case "coord": {
+        const nearest = graph.getNearestNode(
+          tiled.worldCoordToTile(worldPosition.value),
         );
+        if (nearest) {
+          drawManyLinesFromSameStart(this.gfx, worldPosition.value, [
+            tiled.tileCoordToWorld(nearest.data.vector),
+          ]);
+        }
         break;
+      }
       case "obscured": {
         for (const rect of this.walkableChecker.obscuringRects) {
           drawRect(
@@ -258,12 +263,13 @@ function drawGraphNode(
   graph: VectorGraph<Tile>,
   node: VectorGraphNode<Tile>,
 ) {
-  drawStar(
+  drawManyLinesFromSameStart(
     ctx,
     tiled.tileCoordToWorld(node.data.vector),
     node.links
       .values()
-      .map((link) => graph.getNode(link.toId).data.vector)
+      .map((link) => graph.getNode(link.toId)?.data.vector)
+      .filter((v) => v !== undefined)
       .map(tiled.tileCoordToWorld),
   );
 }
@@ -280,7 +286,7 @@ function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
   ctx.stroke();
 }
 
-function drawStar(
+function drawManyLinesFromSameStart(
   ctx: Graphics,
   from: Vector<Pixel>,
   destinations: Iterable<Vector<Pixel>>,

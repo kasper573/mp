@@ -102,9 +102,9 @@ async function testOneGameClient(n: number) {
 
     const url = await rpc.area.areaFileUrl(character.areaId);
     const area = await loadAreaResource(url, character.areaId);
-    const tiles = Array.from(area.graph.getNodes()).map(
-      (node) => node.data.vector,
-    );
+    const tiles = Array.from(area.graph.nodeIds)
+      .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
+      .filter((v) => v !== undefined);
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {

@@ -1,4 +1,4 @@
-import type { Vector } from "@mp/math";
+import type { Vector, VectorLike } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
@@ -133,8 +133,16 @@ export function movementBehavior(
 export function findPathForSubject(
   subject: MovementTrait & { id: unknown },
   areas: AreaLookup,
-  dest: Vector<Tile>,
+  dest: VectorLike<Tile>,
 ): Path<Tile> | undefined {
   const area = assert(areas.get(subject.areaId));
-  return area.findPathBetweenTiles(subject.coords, dest);
+  const fromNode = area.graph.getNearestNode(subject.coords);
+  if (!fromNode) {
+    return;
+  }
+  const destNode = area.graph.getNearestNode(dest);
+  if (!destNode) {
+    return;
+  }
+  return area.graph.findPath(fromNode, destNode);
 }

@@ -36,7 +36,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
     if (!npc.path) {
       const area = assert(areas.get(npc.areaId));
-      const toNode = rng.oneOf(area.graph.getNodes());
+      const toNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
       npc.moveTarget = toNode.data.vector;
       // TODO this is temporary until we have a buff/ability system
       npc.speed = 1 as Tile;

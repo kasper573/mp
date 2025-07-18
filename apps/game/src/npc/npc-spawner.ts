@@ -109,7 +109,7 @@ function determineSpawnCoords(
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {
-    randomNode = rng.oneOf(area.graph.getNodes());
+    randomNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
   }
 
   if (!randomNode) {

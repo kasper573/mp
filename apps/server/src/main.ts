@@ -47,7 +47,6 @@ import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
 import { createExpressLogger } from "./express/logger";
-import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
@@ -220,7 +219,6 @@ const ioc = new ImmutableInjectionContainer()
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
-collectPathFindingMetrics(metrics);
 
 const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
 
