@@ -23,15 +23,11 @@ export class NpcAiCombatMemory {
   }
 
   forgetCombatatants(actorIds: ActorId[]) {
-    const combatIdsToForget = this.#combats
-      .entries()
-      .filter(([, combatants]) =>
-        combatants.some((id) => actorIds.includes(id)),
-      )
-      .map(([combatId]) => combatId);
-
-    for (const id of combatIdsToForget) {
-      this.#combats.delete(id);
+    const isInputActor = (id: ActorId) => actorIds.includes(id);
+    for (const [id, combatants] of this.#combats.entries()) {
+      if (combatants.some(isInputActor)) {
+        this.#combats.delete(id);
+      }
     }
   }
 }
@@ -40,5 +36,5 @@ type CombatId = Branded<string, "CombatId">;
 
 function createCombatId(actor1: ActorId, actor2: ActorId): CombatId {
   // Sorting to ensure order is irrelevant and we only have one combat id per actor pair
-  return [actor1, actor2].toSorted().join("_") as CombatId;
+  return [actor1, actor2].sort().join("_") as CombatId;
 }
