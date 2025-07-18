@@ -22,8 +22,13 @@ export class UncachedIndex<Item, Definition extends IndexDefinition>
     query: IndexQuery<Definition>,
   ): Generator<NarrowedItem> {
     const all = Array.from(this.dataSource());
+    const queryKeys = Object.keys(query);
+    if (queryKeys.length === 0) {
+      throw new Error("Query must have at least one constraint.");
+    }
+
     for (const item of all) {
-      const isMatch = Object.keys(query).every((key) => {
+      const isMatch = queryKeys.every((key) => {
         return query[key] === this.resolvers[key](item);
       });
       if (isMatch) {

@@ -3,6 +3,7 @@ import { performance } from "perf_hooks";
 import type { IndexResolvers, IndexQuery } from "./src/types";
 import { UncachedIndex } from "./src/uncached";
 import { CachedIndex } from "./src/cached";
+import { ComputedIndex } from "./src";
 
 // ---- 1) Generate synthetic data ----
 interface Item {
@@ -14,7 +15,6 @@ interface Item {
 const NUM_ITEMS = 100_000;
 const NUM_QUERIES = 1_000;
 
-// helper to pick a random element
 function pick<T>(arr: T[]): T {
   return arr[Math.floor(Math.random() * arr.length)];
 }
@@ -22,7 +22,6 @@ function pick<T>(arr: T[]): T {
 const categories = ["A", "B", "C", "D", "E"];
 const tags = ["red", "blue", "green", "yellow", "black"];
 
-// build an array of items
 const allItems: Item[] = Array.from({ length: NUM_ITEMS }, (_, i) => ({
   id: i,
   category: pick(categories),
@@ -43,25 +42,44 @@ const resolvers: IndexResolvers<Item, Def> = {
   tag: (item) => item.tag,
 };
 
-// ---- 3) Instantiate both indices ----
-const cached = new CachedIndex<Item, Def>(dataSource, resolvers);
-const uncached = new UncachedIndex<Item, Def>(dataSource, resolvers);
+// ---- 3) Configure providers ----
+interface Provider<I, D> {
+  name: string;
+  instance: {
+    build: () => void;
+    access: (q: Partial<D>) => Generator<I>;
+  };
+}
+
+const providers: Provider<Item, Def>[] = [
+  {
+    name: "CachedIndex",
+    instance: new CachedIndex<Item, Def>(dataSource, resolvers),
+  },
+  {
+    name: "UncachedIndex",
+    instance: new UncachedIndex<Item, Def>(dataSource, resolvers),
+  },
+  {
+    name: "ComputedIndex",
+    instance: new ComputedIndex<Item, Def>(dataSource, resolvers),
+  },
+  // Add new providers here:
+  // { name: "MyOtherIndex", instance: new MyOtherIndex(dataSource, resolvers) },
+];
 
 // ---- 4) Benchmark build() ----
-let t0 = performance.now();
-cached.build();
-const cachedBuildMs = performance.now() - t0;
-
-// for fairness, “warm up” the uncached build (it's a no-op)
-t0 = performance.now();
-uncached.build();
-const uncachedBuildMs = performance.now() - t0;
+const buildTimes: Record<string, number> = {};
+for (const { name, instance } of providers) {
+  const t0 = performance.now();
+  instance.build();
+  buildTimes[name] = performance.now() - t0;
+}
 
 // ---- 5) Prepare random queries ----
 const queries: IndexQuery<Def>[] = Array.from({ length: NUM_QUERIES }, () => {
   const q: Partial<Def> = {};
-  // randomly constrain one or both fields
-  if (Math.random() < 0.8) q.category = pick(categories);
+  q.category = pick(categories);
   if (Math.random() < 0.5) q.tag = pick(tags);
   return q;
 });
@@ -73,30 +91,27 @@ function drain<T>(gen: Generator<T>) {
   }
 }
 
-// ---- 6) Benchmark accessing() ----
-t0 = performance.now();
-for (const q of queries) {
-  drain(cached.access(q));
+// ---- 6) Benchmark queries ----
+const queryTimes: Record<string, number> = {};
+for (const { name, instance } of providers) {
+  const t0 = performance.now();
+  for (const q of queries) {
+    drain(instance.access(q));
+  }
+  queryTimes[name] = performance.now() - t0;
 }
-const cachedQueryMs = performance.now() - t0;
-
-t0 = performance.now();
-for (const q of queries) {
-  drain(uncached.access(q));
-}
-const uncachedQueryMs = performance.now() - t0;
 
 // ---- 7) Report ----
-
 console.log("--- Benchmark Results ---");
 console.log(`Items:           ${NUM_ITEMS.toLocaleString()}`);
 console.log(`Queries:         ${NUM_QUERIES.toLocaleString()}`);
 console.log("");
-console.log(`CachedIndex.build():   ${cachedBuildMs.toFixed(2)} ms`);
-console.log(`UncachedIndex.build(): ${uncachedBuildMs.toFixed(2)} ms (noop)`);
+for (const { name } of providers) {
+  console.log(`${name}.build():   ${buildTimes[name].toFixed(2)} ms`);
+}
 console.log("");
-console.log(`CachedIndex.query():   ${cachedQueryMs.toFixed(2)} ms total`);
-console.log(`UncachedIndex.query(): ${uncachedQueryMs.toFixed(2)} ms total`);
-console.log(`→ per query:`);
-console.log(`    Cached:   ${(cachedQueryMs / NUM_QUERIES).toFixed(4)} ms`);
-console.log(`    Uncached: ${(uncachedQueryMs / NUM_QUERIES).toFixed(4)} ms`);
+for (const { name } of providers) {
+  const total = queryTimes[name];
+  console.log(`${name}.query():   ${total.toFixed(2)} ms total`);
+  console.log(`→ per query: ${(total / NUM_QUERIES).toFixed(4)} ms`);
+}

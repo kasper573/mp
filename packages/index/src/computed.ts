@@ -54,14 +54,14 @@ export class ComputedIndex<Item, Definition extends IndexDefinition>
   *access<NarrowedItem extends Item>(
     query: IndexQuery<Definition>,
   ): Generator<NarrowedItem> {
-    const entries = Object.entries(query) as [
-      keyof Definition,
-      Definition[keyof Definition],
-    ][];
+    const queryEntries = Object.entries(query);
+    if (queryEntries.length === 0) {
+      throw new Error("Query must have at least one constraint.");
+    }
 
     // Gather each constraints candidate set
     const candidateSets: Set<Item>[] = [];
-    for (const [key, value] of entries) {
+    for (const [key, value] of queryEntries) {
       const bucket = this.computedSignals[key].value.get(value);
       if (!bucket) {
         // all constraints must match, any mismatch means no results.

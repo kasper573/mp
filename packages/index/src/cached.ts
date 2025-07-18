@@ -52,15 +52,9 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
   *access<NarrowedItem extends Item>(
     query: IndexQuery<Definition>,
   ): Generator<NarrowedItem> {
-    const entries = Object.entries(query) as [
-      keyof Definition,
-      Definition[keyof Definition],
-    ][];
+    const entries = Object.entries(query);
     if (entries.length === 0) {
-      for (const item of this.allItems) {
-        yield item as NarrowedItem;
-      }
-      return;
+      throw new Error("Query must have at least one constraint.");
     }
 
     // Gather each constraints candidate set
