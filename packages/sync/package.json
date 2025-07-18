@@ -17,7 +17,6 @@
   "dependencies": {
     "@mp/encoding": "workspace:*",
     "@mp/index": "workspace:*",
-    "@mp/std": "workspace:*",
     "@mp/state": "workspace:*"
   },
   "devDependencies": {

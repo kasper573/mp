@@ -15,9 +15,6 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "dependencies": {
-    "@mp/std": "workspace:*"
-  },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
   }
