@@ -454,6 +454,10 @@ importers:
         version: link:../tsconfig
 
   packages/index:
+    dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

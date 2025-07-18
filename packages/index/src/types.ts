@@ -29,7 +29,3 @@ export type IndexDefinition = Record<string, unknown>;
 
 export type IndexQuery<Definition extends IndexDefinition> =
   Partial<Definition>;
-
-export type IndexCache<Item, Definition extends IndexDefinition> = {
-  [K in keyof Definition]: Map<Definition[K], Set<Item>>;
-};

@@ -8,7 +8,7 @@ interface TestItem {
   color: string;
 }
 
-describe("Index", () => {
+describe("Uncached", () => {
   let items: TestItem[];
   let dataSource: () => Iterable<TestItem>;
   let index: Index<TestItem, { type: string; color: string }>;

@@ -1,3 +1,5 @@
+import type { ReadonlySignal } from "@mp/state";
+import { computed } from "@mp/state";
 import type {
   IndexDefinition,
   Index,
@@ -5,48 +7,48 @@ import type {
   IndexQuery,
 } from "./types";
 
-export class CachedIndex<Item, Definition extends IndexDefinition>
+export class ComputedIndex<Item, Definition extends IndexDefinition>
   implements Index<Item, Definition>
 {
-  private caches: IndexCache<Item, Definition>;
-  private allItems = new Set<Item>();
+  private computedSignals: IndexSignals<Item, Definition>;
 
   constructor(
     private dataSource: () => Iterable<Item>,
     private resolvers: IndexResolvers<Item, Definition>,
   ) {
-    this.caches = Object.keys(resolvers).reduce(
+    this.computedSignals = Object.keys(resolvers).reduce(
       (acc, key) => {
-        acc[key] = new Map();
+        acc[key as keyof typeof acc] = computed(() => this.resolveIndex(key));
         return acc;
       },
-      {} as Record<string, Map<unknown, Set<Item>>>,
-    ) as IndexCache<Item, Definition>;
+      {} as IndexSignals<Item, Definition>,
+    );
   }
 
   build(): void {
-    this.clear();
-    for (const item of this.dataSource()) {
-      this.allItems.add(item);
-
-      for (const key in this.resolvers) {
-        const value = this.resolvers[key](item);
-        const cacheForKey = this.caches[key];
-        let bucket = cacheForKey.get(value);
-        if (!bucket) {
-          bucket = new Set();
-          cacheForKey.set(value, bucket);
-        }
-        bucket.add(item);
-      }
-    }
+    // Noop
   }
 
   clear(): void {
-    this.allItems.clear();
-    for (const key in this.caches) {
-      this.caches[key].clear();
+    // Noop
+  }
+
+  private resolveIndex<K extends keyof Definition>(
+    key: K,
+  ): IndexHash<Definition[K], Item> {
+    const map = new Map<Definition[K], Set<Item>>();
+    for (const item of this.dataSource()) {
+      const value = this.resolvers[key](item);
+      let items = map.get(value);
+      if (!items) {
+        items = new Set<Item>();
+        map.set(value, items);
+      }
+      {
+        items.add(item);
+      }
     }
+    return map;
   }
 
   *access<NarrowedItem extends Item>(
@@ -56,18 +58,11 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
       keyof Definition,
       Definition[keyof Definition],
     ][];
-    if (entries.length === 0) {
-      for (const item of this.allItems) {
-        yield item as NarrowedItem;
-      }
-      return;
-    }
 
     // Gather each constraints candidate set
     const candidateSets: Set<Item>[] = [];
     for (const [key, value] of entries) {
-      const cacheForKey = this.caches[key];
-      const bucket = cacheForKey.get(value);
+      const bucket = this.computedSignals[key].value.get(value);
       if (!bucket) {
         // all constraints must match, any mismatch means no results.
         return;
@@ -94,6 +89,8 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
   }
 }
 
-type IndexCache<Item, Definition extends IndexDefinition> = {
-  [K in keyof Definition]: Map<Definition[K], Set<Item>>;
+type IndexHash<HashValue, Item> = ReadonlyMap<HashValue, Set<Item>>;
+
+type IndexSignals<Item, Definition extends IndexDefinition> = {
+  [K in keyof Definition]: ReadonlySignal<IndexHash<Definition[K], Item>>;
 };

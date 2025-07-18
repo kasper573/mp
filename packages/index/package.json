@@ -16,6 +16,9 @@
     "test:watch": "vitest",
     "perf": "tsx performance-test.ts"
   },
+  "dependencies": {
+    "@mp/state": "workspace:*"
+  },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
   }
