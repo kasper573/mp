@@ -8,7 +8,7 @@ import {
 import { SyncEntity } from "./sync-entity";
 
 import type { IndexDefinition, IndexResolvers, Index } from "@mp/index";
-import { UncachedIndex } from "@mp/index";
+import { CachedIndex } from "@mp/index";
 
 export class SyncMap<K, V, Def extends IndexDefinition = {}>
   implements Map<K, V>
@@ -25,7 +25,7 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
 
     // Future proofing indexed access.
     // Currently using an uncached implementation until we have/need a real implementation.
-    this.index = new UncachedIndex(
+    this.index = new CachedIndex(
       () => this.#signal.value.values(),
       indexResolvers ?? ({} as IndexResolvers<V, Def>),
     );
