@@ -1,7 +1,6 @@
 import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
-import { createConsoleLogger } from "@mp/logger";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
@@ -64,13 +63,14 @@ import { createCharacterService } from "./db/services/character-service";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
 import { createTickMetricsObserver } from "./metrics/tick";
+import { createPinoLogger } from "@mp/logger/pino";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = createConsoleLogger();
+const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;
