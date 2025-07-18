@@ -489,10 +489,10 @@ importers:
   packages/logger:
     dependencies:
       pino:
-        specifier: ^9.7.0
+        specifier: 9.7.0
         version: 9.7.0
       pino-pretty:
-        specifier: ^13.0.0
+        specifier: 13.0.0
         version: 13.0.0
     devDependencies:
       '@mp/tsconfig':
@@ -1829,7 +1829,6 @@ packages:
 
   '@ls-lint/ls-lint@2.3.0':
     resolution: {integrity: sha512-lsT5/7SxtImOIjpefC9wcoXt2lkikKhCjd6U+Q9Z6X5h2HBU/71ggt+XStdodZ0HkJGO333zDUeec7JROMCPFw==}
-    cpu: [x64, arm64, s390x, ppc64le]
     os: [darwin, linux, win32]
     hasBin: true
 
