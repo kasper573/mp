@@ -42,7 +42,7 @@ export function movementBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   const nextPathFinds = new Map<ActorId, TimeSpan>();
-  const stalePathInterval = TimeSpan.fromSeconds(1 / 3);
+  const stalePathInterval = TimeSpan.fromSeconds(2 / 3);
 
   return function movementBehaviorTick({
     timeSinceLastTick,
