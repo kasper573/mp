@@ -16,10 +16,9 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
     private dataSource: () => Iterable<Item>,
     private resolvers: IndexResolvers<Item, Definition>,
   ) {
-    // initialize an empty Map for each definitional key
     this.caches = Object.keys(resolvers).reduce(
       (acc, key) => {
-        acc[key] = new Map<Definition[typeof key], Set<Item>>();
+        acc[key] = new Map();
         return acc;
       },
       {} as Record<string, Map<unknown, Set<Item>>>,
@@ -27,14 +26,11 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
   }
 
   build(): void {
-    // reset master set and all per-key caches
     this.clear();
     for (const item of this.dataSource()) {
       this.allItems.add(item);
-      // for each indexable field...
-      for (const key of Object.keys(this.resolvers) as Array<
-        keyof Definition
-      >) {
+
+      for (const key in this.resolvers) {
         const value = this.resolvers[key](item);
         const cacheForKey = this.caches[key];
         let bucket = cacheForKey.get(value);
@@ -49,8 +45,7 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
 
   clear(): void {
     this.allItems.clear();
-    // clear each Map of value→Set<Item>
-    for (const key of Object.keys(this.caches) as Array<keyof Definition>) {
+    for (const key in this.caches) {
       this.caches[key].clear();
     }
   }
@@ -63,26 +58,25 @@ export class CachedIndex<Item, Definition extends IndexDefinition>
       Definition[keyof Definition],
     ][];
     if (entries.length === 0) {
-      // no constraints ⇒ yield everything
       for (const item of this.allItems) {
         yield item as NarrowedItem;
       }
       return;
     }
 
-    // gather each constraint's candidate set
+    // Gather each constraints candidate set
     const candidateSets: Set<Item>[] = [];
     for (const [key, value] of entries) {
       const cacheForKey = this.caches[key];
       const bucket = cacheForKey.get(value);
       if (!bucket) {
-        // nothing matches this constraint ⇒ empty result
+        // all constraints must match, any mismatch means no results.
         return;
       }
       candidateSets.push(bucket);
     }
 
-    // pick the smallest set to iterate, and filter by the others
+    // Pick the smallest set to iterate and filter by the others
     candidateSets.sort((a, b) => a.size - b.size);
     const [smallest, ...others] = candidateSets;
 
