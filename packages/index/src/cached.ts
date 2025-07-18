@@ -11,18 +11,36 @@ export class Index<Item, Definition extends IndexDefinition> {
   access<NarrowedItem extends Item>(
     query: IndexQuery<Definition>,
   ): ReadonlySet<NarrowedItem> {
-    let result: Set<Item> | undefined;
-    for (const key in query) {
-      const matches = this.caches[key].get(query[key] as never);
-      if (!matches) {
-        return emptySet;
-      } else if (!result) {
-        result = matches;
-      } else {
-        result = result.intersection(matches);
-      }
+    const entries = Object.entries(query) as [
+      keyof typeof query,
+      Definition[keyof Definition],
+    ][];
+    if (entries.length === 0) return emptySet;
+
+    // 1. Pull out all matching sets (bail out early if any are empty).
+    const sets: Set<Item>[] = [];
+    for (const [key, val] of entries) {
+      const s = this.caches[key].get(val as never);
+      if (!s) return emptySet;
+      sets.push(s);
     }
-    return result ?? emptySet;
+
+    // 2. Sort by ascending size so we intersect the smallest first.
+    sets.sort((a, b) => a.size - b.size);
+
+    // 3. Clone the smallest set and filter it in-place against the rest.
+    const result = new Set<Item>(sets[0]);
+    for (let i = 1; i < sets.length; i++) {
+      const s = sets[i];
+      for (const item of result) {
+        if (!s.has(item)) {
+          result.delete(item);
+        }
+      }
+      if (result.size === 0) return emptySet; // shortcut if intersection is empty
+    }
+
+    return result as ReadonlySet<unknown> as ReadonlySet<NarrowedItem>;
   }
 
   build() {
