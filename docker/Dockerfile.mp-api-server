@@ -8,7 +8,7 @@ WORKDIR /app
 
 # Copy package files
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY apps/server/package.json ./apps/server/
+COPY apps/api-server/package.json ./apps/api-server/
 COPY packages/*/package.json ./packages/*/
 
 # Install dependencies
@@ -19,10 +19,10 @@ RUN pnpm install --frozen-lockfile
 COPY . .
 
 # Build the application
-RUN pnpm --filter=@mp/server build
+RUN pnpm --filter=@mp/api-server build
 
 # Expose port
 EXPOSE 3000
 
 # Start the API server
-CMD ["node", "apps/server/dist/api-server.js"]
+CMD ["node", "apps/api-server/dist/index.js"]

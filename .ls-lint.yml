@@ -14,6 +14,8 @@ ignore:
   - .git
   - "./*/Dockerfile*"
   - "apps/server/drizzle/**"
+  - "apps/api-server/drizzle/**"
+  - "apps/area-server/drizzle/**"
   - "apps/e2e/.playwright"
   - "apps/client/.tanstack"
   - "./{apps,packages}/*/.turbo"
