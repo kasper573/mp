@@ -95,6 +95,13 @@
         "no-non-null-assertion": "off"
       }
     },
+    // Documentation and example files can use console statements
+    {
+      "files": ["**/docs/**"],
+      "rules": {
+        "no-console": "off"
+      }
+    },
     // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
     {
       "files": ["**/packages/graphics/**"],

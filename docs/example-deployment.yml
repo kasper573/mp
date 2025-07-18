@@ -1,0 +1,77 @@
+# Example: deploying the new horizontally scalable architecture
+
+version: "3.8"
+
+services:
+  # API Server - handles system-wide operations
+  api-server:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.mp-api-server
+    ports:
+      - "9999:9999"
+    environment:
+      MP_SERVER_PORT: "9999"
+      MP_SERVER_DATABASE_URL: "postgres://mp:mp@postgres:5432/mp_game"
+      MP_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_SERVER_PUBLIC_PATH: "/public/"
+      MP_SERVER_HOSTNAME: "0.0.0.0"
+      MP_SERVER_HTTP_BASE_URL: "http://localhost:9999"
+      MP_SERVER_CORS_ORIGIN: "http://localhost:3000"
+    depends_on:
+      - postgres
+
+  # Area Server - Island
+  area-server-island:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.mp-area-server
+    ports:
+      - "3001:3001"
+    environment:
+      MP_AREA_SERVER_SERVER_ID: "island-server"
+      MP_AREA_SERVER_AREAS: "island"
+      MP_AREA_SERVER_PORT: "3001"
+      MP_AREA_SERVER_DATABASE_URL: "postgres://mp:mp@postgres:5432/mp_game"
+      MP_AREA_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_AREA_SERVER_PUBLIC_PATH: "/public/"
+      MP_AREA_SERVER_HOSTNAME: "0.0.0.0"
+      MP_AREA_SERVER_HTTP_BASE_URL: "http://localhost:3001"
+      MP_AREA_SERVER_CORS_ORIGIN: "http://localhost:3000"
+    depends_on:
+      - postgres
+
+  # Area Server - Forest
+  area-server-forest:
+    build:
+      context: .
+      dockerfile: ./docker/Dockerfile.mp-area-server
+    ports:
+      - "3002:3002"
+    environment:
+      MP_AREA_SERVER_SERVER_ID: "forest-server"
+      MP_AREA_SERVER_AREAS: "forest"
+      MP_AREA_SERVER_PORT: "3002"
+      MP_AREA_SERVER_DATABASE_URL: "postgres://mp:mp@postgres:5432/mp_game"
+      MP_AREA_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_AREA_SERVER_PUBLIC_PATH: "/public/"
+      MP_AREA_SERVER_HOSTNAME: "0.0.0.0"
+      MP_AREA_SERVER_HTTP_BASE_URL: "http://localhost:3002"
+      MP_AREA_SERVER_CORS_ORIGIN: "http://localhost:3000"
+    depends_on:
+      - postgres
+
+  # Database
+  postgres:
+    image: postgres:16.4
+    environment:
+      POSTGRES_USER: mp
+      POSTGRES_PASSWORD: mp
+      POSTGRES_DB: mp_game
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
