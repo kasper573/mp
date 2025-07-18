@@ -8,7 +8,7 @@ describe("New Valibot Schemas", () => {
   it("should transform position coordinates to Vector", () => {
     const input = { x: 10, y: 20 };
     const result = v.parse(PositionSchema, input);
-    
+
     expect(result).toBeInstanceOf(Vector);
     expect(result.x).toBe(10);
     expect(result.y).toBe(20);
@@ -17,7 +17,7 @@ describe("New Valibot Schemas", () => {
   it("should transform size to Vector", () => {
     const input = { width: 100, height: 200 };
     const result = v.parse(SizeSchema, input);
-    
+
     expect(result).toBeInstanceOf(Vector);
     expect(result.x).toBe(100);
     expect(result.y).toBe(200);
@@ -43,9 +43,9 @@ describe("New Valibot Schemas", () => {
       tilesets: [],
       layers: [],
     };
-    
+
     const result = v.parse(TiledMapSchema, input);
-    
+
     expect(result.orientation).toBe("orthogonal");
     expect(result.size).toBeInstanceOf(Vector);
     expect(result.size.x).toBe(10);

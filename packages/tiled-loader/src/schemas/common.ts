@@ -1,5 +1,5 @@
 import { Vector } from "@mp/math";
-import type { Pixel, Tile, Branded } from "@mp/std";
+import type { Pixel, Tile } from "@mp/std";
 import * as v from "valibot";
 
 // Primitives
@@ -12,10 +12,19 @@ export type Argb = v.InferOutput<typeof ArgbSchema>;
 export const ColorSchema = v.union([RgbSchema, ArgbSchema]);
 export type Color = v.InferOutput<typeof ColorSchema>;
 
-export const RatioSchema = v.pipe(v.number(), v.minValue(0), v.maxValue(1), v.brand("Ratio"));
+export const RatioSchema = v.pipe(
+  v.number(),
+  v.minValue(0),
+  v.maxValue(1),
+  v.brand("Ratio"),
+);
 export type Ratio = v.InferOutput<typeof RatioSchema>;
 
-export const MillisecondsSchema = v.pipe(v.number(), v.minValue(0), v.brand("Milliseconds"));
+export const MillisecondsSchema = v.pipe(
+  v.number(),
+  v.minValue(0),
+  v.brand("Milliseconds"),
+);
 export type Milliseconds = v.InferOutput<typeof MillisecondsSchema>;
 
 export const DegreesSchema = v.pipe(v.number(), v.brand("Degrees"));
@@ -30,7 +39,7 @@ export const PositionSchema = v.pipe(
     x: PixelSchema,
     y: PixelSchema,
   }),
-  v.transform(({ x, y }) => new Vector(x as Pixel, y as Pixel))
+  v.transform(({ x, y }) => new Vector(x, y)),
 );
 export type Position = v.InferOutput<typeof PositionSchema>;
 
@@ -39,7 +48,7 @@ export const SizeSchema = v.pipe(
     width: PixelSchema,
     height: PixelSchema,
   }),
-  v.transform(({ width, height }) => new Vector(width as Pixel, height as Pixel))
+  v.transform(({ width, height }) => new Vector(width, height)),
 );
 export type Size = v.InferOutput<typeof SizeSchema>;
 
@@ -48,7 +57,7 @@ export const TileSizeSchema = v.pipe(
     width: TileSchema,
     height: TileSchema,
   }),
-  v.transform(({ width, height }) => new Vector(width as Tile, height as Tile))
+  v.transform(({ width, height }) => new Vector(width, height)),
 );
 export type TileSize = v.InferOutput<typeof TileSizeSchema>;
 
@@ -57,7 +66,7 @@ export const TilePositionSchema = v.pipe(
     x: TileSchema,
     y: TileSchema,
   }),
-  v.transform(({ x, y }) => new Vector(x as Tile, y as Tile))
+  v.transform(({ x, y }) => new Vector(x, y)),
 );
 export type TilePosition = v.InferOutput<typeof TilePositionSchema>;
 
@@ -125,7 +134,10 @@ export type MapRenderOrder = v.InferOutput<typeof MapRenderOrderSchema>;
 export const StaggerAxisSchema = v.union([v.literal("x"), v.literal("y")]);
 export type StaggerAxis = v.InferOutput<typeof StaggerAxisSchema>;
 
-export const StaggerIndexSchema = v.union([v.literal("odd"), v.literal("even")]);
+export const StaggerIndexSchema = v.union([
+  v.literal("odd"),
+  v.literal("even"),
+]);
 export type StaggerIndex = v.InferOutput<typeof StaggerIndexSchema>;
 
 export const FillModeSchema = v.union([
@@ -148,11 +160,20 @@ export const ObjectAlignmentSchema = v.union([
 ]);
 export type ObjectAlignment = v.InferOutput<typeof ObjectAlignmentSchema>;
 
-export const TileRenderSizeSchema = v.union([v.literal("tile"), v.literal("grid")]);
+export const TileRenderSizeSchema = v.union([
+  v.literal("tile"),
+  v.literal("grid"),
+]);
 export type TileRenderSize = v.InferOutput<typeof TileRenderSizeSchema>;
 
-export const LayerDrawOrderSchema = v.union([v.literal("topdown"), v.literal("index")]);
+export const LayerDrawOrderSchema = v.union([
+  v.literal("topdown"),
+  v.literal("index"),
+]);
 export type LayerDrawOrder = v.InferOutput<typeof LayerDrawOrderSchema>;
 
-export const WangColorIndexSchema = v.pipe(v.number(), v.brand("WangColorIndex"));
+export const WangColorIndexSchema = v.pipe(
+  v.number(),
+  v.brand("WangColorIndex"),
+);
 export type WangColorIndex = v.InferOutput<typeof WangColorIndexSchema>;

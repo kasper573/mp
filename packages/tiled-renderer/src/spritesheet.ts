@@ -20,8 +20,8 @@ export async function loadTiledMapSpritesheets(
       async (tileset): Promise<[FilePath, TiledSpritesheet]> => [
         tileset.image,
         await loadTilesetSpritesheet(tileset, {
-          width: tiledMap.tilewidth,
-          height: tiledMap.tileheight,
+          width: tiledMap.tileSize.x,
+          height: tiledMap.tileSize.y,
         }),
       ],
     ),

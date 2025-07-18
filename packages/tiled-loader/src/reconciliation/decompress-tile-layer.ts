@@ -29,7 +29,7 @@ export function decompressTileLayer(
 
   let dataOffset = 0;
 
-  const expectedDataSize = map.width * map.height * 4;
+  const expectedDataSize = map.size.x * map.size.y * 4;
   if (data.length !== expectedDataSize) {
     throw new Error(
       `Expected data length of ${expectedDataSize}, but got ${data.length}`,
@@ -46,8 +46,8 @@ export function decompressTileLayer(
   );
 
   const tiles: TileLayerTile[] = [];
-  for (let y = 0 as Tile; y < map.height; y++) {
-    for (let x = 0 as Tile; x < map.width; x++) {
+  for (let y = 0 as Tile; y < map.size.y; y++) {
+    for (let x = 0 as Tile; x < map.size.x; x++) {
       const { gid, newOffset, flags } = readGlobalIdBuffer(data, dataOffset);
       dataOffset = newOffset;
 
@@ -72,8 +72,8 @@ export function decompressTileLayer(
         id: gid,
         x,
         y,
-        width: map.tilewidth,
-        height: map.tileheight,
+        width: map.tileSize.x,
+        height: map.tileSize.y,
         flags,
         tile,
         tileset,

@@ -62,7 +62,9 @@ export type Property = v.InferOutput<typeof PropertySchema>;
 
 export const PropertyMapSchema = v.pipe(
   v.optional(v.array(PropertySchema), []),
-  v.transform((properties) => new Map(properties.map((prop) => [prop.name, prop])))
+  v.transform(
+    (properties) => new Map(properties.map((prop) => [prop.name, prop])),
+  ),
 );
 
 export type PropertyMap = v.InferOutput<typeof PropertyMapSchema>;

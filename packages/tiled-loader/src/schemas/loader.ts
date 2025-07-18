@@ -5,8 +5,12 @@ import { TiledMapSchema, type TiledMap } from "./map";
 
 export type CreateValidatedTiledLoaderOptions = Omit<LoaderContext, "basePath">;
 
-export function createValidatedTiledLoader(options: CreateValidatedTiledLoaderOptions) {
-  return async function loadTiled(mapPath: string): Promise<ValidatedTiledLoaderResult> {
+export function createValidatedTiledLoader(
+  options: CreateValidatedTiledLoaderOptions,
+) {
+  return async function loadTiled(
+    mapPath: string,
+  ): Promise<ValidatedTiledLoaderResult> {
     const context: LoaderContext = {
       basePath: mapPath,
       ...options,
@@ -15,13 +19,13 @@ export function createValidatedTiledLoader(options: CreateValidatedTiledLoaderOp
     try {
       // Load the raw JSON data
       const rawData = await context.loadJson(mapPath);
-      
+
       // Parse and transform with valibot
       const tiledMap = v.parse(TiledMapSchema, rawData);
-      
+
       // TODO: Run reconciliation on the parsed data
       // await reconcileTiledMap(context, tiledMap);
-      
+
       return ok(tiledMap);
     } catch (error) {
       return err(error);

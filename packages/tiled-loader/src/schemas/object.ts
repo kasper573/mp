@@ -41,7 +41,7 @@ const SharedObjectPropertiesSchema = v.pipe(
     position: new Vector(x as Pixel, y as Pixel),
     size: new Vector(width as Pixel, height as Pixel),
     properties: properties || new Map(),
-  }))
+  })),
 );
 
 export const EllipseObjectSchema = v.pipe(
@@ -55,7 +55,7 @@ export const EllipseObjectSchema = v.pipe(
       ...base,
       objectType: "ellipse" as const,
     };
-  })
+  }),
 );
 
 export const PointObjectSchema = v.pipe(
@@ -69,7 +69,7 @@ export const PointObjectSchema = v.pipe(
       ...base,
       objectType: "point" as const,
     };
-  })
+  }),
 );
 
 export const PolygonObjectSchema = v.pipe(
@@ -84,7 +84,7 @@ export const PolygonObjectSchema = v.pipe(
       objectType: "polygon" as const,
       polygon: input.polygon,
     };
-  })
+  }),
 );
 
 export const PolylineObjectSchema = v.pipe(
@@ -99,7 +99,7 @@ export const PolylineObjectSchema = v.pipe(
       objectType: "polyline" as const,
       polyline: input.polyline,
     };
-  })
+  }),
 );
 
 export const TextObjectSchema = v.pipe(
@@ -114,7 +114,7 @@ export const TextObjectSchema = v.pipe(
       objectType: "text" as const,
       text: input.text,
     };
-  })
+  }),
 );
 
 export const RectangleObjectSchema = v.pipe(
@@ -127,7 +127,7 @@ export const RectangleObjectSchema = v.pipe(
       ...base,
       objectType: "rectangle" as const,
     };
-  })
+  }),
 );
 
 export const TiledObjectSchema = v.union([
