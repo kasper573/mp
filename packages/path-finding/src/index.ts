@@ -1,5 +1,5 @@
 import type { VectorKey, VectorLike } from "@mp/math";
-import { Vector } from "@mp/math";
+import { squaredDistance, Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import type { PathFinder } from "ngraph.path";
 import { aStar } from "ngraph.path";
@@ -34,29 +34,36 @@ export class VectorGraph<T extends number> {
     return this.#ng.getNode(id) as unknown as VectorGraphNode<T>;
   }
 
-  getNearestNode(vector: VectorLike<T>): VectorGraphNode<T> | undefined {
-    const v = Vector.from(vector);
-    const from = v.round();
-    const xOffset = (v.x - 0.5) % 1 < 0.5 ? -1 : 1;
-    const yOffset = (v.y - 0.5) % 1 < 0.5 ? -1 : 1;
+  /**
+   * @param fVector A fractional vector (which means itself never matches a node exactly)
+   */
+  getNearestNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
+    // This is a hot code path so we write a bit more verbose code for higher performance:
+    // 1. Avoid Vector allocations, just do manual math operations.
+    // 2. Use squared distance to avoid the square root operation from .distance()
+    //   (we don't need a real distance, we just need to compare anyway)
 
-    const adjacentNodes = [
-      Vector.keyFrom(from),
-      Vector.key(from.x + xOffset, from.y),
-      Vector.key(from.x, from.y + yOffset),
-      Vector.key(from.x + xOffset, from.y + yOffset),
-    ]
-      .map((key) => this.getNode(key))
-      .filter((v) => v !== undefined);
+    const roundedX = Math.round(fVector.x);
+    const roundedY = Math.round(fVector.y);
 
-    const [nearestNode] = adjacentNodes.toSorted(
-      (a, b) =>
-        // We dont need the real distance since we're only sorting.
-        // Squared distance is faster to calculate.
-        a.data.vector.squaredDistance(vector) -
-        b.data.vector.squaredDistance(vector),
-    );
-    return nearestNode;
+    let nearest: VectorGraphNode<T> | undefined;
+    let minDist = Infinity;
+
+    for (const [xOffset, yOffset] of quadrantOffsets) {
+      const y = roundedX + xOffset;
+      const x = roundedY + yOffset;
+      const dist = squaredDistance(y, x, fVector.x, fVector.y);
+
+      if (dist < minDist) {
+        const node = this.getNode(Vector.key(y, x));
+        if (node) {
+          nearest = node;
+          minDist = dist;
+        }
+      }
+    }
+
+    return nearest;
   }
 
   private nodeWeight?: (node: VectorGraphNode<T>) => number;
@@ -109,6 +116,13 @@ export class VectorGraph<T extends number> {
     return path;
   }
 }
+
+let quadrantOffsets: Array<[number, number]> = [
+  [0, 0],
+  [1, 0],
+  [0, 1],
+  [1, 1],
+];
 
 /**
  * Identical to ngraph's node type, but with stricter types.

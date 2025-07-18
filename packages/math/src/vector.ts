@@ -13,19 +13,17 @@ export class Vector<T extends number> implements VectorLike<T> {
   // These function avoids the square root operation, which saves on performance.
 
   squaredDistance(b: VectorLike<T>): T {
-    const dx = this.x - b.x;
-    const dy = this.y - b.y;
-    return (dx * dx + dy * dy) as T;
+    return squaredDistance(this.x, this.y, b.x, b.y);
   }
 
   isWithinDistance(b: VectorLike<T>, distance: number): boolean {
-    const squaredDistance = this.squaredDistance(b);
-    return squaredDistance <= distance * distance;
+    const sd = this.squaredDistance(b);
+    return sd <= distance * distance;
   }
 
   isOutOfReach(b: VectorLike<T>, distance: number): boolean {
-    const squaredDistance = this.squaredDistance(b);
-    return squaredDistance > distance * distance;
+    const sd = this.squaredDistance(b);
+    return sd > distance * distance;
   }
 
   distance(b: VectorLike<T>): T {
@@ -84,6 +82,17 @@ export class Vector<T extends number> implements VectorLike<T> {
   static keyFrom(v: VectorLike<number>): VectorKey {
     return Vector.key(v.x, v.y);
   }
+}
+
+export function squaredDistance<T extends number>(
+  ax: T,
+  ay: T,
+  bx: T,
+  by: T,
+): T {
+  const dx = ax - bx;
+  const dy = ay - by;
+  return (dx * dx + dy * dy) as T;
 }
 
 /**
