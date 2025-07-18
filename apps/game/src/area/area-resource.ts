@@ -1,5 +1,5 @@
 import { Vector } from "@mp/math";
-import type { Layer, TiledObject } from "@mp/tiled-loader";
+import type { LayerWithVectors, TiledObjectWithVectors } from "@mp/tiled-loader";
 import type { Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
 import type { VectorGraph } from "@mp/path-finding";
@@ -19,7 +19,7 @@ export class AreaResource {
    * but also static groups like large trees, houses, etc, anything that
    * should be grouped by their kind and then sorted by their combined y position.
    */
-  readonly dynamicLayer: Layer;
+  readonly dynamicLayer: LayerWithVectors;
 
   constructor(
     readonly id: AreaId,
@@ -40,8 +40,8 @@ export class AreaResource {
     this.start = tiled.worldCoordToTile(Vector.from(startObj)).round();
   }
 
-  hitTestObjects(coord: Vector<Pixel>): TiledObject[] {
-    const matches: TiledObject[] = [];
+  hitTestObjects(coord: Vector<Pixel>): TiledObjectWithVectors[] {
+    const matches: TiledObjectWithVectors[] = [];
     for (const obj of this.tiled.objects) {
       if (hitTestTiledObject(obj, coord)) {
         matches.push(obj);
@@ -51,7 +51,7 @@ export class AreaResource {
   }
 }
 
-export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
+export function getAreaIdFromObject(object: TiledObjectWithVectors): AreaId | undefined {
   const prop = object.properties.get("goto");
   return prop ? (prop.value as AreaId) : undefined;
 }

@@ -5,7 +5,7 @@ import type { Pixel, Tile } from "@mp/std";
 import type { PropertyMap } from "@mp/tiled-loader";
 import {
   type TileLayerTile,
-  type Layer,
+  type LayerWithVectors,
   type GlobalTileId,
   type TilesetTile,
   localToGlobalId,
@@ -86,7 +86,7 @@ export class WalkableChecker {
 
       // Use same transform as the renderer to ensure it's correct
       const objTransform = tiledObjectMeshInput(obj).transform;
-      const rect = new Rect(0 as Pixel, 0 as Pixel, obj.width, obj.height)
+      const rect = new Rect(0 as Pixel, 0 as Pixel, obj.size.x, obj.size.y)
         .apply(objTransform)
         .divide(this.tiled.tileSize) as unknown as Rect<Tile>;
 
@@ -130,12 +130,12 @@ function isOneTileWalkable(props: PropertyMap) {
   return props.get("Walkable")?.value as boolean | undefined;
 }
 
-function tileLayerTiles(layer: Layer): TileLayerTile[] {
+function tileLayerTiles(layer: LayerWithVectors): TileLayerTile[] {
   switch (layer.type) {
     case "group":
-      return layer.layers.flatMap(tileLayerTiles);
+      return layer.layers?.flatMap(tileLayerTiles) ?? [];
     case "tilelayer":
-      return layer.tiles;
+      return layer.tiles ?? [];
     default:
       return [];
   }

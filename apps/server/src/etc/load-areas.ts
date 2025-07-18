@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import type { AreaLookup, AreaId } from "@mp/game/server";
 import { AreaResource, TiledResource } from "@mp/game/server";
 import type { LocalFile } from "@mp/std";
-import { createTiledLoader } from "@mp/tiled-loader";
+import { createTiledLoaderWithVectors } from "@mp/tiled-loader";
 
 export async function loadAreas(dir: string): Promise<AreaLookup> {
   const files = await fs.readdir(dir);
@@ -28,7 +28,7 @@ async function loadTiled(tmxFile: string) {
 
 const loadJson = (path: string) => fs.readFile(path, "utf8").then(JSON.parse);
 const relativePath = (p: string, b: string) => path.resolve(path.dirname(b), p);
-const load = createTiledLoader({
+const load = createTiledLoaderWithVectors({
   loadJson,
   relativePath,
 });

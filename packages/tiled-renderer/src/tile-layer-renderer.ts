@@ -1,5 +1,7 @@
-import type { TiledObjectTransformer } from "@mp/tiled-loader";
-import { objectsInLayers, type Layer } from "@mp/tiled-loader";
+import type { VectorTiledObjectTransformer } from "@mp/tiled-loader";
+import { Vector } from "@mp/math";
+import type { LayerWithVectors } from "@mp/tiled-loader";
+import { objectsInVectorLayers } from "@mp/tiled-loader";
 import { Container } from "@mp/graphics";
 import type { TiledTextureLookup } from "./spritesheet";
 import { renderLayerTilesSorted } from "./tile-renderer-sorted";
@@ -9,7 +11,7 @@ import { assert } from "@mp/std";
 
 export class TiledRenderer extends Container {
   constructor(
-    layers: Layer[],
+    layers: LayerWithVectors[],
     private dynamicLayerName: string,
     textureLookup: TiledTextureLookup,
   ) {
@@ -18,7 +20,7 @@ export class TiledRenderer extends Container {
     renderTiledLayersInto(this, layers, textureLookup);
 
     // Render tile objects into the dynamic layer to ensure they are depth sorted
-    for (const obj of objectsInLayers(layers, inheritObjectOffset)) {
+    for (const obj of objectsInVectorLayers(layers, inheritVectorObjectOffset)) {
       const mesh = renderTileObject(obj, textureLookup);
       if (mesh) {
         this.dynamicLayer.addChild(mesh);
@@ -34,11 +36,12 @@ export class TiledRenderer extends Container {
 
 // Since we cant render nested object layers and apply their offsets that way,
 // we need to inherit the offsets and apply manually to each object.
-const inheritObjectOffset: TiledObjectTransformer = (obj, ancestry) => {
+const inheritVectorObjectOffset: VectorTiledObjectTransformer = (obj, ancestry) => {
   return ancestry.reduce(
     (acc, layer) => {
-      acc.x = (acc.x + layer.offsetx) as Pixel;
-      acc.y = (acc.y + layer.offsety) as Pixel;
+      acc.x = (acc.x + layer.offset.x) as Pixel;
+      acc.y = (acc.y + layer.offset.y) as Pixel;
+      acc.position = new Vector(acc.x, acc.y);
       return acc;
     },
     { ...obj },
@@ -46,7 +49,7 @@ const inheritObjectOffset: TiledObjectTransformer = (obj, ancestry) => {
 };
 
 function renderTiledLayers(
-  layers: Layer[],
+  layers: LayerWithVectors[],
   textureLookup: TiledTextureLookup,
 ): Container {
   const container = new Container({ isRenderGroup: true });
@@ -56,28 +59,28 @@ function renderTiledLayers(
 
 function renderTiledLayersInto(
   container: Container,
-  layers: Layer[],
+  layers: LayerWithVectors[],
   textureLookup: TiledTextureLookup,
 ): void {
   // layers are already in the draw order in the tiled data
   for (const [index, layer] of layers.entries()) {
     const layerRenderer = renderTiledLayer(layer, textureLookup);
     if (layerRenderer) {
-      layerRenderer.position.set(layer.offsetx, layer.offsety);
+      layerRenderer.position.set(layer.offset.x, layer.offset.y);
       layerRenderer.label = layer.name;
       container.addChildAt(layerRenderer, index);
     }
   }
 }
 function renderTiledLayer(
-  layer: Layer,
+  layer: LayerWithVectors,
   textureLookup: TiledTextureLookup,
 ): Container | undefined {
   switch (layer.type) {
     case "group":
-      return renderTiledLayers(layer.layers, textureLookup);
+      return renderTiledLayers(layer.layers ?? [], textureLookup);
     case "tilelayer":
-      return renderLayerTilesSorted(layer.tiles, textureLookup);
+      return renderLayerTilesSorted(layer.tiles ?? [], textureLookup);
     case "imagelayer":
       throw new Error("Not implemented");
     case "objectgroup":

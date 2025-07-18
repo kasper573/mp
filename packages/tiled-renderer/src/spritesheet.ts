@@ -8,20 +8,20 @@ import type { FilePath, LocalTileId, Milliseconds } from "@mp/tiled-loader";
 import {
   localToGlobalId,
   type GlobalTileId,
-  type TiledMap,
+  type TiledMapWithVectors,
   type Tileset,
 } from "@mp/tiled-loader";
 
 export async function loadTiledMapSpritesheets(
-  tiledMap: TiledMap,
+  tiledMap: TiledMapWithVectors,
 ): Promise<TiledSpritesheetRecord> {
   const tilesetsByPath = await Promise.all(
     tiledMap.tilesets.map(
       async (tileset): Promise<[FilePath, TiledSpritesheet]> => [
         tileset.image,
         await loadTilesetSpritesheet(tileset, {
-          width: tiledMap.tilewidth,
-          height: tiledMap.tileheight,
+          width: tiledMap.tileSize.x,
+          height: tiledMap.tileSize.y,
         }),
       ],
     ),

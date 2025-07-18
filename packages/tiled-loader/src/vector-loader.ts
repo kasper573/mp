@@ -61,6 +61,43 @@ export function createTiledLoaderWithVectors(options: CreateTiledLoaderWithVecto
   };
 }
 
+// Vector-based TiledObject types
+export interface TiledObjectWithVectors {
+  id: number;
+  name: string;
+  objectType: string;
+  visible: boolean;
+  rotation: number;
+  type?: string;
+  properties: any;
+  
+  // Vector-based properties
+  position: Vector<Pixel>;
+  size: Vector<Pixel>;
+  
+  // Keep original properties for compatibility
+  x: Pixel;
+  y: Pixel;
+  width: Pixel;
+  height: Pixel;
+  
+  // Object-specific properties
+  gid?: any;
+  flags?: any;
+  
+  // For polygon and polyline objects
+  polygon?: any[];
+  polyline?: any[];
+  polygonVectors?: Vector<Pixel>[];
+  polylineVectors?: Vector<Pixel>[];
+  
+  // For text objects
+  text?: any;
+  
+  // Additional properties
+  [key: string]: any;
+}
+
 export type TiledLoaderWithVectorsResult = Result<TiledMapWithVectors, unknown>;
 
 // Define the Vector-based types
@@ -128,7 +165,7 @@ export interface LayerWithVectors {
   
   // Object layer properties
   draworder?: string;
-  objects?: any[];
+  objects?: TiledObjectWithVectors[];
   
   // Group layer properties
   layers?: LayerWithVectors[];
@@ -224,9 +261,18 @@ function transformLayer(layer: any): LayerWithVectors {
   return transformed;
 }
 
-function transformObject(obj: any): any {
-  const transformed = {
+function transformObject(obj: any): TiledObjectWithVectors {
+  const transformed: TiledObjectWithVectors = {
     ...obj,
+    
+    // Ensure required properties
+    id: obj.id || 0,
+    name: obj.name || "",
+    objectType: obj.objectType || "rectangle",
+    visible: obj.visible !== undefined ? obj.visible : true,
+    rotation: obj.rotation || 0,
+    type: obj.type,
+    properties: obj.properties || {},
     
     // Add Vector-based properties
     position: new Vector((obj.x || 0) as Pixel, (obj.y || 0) as Pixel),
@@ -239,18 +285,67 @@ function transformObject(obj: any): any {
     height: (obj.height || 0) as Pixel,
   };
   
-  // Transform polygon/polyline coordinates to Vector arrays
-  if (obj.polygon) {
+  // Determine object type from Tiled properties
+  if (obj.ellipse) {
+    transformed.objectType = "ellipse";
+  } else if (obj.point) {
+    transformed.objectType = "point";
+  } else if (obj.polygon) {
+    transformed.objectType = "polygon";
+    transformed.polygon = obj.polygon;
     transformed.polygonVectors = obj.polygon.map((coord: any) => 
       new Vector(coord.x as Pixel, coord.y as Pixel)
     );
-  }
-  
-  if (obj.polyline) {
+  } else if (obj.polyline) {
+    transformed.objectType = "polyline";
+    transformed.polyline = obj.polyline;
     transformed.polylineVectors = obj.polyline.map((coord: any) => 
       new Vector(coord.x as Pixel, coord.y as Pixel)
     );
+  } else if (obj.text) {
+    transformed.objectType = "text";
+    transformed.text = obj.text;
+  } else {
+    transformed.objectType = "rectangle";
   }
   
   return transformed;
 }
+
+// Vector-based object traversal functions
+export function objectsInVectorLayers(
+  layers: LayerWithVectors[],
+  transform: VectorTiledObjectTransformer = noopVectorTransformer,
+): TiledObjectWithVectors[] {
+  return layers.flatMap((layer) =>
+    objectsInVectorLayer(layer, emptyVectorLayerList, transform),
+  );
+}
+
+export function objectsInVectorLayer(
+  layer: LayerWithVectors,
+  ancestry: LayerWithVectors[],
+  transform: VectorTiledObjectTransformer,
+): TiledObjectWithVectors[] {
+  switch (layer.type) {
+    case "group": {
+      const newAncestry = ancestry.concat(layer);
+      return (layer.layers || []).flatMap((subLayer) =>
+        objectsInVectorLayer(subLayer, newAncestry, transform),
+      );
+    }
+    case "objectgroup":
+      return (layer.objects || []).map((obj) => transform(obj, ancestry));
+    default:
+      return [];
+  }
+}
+
+const noopVectorTransformer: VectorTiledObjectTransformer = (obj) => obj;
+
+export type VectorTiledObjectTransformer = (
+  obj: TiledObjectWithVectors,
+  ancestry: LayerWithVectors[],
+) => TiledObjectWithVectors;
+
+const emptyVectorLayerList = Object.freeze([]) as unknown as LayerWithVectors[];

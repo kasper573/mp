@@ -1,5 +1,5 @@
-import type { TiledMap } from "@mp/tiled-loader";
-import { createTiledLoader } from "@mp/tiled-loader";
+import type { TiledMapWithVectors } from "@mp/tiled-loader";
+import { createTiledLoaderWithVectors } from "@mp/tiled-loader";
 import { skipToken } from "@mp/rpc/react";
 import type { AreaId } from "./area-id";
 import { TiledResource } from "./tiled-resource";
@@ -33,8 +33,8 @@ export function useTiledMap(areaId: AreaId | undefined) {
   });
 }
 
-export async function loadTiledMap(url: string): Promise<TiledMap> {
-  const loadTiled = createTiledLoader({
+export async function loadTiledMap(url: string): Promise<TiledMapWithVectors> {
+  const loadTiled = createTiledLoaderWithVectors({
     loadJson,
     relativePath: (path, base) => relativeUrl(path, base),
   });
