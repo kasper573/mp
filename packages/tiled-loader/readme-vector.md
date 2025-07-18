@@ -29,12 +29,12 @@ const result = await loader.load("level1.json");
 
 if (result.isOk()) {
   const map = result.value;
-  
+
   // Vector operations are now available!
   const mapSizeInPixels = map.mapSize.scale(map.tileSize);
   const center = mapSizeInPixels.scale({ x: 0.5, y: 0.5 });
   const distance = map.parallaxOrigin?.distance(center) ?? 0;
-  
+
   console.log(`Map size: ${map.mapSize.toString()}`);
   console.log(`Tile size: ${map.tileSize.toString()}`);
   console.log(`Map size in pixels: ${mapSizeInPixels.toString()}`);
@@ -46,6 +46,7 @@ if (result.isOk()) {
 ## Data Structure Transformation
 
 ### Before (Raw Tiled JSON)
+
 ```json
 {
   "width": 58,
@@ -64,6 +65,7 @@ if (result.isOk()) {
 ```
 
 ### After (Vector-based)
+
 ```typescript
 {
   mapSize: Vector<Tile>, // { x: 58, y: 47 }
@@ -80,7 +82,7 @@ if (result.isOk()) {
 ## Benefits
 
 1. **Performance**: No runtime conversions during rendering
-2. **Convenience**: Vector operations (distance, add, scale, etc.) available on positions/sizes  
+2. **Convenience**: Vector operations (distance, add, scale, etc.) available on positions/sizes
 3. **Type Safety**: Branded types distinguish Pixel vs Tile coordinates
 4. **Modern**: Uses latest schema validation with Valibot
 5. **Maintainable**: Schema-driven approach makes it easy to modify data structure
@@ -88,9 +90,9 @@ if (result.isOk()) {
 ## Type System
 
 ```typescript
-type Position = Vector<Pixel>;       // Pixel coordinates  
-type Size = Vector<Pixel>;           // Pixel dimensions
-type TilePosition = Vector<Tile>;    // Tile coordinates
-type TileSize = Vector<Tile>;        // Tile dimensions
+type Position = Vector<Pixel>; // Pixel coordinates
+type Size = Vector<Pixel>; // Pixel dimensions
+type TilePosition = Vector<Tile>; // Tile coordinates
+type TileSize = Vector<Tile>; // Tile dimensions
 type CoordinatePath = readonly Position[]; // Polygon/polyline coordinates
 ```
