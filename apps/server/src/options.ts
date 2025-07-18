@@ -2,7 +2,6 @@ import path from "node:path";
 import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
 import type { InferOutput } from "@mp/env";
-import type { AreaId } from "@mp/game/server";
 import {
   assertEnv,
   boolish,
@@ -147,4 +146,8 @@ export const areaServerOptionsSchema = object({
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
-export const areaServerOptions = assertEnv(areaServerOptionsSchema, process.env, "MP_AREA_SERVER_");
+export const areaServerOptions = assertEnv(
+  areaServerOptionsSchema,
+  process.env,
+  "MP_AREA_SERVER_",
+);

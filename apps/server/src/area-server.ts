@@ -223,8 +223,8 @@ logger.info(`Getting all NPCs and spawns for configured areas...`);
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
 
 // Filter NPCs and spawns to only include those in our areas
-const npcAndSpawns = allNpcsAndSpawns.filter(spawn => 
-  areas.has(spawn.areaId as any)
+const npcAndSpawns = allNpcsAndSpawns.filter((spawn) =>
+  areas.has(spawn.areaId as string),
 );
 
 const characterService = createCharacterService(
@@ -278,14 +278,14 @@ persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
 
 // Graceful shutdown
-process.on('SIGTERM', async () => {
-  logger.info('Received SIGTERM, shutting down gracefully...');
+process.on("SIGTERM", async () => {
+  logger.info("Received SIGTERM, shutting down gracefully...");
   await areaServerRegistry.unregister(opt.serverId);
   process.exit(0);
 });
 
-process.on('SIGINT', async () => {
-  logger.info('Received SIGINT, shutting down gracefully...');
+process.on("SIGINT", async () => {
+  logger.info("Received SIGINT, shutting down gracefully...");
   await areaServerRegistry.unregister(opt.serverId);
   process.exit(0);
 });

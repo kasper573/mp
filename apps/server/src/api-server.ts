@@ -15,7 +15,7 @@ import {
   ctxUserService,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
-import { type LocalFile } from "@mp/std";
+import type { LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import {
   ctxAreaFileUrlResolver,
@@ -37,7 +37,6 @@ import { playerRoles } from "./roles";
 import { createDbClient } from "./db/client";
 import { createUserService } from "./db/services/user-service";
 import { apiServerRpcRouter } from "./rpc/api-server-rpc";
-import { AreaServerRegistry } from "./services/area-server-registry";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -79,12 +78,12 @@ const webServer = express()
 const httpServer = http.createServer(webServer);
 
 logger.info(`Loading areas and actor models...`);
-const [areas, actorModels] = await Promise.all([
+const [areas, _actorModels] = await Promise.all([
   loadAreas(path.resolve(opt.publicDir, "areas")),
   loadActorModels(opt.publicDir),
 ]);
 
-const areaServerRegistry = new AreaServerRegistry(db);
+const _areaServerRegistry = new AreaServerRegistry(db);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,

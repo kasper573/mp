@@ -8,3 +8,9 @@ export const serverRpcRouter = rpc.router({
   system: systemRouter,
   ...gameServerRpcSlice,
 });
+
+// Export the new API and area server types
+export type {
+  ApiServerRpcRouter,
+  AreaServerRpcRouter,
+} from "./rpc/api-server-rpc";

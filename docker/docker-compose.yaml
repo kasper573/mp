@@ -32,6 +32,12 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-api-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
+    environment:
+      MP_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_SERVER_PUBLIC_MAX_AGE: "604800"
+      MP_SERVER_BUILD_VERSION: "${DOCKER_IMAGE_VERSION:-latest}"
+      MP_SERVER_EXPOSE_ERROR_DETAILS: "false"
+      MP_SERVER_AUTH__ALLOW_BYPASS_USERS: "false"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
       interval: 3s
@@ -56,6 +62,13 @@ services:
       MP_AREA_SERVER_SERVER_ID: "island-server"
       MP_AREA_SERVER_AREAS: "island"
       MP_AREA_SERVER_PORT: "3001"
+      MP_AREA_SERVER_HTTP_BASE_URL: "http://mp-area-server-island:3001"
+      MP_AREA_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_AREA_SERVER_PUBLIC_MAX_AGE: "604800"
+      MP_AREA_SERVER_RNG_SEED: "12345"
+      MP_AREA_SERVER_BUILD_VERSION: "${DOCKER_IMAGE_VERSION:-latest}"
+      MP_AREA_SERVER_EXPOSE_ERROR_DETAILS: "false"
+      MP_AREA_SERVER_AUTH__ALLOW_BYPASS_USERS: "false"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3001/health"]
       interval: 3s
@@ -80,6 +93,13 @@ services:
       MP_AREA_SERVER_SERVER_ID: "forest-server"
       MP_AREA_SERVER_AREAS: "forest"
       MP_AREA_SERVER_PORT: "3002"
+      MP_AREA_SERVER_HTTP_BASE_URL: "http://mp-area-server-forest:3002"
+      MP_AREA_SERVER_PUBLIC_DIR: "/app/apps/server/public"
+      MP_AREA_SERVER_PUBLIC_MAX_AGE: "604800"
+      MP_AREA_SERVER_RNG_SEED: "12346"
+      MP_AREA_SERVER_BUILD_VERSION: "${DOCKER_IMAGE_VERSION:-latest}"
+      MP_AREA_SERVER_EXPOSE_ERROR_DETAILS: "false"
+      MP_AREA_SERVER_AUTH__ALLOW_BYPASS_USERS: "false"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:3002/health"]
       interval: 3s

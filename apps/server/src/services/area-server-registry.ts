@@ -12,7 +12,10 @@ export interface AreaServerInfo {
 export class AreaServerRegistry {
   constructor(private db: DbClient) {}
 
-  async register(serverId: string, info: Omit<AreaServerInfo, "registeredAt">): Promise<void> {
+  async register(
+    serverId: string,
+    info: Omit<AreaServerInfo, "registeredAt">,
+  ): Promise<void> {
     const serverInfo: AreaServerInfo = {
       ...info,
       registeredAt: new Date(),
@@ -23,11 +26,11 @@ export class AreaServerRegistry {
         sql`INSERT INTO area_server_registry (server_id, info) 
             VALUES (${serverId}, ${JSON.stringify(serverInfo)}) 
             ON CONFLICT (server_id) 
-            DO UPDATE SET info = ${JSON.stringify(serverInfo)}, updated_at = NOW()`
+            DO UPDATE SET info = ${JSON.stringify(serverInfo)}, updated_at = NOW()`,
       );
     } catch (error) {
       // If table doesn't exist, create it
-      if (error instanceof Error && error.message.includes('does not exist')) {
+      if (error instanceof Error && error.message.includes("does not exist")) {
         await this.createTableIfNotExists();
         await this.register(serverId, info);
       } else {
@@ -42,26 +45,28 @@ export class AreaServerRegistry {
           server_id TEXT PRIMARY KEY,
           info JSONB NOT NULL,
           updated_at TIMESTAMP DEFAULT NOW()
-      )`
+      )`,
     );
     await this.db.execute(
       sql`CREATE INDEX IF NOT EXISTS idx_area_server_registry_areas 
-          ON area_server_registry USING GIN ((info->'areas'))`
+          ON area_server_registry USING GIN ((info->'areas'))`,
     );
   }
 
   async unregister(serverId: string): Promise<void> {
     await this.db.execute(
-      sql`DELETE FROM area_server_registry WHERE server_id = ${serverId}`
+      sql`DELETE FROM area_server_registry WHERE server_id = ${serverId}`,
     );
   }
 
-  async getServerForArea(areaId: AreaId): Promise<{ serverId: string; info: AreaServerInfo } | null> {
+  async getServerForArea(
+    areaId: AreaId,
+  ): Promise<{ serverId: string; info: AreaServerInfo } | null> {
     const result = await this.db.execute(
       sql`SELECT server_id, info FROM area_server_registry 
           WHERE info::jsonb @> ${JSON.stringify({ areas: [areaId] })}
           ORDER BY updated_at DESC
-          LIMIT 1`
+          LIMIT 1`,
     );
 
     if (result.rows.length === 0) {
@@ -76,10 +81,10 @@ export class AreaServerRegistry {
 
   async getAllServers(): Promise<{ serverId: string; info: AreaServerInfo }[]> {
     const result = await this.db.execute(
-      sql`SELECT server_id, info FROM area_server_registry ORDER BY updated_at DESC`
+      sql`SELECT server_id, info FROM area_server_registry ORDER BY updated_at DESC`,
     );
 
-    return result.rows.map(row => ({
+    return result.rows.map((row) => ({
       serverId: row.server_id as string,
       info: JSON.parse(row.info as string),
     }));

@@ -9,7 +9,15 @@ import type {
 import { npcTypes } from "@mp/game/server";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
-import { varchar, real, uuid, pgTable, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
+import {
+  varchar,
+  real,
+  uuid,
+  pgTable,
+  integer,
+  jsonb,
+  timestamp,
+} from "drizzle-orm/pg-core";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 import { path } from "./types/path";
