@@ -1,8 +1,4 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": [
-    "@babel/plugin-proposal-decorators",
-    "@mp/tsconfig",
-    "@mp/keycloak-provision"
-  ]
+  "ignoreDependencies": ["@babel/plugin-proposal-decorators", "@mp/tsconfig"]
 }

@@ -10,29 +10,21 @@ import type { GameState } from "./game-state";
 import type { Actor, ActorId } from "../actor/actor";
 
 export class OptimisticGameState implements GameState {
-  actors = new SyncMap<ActorId, Actor>();
+  actors: GameState["actors"] = new SyncMap();
 
-  constructor(private settings: OptimisticGameStateSettings) {}
+  constructor(private settings: () => OptimisticGameStateSettings) {}
 
   frameCallback = (opt: FrameCallbackOptions) => {
-    if (!this.settings.useInterpolator) {
+    if (!this.settings().useInterpolator) {
       return;
     }
 
     for (const actor of this.actors.values()) {
       if (actor.path && actor.health > 0) {
-        const [newCoords, newPath] = moveAlongPath(
-          actor.coords,
-          actor.path,
-          actor.speed,
-          opt.timeSinceLastFrame,
-        );
-
-        actor.coords = newCoords;
-        actor.path = newPath;
+        moveAlongPath(actor, opt.timeSinceLastFrame);
 
         // Face the direction the actor is moving towards
-        const target = newPath?.[0];
+        const target = actor.path?.[0];
         if (target) {
           actor.dir = nearestCardinalDirection(actor.coords.angle(target));
         }
@@ -43,7 +35,7 @@ export class OptimisticGameState implements GameState {
   };
 
   applyPatch = (patch: Patch, events: EventAccessFn<GameStateEvents>) => {
-    if (this.settings.usePatchOptimizer) {
+    if (this.settings().usePatchOptimizer) {
       applyPatchOptimized(this, patch, events);
     } else {
       applyPatch(this, patch);
@@ -109,7 +101,10 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
         return true; // Always trust new coord when area changes
       }
       const threshold = actor.speed * teleportThreshold.totalSeconds;
-      if (update.coords && update.coords.distance(actor.coords) >= threshold) {
+      if (
+        update.coords &&
+        !update.coords.isWithinDistance(actor.coords, threshold)
+      ) {
         return true; // Snap to new coords if the distance is too large
       }
 
@@ -130,7 +125,7 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
       const lastRemainingLocalStep = actor.path?.[0];
       if (
         lastRemainingLocalStep &&
-        lastRemainingLocalStep.distance(actor.coords) <= tileMargin
+        lastRemainingLocalStep.isWithinDistance(actor.coords, tileMargin)
       ) {
         // The last remaining step is within the tile margin,
         // which means the stop command was likely due to the movement completing,

@@ -1,13 +1,9 @@
-import type {
-  AreaLookup,
-  AreaResource,
-  Npc,
-  NpcSpawn,
-  NpcSpawnId,
-} from "@mp/game";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
 import type { TiledClass, TiledObject } from "@mp/tiled-loader";
+import type { Npc, NpcSpawn, NpcSpawnId } from "./types";
+import type { AreaLookup } from "../area/lookup";
+import type { AreaResource } from "../area/area-resource";
 
 export function deriveNpcSpawnsFromAreas(
   areas: AreaLookup,
@@ -15,7 +11,9 @@ export function deriveNpcSpawnsFromAreas(
 ) {
   const derived: Array<{ npc: Npc; spawn: NpcSpawn }> = [];
   for (const area of areas.values()) {
-    const npcObjects = area.tiled.getObjectsByClassName("npc" as TiledClass);
+    const npcObjects = area.tiled.objects.filter(
+      (obj) => obj.type === ("npc" as TiledClass),
+    );
     for (const npcObject of npcObjects) {
       const idProperty = npcObject.properties.get("npc-id");
       if (!idProperty) {

@@ -27,11 +27,9 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
     engine.pointer.worldPosition.value,
   );
   const info = {
-    viewport: engine.pointer.position.value,
-    world: engine.pointer.worldPosition.value,
-    tile: tilePos,
-    tileSnapped: tilePos.round(),
-    cameraTransform: engine.camera.transform.value.data,
+    viewport: engine.pointer.position.value.toString(),
+    world: engine.pointer.worldPosition.value.toString(),
+    tile: tilePos.toString(),
     frameInterval: frameInterval?.totalMilliseconds.toFixed(2),
     frameDuration: frameDuration?.totalMilliseconds.toFixed(2),
     frameCallbacks: engine.frameEmitter.callbackCount,

@@ -1,6 +1,12 @@
-import type { AreaId, Npc, NpcId, NpcSpawnId } from "@mp/game";
-import { npcTypes, type ActorModelLookup, type AreaLookup } from "@mp/game";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import type {
+  AreaId,
+  AreaLookup,
+  Npc,
+  NpcId,
+  NpcSpawnId,
+} from "@mp/game/server";
+import { npcTypes, type ActorModelLookup } from "@mp/game/server";
+import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import type { DbClient } from "./src/db/client";
 import { npcSpawnTable, npcTable } from "./src/db/schema";
 
@@ -15,7 +21,7 @@ import { npcSpawnTable, npcTable } from "./src/db/schema";
  */
 export async function seed(
   db: DbClient,
-  areaLookup: AreaLookup,
+  areas: AreaLookup,
   actorModelLookup: ActorModelLookup,
 ) {
   await db.transaction((tx) => {
@@ -44,7 +50,7 @@ export async function seed(
       yield tx.insert(npcTable).values(soldier);
 
       const areaId = "forest" as AreaId;
-      for (const [i, npcType] of npcTypes.entries()) {
+      for (const npcType of npcTypes.values()) {
         if (npcType === "patrol" || npcType === "static") {
           continue;
         }
@@ -53,7 +59,7 @@ export async function seed(
           npcType,
           areaId,
           count: 10,
-          id: String(`${areaId}-${i}`) as NpcSpawnId,
+          id: createShortId() as NpcSpawnId,
           npcId: soldier.id,
         });
       }

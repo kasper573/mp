@@ -24,7 +24,7 @@ export function registerEncoderExtensions(): void {
     Class: Rect<number>,
     tag: nextTag(),
     encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),
-    decode: (v) => Rect.fromComponents(...v),
+    decode: (v) => new Rect(...v),
   });
 
   addEncoderExtension<Error, { name: string; stack?: string; message: string }>(

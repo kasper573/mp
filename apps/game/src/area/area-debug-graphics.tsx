@@ -1,10 +1,12 @@
+import type { Rect } from "@mp/math";
 import { type Path, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { VectorGraph } from "@mp/path-finding";
-import { Container, Graphics, ReactiveCollection } from "@mp/graphics";
+import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
+import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Tile, Pixel } from "@mp/std";
 import uniqolor from "uniqolor";
-import { computed, type ReadonlySignal } from "@mp/state";
+import { computed, effect, type ReadonlySignal } from "@mp/state";
 import type { TiledResource } from "./tiled-resource";
 import type { AreaResource } from "./area-resource";
 import { clientViewDistanceRect } from "../client-view-distance-rect";
@@ -17,6 +19,7 @@ import type {
 import { clientViewDistance } from "../client-view-distance-settings";
 import type { Actor } from "../actor/actor";
 import type { NpcInstance } from "../npc/types";
+import { WalkableChecker } from "./tiled-walkable-checker";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;
@@ -93,40 +96,92 @@ export class AreaDebugGraphics extends Container {
   };
 }
 
-class DebugTiledGraph extends Graphics {
+class DebugTiledGraph extends Container {
+  private gfx = new Graphics();
+  private cleanup: () => void;
+  private text = new Text({
+    style: {
+      fill: "white",
+      fontSize: 28,
+      fontWeight: "bold",
+      stroke: { color: "black", width: 4 } satisfies Partial<StrokeStyle>,
+    } satisfies Partial<TextStyle>,
+    scale: 0.25,
+  });
+  private walkableChecker: WalkableChecker;
+
   constructor(
     private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
   ) {
     super();
-    this.onRender = this.#onRender;
+
+    this.addChild(this.gfx);
+    this.walkableChecker = new WalkableChecker(area.tiled);
+    this.addChild(this.text);
+
+    this.cleanup = effect(this.redrawGraph);
   }
 
-  #onRender = () => {
-    this.clear();
+  override destroy(options?: DestroyOptions): void {
+    super.destroy(options);
+    this.cleanup();
+  }
+
+  private redrawGraph = () => {
+    this.gfx.clear();
     const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
     const { worldPosition } = engine.pointer;
+    this.text.visible = false;
 
-    if (this.visibleGraphType() === "all") {
-      for (const node of graph.getNodes()) {
-        drawGraphNode(this, tiled, graph, node);
+    switch (this.visibleGraphType()) {
+      case "all":
+        for (const nodeId of graph.nodeIds) {
+          const node = graph.getNode(nodeId);
+          if (node) {
+            drawGraphNode(this.gfx, tiled, graph, node);
+          }
+        }
+        break;
+      case "tile": {
+        const tileNode = graph.getNearestNode(
+          tiled.worldCoordToTile(worldPosition.value),
+        );
+        if (tileNode) {
+          drawGraphNode(this.gfx, tiled, graph, tileNode);
+        }
+        break;
       }
-    } else if (this.visibleGraphType() === "tile") {
-      const tileNode = graph.getNearestNode(
-        tiled.worldCoordToTile(worldPosition.value),
-      );
-      if (tileNode) {
-        drawGraphNode(this, tiled, graph, tileNode);
+      case "coord": {
+        const nearest = graph.getNearestNode(
+          tiled.worldCoordToTile(worldPosition.value),
+        );
+        if (nearest) {
+          drawManyLinesFromSameStart(this.gfx, worldPosition.value, [
+            tiled.tileCoordToWorld(nearest.data.vector),
+          ]);
+        }
+        break;
       }
-    } else if (this.visibleGraphType() === "coord") {
-      drawStar(
-        this,
-        worldPosition.value,
-        graph
-          .getAdjacentNodes(tiled.worldCoordToTile(worldPosition.value))
-          .map((node) => tiled.tileCoordToWorld(node.data.vector)),
-      );
+      case "obscured": {
+        for (const rect of this.walkableChecker.obscuringRects) {
+          drawRect(
+            this.gfx,
+            rect.scale(tiled.tileSize),
+            "rgba(255, 0, 0, 0.5)",
+          );
+        }
+
+        const obscureAmount = this.walkableChecker.obscureAmount(
+          tiled.worldCoordToTile(worldPosition.value).round(),
+        );
+
+        this.text.visible = true;
+        this.text.position.copyFrom(worldPosition.value);
+        this.text.position.x += 5;
+        this.text.text = `${(obscureAmount * 100).toFixed(2)}% obscured`;
+      }
     }
   };
 }
@@ -208,12 +263,13 @@ function drawGraphNode(
   graph: VectorGraph<Tile>,
   node: VectorGraphNode<Tile>,
 ) {
-  drawStar(
+  drawManyLinesFromSameStart(
     ctx,
     tiled.tileCoordToWorld(node.data.vector),
     node.links
       .values()
-      .map((link) => graph.getNode(link.toId).data.vector)
+      .map((link) => graph.getNode(link.toId)?.data.vector)
+      .filter((v) => v !== undefined)
       .map(tiled.tileCoordToWorld),
   );
 }
@@ -230,7 +286,7 @@ function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
   ctx.stroke();
 }
 
-function drawStar(
+function drawManyLinesFromSameStart(
   ctx: Graphics,
   from: Vector<Pixel>,
   destinations: Iterable<Vector<Pixel>>,
@@ -243,6 +299,11 @@ function drawStar(
     ctx.stroke();
     ctx.strokeStyle = { width: 1, color: "black" };
   }
+}
+
+function drawRect(ctx: Graphics, rect: Rect<Pixel>, color: string) {
+  ctx.rect(rect.x, rect.y, rect.width, rect.height);
+  ctx.fill({ color });
 }
 
 function hexColorFromInt(color: number): string {

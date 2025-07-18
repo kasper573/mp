@@ -20,11 +20,11 @@ import {
   ctxUserService,
   NpcAi,
   NpcSpawner,
-} from "@mp/game";
+} from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, type LocalFile } from "@mp/std";
-import { ctxGlobalMiddleware } from "@mp/game";
-import type { GameState } from "@mp/game";
+import { ctxGlobalMiddleware } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import {
   ctxRng,
   ctxAreaFileUrlResolver,
@@ -37,18 +37,16 @@ import {
   ctxNpcService,
   ctxGameState,
   deriveClientVisibility,
-} from "@mp/game";
-import { registerEncoderExtensions } from "@mp/game";
-import { clientViewDistance } from "@mp/game";
+} from "@mp/game/server";
+import { registerEncoderExtensions } from "@mp/game/server";
+import { clientViewDistance } from "@mp/game/server";
 import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
-import type { GameStateEvents } from "@mp/game";
+import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectUserMetrics } from "./metrics/user";
-import { createTickMetricsObserver } from "./metrics/tick";
 import { createExpressLogger } from "./express/logger";
-import { collectPathFindingMetrics } from "./metrics/path-finding";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
@@ -63,9 +61,9 @@ import { ctxUpdateTicker } from "./etc/system-rpc";
 import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { createCharacterService } from "./db/services/character-service";
-import { deriveNpcSpawnsFromAreas } from "./etc/derive-npc-spawns-from-areas";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
+import { createTickMetricsObserver } from "./metrics/tick";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -73,7 +71,7 @@ registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
 const logger = createConsoleLogger();
-logger.info(opt, `Server started `);
+logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;
 
@@ -109,11 +107,13 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
+logger.info(`Loading areas and actor models...`);
 const [areas, actorModels] = await Promise.all([
   loadAreas(path.resolve(opt.publicDir, "areas")),
   loadActorModels(opt.publicDir),
 ]);
 
+logger.info(`Seeding database...`);
 await seed(db, areas, actorModels);
 
 const wss = new WebSocketServer({
@@ -155,7 +155,14 @@ setupRpcTransceivers({
 
 SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
 
-const gameState: GameState = { actors: new SyncMap() };
+const gameState: GameState = {
+  actors: new SyncMap([], {
+    type: (actor) => actor.type,
+    alive: (actor) => actor.health > 0,
+    areaId: (actor) => actor.areaId,
+    spawnId: (actor) => (actor.type === "npc" ? actor.spawnId : undefined),
+  }),
+};
 
 const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   clientIds: () => wss.clients.values().map(getSocketId),
@@ -166,7 +173,7 @@ const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   ),
 });
 
-const npcService = createNpcService(db);
+const npcService = createNpcService(db, areas);
 const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
@@ -174,19 +181,21 @@ const persistTicker = new Ticker({
   middleware: () => gameService.persist(gameState),
 });
 
+const observeTick = createTickMetricsObserver(metrics);
+
 const updateTicker = new Ticker({
   onError: logger.error,
-  middleware: createTickMetricsObserver(metrics),
+  middleware(opt) {
+    // Build an index of commonly accessed entities before each tick.
+    // This lets us to easily get some nice performance improvements for for simple lookups.
+    // Should only be used for values that don't require more precision than the state of the last tick.
+    gameState.actors.index.build();
+    observeTick(opt);
+  },
 });
 
+logger.info(`Getting all NPCs and spawns...`);
 const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
-const spawnsFromDbAndAreas = [
-  ...allNpcsAndSpawns,
-  ...deriveNpcSpawnsFromAreas(
-    areas,
-    allNpcsAndSpawns.map(({ npc }) => npc),
-  ),
-];
 
 const characterService = createCharacterService(
   db,
@@ -195,12 +204,7 @@ const characterService = createCharacterService(
   actorModels,
   rng,
 );
-const npcSpawner = new NpcSpawner(
-  areas,
-  actorModels,
-  spawnsFromDbAndAreas,
-  rng,
-);
+const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
@@ -223,7 +227,6 @@ const ioc = new ImmutableInjectionContainer()
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
 collectUserMetrics(metrics, clients, gameState);
-collectPathFindingMetrics(metrics);
 
 const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
 
@@ -236,6 +239,7 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 
+logger.info(`Attempting to listen on ${opt.hostname}:${opt.port}...`);
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
 });

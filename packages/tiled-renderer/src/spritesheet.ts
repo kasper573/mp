@@ -1,6 +1,4 @@
 import type {
-  AnimatedSpriteFrames,
-  FrameObject,
   SpritesheetData,
   SpritesheetFrameData,
   Texture,
@@ -32,10 +30,10 @@ export async function loadTiledMapSpritesheets(
   return Object.fromEntries<TiledSpritesheet>(tilesetsByPath);
 }
 
-async function loadTilesetSpritesheet(
+export function createTilesetSpritesheetData(
   tileset: Tileset,
   tileSize: { width: number; height: number },
-): Promise<TiledSpritesheet> {
+): TiledSpritesheetData {
   const tiles = [...tileset.tiles.values()];
 
   const animationsWithDuration = new Map(
@@ -43,14 +41,14 @@ async function loadTilesetSpritesheet(
       .filter((tile) => tile.animation)
       .map((tile) => [
         localToGlobalId(tileset.firstgid, tile.id),
-        (tile.animation ?? []).map((frame) => ({
+        (tile.animation?.frames ?? []).map((frame) => ({
           duration: frame.duration,
           id: localToGlobalId(tileset.firstgid, frame.tileid),
         })),
       ]),
   );
 
-  const data: TiledSpritesheetData = {
+  return {
     frames: Object.fromEntries(
       tiles.map((tile) => createTileFrameData(tileset, tileSize, tile.id)),
     ),
@@ -67,6 +65,16 @@ async function loadTilesetSpritesheet(
     ),
     animationsWithDuration,
   };
+}
+
+async function loadTilesetSpritesheet(
+  tileset: Tileset,
+  tileSize: { width: number; height: number },
+): Promise<TiledSpritesheet> {
+  const data: TiledSpritesheetData = createTilesetSpritesheetData(
+    tileset,
+    tileSize,
+  );
 
   const texture = await Assets.load<Texture>(tileset.image);
   texture.source.scaleMode = "nearest";
@@ -103,39 +111,20 @@ function createTileFrameData(
 export function createTiledTextureLookup(
   spritesheets: TiledSpritesheetRecord,
 ): TiledTextureLookup {
-  return {
-    texture(id) {
-      for (const ss of Object.values(spritesheets)) {
-        const texture = ss.textures[id] as Texture | undefined;
-        if (texture) {
-          return texture;
-        }
+  return (id) => {
+    if (id === undefined) {
+      return;
+    }
+    for (const ss of Object.values(spritesheets)) {
+      const texture = ss.textures[id] as Texture | undefined;
+      if (texture) {
+        return texture;
       }
-      throw new Error(
-        `TiledSpritesheetRecord does not contain a texture for GID ${id}`,
-      );
-    },
-    animation(id): FrameObject[] {
-      for (const ss of Object.values(spritesheets)) {
-        const frames = ss.data.animationsWithDuration?.get(id);
-        if (frames) {
-          return frames.map(({ duration, id }) => ({
-            texture: ss.textures[id],
-            time: duration,
-          }));
-        }
-      }
-      throw new Error(
-        `TiledSpritesheetRecord does not contain an animation for GID ${id}`,
-      );
-    },
+    }
   };
 }
 
-export interface TiledTextureLookup {
-  texture: (gid: GlobalTileId) => Texture;
-  animation: (gid: GlobalTileId) => AnimatedSpriteFrames;
-}
+export type TiledTextureLookup = (gid?: GlobalTileId) => Texture | undefined;
 
 export interface TiledSpritesheetRecord {
   [image: string]: TiledSpritesheet;

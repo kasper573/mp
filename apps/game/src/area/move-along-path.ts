@@ -1,39 +1,51 @@
-import type { Path } from "@mp/math";
 import { Vector } from "@mp/math";
-import { assert } from "@mp/std";
 import type { TimeSpan } from "@mp/time";
+import type { Actor } from "../actor/actor";
+import type { Tile } from "@mp/std";
 
-export function moveAlongPath<T extends number>(
-  coords: Vector<T>,
-  path: Path<T>,
-  speed: NoInfer<T>,
-  delta: TimeSpan,
-): [Vector<T>, Path<T> | undefined] {
-  let distanceToMove = speed * delta.totalSeconds;
-  let newCoords = coords;
-  const newPath = [...path];
+/**
+ * Mutates the given actor so that it walks along its current path.
+ * The distance moved will be derived from its current speed and the given time delta.
+ */
+export function moveAlongPath(actor: Actor, delta: TimeSpan): void {
+  let distanceToMove = actor.speed * delta.totalSeconds;
+  if (!distanceToMove || !actor.path) {
+    return;
+  }
 
-  while (newPath.length > 0 && distanceToMove > 0) {
-    const destination = newPath[0];
+  if (!actor.path.length) {
+    actor.path = undefined;
+    return;
+  }
+
+  const newCoords = { x: actor.coords.x, y: actor.coords.y };
+
+  let pathIndex = 0;
+  let lastIndex = actor.path.length - 1;
+  while (pathIndex <= lastIndex && distanceToMove > 0) {
+    const destination = actor.path[pathIndex];
     const distanceToDestination = destination.distance(newCoords);
 
     if (distanceToMove > distanceToDestination) {
       distanceToMove -= distanceToDestination;
-      newCoords = assert(newPath.shift());
+      newCoords.x = destination.x;
+      newCoords.y = destination.y;
+      pathIndex++;
     } else {
       const percentage = distanceToMove / distanceToDestination;
-      newCoords = new Vector(
-        (newCoords.x + (destination.x - newCoords.x) * percentage) as T,
-        (newCoords.y + (destination.y - newCoords.y) * percentage) as T,
-      );
+      newCoords.x = (newCoords.x +
+        (destination.x - newCoords.x) * percentage) as Tile;
+      newCoords.y = (newCoords.y +
+        (destination.y - newCoords.y) * percentage) as Tile;
 
       break;
     }
   }
-  if (newPath.length === 0) {
-    return [newCoords, undefined];
-  } else if (newPath.length === path.length) {
-    return [newCoords, path];
+
+  actor.coords = Vector.from(newCoords);
+  if (pathIndex > lastIndex) {
+    actor.path = undefined;
+  } else if (pathIndex > 0) {
+    actor.path = actor.path.slice(pathIndex);
   }
-  return [newCoords, newPath];
 }

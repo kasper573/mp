@@ -1,6 +1,6 @@
 import type { ComponentType, ComponentChildren } from "preact";
 import type { RoleDefinition } from "@mp/auth";
-import { ioc, ctxAuthClient } from "@mp/game";
+import { ioc, ctxAuthClient } from "@mp/game/client";
 import { useComputed } from "@mp/state/react";
 import PermissionDenied from "../routes/permission-denied";
 

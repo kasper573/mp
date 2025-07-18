@@ -11,7 +11,12 @@
       "require": "./src/index.ts"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "devDependencies": {
+    "@mp/std": "workspace:*",
     "@mp/tsconfig": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import type { Tile, Pixel } from "@mp/std";
+import type { Tile, Pixel, Branded } from "@mp/std";
 import type {
   GlobalTileId,
   LocalTileId,
@@ -84,8 +84,18 @@ export interface Tileset {
   wangsets?: WangSet[];
 }
 
+export type TileAnimationKey = Branded<string, "TileAnimationKey">;
+
+export interface TileAnimation {
+  /**
+   * A unique identifier per animation.
+   */
+  key: TileAnimationKey;
+  frames: Frame[];
+}
+
 export interface TilesetTile {
-  animation?: Frame[];
+  animation?: TileAnimation;
   id: LocalTileId;
 
   // Used for image collection tilesets

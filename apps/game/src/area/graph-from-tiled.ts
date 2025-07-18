@@ -1,38 +1,36 @@
 import { VectorGraph } from "@mp/path-finding";
 import type { Tile } from "@mp/std";
 import type { TiledResource } from "./tiled-resource";
+import { Vector } from "@mp/math";
+import { WalkableChecker } from "./tiled-walkable-checker";
 
 export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {
   const graph = new VectorGraph<Tile>();
+  const walkableChecker = new WalkableChecker(tiled);
 
-  const walkableTileCoords = tiled.getMatchingTileCoords(
-    ({ tile }) => tile.properties.get("Walkable")?.value,
-    (valuesPerTile) => {
-      let walkable = false;
-      for (const value of valuesPerTile) {
-        if (value === false) {
-          return false;
-        }
-        if (value === true) {
-          walkable = true;
-        }
-      }
-      return walkable;
-    },
-  );
-
-  for (const from of walkableTileCoords) {
+  graph.beginUpdate();
+  for (const from of walkableChecker.walkableCoords.values()) {
     graph.addNode(from);
-
-    for (const to of walkableTileCoords) {
-      // Only consider tiles that are one tile away to be neighbors
-      // square root of 2 is diagonally adjacent, 1 is orthogonally adjacent
-      const distance = from.distance(to);
-      if (distance === 1 || distance === Math.SQRT2) {
+    for (const [offsetX, offsetY] of neighborOffsets) {
+      const neighborKey = Vector.key(from.x + offsetX, from.y + offsetY);
+      const to = walkableChecker.walkableCoords.get(neighborKey);
+      if (to) {
         graph.addLink(from, to);
       }
     }
   }
+  graph.endUpdate();
 
   return graph;
 }
+
+const neighborOffsets: [number, number][] = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1],
+  [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
+];

@@ -7,7 +7,7 @@ export class Matrix {
   }
 }
 
-export type MatrixData = [
+export type MatrixData = readonly [
   a: number,
   b: number,
   c: number,

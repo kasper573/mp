@@ -1,8 +1,7 @@
-import type { Vector } from "@mp/math";
+import type { Vector, VectorLike } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
-import type { VectorGraphNodeId } from "@mp/path-finding";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state/game-state";
 import type { AreaLookup } from "../area/lookup";
@@ -43,26 +42,12 @@ export function movementBehavior(
   areas: AreaLookup,
 ): TickEventHandler {
   const nextPathFinds = new Map<ActorId, TimeSpan>();
-  const stalePathInterval = TimeSpan.fromSeconds(1 / 3);
-  const tileNodeWeights = new Map<VectorGraphNodeId, number>();
+  const stalePathInterval = TimeSpan.fromSeconds(2 / 3);
 
-  for (const area of areas.values()) {
-    area.graph.bindNodeWeightFn((node) => tileNodeWeights.get(node.id) ?? 0);
-  }
-
-  return ({ timeSinceLastTick, totalTimeElapsed }) => {
-    // We need to make a first pass to set the weights for the path finding graph.
-    // This helps promote more natural movement in avoiding walking over each other.
-    tileNodeWeights.clear();
-    for (const actor of state.actors.values()) {
-      const area = assert(areas.get(actor.areaId));
-      const node = area.graph.getNearestNode(actor.coords);
-      if (node) {
-        // A node occupied by an actor is weighted higher
-        tileNodeWeights.set(node.id, 3); // 3 is more than walking around the tile (which is two diagonals, ~2.8)
-      }
-    }
-
+  return function movementBehaviorTick({
+    timeSinceLastTick,
+    totalTimeElapsed,
+  }) {
     for (const actor of state.actors.values()) {
       // The dead don't move
       if (actor.health <= 0) {
@@ -98,23 +83,13 @@ export function movementBehavior(
         actor.moveTarget = undefined;
       }
 
-      if (actor.path) {
-        const [newCoords, newPath] = moveAlongPath(
-          actor.coords,
-          actor.path,
-          actor.speed,
-          timeSinceLastTick,
-        );
-
-        actor.coords = newCoords;
-        actor.path = newPath;
-      }
+      moveAlongPath(actor, timeSinceLastTick);
 
       // Process portals
       const area = assert(areas.get(actor.areaId));
-      for (const object of area.hitTestObjects([
+      for (const object of area.hitTestObjects(
         area.tiled.tileCoordToWorld(actor.coords),
-      ])) {
+      )) {
         const destinationArea = areas.get(
           getAreaIdFromObject(object) as AreaId,
         );
@@ -136,8 +111,16 @@ export function movementBehavior(
 export function findPathForSubject(
   subject: MovementTrait & { id: unknown },
   areas: AreaLookup,
-  dest: Vector<Tile>,
+  dest: VectorLike<Tile>,
 ): Path<Tile> | undefined {
   const area = assert(areas.get(subject.areaId));
-  return area.findPathBetweenTiles(subject.coords, dest);
+  const fromNode = area.graph.getNearestNode(subject.coords);
+  if (!fromNode) {
+    return;
+  }
+  const destNode = area.graph.getNearestNode(dest);
+  if (!destNode) {
+    return;
+  }
+  return area.graph.findPath(fromNode, destNode);
 }

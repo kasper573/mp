@@ -10,9 +10,9 @@ The other apps will select the relevant parts from this package and compose them
 
 This package or organized by domain and allow you to mix client and server side concerns. This makes it easier to understand each domain and to find most of the code relating to a domain, and to visualize how domains depend on each other by inspecting import maps.
 
-While it's recommended to separate client and server concerns into at least separate files, it's not a requiement, since organizing by domain inevitably will blur the lines between client and server and some code will leak across the client server boundary in either direction, and we're fine with that.
+However, the package itself still exports two buckets: one for the client and one for the server. This allows for better DX in that the server doesn't restart in development when you modify client-only code, and also lets us finetune what code gets exposed to either the client or server, either for security or technical concerns (technical being ie. not exposing vanilla-extract css to the server, allowing it to not have to be able to parse those files).
 
-Secrets should not exist in code anyway, and we don't care if the client bundle becomes slightly larger if some of the server code ends up in the
+So in short: organize by domain, but re-export the relevant code in [package.client.ts](src/package.client.ts) and [package.server.ts](src/package.server.ts).
 
 ## Abstract persistence
 

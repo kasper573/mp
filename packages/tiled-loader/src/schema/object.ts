@@ -9,9 +9,14 @@ import type {
 
 import type { PropertyMap } from "./property";
 import type { TiledText } from "./text";
+import type { GlobalIdFlags } from "../gid";
 
 export interface SharedObjectProperties {
   gid?: GlobalTileId;
+  /**
+   * If the gid was set, these are the flags that it contained.
+   */
+  flags?: GlobalIdFlags;
   id: ObjectId;
   name: string;
   x: Pixel;

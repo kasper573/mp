@@ -7,12 +7,28 @@ import {
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
 
-export class SyncMap<K, V> implements Map<K, V> {
+import type { IndexDefinition, IndexResolvers, Index } from "@mp/index";
+import { ComputedIndex } from "@mp/index";
+
+export class SyncMap<K, V, Def extends IndexDefinition = {}>
+  implements Map<K, V>
+{
   #keysLastFlush = new Set<K>();
   #signal: NotifiableSignal<Map<K, V>>;
+  readonly index: Index<V, Def>;
 
-  constructor(entries?: Iterable<readonly [K, V]> | null) {
+  constructor(
+    entries?: Iterable<readonly [K, V]> | null,
+    indexResolvers?: IndexResolvers<V, Def>,
+  ) {
     this.#signal = new NotifiableSignal(new Map<K, V>(entries));
+
+    // Future proofing indexed access.
+    // Currently using an uncached implementation until we have/need a real implementation.
+    this.index = new ComputedIndex(
+      () => this.#signal.value.values(),
+      indexResolvers ?? ({} as IndexResolvers<V, Def>),
+    );
   }
 
   // Reactive Map implementation
@@ -99,8 +115,3 @@ export class SyncMap<K, V> implements Map<K, V> {
     return patch;
   }
 }
-
-export type SyncMapChangeHandler<K, V> = (
-  value: ReadonlyMap<K, V>,
-  oldValue: ReadonlyMap<K, V>,
-) => void;

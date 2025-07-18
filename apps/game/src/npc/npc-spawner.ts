@@ -26,17 +26,18 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of state.actors.values()) {
-        if (actor.type === "npc" && actor.health <= 0) {
-          let cleanupTime = corpseCleanupTimers.get(actor.id);
-          if (!cleanupTime) {
-            cleanupTime = totalTimeElapsed.add(corpseDuration);
-            corpseCleanupTimers.set(actor.id, cleanupTime);
-          }
-          if (cleanupTime <= totalTimeElapsed) {
-            state.actors.delete(actor.id);
-            corpseCleanupTimers.delete(actor.id);
-          }
+      for (const actor of state.actors.index.access<NpcInstance>({
+        type: "npc",
+        alive: false,
+      })) {
+        let cleanupTime = corpseCleanupTimers.get(actor.id);
+        if (!cleanupTime) {
+          cleanupTime = totalTimeElapsed.add(corpseDuration);
+          corpseCleanupTimers.set(actor.id, cleanupTime);
+        }
+        if (cleanupTime <= totalTimeElapsed) {
+          state.actors.delete(actor.id);
+          corpseCleanupTimers.delete(actor.id);
         }
       }
 
@@ -109,7 +110,7 @@ function determineSpawnCoords(
     );
     randomNode = area.graph.getNearestNode(randomTile);
   } else {
-    randomNode = rng.oneOf(area.graph.getNodes());
+    randomNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
   }
 
   if (!randomNode) {

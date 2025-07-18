@@ -1,4 +1,5 @@
-import { useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useState } from "preact/hooks";
+import type { Application } from "@mp/graphics";
 import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
@@ -6,10 +7,8 @@ import {
   Vector,
 } from "@mp/math";
 import { Select } from "@mp/ui";
-
 import { Engine } from "@mp/engine";
 import { useGraphics } from "@mp/graphics/react";
-import { assert } from "@mp/std";
 import type { CSSProperties } from "@mp/style";
 import { useSignal } from "@mp/state/react";
 import {
@@ -45,20 +44,21 @@ export function ActorSpriteTester() {
     [spritesheets],
   );
 
+  const settings = useCallback(
+    () => ({
+      animationName: animationName.value,
+      modelId: modelId.value,
+    }),
+    [modelId, animationName],
+  );
+
   return (
     <>
       <div id="form" style={styles.settingsForm}>
         <Select signal={animationName} options={actorAnimationNames} />
         <Select signal={modelId} options={allModelIds} />
       </div>
-      {modelId.value ? (
-        <PixiApp
-          settings={() => ({
-            animationName: animationName.value,
-            modelId: modelId.value,
-          })}
-        />
-      ) : null}
+      {modelId.value ? <PixiApp settings={settings} /> : null}
     </>
   );
 }
@@ -72,16 +72,23 @@ function PixiApp({ settings }: { settings: () => ActorTestSettings }) {
       antialias: true,
       eventMode: "none",
       roundPixels: true,
+      settings,
     },
-    (app) => {
-      const engine = new Engine(assert(container));
-      const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
-      app.stage.addChild(new ActorSpriteList(settings));
-      return subs;
-    },
+    buildStage,
   );
 
   return <div style={{ flex: 1 }} ref={setContainer} />;
+}
+
+function buildStage(
+  app: Application,
+  { settings }: { settings: () => ActorTestSettings },
+  container: HTMLDivElement,
+) {
+  const engine = new Engine(container);
+  const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
+  app.stage.addChild(new ActorSpriteList(settings));
+  return subs;
 }
 
 const styles = {
@@ -124,11 +131,9 @@ interface ActorTestSettings {
 class SpecificActorAngle extends Container {
   private sprite: ActorSprite;
   private text: Text;
-  private frameNumberText: Text;
 
   constructor(
     private options: () => ActorTestSettings & {
-      showFrameNumber?: boolean;
       angle: number;
       name?: string;
       pos: Vector<number>;
@@ -141,30 +146,16 @@ class SpecificActorAngle extends Container {
 
     this.text = new Text({ style: { fill: "white", fontSize: "14px" } });
     this.text.scale.set(0.5);
-    this.frameNumberText = new Text({
-      style: { fill: "white", fontSize: "14px" },
-    });
-    this.frameNumberText.scale.set(0.5);
-    this.frameNumberText.position.set(-10, 16);
 
     this.addChild(this.sprite);
     this.addChild(this.text);
-    this.addChild(this.frameNumberText);
     this.scale.set(2);
 
     this.onRender = this.#onRender;
   }
 
   #onRender = () => {
-    const {
-      modelId,
-      angle,
-      name,
-      pos,
-      anchor,
-      showFrameNumber,
-      animationName,
-    } = this.options();
+    const { modelId, angle, name, pos, anchor, animationName } = this.options();
 
     const spritesheets = ioc
       .access(ctxActorSpritesheetLookup)
@@ -185,7 +176,6 @@ class SpecificActorAngle extends Container {
     }
     this.text.position.set(64, 32);
     this.position.set(pos.x, pos.y);
-    this.frameNumberText.visible = showFrameNumber ?? false;
     this.sprite.anchor.set(anchor?.x ?? 0, anchor?.y ?? 0);
   };
 }
@@ -202,7 +192,6 @@ class LookAtPointerActor extends SpecificActorAngle {
         angle,
         pos: center,
         anchor: new Vector(0.5, 0.5),
-        showFrameNumber: true,
         animationName: options().animationName,
       };
     });

@@ -336,9 +336,6 @@ importers:
         specifier: 4.7.1
         version: 4.7.1
     devDependencies:
-      '@jgoz/esbuild-plugin-typecheck':
-        specifier: 4.0.3
-        version: 4.0.3(esbuild@0.25.6)(typescript@5.8.3)
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
@@ -351,9 +348,6 @@ importers:
       '@types/pg':
         specifier: 8.11.10
         version: 8.11.10
-      '@vanilla-extract/esbuild-plugin':
-        specifier: 2.3.18
-        version: 2.3.18(babel-plugin-macros@3.1.0)(esbuild@0.25.6)
       builtin-modules:
         specifier: 5.0.0
         version: 5.0.0
@@ -459,6 +453,16 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/index:
+    dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/ioc:
     dependencies:
       '@mp/std':
@@ -490,6 +494,9 @@ importers:
 
   packages/math:
     devDependencies:
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
@@ -499,9 +506,6 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../math
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
       ngraph.graph:
         specifier: 20.0.1
         version: 20.0.1
@@ -613,6 +617,9 @@ importers:
       '@mp/encoding':
         specifier: workspace:*
         version: link:../encoding
+      '@mp/index':
+        specifier: workspace:*
+        version: link:../index
       '@mp/state':
         specifier: workspace:*
         version: link:../state
@@ -664,6 +671,12 @@ importers:
       '@mp/graphics':
         specifier: workspace:*
         version: link:../graphics
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../tiled-loader
@@ -1778,16 +1791,6 @@ packages:
     resolution: {integrity: sha512-d2CGZR2o7fS6sWB7DG/3a95bGKQyHMACZ5aW8qGkkqQpUoZV6C0X7Pc7l4ZNMZkfNBf4VWNe9E1jRsf0G146Ew==}
     engines: {node: '>=18.18'}
 
-  '@jgoz/esbuild-plugin-typecheck@4.0.3':
-    resolution: {integrity: sha512-tJzjV3pALNuEQ3+w18jt58Y5MogN+Hm2vmEUR2EcLr9+5PR/X0JLAAg0+6AOw168GRZgKzWKK4zdzY9uMT708Q==}
-    peerDependencies:
-      '@jgoz/esbuild-plugin-livereload': '>=2.1.3'
-      esbuild: 0.17.x || 0.18.x || 0.19.x || 0.20.x || 0.21.x || 0.22.x || 0.23.x || 0.24.x || 0.25.x
-      typescript: '>= 3.5'
-    peerDependenciesMeta:
-      '@jgoz/esbuild-plugin-livereload':
-        optional: true
-
   '@jridgewell/gen-mapping@0.3.12':
     resolution: {integrity: sha512-OuLGC46TjB5BbN1dH8JULVVZY4WTdkF7tV9Ys6wLL1rubZnCMstOhNHueU5bLCrnRuDhKPDM4g6sw4Bel5Gzqg==}
 
@@ -2519,14 +2522,6 @@ packages:
 
   '@vanilla-extract/css@1.17.4':
     resolution: {integrity: sha512-m3g9nQDWPtL+sTFdtCGRMI1Vrp86Ay4PBYq1Bo7Bnchj5ElNtAJpOqD+zg+apthVA4fB7oVpMWNjwpa6ElDWFQ==}
-
-  '@vanilla-extract/esbuild-plugin@2.3.18':
-    resolution: {integrity: sha512-QdU6wL8bRrYysxMO+QeaJgUy4uv72SRWdjN1VbZICLCqpWC69/CJwqQTb12F0ncTVh3eHDXE0ll+emE0+WWB2A==}
-    peerDependencies:
-      esbuild: '>=0.17.6'
-    peerDependenciesMeta:
-      esbuild:
-        optional: true
 
   '@vanilla-extract/integration@8.0.4':
     resolution: {integrity: sha512-cmOb7tR+g3ulKvFtSbmdw3YUyIS1d7MQqN+FcbwNhdieyno5xzUyfDCMjeWJhmCSMvZ6WlinkrOkgs6SHB+FRg==}
@@ -5652,11 +5647,6 @@ snapshots:
   '@humanwhocodes/retry@0.3.0':
     optional: true
 
-  '@jgoz/esbuild-plugin-typecheck@4.0.3(esbuild@0.25.6)(typescript@5.8.3)':
-    dependencies:
-      esbuild: 0.25.6
-      typescript: 5.8.3
-
   '@jridgewell/gen-mapping@0.3.12':
     dependencies:
       '@jridgewell/sourcemap-codec': 1.5.0
@@ -6450,15 +6440,6 @@ snapshots:
       picocolors: 1.1.1
     transitivePeerDependencies:
       - babel-plugin-macros
-
-  '@vanilla-extract/esbuild-plugin@2.3.18(babel-plugin-macros@3.1.0)(esbuild@0.25.6)':
-    dependencies:
-      '@vanilla-extract/integration': 8.0.4(babel-plugin-macros@3.1.0)
-    optionalDependencies:
-      esbuild: 0.25.6
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - supports-color
 
   '@vanilla-extract/integration@8.0.4(babel-plugin-macros@3.1.0)':
     dependencies:

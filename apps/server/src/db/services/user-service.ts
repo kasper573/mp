@@ -1,4 +1,4 @@
-import type { UserService } from "@mp/game";
+import type { UserService } from "@mp/game/server";
 import type { UserId, UserIdentity } from "@mp/auth";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 

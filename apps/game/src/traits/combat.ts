@@ -122,8 +122,7 @@ function canAttackFrom(
   targetTile: Vector<Tile>,
   attackRange: Tile,
 ) {
-  const distance = fromTile.distance(targetTile);
-  return distance <= attackRange + tileMargin;
+  return fromTile.isWithinDistance(targetTile, attackRange + tileMargin);
 }
 
 // sqrt(2) is the diagonal distance between two tiles, which is slightly more than 1 tile,

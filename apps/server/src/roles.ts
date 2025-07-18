@@ -1,4 +1,9 @@
-import { characterRoles, npcRoles, systemRoles, worldRoles } from "@mp/game";
+import {
+  characterRoles,
+  npcRoles,
+  systemRoles,
+  worldRoles,
+} from "@mp/game/server";
 
 /**
  * This is the single source of truth of groups and roles.

@@ -15,6 +15,7 @@ export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
           signal={new PropertySignal(signal, "visibleGraphType")}
         />
       </div>
+      <br />
       <label>
         <Checkbox signal={new PropertySignal(signal, "showFogOfWar")} />
         Visualize network fog of war
@@ -46,5 +47,11 @@ export interface AreaDebugSettings {
   showActorPaths: boolean;
 }
 
-export const visibleGraphTypes = ["none", "all", "tile", "coord"] as const;
+export const visibleGraphTypes = [
+  "none",
+  "all",
+  "tile",
+  "coord",
+  "obscured",
+] as const;
 export type VisibleGraphType = (typeof visibleGraphTypes)[number];

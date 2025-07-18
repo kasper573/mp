@@ -19,7 +19,8 @@ export function useGraphics<Options extends UseGraphicsOptions>(
   configureApp: (
     app: Application,
     options: Options,
-  ) => undefined | CleanupFn | CleanupFn[],
+    container: HTMLDivElement,
+  ) => void | CleanupFn | CleanupFn[],
 ) {
   useEffect(() => {
     if (!container) {
@@ -29,24 +30,28 @@ export function useGraphics<Options extends UseGraphicsOptions>(
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
-    const cleanupFns = normalizeCleanupFns(configureApp(app, options));
+    let cleanupFns: Array<() => void>;
     const initPromise = app
       .init({ ...options, canvas, resizeTo: container })
-      .then(() => onInitialized(app));
+      .then(() => {
+        adjustCanvasSize(app);
+        cleanupFns = normalizeCleanupFns(configureApp(app, options, container));
+      });
 
     return () => {
       canvas.remove();
-      for (const cleanup of cleanupFns) {
-        cleanup();
-      }
-      void initPromise.then(() =>
-        app.destroy({ removeView: false }, { children: true }),
-      );
+
+      void initPromise.then(() => {
+        for (const cleanup of cleanupFns) {
+          cleanup();
+        }
+        app.destroy({ removeView: false }, { children: true });
+      });
     };
     // oxlint-disable-next-line exhaustive-deps A bit hacky but it works. Trust my judgement.
-  }, [container, ...Object.values(options)]);
+  }, [container, configureApp, ...Object.values(options)]);
 
-  function onInitialized(app: Application) {
+  function adjustCanvasSize(app: Application) {
     // It seems that canvas need to be absolute positioned for resizing to work properly.
     // (Without it resizing works when expanding, but not when shrinking.)
     if (container) {
@@ -63,9 +68,9 @@ export function useGraphics<Options extends UseGraphicsOptions>(
 type CleanupFn = () => void;
 
 function normalizeCleanupFns(
-  cleanup: undefined | CleanupFn | CleanupFn[],
+  cleanup: void | CleanupFn | CleanupFn[],
 ): CleanupFn[] {
-  if (cleanup === undefined) {
+  if (!cleanup) {
     return [];
   }
   return Array.isArray(cleanup) ? cleanup : [cleanup];

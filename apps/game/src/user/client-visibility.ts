@@ -23,22 +23,24 @@ export function deriveClientVisibility(
       clients.spectatedCharacterIds.get(clientId),
     ];
     return {
-      actors: new Set(visibleActors(state, observerIds)),
+      actors: visibleActors(state, observerIds),
     };
   };
 
-  function* visibleActors(
+  function visibleActors(
     state: GameState,
     observerIds: Iterable<ActorId | undefined>,
-  ): Generator<ActorId> {
+  ): Set<ActorId> {
+    const ids = new Set<ActorId>();
     for (const other of state.actors.values()) {
       for (const observerId of observerIds) {
         const observer = observerId ? state.actors.get(observerId) : undefined;
         if (observer && canSeeSubject(observer, other)) {
-          yield other.id;
+          ids.add(other.id);
         }
       }
     }
+    return ids;
   }
 
   function canSeeSubject(a: MovementTrait, b: MovementTrait) {

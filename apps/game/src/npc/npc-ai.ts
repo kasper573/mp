@@ -6,7 +6,7 @@ import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor/actor";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { NpcInstance, NpcInstanceId } from "./types";
-import type { Task, TaskInput } from "./ai-tasks/task";
+import type { NpcAiTaskContext, Task } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
 import { createIdleTask } from "./ai-tasks/idle";
@@ -32,27 +32,25 @@ export class NpcAi {
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
-      for (const subject of this.gameState.actors.values()) {
-        if (subject.type !== "npc" || subject.health <= 0) {
-          continue;
-        }
+      const context: NpcAiTaskContext = {
+        areas: this.areas,
+        gameState: this.gameState,
+        gameStateServer: this.gameStateServer,
+        npcCombatMemories: this.combatMemories,
+        tick,
+        rng: this.rng,
+      };
 
+      for (const subject of this.gameState.actors.index.access<NpcInstance>({
+        type: "npc",
+        alive: true,
+      })) {
         this.observeAttacksDoneThisTick(subject);
-
-        const taskInput: TaskInput = {
-          areas: this.areas,
-          gameState: this.gameState,
-          gameStateServer: this.gameStateServer,
-          npcCombatMemories: this.combatMemories,
-          npc: subject,
-          tick,
-          rng: this.rng,
-        };
 
         const task =
           this.npcTasks.get(subject.id) ?? this.deriveTask(subject, tick);
 
-        const nextTask = task(taskInput);
+        const nextTask = task(context, subject);
         this.npcTasks.set(subject.id, nextTask);
       }
 
@@ -65,8 +63,10 @@ export class NpcAi {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
           const combatant = assert(this.gameState.actors.get(combatantId));
-          const distance = observer.coords.distance(combatant.coords);
-          return distance <= observer.aggroRange;
+          return observer.coords.isWithinDistance(
+            combatant.coords,
+            observer.aggroRange,
+          );
         },
       );
 

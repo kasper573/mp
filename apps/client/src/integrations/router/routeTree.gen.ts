@@ -16,6 +16,7 @@ import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~cont
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
 import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
 import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
+import { Route as LayoutAdminDevtoolsTileRendererTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~tile-renderer-tester'
 import { Route as LayoutAdminDevtoolsStorageTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~storage-tester'
 import { Route as LayoutAdminDevtoolsSpringTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~spring-tester'
 import { Route as LayoutAdminDevtoolsObservableTesterRouteImport } from './../../routes/~_layout/~admin/~devtools/~observable-tester'
@@ -57,6 +58,12 @@ const LayoutAdminDevtoolsRouteRoute =
     id: '/admin/devtools',
     path: '/admin/devtools',
     getParentRoute: () => LayoutRouteRoute,
+  } as any)
+const LayoutAdminDevtoolsTileRendererTesterRoute =
+  LayoutAdminDevtoolsTileRendererTesterRouteImport.update({
+    id: '/tile-renderer-tester',
+    path: '/tile-renderer-tester',
+    getParentRoute: () => LayoutAdminDevtoolsRouteRoute,
   } as any)
 const LayoutAdminDevtoolsStorageTesterRoute =
   LayoutAdminDevtoolsStorageTesterRouteImport.update({
@@ -108,6 +115,7 @@ export interface FileRoutesByFullPath {
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
@@ -121,6 +129,7 @@ export interface FileRoutesByTo {
   '/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -137,6 +146,7 @@ export interface FileRoutesById {
   '/_layout/admin/devtools/observable-tester': typeof LayoutAdminDevtoolsObservableTesterRoute
   '/_layout/admin/devtools/spring-tester': typeof LayoutAdminDevtoolsSpringTesterRoute
   '/_layout/admin/devtools/storage-tester': typeof LayoutAdminDevtoolsStorageTesterRoute
+  '/_layout/admin/devtools/tile-renderer-tester': typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/admin/devtools/observable-tester'
     | '/admin/devtools/spring-tester'
     | '/admin/devtools/storage-tester'
+    | '/admin/devtools/tile-renderer-tester'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/auth-callback'
@@ -166,6 +177,7 @@ export interface FileRouteTypes {
     | '/admin/devtools/observable-tester'
     | '/admin/devtools/spring-tester'
     | '/admin/devtools/storage-tester'
+    | '/admin/devtools/tile-renderer-tester'
   id:
     | '__root__'
     | '/_layout'
@@ -181,6 +193,7 @@ export interface FileRouteTypes {
     | '/_layout/admin/devtools/observable-tester'
     | '/_layout/admin/devtools/spring-tester'
     | '/_layout/admin/devtools/storage-tester'
+    | '/_layout/admin/devtools/tile-renderer-tester'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -239,6 +252,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutAdminDevtoolsRouteRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
+    '/_layout/admin/devtools/tile-renderer-tester': {
+      id: '/_layout/admin/devtools/tile-renderer-tester'
+      path: '/tile-renderer-tester'
+      fullPath: '/admin/devtools/tile-renderer-tester'
+      preLoaderRoute: typeof LayoutAdminDevtoolsTileRendererTesterRouteImport
+      parentRoute: typeof LayoutAdminDevtoolsRouteRoute
+    }
     '/_layout/admin/devtools/storage-tester': {
       id: '/_layout/admin/devtools/storage-tester'
       path: '/storage-tester'
@@ -291,6 +311,7 @@ interface LayoutAdminDevtoolsRouteRouteChildren {
   LayoutAdminDevtoolsObservableTesterRoute: typeof LayoutAdminDevtoolsObservableTesterRoute
   LayoutAdminDevtoolsSpringTesterRoute: typeof LayoutAdminDevtoolsSpringTesterRoute
   LayoutAdminDevtoolsStorageTesterRoute: typeof LayoutAdminDevtoolsStorageTesterRoute
+  LayoutAdminDevtoolsTileRendererTesterRoute: typeof LayoutAdminDevtoolsTileRendererTesterRoute
 }
 
 const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildren =
@@ -303,6 +324,8 @@ const LayoutAdminDevtoolsRouteRouteChildren: LayoutAdminDevtoolsRouteRouteChildr
     LayoutAdminDevtoolsSpringTesterRoute: LayoutAdminDevtoolsSpringTesterRoute,
     LayoutAdminDevtoolsStorageTesterRoute:
       LayoutAdminDevtoolsStorageTesterRoute,
+    LayoutAdminDevtoolsTileRendererTesterRoute:
+      LayoutAdminDevtoolsTileRendererTesterRoute,
   }
 
 const LayoutAdminDevtoolsRouteRouteWithChildren =

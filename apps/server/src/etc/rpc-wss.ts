@@ -6,7 +6,7 @@ import {
 } from "@mp/rpc";
 import type { WebSocketServer } from "@mp/ws/server";
 import type { Logger } from "@mp/logger";
-import type { ClientId } from "@mp/game";
+import type { ClientId } from "@mp/game/server";
 import { opt } from "../options";
 import { getSocketId } from "./get-socket-id";
 

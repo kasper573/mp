@@ -1,9 +1,9 @@
 import { VectorSpring } from "@mp/engine";
 import { Vector } from "@mp/math";
 import { Rect } from "@mp/math";
-import { type Tile, type Pixel, dedupe, throttle, assert } from "@mp/std";
+import { type Tile, type Pixel, dedupe, throttle } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { createTiledTextureLookup, LayerViewFactory } from "@mp/tiled-renderer";
+import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { DestroyOptions } from "@mp/graphics";
 import {
@@ -16,7 +16,6 @@ import { TimeSpan } from "@mp/time";
 import { computed } from "@mp/state";
 import { getAreaIdFromObject, type AreaResource } from "./area-resource";
 import { ActorController } from "../actor/actor-controller";
-
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ctxEngine } from "../context/common";
@@ -33,22 +32,23 @@ export interface AreaSceneOptions {
 }
 
 export class AreaScene extends Container {
-  private cleanupActorControllers: () => void;
-
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
+  private cleanup: () => void;
 
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
 
-    const lookup = createTiledTextureLookup(options.spritesheets);
-    const factory = new LayerViewFactory(lookup);
-    const tileContainer = factory.createLayerContainer(
-      options.area.tiled.map.layers.filter((l) => l.type !== "objectgroup"),
+    const tiledRenderer = new TiledRenderer(
+      options.area.tiled.map.layers,
+      options.area.dynamicLayer.name,
+      createTiledTextureLookup(options.spritesheets),
     );
 
-    const dynamicLayerView = assert(
-      tileContainer.getChildByLabel(options.area.dynamicLayer.name),
+    this.cleanup = reactiveCollectionBinding(
+      tiledRenderer.dynamicLayer,
+      this.state.actorList,
+      (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
 
     const areaDebug = new AreaDebugGraphics(
@@ -58,7 +58,7 @@ export class AreaScene extends Container {
       options.debugSettings,
     );
 
-    this.addChild(tileContainer);
+    this.addChild(tiledRenderer);
     this.addChild(areaDebug);
 
     if (this.engine.isInteractive) {
@@ -69,13 +69,13 @@ export class AreaScene extends Container {
       this.addChild(tileHighlight);
     }
 
-    this.onRender = this.#onRender;
-
-    this.cleanupActorControllers = reactiveCollectionBinding(
-      dynamicLayerView,
+    this.cleanup = reactiveCollectionBinding(
+      tiledRenderer.dynamicLayer,
       this.state.actorList,
       (actor) => new ActorController({ actor, tiled: options.area.tiled }),
     );
+
+    this.onRender = this.#onRender;
 
     this.cameraPos = new VectorSpring(
       computed(() =>
@@ -90,6 +90,11 @@ export class AreaScene extends Container {
         precision: 0.1,
       }),
     );
+  }
+
+  override destroy(options?: DestroyOptions): void {
+    this.cleanup();
+    super.destroy(options);
   }
 
   cameraPos: VectorSpring<Pixel>;
@@ -146,11 +151,6 @@ export class AreaScene extends Container {
       aVector.equals(bVector) && aPortalId === bPortalId,
   );
 
-  override destroy(options?: DestroyOptions): void {
-    super.destroy(options);
-    this.cleanupActorControllers();
-  }
-
   #onRender = () => {
     this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.elapsedMS));
     this.engine.camera.update(
@@ -170,7 +170,7 @@ export class AreaScene extends Container {
         );
         if (tileNode) {
           const portal = this.options.area
-            .hitTestObjects([this.engine.pointer.worldPosition.value])
+            .hitTestObjects(this.engine.pointer.worldPosition.value)
             .find(getAreaIdFromObject);
 
           this.moveThrottled(tileNode.data.vector, portal?.id);

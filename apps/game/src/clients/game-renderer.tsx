@@ -1,9 +1,9 @@
 import { Engine } from "@mp/engine";
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
+import type { Signal } from "@mp/state";
 import { StorageSignal } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";
-import { assert } from "@mp/std";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";
@@ -15,6 +15,10 @@ import {
 } from "../area/area-debug-settings-form";
 import { AreaUi } from "../area/area-ui";
 import { GameDebugUi } from "./game-debug-ui";
+import type { Application } from "@mp/graphics";
+import type { AreaResource } from "../area/area-resource";
+import { useSignal } from "@mp/state/react";
+import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 
 interface GameRendererProps {
   interactive: boolean;
@@ -33,7 +37,7 @@ export function GameRenderer({
   additionalDebugUi,
 }: GameRendererProps) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const [showDebugUi, setShowDebugUi] = useState(false);
+  const showDebugUi = useSignal(false);
 
   useGraphics(
     container,
@@ -43,33 +47,18 @@ export function GameRenderer({
       roundPixels: true,
       interactive,
       gameState,
+      spritesheets,
+      showDebugUi,
       area,
     },
-    (app, { interactive, gameState, area }) => {
-      const engine = new Engine(assert(container));
-      const subscriptions = [
-        engine.start(interactive),
-        ioc.register(ctxEngine, engine),
-        engine.frameEmitter.subscribe(gameState.frameCallback),
-        engine.keyboard.on("keydown", "F2", () =>
-          setShowDebugUi((prev) => !prev),
-        ),
-      ];
-      const areaScene = new AreaScene({
-        area,
-        spritesheets,
-        debugSettings: () => areaDebugSettingsStorage.value,
-      });
-      app.stage.addChild(areaScene);
-      return subscriptions;
-    },
+    buildStage,
   );
 
   return (
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
       <AreaUi />
-      {showDebugUi && (
+      {showDebugUi.value && (
         <GameDebugUi>
           {additionalDebugUi}
           <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
@@ -78,6 +67,37 @@ export function GameRenderer({
       )}
     </>
   );
+}
+
+function buildStage(
+  app: Application,
+  opt: {
+    interactive: boolean;
+    gameState: OptimisticGameState;
+    area: AreaResource;
+    spritesheets: TiledSpritesheetRecord;
+    showDebugUi: Signal<boolean>;
+  },
+  container: HTMLDivElement,
+) {
+  const engine = new Engine(container);
+  const subscriptions = [
+    engine.start(opt.interactive),
+    ioc.register(ctxEngine, engine),
+    engine.frameEmitter.subscribe(opt.gameState.frameCallback),
+    engine.keyboard.on(
+      "keydown",
+      "F2",
+      () => (opt.showDebugUi.value = !opt.showDebugUi.value),
+    ),
+  ];
+  const areaScene = new AreaScene({
+    area: opt.area,
+    spritesheets: opt.spritesheets,
+    debugSettings: () => areaDebugSettingsStorage.value,
+  });
+  app.stage.addChild(areaScene);
+  return subscriptions;
 }
 
 const areaDebugSettingsStorage = new StorageSignal<AreaDebugSettings>(

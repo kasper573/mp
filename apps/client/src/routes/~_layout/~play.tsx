@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameStateClient, PlayerClient } from "@mp/game";
+import { GameStateClient, PlayerClient } from "@mp/game/client";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
@@ -15,7 +15,8 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const socket = useContext(SocketContext);
   const stateClient = useMemo(
-    () => new GameStateClient({ socket, settings: miscDebugSettings.value }),
+    () =>
+      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
     [socket],
   );
 

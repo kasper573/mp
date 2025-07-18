@@ -1,7 +1,7 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsHistogram } from "@mp/telemetry/prom";
 import type { TickMiddleware } from "@mp/time";
-import { beginMeasuringTimeSpan } from "@mp/time";
+
 import { msBuckets } from "./shared";
 
 export function createTickMetricsObserver(
@@ -21,11 +21,12 @@ export function createTickMetricsObserver(
     buckets: msBuckets,
   });
 
-  return ({ next, ...event }) => {
-    interval.observe(event.timeSinceLastTick.totalMilliseconds);
+  return (opt) => {
+    interval.observe(opt.timeSinceLastTick.totalMilliseconds);
 
-    const getMeasurement = beginMeasuringTimeSpan();
-    next(event);
-    duration.observe(getMeasurement().totalMilliseconds);
+    const before = performance.now();
+    opt.next(opt);
+    const deltaMs = performance.now() - before;
+    duration.observe(deltaMs);
   };
 }

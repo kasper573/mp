@@ -1,11 +1,13 @@
+import type { CheckboxState } from "@mp/ui";
 import { Button, Checkbox } from "@mp/ui";
-import { ctxGameStateClient, ioc } from "@mp/game";
+import { ctxGameStateClient, ioc } from "@mp/game/client";
 import { assert } from "@mp/std";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
+import { useEffect } from "preact/hooks";
 
 export function MiscDebugUi() {
   const rpc = useRpc();
@@ -32,40 +34,44 @@ export function MiscDebugUi() {
           Die
         </Button>
       </div>
-      <div>
+      <label>
         Use server side patch optimizer:{" "}
         <Checkbox signal={isServerPatchOptimizerEnabled} />
-      </div>
-      <div>
+      </label>
+      <br />
+      <label>
         Use client side patch optimizer:{" "}
         <Checkbox
           signal={new PropertySignal(miscDebugSettings, "usePatchOptimizer")}
         />
-      </div>
-      <div>
+      </label>
+      <br />
+      <label>
         Use client side game state interpolator:{" "}
         <Checkbox
           signal={new PropertySignal(miscDebugSettings, "useInterpolator")}
         />
-      </div>
+      </label>
     </>
   );
 }
 
 function useServerPatchOptimizerSignal() {
   const rpc = useRpc();
-  const enabled = useSignal(true);
+  const enabled = useSignal<CheckboxState>("indeterminate");
   const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
 
   useSignalEffect(() => {
-    void rpc.system.setPatchOptimizerEnabled(enabled.value);
+    if (enabled.value !== "indeterminate") {
+      void rpc.system.setPatchOptimizerEnabled(enabled.value);
+    }
   });
 
-  useSignalEffect(() => {
+  useEffect(() => {
     if (isRemoteEnabled.data !== undefined) {
       enabled.value = isRemoteEnabled.data;
     }
-  });
+  }, [isRemoteEnabled.data, enabled]);
 
   return enabled;
 }

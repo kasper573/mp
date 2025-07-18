@@ -13,7 +13,7 @@
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r --stream test",
     "lint": "oxlint . && ls-lint && manypkg check && knip",
-    "lint:fix": "oxlint . --fix && manypkg fix",
+    "lint:fix": "oxlint . --fix --fix-suggestions --fix-dangerously && manypkg fix",
     "format": "prettier --check .",
     "format:fix": "prettier --write .",
     "postinstall": "pnpm -F game build"

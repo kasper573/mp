@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game";
+import { GameStateClient, SpectatorClient, worldRoles } from "@mp/game/client";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
@@ -17,7 +17,8 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 function RouteComponent() {
   const socket = useContext(SocketContext);
   const stateClient = useMemo(
-    () => new GameStateClient({ socket, settings: miscDebugSettings.value }),
+    () =>
+      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
     [socket],
   );
 

@@ -1,9 +1,9 @@
-import type { Rect } from "./rect";
-import type { Vector } from "./vector";
+import type { RectLike } from "./rect";
+import type { VectorLike } from "./vector";
 
 export function ellipseHitTest<T extends number>(
-  ellipse: Rect<T>,
-  test: Vector<T>,
+  ellipse: RectLike<T>,
+  test: VectorLike<T>,
 ): boolean {
   const { x, y, width, height } = ellipse;
   const dx = x - test.x;
