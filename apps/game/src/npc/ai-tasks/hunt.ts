@@ -57,12 +57,11 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
   npc,
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
-  const target = gameState.actors
-    .index({ type: "character" })
+  const target = gameState.actors.index
+    .access({ areaId: npc.areaId, alive: true, type: "character" })
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
       return (
-        candidate.health > 0 &&
         candidate.coords.isWithinDistance(npc.coords, npc.aggroRange) &&
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id)
       );
@@ -74,14 +73,11 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
   { gameState },
   npc,
 ) {
-  const target = gameState.actors
-    .index({ type: "character" })
+  const target = gameState.actors.index
+    .access({ areaId: npc.areaId, alive: true, type: "character" })
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
-      return (
-        candidate.health > 0 &&
-        candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)
-      );
+      return candidate.coords.isWithinDistance(npc.coords, npc.aggroRange);
     });
   return target?.id;
 };
@@ -92,14 +88,20 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
+  const aliveActorsInArea = gameState.actors.index
+    .access({ areaId: npc.areaId, alive: true })
+    .values()
+    .toArray();
+
   // Consider other npcs of the same spawn allies
   const allyIds = new Set<ActorId>(
-    gameState.actors
-      .index({ type: "npc", spawnId: npc.spawnId })
-      .values()
-      .filter(function isProtectiveHuntAlly(actor) {
-        return actor.id !== npc.id;
-      })
+    aliveActorsInArea
+      .filter(
+        (actor) =>
+          actor.type === "npc" &&
+          actor.spawnId === npc.spawnId &&
+          actor.id !== npc.id,
+      )
       .map((actor) => actor.id),
   );
 
@@ -118,13 +120,9 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
     }),
   );
 
-  const target = gameState.actors
-    .values()
-    .find(function isProtectiveHuntTarget(candidate) {
-      if (
-        candidate.health <= 0 ||
-        !candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)
-      ) {
+  const target = aliveActorsInArea.find(
+    function isProtectiveHuntTarget(candidate) {
+      if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
         return false;
       }
 
@@ -132,7 +130,8 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
         enemyIds.has(candidate.id)
       );
-    });
+    },
+  );
 
   return target?.id;
 };

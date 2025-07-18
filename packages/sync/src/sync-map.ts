@@ -6,14 +6,25 @@ import {
   type PatchPath,
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
-import type { Branded } from "../../std/src/types";
+import { Index } from "@mp/index";
+import type { IndexDefinition, IndexResolvers } from "@mp/index";
 
-export class SyncMap<K, V> implements Map<K, V> {
+export class SyncMap<K, V, Def extends IndexDefinition = {}>
+  implements Map<K, V>
+{
   #keysLastFlush = new Set<K>();
   #signal: NotifiableSignal<Map<K, V>>;
+  readonly index: Index<V, Def>;
 
-  constructor(entries?: Iterable<readonly [K, V]> | null) {
+  constructor(
+    entries?: Iterable<readonly [K, V]> | null,
+    indexResolvers?: IndexResolvers<V, Def>,
+  ) {
     this.#signal = new NotifiableSignal(new Map<K, V>(entries));
+    this.index = new Index(
+      () => this.#signal.value.values(),
+      indexResolvers ?? ({} as IndexResolvers<V, Def>),
+    );
   }
 
   // Reactive Map implementation
@@ -99,94 +110,4 @@ export class SyncMap<K, V> implements Map<K, V> {
 
     return patch;
   }
-
-  // Indexing capabilities
-
-  #indexCache = new Map<IndexKey, ReadonlyMap<K, V>>();
-  #suspendHandlers = new Set<object>();
-
-  /**
-   * Basic indexing functionality. Only supports equality checks.
-   * Use this to query the map for entities that match a specific set of properties.
-   * You can suspend index updates to avoid recalculating indices during a batch of operations.
-   * This is useful for performance optimizations in scenarios where multiple updates are made at once.
-   */
-  index<Query extends IndexQuery<V>>(
-    query: Query,
-  ): ReadonlyMap<K, EvaluateQuery<V, Query>> {
-    const indexKey = indexKeyFromQuery(query);
-    if (this.#suspendHandlers.size) {
-      const cachedResult = this.#indexCache.get(indexKey) as
-        | Map<K, EvaluateQuery<V, Query>>
-        | undefined;
-      if (cachedResult) {
-        return cachedResult;
-      }
-    }
-    const matchingEntities = new Map<K, EvaluateQuery<V, Query>>();
-    const indexKeys = Object.keys(query) as (keyof V)[];
-    for (const [entityId, entity] of this.entries()) {
-      const match = indexKeys.every((key) =>
-        evaluateBooleanOperation(entity[key], query[key as never]),
-      );
-      if (match) {
-        matchingEntities.set(entityId, entity as EvaluateQuery<V, Query>);
-      }
-    }
-    this.#indexCache.set(indexKey, matchingEntities);
-    return matchingEntities;
-  }
-
-  /**
-   * Suspends index updates. This is useful when you want to perform multiple operations
-   * on the map without recalculating indices after each operation.
-   * Call the returned function to resume index updates.
-   */
-  suspendIndexUpdates(): () => void {
-    const handle = {};
-    this.#suspendHandlers.add(handle);
-    return () => {
-      this.#suspendHandlers.delete(handle);
-      this.#indexCache.clear();
-    };
-  }
-}
-
-type IndexKey = Branded<string, "IndexKey">;
-
-type IndexQuery<V> = { [K in keyof V]?: BooleanOperation<V[K]> };
-
-function indexKeyFromQuery<V>(query: IndexQuery<V>): IndexKey {
-  let parts: unknown[] = [];
-  for (const k in query) {
-    parts.push(k, query[k as never]);
-  }
-  return parts.join("_") as IndexKey;
-}
-
-// We can't really infer anything except equality checks,
-// but this at least helps narrowing down types when indexing on ie. discriminated unions.
-type EvaluateQuery<V, Query extends IndexQuery<V>> = Extract<
-  V,
-  {
-    [K in keyof Query]: Query[K] extends EqualsOperation<infer PropertyValue>
-      ? PropertyValue
-      : unknown;
-  }
->;
-
-export type SyncMapChangeHandler<K, V> = (
-  value: ReadonlyMap<K, V>,
-  oldValue: ReadonlyMap<K, V>,
-) => void;
-
-// Future proofing for more operators
-type EqualsOperation<PropertyValue> = PropertyValue;
-type BooleanOperation<PropertyValue> = EqualsOperation<PropertyValue>;
-
-function evaluateBooleanOperation<PropertyValue>(
-  value: PropertyValue,
-  operand: BooleanOperation<PropertyValue>,
-): boolean {
-  return value === operand;
 }

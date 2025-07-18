@@ -10,7 +10,7 @@ import type { GameState } from "./game-state";
 import type { Actor, ActorId } from "../actor/actor";
 
 export class OptimisticGameState implements GameState {
-  actors = new SyncMap<ActorId, Actor>();
+  actors: GameState["actors"] = new SyncMap();
 
   constructor(private settings: () => OptimisticGameStateSettings) {}
 

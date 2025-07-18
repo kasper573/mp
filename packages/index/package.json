@@ -1,7 +1,8 @@
 {
-  "name": "@mp/sync",
+  "name": "@mp/index",
   "version": "0.0.0",
-  "private": true,
+  "sideEffects": false,
+  "license": "MIT",
   "type": "module",
   "exports": {
     ".": {
@@ -15,13 +16,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/encoding": "workspace:*",
-    "@mp/index": "workspace:*",
-    "@mp/std": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/std": "workspace:*"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "vitest": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

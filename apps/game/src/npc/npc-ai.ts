@@ -41,13 +41,10 @@ export class NpcAi {
         rng: this.rng,
       };
 
-      for (const subject of this.gameState.actors
-        .index({ type: "npc" })
-        .values()) {
-        if (subject.health <= 0) {
-          continue;
-        }
-
+      for (const subject of this.gameState.actors.index.access<NpcInstance>({
+        type: "npc",
+        alive: true,
+      })) {
         this.observeAttacksDoneThisTick(subject);
 
         const task =
