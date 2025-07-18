@@ -127,12 +127,6 @@ export const serverOptionsSchema = object({
   rngSeed: optional(numeric()),
 
   /**
-   * Whether to use pretty logs.
-   * Best only used in development. In production we want raw logs for performance and parsing reasons.
-   */
-  prettyLogs: boolish(),
-
-  /**
    * Set to true to enable the patch optimizer on the server side.
    */
   patchOptimizer: boolish(),
