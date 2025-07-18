@@ -54,8 +54,11 @@ async function testAllHttpRequests() {
 async function testAllGameClients() {
   logger.info("Testing", gameClients, "sockets with Rpc");
 
+  // Seeded rng to get consistent behavior over time across runs in the ci pipeline
+  const rng = new Rng(1337);
+
   const results = await Promise.allSettled(
-    range(gameClients).map(testOneGameClient),
+    range(gameClients).map((n) => testOneGameClient(n, rng)),
   );
 
   const successes = results.filter((r) => r.status === "fulfilled");
@@ -68,7 +71,7 @@ async function testAllGameClients() {
   return failures.length === 0;
 }
 
-async function testOneGameClient(n: number) {
+async function testOneGameClient(n: number, rng: Rng) {
   if (verbose) {
     logger.info(`Creating socket ${n}`);
   }
@@ -86,9 +89,6 @@ async function testOneGameClient(n: number) {
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
-
-    // Seeded rng to get consistent behavior over time across runs in the ci pipeline
-    const rng = new Rng(1337);
 
     await rpc.world.auth(createBypassUser(`Test User ${n}`));
     if (verbose) {
