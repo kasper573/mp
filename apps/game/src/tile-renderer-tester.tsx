@@ -2,15 +2,8 @@ import type { Container, Size } from "@mp/graphics";
 import { FpsIndicator, type Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
-import { skipToken, useQuery } from "@mp/rpc/react";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import {
-  createTiledTextureLookup,
-  loadTiledMapSpritesheets,
-  TiledRenderer,
-} from "@mp/tiled-renderer";
-import { useTiledMap } from "./area/use-area-resource";
-import type { AreaId } from "./area/area-id";
+import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { dynamicLayerName } from "./area/area-resource";
 import type { LayerId, Ratio, TileLayer } from "@mp/tiled-loader";
 import { tilesInLayers, type TiledMap } from "@mp/tiled-loader";
@@ -25,14 +18,6 @@ export function TileRendererTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const mapSize = useSignal(1 as Tile);
   const fitToStage = useSignal(false);
-  const tiledMap = useTiledMap("single-water-tile" as AreaId);
-  const spritesheets = useQuery({
-    queryKey: ["test-renderer-area-spritesheets"],
-    staleTime: Infinity,
-    queryFn: tiledMap.data
-      ? () => loadTiledMapSpritesheets(tiledMap.data)
-      : skipToken,
-  });
 
   useGraphics(
     container,
@@ -42,8 +27,6 @@ export function TileRendererTester() {
       roundPixels: true,
       mapSize,
       fitToStage,
-      tiledMap: tiledMap.data,
-      spritesheets: spritesheets.data,
     },
     buildStage,
   );
