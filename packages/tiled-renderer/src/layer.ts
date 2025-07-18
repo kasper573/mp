@@ -4,14 +4,89 @@ import type {
   Layer,
   LayerDrawOrder,
   ObjectGroupLayer,
-  TiledObject,
+  VectorTiledObjectUnion,
+  VectorTextObject,
   TileLayer,
   TileLayerTile,
 } from "@mp/tiled-loader";
+import { createPosition, createSize } from "@mp/tiled-loader";
 import { Container } from "@mp/graphics";
 import { createObjectView } from "./object";
 import { createTileSprite } from "./tile";
 import type { TiledTextureLookup } from "./spritesheet";
+
+/**
+ * Transform a legacy TiledObject to a Vector-based object for rendering
+ */
+function transformToVectorObject(obj: unknown): VectorTiledObjectUnion {
+  const rawObj = obj as Record<string, unknown>;
+  // Create proper Vector instances
+  const position = createPosition(
+    (rawObj.x as number) || 0,
+    (rawObj.y as number) || 0,
+  );
+  const size = createSize(
+    (rawObj.width as number) || 0,
+    (rawObj.height as number) || 0,
+  );
+
+  const baseProps = {
+    id: (rawObj.id as number) || 0,
+    name: (rawObj.name as string) || "",
+    position,
+    size,
+    rotation: (rawObj.rotation as number) || 0,
+    type: rawObj.type as string,
+    visible: (rawObj.visible as boolean) !== false,
+    properties: (rawObj.properties as Map<string, unknown>) || new Map(),
+    gid: rawObj.gid as number,
+  };
+
+  switch (rawObj.objectType) {
+    case "ellipse":
+      return { ...baseProps, objectType: "ellipse" };
+    case "point":
+      return { ...baseProps, objectType: "point" };
+    case "polygon":
+      return {
+        ...baseProps,
+        objectType: "polygon",
+        polygon: ((rawObj.polygon as Array<Record<string, unknown>>) || []).map(
+          (coord) =>
+            createPosition((coord.x as number) || 0, (coord.y as number) || 0),
+        ),
+      };
+    case "polyline":
+      return {
+        ...baseProps,
+        objectType: "polyline",
+        polyline: (
+          (rawObj.polyline as Array<Record<string, unknown>>) || []
+        ).map((coord) =>
+          createPosition((coord.x as number) || 0, (coord.y as number) || 0),
+        ),
+      };
+    case "rectangle":
+      return { ...baseProps, objectType: "rectangle" };
+    case "text":
+      return {
+        ...baseProps,
+        objectType: "text",
+        text: (rawObj.text as Record<string, unknown>) || {},
+      } as VectorTextObject;
+    default:
+      // Check if it has a gid (tile object)
+      if (rawObj.gid) {
+        return {
+          ...baseProps,
+          objectType: "tile",
+          gid: rawObj.gid as number,
+        };
+      }
+      // Default to rectangle for unknown types
+      return { ...baseProps, objectType: "rectangle" };
+  }
+}
 
 export type LayerView = Container;
 
@@ -84,7 +159,18 @@ export class LayerViewFactory {
 
     const toSorted = createObjectSorter(layer.draworder);
 
-    for (const obj of toSorted(layer.objects)) {
+    // Handle both old and new object formats
+    const objects = layer.objects.map((obj: unknown) => {
+      // If it's already a Vector object, return as-is
+      const objectCandidate = obj as Record<string, unknown>;
+      if (objectCandidate.position && objectCandidate.size) {
+        return obj as VectorTiledObjectUnion;
+      }
+      // Otherwise, transform it
+      return transformToVectorObject(obj);
+    });
+
+    for (const obj of toSorted(objects)) {
       view.addChild(createObjectView(obj));
     }
 
@@ -108,7 +194,8 @@ export class LayerViewFactory {
 function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
   switch (order) {
     case "topdown":
-      return (objects) => objects.toSorted((a, b) => a.y - b.y);
+      return (objects) =>
+        objects.toSorted((a, b) => a.position.y - b.position.y);
     case "index":
       return (objects) => objects;
   }
@@ -117,7 +204,9 @@ function createObjectSorter(order: LayerDrawOrder): TiledObjectSorter {
 // We use a separate class purely for debug purposes as it provides a name for pixijs devtools
 class TileRendererContainer extends Container {}
 
-type TiledObjectSorter = (arr: TiledObject[]) => TiledObject[];
+type TiledObjectSorter = (
+  arr: VectorTiledObjectUnion[],
+) => VectorTiledObjectUnion[];
 
 // We store layer instance on a symbol because pixi.js
 // containers don't have a way to attach meta data

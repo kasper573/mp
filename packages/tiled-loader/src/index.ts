@@ -10,7 +10,23 @@ export type * from "./schema/tileset";
 export type * from "./schema/transformations";
 export type * from "./schema/wang";
 
-// Original map types
+// Vector-based types and schemas (primary interface)
+export type * from "./schema/vector-types";
+export type * from "./schema/vector-objects";
+export type { VectorTiledMap } from "./schema/vector-map";
+
+// Vector helper functions
+export {
+  createPosition,
+  createSize,
+  createTilePosition,
+  createTileSize,
+} from "./schema/vector-types";
+
+// Vector-based loader (primary loader)
+export * from "./vector-loader";
+
+// Legacy map types (for compatibility)
 export type {
   SharedMapProperties,
   OrthogonalMap,
@@ -20,14 +36,5 @@ export type {
   TiledMap,
 } from "./schema/map";
 
-// New Vector-based types and schemas
-export type * from "./schema/vector-types";
-export type * from "./schema/vector-objects";
-export type { VectorTiledMap } from "./schema/vector-map";
-
 export * from "./schema/common";
-export * from "./loader";
 export * from "./gid";
-
-// New Vector-based loader
-export * from "./vector-loader";

@@ -151,7 +151,18 @@ function filterTiledObjects(
     case "imagelayer":
       return [];
     case "objectgroup":
-      return layer.objects.filter(filter);
+      // Transform old objects to new Vector-based objects
+      return layer.objects
+        .map((obj: unknown) => {
+          // If it's already a Vector object, return as-is
+          const objectCandidate = obj as Record<string, unknown>;
+          if (objectCandidate.position && objectCandidate.size) {
+            return obj as VectorTiledObjectUnion;
+          }
+          // Otherwise, transform it
+          return transformToVectorObject(obj as TiledObject);
+        })
+        .filter(filter);
   }
 }
 

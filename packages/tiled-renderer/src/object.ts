@@ -2,17 +2,18 @@ import type { FillStyle, StrokeStyle, ViewContainer } from "@mp/graphics";
 import { TextStyle } from "@mp/graphics";
 import { Graphics, Text } from "@mp/graphics";
 import type {
-  EllipseObject,
-  PointObject,
-  PolygonObject,
-  PolylineObject,
-  RectangleObject,
-  TextObject,
-  TiledObject,
+  VectorEllipseObject,
+  VectorPointObject,
+  VectorPolygonObject,
+  VectorPolylineObject,
+  VectorRectangleObject,
+  VectorTextObject,
+  VectorTileObject,
+  VectorTiledObjectUnion,
   TiledText,
 } from "@mp/tiled-loader";
 
-export function createObjectView(obj: TiledObject): ViewContainer {
+export function createObjectView(obj: VectorTiledObjectUnion): ViewContainer {
   switch (obj.objectType) {
     case "ellipse": {
       return createEllipseGraphics(obj);
@@ -32,64 +33,78 @@ export function createObjectView(obj: TiledObject): ViewContainer {
     case "rectangle": {
       return createRectangleGraphics(obj);
     }
+    case "tile": {
+      return createTileGraphics(obj);
+    }
   }
 }
 
 const strokeStyle: StrokeStyle = { width: 2, color: "rgba(150,150,150,0.9)" };
 const fillStyle: FillStyle = { color: "rgba(100,100,100,0.5)" };
 
-function createEllipseGraphics(obj: EllipseObject): Graphics {
+function createEllipseGraphics(obj: VectorEllipseObject): Graphics {
   const g = new Graphics();
   g.strokeStyle = strokeStyle;
   g.fillStyle = fillStyle;
   g.angle = obj.rotation;
-  g.ellipse(obj.x, obj.y, obj.width / 2, obj.height / 2);
+  g.ellipse(obj.position.x, obj.position.y, obj.size.x / 2, obj.size.y / 2);
   g.fill();
   g.stroke();
   return g;
 }
 
-function createPointGraphics(obj: PointObject): Graphics {
+function createPointGraphics(obj: VectorPointObject): Graphics {
   const g = new Graphics();
   g.strokeStyle = strokeStyle;
   g.angle = obj.rotation;
-  g.ellipse(obj.x, obj.y, 2, 2);
+  g.ellipse(obj.position.x, obj.position.y, 2, 2);
   g.stroke();
   return g;
 }
 
-function createPolygonGraphics(obj: PolygonObject): Graphics {
+function createPolygonGraphics(obj: VectorPolygonObject): Graphics {
   const g = new Graphics();
   g.fillStyle = fillStyle;
   g.strokeStyle = strokeStyle;
   g.angle = obj.rotation;
-  g.moveTo(obj.x + obj.polygon[0].x, obj.y + obj.polygon[0].y);
+  g.moveTo(
+    obj.position.x + obj.polygon[0].x,
+    obj.position.y + obj.polygon[0].y,
+  );
   for (const point of obj.polygon) {
-    g.lineTo(obj.x + point.x, obj.y + point.y);
+    g.lineTo(obj.position.x + point.x, obj.position.y + point.y);
   }
   g.fill();
   g.stroke();
   return g;
 }
 
-function createPolylineGraphics(obj: PolylineObject): Graphics {
+function createPolylineGraphics(obj: VectorPolylineObject): Graphics {
   const g = new Graphics();
   g.strokeStyle = strokeStyle;
   g.angle = obj.rotation;
-  g.moveTo(obj.x + obj.polyline[0].x, obj.y + obj.polyline[0].y);
+  g.moveTo(
+    obj.position.x + obj.polyline[0].x,
+    obj.position.y + obj.polyline[0].y,
+  );
   for (const point of obj.polyline) {
-    g.lineTo(obj.x + point.x, obj.y + point.y);
+    g.lineTo(obj.position.x + point.x, obj.position.y + point.y);
   }
   g.stroke();
   return g;
 }
 
-function createTextRenderer({ text, x, y, width, rotation }: TextObject): Text {
+function createTextRenderer({
+  text,
+  position,
+  size,
+  rotation,
+}: VectorTextObject): Text {
   const view = new Text({
     text: text.text,
-    x,
-    y,
-    style: createTextStyle(text, width),
+    x: position.x,
+    y: position.y,
+    style: createTextStyle(text, size.x),
   });
 
   view.angle = rotation;
@@ -113,12 +128,23 @@ function createTextStyle(
   });
 }
 
-function createRectangleGraphics(obj: RectangleObject): Graphics {
+function createRectangleGraphics(obj: VectorRectangleObject): Graphics {
   const g = new Graphics();
   g.fillStyle = fillStyle;
   g.strokeStyle = strokeStyle;
   g.angle = obj.rotation;
-  g.rect(obj.x, obj.y, obj.width, obj.height);
+  g.rect(obj.position.x, obj.position.y, obj.size.x, obj.size.y);
+  g.fill();
+  g.stroke();
+  return g;
+}
+
+function createTileGraphics(obj: VectorTileObject): Graphics {
+  const g = new Graphics();
+  g.fillStyle = fillStyle;
+  g.strokeStyle = strokeStyle;
+  g.angle = obj.rotation;
+  g.rect(obj.position.x, obj.position.y, obj.size.x, obj.size.y);
   g.fill();
   g.stroke();
   return g;

@@ -7,6 +7,7 @@ import {
   type Size,
   type Position,
 } from "./vector-types";
+import { VectorTiledObjectSchema } from "./vector-objects";
 import type {
   Color,
   CompressionLevel,
@@ -19,6 +20,49 @@ import type {
 import type { Layer } from "./layer";
 import type { PropertyMap } from "./property";
 import type { Tileset } from "./tileset";
+
+/**
+ * Transform layers to use Vector-based objects in objectgroup layers
+ */
+function transformLayers(layers: unknown[]): Layer[] {
+  return layers.map((layer) => {
+    const layerObj = layer as Record<string, unknown>;
+    if (layerObj.type === "objectgroup" && layerObj.objects) {
+      return {
+        ...layerObj,
+        objects: (layerObj.objects as unknown[]).map((obj: unknown) => {
+          // Try to parse with the Vector schema
+          const parseResult = v.safeParse(VectorTiledObjectSchema, obj);
+          if (parseResult.success) {
+            return parseResult.output;
+          }
+          // If parsing fails, create a simple transformation
+          const rawObj = obj as Record<string, unknown>;
+          return {
+            ...rawObj,
+            position: {
+              x: (rawObj.x as number) || 0,
+              y: (rawObj.y as number) || 0,
+            },
+            size: {
+              x: (rawObj.width as number) || 0,
+              y: (rawObj.height as number) || 0,
+            },
+          };
+        }),
+      };
+    }
+
+    if (layerObj.type === "group" && layerObj.layers) {
+      return {
+        ...layerObj,
+        layers: transformLayers(layerObj.layers as unknown[]),
+      };
+    }
+
+    return layerObj;
+  }) as Layer[];
+}
 
 /**
  * Vector-based map interface (transformed from Tiled JSON)
@@ -79,7 +123,7 @@ export const VectorTiledMapSchema = v.pipe(
     // Arrays
     tilesets: v.array(v.any()), // TODO: Use tileset schema
     properties: v.optional(v.array(v.any()), []), // TODO: Transform properties
-    layers: v.array(v.any()), // TODO: Transform layers
+    layers: v.array(v.any()), // TODO: Transform layers to use Vector types for objects
 
     // Optional properties
     backgroundcolor: v.optional(v.string()),
@@ -121,6 +165,7 @@ export const VectorTiledMapSchema = v.pipe(
       staggerindex,
       nextlayerid,
       properties: _properties,
+      layers,
       ...rest
     }): VectorTiledMap => ({
       ...rest,
@@ -139,6 +184,7 @@ export const VectorTiledMapSchema = v.pipe(
       staggerindex: staggerindex as StaggerIndex | undefined,
       nextlayerid: nextlayerid as LayerId,
       properties: {} as PropertyMap, // TODO: Transform properties
+      layers: transformLayers(layers),
     }),
   ),
 );

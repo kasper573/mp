@@ -5,9 +5,8 @@ import type {
   NpcSpawn,
   NpcSpawnId,
 } from "@mp/game";
-import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
-import type { TiledClass, TiledObject } from "@mp/tiled-loader";
+import type { TiledClass, VectorTiledObjectUnion } from "@mp/tiled-loader";
 
 export function deriveNpcSpawnsFromAreas(
   areas: AreaLookup,
@@ -43,14 +42,12 @@ export function deriveNpcSpawnsFromAreas(
 
 function deriveNpcSpawn(
   area: AreaResource,
-  npcObject: TiledObject,
+  npcObject: VectorTiledObjectUnion,
 ): Omit<NpcSpawn, "npcId" | "id"> {
   switch (npcObject.objectType) {
     case "polyline": {
       const patrol = npcObject.polyline.map((coord) =>
-        area.tiled
-          .worldCoordToTile(Vector.from(npcObject).add(Vector.from(coord)))
-          .round(),
+        area.tiled.worldCoordToTile(npcObject.position.add(coord)).round(),
       );
       return {
         areaId: area.id,
@@ -64,7 +61,7 @@ function deriveNpcSpawn(
       return {
         areaId: area.id,
         npcType: "static",
-        coords: area.tiled.worldCoordToTile(Vector.from(npcObject)).round(),
+        coords: area.tiled.worldCoordToTile(npcObject.position).round(),
         count: 1,
       };
   }
