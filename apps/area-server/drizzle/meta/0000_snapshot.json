@@ -142,12 +142,8 @@
           "name": "npc_spawn_npcId_npc_id_fk",
           "tableFrom": "npc_spawn",
           "tableTo": "npc",
-          "columnsFrom": [
-            "npcId"
-          ],
-          "columnsTo": [
-            "id"
-          ],
+          "columnsFrom": ["npcId"],
+          "columnsTo": ["id"],
           "onDelete": "cascade",
           "onUpdate": "no action"
         }
