@@ -4,9 +4,7 @@ import type { Task } from "./task";
 
 export function createPatrolTask(path: Path<Tile>): Task {
   let reversePath = false;
-  return function patrol(input) {
-    const { npc } = input;
-
+  return function patrol(context, npc) {
     if (!npc.path) {
       const nextPath = reversePath ? path.toReversed() : path;
       reversePath = !reversePath;

@@ -1,14 +1,10 @@
 import type { TimeSpan } from "@mp/time";
-import type { Task, TaskInput } from "./task";
+import type { Task } from "./task";
 
-export function createIdleTask(
-  endTime?: TimeSpan,
-  nextTask?: (input: TaskInput) => Task,
-): Task {
-  return function idle(input) {
-    const { npc, tick } = input;
-    if (endTime && tick.totalTimeElapsed.compareTo(endTime) > 0) {
-      return nextTask ? nextTask(input) : idle;
+export function createIdleTask(endTime?: TimeSpan, nextTask?: Task): Task {
+  return function idle(context, npc) {
+    if (endTime && context.tick.totalTimeElapsed.compareTo(endTime) > 0) {
+      return nextTask ? nextTask(context, npc) : idle;
     }
     if (npc.path || npc.moveTarget) {
       npc.path = undefined;

@@ -1,12 +1,13 @@
 import type { Tile } from "@mp/std";
 import { assert } from "@mp/std";
 import type { ActorId } from "../../actor/actor";
-import type { Task, TaskInput } from "./task";
+import type { NpcAiTaskContext, Task } from "./task";
+import type { NpcInstance } from "../types";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
-  return function hunt(input) {
-    const { npc, gameState, gameStateServer, areas, rng, npcCombatMemories } =
-      input;
+  return function hunt(context, npc) {
+    const { gameState, gameStateServer, areas, rng, npcCombatMemories } =
+      context;
 
     const deadActorsThisTick = gameStateServer.peekEvent("actor.death");
     npcCombatMemories.get(npc.id)?.forgetCombatatants(deadActorsThisTick);
@@ -24,7 +25,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
       return hunt;
     }
 
-    const newEnemyId = findNewEnemy(input);
+    const newEnemyId = findNewEnemy(context, npc);
     if (newEnemyId !== undefined) {
       npc.attackTargetId = newEnemyId;
       // TODO this is temporary until we have a buff/ability system
@@ -46,14 +47,15 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
   };
 }
 
-type HuntFilter = (input: TaskInput) => ActorId | undefined;
-type HuntFilterOutput = ActorId | undefined;
+type HuntFilter = (
+  context: NpcAiTaskContext,
+  npc: NpcInstance,
+) => ActorId | undefined;
 
-export function defensiveHuntFilter({
-  gameState,
+export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
+  { gameState, npcCombatMemories },
   npc,
-  npcCombatMemories,
-}: TaskInput): HuntFilterOutput {
+) {
   const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors
     .index({ type: "character" })
@@ -66,12 +68,12 @@ export function defensiveHuntFilter({
       );
     });
   return target?.id;
-}
+};
 
-export function aggressiveHuntFilter({
-  gameState,
+export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
+  { gameState },
   npc,
-}: TaskInput): HuntFilterOutput {
+) {
   const target = gameState.actors
     .index({ type: "character" })
     .values()
@@ -82,13 +84,12 @@ export function aggressiveHuntFilter({
       );
     });
   return target?.id;
-}
+};
 
-export function protectiveHuntFilter({
-  gameState,
+export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
+  { gameState, npcCombatMemories },
   npc,
-  npcCombatMemories,
-}: TaskInput): HuntFilterOutput {
+) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
   // Consider other npcs of the same spawn allies
@@ -134,4 +135,4 @@ export function protectiveHuntFilter({
     });
 
   return target?.id;
-}
+};

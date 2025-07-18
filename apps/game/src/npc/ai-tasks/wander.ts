@@ -1,15 +1,12 @@
 import type { TimeSpan } from "@mp/time";
-import type { Task, TaskInput } from "./task";
+import type { Task } from "./task";
 import { assert } from "@mp/std";
 
-export function createWanderTask(
-  endTime: TimeSpan,
-  nextTask: (input: TaskInput) => Task,
-): Task {
-  return function wander(input) {
-    const { areas, npc, tick, rng } = input;
+export function createWanderTask(endTime: TimeSpan, nextTask: Task): Task {
+  return function wander(context, npc) {
+    const { areas, tick, rng } = context;
     if (tick.totalTimeElapsed.compareTo(endTime) > 0) {
-      return nextTask(input);
+      return nextTask(context, npc);
     }
 
     if (!npc.path) {

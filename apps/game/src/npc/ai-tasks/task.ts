@@ -7,17 +7,16 @@ import type { NpcAiCombatMemory } from "../npc-ai-combat-memory";
 import type { GameState } from "../../game-state/game-state";
 import type { GameStateServer } from "../../game-state/game-state-server";
 
-export interface TaskInput {
+export interface NpcAiTaskContext {
   gameState: GameState;
   gameStateServer: GameStateServer;
   areas: AreaLookup;
-  npc: NpcInstance;
   npcCombatMemories: ReadonlyMap<ActorId, NpcAiCombatMemory>;
   tick: TickEvent;
   rng: Rng;
 }
 
-export type Task = (input: TaskInput) => Task;
+export type Task = (context: NpcAiTaskContext, npc: NpcInstance) => Task;
 
 export interface ObservedCombat {
   actor1: ActorId;
