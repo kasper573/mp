@@ -30,10 +30,10 @@ export async function loadTiledMapSpritesheets(
   return Object.fromEntries<TiledSpritesheet>(tilesetsByPath);
 }
 
-async function loadTilesetSpritesheet(
+export function createTilesetSpritesheetData(
   tileset: Tileset,
   tileSize: { width: number; height: number },
-): Promise<TiledSpritesheet> {
+): TiledSpritesheetData {
   const tiles = [...tileset.tiles.values()];
 
   const animationsWithDuration = new Map(
@@ -48,7 +48,7 @@ async function loadTilesetSpritesheet(
       ]),
   );
 
-  const data: TiledSpritesheetData = {
+  return {
     frames: Object.fromEntries(
       tiles.map((tile) => createTileFrameData(tileset, tileSize, tile.id)),
     ),
@@ -65,6 +65,16 @@ async function loadTilesetSpritesheet(
     ),
     animationsWithDuration,
   };
+}
+
+async function loadTilesetSpritesheet(
+  tileset: Tileset,
+  tileSize: { width: number; height: number },
+): Promise<TiledSpritesheet> {
+  const data: TiledSpritesheetData = createTilesetSpritesheetData(
+    tileset,
+    tileSize,
+  );
 
   const texture = await Assets.load<Texture>(tileset.image);
   texture.source.scaleMode = "nearest";

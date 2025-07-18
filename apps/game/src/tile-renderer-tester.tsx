@@ -1,23 +1,59 @@
-import type { Container, Size } from "@mp/graphics";
-import { FpsIndicator, type Application } from "@mp/graphics";
+import type { Container, Size, Texture } from "@mp/graphics";
+import {
+  Assets,
+  FpsIndicator,
+  Spritesheet,
+  type Application,
+} from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { useState } from "preact/hooks";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
+import type { TiledSpritesheet } from "@mp/tiled-renderer";
+import {
+  createTiledTextureLookup,
+  createTilesetSpritesheetData,
+  TiledRenderer,
+} from "@mp/tiled-renderer";
 import { dynamicLayerName } from "./area/area-resource";
-import type { LayerId, Ratio, TileLayer } from "@mp/tiled-loader";
-import { tilesInLayers, type TiledMap } from "@mp/tiled-loader";
+import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
 import type { Pixel, Tile } from "@mp/std";
-import { assert } from "@mp/std";
 import { Vector } from "@mp/math";
 import { Checkbox, Select } from "@mp/ui";
 import { useSignal } from "@mp/state/react";
 import { effect, type Signal } from "@mp/state";
+import {
+  generateRepeatedTileLayer,
+  generateTileset,
+  generateTilesetTile,
+} from "./test-tile-map-generator";
+import { skipToken, useQuery } from "@mp/rpc/react";
+import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
 
 export function TileRendererTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const tileSize = useSignal(16 as Pixel);
   const mapSize = useSignal(1 as Tile);
   const fitToStage = useSignal(false);
+
+  const texture = useQuery({
+    queryKey: ["text-tileset-texture"],
+    async queryFn() {
+      const texture = await Assets.load<Texture>(testTilesetTextureUrl);
+      texture.source.scaleMode = "nearest";
+      return texture;
+    },
+  });
+
+  const dependencies = useQuery({
+    queryKey: ["text-map-dependencies", mapSize.value, texture.data?.uid],
+    queryFn: texture.data
+      ? () =>
+          generateMapDependencies(
+            new Vector(mapSize.value, mapSize.value),
+            new Vector(tileSize.value, tileSize.value),
+            texture.data,
+          )
+      : skipToken,
+  });
 
   useGraphics(
     container,
@@ -25,8 +61,8 @@ export function TileRendererTester() {
       antialias: true,
       eventMode: "none",
       roundPixels: true,
-      mapSize,
       fitToStage,
+      ...dependencies.data,
     },
     buildStage,
   );
@@ -49,37 +85,48 @@ export function TileRendererTester() {
   );
 }
 
+async function generateMapDependencies(
+  mapSize: Vector<Tile>,
+  tileSize: Vector<Pixel>,
+  tilesetTexture: Texture,
+) {
+  const tile = generateTilesetTile(0 as LocalTileId);
+  const tileset = generateTileset(0 as GlobalTileId, [tile], tileSize);
+  const layer = generateRepeatedTileLayer(mapSize, tileSize, tile, tileset);
+  const data = createTilesetSpritesheetData(tileset, {
+    width: tileSize.x,
+    height: tileSize.y,
+  });
+  const spritesheet: TiledSpritesheet = new Spritesheet(tilesetTexture, data);
+  await spritesheet.parse();
+  return { layer, spritesheet };
+}
+
+type MapDependencies = Awaited<ReturnType<typeof generateMapDependencies>>;
+
 const sizeOptions = [1, 10, 50, 100, 500, 1000, 2500];
 
-interface StageOptions {
-  spritesheets?: TiledSpritesheetRecord;
-  tiledMap?: TiledMap;
-  mapSize: Signal<Tile>;
+type StageOptions = Partial<MapDependencies> & {
   fitToStage: Signal<boolean>;
-}
+};
 
 function buildStage(
   app: Application,
-  { spritesheets, tiledMap, mapSize, fitToStage }: StageOptions,
+  { layer, spritesheet, fitToStage }: StageOptions,
 ) {
-  if (!spritesheets || !tiledMap) {
-    return;
-  }
-
   const fps = new FpsIndicator();
   fps.zIndex = Number.MAX_SAFE_INTEGER;
   app.stage.addChild(fps);
 
   return effect(() => {
-    const scaledMap = scaleUpTiledMap(
-      tiledMap,
-      new Vector(mapSize.value, mapSize.value),
-    );
+    if (!layer || !spritesheet) {
+      return;
+    }
 
     const renderer = new TiledRenderer(
-      scaledMap.layers,
+      [layer],
       dynamicLayerName,
-      createTiledTextureLookup(spritesheets),
+      createTiledTextureLookup({ spritesheet }),
     );
 
     if (fitToStage.value) {
@@ -92,51 +139,6 @@ function buildStage(
       app.stage.removeChild(renderer);
     };
   });
-}
-
-function scaleUpTiledMap(
-  originalTiledMap: TiledMap,
-  newMapSize: Vector<Tile>,
-): TiledMap {
-  const newTiledMap = { ...originalTiledMap };
-  // 1. select the tile to repeat
-  const tileToRepeat = assert(
-    tilesInLayers(newTiledMap.layers).find(() => true),
-  ); // Select the first, any will do.
-  // 2. set the new size of the map
-  newTiledMap.width = newMapSize.x;
-  newTiledMap.height = newMapSize.y;
-  // 3. create a new layer with the repeated tile
-  const newTileLayer: TileLayer = {
-    x: 0 as Tile,
-    y: 0 as Tile,
-    offsetx: 0 as Pixel,
-    offsety: 0 as Pixel,
-    parallaxx: 0 as Ratio,
-    parallaxy: 0 as Ratio,
-    width: newMapSize.x,
-    height: newMapSize.y,
-    id: 1 as LayerId,
-    locked: false,
-    name: "Autoscaled layer",
-    opacity: 1 as Ratio,
-    properties: new Map(),
-    tiles: [],
-    type: "tilelayer",
-    visible: true,
-  };
-  for (let x = 0; x < newMapSize.x; x++) {
-    for (let y = 0; y < newMapSize.y; y++) {
-      newTileLayer.tiles.push({
-        ...tileToRepeat,
-        x: x as Tile,
-        y: y as Tile,
-      });
-    }
-  }
-  // 4. replace existing layers with the new layer
-  newTiledMap.layers = [newTileLayer];
-  return newTiledMap;
 }
 
 function fitObjectInto(target: Container, container: Size): void {
