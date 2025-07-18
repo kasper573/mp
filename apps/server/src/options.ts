@@ -130,6 +130,11 @@ export const serverOptionsSchema = object({
    * Set to true to enable the patch optimizer on the server side.
    */
   patchOptimizer: boolish(),
+
+  /**
+   * Whether to use pretty logging format.
+   */
+  prettyLogs: boolish(),
 });
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

@@ -9,9 +9,18 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./pino": {
+      "types": "./src/pino.ts",
+      "import": "./src/pino.ts",
+      "require": "./src/pino.ts"
     }
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
+  },
+  "dependencies": {
+    "pino": "9.7.0",
+    "pino-pretty": "13.0.0"
   }
 }

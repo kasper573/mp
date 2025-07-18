@@ -63,14 +63,14 @@ import { createCharacterService } from "./db/services/character-service";
 import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
 import { createTickMetricsObserver } from "./metrics/tick";
-import { createConsoleLogger } from "@mp/logger";
+import { createPinoLogger } from "@mp/logger/pino";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 
 const rng = new Rng(opt.rngSeed);
-const logger = createConsoleLogger();
+const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;

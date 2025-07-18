@@ -15,7 +15,11 @@ const buildOptions: esbuild.BuildOptions = {
   sourcemap: true,
   format: "esm",
   logLevel: "info",
-  external: [...builtinModules, ...builtinModules.map((m) => `node:${m}`)],
+  external: [
+    ...builtinModules,
+    ...builtinModules.map((m) => `node:${m}`),
+    "pino-pretty",
+  ],
   mainFields: ["module", "main"],
   // Fix for https://github.com/evanw/esbuild/pull/2067
   banner: {
