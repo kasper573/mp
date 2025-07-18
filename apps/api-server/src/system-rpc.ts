@@ -2,7 +2,9 @@ import { roles, rpc, systemRoles } from "@mp/game/server";
 import { baseServerOptions } from "@mp/server-common";
 
 export const systemRouter = rpc.router({
-  buildVersion: rpc.procedure.output<string>().query(() => baseServerOptions.buildVersion),
+  buildVersion: rpc.procedure
+    .output<string>()
+    .query(() => baseServerOptions.buildVersion),
 
   testError: rpc.procedure
     .use(roles([systemRoles.useDevTools]))

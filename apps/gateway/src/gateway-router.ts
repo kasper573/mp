@@ -1,4 +1,4 @@
-import { WebSocket } from "ws";
+import type { WebSocket } from "ws";
 import type { Logger } from "@mp/logger";
 import { AreaServerProxy } from "./area-server-proxy";
 
@@ -43,7 +43,7 @@ export class GatewayRouter {
     });
   }
 
-  private routeMessage(clientWs: WebSocket, message: any) {
+  private routeMessage(clientWs: WebSocket, message: unknown) {
     // For now, route all messages to the island server
     // In a real implementation, this would determine the correct area server
     // based on the player's current area or the RPC call being made
@@ -55,9 +55,10 @@ export class GatewayRouter {
     }
   }
 
-  async shutdown() {
-    for (const proxy of this.proxies.values()) {
-      await proxy.shutdown();
-    }
+  shutdown() {
+    const shutdownPromises = Array.from(this.proxies.values()).map((proxy) =>
+      proxy.shutdown(),
+    );
+    return Promise.all(shutdownPromises);
   }
 }

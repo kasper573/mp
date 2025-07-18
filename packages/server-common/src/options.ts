@@ -137,4 +137,8 @@ export const serverOptionsSchema = object({
   prettyLogs: boolish(),
 });
 
-export const baseServerOptions = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+export const baseServerOptions = assertEnv(
+  serverOptionsSchema,
+  process.env,
+  "MP_SERVER_",
+);

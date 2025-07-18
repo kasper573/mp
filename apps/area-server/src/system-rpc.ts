@@ -5,13 +5,17 @@ import { SyncEntity } from "@mp/sync";
 import { areaServerOptions } from "@mp/server-common";
 
 export const systemRouter = rpc.router({
-  buildVersion: rpc.procedure.output<string>().query(() => areaServerOptions.buildVersion),
+  buildVersion: rpc.procedure
+    .output<string>()
+    .query(() => areaServerOptions.buildVersion),
 
   testError: rpc.procedure
     .use(roles([systemRoles.useDevTools]))
     .output<string>()
     .query(() => {
-      throw new Error("This is a test error that was thrown in the area server");
+      throw new Error(
+        "This is a test error that was thrown in the area server",
+      );
     }),
 
   isPatchOptimizerEnabled: rpc.procedure

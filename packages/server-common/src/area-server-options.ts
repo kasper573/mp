@@ -1,10 +1,5 @@
 import type { InferOutput } from "@mp/env";
-import {
-  assertEnv,
-  csv,
-  object,
-  string,
-} from "@mp/env";
+import { assertEnv, csv, object, string } from "@mp/env";
 import { serverOptionsSchema } from "./options";
 
 export type AreaServerOptions = InferOutput<typeof areaServerOptionsSchema>;
@@ -21,4 +16,8 @@ export const areaServerOptionsSchema = object({
   apiServerUrl: string(),
 });
 
-export const areaServerOptions = assertEnv(areaServerOptionsSchema, process.env, "MP_AREA_SERVER_");
+export const areaServerOptions = assertEnv(
+  areaServerOptionsSchema,
+  process.env,
+  "MP_AREA_SERVER_",
+);

@@ -71,7 +71,10 @@ registerEncoderExtensions();
 
 const opt = areaServerOptions;
 const logger = createPinoLogger(opt.prettyLogs);
-logger.info(opt, `Starting area server for areas: ${opt.areaIds.join(", ")}...`);
+logger.info(
+  opt,
+  `Starting area server for areas: ${opt.areaIds.join(", ")}...`,
+);
 
 RateLimiter.enabled = opt.rateLimit;
 
@@ -109,12 +112,12 @@ const [allAreas, actorModels] = await Promise.all([
 
 // Filter areas to only include those this server should handle
 const areas = new Map(
-  [...allAreas.entries()].filter(([areaId]) => 
-    opt.areaIds.includes(areaId)
-  )
+  [...allAreas.entries()].filter(([areaId]) => opt.areaIds.includes(areaId)),
 );
 
-logger.info(`This server will handle ${areas.size} areas: ${Array.from(areas.keys()).join(", ")}`);
+logger.info(
+  `This server will handle ${areas.size} areas: ${Array.from(areas.keys()).join(", ")}`,
+);
 
 logger.info(`Seeding database...`);
 await seed(db, allAreas, actorModels);
@@ -189,7 +192,7 @@ const updateTicker = new Ticker({
         localActors.set(id, actor);
       }
     }
-    
+
     // Build index for local actors only
     gameState.actors.index.build();
     observeTick(opt);

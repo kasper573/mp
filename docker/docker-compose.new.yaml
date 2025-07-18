@@ -33,7 +33,11 @@ services:
     restart: always
     profiles: ["prod", "test"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1",
+        ]
       interval: 3s
       timeout: 5s
       retries: 20
@@ -55,7 +59,11 @@ services:
     restart: always
     profiles: ["prod", "test"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1",
+        ]
       interval: 3s
       timeout: 5s
       retries: 20

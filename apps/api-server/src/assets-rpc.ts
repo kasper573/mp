@@ -1,5 +1,4 @@
 import { rpc } from "@mp/game/server";
-import { baseServerOptions } from "@mp/server-common";
 import { serverFileToPublicUrl } from "@mp/server-common";
 import type { LocalFile } from "@mp/std";
 

@@ -11,20 +11,15 @@ import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { createExpressLogger } from "@mp/server-common";
 import { metricsMiddleware } from "@mp/server-common";
 import { collectProcessMetrics } from "@mp/server-common";
-import { rateLimiterMiddleware } from "@mp/server-common";
 import { baseServerOptions } from "@mp/server-common";
 import { playerRoles } from "@mp/server-common";
 import { createDbClient } from "@mp/server-common";
 import { createUserService } from "@mp/server-common";
-import { createCharacterService } from "@mp/server-common";
-import { createNpcService } from "@mp/server-common";
-import { createGameStateService } from "@mp/server-common";
 import { ctxTokenResolver, ctxUserService } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import { collectDefaultMetrics } from "@mp/telemetry/prom";
 import { setupRpcTransceivers } from "./rpc-setup";
 import { apiServerRpcRouter } from "./rpc";
-import { getSocketId } from "@mp/server-common";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -95,7 +90,7 @@ setupRpcTransceivers({
   wss,
   logger,
   router: apiServerRpcRouter,
-  createContext: (socket) => ioc,
+  createContext: (_socket) => ioc,
 });
 
 collectDefaultMetrics({ register: metrics });

@@ -5,7 +5,7 @@ import type { AreaServerEndpoint } from "./gateway-router";
 export class AreaServerProxy {
   private serverWs: WebSocket | null = null;
   private clientSockets = new Set<WebSocket>();
-  private messageQueue: Array<{ client: WebSocket; message: any }> = [];
+  private messageQueue: Array<{ client: WebSocket; message: unknown }> = [];
 
   constructor(
     private endpoint: AreaServerEndpoint,
@@ -14,12 +14,16 @@ export class AreaServerProxy {
     this.connect();
   }
 
-  private async connect() {
+  private connect() {
     try {
-      this.serverWs = new WebSocket(`ws://${this.endpoint.host}:${this.endpoint.port}/ws`);
-      
+      this.serverWs = new WebSocket(
+        `ws://${this.endpoint.host}:${this.endpoint.port}/ws`,
+      );
+
       this.serverWs.on("open", () => {
-        this.logger.info(`Connected to area server at ${this.endpoint.host}:${this.endpoint.port}`);
+        this.logger.info(
+          `Connected to area server at ${this.endpoint.host}:${this.endpoint.port}`,
+        );
         this.flushMessageQueue();
       });
 
@@ -36,7 +40,9 @@ export class AreaServerProxy {
       });
 
       this.serverWs.on("close", () => {
-        this.logger.warn(`Connection to area server ${this.endpoint.host}:${this.endpoint.port} closed`);
+        this.logger.warn(
+          `Connection to area server ${this.endpoint.host}:${this.endpoint.port} closed`,
+        );
         this.serverWs = null;
         // Attempt to reconnect after a delay
         setTimeout(() => this.connect(), 5000);
@@ -52,9 +58,9 @@ export class AreaServerProxy {
     }
   }
 
-  forwardMessage(clientWs: WebSocket, message: any) {
+  forwardMessage(clientWs: WebSocket, message: unknown) {
     this.clientSockets.add(clientWs);
-    
+
     clientWs.on("close", () => {
       this.clientSockets.delete(clientWs);
     });
@@ -73,12 +79,14 @@ export class AreaServerProxy {
 
   private flushMessageQueue() {
     while (this.messageQueue.length > 0) {
-      const { client, message } = this.messageQueue.shift()!;
-      this.forwardMessage(client, message);
+      const item = this.messageQueue.shift();
+      if (item) {
+        this.forwardMessage(item.client, item.message);
+      }
     }
   }
 
-  async shutdown() {
+  shutdown() {
     if (this.serverWs) {
       this.serverWs.close();
     }
