@@ -5,6 +5,8 @@ import builtinModules from "builtin-modules";
 const buildOptions: esbuild.BuildOptions = {
   entryPoints: {
     index: "./src/main.ts",
+    "api-server": "./src/api-server.ts",
+    "area-server": "./src/area-server.ts",
     provision: "./src/keycloak-provision.ts",
   },
   outdir: path.resolve(import.meta.dirname, "dist"),

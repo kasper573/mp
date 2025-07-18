@@ -21,7 +21,75 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      - mp-server
+      - mp-api-server
+
+  mp-api-server:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-api-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-api-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-area-server-island:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-area-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-area-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    environment:
+      MP_AREA_SERVER_SERVER_ID: "island-server"
+      MP_AREA_SERVER_AREAS: "island"
+      MP_AREA_SERVER_PORT: "3001"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-area-server-forest:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-area-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-area-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    environment:
+      MP_AREA_SERVER_SERVER_ID: "forest-server"
+      MP_AREA_SERVER_AREAS: "forest"
+      MP_AREA_SERVER_PORT: "3002"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3002/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
 
   mp-server:
     env_file: *env_files
@@ -31,7 +99,7 @@ services:
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
-    profiles: ["prod", "test"]
+    profiles: ["legacy"]
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
       interval: 3s

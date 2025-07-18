@@ -9,7 +9,7 @@ import type {
 import { npcTypes } from "@mp/game/server";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
-import { varchar, real, uuid, pgTable, integer } from "drizzle-orm/pg-core";
+import { varchar, real, uuid, pgTable, integer, jsonb, timestamp } from "drizzle-orm/pg-core";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 import { path } from "./types/path";
@@ -87,3 +87,9 @@ export const npcSpawnTable = pgTable("npc_spawn", {
 export function actorModelId() {
   return varchar({ length: 64 }).$type<ActorModelId>();
 }
+
+export const areaServerRegistryTable = pgTable("area_server_registry", {
+  serverId: varchar("server_id", { length: 255 }).primaryKey(),
+  info: jsonb("info").notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});

@@ -2,6 +2,7 @@ import path from "node:path";
 import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
 import type { InferOutput } from "@mp/env";
+import type { AreaId } from "@mp/game/server";
 import {
   assertEnv,
   boolish,
@@ -16,6 +17,7 @@ import {
 } from "@mp/env";
 
 export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
+export type AreaServerOptions = InferOutput<typeof areaServerOptionsSchema>;
 
 export const serverOptionsSchema = object({
   /**
@@ -132,4 +134,17 @@ export const serverOptionsSchema = object({
   patchOptimizer: boolish(),
 });
 
+export const areaServerOptionsSchema = object({
+  ...serverOptionsSchema.entries,
+  /**
+   * Unique identifier for this area server instance
+   */
+  serverId: string(),
+  /**
+   * List of area IDs this server should handle
+   */
+  areas: csv(string()),
+});
+
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+export const areaServerOptions = assertEnv(areaServerOptionsSchema, process.env, "MP_AREA_SERVER_");
