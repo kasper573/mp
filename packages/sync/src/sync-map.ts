@@ -6,8 +6,9 @@ import {
   type PatchPath,
 } from "./patch";
 import { SyncEntity } from "./sync-entity";
-import { Index } from "@mp/index";
-import type { IndexDefinition, IndexResolvers } from "@mp/index";
+
+import type { IndexDefinition, IndexResolvers, Index } from "@mp/index";
+import { UncachedIndex } from "@mp/index";
 
 export class SyncMap<K, V, Def extends IndexDefinition = {}>
   implements Map<K, V>
@@ -21,7 +22,10 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
     indexResolvers?: IndexResolvers<V, Def>,
   ) {
     this.#signal = new NotifiableSignal(new Map<K, V>(entries));
-    this.index = new Index(
+
+    // Future proofing indexed access.
+    // Currently using an uncached implementation until we have/need a real implementation.
+    this.index = new UncachedIndex(
       () => this.#signal.value.values(),
       indexResolvers ?? ({} as IndexResolvers<V, Def>),
     );
