@@ -13,5 +13,10 @@ export type * from "./schema/wang";
 
 export * from "./traversal";
 export * from "./schema/common";
-export * from "./loader";
 export * from "./gid";
+
+// Keep the original loader as the default for backward compatibility
+export * from "./loader";
+
+// Export the new Vector-based loader as an additional option
+export * from "./vector-loader";

@@ -15,8 +15,10 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
-    "pako": "2.1.0"
+    "pako": "2.1.0",
+    "valibot": "1.0.0-beta.9"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
