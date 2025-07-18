@@ -1,0 +1,261 @@
+x-env-files: &env_files
+  - path: .env
+    required: false
+  - .env.${COMPOSE_ENV}
+  - .env.shared
+
+x-logging: &logging
+  driver: json-file
+  options:
+    # Used by alloy to produce labels for Loki
+    tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
+
+services:
+  mp-client:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-client
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    depends_on:
+      - mp-gateway
+
+  mp-gateway:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-gateway
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-gateway:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-api-server:
+        condition: service_healthy
+      mp-area-server-island:
+        condition: service_healthy
+      mp-area-server-forest:
+        condition: service_healthy
+
+  mp-api-server:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-api-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-api-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-area-server-island:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-area-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-area-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    environment:
+      - MP_AREA_SERVER_PORT=8001
+      - MP_AREA_SERVER_AREA_IDS=island
+      - MP_AREA_SERVER_API_SERVER_URL=http://mp-api-server:$$MP_SERVER_PORT
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8001/health || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-area-server-forest:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-area-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-area-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    environment:
+      - MP_AREA_SERVER_PORT=8002
+      - MP_AREA_SERVER_AREA_IDS=forest
+      - MP_AREA_SERVER_API_SERVER_URL=http://mp-api-server:$$MP_SERVER_PORT
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8002/health || exit 1"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-migrations:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ../../docker/Dockerfile.mp-migrations
+      context: ../apps/server
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
+    profiles: ["prod", "test"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  keycloak:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./Dockerfile.keycloak
+      context: .
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-keycloak:${DOCKER_IMAGE_VERSION:-latest}
+    command: start --optimized --import-realm
+    volumes:
+      - ./keycloak/import:/opt/keycloak/data/import
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  # the keycloak image dosen't have curl so we healthcheck it externally
+  keycloak-healthcheck:
+    env_file: *env_files
+    logging: *logging
+    image: curlimages/curl
+    command: ["sh", "-c", "sleep infinity"]
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://keycloak:9000/health/live"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+
+  postgres:
+    env_file: *env_files
+    logging: *logging
+    image: postgres:16.4
+    restart: always
+    volumes:
+      - ./postgres-init.sh:/docker-entrypoint-initdb.d/postgres-init.sh
+      - /var/lib/postgresql/data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        ["CMD-SHELL", "pg_isready -d $$POSTGRES_INFRA_DB -U $$POSTGRES_USER"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    env_file: *env_files
+    logging: *logging
+    image: redis:7.4.1
+    restart: always
+
+  mimir:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/mimir:2.15.2
+    volumes:
+      - ./grafana/mimir.yaml:/etc/mimir/config.yaml
+      - mimir-data:/data
+    entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
+
+  tempo:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/tempo:2.6.1
+    volumes:
+      - ./grafana/tempo.yaml:/etc/tempo-config/tempo.yaml
+    command:
+      - -config.file=/etc/tempo-config/tempo.yaml
+      - -config.expand-env=true
+
+  alloy:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/alloy:v1.8.3
+    volumes:
+      - ./grafana/alloy.alloy:/etc/alloy/config.alloy
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/log:/var/log:ro
+      - /tmp:/tmp
+    entrypoint:
+      - "/bin/alloy"
+      - "run"
+      - '--config.extra-args="-config.expand-env"'
+      - /etc/alloy/config.alloy
+    depends_on:
+      - mimir
+      - grafana
+      - loki
+      - tempo
+
+  loki:
+    logging: *logging
+    image: grafana/loki:3.5.0
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./grafana/loki.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+
+  node_exporter:
+    env_file: *env_files
+    logging: *logging
+    image: prom/node-exporter:v1.8.2
+
+  grafana:
+    env_file: *env_files
+    logging: *logging
+    image: grafana/grafana:11.6.1
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/etc/grafana/dashboards
+
+  caddy:
+    env_file: *env_files
+    environment:
+      OTEL_SERVICE_NAME: caddy
+    logging: *logging
+    build:
+      dockerfile: ./Dockerfile.caddy
+      context: .
+    command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-caddy:${DOCKER_IMAGE_VERSION:-latest}
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  grafana-data:
+  loki-data:
+  mimir-data:
+  caddy-data:
+  caddy-config:

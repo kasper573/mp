@@ -1,0 +1,38 @@
+{
+  "name": "@mp/gateway",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/package.ts",
+      "import": "./src/package.ts",
+      "require": "./src/package.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && tsx esbuild.ts",
+    "inspect": "pnpm devenv tsx --inspect src/main.ts",
+    "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
+    "dev": "pnpm devenv tsx watch src/main.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/env": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/server-common": "workspace:*",
+    "@mp/telemetry": "workspace:*",
+    "@mp/ws": "workspace:*",
+    "dotenv": "16.4.5",
+    "express": "4.19.2",
+    "ws": "8.18.0"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/express": "4.17.21",
+    "@types/ws": "8.5.13",
+    "builtin-modules": "5.0.0",
+    "esbuild": "0.25.6",
+    "tsx": "catalog:"
+  }
+}

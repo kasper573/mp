@@ -1,0 +1,10 @@
+{
+  "extends": "@mp/tsconfig/node.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "module": "Preserve",
+    "target": "es2017",
+    "declaration": true,
+    "outDir": "./dist"
+  }
+}
