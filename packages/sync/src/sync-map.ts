@@ -113,24 +113,24 @@ export class SyncMap<K, V> implements Map<K, V> {
    */
   index<Query extends IndexQuery<V>>(
     query: Query,
-  ): ReadonlyMap<K, Extract<V, Query>> {
+  ): ReadonlyMap<K, EvaluateQuery<V, Query>> {
     const indexKey = indexKeyFromQuery(query);
     if (this.#suspendHandlers.size) {
       const cachedResult = this.#indexCache.get(indexKey) as
-        | Map<K, Extract<V, Query>>
+        | Map<K, EvaluateQuery<V, Query>>
         | undefined;
       if (cachedResult) {
         return cachedResult;
       }
     }
-    const matchingEntities = new Map<K, Extract<V, Query>>();
+    const matchingEntities = new Map<K, EvaluateQuery<V, Query>>();
     const indexKeys = Object.keys(query) as (keyof V)[];
     for (const [entityId, entity] of this.entries()) {
-      const match = indexKeys.every(
-        (key) => entity[key] === query[key as never],
+      const match = indexKeys.every((key) =>
+        evaluateBooleanOperation(entity[key], query[key as never]),
       );
       if (match) {
-        matchingEntities.set(entityId, entity as Extract<V, Query>);
+        matchingEntities.set(entityId, entity as EvaluateQuery<V, Query>);
       }
     }
     this.#indexCache.set(indexKey, matchingEntities);
@@ -154,12 +154,7 @@ export class SyncMap<K, V> implements Map<K, V> {
 
 type IndexKey = Branded<string, "IndexKey">;
 
-// Only support indexing on primitive values for now
-type SupportedIndexKeys<V> = {
-  [K in keyof V]: V[K] extends string | number | boolean ? K : never;
-}[keyof V];
-
-type IndexQuery<V> = { [K in SupportedIndexKeys<V>]?: V[K] };
+type IndexQuery<V> = { [K in keyof V]?: BooleanOperation<V[K]> };
 
 function indexKeyFromQuery<V>(query: IndexQuery<V>): IndexKey {
   let parts: unknown[] = [];
@@ -169,7 +164,29 @@ function indexKeyFromQuery<V>(query: IndexQuery<V>): IndexKey {
   return parts.join("_") as IndexKey;
 }
 
+// We can't really infer anything except equality checks,
+// but this at least helps narrowing down types when indexing on ie. discriminated unions.
+type EvaluateQuery<V, Query extends IndexQuery<V>> = Extract<
+  V,
+  {
+    [K in keyof Query]: Query[K] extends EqualsOperation<infer PropertyValue>
+      ? PropertyValue
+      : unknown;
+  }
+>;
+
 export type SyncMapChangeHandler<K, V> = (
   value: ReadonlyMap<K, V>,
   oldValue: ReadonlyMap<K, V>,
 ) => void;
+
+// Future proofing for more operators
+type EqualsOperation<PropertyValue> = PropertyValue;
+type BooleanOperation<PropertyValue> = EqualsOperation<PropertyValue>;
+
+function evaluateBooleanOperation<PropertyValue>(
+  value: PropertyValue,
+  operand: BooleanOperation<PropertyValue>,
+): boolean {
+  return value === operand;
+}

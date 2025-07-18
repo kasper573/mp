@@ -161,74 +161,82 @@ describe("effects", () => {
 });
 
 describe("index", () => {
-  it("can index by a single property", () => {
-    class Entity extends SyncEntity {
-      constructor(public type: string) {
-        super();
+  describe("can access", () => {
+    describe("operator", () => {
+      it("=", () => {
+        class Entity extends SyncEntity {
+          constructor(public type: string) {
+            super();
+          }
+        }
+
+        const map = new SyncMap<string, Entity>([
+          ["apple", new Entity("fruit")],
+          ["banana", new Entity("fruit")],
+          ["carrot", new Entity("vegetable")],
+          ["broccoli", new Entity("vegetable")],
+        ]);
+
+        const entityIds = map.index({ type: "fruit" }).keys().toArray();
+        expect(entityIds).toEqual(["apple", "banana"]);
+      });
+    });
+
+    it("two properties", () => {
+      class Entity extends SyncEntity {
+        constructor(
+          public type: string,
+          public color: string,
+        ) {
+          super();
+        }
       }
-    }
 
-    const map = new SyncMap<string, Entity>([
-      ["apple", new Entity("fruit")],
-      ["banana", new Entity("fruit")],
-      ["carrot", new Entity("vegetable")],
-      ["broccoli", new Entity("vegetable")],
-    ]);
+      const map = new SyncMap<string, Entity>([
+        ["apple", new Entity("fruit", "red")],
+        ["banana", new Entity("fruit", "yellow")],
+        ["carrot", new Entity("vegetable", "orange")],
+        ["broccoli", new Entity("vegetable", "green")],
+      ]);
 
-    const entityIds = map.index({ type: "fruit" }).keys().toArray();
-    expect(entityIds).toEqual(["apple", "banana"]);
+      const entityIds = map
+        .index({ type: "fruit", color: "yellow" })
+        .keys()
+        .toArray();
+      expect(entityIds).toEqual(["banana"]);
+    });
+
+    it("three properties", () => {
+      class Entity extends SyncEntity {
+        constructor(
+          public type: string,
+          public color: string,
+          public size: string,
+        ) {
+          super();
+        }
+      }
+
+      const map = new SyncMap<string, Entity>([
+        ["apple", new Entity("fruit", "red", "small")],
+        ["banana", new Entity("fruit", "yellow", "medium")],
+        ["carrot", new Entity("vegetable", "orange", "large")],
+        ["broccoli", new Entity("vegetable", "green", "medium")],
+      ]);
+
+      const entityIds = map
+        .index({
+          type: "fruit",
+          color: "yellow",
+          size: "medium",
+        })
+        .keys()
+        .toArray();
+      expect(entityIds).toEqual(["banana"]);
+    });
   });
 
-  it("can index by two properties", () => {
-    class Entity extends SyncEntity {
-      constructor(
-        public type: string,
-        public color: string,
-      ) {
-        super();
-      }
-    }
-
-    const map = new SyncMap<string, Entity>([
-      ["apple", new Entity("fruit", "red")],
-      ["banana", new Entity("fruit", "yellow")],
-      ["carrot", new Entity("vegetable", "orange")],
-      ["broccoli", new Entity("vegetable", "green")],
-    ]);
-
-    const entityIds = map
-      .index({ type: "fruit", color: "yellow" })
-      .keys()
-      .toArray();
-    expect(entityIds).toEqual(["banana"]);
-  });
-
-  it("can index by three properties", () => {
-    class Entity extends SyncEntity {
-      constructor(
-        public type: string,
-        public color: string,
-        public size: string,
-      ) {
-        super();
-      }
-    }
-
-    const map = new SyncMap<string, Entity>([
-      ["apple", new Entity("fruit", "red", "small")],
-      ["banana", new Entity("fruit", "yellow", "medium")],
-      ["carrot", new Entity("vegetable", "orange", "large")],
-      ["broccoli", new Entity("vegetable", "green", "medium")],
-    ]);
-
-    const entityIds = map
-      .index({ type: "fruit", color: "yellow", size: "medium" })
-      .keys()
-      .toArray();
-    expect(entityIds).toEqual(["banana"]);
-  });
-
-  it("index is correctly updated on changes", () => {
+  it("is correctly updated on changes", () => {
     class Entity extends SyncEntity {
       constructor(public type: string) {
         super();
@@ -248,7 +256,7 @@ describe("index", () => {
     expect(updatedFruitIds).toEqual(["apple"]);
   });
 
-  it("can suspend index updates", () => {
+  it("can suspend updates", () => {
     class Entity extends SyncEntity {
       constructor(public type: string) {
         super();
@@ -273,7 +281,7 @@ describe("index", () => {
     expect(fruitIds()).toEqual(["apple"]);
   });
 
-  it("when index updates are suspended, reads of entirely new indexes should still be resolved, but only once", () => {
+  it("suspended reads of new indexes should still be resolved once", () => {
     class Entity extends SyncEntity {
       constructor(public type: string) {
         super();
