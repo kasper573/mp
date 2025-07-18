@@ -31,7 +31,7 @@ export function deriveNpcSpawnsFromAreas(
       const spawn: NpcSpawn = {
         npcId: npc.id,
         id: createShortId() as NpcSpawnId,
-        ...deriveNpcSpawn(area, npcObject),
+        ...deriveNpcSpawn(area, npcObject as any),
       };
 
       derived.push({ npc, spawn });

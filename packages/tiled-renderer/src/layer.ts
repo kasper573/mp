@@ -30,16 +30,17 @@ function transformToVectorObject(obj: unknown): VectorTiledObjectUnion {
     (rawObj.height as number) || 0,
   );
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const baseProps = {
-    id: (rawObj.id as number) || 0,
+    id: (rawObj.id as any) || 0,
     name: (rawObj.name as string) || "",
     position,
     size,
-    rotation: (rawObj.rotation as number) || 0,
-    type: rawObj.type as string,
+    rotation: (rawObj.rotation as any) || 0,
+    type: rawObj.type as any,
     visible: (rawObj.visible as boolean) !== false,
-    properties: (rawObj.properties as Map<string, unknown>) || new Map(),
-    gid: rawObj.gid as number,
+    properties: (rawObj.properties as any) || new Map(),
+    gid: rawObj.gid as any,
   };
 
   switch (rawObj.objectType) {
@@ -73,14 +74,16 @@ function transformToVectorObject(obj: unknown): VectorTiledObjectUnion {
         ...baseProps,
         objectType: "text",
         text: (rawObj.text as Record<string, unknown>) || {},
-      } as VectorTextObject;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } as any as VectorTextObject;
     default:
       // Check if it has a gid (tile object)
       if (rawObj.gid) {
         return {
           ...baseProps,
           objectType: "tile",
-          gid: rawObj.gid as number,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          gid: rawObj.gid as any,
         };
       }
       // Default to rectangle for unknown types

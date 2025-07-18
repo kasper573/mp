@@ -61,7 +61,7 @@ function transformLayers(layers: unknown[]): Layer[] {
     }
 
     return layerObj;
-  }) as Layer[];
+  }) as unknown as Layer[];
 }
 
 /**

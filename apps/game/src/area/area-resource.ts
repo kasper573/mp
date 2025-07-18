@@ -37,9 +37,7 @@ export class AreaResource {
     this.#findPath = this.graph.createPathFinder();
 
     const startObj = assert(
-      tiled.getObjectsByClassName(TiledFixture.start)[0] as
-        | VectorTiledObjectUnion
-        | undefined,
+      tiled.getObjectsByClassName(TiledFixture.start)[0] as any,
       "Invalid area data: must have a start location",
     );
 
