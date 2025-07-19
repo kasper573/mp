@@ -2,7 +2,7 @@ import type { VectorKey, VectorLike } from "@mp/math";
 import { squaredDistance, Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import type { PathFinder } from "ngraph.path";
-import { aStar } from "ngraph.path";
+import ngraph from "ngraph.path";
 
 export class VectorGraph<T extends number> {
   #nodeIds = new Set<VectorGraphNodeId>();
@@ -14,14 +14,9 @@ export class VectorGraph<T extends number> {
   }
 
   constructor() {
-    this.#pathFinder = aStar(this.#ng, {
+    this.#pathFinder = ngraph.aGreedy(this.#ng, {
       distance: (fromNode, toNode, link) => {
-        const base = link.data.distance;
-        const w = Math.pow(
-          this.nodeWeight?.(toNode as unknown as VectorGraphNode<T>) ?? 0,
-          2, // Square the weight to align weight with our distance value, which is squared distances
-        );
-        return base + w;
+        return link.data.distance;
       },
       heuristic: (from, to) => from.data.vector.squaredDistance(to.data.vector),
     });
@@ -66,17 +61,6 @@ export class VectorGraph<T extends number> {
     return nearest;
   }
 
-  private nodeWeight?: (node: VectorGraphNode<T>) => number;
-  bindNodeWeightFn(fn: (node: VectorGraphNode<T>) => number) {
-    if (this.nodeWeight) {
-      throw new Error(
-        "Node weight function has already been bound. You must unbind it before binding another function",
-      );
-    }
-    this.nodeWeight = fn;
-    return (): void => (this.nodeWeight = undefined);
-  }
-
   beginUpdate() {
     this.#ng.beginUpdate();
   }
@@ -110,10 +94,18 @@ export class VectorGraph<T extends number> {
     end: VectorGraphNode<T>,
   ): Vector<T>[] | undefined {
     // Skip the first node since it's the start node
-    const [, ...path] = this.#pathFinder
-      .find(end.id, start.id) // aStar seems to return the path in reverse order, so we flip the args to avoid having to reverse the path
+    const path = this.#pathFinder
+      .find(start.id, end.id)
       .map((node) => node.data.vector);
-    return path;
+
+    // ngraph seems to return the path in reverse order, so we flip the args to avoid having to reverse the path
+    // (nba and aStar consistently return the path reversed while aGreedy returns it seemingly randomly reversed)
+    if (!path[0]?.equals(start.data.vector)) {
+      path.reverse();
+    }
+
+    // Skip the first node since it's the start node
+    return path.slice(1);
   }
 }
 
