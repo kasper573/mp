@@ -176,14 +176,14 @@ const npcService = createNpcService(db, areas);
 const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
-  onError: logger.error,
+  onError: (error) => logger.error(error, "Persist Ticker Error"),
   middleware: () => gameService.persist(gameState),
 });
 
 const observeTick = createTickMetricsObserver(metrics);
 
 const updateTicker = new Ticker({
-  onError: logger.error,
+  onError: (error) => logger.error(error, "Update Ticker Error"),
   middleware(opt) {
     // Build an index of commonly accessed entities before each tick.
     // This lets us to easily get some nice performance improvements for for simple lookups.
