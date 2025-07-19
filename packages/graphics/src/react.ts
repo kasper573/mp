@@ -1,4 +1,3 @@
-// oxlint-disable no-console
 import { useEffect } from "preact/hooks";
 import type { ApplicationOptions } from "@mp/graphics";
 import { Application } from "@mp/graphics";
@@ -26,7 +25,6 @@ export function useGraphics(
       return;
     }
 
-    console.debug("useGraphics: initializing pixi app");
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
@@ -40,7 +38,6 @@ export function useGraphics(
       })
       .then(() => {
         adjustCanvasSize(app);
-        console.debug("useGraphics: updating app signal");
         appSignal.value = app;
       });
 
@@ -58,7 +55,6 @@ export function useGraphics(
     }
 
     return () => {
-      console.debug("useGraphics: destroying pixi app");
       appSignal.value = undefined;
       canvas.remove();
       void initPromise.then(() => {
