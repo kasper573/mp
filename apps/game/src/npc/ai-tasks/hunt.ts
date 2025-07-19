@@ -86,21 +86,13 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
-  const aliveActorsInArea = gameState.actors.index
-    .access({ areaId: npc.areaId, alive: true })
-    .toArray();
+  const potentialAllies = gameState.actors.index.access({
+    areaId: npc.areaId,
+    alive: true,
+    spawnId: npc.spawnId,
+  });
 
-  // Consider other npcs of the same spawn allies
-  const allyIds = new Set<ActorId>(
-    aliveActorsInArea
-      .filter(
-        (actor) =>
-          actor.type === "npc" &&
-          actor.spawnId === npc.spawnId &&
-          actor.id !== npc.id,
-      )
-      .map((actor) => actor.id),
-  );
+  const allyIds = new Set<ActorId>(potentialAllies.map((actor) => actor.id));
 
   // Actors attacking allies are considered enemies
   const enemyIds = new Set(
@@ -117,8 +109,10 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
     }),
   );
 
-  const target = aliveActorsInArea.find(
-    function isProtectiveHuntTarget(candidate) {
+  const targetId = enemyIds
+    .values()
+    .find(function isProtectiveHuntTarget(enemyId) {
+      const candidate = assert(gameState.actors.get(enemyId));
       if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
         return false;
       }
@@ -127,8 +121,7 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
         enemyIds.has(candidate.id)
       );
-    },
-  );
+    });
 
-  return target?.id;
+  return targetId;
 };
