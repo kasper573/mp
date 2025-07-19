@@ -9,8 +9,6 @@ export function useObjectSignal<T extends object>(obj: T): ReadonlySignal<T> {
   const signal = useSignal<T>(obj);
 
   useEffect(() => {
-    // oxlint-disable-next-line no-console
-    console.log("object signal updated");
     // Must shallow copy for signal to accept the new value as different
     signal.value = { ...obj };
     // oxlint-disable-next-line exhaustive-deps
