@@ -44,9 +44,9 @@ export class VectorGraph<T extends number> {
     const flooredY = Math.floor(fVector.y);
 
     for (const [xOffset, yOffset] of nearestNodeOffsets) {
-      const y = flooredX + xOffset;
-      const x = flooredY + yOffset;
-      const node = this.getNode(Vector.key(y, x));
+      const x = flooredX + xOffset;
+      const y = flooredY + yOffset;
+      const node = this.getNode(Vector.key(x, y));
       if (node) {
         return node;
       }
