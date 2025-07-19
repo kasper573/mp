@@ -23,6 +23,8 @@
   "dependencies": {
     "@mp/encoding": "workspace:*",
     "@mp/std": "workspace:*",
+    "@mp/state": "workspace:*",
+    "preact": "catalog:",
     "@tanstack/react-query": "5.82.0",
     "@tanstack/react-query-devtools": "5.82.0"
   },
