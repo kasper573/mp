@@ -1,41 +1,28 @@
 import path from "node:path";
 import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
-import type { InferOutput } from "@mp/env";
-import {
-  assertEnv,
-  boolish,
-  csv,
-  numeric,
-  object,
-  optional,
-  picklist,
-  pipe,
-  string,
-  transform,
-} from "@mp/env";
+import { boolish, csv, numeric, type } from "@mp/validate";
+import { assertEnv } from "@mp/env";
 
-export type ServerOptions = InferOutput<typeof serverOptionsSchema>;
+export type ServerOptions = typeof serverOptionsSchema.infer;
 
-export const serverOptionsSchema = object({
+const pathSchema = type("string").pipe((p) => p && path.resolve(p));
+
+const msSchema = numeric().pipe((str) => TimeSpan.fromMilliseconds(str));
+
+export const serverOptionsSchema = type({
   /**
    * If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.
    */
-  clientDir: pipe(
-    optional(string()),
-    transform((p) => p && path.resolve(p)),
-  ),
+  "clientDir?": pathSchema,
   /**
    * The directory to serve static files from
    */
-  publicDir: pipe(
-    string(),
-    transform((p) => path.resolve(p)),
-  ),
+  publicDir: pathSchema,
   /**
    * The relative path after the hostname where the public dir will be exposed
    */
-  publicPath: string(),
+  publicPath: "string",
   /**
    * The max age of files served from the public directory in seconds
    */
@@ -51,66 +38,59 @@ export const serverOptionsSchema = object({
   /**
    * Used for generating publicly accessible URLs to the HTTP server
    */
-  httpBaseUrl: string(),
+  httpBaseUrl: "string",
   /**
    * The relative path to expose the WS endpoint on
    */
-  wsEndpointPath: string(),
+  wsEndpointPath: "string",
   /**
    * The hostname for the server to listen on
    */
-  hostname: string(),
+  hostname: "string",
   /**
    * The CORS origin to allow
    */
-  corsOrigin: string(),
+  corsOrigin: "string",
 
-  auth: object({
+  auth: {
     /**
      * OIDC issuer
      */
-    issuer: string(),
+    issuer: "string",
     /**
      * OIDC audience
      */
-    audience: string(),
+    audience: "string",
     /**
      * OIDC JWKS URI
      */
-    jwksUri: string(),
+    jwksUri: "string",
     /**
      * OIDC JWT algorithms
      */
-    algorithms: csv(picklist(authAlgorithms)),
+    algorithms: csv(type.enumerated(...authAlgorithms)),
     /**
      * Allow bypassing JWT verification using fake tokens.
      * Used by load test to automatically sign in as a new user and character.
      */
     allowBypassUsers: boolish(),
-  }),
-
+  },
   /**
    * The server tick interval in milliseconds
    */
-  tickInterval: pipe(
-    numeric(),
-    transform((ms) => TimeSpan.fromMilliseconds(ms)),
-  ),
+  tickInterval: msSchema,
   /**
    * How often (in milliseconds) to save the game state to the database
    */
-  persistInterval: pipe(
-    numeric(),
-    transform((ms) => TimeSpan.fromMilliseconds(ms)),
-  ),
+  persistInterval: msSchema,
   /**
    * The URL to the database
    */
-  databaseUrl: string(),
+  databaseUrl: "string",
   /**
    * The version of the build
    */
-  buildVersion: string(),
+  buildVersion: "string",
   /**
    * Whether to expose detailed error information to clients
    */
@@ -124,7 +104,7 @@ export const serverOptionsSchema = object({
    * The seed to use for the random number generator.
    * If not provided, a random seed will be used.
    */
-  rngSeed: optional(numeric()),
+  "rngSeed?": numeric(),
 
   /**
    * Set to true to enable the patch optimizer on the server side.

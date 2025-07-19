@@ -1,5 +1,5 @@
 {
-  "name": "@mp/env",
+  "name": "@mp/validate",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -15,12 +15,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "@mp/validate": "workspace:*",
-    "dot-prop": "9.0.0"
+    "arktype": "2.1.20"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "vitest": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

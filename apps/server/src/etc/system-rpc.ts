@@ -1,11 +1,11 @@
 import { roles, rpc, systemRoles } from "@mp/game/server";
-import type { Ticker } from "@mp/time";
-import { InjectionContext } from "@mp/ioc";
 import { SyncEntity } from "@mp/sync";
 import { opt } from "../options";
 
 export const systemRouter = rpc.router({
   buildVersion: rpc.procedure.output<string>().query(() => opt.buildVersion),
+
+  ping: rpc.procedure.output<void>().query(() => {}),
 
   testError: rpc.procedure
     .use(roles([systemRoles.useDevTools]))
@@ -26,5 +26,3 @@ export const systemRouter = rpc.router({
       SyncEntity.shouldOptimizeCollects = input;
     }),
 });
-
-export const ctxUpdateTicker = InjectionContext.new<Ticker>("UpdateTicker");

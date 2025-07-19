@@ -25,8 +25,8 @@ catalogs:
       specifier: 4.19.2
       version: 4.19.2
     typescript:
-      specifier: 5.8.3
-      version: 5.8.3
+      specifier: 5.9.0-beta
+      version: 5.9.0-beta
     vite:
       specifier: 6.3.5
       version: 6.3.5
@@ -55,7 +55,7 @@ importers:
         version: 22.13.10
       knip:
         specifier: 5.61.3
-        version: 5.61.3(@types/node@22.13.10)(typescript@5.8.3)
+        version: 5.61.3(@types/node@22.13.10)(typescript@5.9.0-beta)
       oxlint:
         specifier: 1.6.0
         version: 1.6.0
@@ -64,7 +64,7 @@ importers:
         version: 3.3.3
       typescript:
         specifier: 'catalog:'
-        version: 5.8.3
+        version: 5.9.0-beta
 
   apps/client:
     dependencies:
@@ -104,6 +104,9 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../packages/validate
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
@@ -314,6 +317,9 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../../packages/time
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../packages/validate
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
@@ -417,12 +423,12 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../validate
       dot-prop:
         specifier: 9.0.0
         version: 9.0.0
-      valibot:
-        specifier: 1.0.0-beta.9
-        version: 1.0.0-beta.9(typescript@5.8.3)
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -715,7 +721,7 @@ importers:
         version: 22.13.10
       typescript:
         specifier: 'catalog:'
-        version: 5.8.3
+        version: 5.9.0-beta
 
   packages/ui:
     dependencies:
@@ -731,6 +737,16 @@ importers:
       react-error-boundary:
         specifier: 6.0.0
         version: 6.0.0(react@19.1.0)
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/validate:
+    dependencies:
+      arktype:
+        specifier: 2.1.20
+        version: 2.1.20
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -757,6 +773,12 @@ packages:
   '@ampproject/remapping@2.3.0':
     resolution: {integrity: sha512-30iZtAPgz+LTIYoeivqYo853f02jBYSd5uGnGpkFV0M3xOt9aN73erkgYAmZU43x4VfqcnLxW9Kpg3R5LC4YYw==}
     engines: {node: '>=6.0.0'}
+
+  '@ark/schema@0.46.0':
+    resolution: {integrity: sha512-c2UQdKgP2eqqDArfBqQIJppxJHvNNXuQPeuSPlDML4rjw+f1cu0qAlzOG4b8ujgm9ctIDWwhpyw6gjG5ledIVQ==}
+
+  '@ark/util@0.46.0':
+    resolution: {integrity: sha512-JPy/NGWn/lvf1WmGCPw2VGpBg5utZraE84I7wli18EDF3p3zc/e9WolT35tINeZO3l7C77SjqRJeAUoT0CvMRg==}
 
   '@asamuzakjp/css-color@3.1.1':
     resolution: {integrity: sha512-hpRD68SV2OMcZCsrbdkccTw5FXjNDLo5OuqSHyHZfwweGsDWZwDJ2+gONyNAbazZclobMirACLw0lk8WVxIqxA==}
@@ -2651,6 +2673,9 @@ packages:
   argparse@2.0.1:
     resolution: {integrity: sha512-8+9WqebbFzpX9OR+Wa6O29asIogeRMzcGtAINdpMHHyAg10f05aSFVBbcEqGf/PXw1EjAZ+q2/bEBg3DvurK3Q==}
 
+  arktype@2.1.20:
+    resolution: {integrity: sha512-IZCEEXaJ8g+Ijd59WtSYwtjnqXiwM8sWQ5EjGamcto7+HVN9eK0C4p0zDlCuAwWhpqr6fIBkxPuYDl4/Mcj/+Q==}
+
   array-flatten@1.1.1:
     resolution: {integrity: sha512-PCVAQswWemu6UdxsDFFX/+gVeYqKAod3D3UVm91jHwynguOwAvYPhx8nNlM++NqRcK6CxxpUafjmhIdKiHibqg==}
 
@@ -4504,6 +4529,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.9.0-beta:
+    resolution: {integrity: sha512-p91qoTdwWKj9YEBYavmGiBn0DF4OBElzw4pW4oPbK4HeCfr/SDz9+yviVWshZXGvGvFCJ3AVQ+J7F1UZXc23QQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   ua-parser-js@1.0.40:
     resolution: {integrity: sha512-z6PJ8Lml+v3ichVojCiB8toQJBuwR42ySM4ezjXIqXK3M0HczmKQ3LF4rhU55PfD99KEEXQG6yb7iOMyvYuHew==}
     hasBin: true
@@ -4569,14 +4599,6 @@ packages:
   uuid@11.0.4:
     resolution: {integrity: sha512-IzL6VtTTYcAhA/oghbFJ1Dkmqev+FpQWnCBaKq/gUluLxliWvO8DPFWfIviRmYbtaavtSQe4WBL++rFjdcGWEg==}
     hasBin: true
-
-  valibot@1.0.0-beta.9:
-    resolution: {integrity: sha512-yEX8gMAZ2R1yI2uwOO4NCtVnJQx36zn3vD0omzzj9FhcoblvPukENIiRZXKZwCnqSeV80bMm8wNiGhQ0S8fiww==}
-    peerDependencies:
-      typescript: '>=5'
-    peerDependenciesMeta:
-      typescript:
-        optional: true
 
   validate-html-nesting@1.2.2:
     resolution: {integrity: sha512-hGdgQozCsQJMyfK5urgFcWEqsSSrK63Awe0t/IMR0bZ0QMtnuaiHzThW81guu3qx9abLi99NEuiaN6P9gVYsNg==}
@@ -4851,6 +4873,12 @@ snapshots:
     dependencies:
       '@jridgewell/gen-mapping': 0.3.5
       '@jridgewell/trace-mapping': 0.3.25
+
+  '@ark/schema@0.46.0':
+    dependencies:
+      '@ark/util': 0.46.0
+
+  '@ark/util@0.46.0': {}
 
   '@asamuzakjp/css-color@3.1.1':
     dependencies:
@@ -6673,6 +6701,11 @@ snapshots:
 
   argparse@2.0.1: {}
 
+  arktype@2.1.20:
+    dependencies:
+      '@ark/schema': 0.46.0
+      '@ark/util': 0.46.0
+
   array-flatten@1.1.1: {}
 
   assertion-error@2.0.1: {}
@@ -7790,7 +7823,7 @@ snapshots:
       json-buffer: 3.0.1
     optional: true
 
-  knip@5.61.3(@types/node@22.13.10)(typescript@5.8.3):
+  knip@5.61.3(@types/node@22.13.10)(typescript@5.9.0-beta):
     dependencies:
       '@nodelib/fs.walk': 1.2.8
       '@types/node': 22.13.10
@@ -7804,7 +7837,7 @@ snapshots:
       picomatch: 4.0.2
       smol-toml: 1.4.1
       strip-json-comments: 5.0.2
-      typescript: 5.8.3
+      typescript: 5.9.0-beta
       zod: 3.24.2
       zod-validation-error: 3.4.0(zod@3.24.2)
 
@@ -8669,7 +8702,10 @@ snapshots:
       media-typer: 0.3.0
       mime-types: 2.1.35
 
-  typescript@5.8.3: {}
+  typescript@5.8.3:
+    optional: true
+
+  typescript@5.9.0-beta: {}
 
   ua-parser-js@1.0.40: {}
 
@@ -8721,10 +8757,6 @@ snapshots:
   utils-merge@1.0.1: {}
 
   uuid@11.0.4: {}
-
-  valibot@1.0.0-beta.9(typescript@5.8.3):
-    optionalDependencies:
-      typescript: 5.8.3
 
   validate-html-nesting@1.2.2:
     optional: true
