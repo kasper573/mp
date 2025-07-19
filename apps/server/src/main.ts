@@ -44,7 +44,7 @@ import { seed } from "../seed";
 import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
-import { collectUserMetrics } from "./metrics/user";
+import { collectGameStateMetrics } from "./metrics/game-state";
 import { createExpressLogger } from "./express/logger";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
@@ -224,7 +224,7 @@ const ioc = new ImmutableInjectionContainer()
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, gameState);
+collectGameStateMetrics(metrics, clients, gameState, areas);
 
 const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
 

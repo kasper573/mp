@@ -248,6 +248,19 @@
           "legendFormat": "characters",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "server_area_count",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "areas",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "Game State",
@@ -813,5 +826,5 @@
   "timezone": "browser",
   "title": "mp-server (custom)",
   "uid": "ae3kps81booaoe",
-  "version": 21
+  "version": 23
 }
