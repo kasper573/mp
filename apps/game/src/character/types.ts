@@ -11,6 +11,7 @@ import type { CombatTrait } from "../traits/combat";
 import * as patchOptimizers from "../rpc/patch-optimizers";
 import type { AreaId } from "../area/area-id";
 import type { ActorId } from "../actor/actor";
+import { computed } from "@mp/state";
 
 export class Character
   extends SyncEntity
@@ -63,7 +64,11 @@ export class Character
   @collect()
   accessor desiredPortalId: ObjectId | undefined;
 
-  constructor(data: Omit<MinimalInput<Character>, "type" | keyof SyncEntity>) {
+  alive = computed(() => this.health > 0);
+
+  constructor(
+    data: Omit<MinimalInput<Character>, "type" | "alive" | keyof SyncEntity>,
+  ) {
     super();
     this.type = "character";
     this.id = data.id;

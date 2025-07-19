@@ -3,16 +3,25 @@ import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { AreaResource } from "./area-resource";
+import type { Actor } from "../actor/actor";
 
 export interface TileHighlightOptions {
   area: AreaResource;
   target?: TileHighlightTarget;
 }
 
-export interface TileHighlightTarget {
+interface HighlightTarget<Type extends string> {
+  type: Type;
   rect: Rect<Tile>;
-  type: "attack" | "move";
 }
+
+interface AttackHighlightTarget extends HighlightTarget<"attack"> {
+  actor: Actor;
+}
+
+interface MoveHighlightTarget extends HighlightTarget<"move"> {}
+
+export type TileHighlightTarget = AttackHighlightTarget | MoveHighlightTarget;
 
 export class TileHighlight extends Graphics {
   constructor(private options: () => TileHighlightOptions) {

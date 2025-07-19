@@ -113,7 +113,7 @@ export class AreaScene extends Container {
     ),
   );
 
-  entityAtPointer = computed(() => {
+  actorAtPointer = computed(() => {
     return this.state.actorList.value.find(
       (actor) =>
         actor.health > 0 &&
@@ -122,17 +122,16 @@ export class AreaScene extends Container {
   });
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
-    const entity = this.entityAtPointer.value;
-    if (entity) {
+    const actor = this.actorAtPointer.value;
+    if (actor) {
       return {
+        actor,
         type: "attack",
-        rect: entity.hitBox.offset(entity.coords),
+        rect: actor.hitBox.offset(actor.coords),
       };
     }
 
-    const tileNode = this.options.area.graph.getNearestNode(
-      this.pointerTile.value,
-    );
+    const tileNode = this.options.area.graph.getNodeAt(this.pointerTile.value);
     if (tileNode) {
       return {
         rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
@@ -161,21 +160,27 @@ export class AreaScene extends Container {
     this.setFromMatrix(new Matrix(...this.engine.camera.transform.value.data));
 
     if (this.engine.pointer.isDown.value) {
-      const entity = this.entityAtPointer.value;
-      if (entity) {
-        void this.state.actions.attack(entity.id);
-      } else {
-        const tileNode = this.options.area.graph.getNearestNode(
-          this.pointerTile.value,
-        );
-        if (tileNode) {
-          const portal = this.options.area
-            .hitTestObjects(this.engine.pointer.worldPosition.value)
-            .find(getAreaIdFromObject);
+      const target = this.highlightTarget.value;
+      switch (target?.type) {
+        case "attack":
+          void this.state.actions.attack(target.actor.id);
+          break;
+        case "move": {
+          const tileNode = this.options.area.graph.getProximityNode(
+            target.rect,
+          );
+          if (tileNode) {
+            const portal = this.options.area
+              .hitTestObjects(this.engine.pointer.worldPosition.value)
+              .find(getAreaIdFromObject);
 
-          this.moveThrottled(tileNode.data.vector, portal?.id);
+            this.moveThrottled(tileNode.data.vector, portal?.id);
+          }
+          break;
         }
       }
+    } else {
+      this.moveThrottled.clear();
     }
   };
 }

@@ -59,6 +59,7 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
   const combatMemory = npcCombatMemories.get(npc.id);
   const target = gameState.actors.index
     .access({ areaId: npc.areaId, alive: true, type: "character" })
+    .values()
     .find(function isDefensiveHuntTarget(candidate) {
       return (
         candidate.coords.isWithinDistance(npc.coords, npc.aggroRange) &&
@@ -74,6 +75,7 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
 ) {
   const target = gameState.actors.index
     .access({ areaId: npc.areaId, alive: true, type: "character" })
+    .values()
     .find(function isAggressiveHuntTarget(candidate) {
       return candidate.coords.isWithinDistance(npc.coords, npc.aggroRange);
     });
@@ -86,39 +88,35 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
-  const aliveActorsInArea = gameState.actors.index
-    .access({ areaId: npc.areaId, alive: true })
-    .toArray();
-
-  // Consider other npcs of the same spawn allies
-  const allyIds = new Set<ActorId>(
-    aliveActorsInArea
-      .filter(
-        (actor) =>
-          actor.type === "npc" &&
-          actor.spawnId === npc.spawnId &&
-          actor.id !== npc.id,
-      )
-      .map((actor) => actor.id),
-  );
+  const allies = (function getAllies() {
+    return gameState.actors.index.access({
+      areaId: npc.areaId,
+      spawnId: npc.spawnId,
+    });
+  })();
 
   // Actors attacking allies are considered enemies
-  const enemyIds = new Set(
-    combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
-      actor1,
-      actor2,
-    ]) {
-      if (allyIds.has(actor1)) {
-        return [actor2];
-      } else if (allyIds.has(actor2)) {
-        return [actor1];
-      }
-      return [];
-    }),
-  );
+  const enemyIds = (function getEnemyIds() {
+    return new Set(
+      combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
+        actorId1,
+        actorId2,
+      ]) {
+        // oxlint-disable-next-line no-non-null-assertion
+        if (allies.has(gameState.actors.get(actorId1)!)) {
+          return [actorId2];
+          // oxlint-disable-next-line no-non-null-assertion
+        } else if (allies.has(gameState.actors.get(actorId2)!)) {
+          return [actorId1];
+        }
+        return [];
+      }),
+    );
+  })();
 
-  const target = aliveActorsInArea.find(
-    function isProtectiveHuntTarget(candidate) {
+  const targetId = (function getTargetId() {
+    return enemyIds.values().find(function isProtectiveHuntTarget(enemyId) {
+      const candidate = assert(gameState.actors.get(enemyId));
       if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
         return false;
       }
@@ -127,8 +125,8 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
         combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
         enemyIds.has(candidate.id)
       );
-    },
-  );
+    });
+  })();
 
-  return target?.id;
+  return targetId;
 };

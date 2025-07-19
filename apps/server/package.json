@@ -34,6 +34,7 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
+    "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "cors": "2.8.5",
     "dotenv": "16.4.5",

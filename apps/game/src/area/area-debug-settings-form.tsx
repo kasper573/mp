@@ -51,7 +51,7 @@ export const visibleGraphTypes = [
   "none",
   "all",
   "tile",
-  "coord",
+  "proximityNode",
   "obscured",
 ] as const;
 export type VisibleGraphType = (typeof visibleGraphTypes)[number];

@@ -1,8 +1,7 @@
 {
-  "name": "@mp/index",
+  "name": "@mp/validate",
   "version": "0.0.0",
-  "sideEffects": false,
-  "license": "MIT",
+  "private": true,
   "type": "module",
   "exports": {
     ".": {
@@ -16,7 +15,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/state": "workspace:*"
+    "arktype": "2.1.20"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

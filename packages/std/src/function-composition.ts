@@ -15,14 +15,20 @@ export function throttle<T extends (...args: never[]) => unknown>(
 export function dedupe<Args extends unknown[], Output>(
   fn: (...args: Args) => Output,
   isEqual: (a: Args, b: Args) => boolean,
-): (...args: Args) => Output {
+) {
   let previous: { args: Args; output: Output } | undefined;
-  return (...args: Args): Output => {
+  function dedupedFn(...args: Args): Output {
     if (previous && isEqual(previous.args, args)) {
       return previous.output;
     }
     const output = fn(...args);
     previous = { args, output };
     return output;
+  }
+
+  dedupedFn.clear = () => {
+    previous = undefined;
   };
+
+  return dedupedFn;
 }

@@ -1,8 +1,8 @@
 import type { VectorKey, VectorLike } from "@mp/math";
-import { squaredDistance, Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import type { PathFinder } from "ngraph.path";
-import { aStar } from "ngraph.path";
+import ngraph from "ngraph.path";
 
 export class VectorGraph<T extends number> {
   #nodeIds = new Set<VectorGraphNodeId>();
@@ -14,14 +14,9 @@ export class VectorGraph<T extends number> {
   }
 
   constructor() {
-    this.#pathFinder = aStar(this.#ng, {
+    this.#pathFinder = ngraph.aGreedy(this.#ng, {
       distance: (fromNode, toNode, link) => {
-        const base = link.data.distance;
-        const w = Math.pow(
-          this.nodeWeight?.(toNode as unknown as VectorGraphNode<T>) ?? 0,
-          2, // Square the weight to align weight with our distance value, which is squared distances
-        );
-        return base + w;
+        return link.data.distance;
       },
       heuristic: (from, to) => from.data.vector.squaredDistance(to.data.vector),
     });
@@ -35,46 +30,36 @@ export class VectorGraph<T extends number> {
   }
 
   /**
+   * Gets the node directly at the given vector, rounded to the nearest integer.
    * @param fVector A fractional vector (which means itself never matches a node exactly)
    */
-  getNearestNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
+  getNodeAt(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
     // This is a hot code path so we write a bit more verbose code for higher performance:
     // 1. Avoid Vector allocations, just do manual math operations.
-    // 2. Use squared distance to avoid the square root operation from .distance()
-    //   (we don't need a real distance, we just need to compare anyway)
-
-    const roundedX = Math.round(fVector.x);
-    const roundedY = Math.round(fVector.y);
-
-    let nearest: VectorGraphNode<T> | undefined;
-    let minDist = Infinity;
-
-    for (const [xOffset, yOffset] of quadrantOffsets) {
-      const y = roundedX + xOffset;
-      const x = roundedY + yOffset;
-      const dist = squaredDistance(y, x, fVector.x, fVector.y);
-
-      if (dist < minDist) {
-        const node = this.getNode(Vector.key(y, x));
-        if (node) {
-          nearest = node;
-          minDist = dist;
-        }
-      }
-    }
-
-    return nearest;
+    const x = Math.floor(fVector.x + 0.5);
+    const y = Math.floor(fVector.y + 0.5);
+    return this.getNode(Vector.key(x, y));
   }
 
-  private nodeWeight?: (node: VectorGraphNode<T>) => number;
-  bindNodeWeightFn(fn: (node: VectorGraphNode<T>) => number) {
-    if (this.nodeWeight) {
-      throw new Error(
-        "Node weight function has already been bound. You must unbind it before binding another function",
-      );
+  /**
+   * Gets the node directly at the given vector, or an arbitrary adjacent node.
+   * Returns undefined if no node is found.
+   * @param fVector A fractional vector (which means itself never matches a node exactly)
+   */
+  getProximityNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
+    // This is a hot code path so we write a bit more verbose code for higher performance:
+    // 1. Avoid Vector allocations, just do manual math operations.
+    const flooredX = Math.floor(fVector.x + 0.5);
+    const flooredY = Math.floor(fVector.y + 0.5);
+
+    for (const [xOffset, yOffset] of nearestNodeOffsets) {
+      const x = flooredX + xOffset;
+      const y = flooredY + yOffset;
+      const node = this.getNode(Vector.key(x, y));
+      if (node) {
+        return node;
+      }
     }
-    this.nodeWeight = fn;
-    return (): void => (this.nodeWeight = undefined);
   }
 
   beginUpdate() {
@@ -110,18 +95,31 @@ export class VectorGraph<T extends number> {
     end: VectorGraphNode<T>,
   ): Vector<T>[] | undefined {
     // Skip the first node since it's the start node
-    const [, ...path] = this.#pathFinder
-      .find(end.id, start.id) // aStar seems to return the path in reverse order, so we flip the args to avoid having to reverse the path
+    const path = this.#pathFinder
+      .find(start.id, end.id)
       .map((node) => node.data.vector);
-    return path;
+
+    // ngraph seems to return the path in reverse order, so we flip the args to avoid having to reverse the path
+    // (nba and aStar consistently return the path reversed while aGreedy returns it seemingly randomly reversed)
+    if (!path[0]?.equals(start.data.vector)) {
+      path.reverse();
+    }
+
+    // Skip the first node since it's the start node
+    return path.slice(1);
   }
 }
 
-let quadrantOffsets: Array<[number, number]> = [
+let nearestNodeOffsets: Array<[number, number]> = [
   [0, 0],
   [1, 0],
+  [-1, 0],
   [0, 1],
+  [0, -1],
   [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
 ];
 
 /**

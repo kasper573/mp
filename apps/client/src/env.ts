@@ -1,24 +1,24 @@
-import type { FlatObject, InferOutput } from "@mp/env";
-import { object, string, parseEnv, csv, fallback, numeric } from "@mp/env";
+import { parseEnv, type FlatObject } from "@mp/env";
+import { csv, numeric, type } from "@mp/validate";
 
-export type ClientEnv = InferOutput<typeof clientEnvSchema>;
+export type ClientEnv = typeof clientEnvSchema.infer;
 
-const clientEnvSchema = object({
-  wsUrl: string(),
-  buildVersion: string(),
-  retryRpcQueries: fallback(numeric(), 0),
-  auth: object({
-    authority: string(),
-    audience: string(),
+const clientEnvSchema = type({
+  wsUrl: "string",
+  buildVersion: "string",
+  retryRpcQueries: numeric().default(0),
+  auth: {
+    authority: "string",
+    audience: "string",
     /**
      * The full URI that OIDC should redirect back to
      */
-    redirectUri: string(),
-  }),
-  faro: object({
-    receiverUrl: string(),
-    propagateTraceHeaderCorsUrls: csv(string()),
-  }),
+    redirectUri: "string",
+  },
+  faro: {
+    receiverUrl: "string",
+    propagateTraceHeaderCorsUrls: csv(type("string")),
+  },
 });
 
 export const env: ClientEnv = getClientEnv();

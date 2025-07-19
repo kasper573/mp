@@ -145,7 +145,7 @@ class DebugTiledGraph extends Container {
         }
         break;
       case "tile": {
-        const tileNode = graph.getNearestNode(
+        const tileNode = graph.getProximityNode(
           tiled.worldCoordToTile(worldPosition.value),
         );
         if (tileNode) {
@@ -153,8 +153,8 @@ class DebugTiledGraph extends Container {
         }
         break;
       }
-      case "coord": {
-        const nearest = graph.getNearestNode(
+      case "proximityNode": {
+        const nearest = graph.getProximityNode(
           tiled.worldCoordToTile(worldPosition.value),
         );
         if (nearest) {

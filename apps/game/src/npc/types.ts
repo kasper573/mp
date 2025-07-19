@@ -9,6 +9,7 @@ import type { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../area/area-id";
 import * as patchOptimizers from "../rpc/patch-optimizers";
 import type { ActorId } from "../actor/actor";
+import { computed } from "@mp/state";
 
 export type NpcType = (typeof npcTypes)[number];
 export const npcTypes = [
@@ -132,8 +133,10 @@ export class NpcInstance
   @collect()
   accessor lastAttack: TimeSpan | undefined;
 
+  alive = computed(() => this.health > 0);
+
   constructor(
-    data: Omit<MinimalInput<NpcInstance>, "type" | keyof SyncEntity>,
+    data: Omit<MinimalInput<NpcInstance>, "type" | "alive" | keyof SyncEntity>,
   ) {
     super();
     this.id = data.id;

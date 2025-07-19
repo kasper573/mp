@@ -35,17 +35,16 @@ export class NpcSpawner {
           cleanupTime = totalTimeElapsed.add(corpseDuration);
           corpseCleanupTimers.set(actor.id, cleanupTime);
         }
-        if (cleanupTime <= totalTimeElapsed) {
+        if (totalTimeElapsed.compareTo(cleanupTime) >= 0) {
           state.actors.delete(actor.id);
           corpseCleanupTimers.delete(actor.id);
         }
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = state.actors
-          .values()
-          .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
-          .toArray().length;
+        const currentSpawnCount = state.actors.index.access<NpcInstance>({
+          spawnId: spawn.id,
+        }).size;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {
@@ -108,7 +107,7 @@ function determineSpawnCoords(
       clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,
       clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as Tile,
     );
-    randomNode = area.graph.getNearestNode(randomTile);
+    randomNode = area.graph.getProximityNode(randomTile);
   } else {
     randomNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
   }

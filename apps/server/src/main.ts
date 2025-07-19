@@ -14,7 +14,9 @@ import {
   ctxClientId,
   ctxClientRegistry,
   ctxGameStateServer,
+  ctxLogger,
   ctxNpcSpawner,
+  ctxRng,
   ctxTokenResolver,
   ctxUserService,
   NpcAi,
@@ -25,7 +27,6 @@ import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameState } from "@mp/game/server";
 import {
-  ctxRng,
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
   ClientRegistry,
@@ -44,7 +45,7 @@ import { seed } from "../seed";
 import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
-import { collectUserMetrics } from "./metrics/user";
+import { collectGameStateMetrics } from "./metrics/game-state";
 import { createExpressLogger } from "./express/logger";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
@@ -56,7 +57,6 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { ctxUpdateTicker } from "./etc/system-rpc";
 import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { createCharacterService } from "./db/services/character-service";
@@ -158,7 +158,7 @@ SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
 const gameState: GameState = {
   actors: new SyncMap([], {
     type: (actor) => actor.type,
-    alive: (actor) => actor.health > 0,
+    alive: (actor) => actor.alive.value,
     areaId: (actor) => actor.areaId,
     spawnId: (actor) => (actor.type === "npc" ? actor.spawnId : undefined),
   }),
@@ -177,21 +177,13 @@ const npcService = createNpcService(db, areas);
 const gameService = createGameStateService(db);
 
 const persistTicker = new Ticker({
-  onError: logger.error,
+  onError: (error) => logger.error(error, "Persist Ticker Error"),
   middleware: () => gameService.persist(gameState),
 });
 
-const observeTick = createTickMetricsObserver(metrics);
-
 const updateTicker = new Ticker({
-  onError: logger.error,
-  middleware(opt) {
-    // Build an index of commonly accessed entities before each tick.
-    // This lets us to easily get some nice performance improvements for for simple lookups.
-    // Should only be used for values that don't require more precision than the state of the last tick.
-    gameState.actors.index.build();
-    observeTick(opt);
-  },
+  onError: (error) => logger.error(error, "Update Ticker Error"),
+  middleware: createTickMetricsObserver(metrics),
 });
 
 logger.info(`Getting all NPCs and spawns...`);
@@ -216,17 +208,17 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
+  .provide(ctxLogger, logger)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
   .provide(ctxActorModelLookup, actorModels)
-  .provide(ctxUpdateTicker, updateTicker)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectUserMetrics(metrics, clients, gameState);
+collectGameStateMetrics(metrics, clients, gameState, areas);
 
 const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
 

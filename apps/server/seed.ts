@@ -1,10 +1,4 @@
-import type {
-  AreaId,
-  AreaLookup,
-  Npc,
-  NpcId,
-  NpcSpawnId,
-} from "@mp/game/server";
+import type { AreaLookup, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import { npcTypes, type ActorModelLookup } from "@mp/game/server";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import type { DbClient } from "./src/db/client";
@@ -49,19 +43,20 @@ export async function seed(
 
       yield tx.insert(npcTable).values(soldier);
 
-      const areaId = "forest" as AreaId;
-      for (const npcType of npcTypes.values()) {
-        if (npcType === "patrol" || npcType === "static") {
-          continue;
-        }
+      for (const areaId of areas.keys()) {
+        for (const npcType of npcTypes.values()) {
+          if (npcType === "patrol" || npcType === "static") {
+            continue;
+          }
 
-        yield tx.insert(npcSpawnTable).values({
-          npcType,
-          areaId,
-          count: 10,
-          id: createShortId() as NpcSpawnId,
-          npcId: soldier.id,
-        });
+          yield tx.insert(npcSpawnTable).values({
+            npcType,
+            areaId,
+            count: 10,
+            id: createShortId() as NpcSpawnId,
+            npcId: soldier.id,
+          });
+        }
       }
     }
   });
