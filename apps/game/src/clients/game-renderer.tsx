@@ -19,7 +19,7 @@ import type { Application } from "@mp/graphics";
 import type { AreaResource } from "../area/area-resource";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { useObjectSignal } from "../useObjectSignal";
+import { useObjectSignal } from "../use-object-signal";
 
 interface GameRendererProps {
   interactive: boolean;
