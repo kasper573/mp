@@ -30,6 +30,18 @@ export class VectorGraph<T extends number> {
   }
 
   /**
+   * Gets the node directly at the given vector, rounded to the nearest integer.
+   * @param fVector A fractional vector (which means itself never matches a node exactly)
+   */
+  getNodeAt(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
+    // This is a hot code path so we write a bit more verbose code for higher performance:
+    // 1. Avoid Vector allocations, just do manual math operations.
+    const x = Math.floor(fVector.x + 0.5);
+    const y = Math.floor(fVector.y + 0.5);
+    return this.getNode(Vector.key(x, y));
+  }
+
+  /**
    * Gets the node directly at the given vector, or an arbitrary adjacent node.
    * Returns undefined if no node is found.
    * @param fVector A fractional vector (which means itself never matches a node exactly)
@@ -37,11 +49,8 @@ export class VectorGraph<T extends number> {
   getProximityNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
     // This is a hot code path so we write a bit more verbose code for higher performance:
     // 1. Avoid Vector allocations, just do manual math operations.
-    // 2. Use squared distance to avoid the square root operation from .distance()
-    //   (we don't need a real distance, we just need to compare anyway)
-
-    const flooredX = Math.floor(fVector.x);
-    const flooredY = Math.floor(fVector.y);
+    const flooredX = Math.floor(fVector.x + 0.5);
+    const flooredY = Math.floor(fVector.y + 0.5);
 
     for (const [xOffset, yOffset] of nearestNodeOffsets) {
       const x = flooredX + xOffset;

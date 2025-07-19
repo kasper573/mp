@@ -153,7 +153,7 @@ class DebugTiledGraph extends Container {
         }
         break;
       }
-      case "coord": {
+      case "proximityNode": {
         const nearest = graph.getProximityNode(
           tiled.worldCoordToTile(worldPosition.value),
         );
