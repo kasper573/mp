@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useState } from "preact/hooks";
-import type { Application } from "@mp/graphics";
 import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
@@ -10,7 +9,7 @@ import { Select } from "@mp/ui";
 import { Engine } from "@mp/engine";
 import { useGraphics } from "@mp/graphics/react";
 import type { CSSProperties } from "@mp/style";
-import { useSignal } from "@mp/state/react";
+import { useSignal, useSignalEffect } from "@mp/state/react";
 import {
   actorAnimationNames,
   type ActorModelId,
@@ -65,30 +64,27 @@ export function ActorSpriteTester() {
 
 function PixiApp({ settings }: { settings: () => ActorTestSettings }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const appSignal = useGraphics(container);
 
-  useGraphics(
-    container,
-    {
-      antialias: true,
-      eventMode: "none",
-      roundPixels: true,
-      settings,
-    },
-    buildStage,
-  );
+  useSignalEffect(() => {
+    const app = appSignal.value;
+    if (!app) {
+      return;
+    }
+
+    const engine = new Engine(app.canvas);
+    const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
+    app.stage.addChild(new ActorSpriteList(settings));
+
+    return function cleanup() {
+      app.stage.removeChildren();
+      for (const unsubscribe of subs) {
+        unsubscribe();
+      }
+    };
+  });
 
   return <div style={{ flex: 1 }} ref={setContainer} />;
-}
-
-function buildStage(
-  app: Application,
-  { settings }: { settings: () => ActorTestSettings },
-  container: HTMLDivElement,
-) {
-  const engine = new Engine(container);
-  const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
-  app.stage.addChild(new ActorSpriteList(settings));
-  return subs;
 }
 
 const styles = {
