@@ -88,34 +88,31 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
-  const allies = (function getAllies() {
-    return gameState.actors.index.access({
-      areaId: npc.areaId,
-      spawnId: npc.spawnId,
-    });
-  })();
+  const allies = gameState.actors.index.access({
+    areaId: npc.areaId,
+    spawnId: npc.spawnId,
+  });
 
   // Actors attacking allies are considered enemies
-  const enemyIds = (function getEnemyIds() {
-    return new Set(
-      combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
-        actorId1,
-        actorId2,
-      ]) {
+  const enemyIds = new Set(
+    combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
+      actorId1,
+      actorId2,
+    ]) {
+      // oxlint-disable-next-line no-non-null-assertion
+      if (allies.has(gameState.actors.get(actorId1)!)) {
+        return [actorId2];
         // oxlint-disable-next-line no-non-null-assertion
-        if (allies.has(gameState.actors.get(actorId1)!)) {
-          return [actorId2];
-          // oxlint-disable-next-line no-non-null-assertion
-        } else if (allies.has(gameState.actors.get(actorId2)!)) {
-          return [actorId1];
-        }
-        return [];
-      }),
-    );
-  })();
+      } else if (allies.has(gameState.actors.get(actorId2)!)) {
+        return [actorId1];
+      }
+      return [];
+    }),
+  );
 
-  const targetId = (function getTargetId() {
-    return enemyIds.values().find(function isProtectiveHuntTarget(enemyId) {
+  const targetId = enemyIds
+    .values()
+    .find(function isProtectiveHuntTarget(enemyId) {
       const candidate = assert(gameState.actors.get(enemyId));
       if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
         return false;
@@ -126,7 +123,6 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
         enemyIds.has(candidate.id)
       );
     });
-  })();
 
   return targetId;
 };
