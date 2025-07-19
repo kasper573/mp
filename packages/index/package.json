@@ -13,8 +13,7 @@
   },
   "scripts": {
     "test": "vitest run",
-    "test:watch": "vitest",
-    "perf": "tsx performance-test.ts"
+    "test:watch": "vitest"
   },
   "dependencies": {
     "@mp/state": "workspace:*"

@@ -158,7 +158,7 @@ SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
 const gameState: GameState = {
   actors: new SyncMap([], {
     type: (actor) => actor.type,
-    alive: (actor) => actor.health > 0,
+    alive: (actor) => actor.alive.value,
     areaId: (actor) => actor.areaId,
     spawnId: (actor) => (actor.type === "npc" ? actor.spawnId : undefined),
   }),
@@ -181,17 +181,9 @@ const persistTicker = new Ticker({
   middleware: () => gameService.persist(gameState),
 });
 
-const observeTick = createTickMetricsObserver(metrics);
-
 const updateTicker = new Ticker({
   onError: (error) => logger.error(error, "Update Ticker Error"),
-  middleware(opt) {
-    // Build an index of commonly accessed entities before each tick.
-    // This lets us to easily get some nice performance improvements for for simple lookups.
-    // Should only be used for values that don't require more precision than the state of the last tick.
-    gameState.actors.index.build();
-    observeTick(opt);
-  },
+  middleware: createTickMetricsObserver(metrics),
 });
 
 logger.info(`Getting all NPCs and spawns...`);

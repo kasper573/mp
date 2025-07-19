@@ -42,9 +42,9 @@ export class NpcSpawner {
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = state.actors.index
-          .access<NpcInstance>({ spawnId: spawn.id })
-          .toArray().length;
+        const currentSpawnCount = state.actors.index.access<NpcInstance>({
+          spawnId: spawn.id,
+        }).size;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {
