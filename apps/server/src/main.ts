@@ -15,6 +15,7 @@ import {
   ctxClientRegistry,
   ctxGameStateServer,
   ctxNpcSpawner,
+  ctxRng,
   ctxTokenResolver,
   ctxUserService,
   NpcAi,
@@ -56,7 +57,6 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { ctxUpdateTicker } from "./etc/system-rpc";
 import { createNpcService } from "./db/services/npc-service";
 import { createDbClient } from "./db/client";
 import { createCharacterService } from "./db/services/character-service";
@@ -220,7 +220,6 @@ const ioc = new ImmutableInjectionContainer()
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
   .provide(ctxActorModelLookup, actorModels)
-  .provide(ctxUpdateTicker, updateTicker)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
 
