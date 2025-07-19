@@ -26,7 +26,6 @@ import { Rng, type LocalFile } from "@mp/std";
 import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameState } from "@mp/game/server";
 import {
-  ctxRng,
   ctxAreaFileUrlResolver,
   ctxAreaLookup,
   ClientRegistry,
