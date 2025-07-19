@@ -1,13 +1,13 @@
 import type { Vector, VectorLike } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
-import { TimeSpan, type TickEventHandler } from "@mp/time";
+import type { TickEventHandler } from "@mp/time";
 import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state/game-state";
 import type { AreaLookup } from "../area/lookup";
 import type { AreaId } from "../area/area-id";
 import { moveAlongPath } from "../area/move-along-path";
-import type { ActorId } from "../actor/actor";
+
 import { getAreaIdFromObject } from "../area/area-resource";
 
 export interface MovementTrait {
@@ -41,13 +41,7 @@ export function movementBehavior(
   state: GameState,
   areas: AreaLookup,
 ): TickEventHandler {
-  const nextPathFinds = new Map<ActorId, TimeSpan>();
-  const stalePathInterval = TimeSpan.fromSeconds(2 / 3);
-
-  return function movementBehaviorTick({
-    timeSinceLastTick,
-    totalTimeElapsed,
-  }) {
+  return function movementBehaviorTick({ timeSinceLastTick }) {
     for (const actor of state.actors.values()) {
       // The dead don't move
       if (actor.health <= 0) {
@@ -56,30 +50,9 @@ export function movementBehavior(
         continue;
       }
 
-      // Force refresh the path on an interval to avoid path finding every tick.
-      // This gives us a good balance between correctness and performance.
-      let { moveTarget } = actor;
-      let pathIsStale =
-        !moveTarget &&
-        actor.path?.length &&
-        totalTimeElapsed.compareTo(
-          nextPathFinds.get(actor.id) ?? TimeSpan.Zero,
-        ) > 0;
-
-      // Patrolling npcs should never re-evaluate their paths since they're patrolling on a predetermined path
-      if (actor.type === "npc" && actor.patrol) {
-        pathIsStale = false;
-      }
-
-      if (pathIsStale && actor.path) {
-        // Resetting the move target to the destination will effectively refresh the path
-        moveTarget = actor.path.at(-1);
-        nextPathFinds.set(actor.id, totalTimeElapsed.add(stalePathInterval));
-      }
-
       // Consume the move target and produce a new path to move along
-      if (moveTarget) {
-        actor.path = findPathForSubject(actor, areas, moveTarget);
+      if (actor.moveTarget) {
+        actor.path = findPathForSubject(actor, areas, actor.moveTarget);
         actor.moveTarget = undefined;
       }
 
@@ -114,11 +87,11 @@ export function findPathForSubject(
   dest: VectorLike<Tile>,
 ): Path<Tile> | undefined {
   const area = assert(areas.get(subject.areaId));
-  const fromNode = area.graph.getNearestNode(subject.coords);
+  const fromNode = area.graph.getProximityNode(subject.coords);
   if (!fromNode) {
     return;
   }
-  const destNode = area.graph.getNearestNode(dest);
+  const destNode = area.graph.getProximityNode(dest);
   if (!destNode) {
     return;
   }

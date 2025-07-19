@@ -1,5 +1,5 @@
 import type { VectorKey, VectorLike } from "@mp/math";
-import { squaredDistance, Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import type { PathFinder } from "ngraph.path";
 import ngraph from "ngraph.path";
@@ -30,9 +30,11 @@ export class VectorGraph<T extends number> {
   }
 
   /**
+   * Gets the node directly at the given vector, or an arbitrary adjacent node.
+   * Returns undefined if no node is found.
    * @param fVector A fractional vector (which means itself never matches a node exactly)
    */
-  getNearestNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
+  getProximityNode(fVector: VectorLike<T>): VectorGraphNode<T> | undefined {
     // This is a hot code path so we write a bit more verbose code for higher performance:
     // 1. Avoid Vector allocations, just do manual math operations.
     // 2. Use squared distance to avoid the square root operation from .distance()
@@ -41,24 +43,14 @@ export class VectorGraph<T extends number> {
     const flooredX = Math.floor(fVector.x);
     const flooredY = Math.floor(fVector.y);
 
-    let nearest: VectorGraphNode<T> | undefined;
-    let minDist = Infinity;
-
     for (const [xOffset, yOffset] of nearestNodeOffsets) {
       const y = flooredX + xOffset;
       const x = flooredY + yOffset;
-      const dist = squaredDistance(y, x, fVector.x, fVector.y);
-
-      if (dist < minDist) {
-        const node = this.getNode(Vector.key(y, x));
-        if (node) {
-          nearest = node;
-          minDist = dist;
-        }
+      const node = this.getNode(Vector.key(y, x));
+      if (node) {
+        return node;
       }
     }
-
-    return nearest;
   }
 
   beginUpdate() {

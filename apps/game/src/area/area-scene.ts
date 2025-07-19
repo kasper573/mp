@@ -130,7 +130,7 @@ export class AreaScene extends Container {
       };
     }
 
-    const tileNode = this.options.area.graph.getNearestNode(
+    const tileNode = this.options.area.graph.getProximityNode(
       this.pointerTile.value,
     );
     if (tileNode) {
@@ -165,7 +165,7 @@ export class AreaScene extends Container {
       if (entity) {
         void this.state.actions.attack(entity.id);
       } else {
-        const tileNode = this.options.area.graph.getNearestNode(
+        const tileNode = this.options.area.graph.getProximityNode(
           this.pointerTile.value,
         );
         if (tileNode) {

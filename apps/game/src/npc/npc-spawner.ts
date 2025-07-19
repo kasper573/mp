@@ -107,7 +107,7 @@ function determineSpawnCoords(
       clamp(0, Math.cos(angle) * radius, area.tiled.mapSize.x) as Tile,
       clamp(0, Math.sin(angle) * radius, area.tiled.mapSize.y) as Tile,
     );
-    randomNode = area.graph.getNearestNode(randomTile);
+    randomNode = area.graph.getProximityNode(randomTile);
   } else {
     randomNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
   }
