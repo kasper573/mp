@@ -94,35 +94,28 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
   });
 
   // Actors attacking allies are considered enemies
-  const enemyIds = new Set(
-    combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
-      actorId1,
-      actorId2,
-    ]) {
+  const enemyIds = combatMemory?.combats.reduce((acc, [actorId1, actorId2]) => {
+    // oxlint-disable-next-line no-non-null-assertion
+    if (allies.has(gameState.actors.get(actorId1)!)) {
+      acc.add(actorId2);
       // oxlint-disable-next-line no-non-null-assertion
-      if (allies.has(gameState.actors.get(actorId1)!)) {
-        return [actorId2];
-        // oxlint-disable-next-line no-non-null-assertion
-      } else if (allies.has(gameState.actors.get(actorId2)!)) {
-        return [actorId1];
-      }
-      return [];
-    }),
-  );
+    } else if (allies.has(gameState.actors.get(actorId2)!)) {
+      acc.add(actorId1);
+    }
+    return acc;
+  }, new Set<ActorId>());
 
-  const targetId = enemyIds
-    .values()
-    .find(function isProtectiveHuntTarget(enemyId) {
-      const candidate = assert(gameState.actors.get(enemyId));
-      if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
-        return false;
-      }
+  const targetId = enemyIds?.values().find((enemyId) => {
+    const candidate = assert(gameState.actors.get(enemyId));
+    if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
+      return false;
+    }
 
-      return (
-        combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
-        enemyIds.has(candidate.id)
-      );
-    });
+    return (
+      combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
+      enemyIds.has(candidate.id)
+    );
+  });
 
   return targetId;
 };
