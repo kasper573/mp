@@ -176,6 +176,8 @@ export class AreaScene extends Container {
           this.moveThrottled(tileNode.data.vector, portal?.id);
         }
       }
+    } else {
+      this.moveThrottled.clear();
     }
   };
 }
