@@ -43,15 +43,15 @@ export class VectorGraph<T extends number> {
     // 2. Use squared distance to avoid the square root operation from .distance()
     //   (we don't need a real distance, we just need to compare anyway)
 
-    const roundedX = Math.round(fVector.x);
-    const roundedY = Math.round(fVector.y);
+    const flooredX = Math.floor(fVector.x);
+    const flooredY = Math.floor(fVector.y);
 
     let nearest: VectorGraphNode<T> | undefined;
     let minDist = Infinity;
 
-    for (const [xOffset, yOffset] of quadrantOffsets) {
-      const y = roundedX + xOffset;
-      const x = roundedY + yOffset;
+    for (const [xOffset, yOffset] of nearestNodeOffsets) {
+      const y = flooredX + xOffset;
+      const x = flooredY + yOffset;
       const dist = squaredDistance(y, x, fVector.x, fVector.y);
 
       if (dist < minDist) {
@@ -117,11 +117,16 @@ export class VectorGraph<T extends number> {
   }
 }
 
-let quadrantOffsets: Array<[number, number]> = [
+let nearestNodeOffsets: Array<[number, number]> = [
   [0, 0],
   [1, 0],
+  [-1, 0],
   [0, 1],
+  [0, -1],
   [1, 1],
+  [1, -1],
+  [-1, 1],
+  [-1, -1],
 ];
 
 /**
