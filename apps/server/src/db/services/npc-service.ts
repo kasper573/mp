@@ -9,7 +9,11 @@ import {
 import { npcSpawnTable, npcTable } from "../schema";
 import type { DbClient } from "../client";
 
-export function createNpcService(db: DbClient, areas: AreaLookup): NpcService {
+export function createNpcService(
+  db: DbClient,
+  areas: AreaLookup,
+  includeDerivedFromTiled = true,
+): NpcService {
   return {
     async getAllSpawnsAndTheirNpcs() {
       const result = await db
@@ -17,20 +21,23 @@ export function createNpcService(db: DbClient, areas: AreaLookup): NpcService {
         .from(npcSpawnTable)
         .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id));
 
-      const allNpcsAndSpawns = result.map(({ npc, npc_spawn: spawn }) => {
+      const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
         if (!npc) {
           throw new Error(`NPC spawn ${spawn.id} has no NPC`);
         }
         return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
       });
 
-      return [
-        ...allNpcsAndSpawns,
-        ...deriveNpcSpawnsFromAreas(
-          areas,
-          allNpcsAndSpawns.map(({ npc }) => npc),
-        ),
-      ];
+      if (!includeDerivedFromTiled) {
+        return allFromDB;
+      }
+
+      const allFromTiled = deriveNpcSpawnsFromAreas(
+        areas,
+        allFromDB.map(({ npc }) => npc),
+      );
+
+      return [...allFromDB, ...allFromTiled];
     },
   };
 }
