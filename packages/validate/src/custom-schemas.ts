@@ -39,8 +39,8 @@ export function numeric() {
  * Turn a comma-separated string into an array
  * of your schema’s outputs.
  */
-export function csv<O>(schema: Type<unknown, O>): Type<string, O[]> {
-  return type("string").pipe((value) =>
-    value.split(",").map((v) => schema.assert(v.trim())),
-  ) as never;
+export function csv<Item extends Type>(itemType: Item) {
+  return type("string").pipe((str) =>
+    str.split(",").map((v) => itemType.from(v.trim())),
+  );
 }
