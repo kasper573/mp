@@ -14,6 +14,7 @@ import {
   ctxClientId,
   ctxClientRegistry,
   ctxGameStateServer,
+  ctxLogger,
   ctxNpcSpawner,
   ctxRng,
   ctxTokenResolver,
@@ -215,6 +216,7 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxAreaLookup, areas)
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
+  .provide(ctxLogger, logger)
   .provide(ctxAreaFileUrlResolver, (id) =>
     serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
   )
