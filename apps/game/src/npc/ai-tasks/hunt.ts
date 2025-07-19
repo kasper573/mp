@@ -86,32 +86,35 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.id);
 
-  const potentialAllies = gameState.actors.index.access({
-    areaId: npc.areaId,
-    alive: true,
-    spawnId: npc.spawnId,
-  });
-
-  const allyIds = new Set<ActorId>(potentialAllies.map((actor) => actor.id));
+  const allies = (function getAllies() {
+    const result = gameState.actors.index.access({
+      areaId: npc.areaId,
+      spawnId: npc.spawnId,
+    });
+    return new Set(result);
+  })();
 
   // Actors attacking allies are considered enemies
-  const enemyIds = new Set(
-    combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
-      actor1,
-      actor2,
-    ]) {
-      if (allyIds.has(actor1)) {
-        return [actor2];
-      } else if (allyIds.has(actor2)) {
-        return [actor1];
-      }
-      return [];
-    }),
-  );
+  const enemyIds = (function getEnemyIds() {
+    return new Set(
+      combatMemory?.combats.flatMap(function determineProtectiveHuntEnemyId([
+        actorId1,
+        actorId2,
+      ]) {
+        // oxlint-disable-next-line no-non-null-assertion
+        if (allies.has(gameState.actors.get(actorId1)!)) {
+          return [actorId2];
+          // oxlint-disable-next-line no-non-null-assertion
+        } else if (allies.has(gameState.actors.get(actorId2)!)) {
+          return [actorId1];
+        }
+        return [];
+      }),
+    );
+  })();
 
-  const targetId = enemyIds
-    .values()
-    .find(function isProtectiveHuntTarget(enemyId) {
+  const targetId = (function getTargetId() {
+    return enemyIds.values().find(function isProtectiveHuntTarget(enemyId) {
       const candidate = assert(gameState.actors.get(enemyId));
       if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
         return false;
@@ -122,6 +125,7 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
         enemyIds.has(candidate.id)
       );
     });
+  })();
 
   return targetId;
 };
