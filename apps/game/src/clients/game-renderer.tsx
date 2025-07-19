@@ -2,7 +2,7 @@ import { Engine } from "@mp/engine";
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
 import type { Signal } from "@mp/state";
-import { StorageSignal } from "@mp/state";
+import { StorageSignal, untracked } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";
 import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
 import { ioc } from "../context/ioc";
@@ -17,8 +17,9 @@ import { AreaUi } from "../area/area-ui";
 import { GameDebugUi } from "./game-debug-ui";
 import type { Application } from "@mp/graphics";
 import type { AreaResource } from "../area/area-resource";
-import { useSignal } from "@mp/state/react";
+import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import { useObjectSignal } from "../use-object-signal";
 
 interface GameRendererProps {
   interactive: boolean;
@@ -39,20 +40,22 @@ export function GameRenderer({
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
 
-  useGraphics(
-    container,
-    {
-      antialias: true,
-      eventMode: "none",
-      roundPixels: true,
-      interactive,
-      gameState,
-      spritesheets,
-      showDebugUi,
-      area,
-    },
-    buildStage,
-  );
+  const appSignal = useGraphics(container);
+  const optionsSignal = useObjectSignal({
+    interactive,
+    gameState,
+    area,
+    spritesheets,
+    showDebugUi,
+  });
+
+  useSignalEffect(() => {
+    const app = appSignal.value;
+    if (app) {
+      const options = optionsSignal.value;
+      return untracked(() => buildStage(app, options));
+    }
+  });
 
   return (
     <>
@@ -78,9 +81,8 @@ function buildStage(
     spritesheets: TiledSpritesheetRecord;
     showDebugUi: Signal<boolean>;
   },
-  container: HTMLDivElement,
 ) {
-  const engine = new Engine(container);
+  const engine = new Engine(app.canvas);
   const subscriptions = [
     engine.start(opt.interactive),
     ioc.register(ctxEngine, engine),
@@ -97,7 +99,13 @@ function buildStage(
     debugSettings: () => areaDebugSettingsStorage.value,
   });
   app.stage.addChild(areaScene);
-  return subscriptions;
+  return function cleanup() {
+    app.stage.removeChildren();
+    areaScene.destroy({ children: true });
+    for (const unsubscribe of subscriptions) {
+      unsubscribe();
+    }
+  };
 }
 
 const areaDebugSettingsStorage = new StorageSignal<AreaDebugSettings>(

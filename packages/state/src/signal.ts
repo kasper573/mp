@@ -4,4 +4,5 @@ export {
   signal,
   computed,
   effect,
+  untracked,
 } from "@preact/signals-core";

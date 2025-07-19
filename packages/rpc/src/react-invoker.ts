@@ -12,8 +12,35 @@ import type {
 import type { AnyFunction } from "./invocation-proxy";
 import { createInvocationProxy } from "./invocation-proxy";
 import type { RpcCaller, RpcProcedureInvoker } from "./proxy-invoker";
+import { useSignal } from "@mp/state/react";
+import type { ReadonlySignal } from "@mp/state";
+import { useEffect, useMemo } from "preact/hooks";
 
 export { useQuery, skipToken, type SkipToken } from "@tanstack/react-query";
+
+export function useQuerySignal<
+  TQueryFnData = unknown,
+  TError = tanstack.DefaultError,
+  TData = TQueryFnData,
+  TQueryKey extends tanstack.QueryKey = tanstack.QueryKey,
+>(
+  options: tanstack.UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
+): Omit<tanstack.UseQueryResult<TData, TError>, "data"> & {
+  signal: ReadonlySignal<TData | undefined>;
+} {
+  const result = tanstack.useQuery(options);
+  const dataSignal = useSignal(result.data);
+  useEffect(() => {
+    dataSignal.value = result.data;
+  }, [result.data, dataSignal]);
+  return useMemo(
+    () => ({
+      ...result,
+      signal: dataSignal,
+    }),
+    [result, dataSignal],
+  );
+}
 
 export { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
