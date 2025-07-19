@@ -35,16 +35,15 @@ export class NpcSpawner {
           cleanupTime = totalTimeElapsed.add(corpseDuration);
           corpseCleanupTimers.set(actor.id, cleanupTime);
         }
-        if (cleanupTime <= totalTimeElapsed) {
+        if (totalTimeElapsed.compareTo(cleanupTime) >= 0) {
           state.actors.delete(actor.id);
           corpseCleanupTimers.delete(actor.id);
         }
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = state.actors
-          .values()
-          .filter((actor) => actor.type === "npc" && actor.spawnId === spawn.id)
+        const currentSpawnCount = state.actors.index
+          .access<NpcInstance>({ spawnId: spawn.id })
           .toArray().length;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
