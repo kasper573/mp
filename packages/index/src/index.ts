@@ -30,8 +30,6 @@ export class Index<Item, Definition extends IndexDefinition> {
     if (!computation) {
       computation = computed(() => this.resolveQuery(query));
       this.#computedQueries.set(key, computation);
-      // oxlint-disable-next-line no-console
-      console.log("Created computation #", this.#computedQueries.size);
     }
 
     return computation.value as ReadonlySet<NarrowedItem>;
