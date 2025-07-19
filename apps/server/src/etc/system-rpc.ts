@@ -5,6 +5,8 @@ import { opt } from "../options";
 export const systemRouter = rpc.router({
   buildVersion: rpc.procedure.output<string>().query(() => opt.buildVersion),
 
+  ping: rpc.procedure.output<void>().query(() => {}),
+
   testError: rpc.procedure
     .use(roles([systemRoles.useDevTools]))
     .output<string>()

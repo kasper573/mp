@@ -3,11 +3,14 @@ import { Button, Checkbox } from "@mp/ui";
 import { ctxGameStateClient, ioc } from "@mp/game/client";
 import { assert } from "@mp/std";
 import { useSignal, useSignalEffect } from "@mp/state/react";
-import { PropertySignal } from "@mp/state";
+import { PropertySignal, StorageSignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { useEffect } from "preact/hooks";
+import { useQuery } from "@mp/rpc/react";
+
+const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
 export function MiscDebugUi() {
   const rpc = useRpc();
@@ -35,6 +38,11 @@ export function MiscDebugUi() {
         </Button>
       </div>
       <label>
+        Show ping <Checkbox signal={pingEnabledSignal} />{" "}
+        {pingEnabledSignal.value ? <PingIndicator /> : null}
+      </label>
+      <br />
+      <label>
         Use server side patch optimizer:{" "}
         <Checkbox signal={isServerPatchOptimizerEnabled} />
       </label>
@@ -54,6 +62,22 @@ export function MiscDebugUi() {
       </label>
     </>
   );
+}
+
+function PingIndicator() {
+  const rpc = useRpc();
+  const ping = useQuery({
+    queryKey: ["ping"],
+    async queryFn() {
+      const start = performance.now();
+      await rpc.system.ping();
+      return performance.now() - start;
+    },
+    refetchInterval: 1000,
+    initialData: 0,
+  });
+
+  return <>{ping.data.toFixed(2)} ms</>;
 }
 
 function useServerPatchOptimizerSignal() {
