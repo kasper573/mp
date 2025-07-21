@@ -1,9 +1,9 @@
 import type { Branded, Result } from "@mp/std";
 import { err, ok } from "@mp/std";
-import type { AnyEventRouterNode } from "./builder";
+import type { AnyEventNode } from "./builder";
 
 export function createEventRouterInvoker<Context>(
-  root: AnyEventRouterNode<Context>,
+  root: AnyEventNode<Context>,
 ): EventRouterInvoker<Context> {
   return async function invokeEventRouter(call, ctx) {
     const [path, input] = call;
@@ -22,10 +22,10 @@ export function createEventRouterInvoker<Context>(
 }
 
 function resolveEventRouterNode<Context>(
-  start: AnyEventRouterNode,
+  start: AnyEventNode,
   path: string[],
-): AnyEventRouterNode<Context> | undefined {
-  let node: AnyEventRouterNode | undefined = start;
+): AnyEventNode<Context> | undefined {
+  let node: AnyEventNode | undefined = start;
   for (const key of path) {
     if (node.type === "router") {
       node = node.routes[key];

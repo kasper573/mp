@@ -1,14 +1,14 @@
 import type {
-  AnyEventNode,
-  AnyRouterNode,
+  AnyEventRouterHandlerNode,
   AnyEventRouterNode,
-  InferContext,
-  InferInput,
+  AnyEventNode,
+  InferEventContext,
+  InferEventInput,
 } from "./builder";
 import { createInvocationProxy } from "@mp/invocation-proxy";
 import { createEventRouterInvoker } from "./event-invoker";
 
-export function createEventRouterProxyInvoker<Node extends AnyEventRouterNode>(
+export function createEventRouterProxyInvoker<Node extends AnyEventNode>(
   call: EventRouterCaller,
 ): EventRouterProxyInvoker<Node> {
   const proxy = createInvocationProxy((path) => (input) => call(path, input));
@@ -16,9 +16,10 @@ export function createEventRouterProxyInvoker<Node extends AnyEventRouterNode>(
   return proxy as EventRouterProxyInvoker<Node>;
 }
 
-export function createEventRouterProxyInvokerForNode<
-  Node extends AnyEventRouterNode,
->(node: Node, context: InferContext<Node>): EventRouterProxyInvoker<Node> {
+export function createEventRouterProxyInvokerForNode<Node extends AnyEventNode>(
+  node: Node,
+  context: InferEventContext<Node>,
+): EventRouterProxyInvoker<Node> {
   const invoke = createEventRouterInvoker(node);
 
   const proxy = createInvocationProxy(
@@ -33,14 +34,14 @@ export type EventRouterCaller<Input = unknown> = (
   input: Input,
 ) => void;
 
-export type EventRouterProxyInvoker<Node extends AnyEventRouterNode> =
-  Node extends AnyRouterNode
-    ? EventRouterRouterInvoker<Node>
-    : Node extends AnyEventNode
+export type EventRouterProxyInvoker<Node extends AnyEventNode> =
+  Node extends AnyEventRouterNode
+    ? EventRouterProxyInvokerRecord<Node>
+    : Node extends AnyEventRouterHandlerNode
       ? EventRouterEventInvoker<Node>
       : never;
 
-export type EventRouterRouterInvoker<Router extends AnyRouterNode> = {
+export type EventRouterProxyInvokerRecord<Router extends AnyEventRouterNode> = {
   [K in keyof Router["routes"]]: EventRouterProxyInvoker<Router["routes"][K]>;
 };
 
@@ -48,6 +49,6 @@ export interface EventRouterQueryOptions<Input> {
   input: Input;
 }
 
-export type EventRouterEventInvoker<Node extends AnyEventNode> = (
-  input: InferInput<Node["handler"]>,
+export type EventRouterEventInvoker<Node extends AnyEventRouterHandlerNode> = (
+  input: InferEventInput<Node["handler"]>,
 ) => void;
