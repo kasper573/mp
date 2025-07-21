@@ -1,6 +1,9 @@
 import type { ActorSpritesheetUrls, AreaId, Character } from "@mp/game/server";
 import {
   ctxActorModelLookup,
+  ctxClientId,
+  ctxClientRegistry,
+  ctxTokenResolver,
   roles,
   systemRoles,
   worldRoles,
@@ -60,6 +63,7 @@ export const systemRouter = rpc.router({
       const resolveUrl = ctx.get(ctxAreaFileUrlResolver);
       return resolveUrl(areaId);
     }),
+
   actorSpritesheetUrls: rpc.procedure.output<ActorSpritesheetUrls>().query(
     ({ ctx }) =>
       new Map(
@@ -70,8 +74,15 @@ export const systemRouter = rpc.router({
       ),
   ),
 
-  auth: rpc.procedure.input<AccessToken>().mutation(() => {
-    // TODO broadcast to services
+  auth: rpc.procedure.input<AccessToken>().mutation(async ({ input, ctx }) => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    const tokenResolver = ctx.get(ctxTokenResolver);
+    const result = await tokenResolver(input);
+    if (result.isErr()) {
+      throw new Error("Invalid token", { cause: result.error });
+    }
+    clients.userIds.set(clientId, result.value.id);
   }),
 });
 

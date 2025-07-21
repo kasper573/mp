@@ -1,7 +1,6 @@
-import type { AccessToken } from "@mp/auth";
 import { ctxGameState } from "../game-state/game-state";
 import { eventHandlerBuilder } from "../network/event-definition";
-import { ctxTokenResolver, roles } from "../user/auth";
+import { roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 
@@ -12,32 +11,6 @@ import { worldRoles } from "../user/roles";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = eventHandlerBuilder.router({
-  auth: eventHandlerBuilder.event
-    .input<AccessToken>()
-    .handler(async ({ input, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      const tokenResolver = ctx.get(ctxTokenResolver);
-      const result = await tokenResolver(input);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-      clients.userIds.set(clientId, result.value.id);
-    }),
-
-  removeAuth: eventHandlerBuilder.event
-    .input<AccessToken>()
-    .handler(async ({ input, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      const tokenResolver = ctx.get(ctxTokenResolver);
-      const result = await tokenResolver(input);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-      clients.userIds.delete(clientId);
-    }),
-
   spectate: eventHandlerBuilder.event
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
