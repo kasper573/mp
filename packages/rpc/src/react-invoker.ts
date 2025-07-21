@@ -16,7 +16,12 @@ import { useSignal } from "@mp/state/react";
 import type { ReadonlySignal } from "@mp/state";
 import { useEffect, useMemo } from "preact/hooks";
 
-export { useQuery, skipToken, type SkipToken } from "@tanstack/react-query";
+export {
+  useQuery,
+  useSuspenseQuery,
+  skipToken,
+  type SkipToken,
+} from "@tanstack/react-query";
 
 export function useQuerySignal<
   TQueryFnData = unknown,
