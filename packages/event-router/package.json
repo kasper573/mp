@@ -1,0 +1,36 @@
+{
+  "name": "@mp/event-router",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    },
+    "./react": {
+      "types": "./src/react-invoker.ts",
+      "import": "./src/react-invoker.ts",
+      "require": "./src/react-invoker.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mp/encoding": "workspace:*",
+    "@mp/invocation-proxy": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@tanstack/react-query": "5.82.0",
+    "@tanstack/react-query-devtools": "5.82.0",
+    "preact": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "vitest": "catalog:"
+  }
+}
