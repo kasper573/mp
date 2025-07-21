@@ -500,21 +500,9 @@ importers:
       '@mp/invocation-proxy':
         specifier: workspace:*
         version: link:../invocation-proxy
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      '@tanstack/react-query':
-        specifier: 5.82.0
-        version: 5.82.0(react@19.1.0)
-      '@tanstack/react-query-devtools':
-        specifier: 5.82.0
-        version: 5.82.0(@tanstack/react-query@5.82.0(react@19.1.0))(react@19.1.0)
-      preact:
-        specifier: 'catalog:'
-        version: 10.26.9
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
