@@ -12,3 +12,5 @@ catalog:
   "@preact/preset-vite": 2.10.2
   tsx: 4.19.2
   dotenv: 17.2.0
+  express: 5.1.0
+  "@types/express": 5.0.3

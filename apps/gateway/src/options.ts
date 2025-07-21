@@ -23,4 +23,4 @@ export const serverOptionsSchema = type({
   prettyLogs: boolish(),
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+export const opt = assertEnv(serverOptionsSchema, process.env, "MP_GATEWAY_");
