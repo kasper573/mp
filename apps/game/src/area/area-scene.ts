@@ -123,7 +123,7 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    if (actor) {
+    if (actor && actor?.id !== this.state.characterId.value) {
       return {
         actor,
         type: "attack",
@@ -166,16 +166,11 @@ export class AreaScene extends Container {
           void this.state.actions.attack(target.actor.id);
           break;
         case "move": {
-          const tileNode = this.options.area.graph.getProximityNode(
-            target.rect,
-          );
-          if (tileNode) {
-            const portal = this.options.area
-              .hitTestObjects(this.engine.pointer.worldPosition.value)
-              .find(getAreaIdFromObject);
+          const portal = this.options.area
+            .hitTestObjects(this.engine.pointer.worldPosition.value)
+            .find(getAreaIdFromObject);
 
-            this.moveThrottled(tileNode.data.vector, portal?.id);
-          }
+          this.moveThrottled(Vector.from(target.rect), portal?.id);
           break;
         }
       }

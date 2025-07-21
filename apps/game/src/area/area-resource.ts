@@ -1,3 +1,4 @@
+import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import type { Pixel } from "@mp/std";
@@ -40,7 +41,7 @@ export class AreaResource {
     this.start = tiled.worldCoordToTile(Vector.from(startObj)).round();
   }
 
-  hitTestObjects(coord: Vector<Pixel>): TiledObject[] {
+  hitTestObjects(coord: VectorLike<Pixel>): TiledObject[] {
     const matches: TiledObject[] = [];
     for (const obj of this.tiled.objects) {
       if (hitTestTiledObject(obj, coord)) {
