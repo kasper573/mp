@@ -4,8 +4,8 @@ import type {
   ActorSpritesheetLookup,
   AreaId,
   AreaResource,
-} from "@mp/game/server";
-import { loadActorSpritesheets } from "@mp/game/server";
+} from "@mp/game/client";
+import { loadActorSpritesheets } from "@mp/game/client";
 import { useContext } from "preact/hooks";
 import { RpcClientContext } from "./rpc";
 import { useSuspenseQuery } from "@mp/rpc/react";

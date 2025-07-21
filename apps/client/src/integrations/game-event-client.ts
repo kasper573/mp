@@ -3,7 +3,7 @@ import {
   createEventRouterProxyInvoker,
 } from "@mp/event-router";
 import type { GameEventClient } from "@mp/game/client";
-import type { GameServerEventRouter } from "@mp/game/server";
+import type { GameServerEventRouter } from "@mp/game/client";
 
 export function createGameEventClient(socket: WebSocket): GameEventClient {
   const client = new BinaryEventTransceiver({

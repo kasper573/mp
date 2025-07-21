@@ -15,7 +15,7 @@ import { AuthBoundary } from "../../../ui/auth-boundary";
 import { RpcClientContext, SocketContext } from "../../../integrations/rpc";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
 import { miscDebugSettings } from "../../../signals/misc-debug-ui-settings";
-import type { CharacterId } from "@mp/game/server";
+import type { CharacterId } from "@mp/game/client";
 import { useGameAssets } from "../../../integrations/assets";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({

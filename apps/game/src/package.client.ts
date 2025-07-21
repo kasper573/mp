@@ -1,12 +1,17 @@
 export * from "./context/ioc";
 export * from "./context/common";
 export * from "./user/roles";
+export * from "./character/types";
 export * from "./actor/actor-sprite-tester";
+export * from "./actor/actor-spritesheet-lookup";
 export * from "./area/area-debug-graphics";
 export * from "./area/area-scene";
 export * from "./area/load-area";
+export * from "./area/area-id";
+export * from "./area/area-resource";
 export * from "./game-state/game-state-client";
 export * from "./game-state/optimistic-game-state";
+export type * from "./network/event-definition.slice";
 export * from "./clients/spectator-client";
 export * from "./clients/player-client";
 export * from "./clients/game-asset-loader";
