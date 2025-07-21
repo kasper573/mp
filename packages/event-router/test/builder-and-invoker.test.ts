@@ -1,9 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
-import type { EventRouterCall } from "../src";
+import type { EventRouterMessage } from "../src";
 import {
   EventRouterBuilder,
-  createEventRouterInvoker,
-  EventRouterInvokerError,
+  createEventRouterReceiver,
+  EventRouterReceiverError,
 } from "../src";
 
 describe("builder and invoker", () => {
@@ -14,8 +14,8 @@ describe("builder and invoker", () => {
       .input<number>()
       .handler(({ input }) => fn(input * 2));
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<number> = [[], 5];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<number> = [[], 5];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -30,8 +30,8 @@ describe("builder and invoker", () => {
     const fn = vi.fn();
     const node = builder.event.handler(({ ctx }) => fn(ctx.value * 3));
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<unknown> = [[], undefined];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<unknown> = [[], undefined];
     const result = await invoker(call, { value: 4 });
 
     expect(result.isOk()).toBe(true);
@@ -48,8 +48,8 @@ describe("builder and invoker", () => {
       .handler(({ input }) => fn(`Hello, ${input}!`));
 
     const root = builder.router({ greet });
-    const invoker = createEventRouterInvoker(root);
-    const call: EventRouterCall<string> = [["greet"], "Test"];
+    const invoker = createEventRouterReceiver(root);
+    const call: EventRouterMessage<string> = [["greet"], "Test"];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -59,13 +59,13 @@ describe("builder and invoker", () => {
   it("returns Err when path not found", async () => {
     const builder = new EventRouterBuilder().build();
     const root = builder.router({});
-    const invoker = createEventRouterInvoker(root);
-    const call: EventRouterCall<unknown> = [["unknown"], {}];
+    const invoker = createEventRouterReceiver(root);
+    const call: EventRouterMessage<unknown> = [["unknown"], {}];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
+    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.message).toBe('error in event handler "unknown"');
   });
@@ -77,13 +77,13 @@ describe("builder and invoker", () => {
       child: builder.event.handler(() => {}),
     });
     const root = builder.router({ nested: nestedRouter });
-    const invoker = createEventRouterInvoker(root);
-    const call: EventRouterCall<unknown> = [["nested"], {}];
+    const invoker = createEventRouterReceiver(root);
+    const call: EventRouterMessage<unknown> = [["nested"], {}];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
+    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.message).toBe('error in event handler "nested"');
   });
@@ -96,13 +96,13 @@ describe("builder and invoker", () => {
     });
 
     const root = builder.router({ broken: brokenProc });
-    const invoker = createEventRouterInvoker(root);
-    const call: EventRouterCall<unknown> = [["broken"], {}];
+    const invoker = createEventRouterReceiver(root);
+    const call: EventRouterMessage<unknown> = [["broken"], {}];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
+    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.cause).toBeInstanceOf(Error);
     // @ts-expect-error ignore harmless error for lazy property accses
@@ -124,8 +124,8 @@ describe("builder and invoker", () => {
         }),
       );
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<unknown> = [[], undefined];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<unknown> = [[], undefined];
     const result = await invoker(call, { userId: 7 });
 
     expect(result.isOk()).toBe(true);
@@ -148,8 +148,8 @@ describe("builder and invoker", () => {
       )
       .handler(({ ctx, mwc }) => fn({ userId: ctx.userId, ...mwc }));
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<unknown> = [[], undefined];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<unknown> = [[], undefined];
     const result = await invoker(call, { userId: 42 });
 
     expect(result.isOk()).toBe(true);
@@ -168,8 +168,8 @@ describe("builder and invoker", () => {
     const fn = vi.fn();
     const node = builder.event.use(pipedMw).handler(({ mwc }) => fn(mwc.count));
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<unknown> = [[], undefined];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<unknown> = [[], undefined];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
@@ -184,8 +184,8 @@ describe("builder and invoker", () => {
       .input<string>()
       .handler(({ input }) => fn(input.length));
 
-    const invoker = createEventRouterInvoker(node);
-    const call: EventRouterCall<string> = [[], "hello"];
+    const invoker = createEventRouterReceiver(node);
+    const call: EventRouterMessage<string> = [[], "hello"];
     const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
