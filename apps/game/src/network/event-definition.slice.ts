@@ -1,13 +1,11 @@
 import { characterEventRouterSlice } from "../character/events";
 import { npcEventRouterSlice } from "../npc/events";
 import { worldEventRouterSlice } from "../world/events";
-import type { AnyEventNodeRecord, EventRouterNode } from "@mp/event-router";
+import { eventHandlerBuilder } from "./event-definition";
 
-export type GameServerEventRouter = EventRouterNode<
-  typeof gameServerEventSlice
->;
-export const gameServerEventSlice = {
+export type GameServerEventRouter = typeof gameServerEventRouter;
+export const gameServerEventRouter = eventHandlerBuilder.router({
   ...characterEventRouterSlice,
   ...worldEventRouterSlice,
   ...npcEventRouterSlice,
-} satisfies AnyEventNodeRecord;
+});

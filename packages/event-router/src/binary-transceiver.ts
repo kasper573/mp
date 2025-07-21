@@ -5,7 +5,7 @@ import type {
 } from "./event-receiver";
 
 export interface BinaryEventTransceiverOptions<Context> {
-  send: (messageBuffer: ArrayBufferLike) => unknown;
+  send?: (messageBuffer: ArrayBufferLike) => unknown;
   receive?: EventRouterMessageReceiver<Context>;
 }
 
@@ -16,12 +16,15 @@ export class BinaryEventTransceiver<Context = void> {
   constructor(private options: BinaryEventTransceiverOptions<Context>) {}
 
   send<Input>(message: EventRouterMessage<Input>) {
+    if (!this.options.send) {
+      throw new Error("No sender defined, send not supported.");
+    }
     this.options.send(this.messageEncoding.encode(message));
   }
 
   handleMessage = async (data: ArrayBufferLike, context: Context) => {
     if (!this.options.receive) {
-      throw new Error("No message receivr defined. Cannot handle messages.");
+      throw new Error("No receiver defined, receive not supported.");
     }
 
     const decodeResult = this.messageEncoding.decode(data);

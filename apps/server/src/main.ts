@@ -20,6 +20,7 @@ import {
   ctxRng,
   ctxTokenResolver,
   ctxUserService,
+  gameServerEventRouter,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -53,7 +54,7 @@ import {
 } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { serverRpcRouter } from "./rpc";
-import { setupRpcTransceivers } from "./etc/setup-rpc-transceivers";
+import { setupRpc } from "./etc/setup-rpc";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
@@ -68,6 +69,7 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 import { ctxGlobalRpcMiddleware } from "./etc/rpc-builder";
 import { ctxAreaFileUrlResolver } from "./etc/system-rpc";
+import { setupEventRouter } from "./etc/setup-event-router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -143,18 +145,26 @@ const wss = new WebSocketServer({
 
 wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
 
+const setupRpcForSocket = setupRpc({
+  logger,
+  router: serverRpcRouter,
+  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
+});
+
+const setupEventRoutingForSocket = setupEventRouter({
+  logger,
+  router: gameServerEventRouter,
+  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
+});
+
 wss.on("connection", (socket) => {
+  socket.binaryType = "arraybuffer";
+  setupEventRoutingForSocket(socket);
+  setupRpcForSocket(socket);
   socket.on("close", () => clients.removeClient(getSocketId(socket)));
   socket.on("error", (err) =>
     logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
   );
-});
-
-setupRpcTransceivers({
-  wss,
-  logger,
-  router: serverRpcRouter,
-  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
 });
 
 SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
