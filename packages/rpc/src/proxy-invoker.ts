@@ -1,10 +1,10 @@
 import type {
-  AnyProcedureNode,
-  AnyRouterNode,
+  AnyRpcProcedureNode,
+  AnyRpcRouterNode,
   AnyRpcNode,
-  InferContext,
-  InferInput,
-  InferOutput,
+  InferRpcContext,
+  InferRpcInput,
+  InferRpcOutput,
 } from "./builder";
 import { createInvocationProxy } from "@mp/invocation-proxy";
 import { createRpcInvoker, type RpcCallId } from "./rpc-invoker";
@@ -19,7 +19,7 @@ export function createRpcProxyInvoker<Node extends AnyRpcNode>(
 
 export function createRpcProxyInvokerForNode<Node extends AnyRpcNode>(
   node: Node,
-  context: InferContext<Node>,
+  context: InferRpcContext<Node>,
 ): RpcProxyInvoker<Node> {
   const invoke = createRpcInvoker(node);
 
@@ -38,13 +38,13 @@ export type RpcCaller<Input = unknown, Output = unknown> = (
 ) => Promise<Output>;
 
 export type RpcProxyInvoker<Node extends AnyRpcNode> =
-  Node extends AnyRouterNode
+  Node extends AnyRpcRouterNode
     ? RpcRouterInvoker<Node>
-    : Node extends AnyProcedureNode
+    : Node extends AnyRpcProcedureNode
       ? RpcProcedureInvoker<Node>
       : never;
 
-export type RpcRouterInvoker<Router extends AnyRouterNode> = {
+export type RpcRouterInvoker<Router extends AnyRpcRouterNode> = {
   [K in keyof Router["routes"]]: RpcProxyInvoker<Router["routes"][K]>;
 };
 
@@ -53,6 +53,6 @@ export interface RpcQueryOptions<Input, Output, MappedOutput> {
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export type RpcProcedureInvoker<Node extends AnyProcedureNode> = (
-  input: InferInput<Node["handler"]>,
-) => Promise<InferOutput<Node["handler"]>>;
+export type RpcProcedureInvoker<Node extends AnyRpcProcedureNode> = (
+  input: InferRpcInput<Node["handler"]>,
+) => Promise<InferRpcOutput<Node["handler"]>>;

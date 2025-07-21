@@ -2,7 +2,7 @@ import type { WebSocket } from "@mp/ws/server";
 import {
   BinaryRpcTransceiver,
   createRpcInvoker,
-  type AnyRouterNode,
+  type AnyRpcRouterNode,
 } from "@mp/rpc";
 import type { WebSocketServer } from "@mp/ws/server";
 import type { Logger } from "@mp/logger";
@@ -18,7 +18,7 @@ export function setupRpcTransceivers<Context>({
 }: {
   wss: WebSocketServer;
   logger: Logger;
-  router: AnyRouterNode<Context>;
+  router: AnyRpcRouterNode<Context>;
   createContext: (socket: WebSocket) => Context;
 }): ReadonlyMap<ClientId, BinaryRpcTransceiver<Context>> {
   const invoke = createRpcInvoker(router);

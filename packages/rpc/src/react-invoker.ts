@@ -2,12 +2,12 @@ import * as tanstack from "@tanstack/react-query";
 import type { UseMutationResult } from "@tanstack/react-query";
 import { skipToken } from "@tanstack/react-query";
 import type {
-  AnyMutationNode,
-  AnyQueryNode,
-  AnyRouterNode,
+  AnyRpcMutationNode,
+  AnyRpcQueryNode,
+  AnyRpcRouterNode,
   AnyRpcNode,
-  InferInput,
-  InferOutput,
+  InferRpcInput,
+  InferRpcOutput,
 } from "./builder";
 import type { AnyFunction } from "@mp/invocation-proxy";
 import { createInvocationProxy } from "@mp/invocation-proxy";
@@ -66,7 +66,7 @@ export function createReactRpcInvoker<Node extends AnyRpcNode>(
 function createUseQuery(
   call: RpcCaller,
   path: string[],
-): UseQuery<AnyQueryNode> {
+): UseQuery<AnyRpcQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): tanstack.UseQueryResult {
@@ -88,13 +88,13 @@ function createUseQuery(
     }
   }
 
-  return useQuery as UseQuery<AnyQueryNode>;
+  return useQuery as UseQuery<AnyRpcQueryNode>;
 }
 
 function createUseSuspenseQuery(
   call: RpcCaller,
   path: string[],
-): UseQuery<AnyQueryNode> {
+): UseQuery<AnyRpcQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
   ): tanstack.UseSuspenseQueryResult {
@@ -116,13 +116,13 @@ function createUseSuspenseQuery(
     }
   }
 
-  return useQuery as UseQuery<AnyQueryNode>;
+  return useQuery as UseQuery<AnyRpcQueryNode>;
 }
 
 function createUseMutation(
   call: RpcCaller,
   path: string[],
-): UseMutation<AnyMutationNode> {
+): UseMutation<AnyRpcMutationNode> {
   return () => {
     return tanstack.useMutation({
       mutationKey: path,
@@ -132,15 +132,15 @@ function createUseMutation(
 }
 
 export type ReactRpcInvoker<Node extends AnyRpcNode> =
-  Node extends AnyRouterNode
+  Node extends AnyRpcRouterNode
     ? ReactRpcRouterInvoker<Node>
-    : Node extends AnyQueryNode
+    : Node extends AnyRpcQueryNode
       ? ReactRpcQueryInvoker<Node>
-      : Node extends AnyMutationNode
+      : Node extends AnyRpcMutationNode
         ? ReactRpcMutationInvoker<Node>
         : never;
 
-export type ReactRpcRouterInvoker<Router extends AnyRouterNode> = {
+export type ReactRpcRouterInvoker<Router extends AnyRpcRouterNode> = {
   [K in keyof Router["routes"]]: ReactRpcInvoker<Router["routes"][K]>;
 };
 
@@ -162,28 +162,28 @@ export interface ReactRpcSuspenseQueryOptions<Input, Output, MappedOutput>
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
-export interface ReactRpcQueryInvoker<Node extends AnyQueryNode>
+export interface ReactRpcQueryInvoker<Node extends AnyRpcQueryNode>
   extends RpcProcedureInvoker<Node> {
   [useQueryProperty]: UseQuery<Node>;
   [useSuspenseQueryProperty]: UseSuspenseQuery<Node>;
 }
 
-export type UseQuery<Node extends AnyQueryNode> = <
-  MappedOutput = InferOutput<Node["handler"]>,
+export type UseQuery<Node extends AnyRpcQueryNode> = <
+  MappedOutput = InferRpcOutput<Node["handler"]>,
 >(
   options?: ReactRpcQueryOptions<
-    InferInput<Node["handler"]>,
-    InferOutput<Node["handler"]>,
+    InferRpcInput<Node["handler"]>,
+    InferRpcOutput<Node["handler"]>,
     MappedOutput
   >,
 ) => tanstack.UseQueryResult<MappedOutput, unknown>;
 
-export type UseSuspenseQuery<Node extends AnyQueryNode> = <
-  MappedOutput = InferOutput<Node["handler"]>,
+export type UseSuspenseQuery<Node extends AnyRpcQueryNode> = <
+  MappedOutput = InferRpcOutput<Node["handler"]>,
 >(
   options?: ReactRpcSuspenseQueryOptions<
-    InferInput<Node["handler"]>,
-    InferOutput<Node["handler"]>,
+    InferRpcInput<Node["handler"]>,
+    InferRpcOutput<Node["handler"]>,
     MappedOutput
   >,
 ) => tanstack.UseSuspenseQueryResult<MappedOutput, unknown>;
@@ -192,12 +192,13 @@ const useSuspenseQueryProperty = "useSuspenseQuery";
 const useQueryProperty = "useQuery";
 const useMutationProperty = "useMutation";
 
-export type UseMutation<Node extends AnyMutationNode> = () => UseMutationResult<
-  InferInput<Node["handler"]>,
-  unknown,
-  InferOutput<Node["handler"]>
->;
-export interface ReactRpcMutationInvoker<Node extends AnyMutationNode>
+export type UseMutation<Node extends AnyRpcMutationNode> =
+  () => UseMutationResult<
+    InferRpcInput<Node["handler"]>,
+    unknown,
+    InferRpcOutput<Node["handler"]>
+  >;
+export interface ReactRpcMutationInvoker<Node extends AnyRpcMutationNode>
   extends RpcProcedureInvoker<Node> {
   [useMutationProperty]: UseMutation<Node>;
 }

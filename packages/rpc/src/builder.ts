@@ -7,7 +7,7 @@ export class RpcBuilder<Context = void> {
   build(): RpcFactories<Context> {
     return {
       router: (routes) => ({ type: "router", routes }),
-      procedure: ProcedureBuilder.create<Context>(),
+      procedure: RpcProcedureBuilder.create<Context>(),
       middleware: createMiddleware,
     };
   }
@@ -20,7 +20,7 @@ function createMiddleware<Context, MwContext, PipedMwContext>(
     return handler(...args);
   }
 
-  const pipe: MiddlewareBuilder<Context, MwContext> = (nextHandler) =>
+  const pipe: RpcMiddlewareBuilder<Context, MwContext> = (nextHandler) =>
     createMiddleware(async (opt) => {
       const mwc = await handler(opt as never);
       return nextHandler({ ...opt, mwc });
@@ -32,16 +32,16 @@ function createMiddleware<Context, MwContext, PipedMwContext>(
 }
 
 export interface RpcFactories<Context> {
-  router: RouterBuilder;
-  procedure: ProcedureBuilder<void, void, Context, unknown>;
-  middleware: MiddlewareBuilder<Context, unknown>;
+  router: RpcRouterBuilder;
+  procedure: RpcProcedureBuilder<void, void, Context, unknown>;
+  middleware: RpcMiddlewareBuilder<Context, unknown>;
 }
 
-export type RouterBuilder = <Routes extends AnyRouteRecord>(
+export type RpcRouterBuilder = <Routes extends AnyRpcRouteRecord>(
   routes: Routes,
-) => RouterNode<Routes>;
+) => RpcRouterNode<Routes>;
 
-export type MiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
+export type RpcMiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
   middlewareFn: RpcMiddlewareHandler<Context, MwContext, PipedMwContext>,
 ) => RpcMiddleware<Context, MwContext, PipedMwContext>;
 
@@ -49,7 +49,7 @@ interface RpcNode<Type extends string> {
   type: Type;
 }
 
-export type ProcedureHandler<Input, Output, Context, MwContext> = (
+export type RpcProcedureHandler<Input, Output, Context, MwContext> = (
   opt: ProcedureHandlerOptions<Input, Context, MwContext>,
 ) => ProcedureResult<Output>;
 
@@ -67,59 +67,74 @@ interface ProcedureHandlerOptions<Input, Context, MwContext> {
   input: Input;
 }
 
-export interface QueryNode<Input, Output, Context, MwContext>
+export interface RpcQueryNode<Input, Output, Context, MwContext>
   extends RpcNode<"query"> {
-  handler: ProcedureHandler<Input, Output, Context, MwContext>;
+  handler: RpcProcedureHandler<Input, Output, Context, MwContext>;
 }
 
-export interface MutationNode<Input, Output, Context, MwContext>
+export interface RpcMutationNode<Input, Output, Context, MwContext>
   extends RpcNode<"mutation"> {
-  handler: ProcedureHandler<Input, Output, Context, MwContext>;
+  handler: RpcProcedureHandler<Input, Output, Context, MwContext>;
 }
 
-export interface RouterNode<Routes extends AnyRouteRecord>
+export interface RpcRouterNode<Routes extends AnyRpcRouteRecord>
   extends RpcNode<"router"> {
   routes: Routes;
 }
 
-export type AnyMutationNode<Context = any> = MutationNode<
+export type AnyRpcMutationNode<Context = any> = RpcMutationNode<
   any,
   any,
   Context,
   any
 >;
-export type AnyQueryNode<Context = any> = QueryNode<any, any, Context, any>;
-export type AnyProcedureNode<Context = any> =
-  | AnyMutationNode<Context>
-  | AnyQueryNode<Context>;
-export type AnyRouterNode<Context = any> = RouterNode<AnyRouteRecord<Context>>;
+export type AnyRpcQueryNode<Context = any> = RpcQueryNode<
+  any,
+  any,
+  Context,
+  any
+>;
+export type AnyRpcProcedureNode<Context = any> =
+  | AnyRpcMutationNode<Context>
+  | AnyRpcQueryNode<Context>;
+export type AnyRpcRouterNode<Context = any> = RpcRouterNode<
+  AnyRpcRouteRecord<Context>
+>;
 export type AnyRpcNode<Context = any> =
-  | AnyProcedureNode<Context>
-  | AnyRouterNode<Context>;
-export type AnyRouteRecord<Context = any> = Record<string, AnyRpcNode<Context>>;
+  | AnyRpcProcedureNode<Context>
+  | AnyRpcRouterNode<Context>;
+export type AnyRpcRouteRecord<Context = any> = Record<
+  string,
+  AnyRpcNode<Context>
+>;
 
-export class ProcedureBuilder<Input, Output, Context, MwContext> {
+export class RpcProcedureBuilder<Input, Output, Context, MwContext> {
   private constructor(
     private middleware: RpcMiddleware<Context, MwContext, unknown>,
   ) {}
 
   use<NewMwContext, PipedMwContext>(
     middleware: RpcMiddleware<Context, NewMwContext, PipedMwContext>,
-  ): ProcedureBuilder<Input, Output, Context, NewMwContext> {
-    return new ProcedureBuilder(
+  ): RpcProcedureBuilder<Input, Output, Context, NewMwContext> {
+    return new RpcProcedureBuilder(
       this.middleware.pipe(middleware as never) as never,
     );
   }
-  input<NewInput>(): ProcedureBuilder<NewInput, Output, Context, MwContext> {
-    return new ProcedureBuilder(this.middleware);
+  input<NewInput>(): RpcProcedureBuilder<NewInput, Output, Context, MwContext> {
+    return new RpcProcedureBuilder(this.middleware);
   }
-  output<NewOutput>(): ProcedureBuilder<Input, NewOutput, Context, MwContext> {
-    return new ProcedureBuilder(this.middleware);
+  output<NewOutput>(): RpcProcedureBuilder<
+    Input,
+    NewOutput,
+    Context,
+    MwContext
+  > {
+    return new RpcProcedureBuilder(this.middleware);
   }
 
   query(
-    handler: ProcedureHandler<Input, Output, Context, MwContext>,
-  ): QueryNode<Input, Output, Context, MwContext> {
+    handler: RpcProcedureHandler<Input, Output, Context, MwContext>,
+  ): RpcQueryNode<Input, Output, Context, MwContext> {
     return {
       type: "query",
       handler: this.pipeMiddlewareIntoHandler(handler),
@@ -127,8 +142,8 @@ export class ProcedureBuilder<Input, Output, Context, MwContext> {
   }
 
   mutation(
-    handler: ProcedureHandler<Input, Output, Context, MwContext>,
-  ): MutationNode<Input, Output, Context, MwContext> {
+    handler: RpcProcedureHandler<Input, Output, Context, MwContext>,
+  ): RpcMutationNode<Input, Output, Context, MwContext> {
     return {
       type: "mutation",
       handler: this.pipeMiddlewareIntoHandler(handler),
@@ -136,16 +151,16 @@ export class ProcedureBuilder<Input, Output, Context, MwContext> {
   }
 
   private pipeMiddlewareIntoHandler(
-    handler: ProcedureHandler<Input, Output, Context, MwContext>,
-  ): ProcedureHandler<Input, Output, Context, MwContext> {
+    handler: RpcProcedureHandler<Input, Output, Context, MwContext>,
+  ): RpcProcedureHandler<Input, Output, Context, MwContext> {
     return async (opt) => {
       const mwc = await this.middleware(opt);
       return handler({ ...opt, mwc });
     };
   }
 
-  static create<Context>(): ProcedureBuilder<void, void, Context, unknown> {
-    return new ProcedureBuilder(
+  static create<Context>(): RpcProcedureBuilder<void, void, Context, unknown> {
+    return new RpcProcedureBuilder(
       createMiddleware<Context, unknown, unknown>(() => {}),
     );
   }
@@ -164,18 +179,18 @@ export type RpcMiddlewareHandler<Context, MwContext, PipedMwContext> = (opt: {
 
 export interface RpcMiddleware<Context, MwContext, PipedMwContext>
   extends RpcMiddlewareHandler<Context, MwContext, PipedMwContext> {
-  pipe: MiddlewareBuilder<Context, MwContext>;
+  pipe: RpcMiddlewareBuilder<Context, MwContext>;
 }
 
-export type InferInput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer I, infer _O, infer _C, infer _MW>
+export type InferRpcInput<T extends AnyRpcProcedureNode["handler"]> =
+  T extends RpcProcedureHandler<infer I, infer _O, infer _C, infer _MW>
     ? I
     : never;
 
-export type InferOutput<T extends AnyProcedureNode["handler"]> =
-  T extends ProcedureHandler<infer _I, infer O, infer _C, infer _MW>
+export type InferRpcOutput<T extends AnyRpcProcedureNode["handler"]> =
+  T extends RpcProcedureHandler<infer _I, infer O, infer _C, infer _MW>
     ? O
     : never;
 
-export type InferContext<T extends AnyRpcNode> =
+export type InferRpcContext<T extends AnyRpcNode> =
   T extends AnyRpcNode<infer C> ? C : never;
