@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { ok, err } from "@mp/std";
-import type { RcpResponse } from "../src/transceiver";
+import type { RpcResponse } from "../src/transceiver";
 import { RpcTransceiver } from "../src/transceiver";
 import type { RpcCall, RpcCallId } from "../src/rpc-invoker";
 import { RpcInvokerError } from "../src/rpc-invoker";
@@ -40,7 +40,7 @@ describe("RpcTransceiver", () => {
       expect(id).toBe(0);
 
       // simulate response
-      const response: RcpResponse<number> = [0 as RpcCallId, { output: 123 }];
+      const response: RpcResponse<number> = [0 as RpcCallId, { output: 123 }];
       transceiver.handleResponse(response);
 
       await expect(promise).resolves.toBe(123);

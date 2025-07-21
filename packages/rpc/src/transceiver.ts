@@ -10,7 +10,7 @@ import type { RpcCaller } from "./proxy-invoker";
 
 export interface RpcTransceiverOptions<Context> {
   sendCall: (rpc: RpcCall<unknown>) => void;
-  sendResponse: (response: RcpResponse<unknown>) => void;
+  sendResponse: (response: RpcResponse<unknown>) => void;
   invoke?: RpcInvoker<Context>;
   formatResponseError?: (error: unknown) => unknown;
   timeout?: number;
@@ -21,7 +21,7 @@ export class RpcTransceiver<Context = void> {
   private idCounter: RpcCallId = 0 as RpcCallId;
   private resolvers = new Map<
     RpcCallId,
-    (response: RcpResponse<unknown>) => void
+    (response: RpcResponse<unknown>) => void
   >();
 
   constructor(private options: RpcTransceiverOptions<Context>) {}
@@ -50,7 +50,7 @@ export class RpcTransceiver<Context = void> {
     }
 
     try {
-      const [, result] = await new Promise<RcpResponse<unknown>>((resolve) =>
+      const [, result] = await new Promise<RpcResponse<unknown>>((resolve) =>
         this.resolvers.set(id, resolve),
       );
 
@@ -99,7 +99,7 @@ export class RpcTransceiver<Context = void> {
     return result;
   };
 
-  handleResponse = (response: RcpResponse<unknown>): HandleResponseResult => {
+  handleResponse = (response: RpcResponse<unknown>): HandleResponseResult => {
     const [callId] = response;
     const resolve = this.resolvers.get(callId);
     if (!resolve) {
@@ -129,7 +129,7 @@ export class RpcRemoteError extends Error {
 // oxlint-disable-next-line no-explicit-any
 export type AnyRpcTransceiver = RpcTransceiver<any>;
 
-export type RcpResponse<Output> = [
+export type RpcResponse<Output> = [
   id: RpcCallId,
   { output: Output } | { error: unknown },
 ];

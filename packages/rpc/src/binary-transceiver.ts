@@ -1,5 +1,5 @@
 import { createEncoding } from "@mp/encoding";
-import type { RcpResponse, RpcTransceiverOptions } from "./transceiver";
+import type { RpcResponse, RpcTransceiverOptions } from "./transceiver";
 import { RpcTransceiver } from "./transceiver";
 import type { RpcCall } from "./rpc-invoker";
 
@@ -13,7 +13,7 @@ export class BinaryRpcTransceiver<
 > extends RpcTransceiver<Context> {
   // Claiming the range 41_000 - 41_999 for the binary Rpc protocol
   private callEncoding = createEncoding<RpcCall<unknown>>(41_000);
-  private responseEncoding = createEncoding<RcpResponse<unknown>>(41_001);
+  private responseEncoding = createEncoding<RpcResponse<unknown>>(41_001);
 
   constructor({ send, ...options }: BinaryRpcTransceiverOptions<Context>) {
     super({
