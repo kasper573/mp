@@ -6,21 +6,21 @@ import { characterRoles } from "../user/roles";
 import { ctxCharacterService } from "./service";
 import type { CharacterId } from "./types";
 import { accessCharacter } from "./access";
-import { rpc } from "../rpc/rpc-definition";
 import type { ActorId } from "../actor/actor";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateServer } from "../game-state/game-state-server";
+import { eventHandlerBuilder } from "../network/event-definition";
 
 export type CharacterRouter = typeof characterRouter;
-export const characterRouter = rpc.router({
-  move: rpc.procedure
+export const characterRouter = eventHandlerBuilder.router({
+  move: eventHandlerBuilder.event
     .input<{
       characterId: CharacterId;
       to: VectorLike<Tile>;
       desiredPortalId?: ObjectId;
     }>()
     .use(roles([characterRoles.move]))
-    .mutation(({ input: { characterId, to, desiredPortalId }, ctx }) => {
+    .handler(({ input: { characterId, to, desiredPortalId }, ctx }) => {
       const char = accessCharacter(ctx, characterId);
 
       if (!char.health) {
@@ -32,10 +32,10 @@ export const characterRouter = rpc.router({
       char.desiredPortalId = desiredPortalId;
     }),
 
-  attack: rpc.procedure
+  attack: eventHandlerBuilder.event
     .input<{ characterId: CharacterId; targetId: ActorId }>()
     .use(roles([characterRoles.attack]))
-    .mutation(({ input: { characterId, targetId }, ctx }) => {
+    .handler(({ input: { characterId, targetId }, ctx }) => {
       const char = accessCharacter(ctx, characterId);
 
       if (targetId === characterId) {
@@ -45,10 +45,10 @@ export const characterRouter = rpc.router({
       char.attackTargetId = targetId;
     }),
 
-  kill: rpc.procedure
+  kill: eventHandlerBuilder.event
     .input<{ targetId: ActorId }>()
     .use(roles([characterRoles.kill]))
-    .mutation(({ input: { targetId }, ctx }) => {
+    .handler(({ input: { targetId }, ctx }) => {
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
       const target = assert(state.actors.get(targetId));
@@ -56,10 +56,10 @@ export const characterRouter = rpc.router({
       server.addEvent("actor.death", target.id);
     }),
 
-  respawn: rpc.procedure
+  respawn: eventHandlerBuilder.event
     .input<CharacterId>()
     .use(roles([characterRoles.respawn]))
-    .mutation(({ input: characterId, ctx }) => {
+    .handler(({ input: characterId, ctx }) => {
       const char = accessCharacter(ctx, characterId);
 
       if (char.health > 0) {
@@ -74,4 +74,4 @@ export const characterRouter = rpc.router({
     }),
 });
 
-export const characterRouterSlice = { character: characterRouter };
+export const characterEventRouterSlice = { character: characterRouter };

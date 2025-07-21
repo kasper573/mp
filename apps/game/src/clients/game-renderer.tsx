@@ -1,10 +1,10 @@
 import { Engine } from "@mp/engine";
 import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useContext, useState } from "preact/hooks";
 import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";
-import { type AreaSceneOptions, AreaScene } from "../area/area-scene";
+import { AreaScene } from "../area/area-scene";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";
@@ -16,16 +16,16 @@ import {
 import { AreaUi } from "../area/area-ui";
 import { GameDebugUi } from "./game-debug-ui";
 import type { Application } from "@mp/graphics";
-import type { AreaResource } from "../area/area-resource";
 import { useSignal, useSignalEffect } from "@mp/state/react";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { useObjectSignal } from "../use-object-signal";
+import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
+import type { AreaId } from "../area/area-id";
 
 interface GameRendererProps {
   interactive: boolean;
   gameState: OptimisticGameState;
   additionalDebugUi?: JSX.Element;
-  areaSceneOptions: Omit<AreaSceneOptions, "debugSettings">;
+  areaIdToLoadAssetsFor: AreaId;
 }
 
 /**
@@ -33,19 +33,20 @@ interface GameRendererProps {
  */
 export function GameRenderer({
   interactive,
-  areaSceneOptions: { area, spritesheets },
   gameState,
+  areaIdToLoadAssetsFor,
   additionalDebugUi,
 }: GameRendererProps) {
+  const useGameAssets = useContext(GameAssetLoaderContext);
+
+  const assets = useGameAssets(areaIdToLoadAssetsFor);
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
-
   const appSignal = useGraphics(container);
   const optionsSignal = useObjectSignal({
     interactive,
     gameState,
-    area,
-    spritesheets,
+    assets,
     showDebugUi,
   });
 
@@ -65,7 +66,7 @@ export function GameRenderer({
         <GameDebugUi>
           {additionalDebugUi}
           <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
-          <GameStateDebugInfo tiled={area.tiled} />
+          <GameStateDebugInfo tiled={assets.area.tiled} />
         </GameDebugUi>
       )}
     </>
@@ -77,8 +78,7 @@ function buildStage(
   opt: {
     interactive: boolean;
     gameState: OptimisticGameState;
-    area: AreaResource;
-    spritesheets: TiledSpritesheetRecord;
+    assets: GameAssets;
     showDebugUi: Signal<boolean>;
   },
 ) {
@@ -94,8 +94,7 @@ function buildStage(
     ),
   ];
   const areaScene = new AreaScene({
-    area: opt.area,
-    spritesheets: opt.spritesheets,
+    area: opt.assets.area,
     debugSettings: () => areaDebugSettingsStorage.value,
   });
   app.stage.addChild(areaScene);

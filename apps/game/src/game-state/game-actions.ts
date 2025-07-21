@@ -2,13 +2,13 @@ import type { Vector } from "@mp/math";
 import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { GameRpcClient } from "../rpc/game-rpc-client";
+import type { GameEventClient } from "../network/game-event-client";
 import type { CharacterId } from "../character/types";
 import type { ActorId } from "../actor/actor";
 
 export class GameActions {
   constructor(
-    private rpc: GameRpcClient,
+    private rpc: GameEventClient,
     private characterId: Signal<CharacterId | undefined>,
   ) {}
 
@@ -31,9 +31,7 @@ export class GameActions {
     return this.rpc.character.respawn(assert(this.characterId.value));
   }
 
-  async join() {
-    const char = await this.rpc.world.join();
-    this.characterId.value = char.id;
-    return char;
+  join() {
+    this.rpc.world.join();
   }
 }

@@ -2,20 +2,21 @@ import { InjectionContext, type ImmutableInjectionContainer } from "@mp/ioc";
 import type { RpcFactories, RpcMiddleware } from "@mp/rpc";
 import { RpcBuilder } from "@mp/rpc";
 
-export const ctxGlobalMiddleware =
-  InjectionContext.new<GameRpcMiddleware>("GlobalMiddleware");
+export const ctxGlobalRpcMiddleware = InjectionContext.new<ApiRpcMiddleware>(
+  "GlobalRpcMiddleware",
+);
 
 export const rpc = buildRpc();
 
-export type GameRpcContext = ImmutableInjectionContainer;
+export type ApiRpcContext = ImmutableInjectionContainer;
 
-export type GameRpcMiddleware = RpcMiddleware<GameRpcContext, unknown, unknown>;
+export type ApiRpcMiddleware = RpcMiddleware<ApiRpcContext, unknown, unknown>;
 
-function buildRpc(): RpcFactories<GameRpcContext> {
-  const rpc = new RpcBuilder().context<GameRpcContext>().build();
+function buildRpc(): RpcFactories<ApiRpcContext> {
+  const rpc = new RpcBuilder().context<ApiRpcContext>().build();
 
   const globalMiddleware = rpc.middleware((opt) => {
-    const middleware = opt.ctx.get(ctxGlobalMiddleware);
+    const middleware = opt.ctx.get(ctxGlobalRpcMiddleware);
     return middleware(opt);
   });
 

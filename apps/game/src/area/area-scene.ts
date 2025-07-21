@@ -24,16 +24,17 @@ import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 import { clientViewDistance } from "../client-view-distance-settings";
+import { InjectionContext } from "@mp/ioc";
 
 export interface AreaSceneOptions {
   area: AreaResource;
-  spritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
 }
 
 export class AreaScene extends Container {
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
+  private areaSpritesheets = ioc.get(ctxAreaSpritesheets);
   private cleanup: () => void;
 
   constructor(private options: AreaSceneOptions) {
@@ -42,7 +43,7 @@ export class AreaScene extends Container {
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
       options.area.dynamicLayer.name,
-      createTiledTextureLookup(options.spritesheets),
+      createTiledTextureLookup(this.areaSpritesheets),
     );
 
     this.cleanup = reactiveCollectionBinding(
@@ -192,3 +193,6 @@ function createZoomLevelForViewDistance(
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
 }
+
+export const ctxAreaSpritesheets =
+  InjectionContext.new<TiledSpritesheetRecord>("AreaSpritesheets");

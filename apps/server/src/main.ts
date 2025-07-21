@@ -14,6 +14,7 @@ import {
   ctxClientId,
   ctxClientRegistry,
   ctxGameStateServer,
+  ctxGlobalEventRouterMiddleware,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
@@ -24,10 +25,8 @@ import {
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, type LocalFile } from "@mp/std";
-import { ctxGlobalMiddleware } from "@mp/game/server";
 import type { GameState } from "@mp/game/server";
 import {
-  ctxAreaFileUrlResolver,
   ctxAreaLookup,
   ClientRegistry,
   movementBehavior,
@@ -48,7 +47,10 @@ import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { createExpressLogger } from "./express/logger";
 import { opt } from "./options";
-import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
+import {
+  rateLimiterEventMiddleware,
+  rateLimiterRpcMiddleware,
+} from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { serverRpcRouter } from "./rpc";
 import { setupRpcTransceivers } from "./etc/rpc-wss";
@@ -64,6 +66,8 @@ import { createUserService } from "./db/services/user-service";
 import { createGameStateService } from "./db/services/game-service";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
+import { ctxGlobalRpcMiddleware } from "./etc/rpc-builder";
+import { ctxAreaFileUrlResolver } from "./etc/system-rpc";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -199,7 +203,8 @@ const characterService = createCharacterService(
 const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
-  .provide(ctxGlobalMiddleware, rateLimiterMiddleware)
+  .provide(ctxGlobalRpcMiddleware, rateLimiterRpcMiddleware)
+  .provide(ctxGlobalEventRouterMiddleware, rateLimiterEventMiddleware)
   .provide(ctxUserService, userService)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)

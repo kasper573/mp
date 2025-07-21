@@ -7,7 +7,7 @@ import type { ActorModelId } from "../traits/appearance";
 import type { AppearanceTrait } from "../traits/appearance";
 import type { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../area/area-id";
-import * as patchOptimizers from "../rpc/patch-optimizers";
+import * as patchOptimizers from "../network/patch-optimizers";
 import type { ActorId } from "../actor/actor";
 import { computed } from "@mp/state";
 

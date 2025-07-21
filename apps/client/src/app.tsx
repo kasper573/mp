@@ -5,7 +5,7 @@ import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   ctxAuthClient,
-  ctxGameRpcClient,
+  ctxGameEventClient,
   ctxLogger,
   ioc,
   registerEncoderExtensions,
@@ -25,6 +25,8 @@ import {
   SocketContext,
 } from "./integrations/rpc";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
+
+import { createGameEventClient } from "./integrations/game-event-client";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -72,6 +74,8 @@ function createSystems() {
     () => auth.identity.value?.token,
   );
 
+  const eventClient = createGameEventClient(socket);
+
   const query = new QueryClient({
     defaultOptions: {
       queries: {
@@ -86,7 +90,7 @@ function createSystems() {
     socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
     const subscriptions = [
       auth.initialize(),
-      ioc.register(ctxGameRpcClient, rpc),
+      ioc.register(ctxGameEventClient, eventClient),
       ioc.register(ctxAuthClient, auth),
       ioc.register(ctxLogger, logger),
       initializeRpc(),

@@ -1,7 +1,5 @@
 import type { CheckboxState } from "@mp/ui";
-import { Button, Checkbox } from "@mp/ui";
-import { ctxGameStateClient, ioc } from "@mp/game/client";
-import { assert } from "@mp/std";
+import { Checkbox } from "@mp/ui";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal, StorageSignal } from "@mp/state";
 import { useRpc } from "../integrations/rpc";
@@ -17,26 +15,10 @@ export function MiscDebugUi() {
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
 
   const serverVersion = rpc.system.buildVersion.useQuery();
-  const gameState = ioc.get(ctxGameStateClient);
-
   return (
     <>
       <div>Client version: {env.buildVersion}</div>
       <div>Server version: {serverVersion.data ?? "unknown"}</div>
-      <div>
-        <Button onClick={() => void rpc.npc.spawnRandomNpc()}>
-          Spawn random NPC
-        </Button>
-        <Button
-          onClick={() =>
-            void rpc.character.kill({
-              targetId: assert(gameState.characterId.value),
-            })
-          }
-        >
-          Die
-        </Button>
-      </div>
       <label>
         Show ping <Checkbox signal={pingEnabledSignal} />{" "}
         {pingEnabledSignal.value ? <PingIndicator /> : null}

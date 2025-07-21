@@ -1,10 +1,13 @@
 import { ctxGameState } from "../game-state/game-state";
-import type { GameRpcContext } from "../rpc/rpc-definition";
+import type { GameEventRouterContext } from "../network/event-definition";
 import { ctxClientId } from "../user/client-id";
 import { ctxClientRegistry } from "../user/client-registry";
 import type { CharacterId } from "./types";
 
-export function accessCharacter(ctx: GameRpcContext, characterId: CharacterId) {
+export function accessCharacter(
+  ctx: GameEventRouterContext,
+  characterId: CharacterId,
+) {
   const state = ctx.get(ctxGameState);
   const char = state.actors.get(characterId);
   const clientId = ctx.get(ctxClientId);

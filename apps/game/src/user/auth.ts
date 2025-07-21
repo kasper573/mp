@@ -1,7 +1,7 @@
 import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserId } from "@mp/auth";
 import type { TokenResolver } from "@mp/auth/server";
-import { rpc } from "../rpc/rpc-definition";
+import { eventHandlerBuilder } from "../network/event-definition";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
 import { ctxUserService } from "./service";
@@ -10,7 +10,7 @@ export const ctxTokenResolver =
   InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
-  return rpc.middleware(({ ctx }): AuthContext => {
+  return eventHandlerBuilder.middleware(({ ctx }): AuthContext => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const userId = clients.userIds.get(clientId);
@@ -38,7 +38,7 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return rpc.middleware(({ ctx }): Partial<AuthContext> => {
+  return eventHandlerBuilder.middleware(({ ctx }): Partial<AuthContext> => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const userId = clients.userIds.get(clientId);

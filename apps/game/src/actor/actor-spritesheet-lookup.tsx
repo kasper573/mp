@@ -4,7 +4,7 @@ import { InjectionContext } from "@mp/ioc";
 import type { ActorModelId, ActorAnimationName } from "../traits/appearance";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
-import type { ActorSpritesheetUrls } from "../area/rpc";
+import type { ActorSpritesheetUrls } from "./actor-spritesheet-urls";
 
 export type ActorSpritesheetLookup = ReadonlyMap<
   ActorModelId,

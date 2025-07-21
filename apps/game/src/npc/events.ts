@@ -1,19 +1,19 @@
 import { ctxGameState } from "../game-state/game-state";
-import { rpc } from "../rpc/rpc-definition";
+
 import { ctxRng } from "../rng";
 import { npcRoles } from "../user/roles";
 import { ctxNpcSpawner } from "./npc-spawner";
 import { roles } from "../user/auth";
+import { eventHandlerBuilder } from "../network/event-definition";
 
-export type NpcRouter = typeof npcRouter;
-export const npcRouter = rpc.router({
-  spawnRandomNpc: rpc.procedure
+export type NpcEventRouter = typeof npcEventRouter;
+export const npcEventRouter = eventHandlerBuilder.router({
+  spawnRandomNpc: eventHandlerBuilder.event
     .use(roles([npcRoles.spawnRandom]))
-    .mutation(({ ctx }) => {
+    .handler(({ ctx }) => {
       const state = ctx.get(ctxGameState);
       const rng = ctx.get(ctxRng);
       const spawner = ctx.get(ctxNpcSpawner);
-
       const selected = rng.oneOfMaybe(spawner.options);
       if (!selected) {
         throw new Error("No npcs or npc spawns available");
@@ -24,4 +24,4 @@ export const npcRouter = rpc.router({
     }),
 });
 
-export const npcRouterSlice = { npc: npcRouter };
+export const npcEventRouterSlice = { npc: npcEventRouter };

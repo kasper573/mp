@@ -1,55 +1,33 @@
 import type { AccessToken } from "@mp/auth";
 import { ctxGameState } from "../game-state/game-state";
-import { rpc } from "../rpc/rpc-definition";
+import { eventHandlerBuilder } from "../network/event-definition";
 import { ctxTokenResolver, roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
-import type { Character } from "../character/types";
+
 import type { CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { worldRoles } from "../user/roles";
-import type { SimpleQueryQueryForItem } from "../pagination";
-import {
-  createPaginator,
-  createSimpleFilter,
-  createSimpleSortFactory,
-  type SearchResult,
-} from "../pagination";
-
-const characterPaginator = createPaginator(
-  createSimpleFilter<Character>(),
-  createSimpleSortFactory(),
-);
 
 export type WorldRouter = typeof worldRouter;
-export const worldRouter = rpc.router({
-  characterList: rpc.procedure
-    .use(roles([worldRoles.spectate]))
-    .input<SimpleQueryQueryForItem<Character> | undefined>()
-    .output<SearchResult<Character>>()
-    .query(({ ctx, input = { filter: {} } }) => {
-      const state = ctx.get(ctxGameState);
-      const characters = state.actors
-        .values()
-        .filter((actor) => actor.type === "character");
-      return characterPaginator(characters.toArray(), input, 50);
+export const worldRouter = eventHandlerBuilder.router({
+  auth: eventHandlerBuilder.event
+    .input<AccessToken>()
+    .handler(async ({ input, ctx }) => {
+      const clientId = ctx.get(ctxClientId);
+      const clients = ctx.get(ctxClientRegistry);
+      const tokenResolver = ctx.get(ctxTokenResolver);
+      const result = await tokenResolver(input);
+      if (result.isErr()) {
+        throw new Error("Invalid token", { cause: result.error });
+      }
+      clients.userIds.set(clientId, result.value.id);
     }),
 
-  auth: rpc.procedure.input<AccessToken>().mutation(async ({ input, ctx }) => {
-    const clientId = ctx.get(ctxClientId);
-    const clients = ctx.get(ctxClientRegistry);
-    const tokenResolver = ctx.get(ctxTokenResolver);
-    const result = await tokenResolver(input);
-    if (result.isErr()) {
-      throw new Error("Invalid token", { cause: result.error });
-    }
-    clients.userIds.set(clientId, result.value.id);
-  }),
-
-  removeAuth: rpc.procedure
+  removeAuth: eventHandlerBuilder.event
     .input<AccessToken>()
-    .mutation(async ({ input, ctx }) => {
+    .handler(async ({ input, ctx }) => {
       const clientId = ctx.get(ctxClientId);
       const clients = ctx.get(ctxClientRegistry);
       const tokenResolver = ctx.get(ctxTokenResolver);
@@ -60,10 +38,10 @@ export const worldRouter = rpc.router({
       clients.userIds.delete(clientId);
     }),
 
-  spectate: rpc.procedure
+  spectate: eventHandlerBuilder.event
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
-    .mutation(({ ctx, input }) => {
+    .handler(({ ctx, input }) => {
       const clients = ctx.get(ctxClientRegistry);
       const clientId = ctx.get(ctxClientId);
       clients.spectatedCharacterIds.set(clientId, input);
@@ -71,10 +49,9 @@ export const worldRouter = rpc.router({
       server.markToResendFullState(clientId);
     }),
 
-  join: rpc.procedure
+  join: eventHandlerBuilder.event
     .use(roles([worldRoles.join]))
-    .output<Pick<Character, "id" | "areaId">>()
-    .mutation(async ({ ctx, mwc }) => {
+    .handler(async ({ ctx, mwc }) => {
       const clientId = ctx.get(ctxClientId);
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
@@ -94,17 +71,20 @@ export const worldRouter = rpc.router({
       const clients = ctx.get(ctxClientRegistry);
       clients.characterIds.set(clientId, char.id);
 
-      const { id, areaId } = char;
-      return { id, areaId };
+      server.addEvent(
+        "world.joined",
+        { areaId: char.areaId, characterId: char.id },
+        { actors: [char.id] },
+      );
     }),
 
-  requestFullState: rpc.procedure.query(({ ctx }) => {
+  requestFullState: eventHandlerBuilder.event.handler(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const server = ctx.get(ctxGameStateServer);
     server.markToResendFullState(clientId);
   }),
 
-  leave: rpc.procedure.input<CharacterId>().mutation(({ ctx }) => {
+  leave: eventHandlerBuilder.event.input<CharacterId>().handler(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
 
@@ -117,4 +97,4 @@ export const worldRouter = rpc.router({
   }),
 });
 
-export const worldRouterSlice = { world: worldRouter };
+export const worldEventRouterSlice = { world: worldRouter };

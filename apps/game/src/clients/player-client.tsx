@@ -1,5 +1,5 @@
 import { useSignalEffect } from "@mp/state/react";
-import { ctxGameRpcClient } from "../rpc/game-rpc-client";
+import { ctxGameEventClient } from "../network/game-event-client";
 import { GameActions } from "../game-state/game-actions";
 import { ioc } from "../context/ioc";
 import { ctxAuthClient } from "../context/common";
@@ -10,7 +10,7 @@ import { GameClient } from "./game-client";
  * A `GameClient` that joins the game as the authenticated user
  */
 export function PlayerClient(props: GameClientProps) {
-  const rpc = ioc.get(ctxGameRpcClient);
+  const rpc = ioc.get(ctxGameEventClient);
   const auth = ioc.get(ctxAuthClient);
 
   useSignalEffect(() => {

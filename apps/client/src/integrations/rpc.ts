@@ -119,7 +119,7 @@ function createAccessTokenSyncBehavior(
 
     if (didTokenChange && token && !currentAuthSendPromise) {
       logger.debug("Sending auth token to rpc server");
-      currentAuthSendPromise = rpc.world.auth(token).then(() => {
+      currentAuthSendPromise = rpc.system.auth(token).then(() => {
         currentAuthSendPromise = undefined;
       });
     }

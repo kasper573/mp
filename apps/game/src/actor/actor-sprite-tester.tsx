@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useState } from "preact/hooks";
 import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
@@ -16,32 +16,16 @@ import {
   type ActorAnimationName,
 } from "../traits/appearance";
 import { ioc } from "../context/ioc";
-import { ctxGameRpcClient } from "../rpc/game-rpc-client";
+
 import { ctxEngine } from "../context/common";
 import { ActorSprite } from "./actor-sprite";
-import {
-  ctxActorSpritesheetLookup,
-  loadActorSpritesheets,
-} from "./actor-spritesheet-lookup";
+import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester() {
-  const rpc = ioc.get(ctxGameRpcClient);
-  const { data: spritesheets } = rpc.area.actorSpritesheetUrls.useSuspenseQuery(
-    {
-      input: void 0,
-      map: loadActorSpritesheets,
-    },
-  );
-
+  const spritesheets = ioc.get(ctxActorSpritesheetLookup);
   const allModelIds = Array.from(spritesheets.keys());
-
   const animationName = useSignal<ActorAnimationName>("walk-normal");
   const modelId = useSignal<ActorModelId>(allModelIds[0]);
-
-  useEffect(
-    () => ioc.register(ctxActorSpritesheetLookup, spritesheets),
-    [spritesheets],
-  );
 
   const settings = useCallback(
     () => ({
