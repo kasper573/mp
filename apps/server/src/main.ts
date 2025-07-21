@@ -53,7 +53,7 @@ import {
 } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 import { serverRpcRouter } from "./rpc";
-import { setupRpcTransceivers } from "./etc/rpc-wss";
+import { setupRpcTransceivers } from "./etc/setup-rpc-transceivers";
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
