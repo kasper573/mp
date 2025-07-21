@@ -27,6 +27,7 @@ import {
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
 
 import { createGameEventClient } from "./integrations/game-event-client";
+import { enhanceWebSocketWithAuthHandshake } from "./integrations/auth-handshake";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -64,15 +65,16 @@ export default function App() {
 
 function createSystems() {
   const logger = createConsoleLogger();
-  const socket = createWebSocket(env.wsUrl);
   const auth = createAuthClient(env.auth);
+  const socket = enhanceWebSocketWithAuthHandshake({
+    logger,
+    socket: createWebSocket(env.wsUrl),
+    getAccessToken: () => auth.identity.value?.token,
+    handshake: (token) => rpc.system.auth(token),
+  });
   const router = createClientRouter();
   const faro = createFaroClient();
-  const [rpc, initializeRpc] = createRpcClient(
-    socket,
-    logger,
-    () => auth.identity.value?.token,
-  );
+  const [rpc, initializeRpc] = createRpcClient(socket, logger);
 
   const eventClient = createGameEventClient(socket);
 
@@ -87,17 +89,21 @@ function createSystems() {
 
   function initialize() {
     void auth.refresh();
-    socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
+    const logSocketError = (e: Event) => logger.error(e, "Socket error");
+    socket.addEventListener("error", logSocketError);
+    socket.addEventListener("close", socket.handleCloseEvent);
     const subscriptions = [
       auth.initialize(),
       ioc.register(ctxGameEventClient, eventClient),
       ioc.register(ctxAuthClient, auth),
       ioc.register(ctxLogger, logger),
-      initializeRpc(),
       createFaroBindings(faro, auth.identity),
+      initializeRpc(),
     ];
 
     return () => {
+      socket.removeEventListener("error", logSocketError);
+      socket.removeEventListener("close", socket.handleCloseEvent);
       socket.close();
       for (const unsubscribe of subscriptions) {
         unsubscribe();
