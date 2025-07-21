@@ -4,7 +4,7 @@ import { useContext, useState } from "preact/hooks";
 import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
 import { useGraphics } from "@mp/graphics/react";
-import { AreaScene } from "../area/area-scene";
+import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";
@@ -20,6 +20,7 @@ import { useSignal, useSignalEffect } from "@mp/state/react";
 import { useObjectSignal } from "../use-object-signal";
 import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
 import type { AreaId } from "../area/area-id";
+import { ctxActorSpritesheetLookup } from "../actor/actor-spritesheet-lookup";
 
 interface GameRendererProps {
   interactive: boolean;
@@ -86,6 +87,8 @@ function buildStage(
   const subscriptions = [
     engine.start(opt.interactive),
     ioc.register(ctxEngine, engine),
+    ioc.register(ctxAreaSpritesheets, opt.assets.areaSpritesheets),
+    ioc.register(ctxActorSpritesheetLookup, opt.assets.actorSpritesheets),
     engine.frameEmitter.subscribe(opt.gameState.frameCallback),
     engine.keyboard.on(
       "keydown",
