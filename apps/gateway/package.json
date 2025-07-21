@@ -1,23 +1,13 @@
 {
-  "name": "@mp/server",
+  "name": "@mp/gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./src/package.ts",
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
-    }
-  },
   "scripts": {
-    "build": "tsc && tsx esbuild.ts",
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
-    "db": "drizzle-kit",
-    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
-    "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/keycloak-provision.ts"
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
@@ -40,7 +30,6 @@
     "dotenv": "catalog:",
     "drizzle-orm": "0.38.3",
     "express": "4.19.2",
-    "pg": "8.13.1",
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {

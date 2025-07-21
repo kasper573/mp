@@ -11,3 +11,4 @@ catalog:
   vite: 6.3.5
   "@preact/preset-vite": 2.10.2
   tsx: 4.19.2
+  dotenv: 17.2.0
