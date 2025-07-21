@@ -3,6 +3,7 @@ import {
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
+  ctxGameState,
   ctxTokenResolver,
   roles,
   systemRoles,
@@ -12,9 +13,20 @@ import { SyncEntity } from "@mp/sync";
 import { opt } from "../options";
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
-import type { SimpleQueryQueryForItem, SearchResult } from "./pagination";
+import {
+  type SimpleQueryQueryForItem,
+  type SearchResult,
+  createPaginator,
+  createSimpleFilter,
+  createSimpleSortFactory,
+} from "./pagination";
 import { rpc } from "./rpc-builder";
 import type { AccessToken } from "@mp/auth";
+
+const characterPaginator = createPaginator(
+  createSimpleFilter<Character>(),
+  createSimpleSortFactory(),
+);
 
 export const systemRouter = rpc.router({
   buildVersion: rpc.procedure.output<string>().query(() => opt.buildVersion),
@@ -48,12 +60,13 @@ export const systemRouter = rpc.router({
     .use(roles([worldRoles.spectate]))
     .input<SimpleQueryQueryForItem<Character> | undefined>()
     .output<SearchResult<Character>>()
-    .query(() => {
+    .query(({ ctx, input = { filter: {} } }) => {
       // TODO query the database for online characters
-      return {
-        items: [],
-        total: 0,
-      };
+      const state = ctx.get(ctxGameState);
+      const characters = state.actors
+        .values()
+        .filter((actor) => actor.type === "character");
+      return characterPaginator(characters.toArray(), input, 50);
     }),
 
   areaFileUrl: rpc.procedure
