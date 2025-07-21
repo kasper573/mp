@@ -480,6 +480,37 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
+  packages/event-router:
+    dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../encoding
+      '@mp/invocation-proxy':
+        specifier: workspace:*
+        version: link:../invocation-proxy
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
+      '@tanstack/react-query':
+        specifier: 5.82.0
+        version: 5.82.0(react@19.1.0)
+      '@tanstack/react-query-devtools':
+        specifier: 5.82.0
+        version: 5.82.0(@tanstack/react-query@5.82.0(react@19.1.0))(react@19.1.0)
+      preact:
+        specifier: 'catalog:'
+        version: 10.26.9
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      vitest:
+        specifier: 'catalog:'
+        version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
+
   packages/graphics:
     dependencies:
       '@mp/math':
@@ -507,6 +538,12 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  packages/invocation-proxy:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -591,6 +628,9 @@ importers:
       '@mp/encoding':
         specifier: workspace:*
         version: link:../encoding
+      '@mp/invocation-proxy':
+        specifier: workspace:*
+        version: link:../invocation-proxy
       '@mp/state':
         specifier: workspace:*
         version: link:../state
@@ -3418,9 +3458,6 @@ packages:
     resolution: {integrity: sha512-DyFP3BM/3YHTQOCUL/w0OZHR0lpKeGrxotcHWcqNEdnltqFwXVfhEBQ94eIo34AfQpo0rGki4cyIiftY06h2Fg==}
     engines: {node: 6.* || 8.* || >= 10.*}
 
-  get-func-name@2.0.2:
-    resolution: {integrity: sha512-8vXOvuE167CtIc3OyItco7N/dpRtBbYOsPsXCz7X/PMnlGjYjSGuZJgM1Y7mmew7BKf9BqvLX2tnOVy1BBUsxQ==}
-
   get-intrinsic@1.3.0:
     resolution: {integrity: sha512-9fSjSaos/fRIVIp+xSJlE6lfwhES7LNtKaCBIamHsjr2na1BiABJPo0mOjjz8GJDURarmCPGqaiVg5mfjb98CQ==}
     engines: {node: '>= 0.4'}
@@ -3702,9 +3739,6 @@ packages:
 
   long@5.2.3:
     resolution: {integrity: sha512-lcHwpNoggQTObv5apGNCTdJrO69eHOZMi4BNC+rTLER8iHAqGrUVeLh/irVIM7zTw2bOXA8T6uNPeujwOLg/2Q==}
-
-  loupe@3.1.1:
-    resolution: {integrity: sha512-edNu/8D5MKVfGVFRhFf8aAxiTM6Wumfz5XsaatSxlD3w4R1d/WEKUTydCdPGbl9K7QG/Ca3GnDV2sIKIpXRQcw==}
 
   loupe@3.1.3:
     resolution: {integrity: sha512-kkIp7XSkP78ZxJEsSxW3712C6teJVoeHHwgo9zJ380de7IYyJ2ISlxojcH2pC5OFLewESmnRi/+XCDIEEVyoug==}
@@ -6841,7 +6875,7 @@ snapshots:
       assertion-error: 2.0.1
       check-error: 2.1.1
       deep-eql: 5.0.2
-      loupe: 3.1.1
+      loupe: 3.1.3
       pathval: 2.0.0
 
   chalk@4.1.2:
@@ -7503,8 +7537,6 @@ snapshots:
 
   get-caller-file@2.0.5: {}
 
-  get-func-name@2.0.2: {}
-
   get-intrinsic@1.3.0:
     dependencies:
       call-bind-apply-helpers: 1.0.2
@@ -7788,10 +7820,6 @@ snapshots:
     optional: true
 
   long@5.2.3: {}
-
-  loupe@3.1.1:
-    dependencies:
-      get-func-name: 2.0.2
 
   loupe@3.1.3: {}
 
@@ -8714,7 +8742,7 @@ snapshots:
   vite-node@3.1.4(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2):
     dependencies:
       cac: 6.7.14
-      debug: 4.4.0
+      debug: 4.4.1
       es-module-lexer: 1.7.0
       pathe: 2.0.3
       vite: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
@@ -8823,7 +8851,7 @@ snapshots:
       '@vitest/spy': 3.1.4
       '@vitest/utils': 3.1.4
       chai: 5.2.0
-      debug: 4.4.0
+      debug: 4.4.1
       expect-type: 1.2.1
       magic-string: 0.30.17
       pathe: 2.0.3

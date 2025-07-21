@@ -6,7 +6,7 @@ import type {
   InferInput,
   InferOutput,
 } from "./builder";
-import { createInvocationProxy } from "./invocation-proxy";
+import { createInvocationProxy } from "@mp/invocation-proxy";
 import { createRpcInvoker, type RpcCallId } from "./rpc-invoker";
 
 export function createRpcProxyInvoker<Node extends AnyRpcNode>(

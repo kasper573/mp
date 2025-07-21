@@ -3,8 +3,8 @@ import type {
   AnyFunction,
   FunctionResolver,
   InvocationProxy,
-} from "../src/invocation-proxy";
-import { createInvocationProxy } from "../src/invocation-proxy";
+} from "../src/index";
+import { createInvocationProxy } from "../src/index";
 
 describe("createInvocationProxy", () => {
   it("returns a callable InvocationProxy", () => {

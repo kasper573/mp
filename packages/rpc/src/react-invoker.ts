@@ -9,8 +9,8 @@ import type {
   InferInput,
   InferOutput,
 } from "./builder";
-import type { AnyFunction } from "./invocation-proxy";
-import { createInvocationProxy } from "./invocation-proxy";
+import type { AnyFunction } from "@mp/invocation-proxy";
+import { createInvocationProxy } from "@mp/invocation-proxy";
 import type { RpcCaller, RpcProcedureInvoker } from "./proxy-invoker";
 import { useSignal } from "@mp/state/react";
 import type { ReadonlySignal } from "@mp/state";
