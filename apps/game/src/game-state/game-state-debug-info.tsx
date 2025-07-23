@@ -32,7 +32,7 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
     frameInterval: frameInterval?.totalMilliseconds.toFixed(2),
     frameDuration: frameDuration?.totalMilliseconds.toFixed(2),
     frameCallbacks: engine.frameEmitter.callbackCount,
-    character: client.character.value,
+    character: client.character.value?.snapshot(),
   };
 
   return (
