@@ -122,6 +122,9 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
+      superjson:
+        specifier: 2.2.2
+        version: 2.2.2
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -156,9 +159,6 @@ importers:
       '@mp/query':
         specifier: workspace:*
         version: link:../../packages/query
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -287,9 +287,6 @@ importers:
       '@mp/query':
         specifier: workspace:*
         version: link:../../packages/query
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -339,9 +336,6 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
@@ -376,18 +370,21 @@ importers:
 
   apps/loadtest:
     dependencies:
+      '@mp/api':
+        specifier: workspace:*
+        version: link:../api
       '@mp/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@mp/event-router':
+        specifier: workspace:*
+        version: link:../../packages/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/server':
         specifier: workspace:*
         version: link:../server
@@ -721,34 +718,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-
-  packages/rpc:
-    dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../encoding
-      '@mp/invocation-proxy':
-        specifier: workspace:*
-        version: link:../invocation-proxy
-      '@mp/query':
-        specifier: workspace:*
-        version: link:../query
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      preact:
-        specifier: 'catalog:'
-        version: 10.26.9
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      vitest:
-        specifier: 'catalog:'
-        version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
   packages/state:
     dependencies:
@@ -3051,6 +3020,10 @@ packages:
     resolution: {integrity: sha512-yki5XnKuf750l50uGTllt6kKILY4nQ1eNIQatoXEByZ5dWgnKqbnqmTrBE5B4N7lrMJKQ2ytWMiTO2o0v6Ew/w==}
     engines: {node: '>= 0.6'}
 
+  copy-anything@3.0.5:
+    resolution: {integrity: sha512-yCEafptTtb4bk7GLEQoM8KVJpxAfdBJYaXyzQEgQQQgYrZiDp8SJmGKlYza6CYjEDNstAdNdKA3UuoULlEbS6w==}
+    engines: {node: '>=12.13'}
+
   cors@2.8.5:
     resolution: {integrity: sha512-KIHbLJqu73RGr/hnbrO9uBeixNGuvSQjul/jdFvS/KFSIH1hWVd1ng7zOHx+YrEfInLG7q4n6GHQ9cDtxv/P6g==}
     engines: {node: '>= 0.10'}
@@ -4573,6 +4546,10 @@ packages:
   strip-json-comments@5.0.2:
     resolution: {integrity: sha512-4X2FR3UwhNUE9G49aIsJW5hRRR3GXGTBTZRMfv568O60ojM8HcWjV/VxAxCDW3SUND33O6ZY66ZuRcdkj73q2g==}
     engines: {node: '>=14.16'}
+
+  superjson@2.2.2:
+    resolution: {integrity: sha512-5JRxVqC8I8NuOUjzBbvVJAKNM8qoVuH0O77h4WInc/qC2q5IreqKxYwgkga3PfA22OayK2ikceb/B26dztPl+Q==}
+    engines: {node: '>=16'}
 
   supports-color@7.2.0:
     resolution: {integrity: sha512-qpCAvRl9stuOHveKsn7HncJRvv501qIacKzQlO/+Lwxc9+0q2wLyv4Dfvt80/DPn2pqOBsJdDiogXGR9+OvwRw==}
@@ -7024,6 +7001,10 @@ snapshots:
 
   cookie@0.7.2: {}
 
+  copy-anything@3.0.5:
+    dependencies:
+      is-what: 4.1.16
+
   cors@2.8.5:
     dependencies:
       object-assign: 4.1.1
@@ -7771,8 +7752,7 @@ snapshots:
 
   is-stream@2.0.1: {}
 
-  is-what@4.1.16:
-    optional: true
+  is-what@4.1.16: {}
 
   isbot@5.1.28: {}
 
@@ -8665,6 +8645,10 @@ snapshots:
   strip-json-comments@3.1.1: {}
 
   strip-json-comments@5.0.2: {}
+
+  superjson@2.2.2:
+    dependencies:
+      copy-anything: 3.0.5
 
   supports-color@7.2.0:
     dependencies:

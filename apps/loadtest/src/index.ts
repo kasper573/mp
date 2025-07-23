@@ -1,64 +1,43 @@
 // oxlint-disable no-await-in-loop
 import { createConsoleLogger } from "@mp/logger";
-import type { ApiRpcRouter } from "@mp/api";
-import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
+import { createApiClient } from "@mp/api/sdk";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
+import type { GameEventClient } from "@mp/game/client";
 import {
   GameStateClient,
   loadAreaResource,
   registerEncoderExtensions,
 } from "@mp/game/client";
-import { createReactRpcInvoker } from "@mp/rpc/react";
 import { readCliOptions } from "./cli";
+import type { GameStateEvents } from "@mp/game/server";
+import {
+  BinaryEventTransceiver,
+  createEventRouterProxyInvoker,
+} from "@mp/event-router";
 
 registerEncoderExtensions();
 
 const logger = createConsoleLogger();
 
-const { wsUrl, httpServerUrl, httpRequests, gameClients, timeout, verbose } =
+const { apiUrl, gameServerUrl, gameClients, timeout, verbose } =
   readCliOptions();
 
 const start = performance.now();
 
-const [httpSuccess, gameClientSuccess] = await Promise.all([
-  testAllHttpRequests(),
-  testAllGameClients(),
-]);
+const success = await testAllGameClients();
 
 const end = performance.now();
 
 logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-if (!httpSuccess || !gameClientSuccess) {
-  logger.error("HTTP request test failed");
+if (!success) {
   process.exit(1);
 }
 
-async function testAllHttpRequests() {
-  logger.info("Testing", httpRequests, "HTTP requests");
-  const results = await Promise.allSettled(
-    range(httpRequests).map(async () => {
-      const res = await fetch(httpServerUrl);
-      if (!res.ok) {
-        throw new Error(`Error: ${res.status} ${res.statusText}`);
-      }
-    }),
-  );
-
-  const successes = results.filter((r) => r.status === "fulfilled");
-  const failures = results.filter((r) => r.status === "rejected");
-
-  logger.info(
-    `HTTP request test finished: ${successes.length} successes, ${failures.length} failures`,
-  );
-
-  return failures.length === 0;
-}
-
 async function testAllGameClients() {
-  logger.info("Testing", gameClients, "sockets with Rpc");
+  logger.info("Testing", gameClients, "game clients...");
 
   // Seeded rng to get consistent behavior over time across runs in the ci pipeline
   const rng = new Rng(1337);
@@ -71,7 +50,7 @@ async function testAllGameClients() {
   const failures = results.filter((r) => r.status === "rejected");
 
   logger.info(
-    `Socket test finished: ${successes.length} successes, ${failures.length} failures`,
+    `Game client test finished: ${successes.length} successes, ${failures.length} failures`,
   );
 
   return failures.length === 0;
@@ -82,19 +61,23 @@ async function testOneGameClient(n: number, rng: Rng) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const socket = createWebSocket(wsUrl);
-  const transceiver = new BinaryRpcTransceiver<void>({
-    send: socket.send.bind(socket),
+  const socket = createWebSocket(gameServerUrl);
+  const eventTransceiver = new BinaryEventTransceiver({
+    send: (data) => socket.send(data),
   });
-  const rpc = createReactRpcInvoker<ApiRpcRouter>(transceiver.call);
-  const handleMessage = transceiver.messageEventHandler(logger.error);
+
+  const eventClient: GameEventClient = createEventRouterProxyInvoker(
+    (path, input) => eventTransceiver.send([path, input]),
+  );
+
+  const handleMessage = eventTransceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 
   let stopClient = () => {};
   try {
-    const client = new GameStateClient({
+    const gameClient = new GameStateClient({
       socket,
-      rpc,
+      eventClient,
       logger,
       settings: () => ({
         useInterpolator: false,
@@ -102,24 +85,42 @@ async function testOneGameClient(n: number, rng: Rng) {
       }),
     });
 
-    stopClient = client.start();
+    const api = createApiClient(apiUrl, () =>
+      createBypassUser(`Test User ${n}`),
+    );
+
+    stopClient = gameClient.start();
 
     await waitForOpen(socket);
     if (verbose) {
       logger.info(`Socket ${n} connected`);
     }
 
-    await rpc.world.auth(createBypassUser(`Test User ${n}`));
+    await eventClient.world.auth(createBypassUser(`Test User ${n}`));
     if (verbose) {
       logger.info(`Socket ${n} authenticated`);
     }
 
-    const { areaId, id: characterId } = await client.actions.join();
+    const joinPromise = new Promise<GameStateEvents["world.joined"]>(
+      (resolve) => {
+        const unsub = gameClient.eventBus.subscribe(
+          "world.joined",
+          (payload) => {
+            unsub();
+            resolve(payload);
+          },
+        );
+      },
+    );
+
+    gameClient.actions.join();
+
+    const { areaId, characterId } = await joinPromise;
     if (verbose) {
       logger.info({ characterId }, `Socket ${n} joined`);
     }
 
-    const url = await rpc.area.areaFileUrl(areaId);
+    const url = await api.areaFileUrl.query(areaId);
     const area = await loadAreaResource(url, areaId);
     const tiles = Array.from(area.graph.nodeIds)
       .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
@@ -127,12 +128,15 @@ async function testOneGameClient(n: number, rng: Rng) {
 
     const endTime = Date.now() + timeout.totalMilliseconds;
     while (Date.now() < endTime) {
-      if (client.character.value && !client.character.value.health) {
-        await client.actions.respawn();
+      if (
+        gameClient.character.value &&
+        !gameClient.character.value.combat.health
+      ) {
+        await gameClient.actions.respawn();
       }
       try {
         const to = rng.oneOf(tiles);
-        await rpc.character.move({ characterId, to });
+        await gameClient.actions.move(to);
         logger.info(`Moving character for socket ${n} to ${to}`);
         await wait(1000 + rng.next() * 6000);
       } catch (error) {

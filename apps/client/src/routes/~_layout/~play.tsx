@@ -7,7 +7,7 @@ import {
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
-import { SocketContext } from "../../integrations/rpc";
+import { SocketContext } from "../../integrations/socket";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 import { miscDebugSettings } from "../../signals/misc-debug-ui-settings";

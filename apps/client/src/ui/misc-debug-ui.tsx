@@ -2,19 +2,20 @@ import type { CheckboxState } from "@mp/ui";
 import { Checkbox } from "@mp/ui";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal, StorageSignal } from "@mp/state";
-import { useRpc } from "../integrations/rpc";
+
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { useEffect } from "preact/hooks";
-import { useQuery } from "@mp/query";
+import { useMutation, useQuery } from "@mp/query";
+import { useApi, useApiClient } from "@mp/api/sdk";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
 export function MiscDebugUi() {
-  const rpc = useRpc();
+  const api = useApi();
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
 
-  const serverVersion = rpc.buildVersion.useQuery();
+  const serverVersion = useQuery(api.buildVersion.queryOptions());
   return (
     <>
       <div>Client version: {env.version}</div>
@@ -47,12 +48,12 @@ export function MiscDebugUi() {
 }
 
 function PingIndicator() {
-  const rpc = useRpc();
+  const api = useApiClient();
   const ping = useQuery({
     queryKey: ["ping"],
     async queryFn() {
       const start = performance.now();
-      await rpc.ping();
+      await api.ping.query();
       return performance.now() - start;
     },
     refetchInterval: 1000,
@@ -63,13 +64,16 @@ function PingIndicator() {
 }
 
 function useServerPatchOptimizerSignal() {
-  const rpc = useRpc();
+  const api = useApi();
   const enabled = useSignal<CheckboxState>("indeterminate");
-  const isRemoteEnabled = rpc.isPatchOptimizerEnabled.useQuery();
+  const isRemoteEnabled = useQuery(api.isPatchOptimizerEnabled.queryOptions());
+  const setRemoteEnabled = useMutation(
+    api.setPatchOptimizerEnabled.mutationOptions(),
+  );
 
   useSignalEffect(() => {
     if (enabled.value !== "indeterminate") {
-      void rpc.setPatchOptimizerEnabled(enabled.value);
+      setRemoteEnabled.mutate(enabled.value);
     }
   });
 

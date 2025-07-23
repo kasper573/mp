@@ -6,11 +6,11 @@ import type {
   AreaResource,
 } from "@mp/game/client";
 import { loadActorSpritesheets } from "@mp/game/client";
-import { useContext } from "preact/hooks";
-import { RpcClientContext } from "./rpc";
+
 import { useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
+import { useApi } from "@mp/api/sdk";
 
 export const useGameAssets: GameAssetLoader = (areaId) => {
   const area = useAreaResource(areaId);
@@ -22,21 +22,27 @@ export const useGameAssets: GameAssetLoader = (areaId) => {
 };
 
 export function useActorSpritesheets(): ActorSpritesheetLookup {
-  const rpc = useContext(RpcClientContext);
-  const query = rpc.actorSpritesheetUrls.useSuspenseQuery({
-    input: void 0,
-    map: loadActorSpritesheets,
+  const api = useApi();
+  const { data: urls } = useSuspenseQuery(
+    api.actorSpritesheetUrls.queryOptions(void 0),
+  );
+
+  const query = useSuspenseQuery({
+    queryKey: ["actorSpritesheets", urls],
+    staleTime: Infinity,
+    queryFn: () => loadActorSpritesheets(urls),
   });
 
   return query.data;
 }
 
 export function useAreaResource(areaId: AreaId): AreaResource {
-  const rpc = useContext(RpcClientContext);
-  const query = rpc.areaFileUrl.useSuspenseQuery({
-    input: areaId,
+  const api = useApi();
+  const { data: url } = useSuspenseQuery(api.areaFileUrl.queryOptions(areaId));
+  const query = useSuspenseQuery({
+    queryKey: ["areaResource", url, areaId],
     staleTime: Infinity,
-    map: loadAreaResource,
+    queryFn: () => loadAreaResource(url, areaId),
   });
   return query.data;
 }

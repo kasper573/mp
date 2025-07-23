@@ -32,7 +32,8 @@
     "@mp/logger": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "dotenv": "catalog:"
+    "dotenv": "catalog:",
+    "superjson": "2.2.2"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

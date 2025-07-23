@@ -3,6 +3,8 @@
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import type { ApiRpcRouter } from "./router";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
+import type { AccessToken } from "@mp/auth";
+import { transformer } from "./transformer";
 
 export const {
   TRPCProvider: ApiProvider,
@@ -10,11 +12,21 @@ export const {
   useTRPCClient: useApiClient,
 } = createTRPCContext<ApiRpcRouter>();
 
-export function createApiClint() {
+export function createApiClient(
+  url: string,
+  getAccessToken?: () => AccessToken | undefined,
+) {
   return createTRPCClient<ApiRpcRouter>({
     links: [
       httpBatchLink({
-        url: "http://localhost:2022",
+        transformer,
+        url,
+        headers() {
+          const token = getAccessToken?.();
+          return {
+            Authorization: token ? `Bearer ${token}` : undefined,
+          };
+        },
       }),
     ],
   });

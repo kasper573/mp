@@ -17,7 +17,6 @@
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/query": "workspace:*",
-    "@mp/rpc": "workspace:*",
     "@mp/api": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",

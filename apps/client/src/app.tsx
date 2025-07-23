@@ -14,20 +14,17 @@ import {
   QueryClient,
   QueryClientProvider,
   ReactQueryDevtools,
-} from "@mp/rpc/react";
+} from "@mp/query";
 import { createWebSocket } from "@mp/ws/client";
 import { useEffect, useMemo } from "preact/hooks";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
-import {
-  createRpcClient,
-  RpcClientContext,
-  SocketContext,
-} from "./integrations/rpc";
+import { SocketContext } from "./integrations/socket";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
 
 import { createGameEventClient } from "./integrations/game-event-client";
 import { enhanceWebSocketWithAuthHandshake } from "./integrations/auth-handshake";
+import { ApiProvider, createApiClient } from "@mp/api/sdk";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -48,7 +45,7 @@ export default function App() {
         }}
       >
         <SocketContext.Provider value={systems.socket}>
-          <RpcClientContext.Provider value={systems.rpc}>
+          <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
             <RouterProvider router={systems.router} />
             {showDevTools && (
               <>
@@ -56,7 +53,7 @@ export default function App() {
                 <ReactQueryDevtools client={systems.query} />
               </>
             )}
-          </RpcClientContext.Provider>
+          </ApiProvider>
         </SocketContext.Provider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
@@ -66,22 +63,26 @@ export default function App() {
 function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
+  const socketWithoutHandshake = createWebSocket(env.gameServerUrl);
+  const eventClientWithoutHandshake = createGameEventClient(
+    socketWithoutHandshake,
+  );
   const socket = enhanceWebSocketWithAuthHandshake({
     logger,
-    socket: createWebSocket(env.wsUrl),
+    socket: socketWithoutHandshake,
     getAccessToken: () => auth.identity.value?.token,
-    handshake: (token) => rpc.auth(token),
+    handshake: (token) => eventClientWithoutHandshake.world.auth(token),
   });
   const router = createClientRouter();
   const faro = createFaroClient();
-  const [rpc, initializeRpc] = createRpcClient(socket, logger);
+  const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const eventClient = createGameEventClient(socket);
 
   const query = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: env.retryRpcQueries,
+        retry: env.retryApiQueries,
         refetchOnWindowFocus: false,
       },
     },
@@ -98,7 +99,6 @@ function createSystems() {
       ioc.register(ctxAuthClient, auth),
       ioc.register(ctxLogger, logger),
       createFaroBindings(faro, auth.identity),
-      initializeRpc(),
     ];
 
     return () => {
@@ -113,7 +113,7 @@ function createSystems() {
 
   return {
     auth,
-    rpc,
+    api,
     socket,
     logger,
     router,

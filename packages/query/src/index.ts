@@ -4,6 +4,8 @@ import type { ReadonlySignal } from "@mp/state";
 import { useEffect, useMemo } from "preact/hooks";
 
 export {
+  QueryClient,
+  QueryClientProvider,
   useQuery,
   useSuspenseQuery,
   useMutation,

@@ -19,20 +19,15 @@ export function readCliOptions(argv = process.argv) {
       type: "boolean",
       default: false,
     })
-    .option("wsUrl", {
+    .option("gameServerUrl", {
       type: "string",
-      default: process.env.MP_CLIENT_WS_URL,
+      default: process.env.MP_CLIENT_GAME_SERVER_URL,
       demandOption: true,
     })
-    .option("httpServerUrl", {
+    .option("apiUrl", {
       type: "string",
-      default: `https://${process.env.MP_CLIENT_DOMAIN}`,
+      default: process.env.MP_CLIENT_API_URL,
       demandOption: true,
-    })
-    .option("httpRequests", {
-      alias: "http",
-      type: "number",
-      default: 1,
     })
     .option("gameClients", {
       alias: "gc",
