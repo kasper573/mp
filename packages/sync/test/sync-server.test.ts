@@ -2,7 +2,8 @@ import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncServer } from "../src/sync-server";
 import { SyncMap } from "../src/sync-map";
-import { collect, SyncEntity } from "../src/sync-entity";
+import { SyncEntity } from "../src/sync-entity";
+import { createSyncComponent } from "../src/sync-component";
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestState = {
@@ -72,22 +73,18 @@ it("returns no patches or events when flushed twice with no changes", () => {
 
 it("can collect patches", () => {
   class Person extends SyncEntity {
-    @collect()
-    accessor id: string = "";
-
-    @collect()
-    accessor cash: number = 0;
+    data = createSyncComponent({ id: "", cash: 0 });
 
     constructor(id: string, cash: number) {
       super();
-      this.id = id;
-      this.cash = cash;
+      this.data.id = id;
+      this.data.cash = cash;
     }
   }
 
   // oxlint-disable-next-line consistent-type-definitions
   type TestState = {
-    persons: SyncMap<Person["id"], Person>;
+    persons: SyncMap<Person["data"]["id"], Person>;
   };
 
   const server = new SyncServer<TestState, {}>({
@@ -101,8 +98,8 @@ it("can collect patches", () => {
   const jane = new Person("jane", 50);
   const serverState = {
     persons: new SyncMap([
-      [john.id, john],
-      [jane.id, jane],
+      [john.data.id, john],
+      [jane.data.id, jane],
     ]),
   };
 
@@ -113,15 +110,15 @@ it("can collect patches", () => {
   applyPatch(clientState, flush1.clientPatches.get("client") ?? []);
 
   // Mutating server state should trigger patch observers
-  john.cash += 25;
-  jane.cash -= 25;
+  john.data.cash += 25;
+  jane.data.cash -= 25;
 
   // Flush changes
   const flush2 = server.flush(serverState);
   applyPatch(clientState, flush2.clientPatches.get("client") ?? []);
 
-  expect(clientState.persons.get("john")?.cash).toBe(25);
-  expect(clientState.persons.get("jane")?.cash).toBe(25);
+  expect(clientState.persons.get("john")?.data.cash).toBe(25);
+  expect(clientState.persons.get("jane")?.data.cash).toBe(25);
 });
 
 it("delivers events according to visibility", () => {

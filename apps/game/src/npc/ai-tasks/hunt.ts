@@ -10,37 +10,44 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
       context;
 
     const deadActorsThisTick = gameStateServer.peekEvent("actor.death");
-    npcCombatMemories.get(npc.id)?.forgetCombatatants(deadActorsThisTick);
+    npcCombatMemories
+      .get(npc.identity.id)
+      ?.forgetCombatatants(deadActorsThisTick);
 
-    if (npc.attackTargetId) {
-      const target = assert(gameState.actors.get(npc.attackTargetId));
-      if (!npc.coords.isWithinDistance(target.coords, npc.aggroRange)) {
+    if (npc.combat.attackTargetId) {
+      const target = assert(gameState.actors.get(npc.combat.attackTargetId));
+      if (
+        !npc.movement.coords.isWithinDistance(
+          target.movement.coords,
+          npc.etc.aggroRange,
+        )
+      ) {
         // Target out of range, lose aggro
-        npc.attackTargetId = undefined;
-        npc.moveTarget = undefined;
-        npc.path = undefined;
+        npc.combat.attackTargetId = undefined;
+        npc.movement.moveTarget = undefined;
+        npc.movement.path = undefined;
         // TODO this is temporary until we have a buff/ability system
-        npc.speed = 1 as Tile;
+        npc.movement.speed = 1 as Tile;
       }
       return hunt;
     }
 
     const newEnemyId = findNewEnemy(context, npc);
     if (newEnemyId !== undefined) {
-      npc.attackTargetId = newEnemyId;
+      npc.combat.attackTargetId = newEnemyId;
       // TODO this is temporary until we have a buff/ability system
       // The idea is that a hunter should cast a speed buff when detecting a new enemy
-      npc.speed = 2 as Tile;
+      npc.movement.speed = 2 as Tile;
       return hunt;
     }
 
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
-    if (!npc.path) {
-      const area = assert(areas.get(npc.areaId));
+    if (!npc.movement.path) {
+      const area = assert(areas.get(npc.movement.areaId));
       const toNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
-      npc.moveTarget = toNode.data.vector;
+      npc.movement.moveTarget = toNode.data.vector;
       // TODO this is temporary until we have a buff/ability system
-      npc.speed = 1 as Tile;
+      npc.movement.speed = 1 as Tile;
     }
 
     return hunt;
@@ -56,17 +63,23 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
   { gameState, npcCombatMemories },
   npc,
 ) {
-  const combatMemory = npcCombatMemories.get(npc.id);
+  const combatMemory = npcCombatMemories.get(npc.identity.id);
   const target = gameState.actors.index
-    .access({ areaId: npc.areaId, alive: true, type: "character" })
+    .access({ areaId: npc.movement.areaId, alive: true, type: "character" })
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
       return (
-        candidate.coords.isWithinDistance(npc.coords, npc.aggroRange) &&
-        combatMemory?.hasAttackedEachOther(candidate.id, npc.id)
+        candidate.movement.coords.isWithinDistance(
+          npc.movement.coords,
+          npc.etc.aggroRange,
+        ) &&
+        combatMemory?.hasAttackedEachOther(
+          candidate.identity.id,
+          npc.identity.id,
+        )
       );
     });
-  return target?.id;
+  return target?.identity.id;
 };
 
 export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
@@ -74,23 +87,26 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
   npc,
 ) {
   const target = gameState.actors.index
-    .access({ areaId: npc.areaId, alive: true, type: "character" })
+    .access({ areaId: npc.movement.areaId, alive: true, type: "character" })
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
-      return candidate.coords.isWithinDistance(npc.coords, npc.aggroRange);
+      return candidate.movement.coords.isWithinDistance(
+        npc.movement.coords,
+        npc.etc.aggroRange,
+      );
     });
-  return target?.id;
+  return target?.identity.id;
 };
 
 export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
   { gameState, npcCombatMemories },
   npc,
 ) {
-  const combatMemory = npcCombatMemories.get(npc.id);
+  const combatMemory = npcCombatMemories.get(npc.identity.id);
 
   const allies = gameState.actors.index.access({
-    areaId: npc.areaId,
-    spawnId: npc.spawnId,
+    areaId: npc.movement.areaId,
+    spawnId: npc.identity.spawnId,
   });
 
   // Actors attacking allies are considered enemies
@@ -107,13 +123,20 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 
   const targetId = enemyIds?.values().find((enemyId) => {
     const candidate = assert(gameState.actors.get(enemyId));
-    if (!candidate.coords.isWithinDistance(npc.coords, npc.aggroRange)) {
+    if (
+      !candidate.movement.coords.isWithinDistance(
+        npc.movement.coords,
+        npc.etc.aggroRange,
+      )
+    ) {
       return false;
     }
 
     return (
-      combatMemory?.hasAttackedEachOther(candidate.id, npc.id) ||
-      enemyIds.has(candidate.id)
+      combatMemory?.hasAttackedEachOther(
+        candidate.identity.id,
+        npc.identity.id,
+      ) || enemyIds.has(candidate.identity.id)
     );
   });
 

@@ -82,10 +82,33 @@ export function createCharacterService(
       }
 
       const model = assert(models.get(databaseFields.modelId));
+
       return new Character({
-        ...databaseFields,
-        hitBox: model.hitBox,
-        dir: rng.oneOf(cardinalDirections),
+        appearance: {
+          modelId: databaseFields.modelId,
+          name: databaseFields.name,
+        },
+        identity: {
+          id: databaseFields.id,
+          userId: databaseFields.userId,
+        },
+        progression: {
+          xp: databaseFields.xp,
+        },
+        combat: {
+          attackDamage: databaseFields.attackDamage,
+          attackRange: databaseFields.attackRange,
+          attackSpeed: databaseFields.attackSpeed,
+          health: databaseFields.health,
+          maxHealth: databaseFields.maxHealth,
+          hitBox: model.hitBox,
+        },
+        movement: {
+          areaId: databaseFields.areaId,
+          coords: databaseFields.coords,
+          speed: databaseFields.speed,
+          dir: rng.oneOf(cardinalDirections),
+        },
       });
     },
   };

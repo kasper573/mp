@@ -20,7 +20,7 @@ export const npcEventRouter = eventHandlerBuilder.router({
       }
 
       const instance = spawner.createInstance(selected.npc, selected.spawn);
-      state.actors.set(instance.id, instance);
+      state.actors.set(instance.identity.id, instance);
     }),
 });
 

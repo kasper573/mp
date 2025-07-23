@@ -34,20 +34,20 @@ export const worldRouter = eventHandlerBuilder.router({
       let char = state.actors
         .values()
         .filter((actor) => actor.type === "character")
-        .find((actor) => actor.userId === mwc.userId);
+        .find((actor) => actor.identity.userId === mwc.userId);
 
       if (!char) {
         char = await characterService.getOrCreateCharacterForUser(mwc.userId);
-        state.actors.set(char.id, char);
+        state.actors.set(char.identity.id, char);
       }
 
       const clients = ctx.get(ctxClientRegistry);
-      clients.characterIds.set(clientId, char.id);
+      clients.characterIds.set(clientId, char.identity.id);
 
       server.addEvent(
         "world.joined",
-        { areaId: char.areaId, characterId: char.id },
-        { actors: [char.id] },
+        { areaId: char.movement.areaId, characterId: char.identity.id },
+        { actors: [char.identity.id] },
       );
     }),
 

@@ -6,6 +6,7 @@ import type { AreaLookup } from "../area/lookup";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { ActorId, Actor } from "../actor/actor";
 import { findPathForSubject } from "./movement";
+import { createSyncComponent } from "@mp/sync";
 
 export interface CombatTrait {
   /**
@@ -19,6 +20,10 @@ export interface CombatTrait {
   attackRange: Tile;
   attackTargetId?: ActorId;
   lastAttack?: TimeSpan;
+}
+
+export function createCombatTrait(values: CombatTrait) {
+  return createSyncComponent(values);
 }
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
@@ -35,8 +40,12 @@ export function combatBehavior(
       nextHpRegenTime = totalTimeElapsed.add(hpRegenInterval);
       for (const actor of state.actors
         .values()
-        .filter((a) => a.type === "character" && a.health > 0)) {
-        actor.health = clamp(actor.health + 5, 0, actor.maxHealth);
+        .filter((a) => a.type === "character" && a.combat.health > 0)) {
+        actor.combat.health = clamp(
+          actor.combat.health + 5,
+          0,
+          actor.combat.maxHealth,
+        );
       }
     }
 
@@ -44,59 +53,68 @@ export function combatBehavior(
       attemptAttack(actor, totalTimeElapsed);
 
       // Dying should stop all actions
-      if (!actor.health) {
-        actor.health = 0;
-        actor.path = undefined;
-        actor.moveTarget = undefined;
-        actor.attackTargetId = undefined;
+      if (!actor.combat.health) {
+        actor.combat.health = 0;
+        actor.movement.path = undefined;
+        actor.movement.moveTarget = undefined;
+        actor.combat.attackTargetId = undefined;
       }
     }
   };
 
   function attemptAttack(actor: Actor, currentTime: TimeSpan) {
-    if (!actor.attackTargetId) {
+    if (!actor.combat.attackTargetId) {
       return; // Not attacking
     }
 
-    const target = state.actors.get(actor.attackTargetId);
+    const target = state.actors.get(actor.combat.attackTargetId);
     if (!target || !isTargetable(actor, target)) {
-      actor.attackTargetId = undefined;
+      actor.combat.attackTargetId = undefined;
       return;
     }
 
     // move closer to target if we're not in range to attack
-    if (!canAttackFrom(actor.coords, target.coords, actor.attackRange)) {
-      if (!seemsToBeMovingTowards(actor, target.coords)) {
-        actor.moveTarget = bestTileToAttackFrom(actor, target);
+    if (
+      !canAttackFrom(
+        actor.movement.coords,
+        target.movement.coords,
+        actor.combat.attackRange,
+      )
+    ) {
+      if (!seemsToBeMovingTowards(actor, target.movement.coords)) {
+        actor.movement.moveTarget = bestTileToAttackFrom(actor, target);
       }
       return;
     }
 
-    if (actor.lastAttack) {
-      const attackDelay = 1 / actor.attackSpeed;
-      const timeSinceLastAttack = currentTime.subtract(actor.lastAttack);
+    if (actor.combat.lastAttack) {
+      const attackDelay = 1 / actor.combat.attackSpeed;
+      const timeSinceLastAttack = currentTime.subtract(actor.combat.lastAttack);
       if (timeSinceLastAttack.totalSeconds < attackDelay) {
         return; // attack on cooldown
       }
     }
 
-    target.health = Math.max(0, target.health - actor.attackDamage);
+    target.combat.health = Math.max(
+      0,
+      target.combat.health - actor.combat.attackDamage,
+    );
 
-    if (target.health <= 0) {
-      server.addEvent("actor.death", target.id);
+    if (target.combat.health <= 0) {
+      server.addEvent("actor.death", target.identity.id);
       if (actor.type === "character" && target.type === "npc") {
-        actor.xp += target.xpReward;
+        actor.progression.xp += target.etc.xpReward;
       }
     }
 
-    actor.path = undefined; // stop moving when attacking
-    actor.lastAttack = currentTime;
+    actor.movement.path = undefined; // stop moving when attacking
+    actor.combat.lastAttack = currentTime;
 
-    server.addEvent("movement.stop", actor.id);
+    server.addEvent("movement.stop", actor.identity.id);
     server.addEvent(
       "combat.attack",
-      { actorId: actor.id, targetId: target.id },
-      { actors: [actor.id, target.id] },
+      { actorId: actor.identity.id, targetId: target.identity.id },
+      { actors: [actor.identity.id, target.identity.id] },
     );
   }
 
@@ -104,16 +122,20 @@ export function combatBehavior(
     actor: Actor,
     target: Actor,
   ): Vector<Tile> | undefined {
-    const bestTile = findPathForSubject(actor, areas, target.coords)?.find(
-      (tile) => canAttackFrom(tile, target.coords, actor.attackRange),
+    const bestTile = findPathForSubject(
+      actor.movement,
+      areas,
+      target.movement.coords,
+    )?.find((tile) =>
+      canAttackFrom(tile, target.movement.coords, actor.combat.attackRange),
     );
-    return bestTile ?? target.coords;
+    return bestTile ?? target.movement.coords;
   }
 }
 
 function seemsToBeMovingTowards(actor: Actor, target: Vector<Tile>): boolean {
-  return !!actor.path?.findLast((tile) =>
-    canAttackFrom(tile, target, actor.attackRange),
+  return !!actor.movement.path?.findLast((tile) =>
+    canAttackFrom(tile, target, actor.combat.attackRange),
   );
 }
 
@@ -130,8 +152,10 @@ function canAttackFrom(
 const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
-  actor: Pick<Actor, "areaId">,
-  target: Pick<Actor, "areaId" | "health">,
+  actor: Pick<Actor, "movement">,
+  target: Pick<Actor, "movement" | "combat">,
 ): boolean {
-  return target.areaId === actor.areaId && target.health > 0;
+  return (
+    target.movement.areaId === actor.movement.areaId && target.combat.health > 0
+  );
 }

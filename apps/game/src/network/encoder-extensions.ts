@@ -2,8 +2,9 @@ import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
 import { SyncMap } from "@mp/sync";
-
+import type { NpcInstanceInit } from "../npc/types";
 import { NpcInstance } from "../npc/types";
+import type { CharacterInit } from "../character/types";
 import { Character } from "../character/types";
 
 export function registerEncoderExtensions(): void {
@@ -55,17 +56,19 @@ export function registerEncoderExtensions(): void {
     decode: (entries) => new SyncMap(entries),
   });
 
-  addEncoderExtension<Character, Partial<Character>>({
+  addEncoderExtension<Character, CharacterInit>({
     Class: Character as never,
     tag: nextTag(),
-    encode: (character, encode) => encode(character.snapshot()),
-    decode: (snapshot) => new Character(snapshot as Character),
+    encode: (character, encode) =>
+      encode(character.selectComponentData() as CharacterInit),
+    decode: (init) => new Character(init),
   });
 
-  addEncoderExtension<NpcInstance, Partial<NpcInstance>>({
+  addEncoderExtension<NpcInstance, NpcInstanceInit>({
     Class: NpcInstance as never,
     tag: nextTag(),
-    encode: (npc, encode) => encode(npc.snapshot()),
-    decode: (snapshot) => new NpcInstance(snapshot as NpcInstance),
+    encode: (npc, encode) =>
+      encode(npc.selectComponentData() as NpcInstanceInit),
+    decode: (init) => new NpcInstance(init),
   });
 }

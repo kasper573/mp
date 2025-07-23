@@ -24,16 +24,23 @@ export function characterRemoveBehavior(
     for (const character of state.actors
       .values()
       .filter((a) => a.type === "character")) {
-      if (!registeredCharacterIds.has(character.id)) {
-        if (removeSchedules.has(character.id)) {
+      if (!registeredCharacterIds.has(character.identity.id)) {
+        if (removeSchedules.has(character.identity.id)) {
           // Already scheduled for removal, nothing else to do
         } else {
-          logger.info(`Scheduling removal of character ${character.id}`);
-          removeSchedules.set(character.id, totalTimeElapsed.add(removeDelay));
+          logger.info(
+            `Scheduling removal of character ${character.identity.id}`,
+          );
+          removeSchedules.set(
+            character.identity.id,
+            totalTimeElapsed.add(removeDelay),
+          );
         }
-      } else if (removeSchedules.has(character.id)) {
-        logger.info(`Canceling scheduled removal of character ${character.id}`);
-        removeSchedules.delete(character.id);
+      } else if (removeSchedules.has(character.identity.id)) {
+        logger.info(
+          `Canceling scheduled removal of character ${character.identity.id}`,
+        );
+        removeSchedules.delete(character.identity.id);
       }
     }
 

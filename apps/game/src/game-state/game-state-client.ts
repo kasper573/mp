@@ -69,7 +69,7 @@ export class GameStateClient {
       return char;
     });
 
-    this.areaId = computed(() => this.character.value?.areaId);
+    this.areaId = computed(() => this.character.value?.movement.areaId);
   }
 
   private refreshState: () => unknown;

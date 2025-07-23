@@ -1,4 +1,4 @@
-import type { Character, GameState } from "@mp/game/server";
+import type { GameState } from "@mp/game/server";
 import type { DbClient } from "@mp/db";
 import { characterTable } from "@mp/db";
 
@@ -11,13 +11,19 @@ export function createGameStateService(db: DbClient) {
             .values()
             .filter((actor) => actor.type === "character")
             .map((character) => {
-              const values = character.snapshot();
+              const inputValues: typeof characterTable.$inferInsert = {
+                ...character.identity,
+                ...character.appearance,
+                ...character.combat,
+                ...character.movement,
+                ...character.progression,
+              };
               return tx
                 .insert(characterTable)
-                .values(values as Character)
+                .values(inputValues)
                 .onConflictDoUpdate({
                   target: characterTable.id,
-                  set: values,
+                  set: inputValues,
                 });
             }),
         ),

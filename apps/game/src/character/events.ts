@@ -23,13 +23,13 @@ export const characterRouter = eventHandlerBuilder.router({
     .handler(({ input: { characterId, to, desiredPortalId }, ctx }) => {
       const char = accessCharacter(ctx, characterId);
 
-      if (!char.health) {
+      if (!char.combat.health) {
         throw new Error("Cannot move a dead character");
       }
 
-      char.attackTargetId = undefined;
-      char.moveTarget = Vector.from(to);
-      char.desiredPortalId = desiredPortalId;
+      char.combat.attackTargetId = undefined;
+      char.movement.moveTarget = Vector.from(to);
+      char.movement.desiredPortalId = desiredPortalId;
     }),
 
   attack: eventHandlerBuilder.event
@@ -42,7 +42,7 @@ export const characterRouter = eventHandlerBuilder.router({
         throw new Error("You can't attack yourself");
       }
 
-      char.attackTargetId = targetId;
+      char.combat.attackTargetId = targetId;
     }),
 
   kill: eventHandlerBuilder.event
@@ -52,8 +52,8 @@ export const characterRouter = eventHandlerBuilder.router({
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
       const target = assert(state.actors.get(targetId));
-      target.health = 0;
-      server.addEvent("actor.death", target.id);
+      target.combat.health = 0;
+      server.addEvent("actor.death", target.identity.id);
     }),
 
   respawn: eventHandlerBuilder.event
@@ -62,15 +62,15 @@ export const characterRouter = eventHandlerBuilder.router({
     .handler(({ input: characterId, ctx }) => {
       const char = accessCharacter(ctx, characterId);
 
-      if (char.health > 0) {
+      if (char.combat.health > 0) {
         throw new Error("Character is not dead");
       }
 
       const characterService = ctx.get(ctxCharacterService);
       const spawnPoint = characterService.getDefaultSpawnPoint();
-      char.health = char.maxHealth;
-      char.coords = spawnPoint.coords;
-      char.areaId = spawnPoint.areaId;
+      char.combat.health = char.combat.maxHealth;
+      char.movement.coords = spawnPoint.coords;
+      char.movement.areaId = spawnPoint.areaId;
     }),
 });
 

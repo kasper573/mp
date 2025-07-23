@@ -1,26 +1,25 @@
 import { describe, expect, it, vi } from "vitest";
 import { effect } from "@mp/state";
-import { collect, SyncEntity } from "../src/sync-entity";
+import { SyncEntity } from "../src/sync-entity";
 import { PatchType } from "../src/patch";
+import { createSyncComponent } from "../src/sync-component";
 
 it("can collect changes as patch", () => {
   class Entity extends SyncEntity {
-    @collect()
-    accessor count: number = 0;
+    data = createSyncComponent({ count: 0 });
   }
 
   const e = new Entity();
-  e.count = 1;
-  e.count = 2;
+  e.data.count = 1;
+  e.data.count = 2;
 
   const patch = e.flush();
-  expect(patch).toEqual([[PatchType.Update, [], { count: 2 }]]);
+  expect(patch).toEqual([[PatchType.Update, ["data"], { count: 2 }]]);
 });
 
 it("does not collect changes to non decorated fields", () => {
   class Entity extends SyncEntity {
-    @collect()
-    accessor count: number = 0;
+    data = createSyncComponent({ count: 0 });
 
     notCollected = "value";
   }
@@ -31,29 +30,24 @@ it("does not collect changes to non decorated fields", () => {
   expect(patch).toEqual([]);
 });
 
-it("can select collectable subset", () => {
+it("can select component properties", () => {
   class Entity extends SyncEntity {
-    @collect()
-    accessor count: number = 0;
-
-    @collect()
-    accessor name: string = "";
+    data = createSyncComponent({ count: 0, name: "" });
 
     notCollected = "value";
   }
 
   const e = new Entity();
-  e.count = 1;
-  e.name = "john";
-  const subset = e.snapshot();
-  expect(subset).toEqual({ count: 1, name: "john" });
+  e.data.count = 1;
+  e.data.name = "john";
+  const props = Object.fromEntries(Object.entries(e.data));
+  expect(props).toEqual({ count: 1, name: "john" });
 });
 
 describe("effects", () => {
-  it("can listen to changes on class instances", () => {
+  it("can listen to changes in components", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor value: string = "initial";
+      data = createSyncComponent({ value: "initial" });
     }
 
     let received: unknown;
@@ -61,17 +55,16 @@ describe("effects", () => {
       received = arg;
     });
     const e = new Entity();
-    effect(() => fn(e.value));
-    e.value = "first";
-    e.value = "second";
+    effect(() => fn(e.data.value));
+    e.data.value = "first";
+    e.data.value = "second";
     expect(fn).toHaveBeenCalledTimes(3);
     expect(received).toEqual("second");
   });
 
   it("can stop listening to changes on class instances", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor value: string = "initial";
+      data = createSyncComponent({ value: "initial" });
     }
 
     let received: unknown;
@@ -80,13 +73,13 @@ describe("effects", () => {
     });
     const e = new Entity();
 
-    const stop = effect(() => fn(e.value));
+    const stop = effect(() => fn(e.data.value));
 
-    e.value = "first";
+    e.data.value = "first";
 
     stop();
 
-    e.value = "second";
+    e.data.value = "second";
 
     expect(fn).toHaveBeenCalledTimes(2); // one when effect inits, another when e.count = "first"
     expect(received).toEqual("first");

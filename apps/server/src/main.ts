@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
-import { SyncServer, SyncEntity, SyncMap } from "@mp/sync";
+import { SyncServer, SyncMap, createSyncComponent } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -60,18 +60,16 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import {
-  createNpcService,
-  createDbClient,
-  createCharacterService,
-  createUserService,
-  createGameStateService,
-} from "@mp/db";
+import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 import { ctxGlobalRpcMiddleware } from "./etc/rpc-builder";
 import { ctxAreaFileUrlResolver } from "./etc/system-rpc";
 import { setupEventRouter } from "./etc/setup-event-router";
+import { createCharacterService } from "./services/character-service";
+import { createGameStateService } from "./services/game-service";
+import { createNpcService } from "./services/npc-service";
+import { createUserService } from "./services/user-service";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -169,14 +167,15 @@ wss.on("connection", (socket) => {
   );
 });
 
-SyncEntity.shouldOptimizeCollects = opt.patchOptimizer;
+createSyncComponent.shouldOptimizeCollects = opt.patchOptimizer;
 
 const gameState: GameState = {
   actors: new SyncMap([], {
     type: (actor) => actor.type,
     alive: (actor) => actor.alive.value,
-    areaId: (actor) => actor.areaId,
-    spawnId: (actor) => (actor.type === "npc" ? actor.spawnId : undefined),
+    areaId: (actor) => actor.movement.areaId,
+    spawnId: (actor) =>
+      actor.type === "npc" ? actor.identity.spawnId : undefined,
   }),
 };
 

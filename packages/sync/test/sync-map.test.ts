@@ -1,38 +1,37 @@
 import { describe, expect, it, vi } from "vitest";
 import { effect } from "@mp/state";
-import { collect, SyncEntity } from "../src/sync-entity";
+import { SyncEntity } from "../src/sync-entity";
 import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
+import { createSyncComponent } from "../src/sync-component";
 
-describe("can collect changes from map of decorated entities", () => {
+describe("can collect changes from map of entities", () => {
   it("set", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor cash: number = 0;
+      data = createSyncComponent({ cash: 0 });
     }
 
     const map = new SyncMap<string, Entity>();
     map.set("john", new Entity());
-    map.get("john")!.cash = 50;
+    map.get("john")!.data.cash = 50;
 
     const patch = map.flush();
 
     const receiver: Record<string, Entity> = {};
     applyPatch(receiver, patch);
 
-    expect(receiver.john.cash).toBe(50);
+    expect(receiver.john.data.cash).toBe(50);
   });
 
   it("delete", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor cash: number = 0;
+      data = createSyncComponent({ cash: 0 });
     }
 
     const john = new Entity();
-    john.cash = 0;
+    john.data.cash = 0;
     const jane = new Entity();
-    jane.cash = 50;
+    jane.data.cash = 50;
 
     const map = new SyncMap<string, Entity>([
       ["john", john],
@@ -48,17 +47,16 @@ describe("can collect changes from map of decorated entities", () => {
     applyPatch(receiver, map.flush());
 
     expect(receiver.john).toBeUndefined();
-    expect(receiver.jane.cash).toBe(50);
+    expect(receiver.jane.data.cash).toBe(50);
   });
 
   it("entity mutation", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor cash: number = 0;
+      data = createSyncComponent({ cash: 0 });
     }
 
     const john = new Entity();
-    john.cash = 0;
+    john.data.cash = 0;
     const map = new SyncMap([["john", john]]);
 
     // Flush initial state
@@ -67,10 +65,10 @@ describe("can collect changes from map of decorated entities", () => {
     applyPatch(receiver, patch);
 
     // Apply and flush entity mutation
-    john.cash = 25;
+    john.data.cash = 25;
     applyPatch(receiver, patch);
 
-    expect(receiver.john.cash).toBe(25);
+    expect(receiver.john.data.cash).toBe(25);
   });
 });
 
@@ -141,11 +139,10 @@ describe("effects", () => {
 
   it("does not notify when entities are mutated", () => {
     class Entity extends SyncEntity {
-      @collect()
-      accessor name: string;
+      data = createSyncComponent({ name: "" });
       constructor(name: string) {
         super();
-        this.name = name;
+        this.data.name = name;
       }
     }
 
@@ -154,7 +151,7 @@ describe("effects", () => {
 
     const fn = vi.fn();
     effect(() => void fn(map.get("1")));
-    person.name = "jane";
+    person.data.name = "jane";
 
     expect(fn).toHaveBeenCalledTimes(1); // only the init call
   });

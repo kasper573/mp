@@ -8,6 +8,7 @@ import { moveAlongPath } from "../area/move-along-path";
 import type { GameStateEvents } from "./game-state-events";
 import type { GameState } from "./game-state";
 import type { Actor, ActorId } from "../actor/actor";
+import type { MovementTrait } from "../traits/movement";
 
 export class OptimisticGameState implements GameState {
   actors: GameState["actors"] = new SyncMap();
@@ -20,13 +21,15 @@ export class OptimisticGameState implements GameState {
     }
 
     for (const actor of this.actors.values()) {
-      if (actor.path && actor.health > 0) {
-        moveAlongPath(actor, opt.timeSinceLastFrame);
+      if (actor.movement.path && actor.combat.health > 0) {
+        moveAlongPath(actor.movement, opt.timeSinceLastFrame);
 
         // Face the direction the actor is moving towards
-        const target = actor.path?.[0];
+        const target = actor.movement.path?.[0];
         if (target) {
-          actor.dir = nearestCardinalDirection(actor.coords.angle(target));
+          actor.movement.dir = nearestCardinalDirection(
+            actor.movement.coords.angle(target),
+          );
         }
       }
     }
@@ -46,7 +49,9 @@ export class OptimisticGameState implements GameState {
       const actor = this.actors.get(actorId);
       const target = this.actors.get(targetId);
       if (actor && target) {
-        actor.dir = nearestCardinalDirection(actor.coords.angle(target.coords));
+        actor.movement.dir = nearestCardinalDirection(
+          actor.movement.coords.angle(target.movement.coords),
+        );
       }
     }
 
@@ -71,15 +76,25 @@ function applyPatchOptimized(
   events: EventAccessFn<GameStateEvents>,
 ): void {
   for (const op of patch) {
-    const [type, [entityName, entityId], update] = op;
+    const [type, [entityName, entityId, traitName], update] = op;
 
     if (
       entityName === ("actors" satisfies keyof GameState) &&
+      traitName === ("movement" satisfies keyof Actor) &&
       type === PatchType.Update
     ) {
       const actor = gameState[entityName].get(entityId as ActorId);
       for (const key of typedKeys(update)) {
-        if (actor && !shouldApplyActorUpdate(actor, update, key, events)) {
+        if (
+          actor &&
+          !shouldApplyMovementUpdate(
+            actor.identity.id,
+            actor.movement,
+            update,
+            key,
+            events,
+          )
+        ) {
           delete update[key];
         }
       }
@@ -89,21 +104,22 @@ function applyPatchOptimized(
   }
 }
 
-function shouldApplyActorUpdate<Key extends keyof Actor>(
-  actor: Actor,
-  update: Partial<Actor>,
+function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
+  actorId: ActorId,
+  target: MovementTrait,
+  update: Partial<MovementTrait>,
   key: Key,
   events: EventAccessFn<GameStateEvents>,
 ) {
   switch (key) {
     case "coords": {
-      if (update.areaId && update.areaId !== actor.areaId) {
+      if (update.areaId && update.areaId !== target.areaId) {
         return true; // Always trust new coord when area changes
       }
-      const threshold = actor.speed * teleportThreshold.totalSeconds;
+      const threshold = target.speed * teleportThreshold.totalSeconds;
       if (
         update.coords &&
-        !update.coords.isWithinDistance(actor.coords, threshold)
+        !update.coords.isWithinDistance(target.coords, threshold)
       ) {
         return true; // Snap to new coords if the distance is too large
       }
@@ -112,27 +128,31 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
     }
 
     case "path": {
-      if (events("movement.stop").some((id) => id === actor.id)) {
+      if (
+        events("movement.stop").some(
+          (stoppedActorId) => stoppedActorId === actorId,
+        )
+      ) {
         return true;
       }
-      if (update.areaId && update.areaId !== actor.areaId) {
+      if (update.areaId && update.areaId !== target.areaId) {
         return true; // Always trust new path when area changes
       }
       if (update.path?.length) {
         return true; // Any new path should be trusted
       }
       // If server says to stop moving, we need to check if to let lerp finish
-      const lastRemainingLocalStep = actor.path?.[0];
+      const lastRemainingLocalStep = target.path?.[0];
       if (
         lastRemainingLocalStep &&
-        lastRemainingLocalStep.isWithinDistance(actor.coords, tileMargin)
+        lastRemainingLocalStep.isWithinDistance(target.coords, tileMargin)
       ) {
         // The last remaining step is within the tile margin,
         // which means the stop command was likely due to the movement completing,
         // so we want to let the lerp finish its remaining step.
         return false;
       }
-      return !isPathEqual(update.path, actor.path);
+      return !isPathEqual(update.path, target.path);
     }
     case "dir": {
       // Client handles actor facing directions completely manually
@@ -140,5 +160,5 @@ function shouldApplyActorUpdate<Key extends keyof Actor>(
     }
   }
 
-  return update[key] !== actor[key];
+  return update[key] !== target[key];
 }

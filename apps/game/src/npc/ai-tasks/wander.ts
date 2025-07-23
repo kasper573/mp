@@ -9,15 +9,15 @@ export function createWanderTask(endTime: TimeSpan, nextTask: Task): Task {
       return nextTask(context, npc);
     }
 
-    if (!npc.path) {
-      const area = areas.get(npc.areaId);
+    if (!npc.movement.path) {
+      const area = areas.get(npc.movement.areaId);
       if (!area) {
-        throw new Error(`Area not found: ${npc.areaId}`);
+        throw new Error(`Area not found: ${npc.movement.areaId}`);
       }
 
       const toNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
-      npc.moveTarget = toNode.data.vector;
-      npc.attackTargetId = undefined;
+      npc.movement.moveTarget = toNode.data.vector;
+      npc.combat.attackTargetId = undefined;
     }
 
     return wander;

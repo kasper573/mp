@@ -48,10 +48,11 @@ export class NpcAi {
         this.observeAttacksDoneThisTick(subject);
 
         const task =
-          this.npcTasks.get(subject.id) ?? this.deriveTask(subject, tick);
+          this.npcTasks.get(subject.identity.id) ??
+          this.deriveTask(subject, tick);
 
         const nextTask = task(context, subject);
-        this.npcTasks.set(subject.id, nextTask);
+        this.npcTasks.set(subject.identity.id, nextTask);
       }
 
       this.removeExpiredCombats();
@@ -63,18 +64,18 @@ export class NpcAi {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
           const combatant = assert(this.gameState.actors.get(combatantId));
-          return observer.coords.isWithinDistance(
-            combatant.coords,
-            observer.aggroRange,
+          return observer.movement.coords.isWithinDistance(
+            combatant.movement.coords,
+            observer.etc.aggroRange,
           );
         },
       );
 
       if (canSeeCombatants) {
-        let memory = this.combatMemories.get(observer.id);
+        let memory = this.combatMemories.get(observer.identity.id);
         if (!memory) {
           memory = new NpcAiCombatMemory();
-          this.combatMemories.set(observer.id, memory);
+          this.combatMemories.set(observer.identity.id, memory);
         }
         memory.observeAttack(attack.actorId, attack.targetId);
       }
@@ -91,16 +92,16 @@ export class NpcAi {
   }
 
   deriveTask = (npc: NpcInstance, tick: TickEvent): Task => {
-    switch (npc.npcType) {
+    switch (npc.identity.npcType) {
       case "static":
         return createIdleTask();
       case "patrol":
-        if (!npc.patrol) {
+        if (!npc.etc.patrol) {
           throw new Error(
-            `NPC instance "${npc.id}" of type "patrol" does not have a patrol path defined.`,
+            `NPC instance "${npc.identity.id}" of type "patrol" does not have a patrol path defined.`,
           );
         }
-        return createPatrolTask(npc.patrol);
+        return createPatrolTask(npc.etc.patrol);
       case "pacifist":
         return this.idleOrWander(tick);
       case "aggressive":

@@ -102,9 +102,8 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
     for (const key of staleKeys) {
       const v = this.get(key) as V;
-      const op = v instanceof SyncEntity ? v.flush(...path, String(key)) : null;
-      if (op?.length) {
-        patch.push(...op);
+      if (v instanceof SyncEntity) {
+        v.flush([...path, String(key)], patch);
       }
     }
 

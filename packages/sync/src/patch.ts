@@ -16,7 +16,12 @@ export type Patch = Operation[];
 export type PatchPathStep = string | number;
 export type PatchPath =
   | [entityName: PatchPathStep]
-  | [entityName: PatchPathStep, entityId: PatchPathStep];
+  | [entityName: PatchPathStep, entityId: PatchPathStep]
+  | [
+      entityName: PatchPathStep,
+      entityId: PatchPathStep,
+      componentName: PatchPathStep,
+    ];
 
 export type Operation = SetOperation | UpdateOperation | RemoveOperation;
 

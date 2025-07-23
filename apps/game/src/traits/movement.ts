@@ -9,6 +9,7 @@ import type { AreaId } from "../area/area-id";
 import { moveAlongPath } from "../area/move-along-path";
 
 import { getAreaIdFromObject } from "../area/area-resource";
+import { createSyncComponent } from "@mp/sync";
 
 export interface MovementTrait {
   /**
@@ -37,6 +38,10 @@ export interface MovementTrait {
   dir: CardinalDirection;
 }
 
+export function createMovementTrait(values: MovementTrait) {
+  return createSyncComponent(values);
+}
+
 export function movementBehavior(
   state: GameState,
   areas: AreaLookup,
@@ -44,24 +49,28 @@ export function movementBehavior(
   return function movementBehaviorTick({ timeSinceLastTick }) {
     for (const actor of state.actors.values()) {
       // The dead don't move
-      if (actor.health <= 0) {
-        actor.path = undefined;
-        actor.moveTarget = undefined;
+      if (actor.combat.health <= 0) {
+        actor.movement.path = undefined;
+        actor.movement.moveTarget = undefined;
         continue;
       }
 
       // Consume the move target and produce a new path to move along
-      if (actor.moveTarget) {
-        actor.path = findPathForSubject(actor, areas, actor.moveTarget);
-        actor.moveTarget = undefined;
+      if (actor.movement.moveTarget) {
+        actor.movement.path = findPathForSubject(
+          actor.movement,
+          areas,
+          actor.movement.moveTarget,
+        );
+        actor.movement.moveTarget = undefined;
       }
 
-      moveAlongPath(actor, timeSinceLastTick);
+      moveAlongPath(actor.movement, timeSinceLastTick);
 
       // Process portals
-      const area = assert(areas.get(actor.areaId));
+      const area = assert(areas.get(actor.movement.areaId));
       for (const object of area.hitTestObjects(
-        area.tiled.tileCoordToWorld(actor.coords),
+        area.tiled.tileCoordToWorld(actor.movement.coords),
       )) {
         const destinationArea = areas.get(
           getAreaIdFromObject(object) as AreaId,
@@ -69,12 +78,12 @@ export function movementBehavior(
         if (
           destinationArea &&
           actor.type === "character" &&
-          actor.desiredPortalId === object.id
+          actor.movement.desiredPortalId === object.id
         ) {
-          actor.path = undefined;
-          actor.desiredPortalId = undefined;
-          actor.areaId = destinationArea.id;
-          actor.coords = destinationArea.start;
+          actor.movement.path = undefined;
+          actor.movement.desiredPortalId = undefined;
+          actor.movement.areaId = destinationArea.id;
+          actor.movement.coords = destinationArea.start;
         }
       }
     }
@@ -82,7 +91,7 @@ export function movementBehavior(
 }
 
 export function findPathForSubject(
-  subject: MovementTrait & { id: unknown },
+  subject: MovementTrait,
   areas: AreaLookup,
   dest: VectorLike<Tile>,
 ): Path<Tile> | undefined {

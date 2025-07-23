@@ -35,8 +35,8 @@ export function deriveClientVisibility(
     for (const other of state.actors.values()) {
       for (const observerId of observerIds) {
         const observer = observerId ? state.actors.get(observerId) : undefined;
-        if (observer && canSeeSubject(observer, other)) {
-          ids.add(other.id);
+        if (observer && canSeeSubject(observer.movement, other.movement)) {
+          ids.add(other.identity.id);
         }
       }
     }

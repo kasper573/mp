@@ -42,7 +42,10 @@ function RouteComponent() {
     enabled: !!auth.identity.value,
     map: (result): SelectOption<CharacterId>[] => [
       { value: undefined as unknown as CharacterId, label: "Select character" },
-      ...result.items.map(({ id, name }) => ({ value: id, label: name })),
+      ...result.items.map((char) => ({
+        value: char.identity.id,
+        label: char.appearance.name,
+      })),
     ],
   });
 

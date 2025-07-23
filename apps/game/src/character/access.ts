@@ -18,7 +18,7 @@ export function accessCharacter(
     throw new Error("Character not found");
   }
 
-  if (char.userId !== userId) {
+  if (char.identity.userId !== userId) {
     throw new Error("You don't have access to this character");
   }
   return char;

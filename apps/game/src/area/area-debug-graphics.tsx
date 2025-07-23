@@ -45,8 +45,8 @@ export class AreaDebugGraphics extends Container {
       (actor) =>
         new DebugPath(() => ({
           tiled: area.tiled,
-          path: actor.path,
-          color: uniqolor(actor.id).color,
+          path: actor.movement.path,
+          color: uniqolor(actor.identity.id).color,
         })),
     );
 
@@ -55,9 +55,9 @@ export class AreaDebugGraphics extends Container {
       (actor) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
-          pos: actor.coords,
-          radius: actor.attackRange,
-          color: uniqolor(actor.id).color,
+          pos: actor.movement.coords,
+          radius: actor.combat.attackRange,
+          color: uniqolor(actor.identity.id).color,
         })),
     );
 
@@ -66,11 +66,11 @@ export class AreaDebugGraphics extends Container {
       (npc) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
-          pos: npc.coords,
-          radius: npc.aggroRange,
-          color: npc.color
-            ? hexColorFromInt(npc.color)
-            : uniqolor(npc.id).color,
+          pos: npc.movement.coords,
+          radius: npc.etc.aggroRange,
+          color: npc.appearance.color
+            ? hexColorFromInt(npc.appearance.color)
+            : uniqolor(npc.identity.id).color,
         })),
     );
 
