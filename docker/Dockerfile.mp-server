@@ -28,8 +28,6 @@ RUN npm install \
 
 COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
-COPY --from=builder /workdir/apps/server/drizzle /workdir/server/drizzle
-COPY --from=builder /workdir/apps/server/drizzle.config.js /workdir/server
 
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 ENV MP_SERVER_CLIENT_DIR=/workdir/client
