@@ -2,54 +2,138 @@ import { signal, type Signal } from "@mp/state";
 import type { PatchPath, PatchPathStep } from "./patch";
 import { PatchType, type Patch } from "./patch";
 
+class SyncComponentFields {
+  protected readonly meta = new SyncComponentMeta();
+}
+
+class SyncComponentBuilder<Values extends object> {
+  constructor(
+    private readonly fields: new (
+      initialValues?: Partial<Values>,
+    ) => SyncComponentFields,
+  ) {}
+
+  add<Name extends PropertyKey, Value>(
+    name: Name,
+    defaultValue: Value,
+    {
+      filter = refDiff,
+      transform = passThrough,
+    }: SyncComponentPropertyOptions<Value> = {},
+  ): SyncComponentBuilder<Values & { [K in Name]: Value }> {
+    return new SyncComponentBuilder(
+      class extends this.fields {
+        constructor(initialValues?: Partial<Values & { [K in Name]: Value }>) {
+          super(initialValues);
+          this.meta.observables[name] = signal(
+            initialValues?.[name] ?? defaultValue,
+          );
+        }
+        get [name](): Value {
+          return this.meta.observables[name].value as Value;
+        }
+        set [name](newValue: Value) {
+          let collectedValue = newValue;
+          let shouldCollectValue = true;
+
+          const obs = this.meta.observables[name] as Signal<Value>;
+
+          // We can't guarantee that the prevValue exists until a value has been assigned at least once.
+          if (
+            shouldOptimizeCollects.value &&
+            this.meta.assignedProperties.has(name)
+          ) {
+            const prevValue = obs.value;
+            collectedValue = transform(newValue);
+            shouldCollectValue = filter(collectedValue, transform(prevValue));
+          }
+
+          if (shouldCollectValue) {
+            this.meta.changes ??= {};
+            this.meta.changes[name] = collectedValue;
+          }
+
+          obs.value = newValue;
+          this.meta.assignedProperties.add(name);
+        }
+      },
+    );
+  }
+
+  build(): SyncComponentConstructor<Values> {
+    class SyncComponent extends this.fields {
+      flush(path: PatchPathStep[] = [], patch: Patch = []): Patch {
+        const changes = this.meta.changes;
+        if (changes) {
+          patch.push([PatchType.Update, path as PatchPath, changes]);
+          for (const key in this) {
+            const value = this[key];
+            if (isSyncComponent(value)) {
+              value.flush([...path, key], patch);
+            }
+          }
+          this.meta.changes = undefined;
+        }
+        return patch;
+      }
+
+      /**
+       * Returns the subset of the component that is decorated with @collect.
+       * Will also include descendant SyncComponent instances (if any).
+       */
+      snapshot(): Values {
+        const snapshot: Record<string, unknown> = Object.fromEntries(
+          Object.keys(this.meta.observables).map((name) => [
+            name,
+            this[name as keyof this],
+          ]),
+        );
+        for (const key in this) {
+          const value = this[key];
+          if (isSyncComponent(value)) {
+            snapshot[key] = value.snapshot();
+          }
+        }
+        return snapshot as Values;
+      }
+    }
+
+    return SyncComponent as unknown as SyncComponentConstructor<Values>;
+  }
+}
+
+export const shouldOptimizeCollects = signal(false);
+
+interface SyncComponentConstructor<Values> {
+  new (initialValues?: Values): SyncComponent<Values>;
+  $infer: Values;
+}
+
+export function defineSyncComponent<Values extends object>(
+  nextBuilder: (
+    builder: SyncComponentBuilder<{}>,
+  ) => SyncComponentBuilder<Values>,
+): SyncComponentConstructor<Values> {
+  return nextBuilder(new SyncComponentBuilder(SyncComponentFields)).build();
+}
+
+export function isSyncComponent<Values>(
+  target: unknown,
+): target is SyncComponent<Values> {
+  return (
+    target !== null &&
+    typeof target === "object" &&
+    Reflect.get(target, "meta") instanceof SyncComponentMeta
+  );
+}
+
 /**
  * Allows collecting changes on fields decorated with @collect.
  */
-export abstract class SyncComponent {
-  #meta = new SyncComponentMeta();
-
-  /**
-   * Produces a patch that represents all changes since the last flush.
-   * Will also flush descendant SyncComponent instances (if any)
-   */
-  flush(path: PatchPathStep[] = [], patch: Patch = []): Patch {
-    const changes = this.#meta.changes;
-    if (changes) {
-      patch.push([PatchType.Update, path as PatchPath, changes]);
-      for (const key in this) {
-        const value = this[key];
-        if (value instanceof SyncComponent) {
-          value.flush([...path, key], patch);
-        }
-      }
-      this.#meta.changes = undefined;
-    }
-    return patch;
-  }
-
-  /**
-   * Returns a subset of the component that contains only the properties that are decorated with @collect.
-   */
-  snapshot(): Partial<this> {
-    const subset = Object.fromEntries(
-      Object.keys(this.#meta.observables).map((name) => [
-        name,
-        this[name as keyof this],
-      ]),
-    );
-    return subset as Partial<this>;
-  }
-
-  /**
-   * Accesses the private metadata of a SyncComponent instance.
-   * @internal Should only be used by the collect decorator.
-   */
-  static accessMeta(component: SyncComponent) {
-    return component.#meta;
-  }
-
-  static shouldOptimizeCollects = false;
-}
+export type SyncComponent<Values> = Values & {
+  flush(path?: PatchPathStep[], patch?: Patch): Patch;
+  snapshot(): Values;
+};
 
 /**
  * Private metadata for a SyncComponent instance.
@@ -61,7 +145,7 @@ class SyncComponentMeta {
   assignedProperties = new Set<PropertyKey>();
 }
 
-export interface CollectDecoratorOptions<T> {
+export interface SyncComponentPropertyOptions<T> {
   /**
    * A predicate (prevValue, newValue) => boolean.
    * If provided, the change will only be recorded if this returns true.
@@ -75,54 +159,6 @@ export interface CollectDecoratorOptions<T> {
    * The property on the instance is always set to the raw "new" value.
    */
   transform?: (value: T) => T;
-}
-
-export function collect<V>({
-  transform = passThrough,
-  filter = refDiff,
-}: CollectDecoratorOptions<V> = {}) {
-  return <T extends object>(
-    instanceValue: ClassAccessorDecoratorTarget<T, V>,
-    context: ClassAccessorDecoratorContext<T, V>,
-  ): ClassAccessorDecoratorResult<T, V> => {
-    return {
-      init(initialValue) {
-        const meta = SyncComponent.accessMeta(this as SyncComponent);
-        meta.observables[context.name] ??= signal(initialValue as unknown);
-        return initialValue;
-      },
-      get() {
-        const meta = SyncComponent.accessMeta(this as SyncComponent);
-        const obs = meta.observables[context.name];
-        return obs.value as V;
-      },
-      set(newValue) {
-        let collectedValue = newValue;
-        let shouldCollectValue = true;
-
-        const meta = SyncComponent.accessMeta(this as SyncComponent);
-        const obs = meta.observables[context.name] as Signal<V>;
-
-        // We can't guarantee that the prevValue exists until a value has been assigned at least once.
-        if (
-          SyncComponent.shouldOptimizeCollects &&
-          meta.assignedProperties.has(context.name)
-        ) {
-          const prevValue = obs.value;
-          collectedValue = transform(newValue);
-          shouldCollectValue = filter(collectedValue, transform(prevValue));
-        }
-
-        if (shouldCollectValue) {
-          meta.changes ??= {};
-          meta.changes[context.name] = collectedValue;
-        }
-
-        obs.value = newValue;
-        meta.assignedProperties.add(context.name);
-      },
-    };
-  };
 }
 
 const passThrough = <T>(v: T): T => v;

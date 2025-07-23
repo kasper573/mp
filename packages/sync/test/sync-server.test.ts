@@ -2,7 +2,7 @@ import { it, expect } from "vitest";
 import { applyPatch } from "../src/patch";
 import { SyncServer } from "../src/sync-server";
 import { SyncMap } from "../src/sync-map";
-import { collect, SyncComponent } from "../src/sync-component";
+import { defineSyncComponent } from "../src/sync-component";
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestState = {
@@ -71,19 +71,10 @@ it("returns no patches or events when flushed twice with no changes", () => {
 });
 
 it("can collect patches", () => {
-  class Person extends SyncComponent {
-    @collect()
-    accessor id: string = "";
-
-    @collect()
-    accessor cash: number = 0;
-
-    constructor(id: string, cash: number) {
-      super();
-      this.id = id;
-      this.cash = cash;
-    }
-  }
+  const Person = defineSyncComponent((builder) =>
+    builder.add("id", "").add("cash", 0),
+  );
+  type Person = typeof Person.$infer;
 
   // oxlint-disable-next-line consistent-type-definitions
   type TestState = {
@@ -97,8 +88,8 @@ it("can collect patches", () => {
     }),
   });
 
-  const john = new Person("john", 0);
-  const jane = new Person("jane", 50);
+  const john = new Person({ id: "john", cash: 0 });
+  const jane = new Person({ id: "jane", cash: 50 });
   const serverState = {
     persons: new SyncMap([
       [john.id, john],

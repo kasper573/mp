@@ -1,13 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 import { effect } from "@mp/state";
-import { collect, SyncComponent } from "../src/sync-component";
+import { defineSyncComponent } from "../src/sync-component";
 import { PatchType } from "../src/patch";
 
 it("can collect changes as patch", () => {
-  class Component extends SyncComponent {
-    @collect()
-    accessor count: number = 0;
-  }
+  const Component = defineSyncComponent((builder) => builder.add("count", 0));
 
   const c = new Component();
   c.count = 1;
@@ -18,10 +15,8 @@ it("can collect changes as patch", () => {
 });
 
 it("does not collect changes to non decorated fields", () => {
-  class Component extends SyncComponent {
-    @collect()
-    accessor count: number = 0;
-
+  const Base = defineSyncComponent((builder) => builder.add("count", 0));
+  class Component extends Base {
     notCollected = "value";
   }
 
@@ -32,13 +27,10 @@ it("does not collect changes to non decorated fields", () => {
 });
 
 it("can select collectable subset", () => {
-  class Component extends SyncComponent {
-    @collect()
-    accessor count: number = 0;
-
-    @collect()
-    accessor name: string = "";
-
+  const Base = defineSyncComponent((builder) =>
+    builder.add("count", 0).add("name", ""),
+  );
+  class Component extends Base {
     notCollected = "value";
   }
 
@@ -50,14 +42,9 @@ it("can select collectable subset", () => {
 });
 
 it("can collect nested changes as patch", () => {
-  class Stats extends SyncComponent {
-    @collect()
-    accessor count: number = 0;
-  }
-
-  class Entity extends SyncComponent {
-    @collect()
-    accessor name: string = "";
+  const Stats = defineSyncComponent((builder) => builder.add("count", 0));
+  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+  class Entity extends Base {
     readonly stats = new Stats();
   }
 
@@ -74,10 +61,9 @@ it("can collect nested changes as patch", () => {
 
 describe("effects", () => {
   it("can listen to changes on class instances", () => {
-    class Component extends SyncComponent {
-      @collect()
-      accessor value: string = "initial";
-    }
+    const Component = defineSyncComponent((builder) =>
+      builder.add("value", "initial"),
+    );
 
     let received: unknown;
     const fn = vi.fn((arg) => {
@@ -92,10 +78,9 @@ describe("effects", () => {
   });
 
   it("can stop listening to changes on class instances", () => {
-    class Component extends SyncComponent {
-      @collect()
-      accessor value: string = "initial";
-    }
+    const Component = defineSyncComponent((builder) =>
+      builder.add("value", "initial"),
+    );
 
     let received: unknown;
     const fn = vi.fn((arg) => {

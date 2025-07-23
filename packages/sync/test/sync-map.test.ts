@@ -1,15 +1,13 @@
 import { describe, expect, it, vi } from "vitest";
 import { effect } from "@mp/state";
-import { collect, SyncComponent } from "../src/sync-component";
+import { defineSyncComponent } from "../src/sync-component";
 import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
 
 describe("can collect changes from map of decorated entities", () => {
   it("set", () => {
-    class Entity extends SyncComponent {
-      @collect()
-      accessor cash: number = 0;
-    }
+    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
+    type Entity = typeof Entity.$infer;
 
     const map = new SyncMap<string, Entity>();
     map.set("john", new Entity());
@@ -24,10 +22,8 @@ describe("can collect changes from map of decorated entities", () => {
   });
 
   it("delete", () => {
-    class Entity extends SyncComponent {
-      @collect()
-      accessor cash: number = 0;
-    }
+    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
+    type Entity = typeof Entity.$infer;
 
     const john = new Entity();
     john.cash = 0;
@@ -52,10 +48,8 @@ describe("can collect changes from map of decorated entities", () => {
   });
 
   it("entity mutation", () => {
-    class Entity extends SyncComponent {
-      @collect()
-      accessor cash: number = 0;
-    }
+    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
+    type Entity = typeof Entity.$infer;
 
     const john = new Entity();
     john.cash = 0;
@@ -140,16 +134,10 @@ describe("effects", () => {
   });
 
   it("does not notify when entities are mutated", () => {
-    class Entity extends SyncComponent {
-      @collect()
-      accessor name: string;
-      constructor(name: string) {
-        super();
-        this.name = name;
-      }
-    }
+    const Entity = defineSyncComponent((builder) => builder.add("name", ""));
+    type Entity = typeof Entity.$infer;
 
-    const person = new Entity("john");
+    const person = new Entity({ name: "john" });
     const map = new SyncMap<string, Entity>([["1", person]]);
 
     const fn = vi.fn();
