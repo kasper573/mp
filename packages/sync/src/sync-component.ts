@@ -4,7 +4,7 @@ import { PatchType, type Patch } from "./patch";
 
 export function createSyncComponent<Values>(
   initialValues: Values,
-  options?: { [K in keyof Values]: SyncComponentPropertyOptions<Values[K]> },
+  options?: { [K in keyof Values]?: SyncComponentPropertyOptions<Values[K]> },
 ): SyncComponent<Values> {
   const meta = new SyncComponentMeta();
   const componentInstance = {} as SyncComponent<Values>;

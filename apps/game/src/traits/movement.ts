@@ -10,6 +10,7 @@ import { moveAlongPath } from "../area/move-along-path";
 
 import { getAreaIdFromObject } from "../area/area-resource";
 import { createSyncComponent } from "@mp/sync";
+import * as patchOptimizers from "../network/patch-optimizers";
 
 export interface MovementTrait {
   /**
@@ -39,7 +40,10 @@ export interface MovementTrait {
 }
 
 export function createMovementTrait(values: MovementTrait) {
-  return createSyncComponent(values);
+  return createSyncComponent(values, {
+    coords: patchOptimizers.coords,
+    path: patchOptimizers.path,
+  });
 }
 
 export function movementBehavior(

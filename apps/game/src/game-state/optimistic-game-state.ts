@@ -76,11 +76,11 @@ function applyPatchOptimized(
   events: EventAccessFn<GameStateEvents>,
 ): void {
   for (const op of patch) {
-    const [type, [entityName, entityId, traitName], update] = op;
+    const [type, [entityName, entityId, componentName], update] = op;
 
     if (
       entityName === ("actors" satisfies keyof GameState) &&
-      traitName === ("movement" satisfies keyof Actor) &&
+      componentName === ("movement" satisfies keyof Actor) &&
       type === PatchType.Update
     ) {
       const actor = gameState[entityName].get(entityId as ActorId);
