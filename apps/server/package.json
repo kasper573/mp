@@ -11,7 +11,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && tsup",
+    "build": "tsc && tsx esbuild.ts",
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
@@ -46,7 +46,8 @@
     "@mp/tsconfig": "workspace:*",
     "@types/cors": "2.8.17",
     "@types/express": "catalog:",
-    "tsup": "8.5.0",
+    "builtin-modules": "5.0.0",
+    "esbuild": "0.25.6",
     "tsx": "catalog:"
   }
 }
