@@ -12,11 +12,11 @@ export function createGameStateService(db: DbClient) {
             .filter((actor) => actor.type === "character")
             .map((character) => {
               const inputValues: typeof characterTable.$inferInsert = {
-                ...character.identity,
-                ...character.appearance,
-                ...character.combat,
-                ...character.movement,
-                ...character.progression,
+                ...character.identity.snapshot(),
+                ...character.appearance.snapshot(),
+                ...character.combat.snapshot(),
+                ...character.movement.snapshot(),
+                ...character.progression.snapshot(),
               };
               return tx
                 .insert(characterTable)

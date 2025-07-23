@@ -59,6 +59,20 @@ it("can collect nested changes as patch", () => {
   ]);
 });
 
+it("can define component property without initializer", () => {
+  const Component = defineSyncComponent((builder) => builder.add("count"));
+
+  const c = new Component({ count: 1 });
+
+  expect(c.count).toBe(1);
+});
+
+it("cannot create components that lack property initializers without providing an initial value", () => {
+  const Component = defineSyncComponent((builder) => builder.add("count"));
+
+  expect(() => new Component()).toThrow();
+});
+
 describe("effects", () => {
   it("can listen to changes on class instances", () => {
     const Component = defineSyncComponent((builder) =>

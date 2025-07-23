@@ -9,7 +9,7 @@ import {
   systemRoles,
   worldRoles,
 } from "@mp/game/server";
-import { createSyncComponent } from "@mp/sync";
+import { shouldOptimizeCollects } from "@mp/sync";
 import { opt } from "../options";
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
@@ -45,7 +45,7 @@ export const systemRouter = rpc.router({
     .output<boolean>()
     .query(() => {
       // TODO get config from database
-      return createSyncComponent.shouldOptimizeCollects;
+      return shouldOptimizeCollects.value;
     }),
 
   setPatchOptimizerEnabled: rpc.procedure
@@ -53,7 +53,7 @@ export const systemRouter = rpc.router({
     .input<boolean>()
     .mutation(({ input }) => {
       // TODO update config in database
-      createSyncComponent.shouldOptimizeCollects = input;
+      shouldOptimizeCollects.value = input;
     }),
 
   characterList: rpc.procedure

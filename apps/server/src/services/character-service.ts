@@ -87,6 +87,8 @@ export function createCharacterService(
         appearance: {
           modelId: databaseFields.modelId,
           name: databaseFields.name,
+          color: undefined,
+          opacity: undefined,
         },
         identity: {
           id: databaseFields.id,
@@ -102,12 +104,17 @@ export function createCharacterService(
           health: databaseFields.health,
           maxHealth: databaseFields.maxHealth,
           hitBox: model.hitBox,
+          attackTargetId: undefined,
+          lastAttack: undefined,
         },
         movement: {
           areaId: databaseFields.areaId,
           coords: databaseFields.coords,
           speed: databaseFields.speed,
           dir: rng.oneOf(cardinalDirections),
+          desiredPortalId: undefined,
+          moveTarget: undefined,
+          path: undefined,
         },
       });
     },
@@ -115,5 +122,9 @@ export function createCharacterService(
 }
 
 function characterAppearance(): Omit<AppearanceTrait, "name"> {
-  return { color: undefined, modelId: "adventurer" as ActorModelId };
+  return {
+    color: undefined,
+    modelId: "adventurer" as ActorModelId,
+    opacity: undefined,
+  };
 }

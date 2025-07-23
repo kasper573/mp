@@ -15,19 +15,28 @@ class SyncComponentBuilder<Values extends object> {
 
   add<Name extends PropertyKey, Value>(
     name: Name,
-    defaultValue: Value,
+    defaultValue?: Value,
     {
       filter = refDiff,
       transform = passThrough,
     }: SyncComponentPropertyOptions<Value> = {},
   ): SyncComponentBuilder<Values & { [K in Name]: Value }> {
+    const hasDefaultValue = arguments.length === 2;
     return new SyncComponentBuilder(
       class extends this.fields {
         constructor(initialValues?: Partial<Values & { [K in Name]: Value }>) {
           super(initialValues);
-          this.meta.observables[name] = signal(
-            initialValues?.[name] ?? defaultValue,
-          );
+          let initialValue: Value;
+
+          if (initialValues && name in initialValues) {
+            initialValue = initialValues[name] as Value;
+          } else if (hasDefaultValue) {
+            initialValue = defaultValue as Value;
+          } else {
+            throw new Error(`Initializer missing for property ${String(name)}`);
+          }
+
+          this.meta.observables[name] = signal(initialValue);
         }
         get [name](): Value {
           return this.meta.observables[name].value as Value;

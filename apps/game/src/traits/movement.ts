@@ -9,42 +9,42 @@ import type { AreaId } from "../area/area-id";
 import { moveAlongPath } from "../area/move-along-path";
 
 import { getAreaIdFromObject } from "../area/area-resource";
-import { createSyncComponent } from "@mp/sync";
+import { defineSyncComponent } from "@mp/sync";
 import * as patchOptimizers from "../network/patch-optimizers";
 
-export interface MovementTrait {
-  /**
-   * Current position of the subject.
-   */
-  coords: Vector<Tile>;
-  speed: Tile;
-  areaId: AreaId;
-  /**
-   * A desired target. Will be consumed by the movement behavior to find a new path.
-   */
-  moveTarget?: Vector<Tile>;
-  /**
-   * Has to be explicitly set by the client for portal traversal to be able to happen.
-   * This avoids unintended portal traversal by actors that are not supposed to use portals.
-   * The movement behavior will continuously check if the actor has reached this portal.
-   */
-  desiredPortalId?: ObjectId;
-  /**
-   * The current path the subject is following.
-   */
-  path?: Path<Tile>;
-  /**
-   * The direction the subject is facing.
-   */
-  dir: CardinalDirection;
-}
+export type MovementTrait = typeof MovementTrait.$infer;
 
-export function createMovementTrait(values: MovementTrait) {
-  return createSyncComponent(values, {
-    coords: patchOptimizers.coords,
-    path: patchOptimizers.path,
-  });
-}
+export const MovementTrait = defineSyncComponent((builder) =>
+  builder
+    /**
+     * Current position of the subject.
+     */
+    .add<"coords", Vector<Tile>>("coords", undefined, patchOptimizers.coords)
+    .add<"speed", Tile>("speed")
+    .add<"areaId", AreaId>("areaId")
+    /**
+     * A desired target. Will be consumed by the movement behavior to find a new path.
+     */
+    .add<"moveTarget", Vector<Tile> | undefined>("moveTarget", undefined)
+    /**
+     * Has to be explicitly set by the client for portal traversal to be able to happen.
+     * This avoids unintended portal traversal by actors that are not supposed to use portals.
+     * The movement behavior will continuously check if the actor has reached this portal.
+     */
+    .add<"desiredPortalId", ObjectId | undefined>("desiredPortalId", undefined)
+    /**
+     * The current path the subject is following.
+     */
+    .add<"path", Path<Tile> | undefined>(
+      "path",
+      undefined,
+      patchOptimizers.path,
+    )
+    /**
+     * The direction the subject is facing.
+     */
+    .add<"dir", CardinalDirection>("dir"),
+);
 
 export function movementBehavior(
   state: GameState,

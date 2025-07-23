@@ -1,11 +1,12 @@
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { Path, Vector } from "@mp/math";
-import { createSyncComponent, SyncEntity } from "@mp/sync";
+import type { SyncComponent } from "@mp/sync";
+import { defineSyncComponent } from "@mp/sync";
 
-import { createMovementTrait, type MovementTrait } from "../traits/movement";
-import { createAppearanceTrait, type ActorModelId } from "../traits/appearance";
-import type { AppearanceTrait } from "../traits/appearance";
-import { createCombatTrait, type CombatTrait } from "../traits/combat";
+import { MovementTrait } from "../traits/movement";
+import type { ActorModelId } from "../traits/appearance";
+import { AppearanceTrait } from "../traits/appearance";
+import { CombatTrait } from "../traits/combat";
 import type { AreaId } from "../area/area-id";
 
 import { computed } from "@mp/state";
@@ -71,51 +72,61 @@ export interface NpcSpawn {
 
 export type NpcId = Branded<string, "NPCId">;
 
-export interface NpcInstanceIdentity {
-  id: NpcInstanceId;
-  npcId: NpcId;
-  spawnId: NpcSpawnId;
-  npcType: NpcType;
+export interface NpcInstanceInit {
+  identity: NpcInstanceIdentity;
+  appearance: AppearanceTrait;
+  movement: MovementTrait;
+  combat: CombatTrait;
+  etc: NpcEtc;
 }
+
+export type NpcInstanceIdentity = typeof NpcInstanceIdentity.$infer;
+
+const NpcInstanceIdentity = defineSyncComponent((builder) =>
+  builder
+    .add<"id", NpcInstanceId>("id")
+    .add<"npcId", NpcId>("npcId")
+    .add<"spawnId", NpcSpawnId>("spawnId")
+    .add<"npcType", NpcType>("npcType"),
+);
+
+export type NpcEtc = typeof NpcEtc.$infer;
 
 /**
  * TODO Should be replaced by some better solution.
  * Either create better named traits or allow subclassing traits ie NpcCombatTrait from CombatTrait.
  * @deprecated This is lazy af.
  */
-export interface NpcEtc {
-  xpReward: number;
-  patrol?: Path<Tile>;
-  aggroRange: Tile;
-}
+const NpcEtc = defineSyncComponent((builder) =>
+  builder
+    .add<"xpReward", number>("xpReward", 0)
+    .add<"patrol", Path<Tile> | undefined>("patrol", undefined)
+    .add<"aggroRange", Tile>("aggroRange"),
+);
 
-export type NpcInstanceInit = Pick<
-  NpcInstance,
-  "identity" | "appearance" | "movement" | "combat" | "etc"
->;
+export const NpcInstanceCommons = defineSyncComponent((builder) => builder);
 
 /**
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-export class NpcInstance extends SyncEntity {
+export class NpcInstance extends NpcInstanceCommons {
   readonly type = "npc" as const;
-  readonly identity: NpcInstanceIdentity;
-  readonly appearance: AppearanceTrait;
-  readonly movement: MovementTrait;
-  readonly combat: CombatTrait;
-  readonly etc: NpcEtc;
+  readonly identity: SyncComponent<NpcInstanceIdentity>;
+  readonly appearance: SyncComponent<AppearanceTrait>;
+  readonly movement: SyncComponent<MovementTrait>;
+  readonly combat: SyncComponent<CombatTrait>;
+  readonly etc: SyncComponent<NpcEtc>;
 
   alive = computed(() => this.combat.health > 0);
 
   constructor(init: NpcInstanceInit) {
     super();
-    this.type = "npc";
-    this.identity = createSyncComponent(init.identity);
-    this.appearance = createAppearanceTrait(init.appearance);
-    this.movement = createMovementTrait(init.movement);
-    this.combat = createCombatTrait(init.combat);
-    this.etc = createSyncComponent(init.etc);
+    this.identity = new NpcInstanceIdentity(init.identity);
+    this.appearance = new AppearanceTrait(init.appearance);
+    this.movement = new MovementTrait(init.movement);
+    this.combat = new CombatTrait(init.combat);
+    this.etc = new NpcEtc(init.etc);
   }
 }
 

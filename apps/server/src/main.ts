@@ -4,7 +4,7 @@ import path from "node:path";
 import express from "express";
 import createCors from "cors";
 import { createTokenResolver } from "@mp/auth/server";
-import { SyncServer, SyncMap, createSyncComponent } from "@mp/sync";
+import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
 import { WebSocketServer } from "@mp/ws/server";
@@ -167,7 +167,7 @@ wss.on("connection", (socket) => {
   );
 });
 
-createSyncComponent.shouldOptimizeCollects = opt.patchOptimizer;
+shouldOptimizeCollects.value = opt.patchOptimizer;
 
 const gameState: GameState = {
   actors: new SyncMap([], {

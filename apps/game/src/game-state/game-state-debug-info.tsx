@@ -44,5 +44,5 @@ export function GameStateDebugInfo(props: { tiled: TiledResource }) {
 }
 
 function trimCharacterInfo(char?: Character) {
-  return char?.selectComponentData();
+  return char?.snapshot();
 }

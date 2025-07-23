@@ -73,6 +73,7 @@ export class NpcSpawner {
         modelId: npc.modelId,
         name: npc.name,
         color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
+        opacity: undefined,
       },
       combat: {
         hitBox: model.hitBox,
@@ -81,6 +82,8 @@ export class NpcSpawner {
         attackSpeed: npc.attackSpeed,
         health: npc.maxHealth,
         maxHealth: npc.maxHealth,
+        attackTargetId: undefined,
+        lastAttack: undefined,
       },
       etc: {
         xpReward: npc.xpReward,
@@ -92,6 +95,9 @@ export class NpcSpawner {
         coords,
         speed: npc.speed,
         dir: this.rng.oneOf(cardinalDirections),
+        desiredPortalId: undefined,
+        moveTarget: undefined,
+        path: undefined,
       },
     });
   }

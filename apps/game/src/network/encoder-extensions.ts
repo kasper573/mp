@@ -60,15 +60,14 @@ export function registerEncoderExtensions(): void {
     Class: Character as never,
     tag: nextTag(),
     encode: (character, encode) =>
-      encode(character.selectComponentData() as CharacterInit),
+      encode(character.snapshot() as CharacterInit),
     decode: (init) => new Character(init),
   });
 
   addEncoderExtension<NpcInstance, NpcInstanceInit>({
     Class: NpcInstance as never,
     tag: nextTag(),
-    encode: (npc, encode) =>
-      encode(npc.selectComponentData() as NpcInstanceInit),
+    encode: (npc, encode) => encode(npc.snapshot() as NpcInstanceInit),
     decode: (init) => new NpcInstance(init),
   });
 }

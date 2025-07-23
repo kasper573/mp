@@ -6,25 +6,24 @@ import type { AreaLookup } from "../area/lookup";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { ActorId, Actor } from "../actor/actor";
 import { findPathForSubject } from "./movement";
-import { createSyncComponent } from "@mp/sync";
+import { defineSyncComponent } from "@mp/sync";
 
-export interface CombatTrait {
-  /**
-   * Relative to the actor's position.
-   */
-  hitBox: Rect<Tile>;
-  health: number;
-  maxHealth: number;
-  attackDamage: number;
-  attackSpeed: TimesPerSecond;
-  attackRange: Tile;
-  attackTargetId?: ActorId;
-  lastAttack?: TimeSpan;
-}
+export type CombatTrait = typeof CombatTrait.$infer;
 
-export function createCombatTrait(values: CombatTrait) {
-  return createSyncComponent(values);
-}
+export const CombatTrait = defineSyncComponent((builder) =>
+  builder
+    /**
+     * Relative to the actor's position.
+     */
+    .add<"hitBox", Rect<Tile>>("hitBox")
+    .add<"health", number>("health")
+    .add<"maxHealth", number>("maxHealth")
+    .add<"attackDamage", number>("attackDamage")
+    .add<"attackSpeed", TimesPerSecond>("attackSpeed")
+    .add<"attackRange", Tile>("attackRange")
+    .add<"attackTargetId", ActorId | undefined>("attackTargetId", undefined)
+    .add<"lastAttack", TimeSpan | undefined>("lastAttack", undefined),
+);
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
 

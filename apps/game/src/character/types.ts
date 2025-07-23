@@ -1,47 +1,53 @@
 import type { Branded } from "@mp/std";
 import type { UserId } from "@mp/auth";
-import { createSyncComponent, SyncEntity } from "@mp/sync";
-import { createMovementTrait, type MovementTrait } from "../traits/movement";
-import {
-  createAppearanceTrait,
-  type AppearanceTrait,
-} from "../traits/appearance";
-import { createCombatTrait, type CombatTrait } from "../traits/combat";
+import type { SyncComponent } from "@mp/sync";
+import { defineSyncComponent } from "@mp/sync";
+import { MovementTrait } from "../traits/movement";
+import { AppearanceTrait } from "../traits/appearance";
+import { CombatTrait } from "../traits/combat";
 
 import { computed } from "@mp/state";
 
-interface CharacterIdentity {
-  id: CharacterId;
-  userId: UserId;
+type CharacterProgression = typeof CharacterProgression.$infer;
+
+const CharacterProgression = defineSyncComponent((builder) =>
+  builder.add<"xp", number>("xp", 0),
+);
+
+export interface CharacterInit {
+  identity: CharacterIdentity;
+  appearance: AppearanceTrait;
+  movement: MovementTrait;
+  combat: CombatTrait;
+  progression: CharacterProgression;
 }
 
-interface CharacterProgression {
-  xp: number;
-}
+const CharacterIdentity = defineSyncComponent((builder) =>
+  builder.add<"id", CharacterId>("id").add<"userId", UserId>("userId"),
+);
 
-export type CharacterInit = Pick<
-  Character,
-  "identity" | "appearance" | "movement" | "combat" | "progression"
->;
+type CharacterIdentity = typeof CharacterIdentity.$infer;
 
-export class Character extends SyncEntity {
+const CharacterCommons = defineSyncComponent((builder) => builder);
+
+export class Character extends CharacterCommons {
   readonly type = "character" as const;
-  readonly identity: CharacterIdentity;
-  readonly appearance: AppearanceTrait;
-  readonly movement: MovementTrait;
-  readonly combat: CombatTrait;
-  readonly progression: CharacterProgression;
+  readonly identity: SyncComponent<CharacterIdentity>;
+  readonly appearance: SyncComponent<AppearanceTrait>;
+  readonly movement: SyncComponent<MovementTrait>;
+  readonly combat: SyncComponent<CombatTrait>;
+  readonly progression: SyncComponent<CharacterProgression>;
 
   alive = computed(() => this.combat.health > 0);
 
   constructor(init: CharacterInit) {
     super();
     this.type = "character";
-    this.identity = createSyncComponent(init.identity);
-    this.appearance = createAppearanceTrait(init.appearance);
-    this.movement = createMovementTrait(init.movement);
-    this.combat = createCombatTrait(init.combat);
-    this.progression = createSyncComponent(init.progression);
+    this.identity = new CharacterIdentity(init.identity);
+    this.appearance = new AppearanceTrait(init.appearance);
+    this.movement = new MovementTrait(init.movement);
+    this.combat = new CombatTrait(init.combat);
+    this.progression = new CharacterProgression(init.progression);
   }
 }
 
