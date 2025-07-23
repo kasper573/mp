@@ -1,4 +1,4 @@
-import { skipToken } from "@mp/rpc/react";
+import { skipToken } from "@mp/query";
 import { Checkbox, ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "preact/hooks";
@@ -15,7 +15,7 @@ function RouteComponent() {
   const [rpcError, setRpcError] = useState(false);
   const errorBoundary = useSignal(false);
 
-  const query = rpc.system.testError.useQuery({
+  const query = rpc.testError.useQuery({
     input: rpcError ? void 0 : skipToken,
     throwOnError: errorBoundary.value,
   });

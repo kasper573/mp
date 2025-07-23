@@ -16,6 +16,7 @@
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/query": "workspace:*",
     "@mp/rpc": "workspace:*",
     "@mp/api": "workspace:*",
     "@mp/state": "workspace:*",

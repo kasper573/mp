@@ -19,7 +19,7 @@ import {
   generateTileset,
   generateTilesetTile,
 } from "./test-tile-map-generator";
-import { skipToken, useQuery, useQuerySignal } from "@mp/rpc/react";
+import { skipToken, useQuery, useQuerySignal } from "@mp/query";
 import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
 
 export function TileRendererTester() {

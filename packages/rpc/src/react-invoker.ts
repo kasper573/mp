@@ -1,6 +1,6 @@
-import * as tanstack from "@tanstack/react-query";
-import type { UseMutationResult } from "@tanstack/react-query";
-import { skipToken } from "@tanstack/react-query";
+import * as query from "@mp/query";
+import type { UseMutationResult } from "@mp/query";
+import { skipToken } from "@mp/query";
 import type {
   AnyRpcMutationNode,
   AnyRpcQueryNode,
@@ -12,42 +12,6 @@ import type {
 import type { AnyFunction } from "@mp/invocation-proxy";
 import { createInvocationProxy } from "@mp/invocation-proxy";
 import type { RpcCaller, RpcProcedureInvoker } from "./proxy-invoker";
-import { useSignal } from "@mp/state/react";
-import type { ReadonlySignal } from "@mp/state";
-import { useEffect, useMemo } from "preact/hooks";
-
-export {
-  useQuery,
-  useSuspenseQuery,
-  skipToken,
-  type SkipToken,
-} from "@tanstack/react-query";
-
-export function useQuerySignal<
-  TQueryFnData = unknown,
-  TError = tanstack.DefaultError,
-  TData = TQueryFnData,
-  TQueryKey extends tanstack.QueryKey = tanstack.QueryKey,
->(
-  options: tanstack.UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
-): Omit<tanstack.UseQueryResult<TData, TError>, "data"> & {
-  signal: ReadonlySignal<TData | undefined>;
-} {
-  const result = tanstack.useQuery(options);
-  const dataSignal = useSignal(result.data);
-  useEffect(() => {
-    dataSignal.value = result.data;
-  }, [result.data, dataSignal]);
-  return useMemo(
-    () => ({
-      ...result,
-      signal: dataSignal,
-    }),
-    [result, dataSignal],
-  );
-}
-
-export { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 
 export function createReactRpcInvoker<Node extends AnyRpcNode>(
   call: RpcCaller,
@@ -74,10 +38,10 @@ function createUseQuery(
 ): UseQuery<AnyRpcQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
-  ): tanstack.UseQueryResult {
+  ): query.UseQueryResult {
     // oxlint-disable-next-line no-unused-vars Needs to be omitted to not pass to tanstack
     const { input, map, ...tanstackOptions } = options ?? {};
-    return tanstack.useQuery({
+    return query.useQuery({
       queryKey: [path, input],
       queryFn: input === skipToken ? skipToken : queryFn,
       ...tanstackOptions,
@@ -102,10 +66,10 @@ function createUseSuspenseQuery(
 ): UseQuery<AnyRpcQueryNode> {
   function useQuery<MappedOutput>(
     options?: ReactRpcQueryOptions<unknown, unknown, MappedOutput>,
-  ): tanstack.UseSuspenseQueryResult {
+  ): query.UseSuspenseQueryResult {
     // oxlint-disable-next-line no-unused-vars Needs to be omitted to not pass to tanstack
     const { input, map, ...tanstackOptions } = options ?? {};
-    return tanstack.useSuspenseQuery({
+    return query.useSuspenseQuery({
       queryKey: [path, input],
       queryFn,
       ...tanstackOptions,
@@ -129,7 +93,7 @@ function createUseMutation(
   path: string[],
 ): UseMutation<AnyRpcMutationNode> {
   return () => {
-    return tanstack.useMutation({
+    return query.useMutation({
       mutationKey: path,
       mutationFn: (input: unknown) => call(path, input),
     });
@@ -151,16 +115,16 @@ export type ReactRpcRouterInvoker<Router extends AnyRpcRouterNode> = {
 
 export interface ReactRpcQueryOptions<Input, Output, MappedOutput>
   extends Omit<
-    tanstack.UseQueryOptions<Input, tanstack.DefaultError, Output>,
+    query.UseQueryOptions<Input, query.DefaultError, Output>,
     "initialData" | "queryKey" | "queryFn" | "select"
   > {
-  input: Input | tanstack.SkipToken;
+  input: Input | query.SkipToken;
   map?: (output: Output, input: Input) => MappedOutput | Promise<MappedOutput>;
 }
 
 export interface ReactRpcSuspenseQueryOptions<Input, Output, MappedOutput>
   extends Omit<
-    tanstack.UseQueryOptions<Input, tanstack.DefaultError, Output>,
+    query.UseQueryOptions<Input, query.DefaultError, Output>,
     "initialData" | "queryKey" | "queryFn" | "select" | "enabled"
   > {
   input: Input;
@@ -181,7 +145,7 @@ export type UseQuery<Node extends AnyRpcQueryNode> = <
     InferRpcOutput<Node["handler"]>,
     MappedOutput
   >,
-) => tanstack.UseQueryResult<MappedOutput, unknown>;
+) => query.UseQueryResult<MappedOutput, unknown>;
 
 export type UseSuspenseQuery<Node extends AnyRpcQueryNode> = <
   MappedOutput = InferRpcOutput<Node["handler"]>,
@@ -191,7 +155,7 @@ export type UseSuspenseQuery<Node extends AnyRpcQueryNode> = <
     InferRpcOutput<Node["handler"]>,
     MappedOutput
   >,
-) => tanstack.UseSuspenseQueryResult<MappedOutput, unknown>;
+) => query.UseSuspenseQueryResult<MappedOutput, unknown>;
 
 const useSuspenseQueryProperty = "useSuspenseQuery";
 const useQueryProperty = "useQuery";

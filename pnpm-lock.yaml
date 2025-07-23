@@ -144,6 +144,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/query':
+        specifier: workspace:*
+        version: link:../../packages/query
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
@@ -272,6 +275,9 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../packages/path-finding
+      '@mp/query':
+        specifier: workspace:*
+        version: link:../../packages/query
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
@@ -440,9 +446,6 @@ importers:
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../packages/rate-limiter
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
@@ -678,6 +681,25 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  packages/query:
+    dependencies:
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../state
+      '@tanstack/react-query':
+        specifier: 5.82.0
+        version: 5.82.0(react@19.1.0)
+      '@tanstack/react-query-devtools':
+        specifier: 5.82.0
+        version: 5.82.0(@tanstack/react-query@5.82.0(react@19.1.0))(react@19.1.0)
+      preact:
+        specifier: 'catalog:'
+        version: 10.26.9
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   packages/rate-limiter:
     dependencies:
       '@mp/std':
@@ -699,18 +721,15 @@ importers:
       '@mp/invocation-proxy':
         specifier: workspace:*
         version: link:../invocation-proxy
+      '@mp/query':
+        specifier: workspace:*
+        version: link:../query
       '@mp/state':
         specifier: workspace:*
         version: link:../state
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      '@tanstack/react-query':
-        specifier: 5.82.0
-        version: 5.82.0(react@19.1.0)
-      '@tanstack/react-query-devtools':
-        specifier: 5.82.0
-        version: 5.82.0(@tanstack/react-query@5.82.0(react@19.1.0))(react@19.1.0)
       preact:
         specifier: 'catalog:'
         version: 10.26.9

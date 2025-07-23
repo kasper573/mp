@@ -1,6 +1,6 @@
 // oxlint-disable no-await-in-loop
 import { createConsoleLogger } from "@mp/logger";
-import type { ServerRpcRouter } from "@mp/server";
+import type { ApiRpcRouter } from "@mp/api";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createWebSocket } from "@mp/ws/client";
 import { createBypassUser } from "@mp/auth";
@@ -86,7 +86,7 @@ async function testOneGameClient(n: number, rng: Rng) {
   const transceiver = new BinaryRpcTransceiver<void>({
     send: socket.send.bind(socket),
   });
-  const rpc = createReactRpcInvoker<ServerRpcRouter>(transceiver.call);
+  const rpc = createReactRpcInvoker<ApiRpcRouter>(transceiver.call);
   const handleMessage = transceiver.messageEventHandler(logger.error);
   socket.addEventListener("message", handleMessage);
 

@@ -25,8 +25,7 @@
     "@mp/invocation-proxy": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
-    "@tanstack/react-query": "5.82.0",
-    "@tanstack/react-query-devtools": "5.82.0",
+    "@mp/query": "workspace:*",
     "preact": "catalog:"
   },
   "devDependencies": {
