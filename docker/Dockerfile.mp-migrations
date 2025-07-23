@@ -10,7 +10,7 @@ RUN KIT_VER=$(jq -r '.devDependencies["drizzle-kit"]' package.json) && \
     npm install -g drizzle-kit@$KIT_VER drizzle-orm@$ORM_VER pg@$PG_VER
 
 # Copy migration scripts and configuration
-COPY ./drizzle.config.js .
+COPY ./drizzle.config.ts .
 COPY ./drizzle/ ./drizzle/
 
 CMD ["drizzle-kit", "migrate"]
