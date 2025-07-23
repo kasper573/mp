@@ -11,7 +11,7 @@ import { computed } from "@mp/state";
 type CharacterProgression = typeof CharacterProgression.$infer;
 
 const CharacterProgression = defineSyncComponent((builder) =>
-  builder.add<"xp", number>("xp", 0),
+  builder.add<number>()("xp"),
 );
 
 export interface CharacterInit {
@@ -23,7 +23,7 @@ export interface CharacterInit {
 }
 
 const CharacterIdentity = defineSyncComponent((builder) =>
-  builder.add<"id", CharacterId>("id").add<"userId", UserId>("userId"),
+  builder.add<CharacterId>()("id").add<UserId>()("userId"),
 );
 
 type CharacterIdentity = typeof CharacterIdentity.$infer;
@@ -41,7 +41,7 @@ export class Character extends CharacterCommons {
   alive = computed(() => this.combat.health > 0);
 
   constructor(init: CharacterInit) {
-    super();
+    super({});
     this.type = "character";
     this.identity = new CharacterIdentity(init.identity);
     this.appearance = new AppearanceTrait(init.appearance);

@@ -8,65 +8,61 @@ class SyncComponentFields {
 
 class SyncComponentBuilder<Values extends object> {
   constructor(
-    private readonly fields: new (
-      initialValues?: Partial<Values>,
-    ) => SyncComponentFields,
+    private readonly fields: new (initialValues: Values) => SyncComponentFields,
   ) {}
 
-  add<Name extends PropertyKey, Value>(
-    name: Name,
-    defaultValue?: Value,
-    {
-      filter = refDiff,
-      transform = passThrough,
-    }: SyncComponentPropertyOptions<Value> = {},
-  ): SyncComponentBuilder<Values & { [K in Name]: Value }> {
-    const hasDefaultValue = arguments.length === 2;
-    return new SyncComponentBuilder(
-      class extends this.fields {
-        constructor(initialValues?: Partial<Values & { [K in Name]: Value }>) {
-          super(initialValues);
-          let initialValue: Value;
+  add<Value>({
+    filter = refDiff,
+    transform = passThrough,
+  }: SyncComponentPropertyOptions<Value> = {}) {
+    const fields = this.fields;
+    return function addName<Name extends PropertyKey>(name: Name) {
+      return new SyncComponentBuilder(
+        class extends fields {
+          constructor(initialValues: Values & { [K in Name]: Value }) {
+            super(initialValues);
+            let initialValue: Value;
 
-          if (initialValues && name in initialValues) {
-            initialValue = initialValues[name] as Value;
-          } else if (hasDefaultValue) {
-            initialValue = defaultValue as Value;
-          } else {
-            throw new Error(`Initializer missing for property ${String(name)}`);
+            if (name in initialValues) {
+              initialValue = initialValues[name] as Value;
+            } else {
+              throw new Error(
+                `Initializer missing for property ${String(name)}`,
+              );
+            }
+
+            this.meta.observables[name] = signal(initialValue);
           }
-
-          this.meta.observables[name] = signal(initialValue);
-        }
-        get [name](): Value {
-          return this.meta.observables[name].value as Value;
-        }
-        set [name](newValue: Value) {
-          let collectedValue = newValue;
-          let shouldCollectValue = true;
-
-          const obs = this.meta.observables[name] as Signal<Value>;
-
-          // We can't guarantee that the prevValue exists until a value has been assigned at least once.
-          if (
-            shouldOptimizeCollects.value &&
-            this.meta.assignedProperties.has(name)
-          ) {
-            const prevValue = obs.value;
-            collectedValue = transform(newValue);
-            shouldCollectValue = filter(collectedValue, transform(prevValue));
+          get [name](): Value {
+            return this.meta.observables[name].value as Value;
           }
+          set [name](newValue: Value) {
+            let collectedValue = newValue;
+            let shouldCollectValue = true;
 
-          if (shouldCollectValue) {
-            this.meta.changes ??= {};
-            this.meta.changes[name] = collectedValue;
+            const obs = this.meta.observables[name] as Signal<Value>;
+
+            // We can't guarantee that the prevValue exists until a value has been assigned at least once.
+            if (
+              shouldOptimizeCollects.value &&
+              this.meta.assignedProperties.has(name)
+            ) {
+              const prevValue = obs.value;
+              collectedValue = transform(newValue);
+              shouldCollectValue = filter(collectedValue, transform(prevValue));
+            }
+
+            if (shouldCollectValue) {
+              this.meta.changes ??= {};
+              this.meta.changes[name] = collectedValue;
+            }
+
+            obs.value = newValue;
+            this.meta.assignedProperties.add(name);
           }
-
-          obs.value = newValue;
-          this.meta.assignedProperties.add(name);
-        }
-      },
-    );
+        },
+      );
+    };
   }
 
   build(): SyncComponentConstructor<Values> {
@@ -134,7 +130,7 @@ function flushProperties<T>(
 export const shouldOptimizeCollects = signal(false);
 
 interface SyncComponentConstructor<Values> {
-  new (initialValues?: Values): SyncComponent<Values>;
+  new (initialValues: Values): SyncComponent<Values>;
   $infer: Values;
 }
 

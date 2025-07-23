@@ -8,10 +8,10 @@ export type AppearanceTrait = typeof AppearanceTrait.$infer;
 
 export const AppearanceTrait = defineSyncComponent((builder) =>
   builder
-    .add<"color", number | undefined>("color", undefined)
-    .add<"opacity", number | undefined>("opacity", undefined)
-    .add<"modelId", ActorModelId>("modelId")
-    .add<"name", string>("name"),
+    .add<number | undefined>()("color")
+    .add<number | undefined>()("opacity")
+    .add<ActorModelId>()("modelId")
+    .add<string>()("name"),
 );
 
 export interface ActorModel {

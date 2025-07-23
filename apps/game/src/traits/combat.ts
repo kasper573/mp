@@ -15,14 +15,14 @@ export const CombatTrait = defineSyncComponent((builder) =>
     /**
      * Relative to the actor's position.
      */
-    .add<"hitBox", Rect<Tile>>("hitBox")
-    .add<"health", number>("health")
-    .add<"maxHealth", number>("maxHealth")
-    .add<"attackDamage", number>("attackDamage")
-    .add<"attackSpeed", TimesPerSecond>("attackSpeed")
-    .add<"attackRange", Tile>("attackRange")
-    .add<"attackTargetId", ActorId | undefined>("attackTargetId", undefined)
-    .add<"lastAttack", TimeSpan | undefined>("lastAttack", undefined),
+    .add<Rect<Tile>>()("hitBox")
+    .add<number>()("health")
+    .add<number>()("maxHealth")
+    .add<number>()("attackDamage")
+    .add<TimesPerSecond>()("attackSpeed")
+    .add<Tile>()("attackRange")
+    .add<ActorId | undefined>()("attackTargetId")
+    .add<TimeSpan | undefined>()("lastAttack"),
 );
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);

@@ -4,9 +4,11 @@ import { defineSyncComponent } from "../src/sync-component";
 import { PatchType } from "../src/patch";
 
 it("can collect changes as patch", () => {
-  const Component = defineSyncComponent((builder) => builder.add("count", 0));
+  const Component = defineSyncComponent((builder) =>
+    builder.add<number>()("count"),
+  );
 
-  const c = new Component();
+  const c = new Component({ count: 0 });
   c.count = 1;
   c.count = 2;
 
@@ -15,12 +17,12 @@ it("can collect changes as patch", () => {
 });
 
 it("does not collect changes to non decorated fields", () => {
-  const Base = defineSyncComponent((builder) => builder.add("count", 0));
+  const Base = defineSyncComponent((builder) => builder.add<number>()("count"));
   class Component extends Base {
     notCollected = "value";
   }
 
-  const c = new Component();
+  const c = new Component({ count: 0 });
   c.notCollected = "changed";
   const patch = c.flush();
   expect(patch).toEqual([]);
@@ -28,13 +30,13 @@ it("does not collect changes to non decorated fields", () => {
 
 it("can select collectable subset", () => {
   const Base = defineSyncComponent((builder) =>
-    builder.add("count", 0).add("name", ""),
+    builder.add<number>()("count").add<string>()("name"),
   );
   class Component extends Base {
     notCollected = "value";
   }
 
-  const c = new Component();
+  const c = new Component({ count: 0, name: "" });
   c.count = 1;
   c.name = "john";
   const subset = c.snapshot();
@@ -42,13 +44,15 @@ it("can select collectable subset", () => {
 });
 
 it("can collect nested changes as patch", () => {
-  const Stats = defineSyncComponent((builder) => builder.add("count", 0));
-  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+  const Stats = defineSyncComponent((builder) =>
+    builder.add<number>()("count"),
+  );
+  const Base = defineSyncComponent((builder) => builder.add<string>()("name"));
   class Entity extends Base {
-    readonly stats = new Stats();
+    readonly stats = new Stats({ count: 0 });
   }
 
-  const e = new Entity();
+  const e = new Entity({ name: "" });
   e.name = "john";
   e.stats.count = 2;
 
@@ -59,34 +63,18 @@ it("can collect nested changes as patch", () => {
   ]);
 });
 
-it("can define component property without initializer", () => {
-  const Component = defineSyncComponent((builder) => builder.add("count"));
-
-  const c = new Component({ count: 1 });
-
-  expect(c.count).toBe(1);
-});
-
-it("cannot create components that lack property initializers without providing an initial value", () => {
-  const Component = defineSyncComponent((builder) => builder.add("count"));
-
-  expect(() => new Component()).toThrow();
-});
-
 it("can flush initial state of nested components", () => {
   type Bank = typeof Bank.$infer;
 
-  const Bank = defineSyncComponent((builder) =>
-    builder.add<"cash", number>("cash", 0),
-  );
+  const Bank = defineSyncComponent((builder) => builder.add<number>()("cash"));
 
-  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+  const Base = defineSyncComponent((builder) => builder.add<string>()("name"));
 
   class Outer extends Base {
-    readonly bank = new Bank();
+    readonly bank = new Bank({ cash: 0 });
   }
 
-  const char = new Outer();
+  const char = new Outer({ name: "" });
   char.name = "jane";
   char.bank.cash = 50;
   const patch = char.flush();
@@ -100,17 +88,15 @@ it("can flush initial state of nested components", () => {
 it("can flush updates of nested components", () => {
   type Bank = typeof Bank.$infer;
 
-  const Bank = defineSyncComponent((builder) =>
-    builder.add<"cash", number>("cash", 0),
-  );
+  const Bank = defineSyncComponent((builder) => builder.add<number>()("cash"));
 
-  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+  const Base = defineSyncComponent((builder) => builder.add<string>()("name"));
 
   class Outer extends Base {
-    readonly bank = new Bank();
+    readonly bank = new Bank({ cash: 0 });
   }
 
-  const char = new Outer();
+  const char = new Outer({ name: "" });
 
   char.name = "john";
   char.bank.cash = 25;
@@ -130,14 +116,14 @@ it("can flush updates of nested components", () => {
 describe("effects", () => {
   it("can listen to changes on class instances", () => {
     const Component = defineSyncComponent((builder) =>
-      builder.add("value", "initial"),
+      builder.add<string>()("value"),
     );
 
     let received: unknown;
     const fn = vi.fn((arg) => {
       received = arg;
     });
-    const c = new Component();
+    const c = new Component({ value: "initial" });
     effect(() => fn(c.value));
     c.value = "first";
     c.value = "second";
@@ -147,14 +133,14 @@ describe("effects", () => {
 
   it("can stop listening to changes on class instances", () => {
     const Component = defineSyncComponent((builder) =>
-      builder.add("value", "initial"),
+      builder.add<string>()("value"),
     );
 
     let received: unknown;
     const fn = vi.fn((arg) => {
       received = arg;
     });
-    const c = new Component();
+    const c = new Component({ value: "initial" });
 
     const stop = effect(() => fn(c.value));
 

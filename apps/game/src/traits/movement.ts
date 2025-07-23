@@ -19,31 +19,27 @@ export const MovementTrait = defineSyncComponent((builder) =>
     /**
      * Current position of the subject.
      */
-    .add<"coords", Vector<Tile>>("coords", undefined, patchOptimizers.coords)
-    .add<"speed", Tile>("speed")
-    .add<"areaId", AreaId>("areaId")
+    .add<Vector<Tile>>(patchOptimizers.coords)("coords")
+    .add<Tile>()("speed")
+    .add<AreaId>()("areaId")
     /**
      * A desired target. Will be consumed by the movement behavior to find a new path.
      */
-    .add<"moveTarget", Vector<Tile> | undefined>("moveTarget", undefined)
+    .add<Vector<Tile> | undefined>()("moveTarget")
     /**
      * Has to be explicitly set by the client for portal traversal to be able to happen.
      * This avoids unintended portal traversal by actors that are not supposed to use portals.
      * The movement behavior will continuously check if the actor has reached this portal.
      */
-    .add<"desiredPortalId", ObjectId | undefined>("desiredPortalId", undefined)
+    .add<ObjectId | undefined>()("desiredPortalId")
     /**
      * The current path the subject is following.
      */
-    .add<"path", Path<Tile> | undefined>(
-      "path",
-      undefined,
-      patchOptimizers.path,
-    )
+    .add<Path<Tile> | undefined>(patchOptimizers.path)("path")
     /**
      * The direction the subject is facing.
      */
-    .add<"dir", CardinalDirection>("dir"),
+    .add<CardinalDirection>()("dir"),
 );
 
 export function movementBehavior(

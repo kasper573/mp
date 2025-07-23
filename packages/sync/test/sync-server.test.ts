@@ -72,7 +72,7 @@ it("returns no patches or events when flushed twice with no changes", () => {
 
 it("can collect patches", () => {
   const Person = defineSyncComponent((builder) =>
-    builder.add("id", "").add("cash", 0),
+    builder.add<string>()("id").add<number>()("cash"),
   );
   type Person = typeof Person.$infer;
 

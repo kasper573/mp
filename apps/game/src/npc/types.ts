@@ -84,10 +84,10 @@ export type NpcInstanceIdentity = typeof NpcInstanceIdentity.$infer;
 
 const NpcInstanceIdentity = defineSyncComponent((builder) =>
   builder
-    .add<"id", NpcInstanceId>("id")
-    .add<"npcId", NpcId>("npcId")
-    .add<"spawnId", NpcSpawnId>("spawnId")
-    .add<"npcType", NpcType>("npcType"),
+    .add<NpcInstanceId>()("id")
+    .add<NpcId>()("npcId")
+    .add<NpcSpawnId>()("spawnId")
+    .add<NpcType>()("npcType"),
 );
 
 export type NpcEtc = typeof NpcEtc.$infer;
@@ -99,9 +99,9 @@ export type NpcEtc = typeof NpcEtc.$infer;
  */
 const NpcEtc = defineSyncComponent((builder) =>
   builder
-    .add<"xpReward", number>("xpReward", 0)
-    .add<"patrol", Path<Tile> | undefined>("patrol", undefined)
-    .add<"aggroRange", Tile>("aggroRange"),
+    .add<number>()("xpReward")
+    .add<Tile>()("aggroRange")
+    .add<Path<Tile> | undefined>()("patrol"),
 );
 
 export const NpcInstanceCommons = defineSyncComponent((builder) => builder);
@@ -121,7 +121,7 @@ export class NpcInstance extends NpcInstanceCommons {
   alive = computed(() => this.combat.health > 0);
 
   constructor(init: NpcInstanceInit) {
-    super();
+    super({});
     this.identity = new NpcInstanceIdentity(init.identity);
     this.appearance = new AppearanceTrait(init.appearance);
     this.movement = new MovementTrait(init.movement);

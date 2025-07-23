@@ -5,12 +5,14 @@ import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
 
 describe("can collect changes from map of components", () => {
-  const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
+  const Entity = defineSyncComponent((builder) =>
+    builder.add<number>()("cash"),
+  );
   type Entity = typeof Entity.$infer;
 
   it("set", () => {
     const map = new SyncMap<string, Entity>();
-    map.set("john", new Entity());
+    map.set("john", new Entity({ cash: 0 }));
     map.get("john")!.cash = 50;
 
     const patch = map.flush();
@@ -22,9 +24,9 @@ describe("can collect changes from map of components", () => {
   });
 
   it("delete", () => {
-    const john = new Entity();
+    const john = new Entity({ cash: 0 });
     john.cash = 0;
-    const jane = new Entity();
+    const jane = new Entity({ cash: 0 });
     jane.cash = 50;
 
     const map = new SyncMap<string, Entity>([
@@ -45,7 +47,7 @@ describe("can collect changes from map of components", () => {
   });
 
   it("entity mutation", () => {
-    const john = new Entity();
+    const john = new Entity({ cash: 0 });
     john.cash = 0;
     const map = new SyncMap([["john", john]]);
 
@@ -55,7 +57,7 @@ describe("can collect changes from map of components", () => {
     // Apply and flush entity mutation
     john.cash = 25;
     const patch = map.flush();
-    const receiver: Record<string, Entity> = { john: new Entity() };
+    const receiver: Record<string, Entity> = { john: new Entity({ cash: 0 }) };
     applyPatch(receiver, patch);
 
     expect(receiver.john.cash).toBe(25);
@@ -63,10 +65,10 @@ describe("can collect changes from map of components", () => {
 });
 
 describe("can collect changes from map of nested components (plain class)", () => {
-  const Bank = defineSyncComponent((builder) => builder.add("cash", 0));
+  const Bank = defineSyncComponent((builder) => builder.add<number>()("cash"));
 
   class Entity {
-    bank = new Bank();
+    bank = new Bank({ cash: 0 });
   }
 
   it("set", () => {
@@ -124,15 +126,15 @@ describe("can collect changes from map of nested components (plain class)", () =
 });
 
 describe("can collect changes from map of nested components (empty component)", () => {
-  const Bank = defineSyncComponent((builder) => builder.add("cash", 0));
+  const Bank = defineSyncComponent((builder) => builder.add<number>()("cash"));
   const Empty = defineSyncComponent((builder) => builder);
   class Entity extends Empty {
-    bank = new Bank();
+    bank = new Bank({ cash: 0 });
   }
 
   it("set", () => {
     const map = new SyncMap<string, Entity>();
-    map.set("john", new Entity());
+    map.set("john", new Entity({}));
     map.get("john")!.bank.cash = 50;
 
     const patch = map.flush();
@@ -144,9 +146,9 @@ describe("can collect changes from map of nested components (empty component)", 
   });
 
   it("delete", () => {
-    const john = new Entity();
+    const john = new Entity({});
     john.bank.cash = 0;
-    const jane = new Entity();
+    const jane = new Entity({});
     jane.bank.cash = 50;
 
     const map = new SyncMap<string, Entity>([
@@ -167,7 +169,7 @@ describe("can collect changes from map of nested components (empty component)", 
   });
 
   it("entity mutation", () => {
-    const john = new Entity();
+    const john = new Entity({});
     john.bank.cash = 0;
     const map = new SyncMap([["john", john]]);
 
@@ -177,7 +179,7 @@ describe("can collect changes from map of nested components (empty component)", 
     // Apply and flush entity mutation
     john.bank.cash = 25;
     const patch = map.flush();
-    const receiver: Record<string, Entity> = { john: new Entity() };
+    const receiver: Record<string, Entity> = { john: new Entity({}) };
     applyPatch(receiver, patch);
 
     expect(receiver.john.bank.cash).toBe(25);
@@ -250,7 +252,9 @@ describe("effects", () => {
   });
 
   it("does not notify when entities are mutated", () => {
-    const Entity = defineSyncComponent((builder) => builder.add("name", ""));
+    const Entity = defineSyncComponent((builder) =>
+      builder.add<string>()("name"),
+    );
     type Entity = typeof Entity.$infer;
 
     const person = new Entity({ name: "john" });
