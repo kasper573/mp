@@ -18,7 +18,6 @@ import {
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
-  ctxTokenResolver,
   ctxUserService,
   gameServerEventRouter,
   NpcAi,
@@ -79,7 +78,7 @@ RateLimiter.enabled = opt.rateLimit;
 const userService = createUserService();
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const tokenResolver = createTokenResolver({
+const _ = createTokenResolver({
   ...opt.auth,
   getBypassUser,
   onResolve(result) {
@@ -200,7 +199,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxAreaLookup, areas)
-  .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxClientRegistry, clients)
   .provide(ctxLogger, logger)
   .provide(ctxAreaFileUrlResolver, (id) =>

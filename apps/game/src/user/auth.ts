@@ -1,13 +1,8 @@
-import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserId } from "@mp/auth";
-import type { TokenResolver } from "@mp/auth/server";
 import { eventHandlerBuilder } from "../network/event-definition";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
 import { ctxUserService } from "./service";
-
-export const ctxTokenResolver =
-  InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
   return eventHandlerBuilder.middleware(({ ctx }): AuthContext => {

@@ -92,12 +92,12 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../packages/math
+      '@mp/query':
+        specifier: workspace:*
+        version: link:../../packages/query
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../packages/rate-limiter
-      '@mp/rpc':
-        specifier: workspace:*
-        version: link:../../packages/rpc
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
@@ -110,6 +110,15 @@ importers:
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
+      '@trpc/client':
+        specifier: 11.4.3
+        version: 11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta)
+      '@trpc/server':
+        specifier: 11.4.3
+        version: 11.4.3(typescript@5.9.0-beta)
+      '@trpc/tanstack-react-query':
+        specifier: 11.4.3
+        version: 11.4.3(@tanstack/react-query@5.82.0(react@19.1.0))(@trpc/client@11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta))(@trpc/server@11.4.3(typescript@5.9.0-beta))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.9.0-beta)
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
@@ -2617,6 +2626,27 @@ packages:
   '@tanstack/virtual-file-routes@1.121.21':
     resolution: {integrity: sha512-3nuYsTyaq6ZN7jRZ9z6Gj3GXZqBOqOT0yzd/WZ33ZFfv4yVNIvsa5Lw+M1j3sgyEAxKMqGu/FaNi7FCjr3yOdw==}
     engines: {node: '>=12'}
+
+  '@trpc/client@11.4.3':
+    resolution: {integrity: sha512-i2suttUCfColktXT8bqex5kHW5jpT15nwUh0hGSDiW1keN621kSUQKcLJ095blqQAUgB+lsmgSqSMmB4L9shQQ==}
+    peerDependencies:
+      '@trpc/server': 11.4.3
+      typescript: '>=5.7.2'
+
+  '@trpc/server@11.4.3':
+    resolution: {integrity: sha512-wnWq3wiLlMOlYkaIZz+qbuYA5udPTLS4GVVRyFkr6aT83xpdCHyVtURT+u4hSoIrOXQM9OPCNXSXsAujWZDdaw==}
+    peerDependencies:
+      typescript: '>=5.7.2'
+
+  '@trpc/tanstack-react-query@11.4.3':
+    resolution: {integrity: sha512-aYPp12wE9IrakccGWoQU/waZuWr3FLw9RtagsqJmX9NKHpQOVzoDvHA1W0amwyTQSAfL98Bn5rWmD7KTdr5AWg==}
+    peerDependencies:
+      '@tanstack/react-query': ^5.80.3
+      '@trpc/client': 11.4.3
+      '@trpc/server': 11.4.3
+      react: '>=18.2.0'
+      react-dom: '>=18.2.0'
+      typescript: '>=5.7.2'
 
   '@tybys/wasm-util@0.10.0':
     resolution: {integrity: sha512-VyyPYFlOMNylG45GoAe0xDoLwWuowvf92F9kySqzYh8vmYm7D2u4iUJKa1tOUpS70Ku13ASrOkS4ScXFsTaCNQ==}
@@ -6439,6 +6469,24 @@ snapshots:
   '@tanstack/store@0.7.2': {}
 
   '@tanstack/virtual-file-routes@1.121.21': {}
+
+  '@trpc/client@11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta)':
+    dependencies:
+      '@trpc/server': 11.4.3(typescript@5.9.0-beta)
+      typescript: 5.9.0-beta
+
+  '@trpc/server@11.4.3(typescript@5.9.0-beta)':
+    dependencies:
+      typescript: 5.9.0-beta
+
+  '@trpc/tanstack-react-query@11.4.3(@tanstack/react-query@5.82.0(react@19.1.0))(@trpc/client@11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta))(@trpc/server@11.4.3(typescript@5.9.0-beta))(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(typescript@5.9.0-beta)':
+    dependencies:
+      '@tanstack/react-query': 5.82.0(react@19.1.0)
+      '@trpc/client': 11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta)
+      '@trpc/server': 11.4.3(typescript@5.9.0-beta)
+      react: 19.1.0
+      react-dom: 19.1.0(react@19.1.0)
+      typescript: 5.9.0-beta
 
   '@tybys/wasm-util@0.10.0':
     dependencies:

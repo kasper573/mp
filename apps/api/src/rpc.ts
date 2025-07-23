@@ -1,9 +1,8 @@
 import type { ImmutableInjectionContainer } from "@mp/ioc";
-import type { RpcMiddleware } from "@mp/rpc";
-import { RpcBuilder } from "@mp/rpc";
+import { initTRPC } from "@trpc/server";
 
-export const rpc = new RpcBuilder().context<ApiContext>().build();
+export const rpc = initTRPC.context<ApiContext>().create();
 
-export type ApiContext = ImmutableInjectionContainer;
-
-export type ApiMiddleware = RpcMiddleware<ApiContext, unknown, unknown>;
+export interface ApiContext {
+  ioc: ImmutableInjectionContainer;
+}

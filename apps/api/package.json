@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": {
-      "types": "./src/package.ts",
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
+    "./sdk": {
+      "types": "./src/sdk.ts",
+      "import": "./src/sdk.ts",
+      "require": "./src/sdk.ts"
     }
   },
   "scripts": {
@@ -24,7 +24,10 @@
     "@mp/auth": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
-    "@mp/rpc": "workspace:*",
+    "@trpc/server": "11.4.3",
+    "@trpc/client": "11.4.3",
+    "@trpc/tanstack-react-query": "11.4.3",
+    "@mp/query": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/validate": "workspace:*",

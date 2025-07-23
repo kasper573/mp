@@ -28,6 +28,8 @@ export const serverOptionsSchema = type({
    * Whether to trust the X-Forwarded-For header
    */
   trustProxy: boolish(),
+  apiEndpointPath: "string",
+  apiServiceUrl: "string",
 }).onDeepUndeclaredKey("delete");
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_GATEWAY_");

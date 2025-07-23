@@ -6,29 +6,33 @@ import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
-import { Rng, upsertMapSet } from "@mp/std";
-import { BinaryRpcBroker } from "@mp/rpc";
+import { upsertMapSet } from "@mp/std";
+
 import createCors from "cors";
 import express from "express";
 import http from "http";
+import { createProxyHandler } from "./proxy-handler";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 
-const rng = new Rng();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
-  .use(createCors({ origin: opt.corsOrigin }));
+  .use(createCors({ origin: opt.corsOrigin }))
+  .use(opt.apiEndpointPath, createProxyHandler(opt.apiServiceUrl));
 
 const httpServer = http.createServer(webServer);
 
 const sockets = new Map<SocketType, Set<WebSocket>>();
-const wss = new WebSocketServer({ server: httpServer }); // TODO verifyClient
+const wss = new WebSocketServer({
+  path: opt.wsEndpointPath,
+  server: httpServer,
+}); // TODO verifyClient
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
@@ -42,21 +46,13 @@ wss.on("connection", (socket, request) => {
 
   upsertMapSet(sockets, socketType, socket);
 
-  const rpcBroker = new BinaryRpcBroker({
-    sendCall: (data) => rng.oneOfMaybe(sockets.get("api-server"))?.send(data),
-    sendResponse: socket.send.bind(socket),
-  });
-
   socket.on("close", () => {
     logger.info(`${socketType} connection closed`);
     sockets.get(socketType)?.delete(socket);
   });
 
   socket.on("message", async (data: ArrayBuffer) => {
-    if (await rpcBroker.handleMessage(data)) {
-      logger.info(`RPC message passed onto broker`);
-      return;
-    }
+    // TODO route events based on socket type
   });
 
   socket.on("error", (err) => {
@@ -64,7 +60,7 @@ wss.on("connection", (socket, request) => {
   });
 });
 
-const SocketType = type.enumerated("api-server", "game-client", "game-server");
+const SocketType = type.enumerated("game-client", "game-server");
 type SocketType = typeof SocketType.infer;
 
 function getSearchParams(path = ""): URLSearchParams {

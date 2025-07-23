@@ -5,31 +5,29 @@ import type {
   AreaId,
   Character,
 } from "@mp/game/server";
-import { roles, systemRoles, worldRoles } from "@mp/game/server";
+import { systemRoles, worldRoles } from "@mp/game/server";
 import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
-import type { SimpleQueryQueryForItem, SearchResult } from "./pagination";
 import { rpc } from "./rpc";
 import { ctxResolver } from "./cdn";
 import path from "path";
+import { type } from "@mp/validate";
+import { roles } from "./middlewares/auth";
 
-export type ApiRpcRouter = typeof rpcRouter;
-export const rpcRouter = rpc.router({
-  buildVersion: rpc.procedure.output<string>().query(() => opt.version),
+export type ApiRpcRouter = typeof apiRouter;
+export const apiRouter = rpc.router({
+  buildVersion: rpc.procedure.query(() => opt.version),
 
-  ping: rpc.procedure.output<void>().query(() => {}),
+  ping: rpc.procedure.query(() => {}),
 
-  testError: rpc.procedure
-    .use(roles([systemRoles.useDevTools]))
-    .output<string>()
-    .query(() => {
-      throw new Error("This is a test error that was thrown in the server");
-    }),
+  testError: rpc.procedure.use(roles([systemRoles.useDevTools])).query(() => {
+    throw new Error("This is a test error that was thrown in the server");
+  }),
 
   isPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
-    .output<boolean>()
+    .output(type("boolean"))
     .query(() => {
       // TODO get config from database
       return true;
@@ -37,34 +35,28 @@ export const rpcRouter = rpc.router({
 
   setPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
-    .input<boolean>()
+    .input(type("boolean"))
     .mutation(() => {
       // TODO update config in database
     }),
 
-  characterList: rpc.procedure
-    .use(roles([worldRoles.spectate]))
-    .input<SimpleQueryQueryForItem<Character> | undefined>()
-    .output<SearchResult<Character>>()
-    .query(() => {
-      // TODO query the database for online characters
-      return {
-        items: [],
-        total: 0,
-      };
-    }),
+  characterList: rpc.procedure.use(roles([worldRoles.spectate])).query(() => {
+    // TODO query the database for online characters
+    return {
+      items: [] as Character[],
+      total: 0,
+    };
+  }),
 
   areaFileUrl: rpc.procedure
-    .input<AreaId>()
-    .output<PublicUrl>()
+    .input(type("string").brand("AreaId"))
     .query(({ input: areaId, ctx }) =>
-      ctx.get(ctxResolver).abs("areas", areaId),
+      ctx.ioc.get(ctxResolver).abs("areas", areaId),
     ),
 
-  actorSpritesheetUrls: rpc.procedure
-    .output<ActorSpritesheetUrls>()
-    .query(async ({ ctx }) => {
-      const cdn = ctx.get(ctxResolver);
+  actorSpritesheetUrls: rpc.procedure.query(
+    async ({ ctx }): Promise<ActorSpritesheetUrls> => {
+      const cdn = ctx.ioc.get(ctxResolver);
       const modelFolders = await cdn.dir<ActorModelId>("actors");
       return new Map(
         await Promise.all(
@@ -89,7 +81,8 @@ export const rpcRouter = rpc.router({
           }),
         ),
       );
-    }),
+    },
+  ),
 });
 
 export const ctxAreaFileUrlResolver = InjectionContext.new<
