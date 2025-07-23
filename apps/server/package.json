@@ -15,12 +15,12 @@
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
-    "db": "drizzle-kit",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
     "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/keycloak-provision.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
@@ -39,18 +39,14 @@
     "@mp/ws": "workspace:*",
     "cors": "2.8.5",
     "dotenv": "catalog:",
-    "drizzle-orm": "0.38.3",
     "express": "catalog:",
-    "pg": "8.13.1",
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/cors": "2.8.17",
     "@types/express": "catalog:",
-    "@types/pg": "8.11.10",
     "builtin-modules": "5.0.0",
-    "drizzle-kit": "0.30.1",
     "esbuild": "0.25.6",
     "tsx": "catalog:"
   }

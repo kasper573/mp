@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq } from "@mp/db";
 import {
   type NpcSpawn,
   type Npc,
@@ -6,8 +6,8 @@ import {
   type AreaLookup,
   deriveNpcSpawnsFromAreas,
 } from "@mp/game/server";
-import { npcSpawnTable, npcTable } from "../schema";
-import type { DbClient } from "../client";
+import { npcSpawnTable, npcTable } from "@mp/db";
+import type { DbClient } from "@mp/db";
 
 export function createNpcService(
   db: DbClient,

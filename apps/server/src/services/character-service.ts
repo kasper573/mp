@@ -11,9 +11,9 @@ import {
   type UserService,
   Character,
 } from "@mp/game/server";
-import { eq } from "drizzle-orm";
-import type { DbClient } from "../client";
-import { characterTable } from "../schema";
+import { eq } from "@mp/db";
+import type { DbClient } from "../../../db/src/client";
+import { characterTable } from "../../../db/src/schema";
 
 export function createCharacterService(
   db: DbClient,

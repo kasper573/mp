@@ -157,6 +157,37 @@ importers:
         specifier: 0.9.3
         version: 0.9.3(eslint@9.7.0)(optionator@0.9.4)(typescript@5.8.3)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
 
+  apps/db:
+    dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../game
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../packages/std
+      drizzle-orm:
+        specifier: 0.38.3
+        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
+      drizzle-kit:
+        specifier: 0.30.1
+        version: 0.30.1
+
   apps/e2e:
     devDependencies:
       '@faker-js/faker':
@@ -330,6 +361,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@mp/db':
+        specifier: workspace:*
+        version: link:../db
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
@@ -384,15 +418,9 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
-      drizzle-orm:
-        specifier: 0.38.3
-        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)
       express:
         specifier: 'catalog:'
         version: 5.1.0
-      pg:
-        specifier: 8.13.1
-        version: 8.13.1
       unique-names-generator:
         specifier: 4.7.1
         version: 4.7.1
@@ -406,15 +434,9 @@ importers:
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.3
-      '@types/pg':
-        specifier: 8.11.10
-        version: 8.11.10
       builtin-modules:
         specifier: 5.0.0
         version: 5.0.0
-      drizzle-kit:
-        specifier: 0.30.1
-        version: 0.30.1
       esbuild:
         specifier: 0.25.6
         version: 0.25.6

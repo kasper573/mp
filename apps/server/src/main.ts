@@ -60,11 +60,13 @@ import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
-import { createNpcService } from "./db/services/npc-service";
-import { createDbClient } from "./db/client";
-import { createCharacterService } from "./db/services/character-service";
-import { createUserService } from "./db/services/user-service";
-import { createGameStateService } from "./db/services/game-service";
+import {
+  createNpcService,
+  createDbClient,
+  createCharacterService,
+  createUserService,
+  createGameStateService,
+} from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 import { ctxGlobalRpcMiddleware } from "./etc/rpc-builder";
