@@ -5,7 +5,7 @@ import {
   PatchType,
   type PatchPath,
 } from "./patch";
-import { isSyncComponent } from "./sync-component";
+import { flushObject } from "./sync-component";
 
 import type { IndexDefinition, IndexResolvers } from "@mp/index";
 import { Index } from "@mp/index";
@@ -101,10 +101,7 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
 
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
     for (const key of staleKeys) {
-      const v = this.get(key) as V;
-      if (isSyncComponent(v)) {
-        v.flush([...path, String(key)], patch);
-      }
+      flushObject(this.get(key), [...path, String(key)], patch);
     }
 
     this.#keysLastFlush = currentKeys;

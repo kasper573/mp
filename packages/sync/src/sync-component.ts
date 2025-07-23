@@ -77,12 +77,7 @@ class SyncComponentBuilder<Values extends object> {
           patch.push([PatchType.Update, path as PatchPath, changes]);
           this.meta.changes = undefined;
         }
-        for (const key in this) {
-          const value = this[key];
-          if (isSyncComponent(value)) {
-            value.flush([...path, key], patch);
-          }
-        }
+        flushProperties(this, path, patch);
         return patch;
       }
 
@@ -108,6 +103,31 @@ class SyncComponentBuilder<Values extends object> {
     }
 
     return SyncComponent as unknown as SyncComponentConstructor<Values>;
+  }
+}
+
+export function flushObject<T>(
+  target: T,
+  path: PatchPathStep[] = [],
+  patch: Patch = [],
+): Patch {
+  if (isSyncComponent(target)) {
+    return target.flush(path, patch);
+  }
+  flushProperties(target, path, patch);
+  return patch;
+}
+
+function flushProperties<T>(
+  target: T,
+  path: PatchPathStep[] = [],
+  patch: Patch = [],
+) {
+  for (const key in target) {
+    const value = target[key];
+    if (isSyncComponent(value)) {
+      value.flush([...path, key], patch);
+    }
   }
 }
 
