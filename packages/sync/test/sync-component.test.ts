@@ -73,6 +73,60 @@ it("cannot create components that lack property initializers without providing a
   expect(() => new Component()).toThrow();
 });
 
+it("can flush initial state of nested components", () => {
+  type Bank = typeof Bank.$infer;
+
+  const Bank = defineSyncComponent((builder) =>
+    builder.add<"cash", number>("cash", 0),
+  );
+
+  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+
+  class Outer extends Base {
+    readonly bank = new Bank();
+  }
+
+  const char = new Outer();
+  char.name = "jane";
+  char.bank.cash = 50;
+  const patch = char.flush();
+
+  expect(patch).toEqual([
+    [PatchType.Update, [], { name: "jane" }],
+    [PatchType.Update, ["bank"], { cash: 50 }],
+  ]);
+});
+
+it("can flush updates of nested components", () => {
+  type Bank = typeof Bank.$infer;
+
+  const Bank = defineSyncComponent((builder) =>
+    builder.add<"cash", number>("cash", 0),
+  );
+
+  const Base = defineSyncComponent((builder) => builder.add("name", ""));
+
+  class Outer extends Base {
+    readonly bank = new Bank();
+  }
+
+  const char = new Outer();
+
+  char.name = "john";
+  char.bank.cash = 25;
+  char.flush(); // Discard initial state
+
+  char.name = "jane";
+  char.bank.cash = 50;
+
+  const patch = char.flush();
+
+  expect(patch).toEqual([
+    [PatchType.Update, [], { name: "jane" }],
+    [PatchType.Update, ["bank"], { cash: 50 }],
+  ]);
+});
+
 describe("effects", () => {
   it("can listen to changes on class instances", () => {
     const Component = defineSyncComponent((builder) =>

@@ -75,13 +75,13 @@ class SyncComponentBuilder<Values extends object> {
         const changes = this.meta.changes;
         if (changes) {
           patch.push([PatchType.Update, path as PatchPath, changes]);
-          for (const key in this) {
-            const value = this[key];
-            if (isSyncComponent(value)) {
-              value.flush([...path, key], patch);
-            }
-          }
           this.meta.changes = undefined;
+        }
+        for (const key in this) {
+          const value = this[key];
+          if (isSyncComponent(value)) {
+            value.flush([...path, key], patch);
+          }
         }
         return patch;
       }

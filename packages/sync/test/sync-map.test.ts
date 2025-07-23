@@ -4,11 +4,11 @@ import { defineSyncComponent } from "../src/sync-component";
 import { SyncMap } from "../src/sync-map";
 import { applyPatch } from "../src/patch";
 
-describe("can collect changes from map of decorated entities", () => {
-  it("set", () => {
-    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
-    type Entity = typeof Entity.$infer;
+describe("can collect changes from map of components", () => {
+  const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
+  type Entity = typeof Entity.$infer;
 
+  it("set", () => {
     const map = new SyncMap<string, Entity>();
     map.set("john", new Entity());
     map.get("john")!.cash = 50;
@@ -22,9 +22,6 @@ describe("can collect changes from map of decorated entities", () => {
   });
 
   it("delete", () => {
-    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
-    type Entity = typeof Entity.$infer;
-
     const john = new Entity();
     john.cash = 0;
     const jane = new Entity();
@@ -48,23 +45,142 @@ describe("can collect changes from map of decorated entities", () => {
   });
 
   it("entity mutation", () => {
-    const Entity = defineSyncComponent((builder) => builder.add("cash", 0));
-    type Entity = typeof Entity.$infer;
-
     const john = new Entity();
     john.cash = 0;
     const map = new SyncMap([["john", john]]);
 
-    // Flush initial state
-    const receiver: Record<string, Entity> = {};
-    const patch = map.flush();
-    applyPatch(receiver, patch);
+    // Discard initial state
+    map.flush();
 
     // Apply and flush entity mutation
     john.cash = 25;
+    const patch = map.flush();
+    const receiver: Record<string, Entity> = { john: new Entity() };
     applyPatch(receiver, patch);
 
     expect(receiver.john.cash).toBe(25);
+  });
+});
+
+describe("can collect changes from map of nested components (plain class)", () => {
+  const Bank = defineSyncComponent((builder) => builder.add("cash", 0));
+
+  class Entity {
+    bank = new Bank();
+  }
+
+  it("set", () => {
+    const map = new SyncMap<string, Entity>();
+    map.set("john", new Entity());
+    map.get("john")!.bank.cash = 50;
+
+    const patch = map.flush();
+
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, patch);
+
+    expect(receiver.john.bank.cash).toBe(50);
+  });
+
+  it("delete", () => {
+    const john = new Entity();
+    john.bank.cash = 0;
+    const jane = new Entity();
+    jane.bank.cash = 50;
+
+    const map = new SyncMap<string, Entity>([
+      ["john", john],
+      ["jane", jane],
+    ]);
+
+    // Flush initial state
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, map.flush());
+
+    // Apply and flush delete
+    map.delete("john");
+    applyPatch(receiver, map.flush());
+
+    expect(receiver.john).toBeUndefined();
+    expect(receiver.jane.bank.cash).toBe(50);
+  });
+
+  it("entity mutation", () => {
+    const john = new Entity();
+    john.bank.cash = 0;
+    const map = new SyncMap([["john", john]]);
+
+    // Discard initial state
+    map.flush();
+
+    // Apply and flush entity mutation
+    john.bank.cash = 25;
+    const patch = map.flush();
+    const receiver: Record<string, Entity> = { john: new Entity() };
+    applyPatch(receiver, patch);
+
+    expect(receiver.john.bank.cash).toBe(25);
+  });
+});
+
+describe("can collect changes from map of nested components (empty component)", () => {
+  const Bank = defineSyncComponent((builder) => builder.add("cash", 0));
+  const Empty = defineSyncComponent((builder) => builder);
+  class Entity extends Empty {
+    bank = new Bank();
+  }
+
+  it("set", () => {
+    const map = new SyncMap<string, Entity>();
+    map.set("john", new Entity());
+    map.get("john")!.bank.cash = 50;
+
+    const patch = map.flush();
+
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, patch);
+
+    expect(receiver.john.bank.cash).toBe(50);
+  });
+
+  it("delete", () => {
+    const john = new Entity();
+    john.bank.cash = 0;
+    const jane = new Entity();
+    jane.bank.cash = 50;
+
+    const map = new SyncMap<string, Entity>([
+      ["john", john],
+      ["jane", jane],
+    ]);
+
+    // Flush initial state
+    const receiver: Record<string, Entity> = {};
+    applyPatch(receiver, map.flush());
+
+    // Apply and flush delete
+    map.delete("john");
+    applyPatch(receiver, map.flush());
+
+    expect(receiver.john).toBeUndefined();
+    expect(receiver.jane.bank.cash).toBe(50);
+  });
+
+  it("entity mutation", () => {
+    const john = new Entity();
+    john.bank.cash = 0;
+    const map = new SyncMap([["john", john]]);
+
+    // Discard initial state
+    map.flush();
+
+    // Apply and flush entity mutation
+    john.bank.cash = 25;
+    const patch = map.flush();
+    const receiver: Record<string, Entity> = { john: new Entity() };
+    applyPatch(receiver, patch);
+
+    expect(receiver.john.bank.cash).toBe(25);
   });
 });
 
