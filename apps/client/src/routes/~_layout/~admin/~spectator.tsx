@@ -36,7 +36,7 @@ function RouteComponent() {
 
   useEffect(() => stateClient.start(), [stateClient]);
 
-  const characterOptions = rpc.system.characterList.useQuery({
+  const characterOptions = rpc.characterList.useQuery({
     input: void 0,
     refetchInterval: 5000,
     enabled: !!auth.identity.value,

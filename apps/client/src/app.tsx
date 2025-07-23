@@ -70,7 +70,7 @@ function createSystems() {
     logger,
     socket: createWebSocket(env.wsUrl),
     getAccessToken: () => auth.identity.value?.token,
-    handshake: (token) => rpc.system.auth(token),
+    handshake: (token) => rpc.auth(token),
   });
   const router = createClientRouter();
   const faro = createFaroClient();

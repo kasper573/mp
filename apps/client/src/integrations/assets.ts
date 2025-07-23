@@ -23,7 +23,7 @@ export const useGameAssets: GameAssetLoader = (areaId) => {
 
 export function useActorSpritesheets(): ActorSpritesheetLookup {
   const rpc = useContext(RpcClientContext);
-  const query = rpc.system.actorSpritesheetUrls.useSuspenseQuery({
+  const query = rpc.actorSpritesheetUrls.useSuspenseQuery({
     input: void 0,
     map: loadActorSpritesheets,
   });
@@ -33,7 +33,7 @@ export function useActorSpritesheets(): ActorSpritesheetLookup {
 
 export function useAreaResource(areaId: AreaId): AreaResource {
   const rpc = useContext(RpcClientContext);
-  const query = rpc.system.areaFileUrl.useSuspenseQuery({
+  const query = rpc.areaFileUrl.useSuspenseQuery({
     input: areaId,
     staleTime: Infinity,
     map: loadAreaResource,
