@@ -19,7 +19,6 @@
     "@mp/ws": "workspace:*"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-decorators": "catalog:",
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@types/yargs": "17.0.33",
