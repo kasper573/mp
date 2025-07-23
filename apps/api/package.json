@@ -1,0 +1,24 @@
+{
+  "name": "@mp/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
+    "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch src/main.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/env": "workspace:*",
+    "@mp/game": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/validate": "workspace:*",
+    "@mp/ws": "workspace:*",
+    "dotenv": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "tsx": "catalog:"
+  }
+}
