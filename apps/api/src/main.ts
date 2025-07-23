@@ -11,12 +11,15 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting api...`);
 
-logger.info("Creating socket");
-const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
+const gatewaySocketUrl = new URL(opt.gatewayWssUrl);
+gatewaySocketUrl.searchParams.set("type", "api-server");
 
-gatewaySocket.addEventListener("close", (e) =>
-  logger.error(e, "Gateway socket closed"),
-);
+logger.info("Creating socket");
+const gatewaySocket = new WebSocket(gatewaySocketUrl);
+
+gatewaySocket.addEventListener("close", (e) => {
+  logger.error(e, "Gateway socket closed");
+});
 
 gatewaySocket.addEventListener("open", () =>
   logger.info("Gateway socket opened"),

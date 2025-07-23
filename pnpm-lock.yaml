@@ -303,6 +303,12 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../packages/std
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate

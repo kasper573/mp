@@ -10,7 +10,9 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@mp/std": "workspace:*",
     "@mp/env": "workspace:*",
+    "@mp/rpc": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/validate": "workspace:*",

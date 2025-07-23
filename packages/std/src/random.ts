@@ -16,8 +16,8 @@ export class Rng {
     return items[Math.floor(this.next() * items.length)];
   }
 
-  oneOfMaybe<T>(arr: Iterable<T>): T | undefined {
-    return this.oneOf(arr);
+  oneOfMaybe<T>(arr?: Iterable<T>): T | undefined {
+    return arr ? this.oneOf(arr) : undefined;
   }
 
   shuffle<T>(arr: readonly T[]): T[] {

@@ -8,33 +8,33 @@ export interface BinaryRpcTransceiverOptions<Context>
   send: (messageBuffer: ArrayBufferLike) => unknown;
 }
 
+// Claiming the range 41_000 - 41_999 for the binary Rpc protocol
+export const rpcCallEncoding = createEncoding<RpcCall<unknown>>(41_000);
+export const rpcResponseEncoding = createEncoding<RpcResponse<unknown>>(41_001);
+
 export class BinaryRpcTransceiver<
   Context = void,
 > extends RpcTransceiver<Context> {
-  // Claiming the range 41_000 - 41_999 for the binary Rpc protocol
-  private callEncoding = createEncoding<RpcCall<unknown>>(41_000);
-  private responseEncoding = createEncoding<RpcResponse<unknown>>(41_001);
-
   constructor({ send, ...options }: BinaryRpcTransceiverOptions<Context>) {
     super({
       ...options,
       sendCall: (call) => {
-        send(this.callEncoding.encode(call));
+        send(rpcCallEncoding.encode(call));
       },
       sendResponse: (response) => {
-        send(this.responseEncoding.encode(response));
+        send(rpcResponseEncoding.encode(response));
       },
     });
   }
 
   handleMessage = async (data: ArrayBufferLike, context: Context) => {
-    const call = this.callEncoding.decode(data);
+    const call = rpcCallEncoding.decode(data);
     if (call.isOk()) {
       const result = await this.handleCall(call.value, context);
       return { call: call.value, result };
     }
 
-    const response = this.responseEncoding.decode(data);
+    const response = rpcResponseEncoding.decode(data);
     if (response.isOk()) {
       const result = this.handleResponse(response.value);
       return { response: response.value, result };
