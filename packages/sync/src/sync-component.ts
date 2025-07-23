@@ -10,6 +10,13 @@ export function defineSyncComponent<Values extends object>(
   return nextBuilder(new SyncComponentBuilder({})).build();
 }
 
+/**
+ * This builder pattern exists as a temporary solution before we can start using a @collect decorator (like use used to).
+ *
+ * Decorators are actually supported in TypeScript and ECMAScript,
+ * but various tooling like drizzle-kit and babel and esbuild doesn't support it out of the box,
+ * so instead of dealing with the whole mess of polyfilling decorators, we use this builder pattern.
+ */
 class SyncComponentBuilder<Values extends object> {
   constructor(private definitions: SyncComponentPropertyDefinitions<Values>) {}
 
@@ -43,7 +50,12 @@ class SyncComponentBuilder<Values extends object> {
           patch.push([PatchType.Update, path as PatchPath, this.#changes]);
           this.#changes = undefined;
         }
-        flushProperties(this, path, patch);
+        for (const key in this) {
+          const child = this[key as keyof this];
+          if (isSyncComponent(child)) {
+            child.flush([...path, key], patch);
+          }
+        }
         return patch;
       }
 
@@ -52,16 +64,16 @@ class SyncComponentBuilder<Values extends object> {
        * Will also include descendant SyncComponent instances (if any).
        */
       snapshot(): Values {
-        const snapshot: Record<string, unknown> = {};
+        const snapshot: Record<PropertyKey, unknown> = {};
         // Add property values
         for (const name in definitions) {
           snapshot[name] = this[name as keyof this];
         }
         // Add nested components
         for (const key in this) {
-          const value = this[key];
-          if (isSyncComponent(value)) {
-            snapshot[key] = value.snapshot();
+          const child = this[key as keyof this];
+          if (isSyncComponent(child)) {
+            snapshot[key] = child.snapshot();
           }
         }
         return snapshot as Values;
@@ -104,31 +116,6 @@ class SyncComponentBuilder<Values extends object> {
       }
     }
     return SpecificSyncComponent as unknown as SyncComponentConstructor<Values>;
-  }
-}
-
-export function flushObject<T>(
-  target: T,
-  path: PatchPathStep[] = [],
-  patch: Patch = [],
-): Patch {
-  if (isSyncComponent(target)) {
-    return target.flush(path, patch);
-  }
-  flushProperties(target, path, patch);
-  return patch;
-}
-
-function flushProperties<T>(
-  target: T,
-  path: PatchPathStep[] = [],
-  patch: Patch = [],
-) {
-  for (const key in target) {
-    const value = target[key];
-    if (isSyncComponent(value)) {
-      value.flush([...path, key], patch);
-    }
   }
 }
 
