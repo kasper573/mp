@@ -16,8 +16,6 @@ export function createNpcService(
 ): NpcService {
   return {
     async getAllSpawnsAndTheirNpcs() {
-      return [];
-
       const result = await db
         .select()
         .from(npcSpawnTable)
