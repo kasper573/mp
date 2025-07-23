@@ -4,7 +4,7 @@ import type { Logger } from "@mp/logger";
 export interface AuthHandshakeOptions {
   socket: WebSocket;
   logger: Logger;
-  handshake: (token: AccessToken) => Promise<unknown>;
+  sendToken: (token: AccessToken) => void;
   getAccessToken: () => AccessToken | undefined;
 }
 
@@ -15,22 +15,18 @@ export function enhanceWebSocketWithAuthHandshake(
   opt: AuthHandshakeOptions,
 ): AuthHandshakeEnhancedWebSocket {
   let lastSeenToken: AccessToken | undefined;
-  let currentAuthSendPromise: Promise<void> | undefined;
 
   const originalSend = opt.socket.send.bind(opt.socket);
 
-  opt.socket.send = async (...args) => {
+  opt.socket.send = (...args) => {
     const token = opt.getAccessToken();
     const didTokenChange = token !== lastSeenToken;
     lastSeenToken = token;
 
-    if (didTokenChange && token && !currentAuthSendPromise) {
+    if (didTokenChange && token) {
       opt.logger.debug("Delaying socket send. Performing new auth handshake.");
-      currentAuthSendPromise = opt.handshake(token).then(() => {
-        currentAuthSendPromise = undefined;
-      });
+      opt.sendToken(token);
     }
-    await currentAuthSendPromise;
     originalSend(...args);
   };
 
@@ -44,7 +40,6 @@ export function enhanceWebSocketWithAuthHandshake(
         "WebSocket closed abnormally, will re-authenticate on next socket send",
       );
       lastSeenToken = undefined;
-      currentAuthSendPromise = undefined;
     }
   }
 

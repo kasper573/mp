@@ -2,12 +2,9 @@ import type { AccessToken, RoleDefinition, UserId } from "@mp/auth";
 import type { ApiContext } from "../rpc";
 import { rpc } from "../rpc";
 import { InjectionContext } from "@mp/ioc";
-import type { TokenResolver } from "@mp/auth/server";
+import { ctxTokenResolver } from "@mp/game/server";
 
 export const ctxToken = InjectionContext.new<AccessToken>("AccessToken");
-
-export const ctxTokenResolver =
-  InjectionContext.new<TokenResolver>("TokenResolver");
 
 export function auth() {
   return rpc.middleware(async ({ ctx, next }) => {

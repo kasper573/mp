@@ -8,6 +8,8 @@ import type { CharacterId } from "../character/types";
 import { ctxCharacterService } from "../character/service";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { worldRoles } from "../user/roles";
+import type { AccessToken } from "@mp/auth";
+import { ctxTokenResolver } from "../context/common";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = eventHandlerBuilder.router({
@@ -68,6 +70,19 @@ export const worldRouter = eventHandlerBuilder.router({
     clients.characterIds.delete(clientId);
     clients.spectatedCharacterIds.delete(clientId);
   }),
+
+  auth: eventHandlerBuilder.event
+    .input<AccessToken>()
+    .handler(async ({ input, ctx }) => {
+      const clientId = ctx.get(ctxClientId);
+      const clients = ctx.get(ctxClientRegistry);
+      const tokenResolver = ctx.get(ctxTokenResolver);
+      const result = await tokenResolver(input);
+      if (result.isErr()) {
+        throw new Error("Invalid token", { cause: result.error });
+      }
+      clients.userIds.set(clientId, result.value.id);
+    }),
 });
 
 export const worldEventRouterSlice = { world: worldRouter };

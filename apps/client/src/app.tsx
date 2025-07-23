@@ -71,7 +71,7 @@ function createSystems() {
     logger,
     socket: socketWithoutHandshake,
     getAccessToken: () => auth.identity.value?.token,
-    handshake: (token) => eventClientWithoutHandshake.world.auth(token),
+    sendToken: (token) => eventClientWithoutHandshake.world.auth(token),
   });
   const router = createClientRouter();
   const faro = createFaroClient();
