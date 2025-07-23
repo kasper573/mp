@@ -5,7 +5,7 @@ export type ClientEnv = typeof clientEnvSchema.infer;
 
 const clientEnvSchema = type({
   wsUrl: "string",
-  buildVersion: "string",
+  version: "string",
   retryRpcQueries: numeric().default(0),
   auth: {
     authority: "string",

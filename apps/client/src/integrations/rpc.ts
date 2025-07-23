@@ -1,4 +1,4 @@
-import type { ServerRpcRouter } from "@mp/server";
+import type { ApiRpcRouter } from "@mp/api";
 import type { ReactRpcInvoker } from "@mp/rpc/react";
 import { createReactRpcInvoker } from "@mp/rpc/react";
 import { useContext } from "preact/hooks";
@@ -6,7 +6,7 @@ import type { Logger } from "@mp/logger";
 import { BinaryRpcTransceiver } from "@mp/rpc";
 import { createContext } from "preact";
 
-export type RpcClient = ReactRpcInvoker<ServerRpcRouter>;
+export type RpcClient = ReactRpcInvoker<ApiRpcRouter>;
 
 export type RpcClientMiddleware = () => Promise<unknown>;
 
@@ -15,7 +15,7 @@ export function createRpcClient(socket: WebSocket, logger: Logger) {
     send: (data) => socket.send(data),
   });
 
-  const invoker = createReactRpcInvoker<ServerRpcRouter>(transceiver.call);
+  const invoker = createReactRpcInvoker<ApiRpcRouter>(transceiver.call);
 
   function initialize() {
     const handleMessage = transceiver.messageEventHandler(logger.error);

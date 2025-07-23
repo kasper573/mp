@@ -74,15 +74,36 @@ importers:
 
   apps/api:
     dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
       '@mp/game':
         specifier: workspace:*
         version: link:../game
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../../packages/ioc
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../packages/math
+      '@mp/rate-limiter':
+        specifier: workspace:*
+        version: link:../../packages/rate-limiter
+      '@mp/rpc':
+        specifier: workspace:*
+        version: link:../../packages/rpc
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../packages/std
+      '@mp/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -102,6 +123,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@mp/api':
+        specifier: workspace:*
+        version: link:../api
       '@mp/auth':
         specifier: workspace:*
         version: link:../../packages/auth
@@ -123,9 +147,6 @@ importers:
       '@mp/rpc':
         specifier: workspace:*
         version: link:../../packages/rpc
-      '@mp/server':
-        specifier: workspace:*
-        version: link:../server
       '@mp/state':
         specifier: workspace:*
         version: link:../../packages/state
@@ -315,6 +336,9 @@ importers:
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
+      cors:
+        specifier: 2.8.5
+        version: 2.8.5
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
@@ -325,6 +349,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
+      '@types/cors':
+        specifier: 2.8.17
+        version: 2.8.17
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.3
@@ -437,9 +464,6 @@ importers:
       '@mp/ws':
         specifier: workspace:*
         version: link:../../packages/ws
-      cors:
-        specifier: 2.8.5
-        version: 2.8.5
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
@@ -453,9 +477,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
-      '@types/cors':
-        specifier: 2.8.17
-        version: 2.8.17
       '@types/express':
         specifier: 'catalog:'
         version: 5.0.3

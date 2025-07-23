@@ -36,6 +36,5 @@ export * from "./client-view-distance-settings";
 export * from "./game-state/game-state";
 export * from "./game-state/game-state-server";
 export * from "./game-state/game-state-events";
-export * from "./context/ioc";
 export * from "./context/common";
 export * from "./rng";

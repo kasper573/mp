@@ -20,7 +20,14 @@ export const serverOptionsSchema = type({
    * The CORS origin to allow
    */
   corsOrigin: "string",
+  /**
+   * Whether to show pretty logs (Useful for development)
+   */
   prettyLogs: boolish(),
+  /**
+   * Whether to trust the X-Forwarded-For header
+   */
+  trustProxy: boolish(),
 }).onDeepUndeclaredKey("delete");
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_GATEWAY_");

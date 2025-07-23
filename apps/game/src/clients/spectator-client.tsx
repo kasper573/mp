@@ -18,7 +18,7 @@ export function SpectatorClient(
   props: GameClientProps & { characterOptions: SelectOption<CharacterId>[] },
 ) {
   const spectatedCharacterId = useSignal<CharacterId>();
-  const rpc = ioc.get(ctxGameEventClient);
+  const events = ioc.get(ctxGameEventClient);
   const auth = ioc.get(ctxAuthClient);
 
   useSignalEffect(() => {
@@ -28,7 +28,7 @@ export function SpectatorClient(
       spectatedCharacterId.value
     ) {
       props.stateClient.characterId.value = spectatedCharacterId.value;
-      void rpc.world.spectate(spectatedCharacterId.value);
+      void events.world.spectate(spectatedCharacterId.value);
     }
   });
 

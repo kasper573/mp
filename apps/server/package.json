@@ -3,13 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./src/package.ts",
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
-    }
-  },
   "scripts": {
     "build": "tsc && tsx esbuild.ts",
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
@@ -29,7 +22,6 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
-    "@mp/rpc": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/telemetry": "workspace:*",
@@ -37,15 +29,13 @@
     "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "cors": "2.8.5",
     "dotenv": "catalog:",
     "express": "catalog:",
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/cors": "2.8.17",
     "@types/express": "catalog:",
+    "@mp/tsconfig": "workspace:*",
     "builtin-modules": "5.0.0",
     "esbuild": "0.25.6",
     "tsx": "catalog:"

@@ -145,8 +145,7 @@ jobs:
             # Set production host env vars
             echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" > .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
-            echo "MP_SERVER_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
-            echo "MP_CLIENT_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             echo "MP_DOMAIN=\"${{ vars.MP_DOMAIN }}\"" >> .env
             echo "KC_SMTP_HOST=\"${{ vars.KC_SMTP_HOST }}\"" >> .env
             echo "KC_SMTP_PORT=\"${{ vars.KC_SMTP_PORT }}\"" >> .env

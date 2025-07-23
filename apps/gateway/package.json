@@ -18,10 +18,12 @@
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "dotenv": "catalog:",
-    "express": "catalog:"
+    "express": "catalog:",
+    "cors": "2.8.5"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "@types/cors": "2.8.17",
     "@types/express": "catalog:",
     "tsx": "catalog:"
   }

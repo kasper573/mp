@@ -8,6 +8,9 @@ import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
 import { Rng, upsertMapSet } from "@mp/std";
 import { BinaryRpcBroker } from "@mp/rpc";
+import createCors from "cors";
+import express from "express";
+import http from "http";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -17,13 +20,26 @@ const rng = new Rng();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
+const webServer = express()
+  .set("trust proxy", opt.trustProxy)
+  .use("/health", (req, res) => res.send("OK"))
+  .use(createCors({ origin: opt.corsOrigin }));
+
+const httpServer = http.createServer(webServer);
+
 const sockets = new Map<SocketType, Set<WebSocket>>();
-const wss = new WebSocketServer({ port: opt.port });
+const wss = new WebSocketServer({ server: httpServer }); // TODO verifyClient
+
+httpServer.listen(opt.port, opt.hostname, () => {
+  logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
+});
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
   const socketType = getSocketType(request);
+
   logger.info(`New ${socketType} connection established`);
+
   upsertMapSet(sockets, socketType, socket);
 
   const rpcBroker = new BinaryRpcBroker({
@@ -32,7 +48,7 @@ wss.on("connection", (socket, request) => {
   });
 
   socket.on("close", () => {
-    logger.info("Connection closed");
+    logger.info(`${socketType} connection closed`);
     sockets.get(socketType)?.delete(socket);
   });
 
@@ -44,7 +60,7 @@ wss.on("connection", (socket, request) => {
   });
 
   socket.on("error", (err) => {
-    logger.error(err, "WebSocket error");
+    logger.error(err, `Error in ${socketType} connection`);
   });
 });
 

@@ -2,7 +2,7 @@ import "dotenv/config";
 import http from "node:http";
 import path from "node:path";
 import express from "express";
-import createCors from "cors";
+
 import { createTokenResolver } from "@mp/auth/server";
 import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
@@ -46,15 +46,11 @@ import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectGameStateMetrics } from "./metrics/game-state";
-import { createExpressLogger } from "./express/logger";
+
 import { opt } from "./options";
-import {
-  rateLimiterEventMiddleware,
-  rateLimiterRpcMiddleware,
-} from "./etc/rate-limiter-middleware";
+import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
-import { serverRpcRouter } from "./rpc";
-import { setupRpc } from "./etc/setup-rpc";
+
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
@@ -63,8 +59,7 @@ import { playerRoles } from "./roles";
 import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
-import { ctxGlobalRpcMiddleware } from "./etc/rpc-builder";
-import { ctxAreaFileUrlResolver } from "./etc/system-rpc";
+import { ctxAreaFileUrlResolver } from "../../api/src/router";
 import { setupEventRouter } from "./etc/setup-event-router";
 import { createCharacterService } from "./services/character-service";
 import { createGameStateService } from "./services/game-service";
@@ -100,16 +95,7 @@ db.$client.on("error", (err) => logger.error(err, "Database error"));
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use(metricsMiddleware(metrics))
-  .use("/health", (req, res) => res.send("OK"))
-  // the above is intentionally placed before logger since it's so verbose and unnecessary to log
-  .use(createExpressLogger(logger))
-  .use(createCors({ origin: opt.corsOrigin }))
-  .use(
-    opt.publicPath,
-    express.static(opt.publicDir, {
-      maxAge: opt.publicMaxAge * 1000,
-    }),
-  );
+  .use("/health", (req, res) => res.send("OK"));
 
 const httpServer = http.createServer(webServer);
 
@@ -145,12 +131,6 @@ const wss = new WebSocketServer({
 
 wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
 
-const setupRpcForSocket = setupRpc({
-  logger,
-  router: serverRpcRouter,
-  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
-});
-
 const setupEventRoutingForSocket = setupEventRouter({
   logger,
   router: gameServerEventRouter,
@@ -160,7 +140,6 @@ const setupEventRoutingForSocket = setupEventRouter({
 wss.on("connection", (socket) => {
   socket.binaryType = "arraybuffer";
   setupEventRoutingForSocket(socket);
-  setupRpcForSocket(socket);
   socket.on("close", () => clients.removeClient(getSocketId(socket)));
   socket.on("error", (err) =>
     logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
@@ -214,8 +193,7 @@ const characterService = createCharacterService(
 const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
-  .provide(ctxGlobalRpcMiddleware, rateLimiterRpcMiddleware)
-  .provide(ctxGlobalEventRouterMiddleware, rateLimiterEventMiddleware)
+  .provide(ctxGlobalEventRouterMiddleware, rateLimiterMiddleware)
   .provide(ctxUserService, userService)
   .provide(ctxNpcService, npcService)
   .provide(ctxCharacterService, characterService)

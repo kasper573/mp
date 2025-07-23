@@ -88,9 +88,9 @@ export const serverOptionsSchema = type({
    */
   databaseUrl: "string",
   /**
-   * The version of the build
+   * The version of the game server
    */
-  buildVersion: "string",
+  version: "string",
   /**
    * Whether to expose detailed error information to clients
    */

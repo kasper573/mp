@@ -10,17 +10,17 @@ export interface AreaDebugSettingsFormProps {
 }
 
 export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
-  const rpc = ioc.get(ctxGameEventClient);
+  const events = ioc.get(ctxGameEventClient);
   const client = ioc.get(ctxGameStateClient);
   return (
     <>
       <div>
-        <Button onClick={() => void rpc.npc.spawnRandomNpc()}>
+        <Button onClick={() => void events.npc.spawnRandomNpc()}>
           Spawn random NPC
         </Button>
         <Button
           onClick={() =>
-            void rpc.character.kill({
+            void events.character.kill({
               targetId: assert(client.characterId.value),
             })
           }
