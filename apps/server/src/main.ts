@@ -13,12 +13,12 @@ import {
   ctxActorModelLookup,
   ctxClientId,
   ctxClientRegistry,
+  ctxGameStateLoader,
   ctxGameStateServer,
   ctxGlobalEventRouterMiddleware,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
-  ctxUserService,
   gameServerEventRouter,
   NpcAi,
   NpcSpawner,
@@ -32,8 +32,6 @@ import {
   movementBehavior,
   combatBehavior,
   characterRemoveBehavior,
-  ctxCharacterService,
-  ctxNpcService,
   ctxGameState,
   deriveClientVisibility,
 } from "@mp/game/server";
@@ -59,10 +57,7 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 
 import { setupEventRouter } from "./etc/setup-event-router";
-import { createCharacterService } from "./services/character-service";
-import { createGameStateService } from "./services/game-service";
-import { createNpcService } from "./services/npc-service";
-import { createUserService } from "./services/user-service";
+import { createGameStatePersistence } from "./etc/game-state-persistence";
 import { createApiClient } from "@mp/api/sdk";
 
 // Note that this file is an entrypoint and should not have any exports
@@ -77,7 +72,6 @@ RateLimiter.enabled = opt.rateLimit;
 
 const api = createApiClient(opt.apiUrl);
 
-const userService = createUserService();
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const _ = createTokenResolver({
@@ -85,7 +79,7 @@ const _ = createTokenResolver({
   getBypassUser,
   onResolve(result) {
     if (result.isOk()) {
-      userService.memorizeUserInfo(result.value);
+      gameStatePersistence.memorizeUserInfo(result.value);
     }
   },
 });
@@ -105,6 +99,13 @@ const [areas, actorModels] = await Promise.all([
   api.areaFileUrls.query().then(loadAreas),
   api.actorSpritesheetUrls.query().then(loadActorModels),
 ]);
+
+const gameStatePersistence = createGameStatePersistence(
+  db,
+  areas,
+  actorModels,
+  rng,
+);
 
 logger.info(`Seeding database...`);
 await seed(db, areas, actorModels);
@@ -168,12 +169,9 @@ const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   ),
 });
 
-const npcService = createNpcService(db, areas);
-const gameService = createGameStateService(db);
-
 const persistTicker = new Ticker({
   onError: (error) => logger.error(error, "Persist Ticker Error"),
-  middleware: () => gameService.persist(gameState),
+  middleware: () => gameStatePersistence.persist(gameState),
 });
 
 const updateTicker = new Ticker({
@@ -182,22 +180,13 @@ const updateTicker = new Ticker({
 });
 
 logger.info(`Getting all NPCs and spawns...`);
-const allNpcsAndSpawns = await npcService.getAllSpawnsAndTheirNpcs();
+const allNpcsAndSpawns = await gameStatePersistence.getAllSpawnsAndTheirNpcs();
 
-const characterService = createCharacterService(
-  db,
-  userService,
-  areas,
-  actorModels,
-  rng,
-);
 const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalEventRouterMiddleware, rateLimiterMiddleware)
-  .provide(ctxUserService, userService)
-  .provide(ctxNpcService, npcService)
-  .provide(ctxCharacterService, characterService)
+  .provide(ctxGameStateLoader, gameStatePersistence)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxAreaLookup, areas)

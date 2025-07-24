@@ -2,7 +2,7 @@ import type { RoleDefinition, UserId } from "@mp/auth";
 import { eventHandlerBuilder } from "../network/event-definition";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
-import { ctxUserService } from "./service";
+import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export function auth() {
   return eventHandlerBuilder.middleware(({ ctx }): AuthContext => {
@@ -18,8 +18,8 @@ export function auth() {
 
 export function roles(requiredRoles: RoleDefinition[]) {
   return auth().pipe(async ({ ctx, mwc }) => {
-    const userService = ctx.get(ctxUserService);
-    const roles = await userService.getRoles(mwc.userId);
+    const loader = ctx.get(ctxGameStateLoader);
+    const roles = await loader.getUserRoles(mwc.userId);
     const requiredRolesSet = new Set(requiredRoles);
     if (!requiredRolesSet.isSubsetOf(roles)) {
       const missingRoles = requiredRolesSet.difference(roles);

@@ -3,13 +3,13 @@ import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import { roles } from "../user/auth";
 import { characterRoles } from "../user/roles";
-import { ctxCharacterService } from "./service";
 import type { CharacterId } from "./types";
 import { accessCharacter } from "./access";
 import type { ActorId } from "../actor/actor";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { eventHandlerBuilder } from "../network/event-definition";
+import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = eventHandlerBuilder.router({
@@ -66,8 +66,8 @@ export const characterRouter = eventHandlerBuilder.router({
         throw new Error("Character is not dead");
       }
 
-      const characterService = ctx.get(ctxCharacterService);
-      const spawnPoint = characterService.getDefaultSpawnPoint();
+      const loader = ctx.get(ctxGameStateLoader);
+      const spawnPoint = loader.getDefaultSpawnPoint();
       char.combat.health = char.combat.maxHealth;
       char.movement.coords = spawnPoint.coords;
       char.movement.areaId = spawnPoint.areaId;

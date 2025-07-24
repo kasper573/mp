@@ -5,11 +5,11 @@ import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
 
 import type { CharacterId } from "../character/types";
-import { ctxCharacterService } from "../character/service";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { worldRoles } from "../user/roles";
 import type { AccessToken } from "@mp/auth";
 import { ctxTokenResolver } from "../context/common";
+import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type WorldRouter = typeof worldRouter;
 export const worldRouter = eventHandlerBuilder.router({
@@ -32,14 +32,14 @@ export const worldRouter = eventHandlerBuilder.router({
       const server = ctx.get(ctxGameStateServer);
       server.markToResendFullState(clientId);
 
-      const characterService = ctx.get(ctxCharacterService);
+      const loader = ctx.get(ctxGameStateLoader);
       let char = state.actors
         .values()
         .filter((actor) => actor.type === "character")
         .find((actor) => actor.identity.userId === mwc.userId);
 
       if (!char) {
-        char = await characterService.getOrCreateCharacterForUser(mwc.userId);
+        char = await loader.getOrCreateCharacterForUser(mwc.userId);
         state.actors.set(char.identity.id, char);
       }
 
