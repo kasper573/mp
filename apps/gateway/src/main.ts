@@ -10,7 +10,7 @@ import { upsertMapSet } from "@mp/std";
 import createCors from "cors";
 import express from "express";
 import http from "http";
-import { createProxyHandler } from "./proxy-handler";
+import proxy from "express-http-proxy";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -23,7 +23,7 @@ const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
   .use(createCors({ origin: opt.corsOrigin }))
-  .use(opt.apiEndpointPath, createProxyHandler(opt.apiServiceUrl));
+  .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
 const httpServer = http.createServer(webServer);
 

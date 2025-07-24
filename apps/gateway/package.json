@@ -16,6 +16,7 @@
     "@mp/logger": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
+    "express-http-proxy": "2.1.1",
     "dotenv": "catalog:",
     "express": "catalog:",
     "cors": "2.8.5"
@@ -24,6 +25,7 @@
     "@mp/tsconfig": "workspace:*",
     "@types/cors": "2.8.17",
     "@types/express": "catalog:",
+    "@types/express-http-proxy": "1.6.6",
     "tsx": "catalog:"
   }
 }
