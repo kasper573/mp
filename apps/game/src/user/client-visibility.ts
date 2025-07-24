@@ -1,6 +1,6 @@
 import type { ClientVisibilityFactory } from "@mp/sync";
 import type { Tile } from "@mp/std";
-import { clientViewDistanceRect } from "../client-view-distance-rect";
+import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
 import type { MovementTrait } from "../../src/traits/movement";
 import type { ActorId } from "../actor/actor";
 import type { GameState } from "../game-state/game-state";

@@ -23,7 +23,7 @@ import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
-import { clientViewDistance } from "../client-view-distance-settings";
+import { clientViewDistance } from "../clients/client-view-distance-settings";
 import { InjectionContext } from "@mp/ioc";
 
 export interface AreaSceneOptions {

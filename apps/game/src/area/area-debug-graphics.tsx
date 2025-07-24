@@ -9,14 +9,14 @@ import uniqolor from "uniqolor";
 import { computed, effect, type ReadonlySignal } from "@mp/state";
 import type { TiledResource } from "./tiled-resource";
 import type { AreaResource } from "./area-resource";
-import { clientViewDistanceRect } from "../client-view-distance-rect";
+import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
 import { ioc } from "../context/ioc";
 import { ctxEngine } from "../context/common";
 import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
-import { clientViewDistance } from "../client-view-distance-settings";
+import { clientViewDistance } from "../clients/client-view-distance-settings";
 import type { Actor } from "../actor/actor";
 import type { NpcInstance } from "../npc/types";
 import { WalkableChecker } from "./tiled-walkable-checker";
