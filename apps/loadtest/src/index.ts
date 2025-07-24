@@ -96,7 +96,7 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} connected`);
     }
 
-    await eventClient.world.auth(createBypassUser(`Test User ${n}`));
+    eventClient.world.auth(createBypassUser(`Test User ${n}`));
     if (verbose) {
       logger.info(`Socket ${n} authenticated`);
     }

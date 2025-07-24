@@ -8,7 +8,7 @@ import {
   createTilesetSpritesheetData,
   TiledRenderer,
 } from "@mp/tiled-renderer";
-import { dynamicLayerName } from "./area/area-resource";
+import { dynamicLayerName } from "./area-resource";
 import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
 import type { Pixel, Tile } from "@mp/std";
 import { Vector } from "@mp/math";

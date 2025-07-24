@@ -14,7 +14,7 @@ export function createFaroClient() {
     isolate: true,
     app: {
       name: "mp_client",
-      version: env.buildVersion,
+      version: env.version,
     },
     instrumentations: [
       ...getWebInstrumentations(),
