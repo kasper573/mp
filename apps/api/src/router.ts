@@ -10,7 +10,7 @@ import { systemRoles, worldRoles } from "@mp/game/server";
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
 import { rpc } from "./rpc";
-import { ctxResolver } from "./cdn";
+import { ctxCdnResolver } from "./cdn";
 import path from "path";
 import { type } from "@mp/validate";
 import { roles } from "./middlewares/auth";
@@ -51,12 +51,12 @@ export const apiRouter = rpc.router({
   areaFileUrl: rpc.procedure
     .input(type("string").brand("AreaId"))
     .query(({ input: areaId, ctx }) =>
-      ctx.ioc.get(ctxResolver).abs("areas", areaId),
+      ctx.ioc.get(ctxCdnResolver).abs("areas", areaId),
     ),
 
   areaFileUrls: rpc.procedure.query(
     async ({ ctx }): Promise<ReadonlyMap<AreaId, PublicUrl>> => {
-      const cdn = ctx.ioc.get(ctxResolver);
+      const cdn = ctx.ioc.get(ctxCdnResolver);
       const areaFiles = await cdn.dir("areas");
       return new Map(
         areaFiles.map((file): [AreaId, PublicUrl] => {
@@ -70,7 +70,7 @@ export const apiRouter = rpc.router({
 
   actorSpritesheetUrls: rpc.procedure.query(
     async ({ ctx }): Promise<ActorSpritesheetUrls> => {
-      const cdn = ctx.ioc.get(ctxResolver);
+      const cdn = ctx.ioc.get(ctxCdnResolver);
       const modelFolders = await cdn.dir<ActorModelId>("actors");
       return new Map(
         await Promise.all(

@@ -9,6 +9,7 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createTokenResolver } from "@mp/auth/server";
 import type { ApiContext } from "./rpc";
+import { createCdnResolver, ctxCdnResolver } from "./cdn";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -19,12 +20,13 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
+const cdnResolver = createCdnResolver(opt.cdnBaseUrl);
+
 const requestLimiter = new RateLimiter({ points: 20, duration: 1 });
 
-const ioc = new ImmutableInjectionContainer().provide(
-  ctxTokenResolver,
-  tokenResolver,
-);
+const ioc = new ImmutableInjectionContainer()
+  .provide(ctxTokenResolver, tokenResolver)
+  .provide(ctxCdnResolver, cdnResolver);
 
 const app = express();
 app.use(

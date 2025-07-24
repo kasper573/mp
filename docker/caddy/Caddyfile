@@ -28,6 +28,11 @@ faro.{$MP_DOMAIN} {
     reverse_proxy alloy:18273
 }
 
+${MP_CDN_DOMAIN} {
+	root * /srv/mp-public
+	file_server browse
+}
+
 {$MP_CLIENT_DOMAIN} {
     import common_rate_limit
     reverse_proxy {$MP_CLIENT_PROXY_HOST}
