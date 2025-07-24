@@ -17,6 +17,7 @@
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/api": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak-provision": "workspace:*",
     "@mp/logger": "workspace:*",

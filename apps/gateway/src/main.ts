@@ -7,7 +7,6 @@ import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
 import { upsertMapSet } from "@mp/std";
-
 import createCors from "cors";
 import express from "express";
 import http from "http";

@@ -422,6 +422,9 @@ importers:
 
   apps/server:
     dependencies:
+      '@mp/api':
+        specifier: workspace:*
+        version: link:../api
       '@mp/auth':
         specifier: workspace:*
         version: link:../../packages/auth

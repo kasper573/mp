@@ -1,6 +1,6 @@
 import "dotenv/config";
 import http from "node:http";
-import path from "node:path";
+
 import express from "express";
 
 import { createTokenResolver } from "@mp/auth/server";
@@ -24,7 +24,7 @@ import {
   NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
-import { Rng, type LocalFile } from "@mp/std";
+import { Rng } from "@mp/std";
 import type { GameState } from "@mp/game/server";
 import {
   ctxAreaLookup,
@@ -48,7 +48,6 @@ import { collectGameStateMetrics } from "./metrics/game-state";
 
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
-import { serverFileToPublicUrl } from "./etc/server-file-to-public-url";
 
 import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
@@ -58,12 +57,13 @@ import { playerRoles } from "./roles";
 import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
-import { ctxAreaFileUrlResolver } from "../../api/src/router";
+
 import { setupEventRouter } from "./etc/setup-event-router";
 import { createCharacterService } from "./services/character-service";
 import { createGameStateService } from "./services/game-service";
 import { createNpcService } from "./services/npc-service";
 import { createUserService } from "./services/user-service";
+import { createApiClient } from "@mp/api/sdk";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -74,6 +74,8 @@ const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;
+
+const api = createApiClient(opt.apiUrl);
 
 const userService = createUserService();
 const clients = new ClientRegistry();
@@ -100,8 +102,8 @@ const httpServer = http.createServer(webServer);
 
 logger.info(`Loading areas and actor models...`);
 const [areas, actorModels] = await Promise.all([
-  loadAreas(path.resolve(opt.publicDir, "areas")),
-  loadActorModels(opt.publicDir),
+  api.areaFileUrls.query().then(loadAreas),
+  api.actorSpritesheetUrls.query().then(loadActorModels),
 ]);
 
 logger.info(`Seeding database...`);
@@ -201,9 +203,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxAreaLookup, areas)
   .provide(ctxClientRegistry, clients)
   .provide(ctxLogger, logger)
-  .provide(ctxAreaFileUrlResolver, (id) =>
-    serverFileToPublicUrl(`areas/${id}.json` as LocalFile),
-  )
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);

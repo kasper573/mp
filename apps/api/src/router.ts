@@ -6,7 +6,7 @@ import type {
   Character,
 } from "@mp/game/server";
 import { systemRoles, worldRoles } from "@mp/game/server";
-import { InjectionContext } from "@mp/ioc";
+
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
 import { rpc } from "./rpc";
@@ -54,6 +54,20 @@ export const apiRouter = rpc.router({
       ctx.ioc.get(ctxResolver).abs("areas", areaId),
     ),
 
+  areaFileUrls: rpc.procedure.query(
+    async ({ ctx }): Promise<ReadonlyMap<AreaId, PublicUrl>> => {
+      const cdn = ctx.ioc.get(ctxResolver);
+      const areaFiles = await cdn.dir("areas");
+      return new Map(
+        areaFiles.map((file): [AreaId, PublicUrl] => {
+          const id = path.basename(file, path.extname(file)) as AreaId;
+          const url = cdn.abs("areas", file);
+          return [id, url];
+        }),
+      );
+    },
+  ),
+
   actorSpritesheetUrls: rpc.procedure.query(
     async ({ ctx }): Promise<ActorSpritesheetUrls> => {
       const cdn = ctx.ioc.get(ctxResolver);
@@ -84,7 +98,3 @@ export const apiRouter = rpc.router({
     },
   ),
 });
-
-export const ctxAreaFileUrlResolver = InjectionContext.new<
-  (areaId: AreaId) => PublicUrl
->("AreaFileUrlResolver");

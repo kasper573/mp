@@ -1,4 +1,3 @@
-import path from "node:path";
 import { TimeSpan } from "@mp/time";
 import { authAlgorithms } from "@mp/auth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
@@ -6,27 +5,9 @@ import { assertEnv } from "@mp/env";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;
 
-const pathSchema = type("string").pipe((p) => p && path.resolve(p));
-
 const msSchema = numeric().pipe((str) => TimeSpan.fromMilliseconds(str));
 
 export const serverOptionsSchema = type({
-  /**
-   * If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.
-   */
-  "clientDir?": pathSchema,
-  /**
-   * The directory to serve static files from
-   */
-  publicDir: pathSchema,
-  /**
-   * The relative path after the hostname where the public dir will be exposed
-   */
-  publicPath: "string",
-  /**
-   * The max age of files served from the public directory in seconds
-   */
-  publicMaxAge: numeric(),
   /**
    * Whether to trust the X-Forwarded-For header
    */
@@ -35,10 +16,6 @@ export const serverOptionsSchema = type({
    * The port to listen on
    */
   port: numeric(),
-  /**
-   * Used for generating publicly accessible URLs to the HTTP server
-   */
-  httpBaseUrl: "string",
   /**
    * The relative path to expose the WS endpoint on
    */
@@ -115,6 +92,10 @@ export const serverOptionsSchema = type({
    * Whether to use pretty logging format.
    */
   prettyLogs: boolish(),
+  /**
+   * The URL to the API service
+   */
+  apiUrl: "string",
 }).onDeepUndeclaredKey("delete");
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");

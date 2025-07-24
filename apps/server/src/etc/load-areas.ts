@@ -1,34 +1,49 @@
-import path from "node:path";
-import fs from "node:fs/promises";
 import type { AreaLookup, AreaId } from "@mp/game/server";
 import { AreaResource, TiledResource } from "@mp/game/server";
-import type { LocalFile } from "@mp/std";
+import type { PublicUrl } from "@mp/std";
 import { createTiledLoader } from "@mp/tiled-loader";
 
-export async function loadAreas(dir: string): Promise<AreaLookup> {
-  const files = await fs.readdir(dir);
-  const entries = await Promise.all(
-    files.map(async (file) => {
-      const tmxFile = path.join(dir, file) as LocalFile;
-      const id = path.basename(file, path.extname(file)) as AreaId;
-      return [id, new AreaResource(id, await loadTiled(tmxFile))] as const;
-    }),
+export async function loadAreas(
+  areaUrls: ReadonlyMap<AreaId, PublicUrl>,
+): Promise<AreaLookup> {
+  return new Map(
+    await Promise.all(
+      areaUrls.entries().map(async ([areaId, areaUrl]) => {
+        return [
+          areaId,
+          new AreaResource(areaId, await loadTiled(areaUrl)),
+        ] as const;
+      }),
+    ),
   );
-
-  return new Map(entries);
 }
 
-async function loadTiled(tmxFile: string) {
-  const result = await load(tmxFile);
+async function loadTiled(tmjFile: string) {
+  const result = await loadTiledViaUrl(tmjFile);
   if (result.isErr()) {
     throw result.error;
   }
   return new TiledResource(result.value);
 }
 
-const loadJson = (path: string) => fs.readFile(path, "utf8").then(JSON.parse);
-const relativePath = (p: string, b: string) => path.resolve(path.dirname(b), p);
-const load = createTiledLoader({
+const loadTiledViaUrl = createTiledLoader({
   loadJson,
-  relativePath,
+  relativePath: relativeUrl,
 });
+
+async function loadJson(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  });
+  const json: unknown = await response.json();
+  return json as Record<string, unknown>;
+}
+
+function relativeUrl(path: string, base: string) {
+  base = base.startsWith("//") ? window.location.protocol + base : base;
+  const url = new URL(path, base);
+  return url.toString();
+}
