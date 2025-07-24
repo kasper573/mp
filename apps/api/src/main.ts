@@ -8,8 +8,8 @@ import { apiRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createTokenResolver } from "@mp/auth/server";
-import type { ApiContext } from "./rpc";
-import { createCdnResolver, ctxCdnResolver } from "./cdn";
+import type { ApiContext } from "./integrations/trpc";
+import { createCdnResolver, ctxCdnResolver } from "./integrations/cdn";
 
 // Note that this file is an entrypoint and should not have any exports
 

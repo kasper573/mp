@@ -9,11 +9,11 @@ import { systemRoles, worldRoles } from "@mp/game/server";
 
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
-import { rpc } from "./rpc";
-import { ctxCdnResolver } from "./cdn";
+import { rpc } from "./integrations/trpc";
+import { ctxCdnResolver } from "./integrations/cdn";
 import path from "path";
 import { type } from "@mp/validate";
-import { roles } from "./middlewares/auth";
+import { roles } from "./integrations/auth";
 
 export type ApiRpcRouter = typeof apiRouter;
 export const apiRouter = rpc.router({

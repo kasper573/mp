@@ -1,6 +1,6 @@
 import type { AccessToken, RoleDefinition, UserId } from "@mp/auth";
-import type { ApiContext } from "../rpc";
-import { rpc } from "../rpc";
+import type { ApiContext } from "./trpc";
+import { rpc } from "./trpc";
 import { InjectionContext } from "@mp/ioc";
 import { ctxTokenResolver } from "@mp/game/server";
 
