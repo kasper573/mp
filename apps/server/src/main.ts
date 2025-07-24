@@ -15,7 +15,7 @@ import {
   ctxClientRegistry,
   ctxGameStateLoader,
   ctxGameStateServer,
-  ctxGlobalEventRouterMiddleware,
+  ctxGlobalServerEventMiddleware,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
@@ -185,7 +185,7 @@ const allNpcsAndSpawns = await gameStatePersistence.getAllSpawnsAndTheirNpcs();
 const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
-  .provide(ctxGlobalEventRouterMiddleware, rateLimiterMiddleware)
+  .provide(ctxGlobalServerEventMiddleware, rateLimiterMiddleware)
   .provide(ctxGameStateLoader, gameStatePersistence)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)

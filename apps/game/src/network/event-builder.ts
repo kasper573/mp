@@ -5,12 +5,12 @@ import type {
 } from "@mp/event-router";
 import { EventRouterBuilder } from "@mp/event-router";
 
-export const ctxGlobalEventRouterMiddleware =
+export const ctxGlobalServerEventMiddleware =
   InjectionContext.new<GameEventRouterMiddleware>(
     "GlobalEventRouterMiddleware",
   );
 
-export const eventHandlerBuilder = createFactories();
+export const evt = createFactories();
 
 export type GameEventRouterContext = ImmutableInjectionContainer;
 
@@ -26,7 +26,7 @@ function createFactories(): EventRouterFactories<GameEventRouterContext> {
     .build();
 
   const globalMiddleware = builder.middleware((opt) => {
-    const middleware = opt.ctx.get(ctxGlobalEventRouterMiddleware);
+    const middleware = opt.ctx.get(ctxGlobalServerEventMiddleware);
     return middleware(opt);
   });
 

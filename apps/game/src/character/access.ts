@@ -1,5 +1,5 @@
 import { ctxGameState } from "../game-state/game-state";
-import type { GameEventRouterContext } from "../network/event-definition";
+import type { GameEventRouterContext } from "../network/event-builder";
 import { ctxClientId } from "../user/client-id";
 import { ctxClientRegistry } from "../user/client-registry";
 import type { CharacterId } from "./types";

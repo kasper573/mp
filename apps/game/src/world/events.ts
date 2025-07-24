@@ -1,5 +1,5 @@
 import { ctxGameState } from "../game-state/game-state";
-import { eventHandlerBuilder } from "../network/event-definition";
+import { evt } from "../network/event-builder";
 import { roles } from "../user/auth";
 import { ctxClientRegistry } from "../user/client-registry";
 import { ctxClientId } from "../user/client-id";
@@ -12,8 +12,8 @@ import { ctxTokenResolver } from "../context/common";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type WorldRouter = typeof worldRouter;
-export const worldRouter = eventHandlerBuilder.router({
-  spectate: eventHandlerBuilder.event
+export const worldRouter = evt.router({
+  spectate: evt.event
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
     .handler(({ ctx, input }) => {
@@ -24,7 +24,7 @@ export const worldRouter = eventHandlerBuilder.router({
       server.markToResendFullState(clientId);
     }),
 
-  join: eventHandlerBuilder.event
+  join: evt.event
     .use(roles([worldRoles.join]))
     .handler(async ({ ctx, mwc }) => {
       const clientId = ctx.get(ctxClientId);
@@ -53,13 +53,13 @@ export const worldRouter = eventHandlerBuilder.router({
       );
     }),
 
-  requestFullState: eventHandlerBuilder.event.handler(({ ctx }) => {
+  requestFullState: evt.event.handler(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const server = ctx.get(ctxGameStateServer);
     server.markToResendFullState(clientId);
   }),
 
-  leave: eventHandlerBuilder.event.input<CharacterId>().handler(({ ctx }) => {
+  leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
 
@@ -71,18 +71,16 @@ export const worldRouter = eventHandlerBuilder.router({
     clients.spectatedCharacterIds.delete(clientId);
   }),
 
-  auth: eventHandlerBuilder.event
-    .input<AccessToken>()
-    .handler(async ({ input, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-      const tokenResolver = ctx.get(ctxTokenResolver);
-      const result = await tokenResolver(input);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-      clients.userIds.set(clientId, result.value.id);
-    }),
+  auth: evt.event.input<AccessToken>().handler(async ({ input, ctx }) => {
+    const clientId = ctx.get(ctxClientId);
+    const clients = ctx.get(ctxClientRegistry);
+    const tokenResolver = ctx.get(ctxTokenResolver);
+    const result = await tokenResolver(input);
+    if (result.isErr()) {
+      throw new Error("Invalid token", { cause: result.error });
+    }
+    clients.userIds.set(clientId, result.value.id);
+  }),
 });
 
 export const worldEventRouterSlice = { world: worldRouter };

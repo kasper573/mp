@@ -1,11 +1,11 @@
 import type { RoleDefinition, UserId } from "@mp/auth";
-import { eventHandlerBuilder } from "../network/event-definition";
+import { evt } from "../network/event-builder";
 import { ctxClientRegistry } from "./client-registry";
 import { ctxClientId } from "./client-id";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export function auth() {
-  return eventHandlerBuilder.middleware(({ ctx }): AuthContext => {
+  return evt.middleware(({ ctx }): AuthContext => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const userId = clients.userIds.get(clientId);
@@ -33,7 +33,7 @@ export function roles(requiredRoles: RoleDefinition[]) {
 }
 
 export function optionalAuth() {
-  return eventHandlerBuilder.middleware(({ ctx }): Partial<AuthContext> => {
+  return evt.middleware(({ ctx }): Partial<AuthContext> => {
     const clientId = ctx.get(ctxClientId);
     const clients = ctx.get(ctxClientRegistry);
     const userId = clients.userIds.get(clientId);

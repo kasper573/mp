@@ -8,12 +8,12 @@ import { accessCharacter } from "./access";
 import type { ActorId } from "../actor/actor";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateServer } from "../game-state/game-state-server";
-import { eventHandlerBuilder } from "../network/event-definition";
+import { evt } from "../network/event-builder";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type CharacterRouter = typeof characterRouter;
-export const characterRouter = eventHandlerBuilder.router({
-  move: eventHandlerBuilder.event
+export const characterRouter = evt.router({
+  move: evt.event
     .input<{
       characterId: CharacterId;
       to: VectorLike<Tile>;
@@ -32,7 +32,7 @@ export const characterRouter = eventHandlerBuilder.router({
       char.movement.desiredPortalId = desiredPortalId;
     }),
 
-  attack: eventHandlerBuilder.event
+  attack: evt.event
     .input<{ characterId: CharacterId; targetId: ActorId }>()
     .use(roles([characterRoles.attack]))
     .handler(({ input: { characterId, targetId }, ctx }) => {
@@ -45,7 +45,7 @@ export const characterRouter = eventHandlerBuilder.router({
       char.combat.attackTargetId = targetId;
     }),
 
-  kill: eventHandlerBuilder.event
+  kill: evt.event
     .input<{ targetId: ActorId }>()
     .use(roles([characterRoles.kill]))
     .handler(({ input: { targetId }, ctx }) => {
@@ -56,7 +56,7 @@ export const characterRouter = eventHandlerBuilder.router({
       server.addEvent("actor.death", target.identity.id);
     }),
 
-  respawn: eventHandlerBuilder.event
+  respawn: evt.event
     .input<CharacterId>()
     .use(roles([characterRoles.respawn]))
     .handler(({ input: characterId, ctx }) => {

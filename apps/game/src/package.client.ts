@@ -11,7 +11,7 @@ export * from "./area/area-id";
 export * from "./area/area-resource";
 export * from "./game-state/game-state-client";
 export * from "./game-state/optimistic-game-state";
-export type * from "./network/event-definition.slice";
+export type * from "./network/root-event-router";
 export * from "./clients/spectator-client";
 export * from "./clients/player-client";
 export * from "./clients/game-asset-loader";

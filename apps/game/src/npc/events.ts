@@ -4,11 +4,11 @@ import { ctxRng } from "../rng";
 import { npcRoles } from "../user/roles";
 import { ctxNpcSpawner } from "./npc-spawner";
 import { roles } from "../user/auth";
-import { eventHandlerBuilder } from "../network/event-definition";
+import { evt } from "../network/event-builder";
 
 export type NpcEventRouter = typeof npcEventRouter;
-export const npcEventRouter = eventHandlerBuilder.router({
-  spawnRandomNpc: eventHandlerBuilder.event
+export const npcEventRouter = evt.router({
+  spawnRandomNpc: evt.event
     .use(roles([npcRoles.spawnRandom]))
     .handler(({ ctx }) => {
       const state = ctx.get(ctxGameState);
