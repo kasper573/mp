@@ -6,7 +6,7 @@ export * from "./actor/actor-sprite-tester";
 export * from "./actor/actor-spritesheet-lookup";
 export * from "./area/area-debug-graphics";
 export * from "./area/area-scene";
-export * from "./area/load-area";
+export * from "./area/load-area-resource";
 export * from "./area/area-id";
 export * from "./area/area-resource";
 export * from "./area/tile-renderer-tester";

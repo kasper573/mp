@@ -42,7 +42,7 @@ export function useAreaResource(areaId: AreaId): AreaResource {
   const query = useSuspenseQuery({
     queryKey: ["areaResource", url, areaId],
     staleTime: Infinity,
-    queryFn: () => loadAreaResource(url, areaId),
+    queryFn: () => loadAreaResource(areaId, url),
   });
   return query.data;
 }

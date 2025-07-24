@@ -14,7 +14,7 @@ export type GameStateEvents = {
    * It needs to know that it's okay to stop immediately and not let the interpolation finish.
    */
   "movement.stop": ActorId;
-  "world.joined": {
+  "area.joined": {
     characterId: CharacterId;
     areaId: AreaId;
   };

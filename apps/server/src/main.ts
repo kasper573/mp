@@ -11,6 +11,7 @@ import { WebSocketServer } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
+  ctxArea,
   ctxClientId,
   ctxClientRegistry,
   ctxGameStateLoader,
@@ -27,7 +28,6 @@ import { RateLimiter } from "@mp/rate-limiter";
 import { Rng } from "@mp/std";
 import type { GameState } from "@mp/game/server";
 import {
-  ctxAreaLookup,
   ClientRegistry,
   movementBehavior,
   combatBehavior,
@@ -43,11 +43,8 @@ import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
 import { metricsMiddleware } from "./express/metrics-middleware";
 import { collectGameStateMetrics } from "./metrics/game-state";
-
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
-
-import { loadAreas } from "./etc/load-areas";
 import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
@@ -59,6 +56,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { setupEventRouter } from "./etc/setup-event-router";
 import { createGameStatePersistence } from "./etc/game-state-persistence";
 import { createApiClient } from "@mp/api/sdk";
+import { loadAreaResource } from "@mp/game/server";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -95,20 +93,22 @@ const webServer = express()
 const httpServer = http.createServer(webServer);
 
 logger.info(`Loading areas and actor models...`);
-const [areas, actorModels] = await Promise.all([
-  api.areaFileUrls.query().then(loadAreas),
+const [area, actorModels] = await Promise.all([
+  api.areaFileUrl
+    .query(opt.areaId)
+    .then((url) => loadAreaResource(opt.areaId, url)),
   api.actorSpritesheetUrls.query().then(loadActorModels),
 ]);
 
 const gameStatePersistence = createGameStatePersistence(
   db,
-  areas,
+  area,
   actorModels,
   rng,
 );
 
 logger.info(`Seeding database...`);
-await seed(db, areas, actorModels);
+await seed(db, area, actorModels);
 
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
@@ -154,7 +154,6 @@ const gameState: GameState = {
   actors: new SyncMap([], {
     type: (actor) => actor.type,
     alive: (actor) => actor.alive.value,
-    areaId: (actor) => actor.movement.areaId,
     spawnId: (actor) =>
       actor.type === "npc" ? actor.identity.spawnId : undefined,
   }),
@@ -165,7 +164,7 @@ const gameStateServer = new SyncServer<GameState, GameStateEvents>({
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
-    areas,
+    area,
   ),
 });
 
@@ -182,14 +181,14 @@ const updateTicker = new Ticker({
 logger.info(`Getting all NPCs and spawns...`);
 const allNpcsAndSpawns = await gameStatePersistence.getAllSpawnsAndTheirNpcs();
 
-const npcSpawner = new NpcSpawner(areas, actorModels, allNpcsAndSpawns, rng);
+const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalServerEventMiddleware, rateLimiterMiddleware)
   .provide(ctxGameStateLoader, gameStatePersistence)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
-  .provide(ctxAreaLookup, areas)
+  .provide(ctxArea, area)
   .provide(ctxClientRegistry, clients)
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
@@ -198,13 +197,13 @@ const ioc = new ImmutableInjectionContainer()
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectGameStateMetrics(metrics, clients, gameState, areas);
+collectGameStateMetrics(metrics, clients, gameState);
 
-const npcAi = new NpcAi(gameState, gameStateServer, areas, rng);
+const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
-updateTicker.subscribe(movementBehavior(gameState, areas));
+updateTicker.subscribe(movementBehavior(gameState, area));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, gameStateServer, areas));
+updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
   createGameStateFlusher(gameState, gameStateServer, wss.clients, metrics),

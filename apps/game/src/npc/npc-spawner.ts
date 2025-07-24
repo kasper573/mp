@@ -6,7 +6,6 @@ import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { InjectionContext } from "@mp/ioc";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
 import { NpcInstance } from "./types";
@@ -14,7 +13,7 @@ import type { Npc, NpcType, NpcInstanceId, NpcSpawn } from "./types";
 
 export class NpcSpawner {
   constructor(
-    private readonly areas: AreaLookup,
+    private readonly area: AreaResource,
     private readonly models: ActorModelLookup,
     public readonly options: Array<{ spawn: NpcSpawn; npc: Npc }>,
     private readonly rng: Rng,
@@ -58,8 +57,7 @@ export class NpcSpawner {
   createInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
     const id = createShortId() as NpcInstanceId;
     const model = assert(this.models.get(npc.modelId));
-    const area = assert(this.areas.get(spawn.areaId));
-    const coords = determineSpawnCoords(spawn, area, this.rng);
+    const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
 
     return new NpcInstance({
@@ -91,7 +89,6 @@ export class NpcSpawner {
         aggroRange: npc.aggroRange,
       },
       movement: {
-        areaId: spawn.areaId,
         coords,
         speed: npc.speed,
         dir: this.rng.oneOf(cardinalDirections),

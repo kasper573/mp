@@ -113,9 +113,6 @@ function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
 ) {
   switch (key) {
     case "coords": {
-      if (update.areaId && update.areaId !== target.areaId) {
-        return true; // Always trust new coord when area changes
-      }
       const threshold = target.speed * teleportThreshold.totalSeconds;
       if (
         update.coords &&
@@ -134,9 +131,6 @@ function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
         )
       ) {
         return true;
-      }
-      if (update.areaId && update.areaId !== target.areaId) {
-        return true; // Always trust new path when area changes
       }
       if (update.path?.length) {
         return true; // Any new path should be trusted

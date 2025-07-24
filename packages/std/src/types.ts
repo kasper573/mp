@@ -1,6 +1,11 @@
 import type { WritableKeysOf, Simplify } from "type-fest";
 
-export type Branded<T, Name extends string> = T & { brand: Name };
+// Matches the structure of the `Brand` type from arktype,
+// to make our branded types compatible with arktype's.
+const brand = " brand" as const;
+export type Branded<T, Name extends string> = T & {
+  readonly [brand]: [T, Name];
+};
 
 /**
  * Unit of measurement in 2D screen space.

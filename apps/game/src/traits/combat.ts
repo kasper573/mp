@@ -2,11 +2,11 @@ import { type Vector, type Rect, clamp } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { ActorId, Actor } from "../actor/actor";
 import { findPathForSubject } from "./movement";
 import { defineSyncComponent } from "@mp/sync";
+import type { AreaResource } from "../area/area-resource";
 
 export type CombatTrait = typeof CombatTrait.$infer;
 
@@ -30,7 +30,7 @@ const hpRegenInterval = TimeSpan.fromSeconds(10);
 export function combatBehavior(
   state: GameState,
   server: GameStateServer,
-  areas: AreaLookup,
+  area: AreaResource,
 ): TickEventHandler {
   let nextHpRegenTime = TimeSpan.fromSeconds(0);
   return ({ totalTimeElapsed }) => {
@@ -67,7 +67,7 @@ export function combatBehavior(
     }
 
     const target = state.actors.get(actor.combat.attackTargetId);
-    if (!target || !isTargetable(actor, target)) {
+    if (!target || !isTargetable(target)) {
       actor.combat.attackTargetId = undefined;
       return;
     }
@@ -123,7 +123,7 @@ export function combatBehavior(
   ): Vector<Tile> | undefined {
     const bestTile = findPathForSubject(
       actor.movement,
-      areas,
+      area,
       target.movement.coords,
     )?.find((tile) =>
       canAttackFrom(tile, target.movement.coords, actor.combat.attackRange),
@@ -151,10 +151,7 @@ function canAttackFrom(
 const tileMargin = Math.sqrt(2) - 1;
 
 export function isTargetable(
-  actor: Pick<Actor, "movement">,
   target: Pick<Actor, "movement" | "combat">,
 ): boolean {
-  return (
-    target.movement.areaId === actor.movement.areaId && target.combat.health > 0
-  );
+  return target.combat.health > 0;
 }

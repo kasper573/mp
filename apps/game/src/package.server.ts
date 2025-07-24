@@ -15,7 +15,7 @@ export * from "./user/auth";
 export * from "./user/roles";
 export * from "./user/client-visibility";
 export * from "./user/client-registry";
-export * from "./area/lookup";
+export * from "./area/load-area-resource";
 export * from "./actor/actor-spritesheet-urls";
 export * from "./area/area-id";
 export * from "./area/area-resource";

@@ -9,6 +9,10 @@ const msSchema = numeric().pipe((str) => TimeSpan.fromMilliseconds(str));
 
 export const serverOptionsSchema = type({
   /**
+   * The id ofthe area that this game service instance will handle.
+   */
+  areaId: type("string").brand("AreaId"),
+  /**
    * Whether to trust the X-Forwarded-For header
    */
   trustProxy: boolish(),

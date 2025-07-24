@@ -7,7 +7,6 @@ import { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
 import { AppearanceTrait } from "../traits/appearance";
 import { CombatTrait } from "../traits/combat";
-import type { AreaId } from "../area/area-id";
 
 import { computed } from "@mp/state";
 
@@ -58,7 +57,6 @@ export type NpcSpawnId = Branded<string, "NpcSpawnId">;
 export interface NpcSpawn {
   id: NpcSpawnId;
   count: number;
-  areaId: AreaId;
   npcId: NpcId;
   coords?: Vector<Tile>;
   randomRadius?: number;

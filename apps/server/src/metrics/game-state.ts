@@ -1,12 +1,11 @@
 import type { MetricsRegistry } from "@mp/telemetry/prom";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { AreaLookup, ClientRegistry, GameState } from "@mp/game/server";
+import type { ClientRegistry, GameState } from "@mp/game/server";
 
 export function collectGameStateMetrics(
   registry: MetricsRegistry,
   clients: ClientRegistry,
   state: GameState,
-  areas: AreaLookup,
 ) {
   return [
     new MetricsGague({
@@ -29,15 +28,6 @@ export function collectGameStateMetrics(
             .filter((actor) => actor.type === "character")
             .toArray().length,
         );
-      },
-    }),
-
-    new MetricsGague({
-      name: "server_area_count",
-      help: "Number of areas loaded in the server",
-      registers: [registry],
-      collect() {
-        this.set(areas.size);
       },
     }),
 

@@ -6,7 +6,7 @@ import type { NpcInstance } from "../types";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(context, npc) {
-    const { gameState, gameStateServer, areas, rng, npcCombatMemories } =
+    const { gameState, gameStateServer, area, rng, npcCombatMemories } =
       context;
 
     const deadActorsThisTick = gameStateServer.peekEvent("actor.death");
@@ -43,7 +43,6 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
 
     // If no enemy is in sight, walk to a random location and hope to run into an enemy
     if (!npc.movement.path) {
-      const area = assert(areas.get(npc.movement.areaId));
       const toNode = assert(area.graph.getNode(rng.oneOf(area.graph.nodeIds)));
       npc.movement.moveTarget = toNode.data.vector;
       // TODO this is temporary until we have a buff/ability system
@@ -65,7 +64,7 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.identity.id);
   const target = gameState.actors.index
-    .access({ areaId: npc.movement.areaId, alive: true, type: "character" })
+    .access({ alive: true, type: "character" })
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
       return (
@@ -87,7 +86,7 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
   npc,
 ) {
   const target = gameState.actors.index
-    .access({ areaId: npc.movement.areaId, alive: true, type: "character" })
+    .access({ alive: true, type: "character" })
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
       return candidate.movement.coords.isWithinDistance(
@@ -105,7 +104,6 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
   const combatMemory = npcCombatMemories.get(npc.identity.id);
 
   const allies = gameState.actors.index.access({
-    areaId: npc.movement.areaId,
     spawnId: npc.identity.spawnId,
   });
 

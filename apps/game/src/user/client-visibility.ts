@@ -4,8 +4,8 @@ import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
 import type { MovementTrait } from "../../src/traits/movement";
 import type { ActorId } from "../actor/actor";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../../src/area/lookup";
 import type { ClientRegistry } from "./client-registry";
+import type { AreaResource } from "../area/area-resource";
 
 /**
  * Removes any information that the given client should not have access to.
@@ -15,7 +15,7 @@ import type { ClientRegistry } from "./client-registry";
 export function deriveClientVisibility(
   clients: ClientRegistry,
   clientViewDistance: Tile,
-  areas: AreaLookup,
+  area: AreaResource,
 ): ClientVisibilityFactory<GameState> {
   return (clientId, state) => {
     const observerIds = [
@@ -44,13 +44,6 @@ export function deriveClientVisibility(
   }
 
   function canSeeSubject(a: MovementTrait, b: MovementTrait) {
-    if (a.areaId !== b.areaId) {
-      return false;
-    }
-    const area = areas.get(a.areaId);
-    if (!area) {
-      throw new Error(`Area ${a.areaId} not found`);
-    }
     const box = clientViewDistanceRect(
       a.coords,
       area.tiled.tileCount,

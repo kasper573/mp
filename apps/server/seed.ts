@@ -1,8 +1,8 @@
-import type { AreaLookup, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
+import type { AreaResource, Npc, NpcId, NpcSpawnId } from "@mp/game/server";
 import { npcTypes, type ActorModelLookup } from "@mp/game/server";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import type { DbClient } from "@mp/db";
-import { npcSpawnTable, npcTable } from "@mp/db";
+import { eq, npcSpawnTable, npcTable } from "@mp/db";
 
 /**
  * This is not a long term plan.
@@ -15,14 +15,14 @@ import { npcSpawnTable, npcTable } from "@mp/db";
  */
 export async function seed(
   db: DbClient,
-  areas: AreaLookup,
+  area: AreaResource,
   actorModelLookup: ActorModelLookup,
 ) {
   await db.transaction((tx) => {
     return Promise.all(Array.from(generateNpcsAndSpawns()));
 
     function* generateNpcsAndSpawns() {
-      yield tx.delete(npcSpawnTable);
+      yield tx.delete(npcSpawnTable).where(eq(npcSpawnTable.areaId, area.id));
       yield tx.delete(npcTable);
 
       const modelId = Array.from(actorModelLookup.keys())[0];
@@ -43,20 +43,18 @@ export async function seed(
 
       yield tx.insert(npcTable).values(soldier);
 
-      for (const areaId of areas.keys()) {
-        for (const npcType of npcTypes.values()) {
-          if (npcType === "patrol" || npcType === "static") {
-            continue;
-          }
-
-          yield tx.insert(npcSpawnTable).values({
-            npcType,
-            areaId,
-            count: 10,
-            id: createShortId() as NpcSpawnId,
-            npcId: soldier.id,
-          });
+      for (const npcType of npcTypes.values()) {
+        if (npcType === "patrol" || npcType === "static") {
+          continue;
         }
+
+        yield tx.insert(npcSpawnTable).values({
+          npcType,
+          areaId: area.id,
+          count: 10,
+          id: createShortId() as NpcSpawnId,
+          npcId: soldier.id,
+        });
       }
     }
   });

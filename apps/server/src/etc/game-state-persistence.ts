@@ -3,18 +3,18 @@ import type { Rng } from "@mp/std";
 import { assert, type Tile, type TimesPerSecond } from "@mp/std";
 import { cardinalDirections } from "@mp/math";
 import type {
+  AreaResource,
   GameState,
   GameStateLoader,
   Npc,
   NpcSpawn,
 } from "@mp/game/server";
 import {
-  type AreaLookup,
   type ActorModelLookup,
   type AppearanceTrait,
   type ActorModelId,
   Character,
-  deriveNpcSpawnsFromAreas,
+  deriveNpcSpawnsFromArea,
 } from "@mp/game/server";
 import type { DbClient } from "@mp/db";
 import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
@@ -22,25 +22,14 @@ import { uniqueNamesGenerator, names } from "unique-names-generator";
 
 export function createGameStatePersistence(
   db: DbClient,
-  areas: AreaLookup,
+  area: AreaResource,
   models: ActorModelLookup,
   rng: Rng,
   includeNpcsDerivedFromTiled = true,
 ): GameStatePersistence {
-  if (areas.size === 0) {
-    throw new Error("CharacterService cannot be created without areas");
-  }
-
   const info = new Map<UserId, UserIdentity>();
 
-  const defaultAreaId = [...areas.keys()][0];
-
   function getDefaultSpawnPoint() {
-    const area = areas.get(defaultAreaId);
-    if (!area) {
-      throw new Error("Default area not found: " + defaultAreaId);
-    }
-
     return {
       areaId: area.id,
       coords: area.start,
@@ -50,7 +39,7 @@ export function createGameStatePersistence(
   return {
     getDefaultSpawnPoint,
 
-    async getOrCreateCharacterForUser(userId: UserId): Promise<Character> {
+    async getOrCreateCharacterForUser(userId) {
       const findResult = await db
         .select()
         .from(characterTable)
@@ -115,7 +104,6 @@ export function createGameStatePersistence(
           lastAttack: undefined,
         },
         movement: {
-          areaId: databaseFields.areaId,
           coords: databaseFields.coords,
           speed: databaseFields.speed,
           dir: rng.oneOf(cardinalDirections),
@@ -126,7 +114,7 @@ export function createGameStatePersistence(
       });
     },
 
-    persist: (state: GameState) => {
+    persist: (state) => {
       return db.transaction((tx) =>
         Promise.all(
           state.actors
@@ -134,6 +122,7 @@ export function createGameStatePersistence(
             .filter((actor) => actor.type === "character")
             .map((character) => {
               const inputValues: typeof characterTable.$inferInsert = {
+                areaId: area.id,
                 ...character.identity.snapshot(),
                 ...character.appearance.snapshot(),
                 ...character.combat.snapshot(),
@@ -156,7 +145,8 @@ export function createGameStatePersistence(
       const result = await db
         .select()
         .from(npcSpawnTable)
-        .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id));
+        .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
+        .where(eq(npcSpawnTable.areaId, area.id));
 
       const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
         if (!npc) {
@@ -169,8 +159,8 @@ export function createGameStatePersistence(
         return allFromDB;
       }
 
-      const allFromTiled = deriveNpcSpawnsFromAreas(
-        areas,
+      const allFromTiled = deriveNpcSpawnsFromArea(
+        area,
         allFromDB.map(({ npc }) => npc),
       );
 

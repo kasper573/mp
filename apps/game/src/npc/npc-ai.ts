@@ -2,7 +2,6 @@ import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Rng } from "@mp/std";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor/actor";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { NpcInstance, NpcInstanceId } from "./types";
@@ -18,6 +17,7 @@ import {
 } from "./ai-tasks/hunt";
 import { createWanderTask } from "./ai-tasks/wander";
 import { createPatrolTask } from "./ai-tasks/patrol";
+import type { AreaResource } from "../area/area-resource";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task>();
@@ -26,14 +26,14 @@ export class NpcAi {
   constructor(
     private gameState: GameState,
     private gameStateServer: GameStateServer,
-    private areas: AreaLookup,
+    private area: AreaResource,
     private rng: Rng,
   ) {}
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
       const context: NpcAiTaskContext = {
-        areas: this.areas,
+        area: this.area,
         gameState: this.gameState,
         gameStateServer: this.gameStateServer,
         npcCombatMemories: this.combatMemories,

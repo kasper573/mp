@@ -37,13 +37,13 @@ export class GameStateClient {
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
+  readonly areaId = signal<AreaId | undefined>(undefined);
   readonly readyState: Signal<WebSocket["readyState"]>;
   readonly isConnected: ReadonlySignal<boolean>;
 
   // Derived state
   readonly actorList: ReadonlySignal<Actor[]>;
   readonly character: ReadonlySignal<Character | undefined>;
-  readonly areaId: ReadonlySignal<AreaId | undefined>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
@@ -68,8 +68,6 @@ export class GameStateClient {
       ) as Character | undefined;
       return char;
     });
-
-    this.areaId = computed(() => this.character.value?.movement.areaId);
   }
 
   private refreshState: () => unknown;
@@ -81,10 +79,10 @@ export class GameStateClient {
       subscribeToReadyState(socket, (readyState) => {
         this.readyState.value = readyState;
       }),
-      this.eventBus.subscribe(
-        "world.joined",
-        (event) => (this.characterId.value = event.characterId),
-      ),
+      this.eventBus.subscribe("area.joined", (event) => {
+        this.characterId.value = event.characterId;
+        this.areaId.value = event.areaId;
+      }),
     ];
 
     socket.addEventListener("message", this.handleMessage);

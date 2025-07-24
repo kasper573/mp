@@ -1,16 +1,18 @@
 import type { Vector, VectorLike } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import type { TickEventHandler } from "@mp/time";
-import { assert, type Tile } from "@mp/std";
+import type { Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
+
 import type { AreaId } from "../area/area-id";
 import { moveAlongPath } from "../area/move-along-path";
 
+import type { AreaResource } from "../area/area-resource";
 import { getAreaIdFromObject } from "../area/area-resource";
 import { defineSyncComponent } from "@mp/sync";
 import * as patchOptimizers from "../network/patch-optimizers";
+import type { Character } from "../character/types";
 
 export type MovementTrait = typeof MovementTrait.$infer;
 
@@ -21,7 +23,7 @@ export const MovementTrait = defineSyncComponent((builder) =>
      */
     .add<Vector<Tile>>(patchOptimizers.coords)("coords")
     .add<Tile>()("speed")
-    .add<AreaId>()("areaId")
+    //.add<AreaId>()("areaId")
     /**
      * A desired target. Will be consumed by the movement behavior to find a new path.
      */
@@ -44,7 +46,7 @@ export const MovementTrait = defineSyncComponent((builder) =>
 
 export function movementBehavior(
   state: GameState,
-  areas: AreaLookup,
+  area: AreaResource,
 ): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {
     for (const actor of state.actors.values()) {
@@ -59,7 +61,7 @@ export function movementBehavior(
       if (actor.movement.moveTarget) {
         actor.movement.path = findPathForSubject(
           actor.movement,
-          areas,
+          area,
           actor.movement.moveTarget,
         );
         actor.movement.moveTarget = undefined;
@@ -68,34 +70,50 @@ export function movementBehavior(
       moveAlongPath(actor.movement, timeSinceLastTick);
 
       // Process portals
-      const area = assert(areas.get(actor.movement.areaId));
       for (const object of area.hitTestObjects(
         area.tiled.tileCoordToWorld(actor.movement.coords),
       )) {
-        const destinationArea = areas.get(
-          getAreaIdFromObject(object) as AreaId,
-        );
+        const destinationAreaId = getAreaIdFromObject(object) as
+          | AreaId
+          | undefined;
         if (
-          destinationArea &&
+          destinationAreaId &&
           actor.type === "character" &&
           actor.movement.desiredPortalId === object.id
         ) {
-          actor.movement.path = undefined;
-          actor.movement.desiredPortalId = undefined;
-          actor.movement.areaId = destinationArea.id;
-          actor.movement.coords = destinationArea.start;
+          sendCharacterToArea(actor, area, destinationAreaId);
         }
       }
     }
   };
 }
 
+export function sendCharacterToArea(
+  char: Character,
+  currentArea: AreaResource,
+  destinationAreaId: AreaId,
+  coords?: Vector<Tile>,
+) {
+  char.movement.path = undefined;
+  char.movement.desiredPortalId = undefined;
+  if (destinationAreaId === currentArea.id) {
+    // If we're portalling within the same area we can just change coords
+    char.movement.coords = coords ?? currentArea.start;
+  } else {
+    // But to change to a different area we must handle sharding,
+    // which requires more intricate handling.
+    // TODO implement
+    throw new Error(
+      "Sending character to a different area is not implemented yet.",
+    );
+  }
+}
+
 export function findPathForSubject(
   subject: MovementTrait,
-  areas: AreaLookup,
+  area: AreaResource,
   dest: VectorLike<Tile>,
 ): Path<Tile> | undefined {
-  const area = assert(areas.get(subject.areaId));
   const fromNode = area.graph.getProximityNode(subject.coords);
   if (!fromNode) {
     return;

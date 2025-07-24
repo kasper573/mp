@@ -8,7 +8,7 @@ import type { CharacterId } from "../character/types";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { worldRoles } from "../user/roles";
 import type { AccessToken } from "@mp/auth";
-import { ctxTokenResolver } from "../context/common";
+import { ctxArea, ctxTokenResolver } from "../context/common";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type WorldRouter = typeof worldRouter;
@@ -47,8 +47,8 @@ export const worldRouter = evt.router({
       clients.characterIds.set(clientId, char.identity.id);
 
       server.addEvent(
-        "world.joined",
-        { areaId: char.movement.areaId, characterId: char.identity.id },
+        "area.joined",
+        { areaId: ctx.get(ctxArea).id, characterId: char.identity.id },
         { actors: [char.identity.id] },
       );
     }),

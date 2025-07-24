@@ -4,8 +4,8 @@ import { TiledResource } from "./tiled-resource";
 import { AreaResource } from "./area-resource";
 
 export async function loadAreaResource(
-  areaFileUrl: string,
   areaId: AreaId,
+  areaFileUrl: string,
 ): Promise<AreaResource> {
   const loadTiled = createTiledLoader({
     loadJson,

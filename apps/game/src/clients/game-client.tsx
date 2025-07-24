@@ -33,7 +33,7 @@ export function GameClient(props: GameClientProps) {
   }
 
   if (!areaId) {
-    return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
+    return <LoadingSpinner>Loading area</LoadingSpinner>;
   }
 
   return (

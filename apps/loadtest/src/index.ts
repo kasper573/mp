@@ -101,10 +101,10 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} authenticated`);
     }
 
-    const joinPromise = new Promise<GameStateEvents["world.joined"]>(
+    const joinPromise = new Promise<GameStateEvents["area.joined"]>(
       (resolve) => {
         const unsub = gameClient.eventBus.subscribe(
-          "world.joined",
+          "area.joined",
           (payload) => {
             unsub();
             resolve(payload);
@@ -121,7 +121,7 @@ async function testOneGameClient(n: number, rng: Rng) {
     }
 
     const url = await api.areaFileUrl.query(areaId);
-    const area = await loadAreaResource(url, areaId);
+    const area = await loadAreaResource(areaId, url);
     const tiles = Array.from(area.graph.nodeIds)
       .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
       .filter((v) => v !== undefined);
