@@ -802,7 +802,7 @@
           },
           "direction": "forward",
           "editorMode": "code",
-          "expr": "{service_name=\"docker-mp-server-1\"}",
+          "expr": "{service_name=\"docker-mp-game-service-1\"}",
           "queryType": "range",
           "refId": "A"
         }
@@ -824,7 +824,7 @@
   },
   "timepicker": {},
   "timezone": "browser",
-  "title": "mp-server (custom)",
+  "title": "mp-game-service (custom metrics)",
   "uid": "ae3kps81booaoe",
   "version": 23
 }

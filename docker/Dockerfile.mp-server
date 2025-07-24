@@ -32,7 +32,7 @@ COPY --from=builder /workdir/apps/server/dist /workdir/server
 ENV MP_SERVER_PUBLIC_DIR=/workdir/public
 ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
-ENV OTEL_SERVICE_NAME="mp-server"
+ENV OTEL_SERVICE_NAME="mp-game-service"
 ENV OTEL_SERVICE_VERSION="${MP_BUILD_VERSION}"
 ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
 ENV OTEL_NODE_DISABLED_INSTRUMENTATIONS="nothing-should-be-disabled"

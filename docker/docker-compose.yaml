@@ -21,15 +21,15 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      - mp-server
+      - mp-game-service
 
-  mp-server:
+  mp-game-service:
     env_file: *env_files
     logging: *logging
     build:
-      dockerfile: ./docker/Dockerfile.mp-server
+      dockerfile: ./docker/Dockerfile.mp-game-service
       context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
     healthcheck:
