@@ -9,7 +9,10 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createTokenResolver } from "@mp/auth/server";
 import type { ApiContext } from "./integrations/trpc";
-import { createCdnResolver, ctxCdnResolver } from "./integrations/cdn";
+import {
+  createFileResolver,
+  ctxFileResolver,
+} from "./integrations/file-server";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -20,13 +23,13 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const cdnResolver = createCdnResolver(opt.cdnBaseUrl);
+const fileResolver = createFileResolver(opt.fileServerBaseUrl);
 
 const requestLimiter = new RateLimiter({ points: 20, duration: 1 });
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
-  .provide(ctxCdnResolver, cdnResolver);
+  .provide(ctxFileResolver, fileResolver);
 
 const app = express();
 app.use(

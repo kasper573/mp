@@ -9,7 +9,7 @@ export const apiOptionsSchema = type({
   hostname: "string",
   exposeErrorDetails: boolish(),
   prettyLogs: boolish(),
-  cdnBaseUrl: "string",
+  fileServerBaseUrl: "string",
   version: "string",
   auth: {
     /**

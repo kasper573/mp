@@ -2,16 +2,17 @@ import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import { type } from "@mp/validate";
 
-export const ctxCdnResolver = InjectionContext.new<CdnResolver>("CdnResolver");
+export const ctxFileResolver =
+  InjectionContext.new<FileResolver>("FileResolver");
 
-export interface CdnResolver {
+export interface FileResolver {
   abs: (...relativePath: string[]) => PublicUrl;
   dir: <FileInDir extends string>(
     ...relativePath: string[]
   ) => Promise<FileInDir[]>;
 }
 
-export function createCdnResolver(baseUrl: string): CdnResolver {
+export function createFileResolver(baseUrl: string): FileResolver {
   function abs(...relativePath: string[]) {
     const url = new URL(relativePath.join("/"), baseUrl);
     return url.toString() as PublicUrl;
@@ -28,7 +29,7 @@ export function createCdnResolver(baseUrl: string): CdnResolver {
       throw new Error(`Failed to fetch directory: ${response.statusText}`);
     }
     const json = await response.json();
-    const entries = CaddyDirectoryEntry.array().from(json);
+    const entries = DirectoryEntry.array().from(json);
     return entries.map((entry) => entry.name as FileInDir);
   }
 
@@ -38,7 +39,7 @@ export function createCdnResolver(baseUrl: string): CdnResolver {
   };
 }
 
-const CaddyDirectoryEntry = type({
+const DirectoryEntry = type({
   name: "string",
   size: "number",
   url: "string",
@@ -47,13 +48,3 @@ const CaddyDirectoryEntry = type({
   is_dir: "boolean",
   is_symlink: "boolean",
 });
-
-interface CaddyDirectoryEntry {
-  name: string;
-  size: number;
-  url: string;
-  mod_time: string;
-  mode: number;
-  is_dir: boolean;
-  is_symlink: boolean;
-}

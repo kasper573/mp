@@ -28,7 +28,7 @@ faro.{$MP_DOMAIN} {
     reverse_proxy alloy:18273
 }
 
-{$MP_CDN_DOMAIN} {
+{$MP_FILE_SERVER_DOMAIN} {
 	root * /srv/mp-public
 	file_server browse
 }

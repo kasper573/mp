@@ -10,7 +10,7 @@ import { systemRoles, worldRoles } from "@mp/game/server";
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
 import { rpc } from "./integrations/trpc";
-import { ctxCdnResolver } from "./integrations/cdn";
+import { ctxFileResolver } from "./integrations/file-server";
 import path from "path";
 import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
@@ -51,17 +51,17 @@ export const apiRouter = rpc.router({
   areaFileUrl: rpc.procedure
     .input(type("string").brand("AreaId"))
     .query(({ input: areaId, ctx }) =>
-      ctx.ioc.get(ctxCdnResolver).abs("areas", areaId),
+      ctx.ioc.get(ctxFileResolver).abs("areas", areaId),
     ),
 
   areaFileUrls: rpc.procedure.query(
     async ({ ctx }): Promise<ReadonlyMap<AreaId, PublicUrl>> => {
-      const cdn = ctx.ioc.get(ctxCdnResolver);
-      const areaFiles = await cdn.dir("areas");
+      const fs = ctx.ioc.get(ctxFileResolver);
+      const areaFiles = await fs.dir("areas");
       return new Map(
         areaFiles.map((file): [AreaId, PublicUrl] => {
           const id = path.basename(file, path.extname(file)) as AreaId;
-          const url = cdn.abs("areas", file);
+          const url = fs.abs("areas", file);
           return [id, url];
         }),
       );
@@ -70,12 +70,12 @@ export const apiRouter = rpc.router({
 
   actorSpritesheetUrls: rpc.procedure.query(
     async ({ ctx }): Promise<ActorSpritesheetUrls> => {
-      const cdn = ctx.ioc.get(ctxCdnResolver);
-      const modelFolders = await cdn.dir<ActorModelId>("actors");
+      const fs = ctx.ioc.get(ctxFileResolver);
+      const modelFolders = await fs.dir<ActorModelId>("actors");
       return new Map(
         await Promise.all(
           modelFolders.map(async (modelId) => {
-            const spritesheetFiles = await cdn.dir("actors", modelId);
+            const spritesheetFiles = await fs.dir("actors", modelId);
             const spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl> =
               new Map(
                 await Promise.all(
@@ -85,7 +85,7 @@ export const apiRouter = rpc.router({
                         spritesheet,
                         path.extname(spritesheet),
                       ) as ActorAnimationName;
-                      const url = cdn.abs("actors", modelId, spritesheet);
+                      const url = fs.abs("actors", modelId, spritesheet);
                       return [state, url];
                     },
                   ),
