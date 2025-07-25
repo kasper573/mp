@@ -30,7 +30,7 @@ export class BinaryEventTransceiver<Context = void> {
 
   handleMessage = async (
     data: ArrayBufferLike,
-    context: Context,
+    getContext: () => Context,
   ): Promise<BinaryEventTransceiverHandleMessageResult | undefined> => {
     if (!this.options.receive) {
       throw new Error("No receiver defined, receive not supported.");
@@ -40,35 +40,9 @@ export class BinaryEventTransceiver<Context = void> {
     if (decodeResult.isOk()) {
       const receiveResult = await this.options.receive(
         decodeResult.value,
-        context,
+        getContext(),
       );
       return { message: decodeResult.value, receiveResult };
     }
-  };
-
-  /**
-   * Convenience method to easily bind event based message handlers
-   * The returned event handler will pipe all errors to the given event handler.
-   * This is because most event expect a void return.
-   * If you need to handle the promise, use the handleMessage method directly.
-   */
-  messageEventHandler = (
-    errorHandler: (error: unknown) => void,
-    context: Context,
-  ) => {
-    return (event: { data: ArrayBufferLike }): void => {
-      const handle = async () => {
-        try {
-          const out = await this.handleMessage(event.data, context);
-          if (out?.receiveResult.isErr()) {
-            errorHandler(out.receiveResult.error);
-          }
-        } catch (error) {
-          errorHandler(error);
-        }
-      };
-
-      void handle();
-    };
   };
 }

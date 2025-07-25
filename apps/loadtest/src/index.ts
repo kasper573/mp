@@ -75,8 +75,19 @@ async function testOneGameClient(n: number, rng: Rng) {
     (path, input) => eventTransceiver.send([path, input]),
   );
 
-  const handleMessage = eventTransceiver.messageEventHandler(logger.error);
-  socket.addEventListener("message", handleMessage);
+  socket.addEventListener("message", async (event) => {
+    try {
+      const out = await eventTransceiver.handleMessage(
+        event.data,
+        () => void 0,
+      );
+      if (out?.receiveResult.isErr()) {
+        logger.error(out.receiveResult.error);
+      }
+    } catch (error) {
+      logger.error(error);
+    }
+  });
 
   let stopClient = () => {};
   try {
@@ -160,7 +171,6 @@ async function testOneGameClient(n: number, rng: Rng) {
   } finally {
     stopClient();
     socket.close();
-    socket.removeEventListener("message", handleMessage);
   }
 }
 
