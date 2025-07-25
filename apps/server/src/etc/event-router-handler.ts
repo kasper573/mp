@@ -39,8 +39,8 @@ export function eventRouterHandler<Context>(opt: {
         },
         `[event]`,
       );
-      if (out.result.isErr()) {
-        opt.logger.error(out.result.error, `[event] ${path.join(".")}`);
+      if (out.receiveResult.isErr()) {
+        opt.logger.error(out.receiveResult.error, `[event] ${path.join(".")}`);
       }
     }
     return out;

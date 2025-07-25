@@ -2,11 +2,17 @@ import { createEncoding } from "@mp/encoding";
 import type {
   EventRouterMessageReceiver,
   EventRouterMessage,
+  EventRouterMessageReceiverResult,
 } from "./event-receiver";
 
 export interface BinaryEventTransceiverOptions<Context> {
   send?: (messageBuffer: ArrayBufferLike) => unknown;
   receive?: EventRouterMessageReceiver<Context>;
+}
+
+export interface BinaryEventTransceiverHandleMessageResult {
+  message: EventRouterMessage<unknown>;
+  receiveResult: EventRouterMessageReceiverResult<unknown>;
 }
 
 export class BinaryEventTransceiver<Context = void> {
@@ -22,7 +28,10 @@ export class BinaryEventTransceiver<Context = void> {
     this.options.send(this.messageEncoding.encode(message));
   }
 
-  handleMessage = async (data: ArrayBufferLike, context: Context) => {
+  handleMessage = async (
+    data: ArrayBufferLike,
+    context: Context,
+  ): Promise<BinaryEventTransceiverHandleMessageResult | undefined> => {
     if (!this.options.receive) {
       throw new Error("No receiver defined, receive not supported.");
     }
@@ -33,7 +42,7 @@ export class BinaryEventTransceiver<Context = void> {
         decodeResult.value,
         context,
       );
-      return { message: decodeResult.value, result: receiveResult };
+      return { message: decodeResult.value, receiveResult };
     }
   };
 
@@ -51,8 +60,8 @@ export class BinaryEventTransceiver<Context = void> {
       const handle = async () => {
         try {
           const out = await this.handleMessage(event.data, context);
-          if (out?.result.isErr()) {
-            errorHandler(out.result.error);
+          if (out?.receiveResult.isErr()) {
+            errorHandler(out.receiveResult.error);
           }
         } catch (error) {
           errorHandler(error);
