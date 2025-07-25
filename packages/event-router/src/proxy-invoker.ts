@@ -4,6 +4,7 @@ import type {
   AnyEventNode,
   InferEventContext,
   InferEventInput,
+  EventRouterNode,
 } from "./builder";
 import { createInvocationProxy } from "@mp/invocation-proxy";
 import { createEventRouterReceiver } from "./event-receiver";
@@ -42,6 +43,11 @@ export type EventRouterProxyInvoker<Node extends AnyEventNode> =
     : Node extends AnyEventRouterHandlerNode
       ? EventRouterEventInvoker<Node>
       : never;
+
+export type MergeEventRouterNodes<
+  A extends AnyEventRouterNode,
+  B extends AnyEventRouterNode,
+> = EventRouterNode<A["routes"] & B["routes"]>;
 
 export type EventRouterProxyInvokerRecord<Router extends AnyEventRouterNode> = {
   [K in keyof Router["routes"]]: EventRouterProxyInvoker<Router["routes"][K]>;

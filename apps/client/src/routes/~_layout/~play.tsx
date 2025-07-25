@@ -12,12 +12,14 @@ import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 import { miscDebugSettings } from "../../signals/misc-debug-ui-settings";
 import { useGameAssets } from "../../integrations/assets";
+import { ComposedGameEventClientContext } from "../../integrations/game-event-client";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
 });
 
 function PlayPage() {
+  const events = useContext(ComposedGameEventClientContext);
   const socket = useContext(SocketContext);
   const stateClient = useMemo(
     () =>
@@ -37,6 +39,7 @@ function PlayPage() {
           stateClient={stateClient}
           additionalDebugUi={<MiscDebugUi />}
           interactive
+          sendJoinRequest={() => events.gateway.join()}
         />
       </GameAssetLoaderContext.Provider>
     </Suspense>

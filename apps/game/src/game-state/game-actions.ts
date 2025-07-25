@@ -30,8 +30,4 @@ export class GameActions {
   respawn() {
     return this.events.character.respawn(assert(this.characterId.value));
   }
-
-  join() {
-    this.events.world.join();
-  }
 }

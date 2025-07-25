@@ -153,6 +153,9 @@ importers:
       '@mp/game':
         specifier: workspace:*
         version: link:../game
+      '@mp/gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger
@@ -400,6 +403,9 @@ importers:
       '@mp/game':
         specifier: workspace:*
         version: link:../game
+      '@mp/gateway':
+        specifier: workspace:*
+        version: link:../gateway
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger

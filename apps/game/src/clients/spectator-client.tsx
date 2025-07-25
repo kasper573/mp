@@ -3,22 +3,23 @@ import { LoadingSpinner } from "@mp/ui";
 import { Select } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import { useSignal, useSignalEffect } from "@mp/state/react";
-import { ctxGameEventClient } from "../network/game-event-client";
 import { ioc } from "../context/ioc";
 import { ctxAuthClient } from "../context/common";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 import type { CharacterId } from "../character/types";
 
+export interface SpectatorClientProps extends GameClientProps {
+  characterOptions: SelectOption<CharacterId>[];
+  sendSpectateRequest: (characterId: CharacterId) => void;
+}
+
 /**
  * A `GameClient` that doesn't join the game, but instead spectates the selected player.
  * Also has additional UI for selecting spectator options.
  */
-export function SpectatorClient(
-  props: GameClientProps & { characterOptions: SelectOption<CharacterId>[] },
-) {
+export function SpectatorClient(props: SpectatorClientProps) {
   const spectatedCharacterId = useSignal<CharacterId>();
-  const events = ioc.get(ctxGameEventClient);
   const auth = ioc.get(ctxAuthClient);
 
   useSignalEffect(() => {
@@ -28,7 +29,7 @@ export function SpectatorClient(
       spectatedCharacterId.value
     ) {
       props.stateClient.characterId.value = spectatedCharacterId.value;
-      void events.world.spectate(spectatedCharacterId.value);
+      props.sendSpectateRequest(spectatedCharacterId.value);
     }
   });
 

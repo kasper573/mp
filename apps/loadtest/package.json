@@ -11,6 +11,7 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/gateway": "workspace:*",
     "@mp/api": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/logger": "workspace:*",

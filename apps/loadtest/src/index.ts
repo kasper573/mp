@@ -16,6 +16,7 @@ import {
   BinaryEventTransceiver,
   createEventRouterProxyInvoker,
 } from "@mp/event-router";
+import type { GatewayRouter } from "@mp/gateway";
 
 registerEncoderExtensions();
 
@@ -66,7 +67,11 @@ async function testOneGameClient(n: number, rng: Rng) {
     send: (data) => socket.send(data),
   });
 
-  const eventClient: GameEventClient = createEventRouterProxyInvoker(
+  const gameEvents: GameEventClient = createEventRouterProxyInvoker(
+    (path, input) => eventTransceiver.send([path, input]),
+  );
+
+  const gatewayEvents = createEventRouterProxyInvoker<GatewayRouter>(
     (path, input) => eventTransceiver.send([path, input]),
   );
 
@@ -77,7 +82,7 @@ async function testOneGameClient(n: number, rng: Rng) {
   try {
     const gameClient = new GameStateClient({
       socket,
-      eventClient,
+      eventClient: gameEvents,
       logger,
       settings: () => ({
         useInterpolator: false,
@@ -96,7 +101,7 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} connected`);
     }
 
-    eventClient.world.auth(createBypassUser(`Test User ${n}`));
+    gatewayEvents.gateway.auth(createBypassUser(`Test User ${n}`));
     if (verbose) {
       logger.info(`Socket ${n} authenticated`);
     }
@@ -113,7 +118,7 @@ async function testOneGameClient(n: number, rng: Rng) {
       },
     );
 
-    gameClient.actions.join();
+    gatewayEvents.gateway.join();
 
     const { areaId, characterId } = await joinPromise;
     if (verbose) {

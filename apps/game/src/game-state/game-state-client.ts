@@ -58,7 +58,7 @@ export class GameStateClient {
 
     // We throttle because when stale patches are detected, they usually come in batches,
     // and we only want to send one request for full state.
-    this.refreshState = throttle(this.events.world.requestFullState, 5000);
+    this.refreshState = throttle(this.events.network.requestFullState, 5000);
 
     this.actorList = computed(() => this.gameState.actors.values().toArray());
 
@@ -93,11 +93,6 @@ export class GameStateClient {
       }
 
       socket.removeEventListener("message", this.handleMessage);
-
-      const id = this.characterId.value;
-      if (id !== undefined) {
-        void this.events.world.leave(id);
-      }
     };
 
     // Return stop function so that start can be used in effect like manner.

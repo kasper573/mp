@@ -19,6 +19,7 @@ import type { CharacterId } from "@mp/game/client";
 import { useGameAssets } from "../../../integrations/assets";
 import { useApi } from "@mp/api/sdk";
 import { useQuery } from "@mp/query";
+import { ComposedGameEventClientContext } from "../../../integrations/game-event-client";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -27,6 +28,7 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
+  const events = useContext(ComposedGameEventClientContext);
   const socket = useContext(SocketContext);
   const api = useApi();
   const auth = ioc.get(ctxAuthClient);
@@ -71,6 +73,9 @@ function RouteComponent() {
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi />}
             interactive={false}
+            sendSpectateRequest={(characterId) =>
+              events.gateway.spectate(characterId)
+            }
           />
         </GameAssetLoaderContext.Provider>
       </Suspense>
