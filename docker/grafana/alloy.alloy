@@ -146,7 +146,7 @@ faro.receiver "mp_client" {
 	server {
 		listen_address           = "0.0.0.0"
 		listen_port              = "18273"
-		cors_allowed_origins     = [env("MP_SERVER_CORS_ORIGIN")]
+		cors_allowed_origins     = [env("FARO_RECEIVER_CORS_ALLOWED_ORIGIN")]
 		max_allowed_payload_size = "10MiB"
 
 		rate_limiting {
