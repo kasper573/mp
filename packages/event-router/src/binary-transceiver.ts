@@ -1,8 +1,8 @@
 import { createEncoding } from "@mp/encoding";
 import type {
-  EventRouterMessageInvoker,
+  EventRouterInvoker,
   EventRouterMessage,
-  EventRouterMessageInvokerResult,
+  EventRouterInvokerResult,
 } from "./event-invoker";
 import type { Logger } from "@mp/logger";
 
@@ -10,7 +10,7 @@ import { assert } from "@mp/std";
 
 export interface BinaryEventTransceiverOptions<Context> {
   send?: (messageBuffer: ArrayBufferLike) => unknown;
-  invoke?: EventRouterMessageInvoker<Context>;
+  invoke?: EventRouterInvoker<Context>;
   logger?: Logger;
 }
 
@@ -39,7 +39,7 @@ export class BinaryEventTransceiver<Context = void> {
   }
 
   private async pollMessageQueue(): Promise<
-    EventRouterMessageInvokerResult<unknown> | undefined
+    EventRouterInvokerResult<unknown> | undefined
   > {
     if (this.#isInvokingEvent) {
       return;

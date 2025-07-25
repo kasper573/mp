@@ -4,7 +4,7 @@ import type { AnyEventNode } from "./builder";
 
 export function createEventRouterInvoker<Context>(
   root: AnyEventNode<Context>,
-): EventRouterMessageInvoker<Context> {
+): EventRouterInvoker<Context> {
   return async function invokeEventRouter(message, ctx) {
     const [path, input] = message;
     const node = resolveEventRouterNode<Context>(root, path);
@@ -43,12 +43,12 @@ export class EventRouterInvokerError<Input> extends Error {
   }
 }
 
-export type EventRouterMessageInvoker<Context = void> = (
+export type EventRouterInvoker<Context = void> = (
   message: EventRouterMessage<unknown>,
   context: Context,
-) => Promise<EventRouterMessageInvokerResult<unknown>>;
+) => Promise<EventRouterInvokerResult<unknown>>;
 
-export type EventRouterMessageInvokerResult<Input> = Result<
+export type EventRouterInvokerResult<Input> = Result<
   void,
   EventRouterInvokerError<Input>
 >;

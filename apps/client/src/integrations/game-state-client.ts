@@ -49,7 +49,12 @@ function createGameStateClient(
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
   const socket = createWebSocket(env.gameServiceUrl);
-  const eventClient = createComposedGameEventClient(socket);
+  const transceiver = new BinaryEventTransceiver({
+    send: socket.send.bind(socket),
+  });
+  const eventClient: ComposedGameEventClient = createEventRouterProxyInvoker(
+    transceiver.send,
+  );
   const accessToken = computed(() => auth.identity.value?.token);
 
   function sendAccessTokenToGateway() {
@@ -82,16 +87,4 @@ function createGameStateClient(
   });
 
   return [stateClient, eventClient, initialize];
-}
-
-function createComposedGameEventClient(
-  socket: WebSocket,
-): ComposedGameEventClient {
-  const client = new BinaryEventTransceiver({
-    send: (data) => socket.send(data),
-  });
-
-  return createEventRouterProxyInvoker((path, input) =>
-    client.send([path, input]),
-  );
 }
