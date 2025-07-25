@@ -11,7 +11,7 @@ import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
-import { upsertMapSet } from "@mp/std";
+
 import createCors from "cors";
 import express from "express";
 import http from "http";
@@ -26,16 +26,16 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
-import type { ClientId } from "./client-id";
-import { getClientId } from "./client-id";
 import {
   BinaryEventTransceiver,
   createEventRouterReceiver,
 } from "@mp/event-router";
-import { ctxClientId, gatewayRouter } from "./router";
+import { gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
-import { logEventTransceiverResult } from "./event-transceiver-logger";
+
 import { createTokenResolver } from "@mp/auth/server";
+import type { Branded } from "@mp/std";
+import { createShortId } from "@mp/std";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -44,7 +44,9 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
-const sockets = new Map<SocketType, Set<WebSocket>>();
+type ClientId = Branded<string, "ClientId">;
+const gameServiceSockets = new Set<WebSocket>();
+const gameClientSockets = new Map<ClientId, WebSocket>();
 const userSessions = new Map<ClientId, UserSession>();
 const metricsRegister = new MetricsRegistry();
 
@@ -107,15 +109,24 @@ wss.on("connection", (socket, request) => {
 
   logger.info(`New ${socketType} connection established`);
 
-  upsertMapSet(sockets, socketType, socket);
+  socket.on("error", (err) => {
+    logger.error(err, `Error in ${socketType} connection`);
+  });
 
-  const clientId = getClientId(socket);
-  userSessions.set(clientId, { id: clientId });
+  switch (socketType) {
+    case "game-client":
+      return setupGameClientSocket(socket);
+    case "game-server":
+      return setupGameServerSocket(socket);
+  }
+});
+
+function setupGameServerSocket(socket: WebSocket) {
+  gameServiceSockets.add(socket);
 
   socket.on("close", () => {
-    logger.info(`${socketType} connection closed`);
-    sockets.get(socketType)?.delete(socket);
-    userSessions.delete(clientId);
+    logger.info(`Game service disconnected`);
+    gameServiceSockets.delete(socket);
   });
 
   socket.on("message", (data: ArrayBuffer) => {
@@ -124,35 +135,45 @@ wss.on("connection", (socket, request) => {
       flushGameState(flushResult.value);
       return;
     }
+  });
+}
 
+function setupGameClientSocket(socket: WebSocket) {
+  const clientId = createShortId() as ClientId;
+  userSessions.set(clientId, { id: clientId });
+  gameClientSockets.set(clientId, socket);
+
+  socket.on("close", () => {
+    logger.info(`Game client ${clientId} disconnected`);
+    gameClientSockets.delete(clientId);
+    userSessions.delete(clientId);
+  });
+
+  socket.on("message", (data: ArrayBuffer) => {
     const eventResult = eventTransceiver.handleMessage(data, () => {
       const session = userSessions.get(clientId);
-      return ioc
-        .provide(ctxClientId, clientId)
-        .provideIfDefined(ctxUserSession, session);
+      return ioc.provideIfDefined(ctxUserSession, session);
     });
 
     if (eventResult) {
-      logEventTransceiverResult(logger, eventResult);
-      return;
+      const { message, receiveResult } = eventResult;
+      const [path] = message;
+      logger.info({ clientId }, `[event] ${path.join(".")}`);
+      if (receiveResult.isErr()) {
+        logger.error(
+          receiveResult.error,
+          `[event] ${path.join(".")} (ClientId: ${clientId})`,
+        );
+      }
     }
   });
-
-  socket.on("error", (err) => {
-    logger.error(err, `Error in ${socketType} connection`);
-  });
-});
+}
 
 function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
-  const gameClientSockets = sockets.get("game-client");
-  if (!gameClientSockets) {
-    return;
-  }
-
   const { clientPatches, clientEvents } = flushResult;
 
-  for (const socket of gameClientSockets) {
-    const player = userSessions.get(getClientId(socket))?.player;
+  for (const [clientId, socket] of gameClientSockets.entries()) {
+    const player = userSessions.get(clientId)?.player;
     if (!player) {
       // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
       continue;
@@ -168,9 +189,6 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   }
 }
 
-const SocketType = type.enumerated("game-client", "game-server");
-type SocketType = typeof SocketType.infer;
-
 function getSearchParams(path = ""): URLSearchParams {
   return new URL(path, "http://localhost").searchParams;
 }
@@ -179,6 +197,9 @@ function getSocketType(req: IncomingMessage) {
   const typeParam = getSearchParams(req.url).get("type") ?? "game-client";
   return SocketType(typeParam);
 }
+
+const SocketType = type.enumerated("game-client", "game-server");
+type SocketType = typeof SocketType.infer;
 
 const gameStatePatchSizeHistogram = new MetricsHistogram({
   name: "game_state_flush_patch_size_bytes",
@@ -207,6 +228,6 @@ const _clientCountGague = new MetricsGague({
   help: "Number of active websocket connections",
   registers: [metricsRegister],
   collect() {
-    this.set(sockets.get("game-client")?.size ?? 0);
+    this.set(gameClientSockets.size);
   },
 });

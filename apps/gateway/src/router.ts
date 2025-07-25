@@ -13,8 +13,6 @@ import {
   ctxUserSession,
 } from "@mp/game/server";
 import { ctxGameEventClient } from "@mp/game/server";
-import { InjectionContext } from "@mp/ioc";
-import type { ClientId } from "./client-id";
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
@@ -84,5 +82,3 @@ export const gatewayRouter = evt.router({
 });
 
 export const worldEventRouterSlice = { world: networkEventRouter };
-
-export const ctxClientId = InjectionContext.new<ClientId>("ClientId");
