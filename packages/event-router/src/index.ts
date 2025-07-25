@@ -1,4 +1,4 @@
 export * from "./builder";
 export * from "./proxy-invoker";
-export * from "./event-receiver";
+export * from "./event-invoker";
 export * from "./binary-transceiver";

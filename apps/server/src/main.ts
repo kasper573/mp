@@ -48,10 +48,13 @@ import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 
-import { eventRouterHandler } from "./etc/event-router-handler";
 import { createGameStatePersistence } from "./etc/game-state-persistence";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
+import {
+  createEventRouterInvoker,
+  BinaryEventTransceiver,
+} from "@mp/event-router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -96,16 +99,13 @@ await seed(db, area, actorModels);
 const wssUrl = new URL(opt.gatewayWssUrl);
 wssUrl.searchParams.set("type", "game-server");
 
+const receive = createEventRouterInvoker(gameServerEventRouter);
+const transceiver = new BinaryEventTransceiver({ invoke: receive, logger });
 const gatewaySocket = new WebSocket(wssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
-gatewaySocket.on(
-  "message",
-  eventRouterHandler({
-    logger,
-    router: gameServerEventRouter,
-    createContext: (session) => ioc.provide(ctxUserSession, session),
-  }),
+gatewaySocket.on("message", (buffer: ArrayBuffer) =>
+  transceiver.handleMessage(buffer, ioc.provide(ctxUserSession, { id: "" })),
 );
 
 shouldOptimizeCollects.value = opt.patchOptimizer;

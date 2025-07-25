@@ -2,21 +2,21 @@ import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 import type { AnyEventNode } from "./builder";
 
-export function createEventRouterReceiver<Context>(
+export function createEventRouterInvoker<Context>(
   root: AnyEventNode<Context>,
-): EventRouterMessageReceiver<Context> {
-  return function invokeEventRouter(message, ctx) {
+): EventRouterMessageInvoker<Context> {
+  return async function invokeEventRouter(message, ctx) {
     const [path, input] = message;
     const node = resolveEventRouterNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err(new EventRouterReceiverError(message, "path not found"));
+      return err(new EventRouterInvokerError(message, "path not found"));
     }
 
     try {
-      node.handler({ ctx, input, mwc });
+      await node.handler({ ctx, input, mwc });
       return ok(void 0);
     } catch (error) {
-      return err(new EventRouterReceiverError(message, error));
+      return err(new EventRouterInvokerError(message, error));
     }
   };
 }
@@ -34,7 +34,7 @@ function resolveEventRouterNode<Context>(
   return node;
 }
 
-export class EventRouterReceiverError<Input> extends Error {
+export class EventRouterInvokerError<Input> extends Error {
   constructor(message: EventRouterMessage<Input>, cause?: unknown) {
     super(`error in event handler "${message[0].join(".")}"`, {
       cause,
@@ -43,14 +43,14 @@ export class EventRouterReceiverError<Input> extends Error {
   }
 }
 
-export type EventRouterMessageReceiver<Context = void> = (
+export type EventRouterMessageInvoker<Context = void> = (
   message: EventRouterMessage<unknown>,
   context: Context,
-) => EventRouterMessageReceiverResult<unknown>;
+) => Promise<EventRouterMessageInvokerResult<unknown>>;
 
-export type EventRouterMessageReceiverResult<Input> = Result<
+export type EventRouterMessageInvokerResult<Input> = Result<
   void,
-  EventRouterReceiverError<Input>
+  EventRouterInvokerError<Input>
 >;
 
 export type EventRouterMessage<Input> = [path: string[], input: Input];

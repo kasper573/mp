@@ -2,27 +2,27 @@ import { describe, it, expect, vi } from "vitest";
 import type { EventRouterMessage } from "../src";
 import {
   EventRouterBuilder,
-  createEventRouterReceiver,
-  EventRouterReceiverError,
+  createEventRouterInvoker,
+  EventRouterInvokerError,
 } from "../src";
 
 describe("builder and invoker", () => {
-  it("invokes a query event and returns Ok with output", () => {
+  it("invokes a query event and returns Ok with output", async () => {
     const fn = vi.fn();
     const builder = new EventRouterBuilder().build();
     const node = builder.event
       .input<number>()
       .handler(({ input }) => fn(input * 2));
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<number> = [[], 5];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith(10);
   });
 
-  it("passes the context to the handler", () => {
+  it("passes the context to the handler", async () => {
     interface Ctx {
       value: number;
     }
@@ -30,16 +30,16 @@ describe("builder and invoker", () => {
     const fn = vi.fn();
     const node = builder.event.handler(({ ctx }) => fn(ctx.value * 3));
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<unknown> = [[], undefined];
-    const result = invoker(call, { value: 4 });
+    const result = await invoker(call, { value: 4 });
 
     expect(result.isOk()).toBe(true);
 
     expect(fn).toHaveBeenCalledWith(12);
   });
 
-  it("resolves nested router paths correctly", () => {
+  it("resolves nested router paths correctly", async () => {
     const builder = new EventRouterBuilder().build();
 
     const fn = vi.fn();
@@ -48,47 +48,47 @@ describe("builder and invoker", () => {
       .handler(({ input }) => fn(`Hello, ${input}!`));
 
     const root = builder.router({ greet });
-    const invoker = createEventRouterReceiver(root);
+    const invoker = createEventRouterInvoker(root);
     const call: EventRouterMessage<string> = [["greet"], "Test"];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith("Hello, Test!");
   });
 
-  it("returns Err when path not found", () => {
+  it("returns Err when path not found", async () => {
     const builder = new EventRouterBuilder().build();
     const root = builder.router({});
-    const invoker = createEventRouterReceiver(root);
+    const invoker = createEventRouterInvoker(root);
     const call: EventRouterMessage<unknown> = [["unknown"], {}];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
+    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.message).toBe('error in event handler "unknown"');
   });
 
-  it("returns Err when path points to a router endpoint", () => {
+  it("returns Err when path points to a router endpoint", async () => {
     const builder = new EventRouterBuilder().build();
 
     const nestedRouter = builder.router({
       child: builder.event.handler(() => {}),
     });
     const root = builder.router({ nested: nestedRouter });
-    const invoker = createEventRouterReceiver(root);
+    const invoker = createEventRouterInvoker(root);
     const call: EventRouterMessage<unknown> = [["nested"], {}];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
+    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.message).toBe('error in event handler "nested"');
   });
 
-  it("catches handler exceptions and returns Err with cause", () => {
+  it("catches handler exceptions and returns Err with cause", async () => {
     const builder = new EventRouterBuilder().build();
 
     const brokenProc = builder.event.handler(() => {
@@ -96,20 +96,20 @@ describe("builder and invoker", () => {
     });
 
     const root = builder.router({ broken: brokenProc });
-    const invoker = createEventRouterReceiver(root);
+    const invoker = createEventRouterInvoker(root);
     const call: EventRouterMessage<unknown> = [["broken"], {}];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error).toBeInstanceOf(EventRouterReceiverError);
+    expect(result.error).toBeInstanceOf(EventRouterInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error.cause).toBeInstanceOf(Error);
     // @ts-expect-error ignore harmless error for lazy property accses
     expect((result.error.cause as Error).message).toBe("Unexpected");
   });
 
-  it("allows middleware to provide a custom context to the handler", () => {
+  it("allows middleware to provide a custom context to the handler", async () => {
     interface Ctx {
       userId: number;
     }
@@ -124,15 +124,15 @@ describe("builder and invoker", () => {
         }),
       );
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<unknown> = [[], undefined];
-    const result = invoker(call, { userId: 7 });
+    const result = await invoker(call, { userId: 7 });
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith({ userId: 7, role: "admin" });
   });
 
-  it("can use two middlewares and pass combined contexts", () => {
+  it("can use two middlewares and pass combined contexts", async () => {
     interface Ctx {
       userId: number;
     }
@@ -148,9 +148,9 @@ describe("builder and invoker", () => {
       )
       .handler(({ ctx, mwc }) => fn({ userId: ctx.userId, ...mwc }));
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<unknown> = [[], undefined];
-    const result = invoker(call, { userId: 42 });
+    const result = await invoker(call, { userId: 42 });
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith({
@@ -160,7 +160,7 @@ describe("builder and invoker", () => {
     });
   });
 
-  it("can use a piped middleware", () => {
+  it("can use a piped middleware", async () => {
     const builder = new EventRouterBuilder().build();
 
     const baseMw = builder.middleware(() => ({ count: 1 }));
@@ -168,15 +168,15 @@ describe("builder and invoker", () => {
     const fn = vi.fn();
     const node = builder.event.use(pipedMw).handler(({ mwc }) => fn(mwc.count));
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<unknown> = [[], undefined];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith(2);
   });
 
-  it("supports chaining multiple .input steps in any order", () => {
+  it("supports chaining multiple .input steps in any order", async () => {
     const builder = new EventRouterBuilder().build();
     const fn = vi.fn();
     const node = builder.event
@@ -184,9 +184,9 @@ describe("builder and invoker", () => {
       .input<string>()
       .handler(({ input }) => fn(input.length));
 
-    const invoker = createEventRouterReceiver(node);
+    const invoker = createEventRouterInvoker(node);
     const call: EventRouterMessage<string> = [[], "hello"];
-    const result = invoker(call, undefined);
+    const result = await invoker(call, undefined);
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith(5);

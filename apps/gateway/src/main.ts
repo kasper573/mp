@@ -28,7 +28,7 @@ import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
 import {
   BinaryEventTransceiver,
-  createEventRouterReceiver,
+  createEventRouterInvoker,
 } from "@mp/event-router";
 import { gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
@@ -89,7 +89,8 @@ httpServer.listen(opt.port, opt.hostname, () => {
 });
 
 const eventTransceiver = new BinaryEventTransceiver({
-  receive: createEventRouterReceiver(gatewayRouter),
+  invoke: createEventRouterInvoker(gatewayRouter),
+  logger,
 });
 
 const ioc = new ImmutableInjectionContainer().provide(
@@ -150,23 +151,12 @@ function setupGameClientSocket(socket: WebSocket) {
     userSessions.delete(clientId);
   });
 
-  socket.on("message", (data: ArrayBuffer) => {
-    const eventResult = eventTransceiver.handleMessage(data, () =>
+  socket.on("message", (data: ArrayBuffer) =>
+    eventTransceiver.handleMessage(
+      data,
       ioc.provideIfDefined(ctxUserSession, session),
-    );
-
-    if (eventResult) {
-      const { message, receiveResult } = eventResult;
-      const [path] = message;
-      logger.info({ clientId }, `[event] ${path.join(".")}`);
-      if (receiveResult.isErr()) {
-        logger.error(
-          receiveResult.error,
-          `[event] ${path.join(".")} (ClientId: ${clientId})`,
-        );
-      }
-    }
-  });
+    ),
+  );
 }
 
 function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {

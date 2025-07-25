@@ -610,6 +610,9 @@ importers:
       '@mp/invocation-proxy':
         specifier: workspace:*
         version: link:../invocation-proxy
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../logger
       '@mp/std':
         specifier: workspace:*
         version: link:../std

@@ -1,48 +1,71 @@
 import { createEncoding } from "@mp/encoding";
 import type {
-  EventRouterMessageReceiver,
+  EventRouterMessageInvoker,
   EventRouterMessage,
-  EventRouterMessageReceiverResult,
-} from "./event-receiver";
+  EventRouterMessageInvokerResult,
+} from "./event-invoker";
+import type { Logger } from "@mp/logger";
+
+import { assert } from "@mp/std";
 
 export interface BinaryEventTransceiverOptions<Context> {
   send?: (messageBuffer: ArrayBufferLike) => unknown;
-  receive?: EventRouterMessageReceiver<Context>;
-}
-
-export interface BinaryEventTransceiverHandleMessageResult {
-  message: EventRouterMessage<unknown>;
-  receiveResult: EventRouterMessageReceiverResult<unknown>;
+  invoke?: EventRouterMessageInvoker<Context>;
+  logger?: Logger;
 }
 
 export class BinaryEventTransceiver<Context = void> {
   // Claiming the range 43_000 - 43_999 for the binary event protocol
-  private messageEncoding = createEncoding<EventRouterMessage<unknown>>(43_000);
+  #messageEncoding = createEncoding<EventRouterMessage<unknown>>(43_000);
+  #messageQueue: Array<[EventRouterMessage<unknown>, Context]> = [];
+  #isInvokingEvent = false;
 
-  constructor(private options: BinaryEventTransceiverOptions<Context>) {}
+  constructor(private opt: BinaryEventTransceiverOptions<Context>) {}
 
   send<Input>(message: EventRouterMessage<Input>) {
-    if (!this.options.send) {
-      throw new Error("No sender defined, send not supported.");
-    }
-    this.options.send(this.messageEncoding.encode(message));
+    const sendFn = assert(this.opt.send, "No send function provided");
+    sendFn(this.#messageEncoding.encode(message));
   }
 
-  handleMessage = (
-    data: ArrayBufferLike,
-    getContext: () => Context,
-  ): BinaryEventTransceiverHandleMessageResult | undefined => {
-    if (!this.options.receive) {
-      throw new Error("No receiver defined, receive not supported.");
+  handleMessage(data: ArrayBufferLike, context: Context) {
+    const decodeResult = this.#messageEncoding.decode(data);
+    if (decodeResult.isOk()) {
+      const path = decodeResult.value[0].join(".");
+      this.opt.logger?.debug(`Queueing event: ${path}`);
+      this.#messageQueue.push([decodeResult.value, context]);
+      void this.pollMessageQueue();
+    }
+    return decodeResult;
+  }
+
+  private async pollMessageQueue(): Promise<
+    EventRouterMessageInvokerResult<unknown> | undefined
+  > {
+    if (this.#isInvokingEvent) {
+      return;
     }
 
-    const decodeResult = this.messageEncoding.decode(data);
-    if (decodeResult.isOk()) {
-      const receiveResult = this.options.receive(
-        decodeResult.value,
-        getContext(),
-      );
-      return { message: decodeResult.value, receiveResult };
+    const next = this.#messageQueue.shift();
+    if (!next) {
+      return;
     }
-  };
+
+    this.#isInvokingEvent = true;
+    const [message, context] = next;
+    const path = message[0].join(".");
+    this.opt.logger?.debug(`Invoking event: ${path}`);
+
+    const receiveFn = assert(this.opt.invoke, "No receive function provided");
+    const result = await receiveFn(message, context);
+
+    if (result.isErr()) {
+      this.opt.logger?.error(result.error, `Error handling event "${path}"`);
+    } else {
+      this.opt.logger?.info(`Event: ${path}`);
+    }
+
+    this.#isInvokingEvent = false;
+
+    void this.pollMessageQueue();
+  }
 }
