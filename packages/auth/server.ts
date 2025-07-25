@@ -3,6 +3,7 @@ import { err, ok, type Result } from "@mp/std";
 import {
   extractRolesFromJwtPayload,
   isOurJwtPayload,
+  parseBypassUser,
   type AccessToken,
   type UserId,
   type UserIdentity,
@@ -14,9 +15,9 @@ export interface TokenResolverOption {
   audience: string;
   algorithms: AuthAlgorithm[];
   /**
-   * Provide this function to allow bypassing real JWT verification.
+   * Allow bypassing real JWT verification.
    */
-  getBypassUser?: (token: AccessToken) => UserIdentity | undefined;
+  allowBypassUsers?: boolean;
   /**
    * Optional callback to handle the result of the token resolution.
    * This can be used for logging or other side effects.
@@ -33,7 +34,7 @@ export function createTokenResolver({
   issuer,
   audience,
   algorithms,
-  getBypassUser,
+  allowBypassUsers,
   onResolve,
 }: TokenResolverOption): TokenResolver {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
@@ -43,7 +44,7 @@ export function createTokenResolver({
       return err("A token must be provided");
     }
 
-    const bypassUser = getBypassUser?.(token);
+    const bypassUser = allowBypassUsers ? parseBypassUser(token) : undefined;
     if (bypassUser) {
       return ok(bypassUser);
     }

@@ -1,6 +1,5 @@
 import "dotenv/config";
 
-import { createTokenResolver } from "@mp/auth/server";
 import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import {
@@ -19,7 +18,6 @@ import {
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
-  ctxTokenResolver,
   ctxGameplaySession,
   gameServerEventRouter,
   NpcAi,
@@ -37,7 +35,6 @@ import {
 } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
-import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 
 import { collectProcessMetrics } from "./metrics/process";
@@ -46,7 +43,7 @@ import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
-import { playerRoles } from "./roles";
+
 import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -74,7 +71,6 @@ const metricsPushgateway = new Pushgateway(
   undefined,
   metrics,
 );
-const tokenResolver = createTokenResolver({ ...opt.auth, getBypassUser });
 
 const db = createDbClient(opt.databaseUrl);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
@@ -158,7 +154,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxNpcSpawner, npcSpawner);
 
 collectDefaultMetrics({ register: metrics });
@@ -186,17 +181,3 @@ setTimeout(
     }),
   opt.metricsPushgateway.interval.totalMilliseconds,
 );
-
-function getBypassUser(token: AccessToken): UserIdentity | undefined {
-  if (!opt.auth.allowBypassUsers) {
-    return;
-  }
-
-  const user = parseBypassUser(token);
-  if (!user) {
-    return;
-  }
-
-  user.roles = new Set(playerRoles);
-  return user;
-}

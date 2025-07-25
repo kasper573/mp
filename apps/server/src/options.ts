@@ -1,6 +1,5 @@
 import { TimeSpan } from "@mp/time";
-import { authAlgorithms } from "@mp/auth/server";
-import { boolish, csv, numeric, type } from "@mp/validate";
+import { boolish, numeric, type } from "@mp/validate";
 import { assertEnv } from "@mp/env";
 
 export type GameServiceOptions = typeof gameServiceOptionsSchema.infer;
@@ -20,29 +19,6 @@ export const gameServiceOptionsSchema = type({
    * The URL to the API service
    */
   apiServiceUrl: "string",
-  auth: {
-    /**
-     * OIDC issuer
-     */
-    issuer: "string",
-    /**
-     * OIDC audience
-     */
-    audience: "string",
-    /**
-     * OIDC JWKS URI
-     */
-    jwksUri: "string",
-    /**
-     * OIDC JWT algorithms
-     */
-    algorithms: csv(type.enumerated(...authAlgorithms)),
-    /**
-     * Allow bypassing JWT verification using fake tokens.
-     * Used by load test to automatically sign in as a new user and character.
-     */
-    allowBypassUsers: boolish(),
-  },
   /**
    * The server tick interval
    */

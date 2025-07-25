@@ -1,7 +1,11 @@
 import "dotenv/config";
 import { opt } from "./options";
 import type { CharacterId, GameplaySession } from "@mp/game/server";
-import { ctxGameplaySession, registerEncoderExtensions } from "@mp/game/server";
+import {
+  ctxGameplaySession,
+  ctxTokenResolver,
+  registerEncoderExtensions,
+} from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
@@ -30,6 +34,7 @@ import {
 import { gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { logEventTransceiverResult } from "./event-transceiver-logger";
+import { createTokenResolver } from "@mp/auth/server";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -51,6 +56,8 @@ const webServer = express()
   .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
 const httpServer = http.createServer(webServer);
+
+const tokenResolver = createTokenResolver(opt.auth);
 
 const sockets = new Map<SocketType, Set<WebSocket>>();
 const wss = new WebSocketServer({
@@ -82,7 +89,10 @@ const eventTransceiver = new BinaryEventTransceiver({
   receive: createEventRouterReceiver(gatewayRouter),
 });
 
-const ioc = new ImmutableInjectionContainer();
+const ioc = new ImmutableInjectionContainer().provide(
+  ctxTokenResolver,
+  tokenResolver,
+);
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
@@ -101,6 +111,7 @@ wss.on("connection", (socket, request) => {
   socket.on("close", () => {
     logger.info(`${socketType} connection closed`);
     sockets.get(socketType)?.delete(socket);
+    gameplaySessions.delete(socket);
   });
 
   socket.on("message", async (data: ArrayBuffer) => {
@@ -111,10 +122,9 @@ wss.on("connection", (socket, request) => {
     }
 
     const session = gameplaySessions.get(socket);
-    let socketContext = ioc;
-    if (session) {
-      socketContext = socketContext.provide(ctxGameplaySession, session);
-    }
+    const socketContext = session
+      ? ioc.provide(ctxGameplaySession, session)
+      : ioc;
 
     const result = await eventTransceiver.handleMessage(data, socketContext);
     if (result) {

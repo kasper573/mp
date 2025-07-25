@@ -28,6 +28,11 @@ export const apiOptionsSchema = type({
      * OIDC JWT algorithms
      */
     algorithms: csv(type.enumerated(...authAlgorithms)),
+    /**
+     * Allow bypassing JWT verification using fake tokens.
+     * Used by load test to automatically sign in as a new user and character.
+     */
+    allowBypassUsers: boolish(),
   },
 }).onDeepUndeclaredKey("delete");
 

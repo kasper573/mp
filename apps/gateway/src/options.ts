@@ -1,5 +1,6 @@
-import { boolish, numeric, type } from "@mp/validate";
+import { boolish, csv, numeric, type } from "@mp/validate";
 import { assertEnv } from "@mp/env";
+import { authAlgorithms } from "@mp/auth/server";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;
 
@@ -30,6 +31,29 @@ export const serverOptionsSchema = type({
   trustProxy: boolish(),
   apiEndpointPath: "string",
   apiServiceUrl: "string",
+  auth: {
+    /**
+     * OIDC issuer
+     */
+    issuer: "string",
+    /**
+     * OIDC audience
+     */
+    audience: "string",
+    /**
+     * OIDC JWKS URI
+     */
+    jwksUri: "string",
+    /**
+     * OIDC JWT algorithms
+     */
+    algorithms: csv(type.enumerated(...authAlgorithms)),
+    /**
+     * Allow bypassing JWT verification using fake tokens.
+     * Used by load test to automatically sign in as a new user and character.
+     */
+    allowBypassUsers: boolish(),
+  },
 }).onDeepUndeclaredKey("delete");
 
 export const opt = assertEnv(serverOptionsSchema, process.env, "MP_GATEWAY_");
