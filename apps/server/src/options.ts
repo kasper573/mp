@@ -3,36 +3,23 @@ import { authAlgorithms } from "@mp/auth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
 import { assertEnv } from "@mp/env";
 
-export type ServerOptions = typeof serverOptionsSchema.infer;
+export type GameServiceOptions = typeof gameServiceOptionsSchema.infer;
 
 const msSchema = numeric().pipe((str) => TimeSpan.fromMilliseconds(str));
 
-export const serverOptionsSchema = type({
+export const gameServiceOptionsSchema = type({
   /**
    * The id ofthe area that this game service instance will handle.
    */
   areaId: type("string").brand("AreaId"),
   /**
-   * Whether to trust the X-Forwarded-For header
+   * The URL to the gateway WebSocket server.
    */
-  trustProxy: boolish(),
+  gatewayWssUrl: "string",
   /**
-   * The port to listen on
+   * The URL to the API service
    */
-  port: numeric(),
-  /**
-   * The relative path to expose the WS endpoint on
-   */
-  wsEndpointPath: "string",
-  /**
-   * The hostname for the server to listen on
-   */
-  hostname: "string",
-  /**
-   * The CORS origin to allow
-   */
-  corsOrigin: "string",
-
+  apiServiceUrl: "string",
   auth: {
     /**
      * OIDC issuer
@@ -57,25 +44,34 @@ export const serverOptionsSchema = type({
     allowBypassUsers: boolish(),
   },
   /**
-   * The server tick interval in milliseconds
+   * The server tick interval
    */
   tickInterval: msSchema,
   /**
-   * How often (in milliseconds) to save the game state to the database
+   * How often to save the game state to the database
    */
   persistInterval: msSchema,
+  /**
+   * Options for prom-client Pushgateway
+   */
+  metricsPushgateway: {
+    /**
+     * The URL to the metrics push gateway
+     */
+    url: "string",
+    /**
+     * How often to push metrics to the push gateway
+     */
+    interval: msSchema,
+  },
   /**
    * The URL to the database
    */
   databaseUrl: "string",
   /**
-   * The version of the game server
+   * The version of the game service
    */
   version: "string",
-  /**
-   * Whether to expose detailed error information to clients
-   */
-  exposeErrorDetails: boolish(),
   /**
    * Whether to enable rate limiting
    */
@@ -96,10 +92,10 @@ export const serverOptionsSchema = type({
    * Whether to use pretty logging format.
    */
   prettyLogs: boolish(),
-  /**
-   * The URL to the API service
-   */
-  apiUrl: "string",
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+export const opt = assertEnv(
+  gameServiceOptionsSchema,
+  process.env,
+  "MP_SERVER_",
+);

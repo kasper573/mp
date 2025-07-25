@@ -111,6 +111,12 @@ services:
       - mimir-data:/data
     entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
 
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    container_name: pushgateway
+    ports:
+      - "9091:9091"
+
   tempo:
     env_file: *env_files
     logging: *logging

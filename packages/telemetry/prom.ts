@@ -5,4 +5,6 @@ export {
   Histogram as MetricsHistogram,
   exponentialBuckets,
   linearBuckets,
+  Pushgateway,
+  type PrometheusContentType,
 } from "prom-client";

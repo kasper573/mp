@@ -14,6 +14,12 @@ export class ClientRegistry {
   readonly characterIds = new Map<ClientId, CharacterId>();
   readonly spectatedCharacterIds = new Map<ClientId, CharacterId>();
 
+  clearAll() {
+    this.userIds.clear();
+    this.characterIds.clear();
+    this.spectatedCharacterIds.clear();
+  }
+
   removeClient(clientId: ClientId) {
     this.userIds.delete(clientId);
     this.characterIds.delete(clientId);

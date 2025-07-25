@@ -8,13 +8,14 @@
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch src/main.ts",
-    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
+    "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 MP_SERVER_AREA_ID=forest dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm",
     "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/keycloak-provision.ts"
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
+    "@mp/encoding": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/api": "workspace:*",

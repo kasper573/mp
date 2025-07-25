@@ -339,6 +339,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
+      '@mp/telemetry':
+        specifier: workspace:*
+        version: link:../../packages/telemetry
       '@mp/validate':
         specifier: workspace:*
         version: link:../../packages/validate
@@ -437,6 +440,9 @@ importers:
       '@mp/db':
         specifier: workspace:*
         version: link:../db
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../../packages/encoding
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env

@@ -1,13 +1,14 @@
 import "dotenv/config";
-import http from "node:http";
-
-import express from "express";
 
 import { createTokenResolver } from "@mp/auth/server";
 import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
-import { collectDefaultMetrics, MetricsRegistry } from "@mp/telemetry/prom";
-import { WebSocketServer } from "@mp/ws/server";
+import {
+  collectDefaultMetrics,
+  MetricsRegistry,
+  Pushgateway,
+} from "@mp/telemetry/prom";
+import { WebSocket } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
@@ -42,7 +43,7 @@ import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
-import { metricsMiddleware } from "./express/metrics-middleware";
+
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
@@ -69,10 +70,15 @@ logger.info(opt, `Starting server...`);
 
 RateLimiter.enabled = opt.rateLimit;
 
-const api = createApiClient(opt.apiUrl);
+const api = createApiClient(opt.apiServiceUrl);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
+const metricsPushgateway = new Pushgateway(
+  opt.metricsPushgateway.url,
+  undefined,
+  metrics,
+);
 const tokenResolver = createTokenResolver({
   ...opt.auth,
   getBypassUser,
@@ -85,13 +91,6 @@ const tokenResolver = createTokenResolver({
 
 const db = createDbClient(opt.databaseUrl);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
-
-const webServer = express()
-  .set("trust proxy", opt.trustProxy)
-  .use(metricsMiddleware(metrics))
-  .use("/health", (req, res) => res.send("OK"));
-
-const httpServer = http.createServer(webServer);
 
 logger.info(`Loading areas and actor models...`);
 const [area, actorModels] = await Promise.all([
@@ -111,42 +110,17 @@ const gameStatePersistence = createGameStatePersistence(
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
 
-const wss = new WebSocketServer({
-  path: opt.wsEndpointPath,
-  server: httpServer,
-  maxPayload: 5000,
-  perMessageDeflate: {
-    zlibDeflateOptions: {
-      chunkSize: 1024,
-      memLevel: 7, // default level
-      level: 6, // default is 3, max is 9
-    },
-    zlibInflateOptions: {
-      chunkSize: 10 * 1024,
-    },
-    clientNoContextTakeover: true, // defaults to negotiated value.
-    serverNoContextTakeover: true, // defaults to negotiated value.
-    serverMaxWindowBits: 10, // defaults to negotiated value.
-    concurrencyLimit: 10, // limits zlib concurrency for perf.
-    threshold: 1024, // messages under this size won't be compressed.
-  },
-});
-
-wss.on("error", (err) => logger.error(err, "WebSocketServer error"));
-
-const setupEventRoutingForSocket = setupEventRouter({
+const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
+gatewaySocket.binaryType = "arraybuffer";
+gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
+// If we lose connection to the gateway all hell breaks loose and we can't recover,
+// so better to just clear all clients. On reconnect clients will begin reconnecting.
+gatewaySocket.on("close", () => clients.clearAll());
+setupEventRouter({
+  socket: gatewaySocket,
   logger,
   router: gameServerEventRouter,
   createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
-});
-
-wss.on("connection", (socket) => {
-  socket.binaryType = "arraybuffer";
-  setupEventRoutingForSocket(socket);
-  socket.on("close", () => clients.removeClient(getSocketId(socket)));
-  socket.on("error", (err) =>
-    logger.error(err, `WebSocket error for client ${getSocketId(socket)}`),
-  );
 });
 
 shouldOptimizeCollects.value = opt.patchOptimizer;
@@ -161,7 +135,7 @@ const gameState: GameState = {
 };
 
 const gameStateServer = new SyncServer<GameState, GameStateEvents>({
-  clientIds: () => wss.clients.values().map(getSocketId),
+  clientIds: () => clients.getClientIds(),
   clientVisibility: deriveClientVisibility(
     clients,
     clientViewDistance.networkFogOfWarTileCount,
@@ -212,13 +186,16 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 
-logger.info(`Attempting to listen on ${opt.hostname}:${opt.port}...`);
-httpServer.listen(opt.port, opt.hostname, () => {
-  logger.info(`Server listening on ${opt.hostname}:${opt.port}`);
-});
-
 persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
+setTimeout(
+  () =>
+    metricsPushgateway.push({
+      jobName: "game-service",
+      groupings: { areaId: opt.areaId },
+    }),
+  opt.metricsPushgateway.interval.totalMilliseconds,
+);
 
 function getBypassUser(token: AccessToken): UserIdentity | undefined {
   if (!opt.auth.allowBypassUsers) {

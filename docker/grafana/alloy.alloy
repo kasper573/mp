@@ -1,6 +1,6 @@
-prometheus.scrape "mp_game_service" {
+prometheus.scrape "pushgateway" {
 	targets = [{
-		__address__ = env("MP_GAME_SERVICE_INTERNAL_URL"),
+		__address__ = "pushgateway:9091",
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "mp_game_service"
