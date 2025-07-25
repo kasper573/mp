@@ -21,7 +21,7 @@ registerEncoderExtensions();
 
 const logger = createConsoleLogger();
 
-const { apiUrl, gameServerUrl, gameClients, timeout, verbose } =
+const { apiUrl, gameServiceUrl, gameClients, timeout, verbose } =
   readCliOptions();
 
 const start = performance.now();
@@ -61,7 +61,7 @@ async function testOneGameClient(n: number, rng: Rng) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const socket = createWebSocket(gameServerUrl);
+  const socket = createWebSocket(gameServiceUrl);
   const eventTransceiver = new BinaryEventTransceiver({
     send: (data) => socket.send(data),
   });
