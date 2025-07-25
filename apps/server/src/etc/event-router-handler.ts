@@ -1,34 +1,29 @@
-import type { WebSocket } from "@mp/ws/server";
-
 import type { Logger } from "@mp/logger";
-
-import { getSocketId } from "./get-socket-id";
 import {
   BinaryEventTransceiver,
   createEventRouterReceiver,
   type AnyEventRouterNode,
 } from "@mp/event-router";
+import type { ClientId } from "@mp/sync";
 
-export function setupEventRouter<Context>(opt: {
-  socket: WebSocket;
+export function eventRouterHandler<Context>(opt: {
   logger: Logger;
   router: AnyEventRouterNode<Context>;
-  createContext: (socket: WebSocket) => Context;
-}): void {
+  createContext: (clientId: ClientId) => Context;
+}) {
   const receive = createEventRouterReceiver(opt.router);
 
-  const socketId = getSocketId(opt.socket);
   const transceiver = new BinaryEventTransceiver({ receive });
 
-  opt.socket.addEventListener("message", async (msg) => {
-    const context = opt.createContext(opt.socket);
-    const buffer = msg.data as ArrayBuffer;
+  return async (buffer: ArrayBuffer) => {
+    const clientId: ClientId = "unknown" as ClientId; // TODO determine client id
+    const context = opt.createContext(clientId);
     const out = await transceiver.handleMessage(buffer, context);
     if (out?.message) {
       const [path] = out.message;
       opt.logger.info(
         {
-          socketId,
+          clientId,
           messageByteLength: buffer.byteLength,
           path: path.join("."),
         },
@@ -38,5 +33,6 @@ export function setupEventRouter<Context>(opt: {
         opt.logger.error(out.result.error, `[event] ${path.join(".")}`);
       }
     }
-  });
+    return out;
+  };
 }

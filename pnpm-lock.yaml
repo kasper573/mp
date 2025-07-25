@@ -339,6 +339,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../packages/std
+      '@mp/sync':
+        specifier: workspace:*
+        version: link:../../packages/sync
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../packages/telemetry

@@ -15,6 +15,7 @@
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/telemetry": "workspace:*",
+    "@mp/sync": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "express-http-proxy": "2.1.1",

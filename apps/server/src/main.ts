@@ -43,11 +43,9 @@ import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
 import type { GameStateEvents } from "@mp/game/server";
 import { collectProcessMetrics } from "./metrics/process";
-
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
-import { getSocketId } from "./etc/get-socket-id";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 import { playerRoles } from "./roles";
@@ -55,7 +53,7 @@ import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 
-import { setupEventRouter } from "./etc/setup-event-router";
+import { eventRouterHandler } from "./etc/event-router-handler";
 import { createGameStatePersistence } from "./etc/game-state-persistence";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
@@ -116,11 +114,17 @@ gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
 // If we lose connection to the gateway all hell breaks loose and we can't recover,
 // so better to just clear all clients. On reconnect clients will begin reconnecting.
 gatewaySocket.on("close", () => clients.clearAll());
-setupEventRouter({
-  socket: gatewaySocket,
+
+const handleEvent = eventRouterHandler({
   logger,
   router: gameServerEventRouter,
-  createContext: (socket) => ioc.provide(ctxClientId, getSocketId(socket)),
+  createContext: (clientId) => ioc.provide(ctxClientId, clientId),
+});
+
+gatewaySocket.on("message", async (data: ArrayBuffer) => {
+  if (await handleEvent(data)) {
+    return; // Was an event router message
+  }
 });
 
 shouldOptimizeCollects.value = opt.patchOptimizer;
@@ -182,7 +186,7 @@ updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
-  createGameStateFlusher(gameState, gameStateServer, wss.clients, metrics),
+  createGameStateFlusher(gameState, gameStateServer, gatewaySocket, metrics),
 );
 updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
 

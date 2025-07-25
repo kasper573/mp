@@ -12,7 +12,15 @@ import express from "express";
 import http from "http";
 import proxy from "express-http-proxy";
 import { metricsMiddleware } from "./metrics-middleware";
-import { MetricsRegistry, collectDefaultMetrics } from "@mp/telemetry/prom";
+import {
+  MetricsHistogram,
+  MetricsRegistry,
+  collectDefaultMetrics,
+  exponentialBuckets,
+} from "@mp/telemetry/prom";
+import type { FlushResult } from "@mp/sync";
+import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
+import { getSocketId } from "./get-socket-id";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -21,13 +29,13 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
-const gatewayMetrics = new MetricsRegistry();
-collectDefaultMetrics({ register: gatewayMetrics });
+const metricsRegister = new MetricsRegistry();
+collectDefaultMetrics({ register: metricsRegister });
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
-  .use(metricsMiddleware(gatewayMetrics))
+  .use(metricsMiddleware(metricsRegister))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
@@ -63,6 +71,12 @@ httpServer.listen(opt.port, opt.hostname, () => {
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
   const socketType = getSocketType(request);
+  if (socketType instanceof type.errors) {
+    logger.error(
+      new Error("Unknown socket type", { cause: socketType.summary }),
+    );
+    return;
+  }
 
   logger.info(`New ${socketType} connection established`);
 
@@ -74,13 +88,36 @@ wss.on("connection", (socket, request) => {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    // TODO route events based on socket type
+    const flushResult = flushResultEncoding.decode(data);
+    if (flushResult.isOk()) {
+      flushGameState(flushResult.value);
+    }
   });
 
   socket.on("error", (err) => {
     logger.error(err, `Error in ${socketType} connection`);
   });
 });
+
+function flushGameState([flushResult, time]: [FlushResult, Date]) {
+  const gameClientSockets = sockets.get("game-client");
+  if (!gameClientSockets) {
+    return;
+  }
+
+  const { clientPatches, clientEvents } = flushResult;
+
+  for (const socket of gameClientSockets) {
+    const clientId = getSocketId(socket);
+    const patch = clientPatches.get(clientId);
+    const events = clientEvents.get(clientId);
+    if (patch || events) {
+      const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
+      gameStatePatchSizeHistogram.observe(encodedPatch.byteLength);
+      socket.send(encodedPatch);
+    }
+  }
+}
 
 const SocketType = type.enumerated("game-client", "game-server");
 type SocketType = typeof SocketType.infer;
@@ -89,13 +126,14 @@ function getSearchParams(path = ""): URLSearchParams {
   return new URL(path, "http://localhost").searchParams;
 }
 
-function getSocketType(req: IncomingMessage): SocketType {
+function getSocketType(req: IncomingMessage) {
   const typeParam = getSearchParams(req.url).get("type");
-  const result = SocketType(typeParam);
-  if (result instanceof type.errors) {
-    throw new Error(`Could not determine socket type`, {
-      cause: result.summary,
-    });
-  }
-  return result;
+  return SocketType(typeParam);
 }
+
+const gameStatePatchSizeHistogram = new MetricsHistogram({
+  name: "game_state_flush_patch_size_bytes",
+  help: "Size of the game state patch sent each server tick to clients in bytes",
+  registers: [metricsRegister],
+  buckets: exponentialBuckets(1, 2, 20),
+});
