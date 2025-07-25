@@ -51,7 +51,7 @@ export type EventMiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
 
 export type EventRouterHandler<Input, Context, MwContext> = (
   opt: EventHandlerOptions<Input, Context, MwContext>,
-) => void | Promise<void>;
+) => void;
 
 interface EventHandlerOptions<Input, Context, MwContext> {
   /**

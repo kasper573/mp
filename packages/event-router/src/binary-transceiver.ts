@@ -28,17 +28,17 @@ export class BinaryEventTransceiver<Context = void> {
     this.options.send(this.messageEncoding.encode(message));
   }
 
-  handleMessage = async (
+  handleMessage = (
     data: ArrayBufferLike,
     getContext: () => Context,
-  ): Promise<BinaryEventTransceiverHandleMessageResult | undefined> => {
+  ): BinaryEventTransceiverHandleMessageResult | undefined => {
     if (!this.options.receive) {
       throw new Error("No receiver defined, receive not supported.");
     }
 
     const decodeResult = this.messageEncoding.decode(data);
     if (decodeResult.isOk()) {
-      const receiveResult = await this.options.receive(
+      const receiveResult = this.options.receive(
         decodeResult.value,
         getContext(),
       );

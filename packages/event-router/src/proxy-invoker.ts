@@ -10,9 +10,11 @@ import { createInvocationProxy } from "@mp/invocation-proxy";
 export function createEventRouterProxyInvoker<Node extends AnyEventNode>(
   invoke: EventRouterInvoker,
 ): EventRouterProxyInvoker<Node> {
-  const proxy = createInvocationProxy(
-    (path) => (input) => void invoke(path, input),
-  );
+  const proxy = createInvocationProxy((path) => (input) => {
+    // oxlint-disable-next-line no-console
+    console.log("sending", path.join("."));
+    void invoke(path, input);
+  });
 
   return proxy as EventRouterProxyInvoker<Node>;
 }

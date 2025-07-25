@@ -5,7 +5,7 @@ import type { AnyEventNode } from "./builder";
 export function createEventRouterReceiver<Context>(
   root: AnyEventNode<Context>,
 ): EventRouterMessageReceiver<Context> {
-  return async function invokeEventRouter(message, ctx) {
+  return function invokeEventRouter(message, ctx) {
     const [path, input] = message;
     const node = resolveEventRouterNode<Context>(root, path);
     if (!node || node.type === "router") {
@@ -13,7 +13,7 @@ export function createEventRouterReceiver<Context>(
     }
 
     try {
-      await node.handler({ ctx, input, mwc });
+      node.handler({ ctx, input, mwc });
       return ok(void 0);
     } catch (error) {
       return err(new EventRouterReceiverError(message, error));
@@ -46,7 +46,7 @@ export class EventRouterReceiverError<Input> extends Error {
 export type EventRouterMessageReceiver<Context = void> = (
   message: EventRouterMessage<unknown>,
   context: Context,
-) => Promise<EventRouterMessageReceiverResult<unknown>>;
+) => EventRouterMessageReceiverResult<unknown>;
 
 export type EventRouterMessageReceiverResult<Input> = Result<
   void,
