@@ -97,7 +97,10 @@ const gameStatePersistence = createGameStatePersistence(
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
 
-const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
+const wssUrl = new URL(opt.gatewayWssUrl);
+wssUrl.searchParams.set("type", "game-server");
+
+const gatewaySocket = new WebSocket(wssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
 gatewaySocket.on(
