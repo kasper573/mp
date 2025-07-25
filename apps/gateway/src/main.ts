@@ -118,14 +118,14 @@ wss.on("connection", (socket, request) => {
     userSessions.delete(clientId);
   });
 
-  socket.on("message", async (data: ArrayBuffer) => {
+  socket.on("message", (data: ArrayBuffer) => {
     const flushResult = flushResultEncoding<CharacterId>().decode(data);
     if (flushResult.isOk()) {
       flushGameState(flushResult.value);
       return;
     }
 
-    const eventResult = await eventTransceiver.handleMessage(data, () => {
+    const eventResult = eventTransceiver.handleMessage(data, () => {
       const session = userSessions.get(clientId);
       return ioc
         .provide(ctxClientId, clientId)
