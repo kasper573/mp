@@ -114,18 +114,14 @@ gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
 // If we lose connection to the gateway all hell breaks loose and we can't recover,
 // so better to just clear all clients. On reconnect clients will begin reconnecting.
 gatewaySocket.on("close", () => clients.clearAll());
-
-const handleEvent = eventRouterHandler({
-  logger,
-  router: gameServerEventRouter,
-  createContext: (clientId) => ioc.provide(ctxClientId, clientId),
-});
-
-gatewaySocket.on("message", async (data: ArrayBuffer) => {
-  if (await handleEvent(data)) {
-    return; // Was an event router message
-  }
-});
+gatewaySocket.on(
+  "message",
+  eventRouterHandler({
+    logger,
+    router: gameServerEventRouter,
+    createContext: (clientId) => ioc.provide(ctxClientId, clientId),
+  }),
+);
 
 shouldOptimizeCollects.value = opt.patchOptimizer;
 
