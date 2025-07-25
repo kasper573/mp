@@ -31,7 +31,7 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
-const userSessions = new Map<WebSocket, GameplaySession>();
+const gameplaySessions = new Map<WebSocket, GameplaySession>();
 const clientRegistry = new ClientRegistry();
 const metricsRegister = new MetricsRegistry();
 collectDefaultMetrics({ register: metricsRegister });
@@ -111,7 +111,7 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const socket of gameClientSockets) {
-    const session = userSessions.get(socket);
+    const session = gameplaySessions.get(socket);
     if (!session) {
       // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
       continue;
