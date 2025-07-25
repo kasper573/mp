@@ -1,11 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { SyncEventBus } from "../src/sync-event";
 
-interface TestEvents {
+// oxlint-disable-next-line consistent-type-definitions Cannot be an interface
+type TestEvents = {
   foo: number;
   bar: { x: string };
   baz: undefined;
-}
+};
 
 describe("SyncEventBus", () => {
   let bus: SyncEventBus<TestEvents>;

@@ -15,7 +15,7 @@ type TestEventMap = {
 };
 
 it("sends full state patch on initial flush and respects client visibility config", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
       items: new Set(id === "client1" ? state.items.keys() : ["2"]),
@@ -50,7 +50,7 @@ it("sends full state patch on initial flush and respects client visibility confi
 });
 
 it("returns no patches or events when flushed twice with no changes", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(state.items.keys()),
@@ -81,7 +81,7 @@ it("can collect patches", () => {
     persons: SyncMap<Person["id"], Person>;
   };
 
-  const server = new SyncServer<TestState, {}>({
+  const server = new SyncServer<TestState, {}, string>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       persons: new Set(state.persons.keys()),
@@ -116,7 +116,7 @@ it("can collect patches", () => {
 });
 
 it("delivers events according to visibility", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
       items: new Set(id === "client1" ? state.items.keys() : ["2"]),
@@ -153,7 +153,7 @@ it("delivers events according to visibility", () => {
 });
 
 it("can access events by name before flushing", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(state.items.keys()),
@@ -167,7 +167,7 @@ it("can access events by name before flushing", () => {
 });
 
 it("markToResendFullState forces a client to get full patch again", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
       items: new Set(id === "client1" ? state.items.keys() : ["2"]),
@@ -194,7 +194,7 @@ it("markToResendFullState forces a client to get full patch again", () => {
 });
 
 it("fabricates 'remove' operations when entities leave visibility", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(
@@ -237,7 +237,7 @@ it("fabricates 'remove' operations when entities leave visibility", () => {
 });
 
 it("fabricates 'set' operations when new entities enter visibility", () => {
-  const server = new SyncServer<TestState, TestEventMap>({
+  const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client"],
     clientVisibility: (id, state) => ({
       items: new Set(

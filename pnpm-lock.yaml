@@ -327,12 +327,18 @@ importers:
 
   apps/gateway:
     dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../packages/auth
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
       '@mp/game':
         specifier: workspace:*
         version: link:../game
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../../packages/ioc
       '@mp/logger':
         specifier: workspace:*
         version: link:../../packages/logger

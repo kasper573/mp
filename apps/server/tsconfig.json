@@ -1,6 +1,6 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "*.ts", "../gateway/src/get-socket-id.ts"],
+  "include": ["src", "*.ts"],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017",

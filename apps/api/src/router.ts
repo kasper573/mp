@@ -29,7 +29,6 @@ export const apiRouter = rpc.router({
     .use(roles([systemRoles.changeSettings]))
     .output(type("boolean"))
     .query(() => {
-      // TODO get config from database
       return true;
     }),
 
@@ -37,11 +36,10 @@ export const apiRouter = rpc.router({
     .use(roles([systemRoles.changeSettings]))
     .input(type("boolean"))
     .mutation(() => {
-      // TODO update config in database
+      // noop
     }),
 
   characterList: rpc.procedure.use(roles([worldRoles.spectate])).query(() => {
-    // TODO query the database for online characters
     return {
       items: [] as Character[],
       total: 0,

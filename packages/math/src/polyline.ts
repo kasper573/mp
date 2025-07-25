@@ -4,6 +4,7 @@ export function polylineHitTest<T extends number>(
   _1: unknown,
   _2: VectorLike<T>,
 ): boolean {
-  // TODO implement
+  // oxlint-disable-next-line no-console
+  console.warn("polylineHitTest not implemented");
   return false;
 }

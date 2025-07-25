@@ -1,25 +1,24 @@
 import type { Logger } from "@mp/logger";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import type { ClientRegistry } from "../user/client-registry";
 import type { CharacterId } from "./types";
 import type { GameState } from "../game-state/game-state";
 
 /**
- *  The client registry is the controller of which character SHOULD be in the game.
- *  If a character actor is present in the game state, but not in the client registry,
- *  this means that the player has logged out or disconnected and the character
- *  should be scheduled for removal.
+ * This behavior allows character actors to remain in the game for a duration even if detected as offline.
+ * This prevents players from abusing the system by quickly going offline to avoid ie. dying in a difficult situation and waiting for enemies to disappear.
+ * It also allows for connections to be slightly unstable and lets characters stay in game even if a connection drops for a moment.
  */
 export function characterRemoveBehavior(
-  clients: ClientRegistry,
   state: GameState,
   logger: Logger,
 ): TickEventHandler {
   const removeSchedules = new Map<CharacterId, TimeSpan>();
 
   return ({ totalTimeElapsed }) => {
-    const registeredCharacterIds = new Set(clients.characterIds.values());
+    const registeredCharacterIds = new Set(
+      state.actors.values().map((a) => a.identity.id),
+    );
 
     for (const character of state.actors
       .values()

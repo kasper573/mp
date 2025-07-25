@@ -90,11 +90,6 @@ const NpcInstanceIdentity = defineSyncComponent((builder) =>
 
 export type NpcEtc = typeof NpcEtc.$infer;
 
-/**
- * TODO Should be replaced by some better solution.
- * Either create better named traits or allow subclassing traits ie NpcCombatTrait from CombatTrait.
- * @deprecated This is lazy af.
- */
 const NpcEtc = defineSyncComponent((builder) =>
   builder
     .add<number>()("xpReward")

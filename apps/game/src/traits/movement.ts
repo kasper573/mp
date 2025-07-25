@@ -106,7 +106,6 @@ export function sendCharacterToArea(
   } else {
     // But to change to a different area we must handle sharding,
     // which requires more intricate handling.
-    // TODO implement
     throw new Error(
       "Sending character to a different area is not implemented yet.",
     );

@@ -1,18 +1,21 @@
-import { ctxGameState } from "../game-state/game-state";
-import { evt } from "../network/event-builder";
-import { roles } from "../user/auth";
-import { ctxClientRegistry } from "../user/client-registry";
-import { ctxClientId } from "../user/client-id";
-
-import type { CharacterId } from "../character/types";
-import { ctxGameStateServer } from "../game-state/game-state-server";
-import { worldRoles } from "../user/roles";
 import type { AccessToken } from "@mp/auth";
-import { ctxArea, ctxTokenResolver } from "../context/common";
-import { ctxGameStateLoader } from "../game-state/game-state-loader";
+import type { CharacterId } from "@mp/game/server";
+import {
+  evt,
+  roles,
+  worldRoles,
+  ctxGameStateServer,
+  ctxGameState,
+  ctxGameStateLoader,
+  ctxArea,
+  ctxTokenResolver,
+  networkEventRouter,
+} from "@mp/game/server";
+import { ctxClientId, ctxClientRegistry } from "./client-registry";
+import { ctxGameEventClient } from "@mp/game/server";
 
-export type WorldRouter = typeof worldRouter;
-export const worldRouter = evt.router({
+export type GatewayRouter = typeof gatewayRouter;
+export const gatewayRouter = evt.router({
   spectate: evt.event
     .use(roles([worldRoles.spectate]))
     .input<CharacterId>()
@@ -20,8 +23,7 @@ export const worldRouter = evt.router({
       const clients = ctx.get(ctxClientRegistry);
       const clientId = ctx.get(ctxClientId);
       clients.spectatedCharacterIds.set(clientId, input);
-      const server = ctx.get(ctxGameStateServer);
-      server.markToResendFullState(clientId);
+      ctx.get(ctxGameEventClient).network.requestFullState();
     }),
 
   join: evt.event
@@ -30,7 +32,7 @@ export const worldRouter = evt.router({
       const clientId = ctx.get(ctxClientId);
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
-      server.markToResendFullState(clientId);
+      ctx.get(ctxGameEventClient).network.requestFullState();
 
       const loader = ctx.get(ctxGameStateLoader);
       let char = state.actors
@@ -52,12 +54,6 @@ export const worldRouter = evt.router({
         { actors: [char.identity.id] },
       );
     }),
-
-  requestFullState: evt.event.handler(({ ctx }) => {
-    const clientId = ctx.get(ctxClientId);
-    const server = ctx.get(ctxGameStateServer);
-    server.markToResendFullState(clientId);
-  }),
 
   leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
     const clientId = ctx.get(ctxClientId);
@@ -83,4 +79,4 @@ export const worldRouter = evt.router({
   }),
 });
 
-export const worldEventRouterSlice = { world: worldRouter };
+export const worldEventRouterSlice = { world: networkEventRouter };

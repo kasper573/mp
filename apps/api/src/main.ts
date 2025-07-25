@@ -50,6 +50,5 @@ app.listen(opt.port, opt.hostname, () => {
 });
 
 function sessionId(req: express.Request): string {
-  // TODO use a proper session ID
   return String(req.socket.remoteAddress);
 }

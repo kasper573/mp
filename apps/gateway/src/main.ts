@@ -13,6 +13,7 @@ import http from "http";
 import proxy from "express-http-proxy";
 import { metricsMiddleware } from "./metrics-middleware";
 import {
+  MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
   collectDefaultMetrics,
@@ -20,7 +21,7 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
-import { getSocketId } from "./get-socket-id";
+import { ClientRegistry } from "./client-registry";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -29,6 +30,7 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
+const clientRegistry = new ClientRegistry();
 const metricsRegister = new MetricsRegistry();
 collectDefaultMetrics({ register: metricsRegister });
 
@@ -46,7 +48,6 @@ const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
   maxPayload: 5000,
-  // TODO verifyClient
   perMessageDeflate: {
     zlibDeflateOptions: {
       chunkSize: 1024,
@@ -136,4 +137,22 @@ const gameStatePatchSizeHistogram = new MetricsHistogram({
   help: "Size of the game state patch sent each server tick to clients in bytes",
   registers: [metricsRegister],
   buckets: exponentialBuckets(1, 2, 20),
+});
+
+const _userCountGague = new MetricsGague({
+  name: "active_user_count",
+  help: "Number of users currently connected",
+  registers: [metricsRegister],
+  collect() {
+    this.set(clientRegistry.getUserCount());
+  },
+});
+
+const _clientCountGague = new MetricsGague({
+  name: "active_client_count",
+  help: "Number of active websocket connections",
+  registers: [metricsRegister],
+  collect() {
+    this.set(clientRegistry.getClientIds().size);
+  },
 });

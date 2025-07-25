@@ -1,7 +1,6 @@
 import { ctxGameState } from "../game-state/game-state";
 import type { GameEventRouterContext } from "../network/event-builder";
-import { ctxClientId } from "../user/client-id";
-import { ctxClientRegistry } from "../user/client-registry";
+import { ctxUserSession } from "../user/session";
 import type { CharacterId } from "./types";
 
 export function accessCharacter(
@@ -10,15 +9,13 @@ export function accessCharacter(
 ) {
   const state = ctx.get(ctxGameState);
   const char = state.actors.get(characterId);
-  const clientId = ctx.get(ctxClientId);
-  const clients = ctx.get(ctxClientRegistry);
-  const userId = clients.userIds.get(clientId);
+  const session = ctx.get(ctxUserSession);
 
   if (!char || char.type !== "character") {
     throw new Error("Character not found");
   }
 
-  if (char.identity.userId !== userId) {
+  if (char.identity.userId !== session.userId) {
     throw new Error("You don't have access to this character");
   }
   return char;

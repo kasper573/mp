@@ -180,28 +180,11 @@ export function createGameStatePersistence(
           }),
       );
     },
-
-    getUserRoles(userId) {
-      const user = info.get(userId);
-      if (!user) {
-        throw new Error(`User with ID ${userId} not found in memory.`);
-      }
-      return Promise.resolve(user.roles);
-    },
-
-    /**
-     * Temporary solution. We should be querying the database for user info.
-     * @deprecated
-     */
-    memorizeUserInfo(identity) {
-      info.set(identity.id, identity);
-    },
   };
 }
 
 export interface GameStatePersistence extends GameStateLoader {
   persist: (state: GameState) => Promise<unknown>;
-  memorizeUserInfo: (identity: UserIdentity) => void;
 }
 
 function characterAppearance(): Omit<AppearanceTrait, "name"> {

@@ -14,17 +14,18 @@ import type { SyncEvent, SyncEventMap } from "./sync-event";
 export class SyncServer<
   State extends PatchableState,
   EventMap extends SyncEventMap,
+  ClientId,
 > {
   private events: ServerSyncEvent<State>[] = [];
   private hasBeenGivenFullState = new Set<ClientId>();
   private visibilities = new Map<ClientId, ClientVisibility<State>>();
 
-  constructor(private options: SyncServerOptions<State>) {}
+  constructor(private options: SyncServerOptions<State, ClientId>) {}
 
-  flush(state: State): FlushResult {
+  flush(state: State): FlushResult<ClientId> {
     const clientIds = Array.from(this.options.clientIds());
     const prevVisibilities: Record<
-      ClientId,
+      ClientId & string,
       ClientVisibility<State>
     > = Object.fromEntries(
       clientIds.map((clientId) => [
@@ -36,11 +37,12 @@ export class SyncServer<
 
     const serverPatch: Patch = Array.from(this.flushState(state));
 
-    const clientPatches: ClientPatches = new Map();
-    const clientEvents: ClientEvents = new Map();
+    const clientPatches: ClientPatches<ClientId> = new Map();
+    const clientEvents: ClientEvents<ClientId> = new Map();
 
     for (const clientId of clientIds) {
-      const prevVisibility = prevVisibilities[clientId];
+      const prevVisibility =
+        prevVisibilities[clientId as keyof typeof prevVisibilities];
       const nextVisibility = this.options.clientVisibility(clientId, state);
       const clientPatch: Patch = [];
 
@@ -187,9 +189,9 @@ function createFullStatePatch<State extends PatchableState>(
   return patch;
 }
 
-export interface FlushResult {
-  clientPatches: ClientPatches;
-  clientEvents: ClientEvents;
+export interface FlushResult<ClientId> {
+  clientPatches: ClientPatches<ClientId>;
+  clientEvents: ClientEvents<ClientId>;
 }
 
 export interface ServerSyncEvent<State extends PatchableState> {
@@ -200,19 +202,19 @@ export interface ServerSyncEvent<State extends PatchableState> {
   visibility?: ClientVisibility<State>;
 }
 
-export interface SyncServerOptions<State extends PatchableState> {
-  clientVisibility: ClientVisibilityFactory<State>;
+export interface SyncServerOptions<State extends PatchableState, ClientId> {
+  clientVisibility: ClientVisibilityFactory<State, ClientId>;
   clientIds: () => Iterable<ClientId>;
 }
 
-export type ClientVisibilityFactory<State extends PatchableState> = (
+export type ClientVisibilityFactory<State extends PatchableState, ClientId> = (
   clientId: ClientId,
   state: State,
 ) => ClientVisibility<State>;
 
-export type ClientPatches = Map<ClientId, Patch>;
+export type ClientPatches<ClientId> = Map<ClientId, Patch>;
 
-export type ClientEvents = Map<ClientId, SyncEvent[]>;
+export type ClientEvents<ClientId> = Map<ClientId, SyncEvent[]>;
 
 export type ClientVisibility<State extends PatchableState> = {
   [EntityName in keyof State]: ReadonlySet<inferEntityId<State[EntityName]>>;
@@ -235,11 +237,3 @@ export interface PatchableState {
   // oxlint-disable-next-line no-explicit-any
   [entityName: string]: PatchableEntities<PatchableEntityId, any>;
 }
-
-export type ClientId = Registry extends { clientId: infer T } ? T : string;
-
-/**
- * Designed to be augmented by the consumer package to conveniently override the type of ClientId.
- * This avoids the need to pollute the generic parameters in all places where ClientId is used.
- */
-export interface Registry {}

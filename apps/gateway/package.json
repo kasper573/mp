@@ -12,6 +12,8 @@
   "dependencies": {
     "@mp/std": "workspace:*",
     "@mp/env": "workspace:*",
+    "@mp/auth": "workspace:*",
+    "@mp/ioc": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/telemetry": "workspace:*",

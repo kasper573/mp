@@ -1,10 +1,10 @@
-import { ctxClientId, evt } from "@mp/game/server";
+import { ctxUserSession, evt } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 
 const globalRequestLimit = new RateLimiter({ points: 20, duration: 1 });
 
 export const rateLimiterMiddleware = evt.middleware(async ({ ctx }) => {
-  const result = await globalRequestLimit.consume(ctx.get(ctxClientId));
+  const result = await globalRequestLimit.consume(ctx.get(ctxUserSession).id);
   if (result.isErr()) {
     throw new Error("Rate limit exceeded");
   }

@@ -1,7 +1,7 @@
+import { createShortId, type Branded } from "@mp/std";
 import type { UserId } from "@mp/auth";
+import type { CharacterId } from "@mp/game/server";
 import { InjectionContext } from "@mp/ioc";
-import type { CharacterId } from "../character/types";
-import type { ClientId } from "./client-id";
 
 export const ctxClientRegistry =
   InjectionContext.new<ClientRegistry>("ClientRegistry");
@@ -34,3 +34,18 @@ export class ClientRegistry {
     return new Set(this.userIds.values()).size;
   }
 }
+
+export type ClientId = Branded<string, "ClientId">;
+
+export function getClientId(socket: WebSocket): ClientId {
+  let id = Reflect.get(socket, idSymbol) as ClientId | undefined;
+  if (id === undefined) {
+    id = createShortId() as ClientId;
+    Reflect.set(socket, idSymbol, id);
+  }
+  return id;
+}
+
+const idSymbol = Symbol("socketId");
+
+export const ctxClientId = InjectionContext.new<ClientId>("ClientId");

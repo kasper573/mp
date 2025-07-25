@@ -27,7 +27,8 @@ export function tiledObjectMeshInput(t: TiledObject): TileMeshInput {
   // Now we can translate to the object position
   m.translate(t.x, t.y);
 
-  // TODO process flags
+  // GID flags are not processed because we don't really use them,
+  // but if we need them at some point you would process them here.
 
   return {
     width: t.width,

@@ -13,8 +13,6 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
   ctxArea,
-  ctxClientId,
-  ctxClientRegistry,
   ctxGameStateLoader,
   ctxGameStateServer,
   ctxGlobalServerEventMiddleware,
@@ -22,15 +20,15 @@ import {
   ctxNpcSpawner,
   ctxRng,
   ctxTokenResolver,
+  ctxUserSession,
   gameServerEventRouter,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng } from "@mp/std";
-import type { GameState } from "@mp/game/server";
+import type { GameState, GameStateServer } from "@mp/game/server";
 import {
-  ClientRegistry,
   movementBehavior,
   combatBehavior,
   characterRemoveBehavior,
@@ -41,7 +39,7 @@ import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 import { parseBypassUser, type AccessToken, type UserIdentity } from "@mp/auth";
 import { seed } from "../seed";
-import type { GameStateEvents } from "@mp/game/server";
+
 import { collectProcessMetrics } from "./metrics/process";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
@@ -70,22 +68,13 @@ RateLimiter.enabled = opt.rateLimit;
 
 const api = createApiClient(opt.apiServiceUrl);
 
-const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
 const metricsPushgateway = new Pushgateway(
   opt.metricsPushgateway.url,
   undefined,
   metrics,
 );
-const tokenResolver = createTokenResolver({
-  ...opt.auth,
-  getBypassUser,
-  onResolve(result) {
-    if (result.isOk()) {
-      gameStatePersistence.memorizeUserInfo(result.value);
-    }
-  },
-});
+const tokenResolver = createTokenResolver({ ...opt.auth, getBypassUser });
 
 const db = createDbClient(opt.databaseUrl);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
@@ -111,15 +100,12 @@ await seed(db, area, actorModels);
 const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
-// If we lose connection to the gateway all hell breaks loose and we can't recover,
-// so better to just clear all clients. On reconnect clients will begin reconnecting.
-gatewaySocket.on("close", () => clients.clearAll());
 gatewaySocket.on(
   "message",
   eventRouterHandler({
     logger,
     router: gameServerEventRouter,
-    createContext: (clientId) => ioc.provide(ctxClientId, clientId),
+    createContext: (session) => ioc.provide(ctxUserSession, session),
   }),
 );
 
@@ -134,10 +120,12 @@ const gameState: GameState = {
   }),
 };
 
-const gameStateServer = new SyncServer<GameState, GameStateEvents>({
-  clientIds: () => clients.getClientIds(),
+const gameStateServer: GameStateServer = new SyncServer({
+  clientIds: () =>
+    gameState.actors
+      .values()
+      .flatMap((a) => (a.type === "character" ? [a.identity.id] : [])),
   clientVisibility: deriveClientVisibility(
-    clients,
     clientViewDistance.networkFogOfWarTileCount,
     area,
   ),
@@ -164,7 +152,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxArea, area)
-  .provide(ctxClientRegistry, clients)
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
@@ -173,7 +160,7 @@ const ioc = new ImmutableInjectionContainer()
 
 collectDefaultMetrics({ register: metrics });
 collectProcessMetrics(metrics);
-collectGameStateMetrics(metrics, clients, gameState);
+collectGameStateMetrics(metrics, gameState);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
@@ -184,7 +171,7 @@ updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
   createGameStateFlusher(gameState, gameStateServer, gatewaySocket, metrics),
 );
-updateTicker.subscribe(characterRemoveBehavior(clients, gameState, logger));
+updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
 persistTicker.start(opt.persistInterval);
 updateTicker.start(opt.tickInterval);
