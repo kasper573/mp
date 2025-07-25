@@ -2,24 +2,20 @@ import { createFileRoute } from "@tanstack/react-router";
 import {
   ctxAuthClient,
   GameAssetLoaderContext,
-  GameStateClient,
   ioc,
   SpectatorClient,
   worldRoles,
 } from "@mp/game/client";
-import { useContext, useEffect, useMemo } from "preact/hooks";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import { AuthBoundary } from "../../../ui/auth-boundary";
-import { SocketContext } from "../../../integrations/socket";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import { miscDebugSettings } from "../../../signals/misc-debug-ui-settings";
 import type { CharacterId } from "@mp/game/client";
 import { useGameAssets } from "../../../integrations/assets";
 import { useApi } from "@mp/api/sdk";
 import { useQuery } from "@mp/query";
-import { ComposedGameEventClientContext } from "../../../integrations/game-event-client";
+import { useGameStateClient } from "../../../integrations/game-state-client";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -28,17 +24,9 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const events = useContext(ComposedGameEventClientContext);
-  const socket = useContext(SocketContext);
   const api = useApi();
   const auth = ioc.get(ctxAuthClient);
-  const stateClient = useMemo(
-    () =>
-      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
-    [socket],
-  );
-
-  useEffect(() => stateClient.start(), [stateClient]);
+  const [stateClient, events] = useGameStateClient();
 
   const characterOptions = useQuery(
     api.characterList.queryOptions(void 0, {
