@@ -114,8 +114,6 @@ services:
   pushgateway:
     image: prom/pushgateway:v1.11.1
     container_name: pushgateway
-    ports:
-      - "9091:9091"
 
   tempo:
     env_file: *env_files
