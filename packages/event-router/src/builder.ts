@@ -21,8 +21,8 @@ function createMiddleware<Context, MwContext, PipedMwContext>(
   }
 
   const pipe: EventMiddlewareBuilder<Context, MwContext> = (nextHandler) =>
-    createMiddleware(async (opt) => {
-      const mwc = await handler(opt as never);
+    createMiddleware((opt) => {
+      const mwc = handler(opt as never);
       return nextHandler({ ...opt, mwc });
     });
 
@@ -117,8 +117,8 @@ export class EventBuilder<Input, Context, MwContext> {
   private pipeMiddlewareIntoHandler(
     handler: EventRouterHandler<Input, Context, MwContext>,
   ): EventRouterHandler<Input, Context, MwContext> {
-    return async (opt) => {
-      const mwc = await this.middleware(opt);
+    return (opt) => {
+      const mwc = this.middleware(opt);
       return handler({ ...opt, mwc });
     };
   }
@@ -140,7 +140,7 @@ export type EventRouterMiddlewareHandler<Context, MwContext, PipedMwContext> =
      * The middleware context output by the piped middleware (if any)
      */
     mwc: PipedMwContext;
-  }) => MwContext | Promise<MwContext>;
+  }) => MwContext;
 
 export interface EventRouterMiddleware<Context, MwContext, PipedMwContext>
   extends EventRouterMiddlewareHandler<Context, MwContext, PipedMwContext> {
