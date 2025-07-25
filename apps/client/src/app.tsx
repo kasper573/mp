@@ -63,7 +63,7 @@ export default function App() {
 function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
-  const socketWithoutHandshake = createWebSocket(env.gameServerUrl);
+  const socketWithoutHandshake = createWebSocket(env.gameServiceUrl);
   const eventClientWithoutHandshake = createGameEventClient(
     socketWithoutHandshake,
   );
