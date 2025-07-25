@@ -26,10 +26,7 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
-import {
-  BinaryEventTransceiver,
-  createEventRouterInvoker,
-} from "@mp/event-router";
+import { EventTransceiver, createEventInvoker } from "@mp/event-router";
 import { gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 
@@ -88,8 +85,8 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
 });
 
-const eventTransceiver = new BinaryEventTransceiver({
-  invoke: createEventRouterInvoker(gatewayRouter),
+const eventTransceiver = new EventTransceiver({
+  invoke: createEventInvoker(gatewayRouter),
   logger,
 });
 

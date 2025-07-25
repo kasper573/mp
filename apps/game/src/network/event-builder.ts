@@ -1,8 +1,5 @@
 import { InjectionContext, type ImmutableInjectionContainer } from "@mp/ioc";
-import type {
-  EventRouterFactories,
-  EventRouterMiddleware,
-} from "@mp/event-router";
+import type { EventRouterFactories, EventMiddleware } from "@mp/event-router";
 import { EventRouterBuilder } from "@mp/event-router";
 
 export const ctxGlobalServerEventMiddleware =
@@ -14,7 +11,7 @@ export const evt = createFactories();
 
 export type GameEventRouterContext = ImmutableInjectionContainer;
 
-export type GameEventRouterMiddleware = EventRouterMiddleware<
+export type GameEventRouterMiddleware = EventMiddleware<
   GameEventRouterContext,
   unknown,
   unknown

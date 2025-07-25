@@ -1,39 +1,39 @@
 import type {
-  AnyEventRouterHandlerNode,
-  AnyEventRouterNode,
+  AnyHandlerNode,
+  AnyRouterNode,
   AnyEventNode,
   InferEventInput,
-  EventRouterNode,
+  RouterNode,
 } from "./builder";
 import { createInvocationProxy } from "@mp/invocation-proxy";
 import type { EventRouterMessage } from "./event-invoker";
 
-export function createEventRouterProxyInvoker<Node extends AnyEventNode>(
+export function createProxyEventInvoker<Node extends AnyEventNode>(
   invoke: (message: EventRouterMessage<unknown>) => void,
-): EventRouterProxyInvoker<Node> {
+): ProxyEventInvoker<Node> {
   const proxy = createInvocationProxy(
     (path) => (input) => void invoke([path, input]),
   );
 
-  return proxy as EventRouterProxyInvoker<Node>;
+  return proxy as ProxyEventInvoker<Node>;
 }
 
-export type EventRouterProxyInvoker<Node extends AnyEventNode> =
-  Node extends AnyEventRouterNode
+export type ProxyEventInvoker<Node extends AnyEventNode> =
+  Node extends AnyRouterNode
     ? ProxyRecord<Node>
-    : Node extends AnyEventRouterHandlerNode
+    : Node extends AnyHandlerNode
       ? ProxyNode<Node>
       : never;
 
 export type MergeEventRouterNodes<
-  A extends AnyEventRouterNode,
-  B extends AnyEventRouterNode,
-> = EventRouterNode<A["routes"] & B["routes"]>;
+  A extends AnyRouterNode,
+  B extends AnyRouterNode,
+> = RouterNode<A["routes"] & B["routes"]>;
 
-type ProxyRecord<Router extends AnyEventRouterNode> = {
-  [K in keyof Router["routes"]]: EventRouterProxyInvoker<Router["routes"][K]>;
+type ProxyRecord<Router extends AnyRouterNode> = {
+  [K in keyof Router["routes"]]: ProxyEventInvoker<Router["routes"][K]>;
 };
 
-type ProxyNode<Node extends AnyEventRouterHandlerNode> = (
+type ProxyNode<Node extends AnyHandlerNode> = (
   input: InferEventInput<Node["handler"]>,
 ) => void;

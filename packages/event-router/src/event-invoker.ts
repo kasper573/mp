@@ -2,12 +2,12 @@ import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 import type { AnyEventNode } from "./builder";
 
-export function createEventRouterInvoker<Context>(
+export function createEventInvoker<Context>(
   root: AnyEventNode<Context>,
 ): EventRouterInvoker<Context> {
   return async function invokeEventRouter(message, ctx) {
     const [path, input] = message;
-    const node = resolveEventRouterNode<Context>(root, path);
+    const node = resolveEventNode<Context>(root, path);
     if (!node || node.type === "router") {
       return err(new EventRouterInvokerError(message, "path not found"));
     }
@@ -21,7 +21,7 @@ export function createEventRouterInvoker<Context>(
   };
 }
 
-function resolveEventRouterNode<Context>(
+function resolveEventNode<Context>(
   start: AnyEventNode,
   path: string[],
 ): AnyEventNode<Context> | undefined {

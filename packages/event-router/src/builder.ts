@@ -14,8 +14,8 @@ export class EventRouterBuilder<Context = void> {
 }
 
 function createMiddleware<Context, MwContext, PipedMwContext>(
-  handler: EventRouterMiddlewareHandler<Context, MwContext, PipedMwContext>,
-): EventRouterMiddleware<Context, MwContext, PipedMwContext> {
+  handler: EventMiddlewareHandler<Context, MwContext, PipedMwContext>,
+): EventMiddleware<Context, MwContext, PipedMwContext> {
   function middleware(...args: Parameters<typeof handler>) {
     return handler(...args);
   }
@@ -39,17 +39,13 @@ export interface EventRouterFactories<Context> {
 
 export type EventRouterFactory = <Routes extends AnyEventNodeRecord>(
   routes: Routes,
-) => EventRouterNode<Routes>;
+) => RouterNode<Routes>;
 
 export type EventMiddlewareBuilder<Context, PipedMwContext> = <MwContext>(
-  middlewareFn: EventRouterMiddlewareHandler<
-    Context,
-    MwContext,
-    PipedMwContext
-  >,
-) => EventRouterMiddleware<Context, MwContext, PipedMwContext>;
+  middlewareFn: EventMiddlewareHandler<Context, MwContext, PipedMwContext>,
+) => EventMiddleware<Context, MwContext, PipedMwContext>;
 
-export type EventRouterHandler<Input, Context, MwContext> = (
+export type EventHandler<Input, Context, MwContext> = (
   opt: EventHandlerOptions<Input, Context, MwContext>,
 ) => void | Promise<void>;
 
@@ -65,27 +61,23 @@ interface EventHandlerOptions<Input, Context, MwContext> {
   input: Input;
 }
 
-export interface EventRouterHandlerNode<Input, Context, MwContext> {
+export interface HandlerNode<Input, Context, MwContext> {
   type: "handler";
-  handler: EventRouterHandler<Input, Context, MwContext>;
+  handler: EventHandler<Input, Context, MwContext>;
 }
 
-export interface EventRouterNode<Routes extends AnyEventNodeRecord> {
+export interface RouterNode<Routes extends AnyEventNodeRecord> {
   type: "router";
   routes: Routes;
 }
 
-export type AnyEventRouterHandlerNode<Context = any> = EventRouterHandlerNode<
-  any,
-  Context,
-  any
->;
-export type AnyEventRouterNode<Context = any> = EventRouterNode<
+export type AnyHandlerNode<Context = any> = HandlerNode<any, Context, any>;
+export type AnyRouterNode<Context = any> = RouterNode<
   AnyEventNodeRecord<Context>
 >;
 export type AnyEventNode<Context = any> =
-  | AnyEventRouterHandlerNode<Context>
-  | AnyEventRouterNode<Context>;
+  | AnyHandlerNode<Context>
+  | AnyRouterNode<Context>;
 export type AnyEventNodeRecord<Context = any> = Record<
   string,
   AnyEventNode<Context>
@@ -93,11 +85,11 @@ export type AnyEventNodeRecord<Context = any> = Record<
 
 export class EventBuilder<Input, Context, MwContext> {
   private constructor(
-    private middleware: EventRouterMiddleware<Context, MwContext, unknown>,
+    private middleware: EventMiddleware<Context, MwContext, unknown>,
   ) {}
 
   use<NewMwContext, PipedMwContext>(
-    middleware: EventRouterMiddleware<Context, NewMwContext, PipedMwContext>,
+    middleware: EventMiddleware<Context, NewMwContext, PipedMwContext>,
   ): EventBuilder<Input, Context, NewMwContext> {
     return new EventBuilder(this.middleware.pipe(middleware as never) as never);
   }
@@ -106,8 +98,8 @@ export class EventBuilder<Input, Context, MwContext> {
   }
 
   handler(
-    handler: EventRouterHandler<Input, Context, MwContext>,
-  ): EventRouterHandlerNode<Input, Context, MwContext> {
+    handler: EventHandler<Input, Context, MwContext>,
+  ): HandlerNode<Input, Context, MwContext> {
     return {
       type: "handler",
       handler: this.pipeMiddlewareIntoHandler(handler),
@@ -115,8 +107,8 @@ export class EventBuilder<Input, Context, MwContext> {
   }
 
   private pipeMiddlewareIntoHandler(
-    handler: EventRouterHandler<Input, Context, MwContext>,
-  ): EventRouterHandler<Input, Context, MwContext> {
+    handler: EventHandler<Input, Context, MwContext>,
+  ): EventHandler<Input, Context, MwContext> {
     return async (opt) => {
       const mwc = await this.middleware(opt);
       return handler({ ...opt, mwc });
@@ -130,25 +122,24 @@ export class EventBuilder<Input, Context, MwContext> {
   }
 }
 
-export type EventRouterMiddlewareHandler<Context, MwContext, PipedMwContext> =
-  (opt: {
-    /**
-     * The global eventrouter context
-     */
-    ctx: Context;
-    /**
-     * The middleware context output by the piped middleware (if any)
-     */
-    mwc: PipedMwContext;
-  }) => MwContext | Promise<MwContext>;
+export type EventMiddlewareHandler<Context, MwContext, PipedMwContext> = (opt: {
+  /**
+   * The global eventrouter context
+   */
+  ctx: Context;
+  /**
+   * The middleware context output by the piped middleware (if any)
+   */
+  mwc: PipedMwContext;
+}) => MwContext | Promise<MwContext>;
 
-export interface EventRouterMiddleware<Context, MwContext, PipedMwContext>
-  extends EventRouterMiddlewareHandler<Context, MwContext, PipedMwContext> {
+export interface EventMiddleware<Context, MwContext, PipedMwContext>
+  extends EventMiddlewareHandler<Context, MwContext, PipedMwContext> {
   pipe: EventMiddlewareBuilder<Context, MwContext>;
 }
 
-export type InferEventInput<T extends AnyEventRouterHandlerNode["handler"]> =
-  T extends EventRouterHandler<infer I, infer _C, infer _MW> ? I : never;
+export type InferEventInput<T extends AnyHandlerNode["handler"]> =
+  T extends EventHandler<infer I, infer _C, infer _MW> ? I : never;
 
 export type InferEventContext<T extends AnyEventNode> =
   T extends AnyEventNode<infer C> ? C : never;

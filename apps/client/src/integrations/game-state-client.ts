@@ -1,7 +1,7 @@
 import {
-  BinaryEventTransceiver,
-  createEventRouterProxyInvoker,
-  type EventRouterProxyInvoker,
+  EventTransceiver,
+  createProxyEventInvoker,
+  type ProxyEventInvoker,
   type MergeEventRouterNodes,
 } from "@mp/event-router";
 import {
@@ -22,7 +22,7 @@ import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
 import { computed } from "@mp/state";
 
-export type ComposedGameEventClient = EventRouterProxyInvoker<
+export type ComposedGameEventClient = ProxyEventInvoker<
   MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
 >;
 
@@ -49,10 +49,10 @@ function createGameStateClient(
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
   const socket = createWebSocket(env.gameServiceUrl);
-  const transceiver = new BinaryEventTransceiver({
+  const transceiver = new EventTransceiver({
     send: socket.send.bind(socket),
   });
-  const eventClient: ComposedGameEventClient = createEventRouterProxyInvoker(
+  const eventClient: ComposedGameEventClient = createProxyEventInvoker(
     transceiver.send,
   );
   const accessToken = computed(() => auth.identity.value?.token);
