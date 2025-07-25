@@ -1,12 +1,12 @@
 import type { RoleDefinition } from "@mp/auth";
 import { evt } from "../network/event-builder";
 
-import { ctxUserSession } from "./session";
+import { ctxGameplaySession } from "./session";
 
 export function roles(requiredRoles: Iterable<RoleDefinition>) {
   const requiredRolesSet = new Set(requiredRoles);
   return evt.middleware(({ ctx }) => {
-    const session = ctx.get(ctxUserSession);
+    const session = ctx.get(ctxGameplaySession);
     const userId = session.userId;
     if (userId === undefined) {
       throw new Error("User is not authenticated");

@@ -1,6 +1,6 @@
 import { ctxGameState } from "../game-state/game-state";
 import type { GameEventRouterContext } from "../network/event-builder";
-import { ctxUserSession } from "../user/session";
+import { ctxGameplaySession } from "../user/session";
 import type { CharacterId } from "./types";
 
 export function accessCharacter(
@@ -9,7 +9,7 @@ export function accessCharacter(
 ) {
   const state = ctx.get(ctxGameState);
   const char = state.actors.get(characterId);
-  const session = ctx.get(ctxUserSession);
+  const session = ctx.get(ctxGameplaySession);
 
   if (!char || char.type !== "character") {
     throw new Error("Character not found");

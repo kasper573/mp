@@ -5,7 +5,12 @@ import { Encoder, Decoder, FLOAT32_OPTIONS } from "cbor-x";
 
 export { addExtension as addEncoderExtension } from "cbor-x";
 
-export function createEncoding<T>(header: number) {
+export interface Encoding<T> {
+  decode(data: ArrayBufferLike): Result<T, Error | "skipped">;
+  encode(value: T): ArrayBufferLike;
+}
+
+export function createEncoding<T>(header: number): Encoding<T> {
   if (header > encodingHeaderMaxLength) {
     throw new Error(`Header must be a 16-bit unsigned integer`);
   }
@@ -14,7 +19,7 @@ export function createEncoding<T>(header: number) {
   const decoder = new Decoder(options);
 
   return {
-    decode(data: ArrayBufferLike): Result<T, Error | "skipped"> {
+    decode(data) {
       try {
         const view = new DataView(data);
         if (view.getUint16(0) !== header) {
@@ -31,7 +36,7 @@ export function createEncoding<T>(header: number) {
         );
       }
     },
-    encode(value: T): ArrayBufferLike {
+    encode(value) {
       const encodedValue = encoder.encode(value) as Uint8Array;
       const buffer = new ArrayBuffer(encodedValue.byteLength + 2);
 

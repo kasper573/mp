@@ -1,12 +1,13 @@
 import "dotenv/config";
 import { opt } from "./options";
+import type { CharacterId, GameplaySession } from "@mp/game/server";
 import { registerEncoderExtensions } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
-import { upsertMapSet } from "@mp/std";
+import { assert, upsertMapSet } from "@mp/std";
 import createCors from "cors";
 import express from "express";
 import http from "http";
@@ -30,6 +31,7 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
+const userSessions = new Map<WebSocket, GameplaySession>();
 const clientRegistry = new ClientRegistry();
 const metricsRegister = new MetricsRegistry();
 collectDefaultMetrics({ register: metricsRegister });
@@ -89,7 +91,7 @@ wss.on("connection", (socket, request) => {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    const flushResult = flushResultEncoding.decode(data);
+    const flushResult = flushResultEncoding<CharacterId>().decode(data);
     if (flushResult.isOk()) {
       flushGameState(flushResult.value);
     }
@@ -100,7 +102,7 @@ wss.on("connection", (socket, request) => {
   });
 });
 
-function flushGameState([flushResult, time]: [FlushResult, Date]) {
+function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const gameClientSockets = sockets.get("game-client");
   if (!gameClientSockets) {
     return;
@@ -109,9 +111,9 @@ function flushGameState([flushResult, time]: [FlushResult, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const socket of gameClientSockets) {
-    const clientId = getSocketId(socket);
-    const patch = clientPatches.get(clientId);
-    const events = clientEvents.get(clientId);
+    const session = assert(userSessions.get(socket));
+    const patch = clientPatches.get(session.characterId);
+    const events = clientEvents.get(session.characterId);
     if (patch || events) {
       const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
       gameStatePatchSizeHistogram.observe(encodedPatch.byteLength);

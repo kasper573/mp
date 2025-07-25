@@ -21,7 +21,7 @@ export function createGameStateFlusher(
   return () => {
     const time = new Date();
     const flushResult = server.flush(state);
-    const encoded = flushResultEncoding.encode([flushResult, time]);
+    const encoded = flushResultEncoding().encode([flushResult, time]);
     histogram.observe(encoded.byteLength);
     gatewaySocket.send(encoded);
   };

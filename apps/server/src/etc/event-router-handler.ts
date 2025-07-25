@@ -4,21 +4,25 @@ import {
   createEventRouterReceiver,
   type AnyEventRouterNode,
 } from "@mp/event-router";
-import type { CharacterId, UserSession, UserSessionId } from "@mp/game/server";
+import type {
+  CharacterId,
+  GameplaySession,
+  GameplaySessionId,
+} from "@mp/game/server";
 import type { UserId } from "@mp/auth";
 
 export function eventRouterHandler<Context>(opt: {
   logger: Logger;
   router: AnyEventRouterNode<Context>;
-  createContext: (session: UserSession) => Context;
+  createContext: (session: GameplaySession) => Context;
 }) {
   const receive = createEventRouterReceiver(opt.router);
 
   const transceiver = new BinaryEventTransceiver({ receive });
 
   return async (buffer: ArrayBuffer) => {
-    const session: UserSession = {
-      id: "" as UserSessionId,
+    const session: GameplaySession = {
+      id: "" as GameplaySessionId,
       roles: new Set(),
       characterId: "" as CharacterId,
       userId: "" as UserId,

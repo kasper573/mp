@@ -3,12 +3,13 @@ import { InjectionContext } from "@mp/ioc";
 import type { CharacterId } from "../character/types";
 import type { Branded } from "@mp/std";
 
-export const ctxUserSession = InjectionContext.new<UserSession>("UserSession");
+export const ctxGameplaySession =
+  InjectionContext.new<GameplaySession>("GameplaySession");
 
-export type UserSessionId = Branded<string, "UserSessionId">;
+export type GameplaySessionId = Branded<string, "GameplaySessionId">;
 
-export interface UserSession {
-  id: UserSessionId;
+export interface GameplaySession {
+  id: GameplaySessionId;
   userId: UserId;
   characterId: CharacterId;
   roles: ReadonlySetLike<RoleDefinition>;
