@@ -336,6 +336,9 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../packages/env
+      '@mp/event-router':
+        specifier: workspace:*
+        version: link:../../packages/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game

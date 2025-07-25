@@ -20,6 +20,7 @@
     "@mp/std": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/auth": "workspace:*",
+    "@mp/event-router": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",

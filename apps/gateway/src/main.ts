@@ -23,6 +23,13 @@ import {
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
 import { ClientRegistry } from "./client-registry";
+import {
+  BinaryEventTransceiver,
+  createEventRouterReceiver,
+} from "@mp/event-router";
+import { gatewayRouter } from "./router";
+import { ImmutableInjectionContainer } from "@mp/ioc";
+import { logEventTransceiverResult } from "./event-transceiver-logger";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -71,6 +78,12 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
 });
 
+const eventTransceiver = new BinaryEventTransceiver({
+  receive: createEventRouterReceiver(gatewayRouter),
+});
+
+const ioc = new ImmutableInjectionContainer();
+
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
   const socketType = getSocketType(request);
@@ -90,10 +103,16 @@ wss.on("connection", (socket, request) => {
     sockets.get(socketType)?.delete(socket);
   });
 
-  socket.on("message", (data: ArrayBuffer) => {
+  socket.on("message", async (data: ArrayBuffer) => {
     const flushResult = flushResultEncoding<CharacterId>().decode(data);
     if (flushResult.isOk()) {
       flushGameState(flushResult.value);
+      return;
+    }
+    const result = await eventTransceiver.handleMessage(data, ioc);
+    if (result) {
+      logEventTransceiverResult(logger, result);
+      return;
     }
   });
 
