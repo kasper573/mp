@@ -26,8 +26,11 @@ function createFactories(): EventRouterFactories<GameEventRouterContext> {
     .build();
 
   const globalMiddleware = builder.middleware((opt) => {
-    const middleware = opt.ctx.get(ctxGlobalServerEventMiddleware);
-    return middleware(opt);
+    const middleware = opt.ctx.access(ctxGlobalServerEventMiddleware);
+    if (middleware.isOk()) {
+      return middleware.value(opt);
+    }
+    return opt;
   });
 
   return {
