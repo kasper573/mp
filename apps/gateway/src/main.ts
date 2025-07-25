@@ -1,7 +1,7 @@
 import "dotenv/config";
 import { opt } from "./options";
 import type { CharacterId, GameplaySession } from "@mp/game/server";
-import { registerEncoderExtensions } from "@mp/game/server";
+import { ctxGameplaySession, registerEncoderExtensions } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
@@ -109,7 +109,14 @@ wss.on("connection", (socket, request) => {
       flushGameState(flushResult.value);
       return;
     }
-    const result = await eventTransceiver.handleMessage(data, ioc);
+
+    const session = gameplaySessions.get(socket);
+    let socketContext = ioc;
+    if (session) {
+      socketContext = socketContext.provide(ctxGameplaySession, session);
+    }
+
+    const result = await eventTransceiver.handleMessage(data, socketContext);
     if (result) {
       logEventTransceiverResult(logger, result);
       return;
