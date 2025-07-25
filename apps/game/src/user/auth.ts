@@ -6,9 +6,8 @@ import { ctxGameplaySession } from "./session";
 export function roles(requiredRoles: Iterable<RoleDefinition>) {
   const requiredRolesSet = new Set(requiredRoles);
   return evt.middleware(({ ctx }) => {
-    const session = ctx.get(ctxGameplaySession);
-    const userId = session.userId;
-    if (userId === undefined) {
+    const session = ctx.access(ctxGameplaySession).unwrapOr(undefined);
+    if (!session) {
       throw new Error("User is not authenticated");
     }
     if (!requiredRolesSet.isSubsetOf(session.roles)) {
@@ -17,6 +16,6 @@ export function roles(requiredRoles: Iterable<RoleDefinition>) {
         "Missing permissions: " + missingRoles.values().toArray().join(", "),
       );
     }
-    return { userId };
+    return session;
   });
 }
