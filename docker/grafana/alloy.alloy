@@ -1,3 +1,12 @@
+prometheus.scrape "mp_gateway" {
+	targets = [{
+		__address__ = env("MP_GATEWAY_PROXY_HOST"),
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "mp_gateway"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+}
+
 prometheus.scrape "pushgateway" {
 	targets = [{
 		__address__ = "pushgateway:9091",
