@@ -13,7 +13,9 @@ export async function loadAreaResource(
   });
   const result = await loadTiled(areaFileUrl);
   if (result.isErr()) {
-    throw result.error;
+    throw new Error(`Failed to load area "${areaId}" from "${areaFileUrl}"`, {
+      cause: result.error,
+    });
   }
   return new AreaResource(areaId, new TiledResource(result.value));
 }
