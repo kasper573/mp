@@ -45,6 +45,21 @@ export class ImmutableInjectionContainer extends InjectionContainer {
       ]),
     );
   }
+
+  provideIfDefined<Value>(
+    context: InjectionContext<Value>,
+    value: Value | undefined,
+  ): ImmutableInjectionContainer {
+    if (value === undefined) {
+      return this;
+    }
+    return new ImmutableInjectionContainer(
+      new Map([
+        ...this.map.entries(),
+        [context as InjectionContext<unknown>, value],
+      ]),
+    );
+  }
 }
 
 // Symbol not exported to make it impossible to access a context value without going through the ioc
