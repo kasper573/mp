@@ -5,7 +5,7 @@ const globalRequestLimit = new RateLimiter({ points: 20, duration: 1 });
 
 export const rateLimiterMiddleware = evt.middleware(async ({ ctx }) => {
   const result = await globalRequestLimit.consume(
-    ctx.get(ctxGameplaySession).id,
+    ctx.get(ctxGameplaySession).userId,
   );
   if (result.isErr()) {
     throw new Error("Rate limit exceeded");
