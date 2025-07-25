@@ -51,7 +51,7 @@ export const apiRouter = rpc.router({
   areaFileUrl: rpc.procedure
     .input(type("string").brand("AreaId"))
     .query(({ input: areaId, ctx }) =>
-      ctx.ioc.get(ctxFileResolver).abs("areas", areaId),
+      ctx.ioc.get(ctxFileResolver).abs("areas", `${areaId}.json`),
     ),
 
   areaFileUrls: rpc.procedure.query(
