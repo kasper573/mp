@@ -2,31 +2,16 @@ import type {
   AnyEventRouterHandlerNode,
   AnyEventRouterNode,
   AnyEventNode,
-  InferEventContext,
   InferEventInput,
   EventRouterNode,
 } from "./builder";
 import { createInvocationProxy } from "@mp/invocation-proxy";
-import { createEventRouterReceiver } from "./event-receiver";
 
 export function createEventRouterProxyInvoker<Node extends AnyEventNode>(
   invoke: EventRouterInvoker,
 ): EventRouterProxyInvoker<Node> {
   const proxy = createInvocationProxy(
     (path) => (input) => void invoke(path, input),
-  );
-
-  return proxy as EventRouterProxyInvoker<Node>;
-}
-
-export function createEventRouterProxyInvokerForNode<Node extends AnyEventNode>(
-  node: Node,
-  context: InferEventContext<Node>,
-): EventRouterProxyInvoker<Node> {
-  const invoke = createEventRouterReceiver(node);
-
-  const proxy = createInvocationProxy(
-    (path) => (input) => invoke([path, input], context),
   );
 
   return proxy as EventRouterProxyInvoker<Node>;
