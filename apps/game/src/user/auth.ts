@@ -6,16 +6,19 @@ import { ctxUserSession } from "./session";
 export function roles(requiredRoles: Iterable<RoleDefinition>) {
   const requiredRolesSet = new Set(requiredRoles);
   return evt.middleware(({ ctx }) => {
-    const user = ctx.access(ctxUserSession).unwrapOr(undefined)?.user;
-    if (!user) {
+    const session = ctx.access(ctxUserSession).unwrapOr(undefined);
+    if (!session) {
+      throw new Error("No user session available");
+    }
+    if (!session.user) {
       throw new Error("User is not authenticated");
     }
-    if (!requiredRolesSet.isSubsetOf(user.roles)) {
-      const missingRoles = requiredRolesSet.difference(user.roles);
+    if (!requiredRolesSet.isSubsetOf(session.user.roles)) {
+      const missingRoles = requiredRolesSet.difference(session.user.roles);
       throw new Error(
         "Missing permissions: " + missingRoles.values().toArray().join(", "),
       );
     }
-    return { user };
+    return { user: session.user };
   });
 }
