@@ -1,13 +1,14 @@
 import { evt } from "./event-builder";
 import { ctxGameStateServer } from "../game-state/game-state-server";
-import { ctxGameplaySession } from "../user/session";
+import { ctxUserSession } from "../user/session";
+import { assert } from "@mp/std";
 
 export type NetworkRouter = typeof networkEventRouter;
 export const networkEventRouter = evt.router({
   requestFullState: evt.event.handler(({ ctx }) => {
-    const session = ctx.get(ctxGameplaySession);
+    const session = ctx.get(ctxUserSession);
     const server = ctx.get(ctxGameStateServer);
-    server.markToResendFullState(session.characterId);
+    server.markToResendFullState(assert(session.player).characterId);
   }),
 });
 

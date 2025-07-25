@@ -18,7 +18,7 @@ import {
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
-  ctxGameplaySession,
+  ctxUserSession,
   gameServerEventRouter,
   NpcAi,
   NpcSpawner,
@@ -104,7 +104,7 @@ gatewaySocket.on(
   eventRouterHandler({
     logger,
     router: gameServerEventRouter,
-    createContext: (session) => ioc.provide(ctxGameplaySession, session),
+    createContext: (session) => ioc.provide(ctxUserSession, session),
   }),
 );
 

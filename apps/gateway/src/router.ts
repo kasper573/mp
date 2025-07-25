@@ -10,9 +10,11 @@ import {
   ctxArea,
   ctxTokenResolver,
   networkEventRouter,
+  ctxUserSession,
 } from "@mp/game/server";
-import { ctxClientId, ctxClientRegistry } from "./client-registry";
 import { ctxGameEventClient } from "@mp/game/server";
+import { InjectionContext } from "@mp/ioc";
+import type { ClientId } from "./client-id";
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
@@ -21,16 +23,17 @@ export const gatewayRouter = evt.router({
       .use(roles([worldRoles.spectate]))
       .input<CharacterId>()
       .handler(({ ctx, input }) => {
-        const clients = ctx.get(ctxClientRegistry);
-        const clientId = ctx.get(ctxClientId);
-        clients.spectatedCharacterIds.set(clientId, input);
+        const session = ctx.get(ctxUserSession);
+        session.player = {
+          characterId: input,
+          clientType: "spectator",
+        };
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
     join: evt.event
       .use(roles([worldRoles.join]))
       .handler(async ({ ctx, mwc }) => {
-        const clientId = ctx.get(ctxClientId);
         const state = ctx.get(ctxGameState);
         const server = ctx.get(ctxGameStateServer);
         ctx.get(ctxGameEventClient).network.requestFullState();
@@ -39,15 +42,18 @@ export const gatewayRouter = evt.router({
         let char = state.actors
           .values()
           .filter((actor) => actor.type === "character")
-          .find((actor) => actor.identity.userId === mwc.userId);
+          .find((actor) => actor.identity.userId === mwc.user.id);
 
         if (!char) {
-          char = await loader.getOrCreateCharacterForUser(mwc.userId);
+          char = await loader.getOrCreateCharacterForUser(mwc.user.id);
           state.actors.set(char.identity.id, char);
         }
 
-        const clients = ctx.get(ctxClientRegistry);
-        clients.characterIds.set(clientId, char.identity.id);
+        const session = ctx.get(ctxUserSession);
+        session.player = {
+          characterId: char.identity.id,
+          clientType: "spectator",
+        };
 
         server.addEvent(
           "area.joined",
@@ -57,28 +63,26 @@ export const gatewayRouter = evt.router({
       }),
 
     leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
-
       // Removing the clients character from the registry will eventually
       // lead to the game behavior removing the actor from the game state.
       // This allows the character to remain in the game state for a moment before removal,
       // preventing "quick disconnect" cheating, or allows for connection losses to be handled gracefully.
-      clients.characterIds.delete(clientId);
-      clients.spectatedCharacterIds.delete(clientId);
+      const session = ctx.get(ctxUserSession);
+      delete session.player;
     }),
 
     auth: evt.event.input<AccessToken>().handler(async ({ input, ctx }) => {
-      const clientId = ctx.get(ctxClientId);
-      const clients = ctx.get(ctxClientRegistry);
       const tokenResolver = ctx.get(ctxTokenResolver);
       const result = await tokenResolver(input);
       if (result.isErr()) {
         throw new Error("Invalid token", { cause: result.error });
       }
-      clients.userIds.set(clientId, result.value.id);
+      const session = ctx.get(ctxUserSession);
+      session.user = result.value;
     }),
   }),
 });
 
 export const worldEventRouterSlice = { world: networkEventRouter };
+
+export const ctxClientId = InjectionContext.new<ClientId>("ClientId");

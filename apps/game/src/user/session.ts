@@ -2,11 +2,16 @@ import type { RoleDefinition, UserId } from "@mp/auth";
 import { InjectionContext } from "@mp/ioc";
 import type { CharacterId } from "../character/types";
 
-export const ctxGameplaySession =
-  InjectionContext.new<GameplaySession>("GameplaySession");
+export const ctxUserSession = InjectionContext.new<UserSession>("UserSession");
 
-export interface GameplaySession {
-  userId: UserId;
-  characterId: CharacterId;
-  roles: ReadonlySetLike<RoleDefinition>;
+export interface UserSession {
+  id: string;
+  user?: {
+    id: UserId;
+    roles: ReadonlySetLike<RoleDefinition>;
+  };
+  player?: {
+    characterId: CharacterId;
+    clientType: "spectator" | "player";
+  };
 }

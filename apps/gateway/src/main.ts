@@ -1,8 +1,8 @@
 import "dotenv/config";
 import { opt } from "./options";
-import type { CharacterId, GameplaySession } from "@mp/game/server";
+import type { CharacterId, UserSession } from "@mp/game/server";
 import {
-  ctxGameplaySession,
+  ctxUserSession,
   ctxTokenResolver,
   registerEncoderExtensions,
 } from "@mp/game/server";
@@ -26,12 +26,13 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
-import { ClientRegistry } from "./client-registry";
+import type { ClientId } from "./client-id";
+import { getClientId } from "./client-id";
 import {
   BinaryEventTransceiver,
   createEventRouterReceiver,
 } from "@mp/event-router";
-import { gatewayRouter } from "./router";
+import { ctxClientId, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { logEventTransceiverResult } from "./event-transceiver-logger";
 import { createTokenResolver } from "@mp/auth/server";
@@ -43,9 +44,10 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
-const gameplaySessions = new Map<WebSocket, GameplaySession>();
-const clientRegistry = new ClientRegistry();
+const sockets = new Map<SocketType, Set<WebSocket>>();
+const userSessions = new Map<ClientId, UserSession>();
 const metricsRegister = new MetricsRegistry();
+
 collectDefaultMetrics({ register: metricsRegister });
 
 const webServer = express()
@@ -59,7 +61,6 @@ const httpServer = http.createServer(webServer);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const sockets = new Map<SocketType, Set<WebSocket>>();
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
@@ -108,10 +109,13 @@ wss.on("connection", (socket, request) => {
 
   upsertMapSet(sockets, socketType, socket);
 
+  const clientId = getClientId(socket);
+  userSessions.set(clientId, { id: clientId });
+
   socket.on("close", () => {
     logger.info(`${socketType} connection closed`);
     sockets.get(socketType)?.delete(socket);
-    gameplaySessions.delete(socket);
+    userSessions.delete(clientId);
   });
 
   socket.on("message", async (data: ArrayBuffer) => {
@@ -121,14 +125,15 @@ wss.on("connection", (socket, request) => {
       return;
     }
 
-    const session = gameplaySessions.get(socket);
-    const socketContext = session
-      ? ioc.provide(ctxGameplaySession, session)
-      : ioc;
+    const eventResult = await eventTransceiver.handleMessage(data, () => {
+      const session = userSessions.get(clientId);
+      return ioc
+        .provide(ctxClientId, clientId)
+        .provideIfDefined(ctxUserSession, session);
+    });
 
-    const result = await eventTransceiver.handleMessage(data, socketContext);
-    if (result) {
-      logEventTransceiverResult(logger, result);
+    if (eventResult) {
+      logEventTransceiverResult(logger, eventResult);
       return;
     }
   });
@@ -147,14 +152,14 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const socket of gameClientSockets) {
-    const session = gameplaySessions.get(socket);
-    if (!session) {
+    const player = userSessions.get(getClientId(socket))?.player;
+    if (!player) {
       // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
       continue;
     }
 
-    const patch = clientPatches.get(session.characterId);
-    const events = clientEvents.get(session.characterId);
+    const patch = clientPatches.get(player.characterId);
+    const events = clientEvents.get(player.characterId);
     if (patch || events) {
       const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
       gameStatePatchSizeHistogram.observe(encodedPatch.byteLength);
@@ -187,7 +192,13 @@ const _userCountGague = new MetricsGague({
   help: "Number of users currently connected",
   registers: [metricsRegister],
   collect() {
-    this.set(clientRegistry.getUserCount());
+    this.set(
+      new Set(
+        userSessions
+          .values()
+          .flatMap((session) => (session.user ? [session.user.id] : [])),
+      ).size,
+    );
   },
 });
 
@@ -196,6 +207,6 @@ const _clientCountGague = new MetricsGague({
   help: "Number of active websocket connections",
   registers: [metricsRegister],
   collect() {
-    this.set(clientRegistry.getClientIds().size);
+    this.set(sockets.get("game-client")?.size ?? 0);
   },
 });

@@ -14,7 +14,7 @@ export * from "./game-state/game-state-client";
 export * from "./game-state/optimistic-game-state";
 export type * from "./network/root-event-router";
 export * from "./clients/spectator-client";
-export * from "./clients/player-client";
+export * from "./clients/game-client";
 export * from "./clients/game-asset-loader";
 export * from "./network/encoder-extensions";
 export * from "./network/game-event-client";

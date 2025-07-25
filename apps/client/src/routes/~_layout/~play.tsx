@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameAssetLoaderContext, PlayerClient } from "@mp/game/client";
+import { GameAssetLoaderContext, GameClient } from "@mp/game/client";
 import { LoadingSpinner } from "@mp/ui";
-import { Suspense } from "preact/compat";
+import { Suspense, useEffect } from "preact/compat";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 import { useGameAssets } from "../../integrations/assets";
@@ -14,17 +14,18 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const [stateClient, events] = useGameStateClient();
 
+  useEffect(() => events.gateway.join(), [events]);
+
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
       <GameAssetLoaderContext.Provider value={useGameAssets}>
-        <PlayerClient
+        <GameClient
           stateClient={stateClient}
           additionalDebugUi={<MiscDebugUi />}
           interactive
-          sendJoinRequest={() => events.gateway.join()}
         />
       </GameAssetLoaderContext.Provider>
     </Suspense>
