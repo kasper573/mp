@@ -14,12 +14,13 @@ import {
 } from "@mp/game/client";
 import { createWebSocket } from "@mp/ws/client";
 import type { GatewayRouter } from "@mp/gateway";
-import { enhanceWebSocketWithAuthHandshake } from "./auth-handshake";
+
 import { env } from "../env";
 import { useEffect, useMemo } from "preact/hooks";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
+import { computed } from "@mp/state";
 
 export type ComposedGameEventClient = EventRouterProxyInvoker<
   MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
@@ -47,29 +48,29 @@ function createGameStateClient(
   logger: Logger,
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
-  const socketWithoutHandshake = createWebSocket(env.gameServiceUrl);
-  const eventClientWithoutHandshake = createComposedGameEventClient(
-    socketWithoutHandshake,
-  );
-  const socket = enhanceWebSocketWithAuthHandshake({
-    logger,
-    socket: socketWithoutHandshake,
-    getAccessToken: () => auth.identity.value?.token,
-    sendToken: (token) => eventClientWithoutHandshake.gateway.auth(token),
-  });
-
+  const socket = createWebSocket(env.gameServiceUrl);
   const eventClient = createComposedGameEventClient(socket);
+  const accessToken = computed(() => auth.identity.value?.token);
+
+  function sendAccessTokenToGateway() {
+    if (accessToken.value) {
+      eventClient.gateway.auth(accessToken.value);
+    }
+  }
 
   function initialize() {
     const logSocketError = (e: Event) => logger.error(e, "Socket error");
     socket.addEventListener("error", logSocketError);
-    socket.addEventListener("close", socket.handleCloseEvent);
-    const unsubscrube = ioc.register(ctxGameEventClient, eventClient);
+    const subscriptions = [
+      ioc.register(ctxGameEventClient, eventClient),
+      accessToken.subscribe(sendAccessTokenToGateway),
+    ];
 
     return () => {
-      unsubscrube();
+      for (const unsubscribe of subscriptions) {
+        unsubscribe();
+      }
       socket.removeEventListener("error", logSocketError);
-      socket.removeEventListener("close", socket.handleCloseEvent);
       socket.close();
     };
   }
