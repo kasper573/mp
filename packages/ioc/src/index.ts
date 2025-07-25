@@ -53,12 +53,7 @@ export class ImmutableInjectionContainer extends InjectionContainer {
     if (value === undefined) {
       return this;
     }
-    return new ImmutableInjectionContainer(
-      new Map([
-        ...this.map.entries(),
-        [context as InjectionContext<unknown>, value],
-      ]),
-    );
+    return this.provide(context, value);
   }
 }
 

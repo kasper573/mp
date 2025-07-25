@@ -140,7 +140,8 @@ function setupGameServerSocket(socket: WebSocket) {
 
 function setupGameClientSocket(socket: WebSocket) {
   const clientId = createShortId() as ClientId;
-  userSessions.set(clientId, { id: clientId });
+  const session: UserSession = { id: clientId };
+  userSessions.set(clientId, session);
   gameClientSockets.set(clientId, socket);
 
   socket.on("close", () => {
@@ -150,10 +151,9 @@ function setupGameClientSocket(socket: WebSocket) {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    const eventResult = eventTransceiver.handleMessage(data, () => {
-      const session = userSessions.get(clientId);
-      return ioc.provideIfDefined(ctxUserSession, session);
-    });
+    const eventResult = eventTransceiver.handleMessage(data, () =>
+      ioc.provideIfDefined(ctxUserSession, session),
+    );
 
     if (eventResult) {
       const { message, receiveResult } = eventResult;
