@@ -23,7 +23,6 @@ export const MovementTrait = defineSyncComponent((builder) =>
      */
     .add<Vector<Tile>>(patchOptimizers.coords)("coords")
     .add<Tile>()("speed")
-    //.add<AreaId>()("areaId")
     /**
      * A desired target. Will be consumed by the movement behavior to find a new path.
      */
@@ -88,6 +87,11 @@ export function movementBehavior(
   };
 }
 
+/**
+ * Actors area ids are only stored in the database.
+ * What controls which area an actor is associated with at runtime is simply if it's been added to a game server instance.
+ * Each game server instance only houses one specific area, so adding an actor to a game server instance is equal to adding it to that area.
+ */
 export function sendCharacterToArea(
   char: Character,
   currentArea: AreaResource,

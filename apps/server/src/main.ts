@@ -20,6 +20,7 @@ import {
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
+  ctxTokenResolver,
   gameServerEventRouter,
   NpcAi,
   NpcSpawner,
@@ -72,7 +73,7 @@ const api = createApiClient(opt.apiUrl);
 
 const clients = new ClientRegistry();
 const metrics = new MetricsRegistry();
-const _ = createTokenResolver({
+const tokenResolver = createTokenResolver({
   ...opt.auth,
   getBypassUser,
   onResolve(result) {
@@ -193,6 +194,7 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
+  .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxNpcSpawner, npcSpawner);
 
 collectDefaultMetrics({ register: metrics });
