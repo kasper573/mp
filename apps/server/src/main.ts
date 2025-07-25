@@ -48,10 +48,11 @@ import { createDbClient } from "@mp/db";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 
-import { createGameStatePersistence } from "./etc/game-state-persistence";
+import { createGameStateLoader } from "./etc/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
 import { createEventInvoker, EventTransceiver } from "@mp/event-router";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/game-state-db-sync";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -83,12 +84,7 @@ const [area, actorModels] = await Promise.all([
   api.actorSpritesheetUrls.query().then(loadActorModels),
 ]);
 
-const gameStatePersistence = createGameStatePersistence(
-  db,
-  area,
-  actorModels,
-  rng,
-);
+const gameStatePersistence = createGameStateLoader(db, area, actorModels, rng);
 
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
@@ -127,11 +123,6 @@ const gameStateServer: GameStateServer = new SyncServer({
   ),
 });
 
-const persistTicker = new Ticker({
-  onError: (error) => logger.error(error, "Persist Ticker Error"),
-  middleware: () => gameStatePersistence.persist(gameState),
-});
-
 const updateTicker = new Ticker({
   onError: (error) => logger.error(error, "Update Ticker Error"),
   middleware: createTickMetricsObserver(metrics),
@@ -168,7 +159,7 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
-persistTicker.start(opt.persistInterval);
+startGameStateDbSync(db, area, gameState, gameStateServer);
 updateTicker.start(opt.tickInterval);
 setTimeout(
   () =>

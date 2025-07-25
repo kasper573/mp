@@ -24,10 +24,6 @@ export const gameServiceOptionsSchema = type({
    */
   tickInterval: msSchema,
   /**
-   * How often to save the game state to the database
-   */
-  persistInterval: msSchema,
-  /**
    * Options for prom-client Pushgateway
    */
   metricsPushgateway: {

@@ -4,7 +4,6 @@ import { assert, type Tile, type TimesPerSecond } from "@mp/std";
 import { cardinalDirections } from "@mp/math";
 import type {
   AreaResource,
-  GameState,
   GameStateLoader,
   Npc,
   NpcSpawn,
@@ -20,13 +19,13 @@ import type { DbClient } from "@mp/db";
 import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 
-export function createGameStatePersistence(
+export function createGameStateLoader(
   db: DbClient,
   area: AreaResource,
   models: ActorModelLookup,
   rng: Rng,
   includeNpcsDerivedFromTiled = true,
-): GameStatePersistence {
+): GameStateLoader {
   const info = new Map<UserId, UserIdentity>();
 
   function getDefaultSpawnPoint() {
@@ -114,33 +113,6 @@ export function createGameStatePersistence(
       });
     },
 
-    persist: (state) => {
-      return db.transaction((tx) =>
-        Promise.all(
-          state.actors
-            .values()
-            .filter((actor) => actor.type === "character")
-            .map((character) => {
-              const inputValues: typeof characterTable.$inferInsert = {
-                areaId: area.id,
-                ...character.identity.snapshot(),
-                ...character.appearance.snapshot(),
-                ...character.combat.snapshot(),
-                ...character.movement.snapshot(),
-                ...character.progression.snapshot(),
-              };
-              return tx
-                .insert(characterTable)
-                .values(inputValues)
-                .onConflictDoUpdate({
-                  target: characterTable.id,
-                  set: inputValues,
-                });
-            }),
-        ),
-      );
-    },
-
     async getAllSpawnsAndTheirNpcs() {
       const result = await db
         .select()
@@ -181,10 +153,6 @@ export function createGameStatePersistence(
       );
     },
   };
-}
-
-export interface GameStatePersistence extends GameStateLoader {
-  persist: (state: GameState) => Promise<unknown>;
 }
 
 function characterAppearance(): Omit<AppearanceTrait, "name"> {

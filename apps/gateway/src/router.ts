@@ -4,10 +4,7 @@ import {
   evt,
   roles,
   worldRoles,
-  ctxGameStateServer,
-  ctxGameState,
   ctxGameStateLoader,
-  ctxArea,
   ctxTokenResolver,
   networkEventRouter,
   ctxUserSession,
@@ -32,32 +29,14 @@ export const gatewayRouter = evt.router({
     join: evt.event
       .use(roles([worldRoles.join]))
       .handler(async ({ ctx, mwc }) => {
-        const state = ctx.get(ctxGameState);
-        const server = ctx.get(ctxGameStateServer);
-        ctx.get(ctxGameEventClient).network.requestFullState();
-
         const loader = ctx.get(ctxGameStateLoader);
-        let char = state.actors
-          .values()
-          .filter((actor) => actor.type === "character")
-          .find((actor) => actor.identity.userId === mwc.user.id);
-
-        if (!char) {
-          char = await loader.getOrCreateCharacterForUser(mwc.user.id);
-          state.actors.set(char.identity.id, char);
-        }
-
+        const char = await loader.getOrCreateCharacterForUser(mwc.user.id);
         const session = ctx.get(ctxUserSession);
         session.player = {
           characterId: char.identity.id,
-          clientType: "spectator",
+          clientType: "player",
         };
-
-        server.addEvent(
-          "area.joined",
-          { areaId: ctx.get(ctxArea).id, characterId: char.identity.id },
-          { actors: [char.identity.id] },
-        );
+        ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
     leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
