@@ -7,7 +7,7 @@ import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
-import { assert, upsertMapSet } from "@mp/std";
+import { upsertMapSet } from "@mp/std";
 import createCors from "cors";
 import express from "express";
 import http from "http";
@@ -111,7 +111,12 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const socket of gameClientSockets) {
-    const session = assert(userSessions.get(socket));
+    const session = userSessions.get(socket);
+    if (!session) {
+      // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
+      continue;
+    }
+
     const patch = clientPatches.get(session.characterId);
     const events = clientEvents.get(session.characterId);
     if (patch || events) {
@@ -130,7 +135,7 @@ function getSearchParams(path = ""): URLSearchParams {
 }
 
 function getSocketType(req: IncomingMessage) {
-  const typeParam = getSearchParams(req.url).get("type");
+  const typeParam = getSearchParams(req.url).get("type") ?? "game-client";
   return SocketType(typeParam);
 }
 
