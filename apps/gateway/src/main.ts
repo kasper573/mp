@@ -11,6 +11,8 @@ import createCors from "cors";
 import express from "express";
 import http from "http";
 import proxy from "express-http-proxy";
+import { metricsMiddleware } from "./metrics-middleware";
+import { MetricsRegistry, collectDefaultMetrics } from "@mp/telemetry/prom";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -19,9 +21,13 @@ registerEncoderExtensions();
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting gateway...`);
 
+const gatewayMetrics = new MetricsRegistry();
+collectDefaultMetrics({ register: gatewayMetrics });
+
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
+  .use(metricsMiddleware(gatewayMetrics))
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
@@ -31,7 +37,24 @@ const sockets = new Map<SocketType, Set<WebSocket>>();
 const wss = new WebSocketServer({
   path: opt.wsEndpointPath,
   server: httpServer,
-}); // TODO verifyClient
+  maxPayload: 5000,
+  // TODO verifyClient
+  perMessageDeflate: {
+    zlibDeflateOptions: {
+      chunkSize: 1024,
+      memLevel: 7, // default level
+      level: 6, // default is 3, max is 9
+    },
+    zlibInflateOptions: {
+      chunkSize: 10 * 1024,
+    },
+    clientNoContextTakeover: true, // defaults to negotiated value.
+    serverNoContextTakeover: true, // defaults to negotiated value.
+    serverMaxWindowBits: 10, // defaults to negotiated value.
+    concurrencyLimit: 10, // limits zlib concurrency for perf.
+    threshold: 1024, // messages under this size won't be compressed.
+  },
+});
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
@@ -50,7 +73,7 @@ wss.on("connection", (socket, request) => {
     sockets.get(socketType)?.delete(socket);
   });
 
-  socket.on("message", async (data: ArrayBuffer) => {
+  socket.on("message", (data: ArrayBuffer) => {
     // TODO route events based on socket type
   });
 
