@@ -21,7 +21,7 @@ import {
   NpcSpawner,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
-import { Rng } from "@mp/std";
+import { Rng, withBackoffRetries } from "@mp/std";
 import type { GameState, GameStateServer } from "@mp/game/server";
 import {
   movementBehavior,
@@ -69,12 +69,14 @@ const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 logger.info(`Loading areas and actor models...`);
-const [area, actorModels] = await Promise.all([
-  api.areaFileUrl
-    .query(opt.areaId)
-    .then((url) => loadAreaResource(opt.areaId, url)),
-  api.actorSpritesheetUrls.query().then(loadActorModels),
-]).catch((error) => {
+const [area, actorModels] = await withBackoffRetries(() =>
+  Promise.all([
+    api.areaFileUrl
+      .query(opt.areaId)
+      .then((url) => loadAreaResource(opt.areaId, url)),
+    api.actorSpritesheetUrls.query().then(loadActorModels),
+  ]),
+).catch((error) => {
   logger.error(error, "Failed to load area and actor data from API service");
   process.exit(1);
 });
