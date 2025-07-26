@@ -44,7 +44,7 @@ import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { loadActorModels } from "./etc/load-actor-models";
 
-import { createDbClient } from "@mp/db";
+import { createDbClient } from "@mp/db-client";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
 

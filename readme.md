@@ -71,7 +71,7 @@ Local development is done using node and docker compose.
   > on which browser you are using.
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.17.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `pnpm -F db devenv push` to initialize your database
+- Run `pnpm -F db-client devenv push` to initialize your database
 - Run `pnpm -F server devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
@@ -88,7 +88,7 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
 
-Run its cli against the development environment using `pnpm -F db devenv <drizzle-kit command>`.
+Run its cli against the development environment using `pnpm -F db-client devenv <drizzle-kit command>`.
 
 ### If you change user roles
 

@@ -206,37 +206,6 @@ importers:
         specifier: 0.9.3
         version: 0.9.3(eslint@9.32.0(jiti@2.4.2))(optionator@0.9.4)(typescript@5.8.3)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
 
-  apps/db:
-    dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
-      '@mp/game':
-        specifier: workspace:*
-        version: link:../game
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-      drizzle-orm:
-        specifier: 0.38.3
-        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)
-      pg:
-        specifier: 8.13.1
-        version: 8.13.1
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-      '@types/pg':
-        specifier: 8.11.10
-        version: 8.11.10
-      drizzle-kit:
-        specifier: 0.30.1
-        version: 0.30.1
-
   apps/e2e:
     devDependencies:
       '@faker-js/faker':
@@ -443,9 +412,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/db':
+      '@mp/db-client':
         specifier: workspace:*
-        version: link:../db
+        version: link:../../integrations/db-client
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -507,6 +476,37 @@ importers:
       tsx:
         specifier: 'catalog:'
         version: 4.19.2
+
+  integrations/db-client:
+    dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../../apps/game
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      drizzle-orm:
+        specifier: 0.38.3
+        version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)
+      pg:
+        specifier: 8.13.1
+        version: 8.13.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      '@types/pg':
+        specifier: 8.11.10
+        version: 8.11.10
+      drizzle-kit:
+        specifier: 0.30.1
+        version: 0.30.1
 
   libraries/auth:
     dependencies:

@@ -1,5 +1,5 @@
-import type { DbClient } from "@mp/db";
-import { characterTable } from "@mp/db";
+import type { DbClient } from "@mp/db-client";
+import { characterTable } from "@mp/db-client";
 import type {
   AreaResource,
   Character,

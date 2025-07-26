@@ -48,7 +48,7 @@ services:
     logging: *logging
     build:
       dockerfile: ../../docker/Dockerfile.mp-migrations
-      context: ../apps/db
+      context: ../integrations/db-client
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
     depends_on:

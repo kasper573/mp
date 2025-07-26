@@ -15,8 +15,8 @@ import {
   Character,
   deriveNpcSpawnsFromArea,
 } from "@mp/game/server";
-import type { DbClient } from "@mp/db";
-import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
+import type { DbClient } from "@mp/db-client";
+import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db-client";
 import { uniqueNamesGenerator, names } from "unique-names-generator";
 
 export function createGameStateLoader(
