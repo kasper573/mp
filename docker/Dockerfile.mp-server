@@ -40,7 +40,6 @@ ENV OTEL_NODE_DISABLED_INSTRUMENTATIONS="nothing-should-be-disabled"
 # Add start script
 COPY <<EOF /workdir/start.sh
 cd /workdir/server
-node ./provision.js
 node \\
   --import @opentelemetry/auto-instrumentations-node/register \\
   --experimental-loader @opentelemetry/instrumentation/hook.mjs \\

@@ -1,11 +1,6 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": [
-    "src",
-    "*.ts",
-    "../../integrations/keycloak-client/src/provision.ts",
-    "../../integrations/keycloak-client/src/roles.ts"
-  ],
+  "include": ["src", "*.ts"],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017",

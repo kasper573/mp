@@ -69,6 +69,16 @@ services:
       postgres:
         condition: service_healthy
 
+  keycloak-provision:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.keycloak-provision
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/keycloak-provision:${DOCKER_IMAGE_VERSION:-latest}
+    profiles: ["prod", "test"]
+    depends_on: ["keycloak"]
+
   # the keycloak image dosen't have curl so we healthcheck it externally
   keycloak-healthcheck:
     env_file: *env_files

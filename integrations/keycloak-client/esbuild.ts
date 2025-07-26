@@ -4,7 +4,7 @@ import builtinModules from "builtin-modules";
 
 const buildOptions: esbuild.BuildOptions = {
   entryPoints: {
-    index: "./src/main.ts",
+    provision: "./src/provision.ts",
   },
   outdir: path.resolve(import.meta.dirname, "dist"),
   bundle: true,

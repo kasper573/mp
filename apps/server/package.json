@@ -32,8 +32,8 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "builtin-modules": "5.0.0",
-    "esbuild": "0.25.6",
+    "builtin-modules": "catalog:",
+    "esbuild": "catalog:",
     "tsx": "catalog:"
   }
 }
