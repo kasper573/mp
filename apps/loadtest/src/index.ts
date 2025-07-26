@@ -131,11 +131,11 @@ async function testOneGameClient(n: number, rng: Rng) {
         gameClient.character.value &&
         !gameClient.character.value.combat.health
       ) {
-        await gameClient.actions.respawn();
+        gameClient.actions.respawn();
       }
       try {
         const to = rng.oneOf(tiles);
-        await gameClient.actions.move(to);
+        gameClient.actions.move(to);
         logger.info(`Moving character for socket ${n} to ${to}`);
         await wait(1000 + rng.next() * 6000);
       } catch (error) {
