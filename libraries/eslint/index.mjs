@@ -48,19 +48,19 @@ export default tseslint.config(
     },
     settings: {
       "boundaries/elements": [
-        { type: "game_server_module", pattern: "apps/game/server/**" },
-        { type: "game_client_module", pattern: "apps/game/client/**" },
-        { type: "game_shared_module", pattern: "apps/game/shared/**" },
-        { type: "client_app", pattern: "apps/client/**" },
-        { type: "server_app", pattern: "apps/server/**" },
-        { type: "other_app", pattern: "apps/*" },
-        { type: "library", pattern: "libraries/*" },
+        { type: "app", pattern: "apps/*/src/**" },
+        { type: "integration", pattern: "integrations/*/src/**" },
+        { type: "library", pattern: "libraries/**" },
       ],
+      "import/resolver": {
+        typescript: {
+          alwaysTryTypes: true,
+        },
+      },
     },
     rules: {
       "@typescript-eslint/await-thenable": "error",
       "@typescript-eslint/no-floating-promises": "error",
-      "@typescript-eslint/require-array-sort-compare": "error",
       "monorepo-cop/no-relative-import-outside-package": "error",
       "boundaries/element-types": [
         2,
@@ -68,40 +68,9 @@ export default tseslint.config(
           default: "disallow",
           message: "${file.type} is not allowed to import ${dependency.type}",
           rules: [
-            {
-              from: ["server_app"],
-              allow: ["game_server_module", "game_shared_module", "library"],
-            },
-            {
-              from: ["client_app"],
-              allow: [
-                "game_client_module",
-                "game_shared_module",
-                "server_app",
-                "library",
-              ],
-            },
-            {
-              from: ["other_app"],
-              allow: [
-                "library",
-                "server_app",
-                "game_client_module",
-                "game_shared_module",
-              ],
-            },
-            {
-              from: ["game_client_module"],
-              allow: ["game_server_module", "game_shared_module", "library"],
-            },
-            {
-              from: ["game_server_module"],
-              allow: ["game_shared_module", "library"],
-            },
-            {
-              from: ["game_shared_module", "library"],
-              allow: ["library"],
-            },
+            { from: "app", allow: ["app", "integration", "library"] },
+            { from: "integration", allow: ["app", "library"] },
+            { from: "library", allow: ["library"] },
           ],
         },
       ],

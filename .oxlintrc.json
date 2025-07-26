@@ -102,31 +102,6 @@
         "extensions": "off"
       }
     },
-    // Ensure that the client and server packages only access the relevant parts from the game package
-    {
-      "files": ["**/apps/client/**"],
-      "rules": {
-        "no-restricted-imports": [
-          "error",
-          {
-            "name": "@mp/game/server",
-            "message": "Client should not depend on game server code."
-          }
-        ]
-      }
-    },
-    {
-      "files": ["**/apps/server/**"],
-      "rules": {
-        "no-restricted-imports": [
-          "error",
-          {
-            "name": "@mp/game/client",
-            "message": "Server should not depend on game client code."
-          }
-        ]
-      }
-    },
     // Ensure that the game package does not import from its export files
     {
       "files": ["**/apps/game/**"],
