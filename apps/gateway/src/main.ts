@@ -22,13 +22,13 @@ import createCors from "cors";
 import express from "express";
 import http from "http";
 import proxy from "express-http-proxy";
-import { metricsMiddleware } from "./metrics-middleware";
 import {
   MetricsGague,
   MetricsHistogram,
   MetricsRegistry,
   collectDefaultMetrics,
   exponentialBuckets,
+  metricsMiddleware,
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
