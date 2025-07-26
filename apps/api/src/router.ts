@@ -1,9 +1,7 @@
 import type { Character } from "@mp/game/server";
 import { systemRoles, gatewayRoles } from "@mp/game/server";
-
 import { opt } from "./options";
 import { rpc } from "./integrations/trpc";
-
 import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
 import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
