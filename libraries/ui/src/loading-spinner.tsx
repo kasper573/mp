@@ -14,11 +14,11 @@ export type LoadingSpinnerProps =
 
 export function LoadingSpinner(props: LoadingSpinnerProps) {
   const children =
-    "children" in props ? (props.children ?? <>&nbsp</>) : undefined;
+    "children" in props ? <div>{props.children ?? <>&nbsp</>}</div> : undefined;
 
   const debugId =
     "debugId" in props && showDebugIds ? (
-      <>LoadingSpinner debugId: {props.debugId}</>
+      <div>LoadingSpinner debugId: {props.debugId}</div>
     ) : undefined;
 
   return (

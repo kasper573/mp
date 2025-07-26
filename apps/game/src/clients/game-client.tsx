@@ -33,7 +33,9 @@ export function GameClient(props: GameClientProps) {
   }
 
   if (!areaId) {
-    return <LoadingSpinner>Loading area</LoadingSpinner>;
+    return (
+      <LoadingSpinner debugId="areaId-unavailable">Loading area</LoadingSpinner>
+    );
   }
 
   return (
