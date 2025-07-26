@@ -73,7 +73,7 @@ const metricsPushgateway = new Pushgateway(
   metrics,
 );
 
-const db = createDbClient(opt.databaseUrl);
+const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 logger.info(`Loading areas and actor models...`);

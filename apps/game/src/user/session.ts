@@ -6,12 +6,17 @@ export const ctxUserSession = InjectionContext.new<UserSession>("UserSession");
 
 export interface UserSession {
   id: string;
+
+  /**
+   * Set when the user is authenticated
+   */
   user?: {
     id: UserId;
     roles: ReadonlySetLike<RoleDefinition>;
   };
-  player?: {
-    characterId: CharacterId;
-    clientType: "spectator" | "player";
-  };
+
+  /**
+   * The character id that the user will be subscribing to game state patches and events for
+   */
+  characterId?: CharacterId;
 }

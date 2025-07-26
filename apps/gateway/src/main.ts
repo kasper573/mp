@@ -27,12 +27,13 @@ import {
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
 import { EventTransceiver, createEventInvoker } from "@mp/event-router";
-import { gatewayRouter } from "./router";
+import { ctxDbClient, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 
 import { createTokenResolver } from "@mp/auth/server";
 import type { Branded } from "@mp/std";
 import { createShortId } from "@mp/std";
+import { createDbClient } from "@mp/db-client";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -57,6 +58,8 @@ const webServer = express()
   .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
 const httpServer = http.createServer(webServer);
+
+const dbClient = createDbClient(opt.databaseConnectionString);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
@@ -90,10 +93,9 @@ const eventTransceiver = new EventTransceiver({
   logger,
 });
 
-const ioc = new ImmutableInjectionContainer().provide(
-  ctxTokenResolver,
-  tokenResolver,
-);
+const ioc = new ImmutableInjectionContainer()
+  .provide(ctxTokenResolver, tokenResolver)
+  .provide(ctxDbClient, dbClient);
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
@@ -160,14 +162,14 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const [clientId, socket] of gameClientSockets.entries()) {
-    const player = userSessions.get(clientId)?.player;
-    if (!player) {
+    const characterId = userSessions.get(clientId)?.characterId;
+    if (characterId === undefined) {
       // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
       continue;
     }
 
-    const patch = clientPatches.get(player.characterId);
-    const events = clientEvents.get(player.characterId);
+    const patch = clientPatches.get(characterId);
+    const events = clientEvents.get(characterId);
     if (patch || events) {
       const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
       gameStatePatchSizeHistogram.observe(encodedPatch.byteLength);

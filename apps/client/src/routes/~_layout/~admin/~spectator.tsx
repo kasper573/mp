@@ -4,7 +4,7 @@ import {
   GameAssetLoaderContext,
   ioc,
   SpectatorClient,
-  worldRoles,
+  gatewayRoles,
 } from "@mp/game/client";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
@@ -19,7 +19,7 @@ import { useGameStateClient } from "../../../integrations/game-state-client";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
-    requiredRoles: [worldRoles.spectate],
+    requiredRoles: [gatewayRoles.spectate],
   }),
 });
 

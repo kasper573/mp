@@ -2,7 +2,7 @@ import {
   characterRoles,
   npcRoles,
   systemRoles,
-  worldRoles,
+  gatewayRoles,
 } from "@mp/game/server";
 
 /**
@@ -16,7 +16,7 @@ export const playerRoles = [
   characterRoles.move,
   characterRoles.attack,
   characterRoles.respawn,
-  worldRoles.join,
+  gatewayRoles.join,
 ];
 
 export const groupedRoles = {
@@ -26,7 +26,7 @@ export const groupedRoles = {
     systemRoles.useDevTools,
     characterRoles.kill,
     npcRoles.spawnRandom,
-    worldRoles.spectate,
+    gatewayRoles.spectate,
   ],
   [playerGroup]: playerRoles,
 } satisfies Record<string, string[]>;

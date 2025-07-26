@@ -1,41 +1,41 @@
-import type { AccessToken } from "@mp/auth";
+import { and, characterTable, eq, type DbClient } from "@mp/db-client";
+import type { AccessToken, UserId } from "@mp/auth";
 import type { CharacterId } from "@mp/game/server";
 import {
   evt,
   roles,
-  worldRoles,
-  ctxGameStateLoader,
+  gatewayRoles,
   ctxTokenResolver,
   networkEventRouter,
   ctxUserSession,
 } from "@mp/game/server";
 import { ctxGameEventClient } from "@mp/game/server";
 
+import type { InjectionContainer } from "@mp/ioc";
+import { InjectionContext } from "@mp/ioc";
+
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
   gateway: evt.router({
     spectate: evt.event
-      .use(roles([worldRoles.spectate]))
+      .use(roles([gatewayRoles.spectate]))
       .input<CharacterId>()
-      .handler(({ ctx, input }) => {
+      .handler(({ ctx, input: characterId }) => {
         const session = ctx.get(ctxUserSession);
-        session.player = {
-          characterId: input,
-          clientType: "spectator",
-        };
+        session.characterId = characterId;
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
     join: evt.event
-      .use(roles([worldRoles.join]))
-      .handler(async ({ ctx, mwc }) => {
-        const loader = ctx.get(ctxGameStateLoader);
-        const char = await loader.getOrCreateCharacterForUser(mwc.user.id);
+      .use(roles([gatewayRoles.join]))
+      .input<CharacterId>()
+      .handler(async ({ ctx, input: characterId, mwc }) => {
+        if (!(await hasAccessToCharacter(ctx, mwc.user.id, characterId))) {
+          throw new Error("You do not have access to this character");
+        }
+
         const session = ctx.get(ctxUserSession);
-        session.player = {
-          characterId: char.identity.id,
-          clientType: "player",
-        };
+        session.characterId = characterId;
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
@@ -45,7 +45,7 @@ export const gatewayRouter = evt.router({
       // This allows the character to remain in the game state for a moment before removal,
       // preventing "quick disconnect" cheating, or allows for connection losses to be handled gracefully.
       const session = ctx.get(ctxUserSession);
-      delete session.player;
+      delete session.characterId;
     }),
 
     auth: evt.event.input<AccessToken>().handler(async ({ input, ctx }) => {
@@ -62,3 +62,26 @@ export const gatewayRouter = evt.router({
 });
 
 export const worldEventRouterSlice = { world: networkEventRouter };
+
+export const ctxDbClient = InjectionContext.new<DbClient>("DbClient");
+
+async function hasAccessToCharacter(
+  ctx: InjectionContainer,
+  userId: UserId,
+  characterId: CharacterId,
+) {
+  const db = ctx.get(ctxDbClient);
+  const matches = await db.$count(
+    db
+      .select()
+      .from(characterTable)
+      .where(
+        and(
+          eq(characterTable.userId, userId),
+          eq(characterTable.id, characterId),
+        ),
+      ),
+  );
+
+  return matches > 0;
+}

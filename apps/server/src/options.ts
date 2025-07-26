@@ -36,10 +36,7 @@ export const gameServiceOptionsSchema = type({
      */
     interval: msSchema,
   },
-  /**
-   * The URL to the database
-   */
-  databaseUrl: "string",
+  databaseConnectionString: "string",
   /**
    * The version of the game service
    */

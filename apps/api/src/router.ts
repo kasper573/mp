@@ -5,7 +5,7 @@ import type {
   AreaId,
   Character,
 } from "@mp/game/server";
-import { systemRoles, worldRoles } from "@mp/game/server";
+import { systemRoles, gatewayRoles } from "@mp/game/server";
 
 import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
@@ -39,7 +39,7 @@ export const apiRouter = rpc.router({
       // noop
     }),
 
-  characterList: rpc.procedure.use(roles([worldRoles.spectate])).query(() => {
+  characterList: rpc.procedure.use(roles([gatewayRoles.spectate])).query(() => {
     return {
       items: [] as Character[],
       total: 0,

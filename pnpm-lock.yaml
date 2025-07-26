@@ -293,6 +293,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
+      '@mp/db-client':
+        specifier: workspace:*
+        version: link:../../integrations/db-client
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env

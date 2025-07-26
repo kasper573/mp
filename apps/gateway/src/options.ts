@@ -31,6 +31,7 @@ export const serverOptionsSchema = type({
   trustProxy: boolish(),
   apiEndpointPath: "string",
   apiServiceUrl: "string",
+  databaseConnectionString: "string",
   auth: {
     /**
      * OIDC issuer

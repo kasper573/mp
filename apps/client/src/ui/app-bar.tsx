@@ -1,7 +1,7 @@
 import { dock } from "@mp/style";
 import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
-import { ctxAuthClient, ioc, systemRoles, worldRoles } from "@mp/game/client";
+import { ctxAuthClient, ioc, systemRoles, gatewayRoles } from "@mp/game/client";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
@@ -23,7 +23,7 @@ export default function AppBar() {
         <Link to="/admin/devtools">Dev Tools</Link>
       )}
 
-      {auth.identity.value?.roles.has(worldRoles.spectate) && (
+      {auth.identity.value?.roles.has(gatewayRoles.spectate) && (
         <Link to="/admin/spectator">Spectate</Link>
       )}
 

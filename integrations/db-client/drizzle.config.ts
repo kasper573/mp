@@ -5,6 +5,6 @@ export default {
   schema: "./src/schema.ts", // Requires the server to have been built first
   dialect: "postgresql",
   dbCredentials: {
-    url: process.env.MP_SERVER_DATABASE_URL,
+    url: process.env.MP_SERVER_DATABASE_CONNECTION_STRING,
   },
 };

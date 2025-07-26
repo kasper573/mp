@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import type { CharacterId } from "@mp/game/client";
 import { GameAssetLoaderContext, GameClient } from "@mp/game/client";
 import { LoadingSpinner } from "@mp/ui";
 import { Suspense, useEffect } from "preact/compat";
@@ -14,7 +15,7 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const [stateClient, events] = useGameStateClient();
 
-  useEffect(() => events.gateway.join(), [events]);
+  useEffect(() => events.gateway.join("0" as CharacterId), [events]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
