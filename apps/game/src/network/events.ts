@@ -8,7 +8,12 @@ export const networkEventRouter = evt.router({
   requestFullState: evt.event.handler(({ ctx }) => {
     const session = ctx.get(ctxUserSession);
     const server = ctx.get(ctxGameStateServer);
-    server.markToResendFullState(assert(session.characterId));
+    server.markToResendFullState(
+      assert(
+        session.characterId,
+        "Cannot resend full game state, user session has no character id",
+      ),
+    );
   }),
 });
 
