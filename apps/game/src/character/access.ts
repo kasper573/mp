@@ -1,22 +1,20 @@
+import type { GameEventRouterContext } from "../network/event-builder";
+import { ctxUserSession } from "../user/session";
+import type { Character, CharacterId } from "./types";
 import { ctxGameState } from "../game-state/game-state";
-import type { GameRpcContext } from "../rpc/rpc-definition";
-import { ctxClientId } from "../user/client-id";
-import { ctxClientRegistry } from "../user/client-registry";
-import type { CharacterId } from "./types";
 
-export function accessCharacter(ctx: GameRpcContext, characterId: CharacterId) {
+export function accessCharacter(
+  ctx: GameEventRouterContext,
+  characterId: CharacterId,
+): Character {
+  const session = ctx.get(ctxUserSession);
   const state = ctx.get(ctxGameState);
-  const char = state.actors.get(characterId);
-  const clientId = ctx.get(ctxClientId);
-  const clients = ctx.get(ctxClientRegistry);
-  const userId = clients.userIds.get(clientId);
-
-  if (!char || char.type !== "character") {
-    throw new Error("Character not found");
+  const character = state.actors.get(characterId) as Character | undefined;
+  if (!character) {
+    throw new Error("Unknown character");
   }
-
-  if (char.userId !== userId) {
-    throw new Error("You don't have access to this character");
+  if (session.characterId !== characterId) {
+    throw new Error("User does not have access to character");
   }
-  return char;
+  return character;
 }

@@ -23,17 +23,18 @@ import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
-import { clientViewDistance } from "../client-view-distance-settings";
+import { clientViewDistance } from "../clients/client-view-distance-settings";
+import { InjectionContext } from "@mp/ioc";
 
 export interface AreaSceneOptions {
   area: AreaResource;
-  spritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
 }
 
 export class AreaScene extends Container {
   private engine = ioc.get(ctxEngine);
   private state = ioc.get(ctxGameStateClient);
+  private areaSpritesheets = ioc.get(ctxAreaSpritesheets);
   private cleanup: () => void;
 
   constructor(private options: AreaSceneOptions) {
@@ -42,7 +43,7 @@ export class AreaScene extends Container {
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
       options.area.dynamicLayer.name,
-      createTiledTextureLookup(options.spritesheets),
+      createTiledTextureLookup(this.areaSpritesheets),
     );
 
     this.cleanup = reactiveCollectionBinding(
@@ -54,7 +55,7 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.area,
       this.state.actorList,
-      () => this.state.character.value?.coords,
+      () => this.state.character.value?.movement.coords,
       options.debugSettings,
     );
 
@@ -80,7 +81,7 @@ export class AreaScene extends Container {
     this.cameraPos = new VectorSpring(
       computed(() =>
         options.area.tiled.tileCoordToWorld(
-          this.state.character.value?.coords ?? Vector.zero(),
+          this.state.character.value?.movement.coords ?? Vector.zero(),
         ),
       ),
       () => ({
@@ -116,18 +117,20 @@ export class AreaScene extends Container {
   actorAtPointer = computed(() => {
     return this.state.actorList.value.find(
       (actor) =>
-        actor.health > 0 &&
-        actor.hitBox.offset(actor.coords).contains(this.pointerTile.value),
+        actor.combat.health > 0 &&
+        actor.combat.hitBox
+          .offset(actor.movement.coords)
+          .contains(this.pointerTile.value),
     );
   });
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    if (actor && actor?.id !== this.state.characterId.value) {
+    if (actor && actor?.identity.id !== this.state.characterId.value) {
       return {
         actor,
         type: "attack",
-        rect: actor.hitBox.offset(actor.coords),
+        rect: actor.combat.hitBox.offset(actor.movement.coords),
       };
     }
 
@@ -163,7 +166,7 @@ export class AreaScene extends Container {
       const target = this.highlightTarget.value;
       switch (target?.type) {
         case "attack":
-          void this.state.actions.attack(target.actor.id);
+          void this.state.actions.attack(target.actor.identity.id);
           break;
         case "move": {
           const portal = this.options.area
@@ -192,3 +195,6 @@ function createZoomLevelForViewDistance(
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
 }
+
+export const ctxAreaSpritesheets =
+  InjectionContext.new<TiledSpritesheetRecord>("AreaSpritesheets");

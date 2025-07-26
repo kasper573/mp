@@ -1,13 +1,12 @@
-import { useRpc } from "../integrations/rpc";
+import { useQuery } from "@mp/query";
 import { env } from "../env";
+import { useApi } from "@mp/api/sdk";
 
 export const useVersionCompatibility = () => {
-  const rpc = useRpc();
-  const serverVersion = rpc.system.buildVersion.useQuery();
+  const api = useApi();
+  const serverVersion = useQuery(api.buildVersion.queryOptions());
   if (serverVersion.data) {
-    return env.buildVersion === serverVersion.data
-      ? "compatible"
-      : "incompatible";
+    return env.version === serverVersion.data ? "compatible" : "incompatible";
   }
   return "indeterminate";
 };

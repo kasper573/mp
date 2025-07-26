@@ -6,7 +6,6 @@ import type { Signal, ReadonlySignal } from "@mp/state";
 import { computed, signal } from "@mp/state";
 import { InjectionContext } from "@mp/ioc";
 import type { GameStateEvents } from "./game-state-events";
-import { ctxGameRpcClient, type GameRpcClient } from "../rpc/game-rpc-client";
 import type { Actor } from "../actor/actor";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
@@ -16,13 +15,15 @@ import type { AreaId } from "../area/area-id";
 import type { Logger } from "@mp/logger";
 import { ioc } from "../context/ioc";
 import { ctxLogger } from "../context/common";
+import type { GameEventClient } from "../network/game-event-client";
+import { ctxGameEventClient } from "../network/game-event-client";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
   socket: WebSocket;
   settings: () => OptimisticGameStateSettings;
-  rpc?: GameRpcClient;
+  eventClient?: GameEventClient;
   logger?: Logger;
 }
 
@@ -30,19 +31,19 @@ export class GameStateClient {
   readonly eventBus = new SyncEventBus<GameStateEvents>();
   readonly actions: GameActions;
 
-  private rpc: GameRpcClient;
+  private events: GameEventClient;
   private logger: Logger;
 
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
+  readonly areaId = signal<AreaId | undefined>(undefined);
   readonly readyState: Signal<WebSocket["readyState"]>;
   readonly isConnected: ReadonlySignal<boolean>;
 
   // Derived state
   readonly actorList: ReadonlySignal<Actor[]>;
   readonly character: ReadonlySignal<Character | undefined>;
-  readonly areaId: ReadonlySignal<AreaId | undefined>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
@@ -50,14 +51,14 @@ export class GameStateClient {
       this.options.socket.readyState,
     );
     this.isConnected = computed(() => this.readyState.value === WebSocket.OPEN);
-    this.rpc = this.options.rpc ?? ioc.get(ctxGameRpcClient);
+    this.events = this.options.eventClient ?? ioc.get(ctxGameEventClient);
     this.logger = this.options.logger ?? ioc.get(ctxLogger);
 
-    this.actions = new GameActions(this.rpc, this.characterId);
+    this.actions = new GameActions(this.events, this.characterId);
 
     // We throttle because when stale patches are detected, they usually come in batches,
     // and we only want to send one request for full state.
-    this.refreshState = throttle(this.rpc.world.requestFullState, 5000);
+    this.refreshState = throttle(this.events.network.requestFullState, 5000);
 
     this.actorList = computed(() => this.gameState.actors.values().toArray());
 
@@ -67,8 +68,6 @@ export class GameStateClient {
       ) as Character | undefined;
       return char;
     });
-
-    this.areaId = computed(() => this.character.value?.areaId);
   }
 
   private refreshState: () => unknown;
@@ -80,6 +79,10 @@ export class GameStateClient {
       subscribeToReadyState(socket, (readyState) => {
         this.readyState.value = readyState;
       }),
+      this.eventBus.subscribe("area.joined", (event) => {
+        this.characterId.value = event.characterId;
+        this.areaId.value = event.areaId;
+      }),
     ];
 
     socket.addEventListener("message", this.handleMessage);
@@ -90,11 +93,6 @@ export class GameStateClient {
       }
 
       socket.removeEventListener("message", this.handleMessage);
-
-      const id = this.characterId.value;
-      if (id !== undefined) {
-        void this.rpc.world.leave(id);
-      }
     };
 
     // Return stop function so that start can be used in effect like manner.

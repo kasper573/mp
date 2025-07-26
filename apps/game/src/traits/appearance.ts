@@ -2,12 +2,17 @@ import { InjectionContext } from "@mp/ioc";
 import type { Rect } from "@mp/math";
 import type { Branded, PublicUrl, Tile } from "@mp/std";
 
-export interface AppearanceTrait {
-  color?: number; // HEX
-  opacity?: number; // 0-1
-  modelId: ActorModelId;
-  name: string;
-}
+import { defineSyncComponent } from "@mp/sync";
+
+export type AppearanceTrait = typeof AppearanceTrait.$infer;
+
+export const AppearanceTrait = defineSyncComponent((builder) =>
+  builder
+    .add<number | undefined>()("color")
+    .add<number | undefined>()("opacity")
+    .add<ActorModelId>()("modelId")
+    .add<string>()("name"),
+);
 
 export interface ActorModel {
   id: ActorModelId;

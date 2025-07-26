@@ -21,15 +21,15 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      - mp-server
+      - mp-game-service
 
-  mp-server:
+  mp-game-service:
     env_file: *env_files
     logging: *logging
     build:
-      dockerfile: ./docker/Dockerfile.mp-server
+      dockerfile: ./docker/Dockerfile.mp-game-service
       context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-server:${DOCKER_IMAGE_VERSION:-latest}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
     healthcheck:
@@ -48,7 +48,7 @@ services:
     logging: *logging
     build:
       dockerfile: ../../docker/Dockerfile.mp-migrations
-      context: ../apps/server
+      context: ../integrations/db-client
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
     depends_on:
@@ -67,6 +67,18 @@ services:
       - ./keycloak/import:/opt/keycloak/data/import
     depends_on:
       postgres:
+        condition: service_healthy
+
+  keycloak-provision:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.keycloak-provision
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/keycloak-provision:${DOCKER_IMAGE_VERSION:-latest}
+    profiles: ["prod", "test"]
+    depends_on:
+      keycloak-healthcheck:
         condition: service_healthy
 
   # the keycloak image dosen't have curl so we healthcheck it externally
@@ -110,6 +122,10 @@ services:
       - ./grafana/mimir.yaml:/etc/mimir/config.yaml
       - mimir-data:/data
     entrypoint: ["/bin/mimir", "-config.file=/etc/mimir/config.yaml"]
+
+  pushgateway:
+    image: prom/pushgateway:v1.11.1
+    container_name: pushgateway
 
   tempo:
     env_file: *env_files
@@ -179,7 +195,8 @@ services:
       - "443:443"
       - "443:443/udp"
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile
+      - ./caddy/public:/srv/mp-public
       - caddy-data:/data
       - caddy-config:/config
 

@@ -1,14 +1,13 @@
-import type { Branded, MinimalInput, Tile, TimesPerSecond } from "@mp/std";
-import type { CardinalDirection, Path, Rect, Vector } from "@mp/math";
-import { collect, SyncEntity } from "@mp/sync";
-import type { TimeSpan } from "@mp/time";
-import type { MovementTrait } from "../traits/movement";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import type { Path, Vector } from "@mp/math";
+import type { SyncComponent } from "@mp/sync";
+import { defineSyncComponent } from "@mp/sync";
+
+import { MovementTrait } from "../traits/movement";
 import type { ActorModelId } from "../traits/appearance";
-import type { AppearanceTrait } from "../traits/appearance";
-import type { CombatTrait } from "../traits/combat";
-import type { AreaId } from "../area/area-id";
-import * as patchOptimizers from "../rpc/patch-optimizers";
-import type { ActorId } from "../actor/actor";
+import { AppearanceTrait } from "../traits/appearance";
+import { CombatTrait } from "../traits/combat";
+
 import { computed } from "@mp/state";
 
 export type NpcType = (typeof npcTypes)[number];
@@ -58,7 +57,6 @@ export type NpcSpawnId = Branded<string, "NpcSpawnId">;
 export interface NpcSpawn {
   id: NpcSpawnId;
   count: number;
-  areaId: AreaId;
   npcId: NpcId;
   coords?: Vector<Tile>;
   randomRadius?: number;
@@ -72,98 +70,56 @@ export interface NpcSpawn {
 
 export type NpcId = Branded<string, "NPCId">;
 
+export interface NpcInstanceInit {
+  identity: NpcInstanceIdentity;
+  appearance: AppearanceTrait;
+  movement: MovementTrait;
+  combat: CombatTrait;
+  etc: NpcEtc;
+}
+
+export type NpcInstanceIdentity = typeof NpcInstanceIdentity.$infer;
+
+const NpcInstanceIdentity = defineSyncComponent((builder) =>
+  builder
+    .add<NpcInstanceId>()("id")
+    .add<NpcId>()("npcId")
+    .add<NpcSpawnId>()("spawnId")
+    .add<NpcType>()("npcType"),
+);
+
+export type NpcEtc = typeof NpcEtc.$infer;
+
+const NpcEtc = defineSyncComponent((builder) =>
+  builder
+    .add<number>()("xpReward")
+    .add<Tile>()("aggroRange")
+    .add<Path<Tile> | undefined>()("patrol"),
+);
+
+export const NpcInstanceCommons = defineSyncComponent((builder) => builder);
+
 /**
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-export class NpcInstance
-  extends SyncEntity
-  implements Omit<Npc, "id">, MovementTrait, AppearanceTrait, CombatTrait
-{
-  @collect()
-  accessor type = "npc" as const;
-  @collect()
-  accessor id: NpcInstanceId;
-  @collect()
-  accessor npcId: NpcId;
-  @collect()
-  accessor spawnId: NpcSpawnId;
-  @collect()
-  accessor patrol: Path<Tile> | undefined;
-  @collect()
-  accessor modelId: ActorModelId;
-  @collect()
-  accessor name: string;
-  @collect()
-  accessor speed: Tile;
-  @collect()
-  accessor maxHealth: number;
-  @collect()
-  accessor attackDamage: number;
-  @collect()
-  accessor attackSpeed: TimesPerSecond;
-  @collect()
-  accessor attackRange: Tile;
-  @collect()
-  accessor npcType: NpcType;
-  @collect()
-  accessor aggroRange: Tile;
-  @collect()
-  accessor xpReward: number;
-  @collect(patchOptimizers.coords)
-  accessor coords: Vector<Tile>;
-  @collect()
-  accessor areaId: AreaId;
-  @collect()
-  accessor moveTarget: Vector<Tile> | undefined;
-  @collect(patchOptimizers.path)
-  accessor path: Path<Tile> | undefined;
-  @collect()
-  accessor dir: CardinalDirection;
-  @collect()
-  accessor color: number | undefined;
-  @collect()
-  accessor opacity: number | undefined;
-  @collect()
-  accessor hitBox: Rect<Tile>;
-  @collect()
-  accessor health: number;
-  @collect()
-  accessor attackTargetId: ActorId | undefined;
-  @collect()
-  accessor lastAttack: TimeSpan | undefined;
+export class NpcInstance extends NpcInstanceCommons {
+  readonly type = "npc" as const;
+  readonly identity: SyncComponent<NpcInstanceIdentity>;
+  readonly appearance: SyncComponent<AppearanceTrait>;
+  readonly movement: SyncComponent<MovementTrait>;
+  readonly combat: SyncComponent<CombatTrait>;
+  readonly etc: SyncComponent<NpcEtc>;
 
-  alive = computed(() => this.health > 0);
+  alive = computed(() => this.combat.health > 0);
 
-  constructor(
-    data: Omit<MinimalInput<NpcInstance>, "type" | "alive" | keyof SyncEntity>,
-  ) {
-    super();
-    this.id = data.id;
-    this.npcId = data.npcId;
-    this.spawnId = data.spawnId;
-    this.patrol = data.patrol;
-    this.modelId = data.modelId;
-    this.name = data.name;
-    this.speed = data.speed;
-    this.maxHealth = data.maxHealth;
-    this.attackDamage = data.attackDamage;
-    this.attackSpeed = data.attackSpeed;
-    this.attackRange = data.attackRange;
-    this.npcType = data.npcType;
-    this.aggroRange = data.aggroRange;
-    this.xpReward = data.xpReward;
-    this.coords = data.coords;
-    this.areaId = data.areaId;
-    this.moveTarget = data.moveTarget;
-    this.path = data.path;
-    this.dir = data.dir;
-    this.color = data.color;
-    this.opacity = data.opacity;
-    this.hitBox = data.hitBox;
-    this.health = data.health;
-    this.attackTargetId = data.attackTargetId;
-    this.lastAttack = data.lastAttack;
+  constructor(init: NpcInstanceInit) {
+    super({});
+    this.identity = new NpcInstanceIdentity(init.identity);
+    this.appearance = new AppearanceTrait(init.appearance);
+    this.movement = new MovementTrait(init.movement);
+    this.combat = new CombatTrait(init.combat);
+    this.etc = new NpcEtc(init.etc);
   }
 }
 

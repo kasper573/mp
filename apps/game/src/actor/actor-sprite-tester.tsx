@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import { Container, Text } from "@mp/graphics";
 import {
   cardinalDirectionAngles,
@@ -16,40 +16,28 @@ import {
   type ActorAnimationName,
 } from "../traits/appearance";
 import { ioc } from "../context/ioc";
-import { ctxGameRpcClient } from "../rpc/game-rpc-client";
+
 import { ctxEngine } from "../context/common";
 import { ActorSprite } from "./actor-sprite";
-import {
-  ctxActorSpritesheetLookup,
-  loadActorSpritesheets,
-} from "./actor-spritesheet-lookup";
+import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
+import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
+import { useObjectSignal } from "../use-object-signal";
+import type { Signal } from "@mp/state";
 
-export function ActorSpriteTester() {
-  const rpc = ioc.get(ctxGameRpcClient);
-  const { data: spritesheets } = rpc.area.actorSpritesheetUrls.useSuspenseQuery(
-    {
-      input: void 0,
-      map: loadActorSpritesheets,
-    },
-  );
-
+export function ActorSpriteTester({
+  spritesheets,
+}: {
+  spritesheets: ActorSpritesheetLookup;
+}) {
   const allModelIds = Array.from(spritesheets.keys());
-
   const animationName = useSignal<ActorAnimationName>("walk-normal");
   const modelId = useSignal<ActorModelId>(allModelIds[0]);
 
-  useEffect(
-    () => ioc.register(ctxActorSpritesheetLookup, spritesheets),
-    [spritesheets],
-  );
-
-  const settings = useCallback(
-    () => ({
-      animationName: animationName.value,
-      modelId: modelId.value,
-    }),
-    [modelId, animationName],
-  );
+  const settings = useObjectSignal({
+    animationName: animationName.value,
+    modelId: modelId.value,
+    spritesheets,
+  });
 
   return (
     <>
@@ -62,7 +50,13 @@ export function ActorSpriteTester() {
   );
 }
 
-function PixiApp({ settings }: { settings: () => ActorTestSettings }) {
+function PixiApp({
+  settings,
+}: {
+  settings: Signal<
+    ActorTestSettings & { spritesheets: ActorSpritesheetLookup }
+  >;
+}) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const appSignal = useGraphics(container);
 
@@ -73,8 +67,12 @@ function PixiApp({ settings }: { settings: () => ActorTestSettings }) {
     }
 
     const engine = new Engine(app.canvas);
-    const subs = [engine.start(true), ioc.register(ctxEngine, engine)];
-    app.stage.addChild(new ActorSpriteList(settings));
+    const subs = [
+      engine.start(true),
+      ioc.register(ctxEngine, engine),
+      ioc.register(ctxActorSpritesheetLookup, settings.value.spritesheets),
+    ];
+    app.stage.addChild(new ActorSpriteList(settings.value));
 
     return function cleanup() {
       app.stage.removeChildren();
@@ -101,13 +99,13 @@ const styles = {
 } satisfies Record<string, CSSProperties>;
 
 class ActorSpriteList extends Container {
-  constructor(options: () => ActorTestSettings) {
+  constructor(options: ActorTestSettings) {
     super();
 
     Object.entries(cardinalDirectionAngles).forEach(([name, angle], index) => {
       this.addChild(
         new SpecificActorAngle(() => ({
-          ...options(),
+          ...options,
           angle: angle,
           name: name,
           pos: new Vector(0, index * 64),
@@ -153,10 +151,7 @@ class SpecificActorAngle extends Container {
   #onRender = () => {
     const { modelId, angle, name, pos, anchor, animationName } = this.options();
 
-    const spritesheets = ioc
-      .access(ctxActorSpritesheetLookup)
-      .unwrapOr(undefined)
-      ?.get(modelId);
+    const spritesheets = ioc.get(ctxActorSpritesheetLookup)?.get(modelId);
 
     if (spritesheets) {
       this.sprite.spritesheets = spritesheets;
@@ -177,18 +172,18 @@ class SpecificActorAngle extends Container {
 }
 
 class LookAtPointerActor extends SpecificActorAngle {
-  constructor(options: () => ActorTestSettings) {
+  constructor(options: ActorTestSettings) {
     super(() => {
       const engine = ioc.get(ctxEngine);
       const { x, y } = engine.camera.cameraSize.value;
       const center = new Vector(x / 2, y / 2);
       const angle = center.angle(engine.pointer.position.value);
       return {
-        ...options(),
+        ...options,
         angle,
         pos: center,
         anchor: new Vector(0.5, 0.5),
-        animationName: options().animationName,
+        animationName: options.animationName,
       };
     });
   }

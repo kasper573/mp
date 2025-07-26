@@ -1,100 +1,46 @@
-import path from "node:path";
 import { TimeSpan } from "@mp/time";
-import { authAlgorithms } from "@mp/auth/server";
-import { boolish, csv, numeric, type } from "@mp/validate";
+import { boolish, numeric, type } from "@mp/validate";
 import { assertEnv } from "@mp/env";
 
-export type ServerOptions = typeof serverOptionsSchema.infer;
-
-const pathSchema = type("string").pipe((p) => p && path.resolve(p));
+export type GameServiceOptions = typeof gameServiceOptionsSchema.infer;
 
 const msSchema = numeric().pipe((str) => TimeSpan.fromMilliseconds(str));
 
-export const serverOptionsSchema = type({
+export const gameServiceOptionsSchema = type({
   /**
-   * If provided, serves the client from this directory. Otherwise, assumes the client is served as a separate app.
+   * The id ofthe area that this game service instance will handle.
    */
-  "clientDir?": pathSchema,
+  areaId: type("string").brand("AreaId"),
   /**
-   * The directory to serve static files from
+   * The URL to the gateway WebSocket server.
    */
-  publicDir: pathSchema,
+  gatewayWssUrl: "string",
   /**
-   * The relative path after the hostname where the public dir will be exposed
+   * The URL to the API service
    */
-  publicPath: "string",
+  apiServiceUrl: "string",
   /**
-   * The max age of files served from the public directory in seconds
-   */
-  publicMaxAge: numeric(),
-  /**
-   * Whether to trust the X-Forwarded-For header
-   */
-  trustProxy: boolish(),
-  /**
-   * The port to listen on
-   */
-  port: numeric(),
-  /**
-   * Used for generating publicly accessible URLs to the HTTP server
-   */
-  httpBaseUrl: "string",
-  /**
-   * The relative path to expose the WS endpoint on
-   */
-  wsEndpointPath: "string",
-  /**
-   * The hostname for the server to listen on
-   */
-  hostname: "string",
-  /**
-   * The CORS origin to allow
-   */
-  corsOrigin: "string",
-
-  auth: {
-    /**
-     * OIDC issuer
-     */
-    issuer: "string",
-    /**
-     * OIDC audience
-     */
-    audience: "string",
-    /**
-     * OIDC JWKS URI
-     */
-    jwksUri: "string",
-    /**
-     * OIDC JWT algorithms
-     */
-    algorithms: csv(type.enumerated(...authAlgorithms)),
-    /**
-     * Allow bypassing JWT verification using fake tokens.
-     * Used by load test to automatically sign in as a new user and character.
-     */
-    allowBypassUsers: boolish(),
-  },
-  /**
-   * The server tick interval in milliseconds
+   * The server tick interval
    */
   tickInterval: msSchema,
   /**
-   * How often (in milliseconds) to save the game state to the database
+   * Options for prom-client Pushgateway
    */
-  persistInterval: msSchema,
+  metricsPushgateway: {
+    /**
+     * The URL to the metrics push gateway
+     */
+    url: "string",
+    /**
+     * How often to push metrics to the push gateway
+     */
+    interval: msSchema,
+  },
+  databaseConnectionString: "string",
   /**
-   * The URL to the database
+   * The version of the game service
    */
-  databaseUrl: "string",
-  /**
-   * The version of the build
-   */
-  buildVersion: "string",
-  /**
-   * Whether to expose detailed error information to clients
-   */
-  exposeErrorDetails: boolish(),
+  version: "string",
   /**
    * Whether to enable rate limiting
    */
@@ -115,6 +61,10 @@ export const serverOptionsSchema = type({
    * Whether to use pretty logging format.
    */
   prettyLogs: boolish(),
-});
+}).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(serverOptionsSchema, process.env, "MP_SERVER_");
+export const opt = assertEnv(
+  gameServiceOptionsSchema,
+  process.env,
+  "MP_SERVER_",
+);

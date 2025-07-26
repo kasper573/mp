@@ -1,0 +1,41 @@
+{
+  "name": "@mp/api",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sdk": {
+      "types": "./src/sdk.ts",
+      "import": "./src/sdk.ts",
+      "require": "./src/sdk.ts"
+    }
+  },
+  "scripts": {
+    "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
+    "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/auth": "workspace:*",
+    "@mp/env": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/game": "workspace:*",
+    "@mp/telemetry": "workspace:*",
+    "@mp/db-client": "workspace:*",
+    "@mp/ioc": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/rate-limiter": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/validate": "workspace:*",
+    "@trpc/client": "11.4.3",
+    "@trpc/server": "11.4.3",
+    "@trpc/tanstack-react-query": "11.4.3",
+    "dotenv": "catalog:",
+    "superjson": "2.2.2"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "tsx": "catalog:"
+  }
+}

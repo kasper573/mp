@@ -1,0 +1,24 @@
+{
+  "name": "@mp/keycloak-client",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "build": "tsc && tsx esbuild.ts",
+    "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/provision.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/std": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/game": "workspace:*",
+    "@keycloak/keycloak-admin-client": "26.1.2"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@mp/tsconfig": "workspace:*",
+    "builtin-modules": "catalog:",
+    "esbuild": "catalog:"
+  }
+}

@@ -6,7 +6,6 @@ import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import { InjectionContext } from "@mp/ioc";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
 import type { AreaResource } from "../area/area-resource";
 import type { ActorModelLookup } from "../traits/appearance";
 import { NpcInstance } from "./types";
@@ -14,7 +13,7 @@ import type { Npc, NpcType, NpcInstanceId, NpcSpawn } from "./types";
 
 export class NpcSpawner {
   constructor(
-    private readonly areas: AreaLookup,
+    private readonly area: AreaResource,
     private readonly models: ActorModelLookup,
     public readonly options: Array<{ spawn: NpcSpawn; npc: Npc }>,
     private readonly rng: Rng,
@@ -30,14 +29,14 @@ export class NpcSpawner {
         type: "npc",
         alive: false,
       })) {
-        let cleanupTime = corpseCleanupTimers.get(actor.id);
+        let cleanupTime = corpseCleanupTimers.get(actor.identity.id);
         if (!cleanupTime) {
           cleanupTime = totalTimeElapsed.add(corpseDuration);
-          corpseCleanupTimers.set(actor.id, cleanupTime);
+          corpseCleanupTimers.set(actor.identity.id, cleanupTime);
         }
         if (totalTimeElapsed.compareTo(cleanupTime) >= 0) {
-          state.actors.delete(actor.id);
-          corpseCleanupTimers.delete(actor.id);
+          state.actors.delete(actor.identity.id);
+          corpseCleanupTimers.delete(actor.identity.id);
         }
       }
 
@@ -49,7 +48,7 @@ export class NpcSpawner {
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {
           const instance = this.createInstance(npc, spawn);
-          state.actors.set(instance.id, instance);
+          state.actors.set(instance.identity.id, instance);
         }
       }
     };
@@ -58,22 +57,45 @@ export class NpcSpawner {
   createInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
     const id = createShortId() as NpcInstanceId;
     const model = assert(this.models.get(npc.modelId));
-    const area = assert(this.areas.get(spawn.areaId));
-    const coords = determineSpawnCoords(spawn, area, this.rng);
+    const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
+
     return new NpcInstance({
-      ...npc,
-      id,
-      npcId: npc.id,
-      spawnId: spawn.id,
-      areaId: spawn.areaId,
-      coords,
-      npcType,
-      color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
-      hitBox: model.hitBox,
-      dir: this.rng.oneOf(cardinalDirections),
-      health: npc.maxHealth,
-      patrol: spawn.patrol ?? undefined,
+      identity: {
+        id,
+        npcId: npc.id,
+        spawnId: spawn.id,
+        npcType,
+      },
+      appearance: {
+        modelId: npc.modelId,
+        name: npc.name,
+        color: npcTypeColorIndication[npcType], // Hard coded to enemy color for now
+        opacity: undefined,
+      },
+      combat: {
+        hitBox: model.hitBox,
+        attackDamage: npc.attackDamage,
+        attackRange: npc.attackRange,
+        attackSpeed: npc.attackSpeed,
+        health: npc.maxHealth,
+        maxHealth: npc.maxHealth,
+        attackTargetId: undefined,
+        lastAttack: undefined,
+      },
+      etc: {
+        xpReward: npc.xpReward,
+        patrol: spawn.patrol ?? undefined,
+        aggroRange: npc.aggroRange,
+      },
+      movement: {
+        coords,
+        speed: npc.speed,
+        dir: this.rng.oneOf(cardinalDirections),
+        desiredPortalId: undefined,
+        moveTarget: undefined,
+        path: undefined,
+      },
     });
   }
 }

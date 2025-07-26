@@ -1,42 +1,25 @@
 import type { CheckboxState } from "@mp/ui";
-import { Button, Checkbox } from "@mp/ui";
-import { ctxGameStateClient, ioc } from "@mp/game/client";
-import { assert } from "@mp/std";
+import { Checkbox } from "@mp/ui";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { PropertySignal, StorageSignal } from "@mp/state";
-import { useRpc } from "../integrations/rpc";
+
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { useEffect } from "preact/hooks";
-import { useQuery } from "@mp/rpc/react";
+import { useMutation, useQuery } from "@mp/query";
+import { useApi, useApiClient } from "@mp/api/sdk";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
 export function MiscDebugUi() {
-  const rpc = useRpc();
+  const api = useApi();
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
 
-  const serverVersion = rpc.system.buildVersion.useQuery();
-  const gameState = ioc.get(ctxGameStateClient);
-
+  const serverVersion = useQuery(api.buildVersion.queryOptions());
   return (
     <>
-      <div>Client version: {env.buildVersion}</div>
+      <div>Client version: {env.version}</div>
       <div>Server version: {serverVersion.data ?? "unknown"}</div>
-      <div>
-        <Button onClick={() => void rpc.npc.spawnRandomNpc()}>
-          Spawn random NPC
-        </Button>
-        <Button
-          onClick={() =>
-            void rpc.character.kill({
-              targetId: assert(gameState.characterId.value),
-            })
-          }
-        >
-          Die
-        </Button>
-      </div>
       <label>
         Show ping <Checkbox signal={pingEnabledSignal} />{" "}
         {pingEnabledSignal.value ? <PingIndicator /> : null}
@@ -65,12 +48,12 @@ export function MiscDebugUi() {
 }
 
 function PingIndicator() {
-  const rpc = useRpc();
+  const api = useApiClient();
   const ping = useQuery({
     queryKey: ["ping"],
     async queryFn() {
       const start = performance.now();
-      await rpc.system.ping();
+      await api.ping.query();
       return performance.now() - start;
     },
     refetchInterval: 1000,
@@ -81,13 +64,16 @@ function PingIndicator() {
 }
 
 function useServerPatchOptimizerSignal() {
-  const rpc = useRpc();
+  const api = useApi();
   const enabled = useSignal<CheckboxState>("indeterminate");
-  const isRemoteEnabled = rpc.system.isPatchOptimizerEnabled.useQuery();
+  const isRemoteEnabled = useQuery(api.isPatchOptimizerEnabled.queryOptions());
+  const setRemoteEnabled = useMutation(
+    api.setPatchOptimizerEnabled.mutationOptions(),
+  );
 
   useSignalEffect(() => {
     if (enabled.value !== "indeterminate") {
-      void rpc.system.setPatchOptimizerEnabled(enabled.value);
+      setRemoteEnabled.mutate(enabled.value);
     }
   });
 

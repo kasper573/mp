@@ -11,11 +11,11 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 - graphics: [pixi.js](https://pixijs.com/)
 - maps: [tiled](https://www.mapeditor.org/) (+custom
-  [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
+  [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
 - ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))
+- network: [ws](https://www.npmjs.com/package/ws), [trpc](https://trpc.io/), [custom sync lib](libraries/sync)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
 
@@ -71,8 +71,8 @@ Local development is done using node and docker compose.
   > on which browser you are using.
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.17.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `pnpm -F server devenv db push` to initialize your database
-- Run `pnpm -F server devenv provision` to provision keycloak roles
+- Run `pnpm -F db-client devenv push` to initialize your database
+- Run `pnpm -F keycloak-client devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
 ### Before each development session
@@ -88,7 +88,7 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
 
-Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
+Run its cli against the development environment using `pnpm -F db-client devenv <drizzle-kit command>`.
 
 ### If you change user roles
 
@@ -140,17 +140,21 @@ These are the workspaces, in order:
 
 ### apps
 
-Compositions of packages. Often has deployable artifacts, but is not required to. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
+Deployable executables. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
 The apps are responsible for bundling.
 
-### packages
+### integrations
+
+Integrations between apps, ie. sdks for communicating with services, like a database client or websocket client abstraction. May not directly depend on application code via import, but may loosely couple with apps via protocol (ie. http requests).
+
+### libraries
 
 Generic and low level systems.
 
 Should be highly configurable and modular.
 
-Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many packages will have to depend on really core stuff like [@mp/std](/packages/std) and [@mp/time](/packages/time), but in general you should decouple packages and instead compose them together inside an app.
+Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many libraries will have to depend on really core stuff like [@mp/std](/libraries/std) and [@mp/time](/libraries/time), but in general you should decouple packages and instead compose them together inside an app.
 
 Does not need to handle bundling, package.json may directly export untranspiled code, ie. typescript.
 

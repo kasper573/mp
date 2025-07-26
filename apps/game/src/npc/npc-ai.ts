@@ -2,7 +2,6 @@ import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
 import { assert, type Rng } from "@mp/std";
 import type { GameState } from "../game-state/game-state";
-import type { AreaLookup } from "../area/lookup";
 import type { ActorId } from "../actor/actor";
 import type { GameStateServer } from "../game-state/game-state-server";
 import type { NpcInstance, NpcInstanceId } from "./types";
@@ -18,6 +17,7 @@ import {
 } from "./ai-tasks/hunt";
 import { createWanderTask } from "./ai-tasks/wander";
 import { createPatrolTask } from "./ai-tasks/patrol";
+import type { AreaResource } from "../area/area-resource";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task>();
@@ -26,14 +26,14 @@ export class NpcAi {
   constructor(
     private gameState: GameState,
     private gameStateServer: GameStateServer,
-    private areas: AreaLookup,
+    private area: AreaResource,
     private rng: Rng,
   ) {}
 
   createTickHandler(): TickEventHandler {
     return (tick) => {
       const context: NpcAiTaskContext = {
-        areas: this.areas,
+        area: this.area,
         gameState: this.gameState,
         gameStateServer: this.gameStateServer,
         npcCombatMemories: this.combatMemories,
@@ -48,10 +48,11 @@ export class NpcAi {
         this.observeAttacksDoneThisTick(subject);
 
         const task =
-          this.npcTasks.get(subject.id) ?? this.deriveTask(subject, tick);
+          this.npcTasks.get(subject.identity.id) ??
+          this.deriveTask(subject, tick);
 
         const nextTask = task(context, subject);
-        this.npcTasks.set(subject.id, nextTask);
+        this.npcTasks.set(subject.identity.id, nextTask);
       }
 
       this.removeExpiredCombats();
@@ -63,18 +64,18 @@ export class NpcAi {
       const canSeeCombatants = [attack.actorId, attack.targetId].some(
         (combatantId) => {
           const combatant = assert(this.gameState.actors.get(combatantId));
-          return observer.coords.isWithinDistance(
-            combatant.coords,
-            observer.aggroRange,
+          return observer.movement.coords.isWithinDistance(
+            combatant.movement.coords,
+            observer.etc.aggroRange,
           );
         },
       );
 
       if (canSeeCombatants) {
-        let memory = this.combatMemories.get(observer.id);
+        let memory = this.combatMemories.get(observer.identity.id);
         if (!memory) {
           memory = new NpcAiCombatMemory();
-          this.combatMemories.set(observer.id, memory);
+          this.combatMemories.set(observer.identity.id, memory);
         }
         memory.observeAttack(attack.actorId, attack.targetId);
       }
@@ -91,16 +92,16 @@ export class NpcAi {
   }
 
   deriveTask = (npc: NpcInstance, tick: TickEvent): Task => {
-    switch (npc.npcType) {
+    switch (npc.identity.npcType) {
       case "static":
         return createIdleTask();
       case "patrol":
-        if (!npc.patrol) {
+        if (!npc.etc.patrol) {
           throw new Error(
-            `NPC instance "${npc.id}" of type "patrol" does not have a patrol path defined.`,
+            `NPC instance "${npc.identity.id}" of type "patrol" does not have a patrol path defined.`,
           );
         }
-        return createPatrolTask(npc.patrol);
+        return createPatrolTask(npc.etc.patrol);
       case "pacifist":
         return this.idleOrWander(tick);
       case "aggressive":

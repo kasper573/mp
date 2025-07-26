@@ -1,37 +1,40 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { GameStateClient, PlayerClient } from "@mp/game/client";
-import { useContext, useEffect, useMemo } from "preact/hooks";
+import { GameAssetLoaderContext, GameClient } from "@mp/game/client";
 import { LoadingSpinner } from "@mp/ui";
-import { Suspense } from "preact/compat";
-import { SocketContext } from "../../integrations/rpc";
+import { Suspense, useEffect } from "preact/compat";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
-import { miscDebugSettings } from "../../signals/misc-debug-ui-settings";
+import { useGameAssets } from "../../integrations/assets";
+import { useGameStateClient } from "../../integrations/game-state-client";
+import { useApiClient } from "@mp/api/sdk";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
 });
 
 function PlayPage() {
-  const socket = useContext(SocketContext);
-  const stateClient = useMemo(
-    () =>
-      new GameStateClient({ socket, settings: () => miscDebugSettings.value }),
-    [socket],
-  );
+  const [stateClient, events] = useGameStateClient();
+  const api = useApiClient();
 
-  useEffect(() => stateClient.start(), [stateClient]);
+  useEffect(() => {
+    // Temporary solution until we have a proper character selection UI
+    void api.myCharacterId.query().then((id) => {
+      events.gateway.join(id);
+    });
+  }, [events, api]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-      <PlayerClient
-        stateClient={stateClient}
-        additionalDebugUi={<MiscDebugUi />}
-        interactive
-      />
+      <GameAssetLoaderContext.Provider value={useGameAssets}>
+        <GameClient
+          stateClient={stateClient}
+          additionalDebugUi={<MiscDebugUi />}
+          interactive
+        />
+      </GameAssetLoaderContext.Provider>
     </Suspense>
   );
 }

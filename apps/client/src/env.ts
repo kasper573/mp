@@ -4,9 +4,10 @@ import { csv, numeric, type } from "@mp/validate";
 export type ClientEnv = typeof clientEnvSchema.infer;
 
 const clientEnvSchema = type({
-  wsUrl: "string",
-  buildVersion: "string",
-  retryRpcQueries: numeric().default(0),
+  gameServiceUrl: "string",
+  apiUrl: "string",
+  version: "string",
+  retryApiQueries: numeric().default(0),
   auth: {
     authority: "string",
     audience: "string",

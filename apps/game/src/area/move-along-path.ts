@@ -1,29 +1,29 @@
 import { Vector } from "@mp/math";
 import type { TimeSpan } from "@mp/time";
-import type { Actor } from "../actor/actor";
 import type { Tile } from "@mp/std";
+import type { MovementTrait } from "../traits/movement";
 
 /**
- * Mutates the given actor so that it walks along its current path.
+ * Mutates the given target so that it walks along its current path.
  * The distance moved will be derived from its current speed and the given time delta.
  */
-export function moveAlongPath(actor: Actor, delta: TimeSpan): void {
-  let distanceToMove = actor.speed * delta.totalSeconds;
-  if (!distanceToMove || !actor.path) {
+export function moveAlongPath(target: MovementTrait, delta: TimeSpan): void {
+  let distanceToMove = target.speed * delta.totalSeconds;
+  if (!distanceToMove || !target.path) {
     return;
   }
 
-  if (!actor.path.length) {
-    actor.path = undefined;
+  if (!target.path.length) {
+    target.path = undefined;
     return;
   }
 
-  const newCoords = { x: actor.coords.x, y: actor.coords.y };
+  const newCoords = { x: target.coords.x, y: target.coords.y };
 
   let pathIndex = 0;
-  let lastIndex = actor.path.length - 1;
+  let lastIndex = target.path.length - 1;
   while (pathIndex <= lastIndex && distanceToMove > 0) {
-    const destination = actor.path[pathIndex];
+    const destination = target.path[pathIndex];
     const distanceToDestination = destination.distance(newCoords);
 
     if (distanceToMove > distanceToDestination) {
@@ -42,10 +42,10 @@ export function moveAlongPath(actor: Actor, delta: TimeSpan): void {
     }
   }
 
-  actor.coords = Vector.from(newCoords);
+  target.coords = Vector.from(newCoords);
   if (pathIndex > lastIndex) {
-    actor.path = undefined;
+    target.path = undefined;
   } else if (pathIndex > 0) {
-    actor.path = actor.path.slice(pathIndex);
+    target.path = target.path.slice(pathIndex);
   }
 }

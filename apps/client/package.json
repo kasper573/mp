@@ -10,17 +10,20 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- "
   },
   "dependencies": {
+    "@mp/api": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",
+    "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/gateway": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/rpc": "workspace:*",
-    "@mp/server": "workspace:*",
+    "@mp/query": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/telemetry": "workspace:*",
+    "@mp/tiled-renderer": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
@@ -29,7 +32,6 @@
     "preact": "catalog:"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-decorators": "catalog:",
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@tanstack/router-plugin": "1.126.2",

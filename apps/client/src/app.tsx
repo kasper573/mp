@@ -5,7 +5,6 @@ import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   ctxAuthClient,
-  ctxGameRpcClient,
   ctxLogger,
   ioc,
   registerEncoderExtensions,
@@ -14,17 +13,12 @@ import {
   QueryClient,
   QueryClientProvider,
   ReactQueryDevtools,
-} from "@mp/rpc/react";
-import { createWebSocket } from "@mp/ws/client";
+} from "@mp/query";
 import { useEffect, useMemo } from "preact/hooks";
 import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
-import {
-  createRpcClient,
-  RpcClientContext,
-  SocketContext,
-} from "./integrations/rpc";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
+import { ApiProvider, createApiClient } from "@mp/api/sdk";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -44,17 +38,15 @@ export default function App() {
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
-        <SocketContext.Provider value={systems.socket}>
-          <RpcClientContext.Provider value={systems.rpc}>
-            <RouterProvider router={systems.router} />
-            {showDevTools && (
-              <>
-                <TanStackRouterDevtools router={systems.router} />
-                <ReactQueryDevtools client={systems.query} />
-              </>
-            )}
-          </RpcClientContext.Provider>
-        </SocketContext.Provider>
+        <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
+          <RouterProvider router={systems.router} />
+          {showDevTools && (
+            <>
+              <TanStackRouterDevtools router={systems.router} />
+              <ReactQueryDevtools client={systems.query} />
+            </>
+          )}
+        </ApiProvider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
@@ -62,20 +54,15 @@ export default function App() {
 
 function createSystems() {
   const logger = createConsoleLogger();
-  const socket = createWebSocket(env.wsUrl);
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
   const faro = createFaroClient();
-  const [rpc, initializeRpc] = createRpcClient(
-    socket,
-    logger,
-    () => auth.identity.value?.token,
-  );
+  const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const query = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: env.retryRpcQueries,
+        retry: env.retryApiQueries,
         refetchOnWindowFocus: false,
       },
     },
@@ -83,18 +70,15 @@ function createSystems() {
 
   function initialize() {
     void auth.refresh();
-    socket.addEventListener("error", (e) => logger.error(e, "Socket error"));
+
     const subscriptions = [
       auth.initialize(),
-      ioc.register(ctxGameRpcClient, rpc),
       ioc.register(ctxAuthClient, auth),
       ioc.register(ctxLogger, logger),
-      initializeRpc(),
       createFaroBindings(faro, auth.identity),
     ];
 
     return () => {
-      socket.close();
       for (const unsubscribe of subscriptions) {
         unsubscribe();
       }
@@ -103,8 +87,7 @@ function createSystems() {
 
   return {
     auth,
-    rpc,
-    socket,
+    api,
     logger,
     router,
     faro,
