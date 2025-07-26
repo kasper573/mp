@@ -9,6 +9,7 @@ export {
   linearBuckets,
   Pushgateway,
   type PrometheusContentType,
+  register as metricsRegister,
 } from "prom-client";
 
 /**

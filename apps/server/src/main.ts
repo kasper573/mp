@@ -2,7 +2,11 @@ import "dotenv/config";
 
 import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
-import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
+import {
+  collectDefaultMetrics,
+  metricsRegister,
+  Pushgateway,
+} from "@mp/telemetry/prom";
 import { WebSocket } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
@@ -54,6 +58,8 @@ import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/game-stat
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
+
+metricsRegister.setDefaultLabels({ areaId: opt.areaId });
 
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger(opt.prettyLogs);
@@ -166,10 +172,6 @@ updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 startGameStateDbSync(db, area, gameState, gameStateServer);
 updateTicker.start(opt.tickInterval);
 setInterval(
-  () =>
-    metricsPushgateway.push({
-      jobName: "game-service",
-      groupings: { areaId: opt.areaId },
-    }),
+  () => metricsPushgateway.push({ jobName: "game-service" }),
   opt.metricsPushgateway.interval.totalMilliseconds,
 );
