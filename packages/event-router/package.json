@@ -17,8 +17,8 @@
   },
   "dependencies": {
     "@mp/encoding": "workspace:*",
-    "@mp/logger": "workspace:*",
     "@mp/invocation-proxy": "workspace:*",
+    "@mp/logger": "workspace:*",
     "@mp/std": "workspace:*"
   },
   "devDependencies": {

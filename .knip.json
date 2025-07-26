@@ -1,4 +1,4 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": ["@mp/tsconfig", "pino-pretty", "tsx"]
+  "ignoreDependencies": ["@mp/tsconfig", "pino-pretty", "tsx", "@mp/eslint"]
 }

@@ -17,21 +17,21 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "@mp/env": "workspace:*",
     "@mp/auth": "workspace:*",
+    "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
-    "@mp/ioc": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/telemetry": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
+    "@mp/telemetry": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "express-http-proxy": "2.1.1",
+    "cors": "2.8.5",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "cors": "2.8.5"
+    "express-http-proxy": "2.1.1"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

@@ -10,15 +10,15 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- "
   },
   "dependencies": {
+    "@mp/api": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
-    "@mp/logger": "workspace:*",
     "@mp/gateway": "workspace:*",
+    "@mp/logger": "workspace:*",
     "@mp/query": "workspace:*",
-    "@mp/api": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",

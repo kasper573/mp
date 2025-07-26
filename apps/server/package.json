@@ -12,13 +12,12 @@
     "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx src/keycloak-provision.ts"
   },
   "dependencies": {
+    "@mp/api": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/encoding": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
-    "@mp/api": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak-provision": "workspace:*",
     "@mp/logger": "workspace:*",
@@ -27,16 +26,13 @@
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/telemetry": "workspace:*",
-    "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "dotenv": "catalog:",
-    "express": "catalog:",
     "unique-names-generator": "4.7.1"
   },
   "devDependencies": {
-    "@types/express": "catalog:",
     "@mp/tsconfig": "workspace:*",
     "builtin-modules": "5.0.0",
     "esbuild": "0.25.6",
