@@ -163,7 +163,7 @@ updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
 startGameStateDbSync(db, area, gameState, gameStateServer);
 updateTicker.start(opt.tickInterval);
-setTimeout(
+setInterval(
   () =>
     metricsPushgateway.push({
       jobName: "game-service",
