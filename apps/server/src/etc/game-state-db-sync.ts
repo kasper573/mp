@@ -16,6 +16,12 @@ export function gameStateDbSyncBehavior(
 ) {
   function poll() {
     // TODO check if new characters are online in the database matching this game service instance's area
+    const char: Character | undefined = undefined;
+
+    if (char) {
+      onCharacterJoinedGameService(char);
+      onCharacterLeftGameService(char);
+    }
   }
 
   function save() {
