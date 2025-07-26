@@ -55,7 +55,7 @@ logger.info(opt, `Starting gateway...`);
 type ClientId = Branded<string, "ClientId">;
 const gameServiceSockets = new Set<WebSocket>();
 const gameClientSockets = new Map<ClientId, WebSocket>();
-const userSessions = new Map<ClientId, UserSession>();
+const userSessions = new Map<ClientId, UserSession<ClientId>>();
 
 collectDefaultMetrics();
 
@@ -70,7 +70,7 @@ const httpServer = http.createServer(webServer);
 
 const dbClient = createDbClient(opt.databaseConnectionString);
 
-const tokenResolver = createTokenResolver(opt.auth);
+const resolveAccessToken = createTokenResolver(opt.auth);
 
 const wss = new WebSocketServer({
   ...wssConfig(),
@@ -89,7 +89,7 @@ const gatewayEventInvoker = new QueuedEventInvoker({
 });
 
 const ioc = new ImmutableInjectionContainer()
-  .provide(ctxTokenResolver, tokenResolver)
+  .provide(ctxTokenResolver, resolveAccessToken)
   .provide(ctxDbClient, dbClient);
 
 wss.on("connection", (socket, request) => {
@@ -104,7 +104,7 @@ wss.on("connection", (socket, request) => {
 
   switch (info.type) {
     case "game-client":
-      return setupGameClientSocket(info.clientId, socket);
+      return setupGameClientSocket(socket, info.session);
     case "game-service":
       return setupGameServerSocket(socket);
     default:
@@ -128,10 +128,12 @@ function setupGameServerSocket(socket: WebSocket) {
   });
 }
 
-function setupGameClientSocket(clientId: ClientId, socket: WebSocket) {
-  const session: UserSession = { id: clientId };
-  userSessions.set(clientId, session);
-  gameClientSockets.set(clientId, socket);
+function setupGameClientSocket(
+  socket: WebSocket,
+  session: UserSession<ClientId>,
+) {
+  userSessions.set(session.id, session);
+  gameClientSockets.set(session.id, socket);
 
   const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
     (event) => {
@@ -143,9 +145,9 @@ function setupGameClientSocket(clientId: ClientId, socket: WebSocket) {
   );
 
   socket.on("close", () => {
-    logger.info(`Game client ${clientId} disconnected`);
-    gameClientSockets.delete(clientId);
-    userSessions.delete(clientId);
+    logger.info(`Game client ${session.id} disconnected`);
+    gameClientSockets.delete(session.id);
+    userSessions.delete(session.id);
   });
 
   socket.on("message", (data: ArrayBuffer) => {
@@ -193,8 +195,10 @@ async function verifySocketConnection(
       }
       return cb(false, 403, "Forbidden: Invalid game service secret");
     case "game-client": {
-      const result = await tokenResolver(info.accessToken);
+      const result = await resolveAccessToken(info.token);
       if (result.isOk()) {
+        const { id, roles, name } = result.value;
+        info.session.user = { id, roles, name };
         return cb(true);
       }
       return cb(false, 401, result.error);
@@ -204,26 +208,31 @@ async function verifySocketConnection(
   }
 }
 
-function getRequestInfo(req: IncomingMessage) {
+function getRequestInfo(req: IncomingMessage): RequestInfo {
   if (!req.url) {
-    return { type: "unknown" } as const;
+    return { type: "unknown" };
   }
-  const { searchParams } = new URL(req.url, "http://localhost");
+
+  const { searchParams } = new URL(req.url ?? "", "http://localhost");
   const secret = searchParams.get("gameServiceSecret") ?? undefined;
   if (secret) {
     return { type: "game-service", secret } as const;
   }
-  const accessToken = (searchParams.get("accessToken") ?? undefined) as
+
+  const token = (searchParams.get("accessToken") ?? undefined) as
     | AccessToken
     | undefined;
 
-  let clientId = Reflect.get(req, "clientId") as ClientId | undefined;
-  if (!clientId) {
-    clientId = createShortId() as ClientId;
-    Reflect.set(req, "clientId", clientId);
+  let session = Reflect.get(req, "session") as
+    | UserSession<ClientId>
+    | undefined;
+
+  if (!session) {
+    session = { id: createShortId() as ClientId };
+    Reflect.set(req, "session", session);
   }
 
-  return { type: "game-client", clientId, accessToken } as const;
+  return { type: "game-client", session, token };
 }
 
 function wssConfig(): WebSocketServerOptions {
@@ -276,3 +285,8 @@ const metrics = {
     },
   }),
 };
+
+type RequestInfo =
+  | { type: "game-client"; session: UserSession<ClientId>; token?: AccessToken }
+  | { type: "game-service"; secret?: string }
+  | { type: "unknown" };

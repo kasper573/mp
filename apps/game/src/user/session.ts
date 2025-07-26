@@ -4,8 +4,8 @@ import type { CharacterId } from "../character/types";
 
 export const ctxUserSession = InjectionContext.new<UserSession>("UserSession");
 
-export interface UserSession {
-  id: string;
+export interface UserSession<Id extends string = string> {
+  readonly id: Id;
 
   /**
    * Set when the user is authenticated

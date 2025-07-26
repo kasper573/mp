@@ -1,11 +1,10 @@
 import { and, characterTable, eq, type DbClient } from "@mp/db-client";
-import type { AccessToken, UserId } from "@mp/auth";
+import type { UserId } from "@mp/auth";
 import type { CharacterId } from "@mp/game/server";
 import {
   evt,
   roles,
   gatewayRoles,
-  ctxTokenResolver,
   networkEventRouter,
   ctxUserSession,
 } from "@mp/game/server";
@@ -46,17 +45,6 @@ export const gatewayRouter = evt.router({
       // preventing "quick disconnect" cheating, or allows for connection losses to be handled gracefully.
       const session = ctx.get(ctxUserSession);
       delete session.characterId;
-    }),
-
-    auth: evt.event.input<AccessToken>().handler(async ({ input, ctx }) => {
-      const tokenResolver = ctx.get(ctxTokenResolver);
-      const result = await tokenResolver(input);
-      if (result.isErr()) {
-        throw new Error("Invalid token", { cause: result.error });
-      }
-      const session = ctx.get(ctxUserSession);
-      const { id, roles, name } = result.value;
-      session.user = { id, roles, name };
     }),
   }),
 });

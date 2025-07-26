@@ -20,7 +20,6 @@ import { useEffect, useMemo } from "preact/hooks";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
-import { computed } from "@mp/state";
 
 export type ComposedGameEventClient = ProxyEventInvoker<
   MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
@@ -57,26 +56,14 @@ function createGameStateClient(
   const eventClient: ComposedGameEventClient = createProxyEventInvoker(
     (message) => socket.send(eventMessageEncoding.encode(message)),
   );
-  const accessToken = computed(() => auth.identity.value?.token);
-
-  function sendAccessTokenToGateway() {
-    if (accessToken.value) {
-      eventClient.gateway.auth(accessToken.value);
-    }
-  }
 
   function initialize() {
     const logSocketError = (e: Event) => logger.error(e, "Socket error");
     socket.addEventListener("error", logSocketError);
-    const subscriptions = [
-      ioc.register(ctxGameEventClient, eventClient),
-      accessToken.subscribe(sendAccessTokenToGateway),
-    ];
+    const unregister = ioc.register(ctxGameEventClient, eventClient);
 
     return () => {
-      for (const unsubscribe of subscriptions) {
-        unsubscribe();
-      }
+      unregister();
       socket.removeEventListener("error", logSocketError);
       socket.close();
     };

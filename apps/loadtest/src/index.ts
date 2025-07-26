@@ -62,7 +62,12 @@ async function testOneGameClient(n: number, rng: Rng) {
     logger.info(`Creating socket ${n}`);
   }
 
-  const socket = createWebSocket(gameServiceUrl);
+  const accessToken = createBypassUser(`Test User ${n}`);
+  const socket = createWebSocket(() => {
+    const url = new URL(gameServiceUrl);
+    url.searchParams.set("accessToken", accessToken);
+    return url.toString();
+  });
 
   const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
     socket.send(eventMessageEncoding.encode(message)),
@@ -84,20 +89,13 @@ async function testOneGameClient(n: number, rng: Rng) {
       }),
     });
 
-    const api = createApiClient(apiUrl, () =>
-      createBypassUser(`Test User ${n}`),
-    );
+    const api = createApiClient(apiUrl, () => accessToken);
 
     stopClient = gameClient.start();
 
     await waitForOpen(socket);
     if (verbose) {
       logger.info(`Socket ${n} connected`);
-    }
-
-    gatewayEvents.gateway.auth(createBypassUser(`Test User ${n}`));
-    if (verbose) {
-      logger.info(`Socket ${n} authenticated`);
     }
 
     const joinPromise = new Promise<GameStateEvents["area.joined"]>(
