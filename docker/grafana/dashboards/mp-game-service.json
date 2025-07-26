@@ -15,7 +15,6 @@
       }
     ]
   },
-  "description": "node.js prometheus client basic metrics",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
@@ -1578,10 +1577,9 @@
   "templating": {
     "list": [
       {
+        "allowCustomValue": false,
         "current": {
-          "text": [
-            "All"
-          ],
+          "text": "All",
           "value": [
             "$__all"
           ]
@@ -1590,14 +1588,18 @@
           "type": "prometheus",
           "uid": "mimir"
         },
-        "definition": "label_values(nodejs_version_info, instance)",
+        "definition": "label_values(nodejs_version_info{job=\"mp_game_service\"},instance)",
         "description": "",
-        "includeAll": true,
+        "hide": 2,
+        "includeAll": false,
         "label": "NodeJS Instance",
-        "multi": true,
         "name": "instance",
         "options": [],
-        "query": "label_values(nodejs_version_info, instance)",
+        "query": {
+          "qryType": 1,
+          "query": "label_values(nodejs_version_info{job=\"mp_game_service\"},instance)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
         "refresh": 1,
         "regex": "",
         "sort": 1,
@@ -1636,5 +1638,5 @@
   "timezone": "",
   "title": "mp-game-service",
   "uid": "PTSqcpJWk",
-  "version": 10
+  "version": 13
 }
