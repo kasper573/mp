@@ -26,11 +26,7 @@ RUN npm install \
     @opentelemetry/instrumentation \
     @opentelemetry/api
 
-COPY --from=builder /workdir/apps/server/public /workdir/public
 COPY --from=builder /workdir/apps/server/dist /workdir/server
-
-ENV MP_SERVER_PUBLIC_DIR=/workdir/public
-ENV MP_SERVER_CLIENT_DIR=/workdir/client
 
 ENV OTEL_SERVICE_NAME="mp-game-service"
 ENV OTEL_SERVICE_VERSION="${MP_BUILD_VERSION}"
