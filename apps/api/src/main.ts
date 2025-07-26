@@ -18,10 +18,13 @@ import type { AccessToken } from "@mp/auth";
 import type { IncomingHttpHeaders } from "http";
 import { createDbClient } from "@mp/db-client";
 import { ctxDbClient } from "./context";
+import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
+
+collectDefaultMetrics();
 
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting API...`);
@@ -39,19 +42,22 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxFileResolver, fileResolver)
   .provide(ctxDbClient, dbClient);
 
-const app = express();
-app.use(
-  "/",
-  trpcExpress.createExpressMiddleware({
-    router: apiRouter,
-    onError: (opt) => logger.error(opt.error, "RPC error"),
-    createContext: ({ req, info }): ApiContext => {
-      requestLimiter.consume(sessionId(req));
-      logger.info(info, "[req]");
-      return { ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)) };
-    },
-  }),
-);
+const app = express()
+  .use(metricsMiddleware())
+  .use(
+    "/",
+    trpcExpress.createExpressMiddleware({
+      router: apiRouter,
+      onError: (opt) => logger.error(opt.error, "RPC error"),
+      createContext: ({ req, info }): ApiContext => {
+        requestLimiter.consume(sessionId(req));
+        logger.info(info, "[req]");
+        return {
+          ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
+        };
+      },
+    }),
+  );
 
 app.listen(opt.port, opt.hostname, () => {
   logger.info(`API listening on ${opt.hostname}:${opt.port}`);

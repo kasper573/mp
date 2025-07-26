@@ -21,6 +21,7 @@
     "@mp/env": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/telemetry": "workspace:*",
     "@mp/db-client": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",

@@ -1,3 +1,13 @@
+prometheus.scrape "mp_api" {
+	targets = [{
+		__address__ = env("MP_API_PROXY_HOST"),
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "mp_api"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
+}
+
 prometheus.scrape "mp_gateway" {
 	targets = [{
 		__address__ = env("MP_GATEWAY_PROXY_HOST"),
@@ -5,6 +15,7 @@ prometheus.scrape "mp_gateway" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "mp_gateway"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.scrape "pushgateway" {
@@ -12,8 +23,9 @@ prometheus.scrape "pushgateway" {
 		__address__ = "pushgateway:9091",
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
-	job_name        = "mp_game_service"
+	job_name        = "pushgateway"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.scrape "node_exporter" {
@@ -23,6 +35,7 @@ prometheus.scrape "node_exporter" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.scrape "keycloak" {
@@ -32,6 +45,7 @@ prometheus.scrape "keycloak" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "keycloak"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.remote_write "default" {

@@ -110,6 +110,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+      '@mp/telemetry':
+        specifier: workspace:*
+        version: link:../../libraries/telemetry
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
