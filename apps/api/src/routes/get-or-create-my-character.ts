@@ -53,7 +53,10 @@ export const getOrCreateMyCharacter = rpc.procedure
     }
 
     const models = await getActorModels(ctx.ioc);
-    const model = assert(models.get(databaseFields.modelId));
+    const model = assert(
+      models.get(databaseFields.modelId),
+      `Could not find actor model "${databaseFields.modelId}"`,
+    );
 
     const rng = new Rng();
 
