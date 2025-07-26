@@ -32,6 +32,10 @@ export const serverOptionsSchema = type({
   apiEndpointPath: "string",
   apiServiceUrl: "string",
   databaseConnectionString: "string",
+  /**
+   * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.
+   */
+  gameServiceSecret: "string",
   auth: {
     /**
      * OIDC issuer

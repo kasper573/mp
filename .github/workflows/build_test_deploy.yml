@@ -153,6 +153,7 @@ jobs:
             echo "KC_SMTP_PASSWORD=\"${{ secrets.KC_SMTP_PASSWORD }}\"" >> .env
             echo "KC_ADMIN_USERNAME=\"${{ secrets.KC_ADMIN_USERNAME }}\"" >> .env
             echo "KC_ADMIN_PASSWORD=\"${{ secrets.KC_ADMIN_PASSWORD }}\"" >> .env
+            echo "MP_GATEWAY_GAME_SERVICE_SECRET=\"$(openssl rand -hex 32)\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             ./dockerctl.sh prod pull

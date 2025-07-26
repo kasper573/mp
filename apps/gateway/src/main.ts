@@ -15,10 +15,10 @@ import {
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
-import { type } from "@mp/validate";
-import type { IncomingMessage } from "http";
+
 import createCors from "cors";
 import express from "express";
+import type { IncomingMessage } from "http";
 import http from "http";
 import proxy from "express-http-proxy";
 import {
@@ -90,6 +90,20 @@ const wss = new WebSocketServer({
     concurrencyLimit: 10, // limits zlib concurrency for perf.
     threshold: 1024, // messages under this size won't be compressed.
   },
+  verifyClient({ req }, cb) {
+    const info = getRequestInfo(req);
+    switch (info.type) {
+      case "game-service":
+        if (info.secret === opt.gameServiceSecret) {
+          return cb(true);
+        }
+        return cb(false, 403, "Forbidden: Invalid game service secret");
+      case "game-client":
+        return cb(true);
+      default:
+        return cb(false, 400, "Bad Request: Unknown connection type");
+    }
+  },
 });
 
 httpServer.listen(opt.port, opt.hostname, () => {
@@ -107,25 +121,20 @@ const ioc = new ImmutableInjectionContainer()
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
-  const socketType = getSocketType(request);
-  if (socketType instanceof type.errors) {
-    logger.error(
-      new Error("Unknown socket type", { cause: socketType.summary }),
-    );
-    return;
-  }
+  const info = getRequestInfo(request);
 
-  logger.info(`New ${socketType} connection established`);
+  logger.info(`New ${info.type} connection established`);
 
   socket.on("error", (err) => {
-    logger.error(err, `Error in ${socketType} connection`);
+    logger.error(err, `Error in ${info.type} connection`);
   });
 
-  switch (socketType) {
+  switch (info.type) {
     case "game-client":
       return setupGameClientSocket(socket);
-    case "game-server":
+    case "game-service":
       return setupGameServerSocket(socket);
+    default:
   }
 });
 
@@ -200,17 +209,17 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   }
 }
 
-function getSearchParams(path = ""): URLSearchParams {
-  return new URL(path, "http://localhost").searchParams;
+function getRequestInfo(req: IncomingMessage) {
+  if (!req.url) {
+    return { type: "unknown" } as const;
+  }
+  const { searchParams } = new URL(req.url, "http://localhost");
+  const secret = searchParams.get("gameServiceSecret");
+  if (secret) {
+    return { type: "game-service", secret } as const;
+  }
+  return { type: "game-client" } as const;
 }
-
-function getSocketType(req: IncomingMessage) {
-  const typeParam = getSearchParams(req.url).get("type") ?? "game-client";
-  return SocketType(typeParam);
-}
-
-const SocketType = type.enumerated("game-client", "game-server");
-type SocketType = typeof SocketType.infer;
 
 const metrics = {
   gameStatePatchSize: new MetricsHistogram({
