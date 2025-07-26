@@ -1579,16 +1579,21 @@
     "list": [
       {
         "current": {
-          "text": "All",
-          "value": "$__all"
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "mimir"
         },
         "definition": "label_values(nodejs_version_info, instance)",
+        "description": "",
         "includeAll": true,
-        "label": "instance",
+        "label": "NodeJS Instance",
         "multi": true,
         "name": "instance",
         "options": [],
@@ -1596,6 +1601,29 @@
         "refresh": 1,
         "regex": "",
         "sort": 1,
+        "type": "query"
+      },
+      {
+        "current": {
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
+        "definition": "label_values(areaId)",
+        "includeAll": true,
+        "multi": true,
+        "name": "AreaId",
+        "options": [],
+        "query": {
+          "qryType": 1,
+          "query": "label_values(areaId)",
+          "refId": "PrometheusVariableQueryEditor-VariableQuery"
+        },
+        "refresh": 1,
+        "regex": "",
         "type": "query"
       }
     ]
@@ -1608,5 +1636,5 @@
   "timezone": "",
   "title": "mp-game-service",
   "uid": "PTSqcpJWk",
-  "version": 3
+  "version": 10
 }
