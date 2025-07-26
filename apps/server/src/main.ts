@@ -74,7 +74,10 @@ const [area, actorModels] = await Promise.all([
     .query(opt.areaId)
     .then((url) => loadAreaResource(opt.areaId, url)),
   api.actorSpritesheetUrls.query().then(loadActorModels),
-]);
+]).catch((error) => {
+  logger.error(error, "Failed to load area and actor data from API service");
+  process.exit(1);
+});
 
 const gameStateLoader = createGameStateLoader(db, area);
 
