@@ -36,7 +36,9 @@ export default tseslint.config(
         projectService: true,
         tsconfigRootDir: rootDir,
         alwaysTryTypes: true,
-        project: ["./apps/*/tsconfig.json", "./packages/*/tsconfig.json"],
+        project: ["apps", "integrations", "libraries"].map(
+          (workspace) => `./${workspace}/*/tsconfig.json`,
+        ),
       },
     },
     plugins: {
@@ -52,7 +54,7 @@ export default tseslint.config(
         { type: "client_app", pattern: "apps/client/**" },
         { type: "server_app", pattern: "apps/server/**" },
         { type: "other_app", pattern: "apps/*" },
-        { type: "package", pattern: "packages/*" },
+        { type: "library", pattern: "libraries/*" },
       ],
     },
     rules: {
@@ -68,7 +70,7 @@ export default tseslint.config(
           rules: [
             {
               from: ["server_app"],
-              allow: ["game_server_module", "game_shared_module", "package"],
+              allow: ["game_server_module", "game_shared_module", "library"],
             },
             {
               from: ["client_app"],
@@ -76,13 +78,13 @@ export default tseslint.config(
                 "game_client_module",
                 "game_shared_module",
                 "server_app",
-                "package",
+                "library",
               ],
             },
             {
               from: ["other_app"],
               allow: [
-                "package",
+                "library",
                 "server_app",
                 "game_client_module",
                 "game_shared_module",
@@ -90,15 +92,15 @@ export default tseslint.config(
             },
             {
               from: ["game_client_module"],
-              allow: ["game_server_module", "game_shared_module", "package"],
+              allow: ["game_server_module", "game_shared_module", "library"],
             },
             {
               from: ["game_server_module"],
-              allow: ["game_shared_module", "package"],
+              allow: ["game_shared_module", "library"],
             },
             {
-              from: ["game_shared_module", "package"],
-              allow: ["package"],
+              from: ["game_shared_module", "library"],
+              allow: ["library"],
             },
           ],
         },

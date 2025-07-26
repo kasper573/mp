@@ -1,6 +1,7 @@
 packages:
   - "apps/*"
-  - "packages/*"
+  - "integrations/*"
+  - "libraries/*"
 catalog:
   "@types/node": ^22.13.10
   preact: 10.26.9

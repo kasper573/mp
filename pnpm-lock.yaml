@@ -55,10 +55,10 @@ importers:
         version: 0.24.0
       '@mp/eslint':
         specifier: workspace:*
-        version: link:packages/eslint
+        version: link:libraries/eslint
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:packages/tsconfig
+        version: link:libraries/tsconfig
       '@types/node':
         specifier: 'catalog:'
         version: 22.13.10
@@ -79,28 +79,28 @@ importers:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/env':
         specifier: workspace:*
-        version: link:../../packages/env
+        version: link:../../libraries/env
       '@mp/game':
         specifier: workspace:*
         version: link:../game
       '@mp/ioc':
         specifier: workspace:*
-        version: link:../../packages/ioc
+        version: link:../../libraries/ioc
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/rate-limiter':
         specifier: workspace:*
-        version: link:../../packages/rate-limiter
+        version: link:../../libraries/rate-limiter
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/validate':
         specifier: workspace:*
-        version: link:../../packages/validate
+        version: link:../../libraries/validate
       '@trpc/client':
         specifier: 11.4.3
         version: 11.4.3(@trpc/server@11.4.3(typescript@5.9.0-beta))(typescript@5.9.0-beta)
@@ -119,7 +119,7 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       tsx:
         specifier: 'catalog:'
         version: 4.19.2
@@ -131,16 +131,16 @@ importers:
         version: link:../api
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/engine':
         specifier: workspace:*
-        version: link:../../packages/engine
+        version: link:../../libraries/engine
       '@mp/env':
         specifier: workspace:*
-        version: link:../../packages/env
+        version: link:../../libraries/env
       '@mp/event-router':
         specifier: workspace:*
-        version: link:../../packages/event-router
+        version: link:../../libraries/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
@@ -149,34 +149,34 @@ importers:
         version: link:../gateway
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/query':
         specifier: workspace:*
-        version: link:../../packages/query
+        version: link:../../libraries/query
       '@mp/state':
         specifier: workspace:*
-        version: link:../../packages/state
+        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/style':
         specifier: workspace:*
-        version: link:../../packages/style
+        version: link:../../libraries/style
       '@mp/telemetry':
         specifier: workspace:*
-        version: link:../../packages/telemetry
+        version: link:../../libraries/telemetry
       '@mp/tiled-renderer':
         specifier: workspace:*
-        version: link:../../packages/tiled-renderer
+        version: link:../../libraries/tiled-renderer
       '@mp/ui':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../libraries/ui
       '@mp/validate':
         specifier: workspace:*
-        version: link:../../packages/validate
+        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
-        version: link:../../packages/ws
+        version: link:../../libraries/ws
       '@tanstack/react-router':
         specifier: 1.126.2
         version: 1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -189,7 +189,7 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
         version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -210,16 +210,16 @@ importers:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/game':
         specifier: workspace:*
         version: link:../game
       '@mp/math':
         specifier: workspace:*
-        version: link:../../packages/math
+        version: link:../../libraries/math
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       drizzle-orm:
         specifier: 0.38.3
         version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)
@@ -229,7 +229,7 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       '@types/pg':
         specifier: 8.11.10
         version: 8.11.10
@@ -244,7 +244,7 @@ importers:
         version: 9.2.0
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       '@playwright/test':
         specifier: 1.50.0
         version: 1.50.0
@@ -253,61 +253,61 @@ importers:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/encoding':
         specifier: workspace:*
-        version: link:../../packages/encoding
+        version: link:../../libraries/encoding
       '@mp/engine':
         specifier: workspace:*
-        version: link:../../packages/engine
+        version: link:../../libraries/engine
       '@mp/event-router':
         specifier: workspace:*
-        version: link:../../packages/event-router
+        version: link:../../libraries/event-router
       '@mp/graphics':
         specifier: workspace:*
-        version: link:../../packages/graphics
+        version: link:../../libraries/graphics
       '@mp/ioc':
         specifier: workspace:*
-        version: link:../../packages/ioc
+        version: link:../../libraries/ioc
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
-        version: link:../../packages/math
+        version: link:../../libraries/math
       '@mp/path-finding':
         specifier: workspace:*
-        version: link:../../packages/path-finding
+        version: link:../../libraries/path-finding
       '@mp/query':
         specifier: workspace:*
-        version: link:../../packages/query
+        version: link:../../libraries/query
       '@mp/state':
         specifier: workspace:*
-        version: link:../../packages/state
+        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/style':
         specifier: workspace:*
-        version: link:../../packages/style
+        version: link:../../libraries/style
       '@mp/sync':
         specifier: workspace:*
-        version: link:../../packages/sync
+        version: link:../../libraries/sync
       '@mp/tiled-loader':
         specifier: workspace:*
-        version: link:../../packages/tiled-loader
+        version: link:../../libraries/tiled-loader
       '@mp/tiled-renderer':
         specifier: workspace:*
-        version: link:../../packages/tiled-renderer
+        version: link:../../libraries/tiled-renderer
       '@mp/time':
         specifier: workspace:*
-        version: link:../../packages/time
+        version: link:../../libraries/time
       '@mp/ui':
         specifier: workspace:*
-        version: link:../../packages/ui
+        version: link:../../libraries/ui
       '@mp/ws':
         specifier: workspace:*
-        version: link:../../packages/ws
+        version: link:../../libraries/ws
       preact:
         specifier: 'catalog:'
         version: 10.26.9
@@ -317,43 +317,43 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
 
   apps/gateway:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/env':
         specifier: workspace:*
-        version: link:../../packages/env
+        version: link:../../libraries/env
       '@mp/event-router':
         specifier: workspace:*
-        version: link:../../packages/event-router
+        version: link:../../libraries/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
       '@mp/ioc':
         specifier: workspace:*
-        version: link:../../packages/ioc
+        version: link:../../libraries/ioc
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/sync':
         specifier: workspace:*
-        version: link:../../packages/sync
+        version: link:../../libraries/sync
       '@mp/telemetry':
         specifier: workspace:*
-        version: link:../../packages/telemetry
+        version: link:../../libraries/telemetry
       '@mp/validate':
         specifier: workspace:*
-        version: link:../../packages/validate
+        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
-        version: link:../../packages/ws
+        version: link:../../libraries/ws
       cors:
         specifier: 2.8.5
         version: 2.8.5
@@ -369,7 +369,7 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       '@types/cors':
         specifier: 2.8.17
         version: 2.8.17
@@ -390,10 +390,10 @@ importers:
         version: link:../api
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/event-router':
         specifier: workspace:*
-        version: link:../../packages/event-router
+        version: link:../../libraries/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
@@ -402,20 +402,20 @@ importers:
         version: link:../gateway
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/time':
         specifier: workspace:*
-        version: link:../../packages/time
+        version: link:../../libraries/time
       '@mp/ws':
         specifier: workspace:*
-        version: link:../../packages/ws
+        version: link:../../libraries/ws
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
         version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -442,52 +442,52 @@ importers:
         version: link:../api
       '@mp/auth':
         specifier: workspace:*
-        version: link:../../packages/auth
+        version: link:../../libraries/auth
       '@mp/db':
         specifier: workspace:*
         version: link:../db
       '@mp/env':
         specifier: workspace:*
-        version: link:../../packages/env
+        version: link:../../libraries/env
       '@mp/event-router':
         specifier: workspace:*
-        version: link:../../packages/event-router
+        version: link:../../libraries/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
       '@mp/ioc':
         specifier: workspace:*
-        version: link:../../packages/ioc
+        version: link:../../libraries/ioc
       '@mp/keycloak-provision':
         specifier: workspace:*
-        version: link:../../packages/keycloak-provision
+        version: link:../../libraries/keycloak-provision
       '@mp/logger':
         specifier: workspace:*
-        version: link:../../packages/logger
+        version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
-        version: link:../../packages/math
+        version: link:../../libraries/math
       '@mp/rate-limiter':
         specifier: workspace:*
-        version: link:../../packages/rate-limiter
+        version: link:../../libraries/rate-limiter
       '@mp/std':
         specifier: workspace:*
-        version: link:../../packages/std
+        version: link:../../libraries/std
       '@mp/sync':
         specifier: workspace:*
-        version: link:../../packages/sync
+        version: link:../../libraries/sync
       '@mp/telemetry':
         specifier: workspace:*
-        version: link:../../packages/telemetry
+        version: link:../../libraries/telemetry
       '@mp/time':
         specifier: workspace:*
-        version: link:../../packages/time
+        version: link:../../libraries/time
       '@mp/validate':
         specifier: workspace:*
-        version: link:../../packages/validate
+        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
-        version: link:../../packages/ws
+        version: link:../../libraries/ws
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
@@ -497,7 +497,7 @@ importers:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
-        version: link:../../packages/tsconfig
+        version: link:../../libraries/tsconfig
       builtin-modules:
         specifier: 5.0.0
         version: 5.0.0
@@ -508,7 +508,7 @@ importers:
         specifier: 'catalog:'
         version: 4.19.2
 
-  packages/auth:
+  libraries/auth:
     dependencies:
       '@mp/state':
         specifier: workspace:*
@@ -527,7 +527,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/encoding:
+  libraries/encoding:
     dependencies:
       '@mp/std':
         specifier: workspace:*
@@ -540,7 +540,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/engine:
+  libraries/engine:
     dependencies:
       '@mp/math':
         specifier: workspace:*
@@ -559,7 +559,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/env:
+  libraries/env:
     dependencies:
       '@mp/std':
         specifier: workspace:*
@@ -578,7 +578,7 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
-  packages/eslint:
+  libraries/eslint:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -596,7 +596,7 @@ importers:
         specifier: 8.38.0
         version: 8.38.0(eslint@9.32.0(jiti@2.4.2))(typescript@5.9.0-beta)
 
-  packages/event-router:
+  libraries/event-router:
     dependencies:
       '@mp/encoding':
         specifier: workspace:*
@@ -618,7 +618,7 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
-  packages/graphics:
+  libraries/graphics:
     dependencies:
       '@mp/math':
         specifier: workspace:*
@@ -640,7 +640,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/index:
+  libraries/index:
     dependencies:
       '@mp/state':
         specifier: workspace:*
@@ -650,13 +650,13 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/invocation-proxy:
+  libraries/invocation-proxy:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/ioc:
+  libraries/ioc:
     dependencies:
       '@mp/std':
         specifier: workspace:*
@@ -669,7 +669,7 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
-  packages/keycloak-provision:
+  libraries/keycloak-provision:
     dependencies:
       '@keycloak/keycloak-admin-client':
         specifier: 26.1.2
@@ -679,7 +679,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/logger:
+  libraries/logger:
     dependencies:
       pino:
         specifier: 9.7.0
@@ -692,7 +692,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/math:
+  libraries/math:
     devDependencies:
       '@mp/std':
         specifier: workspace:*
@@ -701,7 +701,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/path-finding:
+  libraries/path-finding:
     dependencies:
       '@mp/math':
         specifier: workspace:*
@@ -717,7 +717,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/query:
+  libraries/query:
     dependencies:
       '@mp/state':
         specifier: workspace:*
@@ -736,7 +736,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/rate-limiter:
+  libraries/rate-limiter:
     dependencies:
       '@mp/std':
         specifier: workspace:*
@@ -749,7 +749,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/state:
+  libraries/state:
     dependencies:
       '@preact/signals':
         specifier: 2.2.1
@@ -765,7 +765,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/std:
+  libraries/std:
     dependencies:
       nanoid:
         specifier: 5.1.5
@@ -787,7 +787,7 @@ importers:
         specifier: 4.41.0
         version: 4.41.0
 
-  packages/style:
+  libraries/style:
     dependencies:
       '@vanilla-extract/css':
         specifier: 1.15.5
@@ -809,7 +809,7 @@ importers:
         specifier: 3.1.3
         version: 3.1.3
 
-  packages/sync:
+  libraries/sync:
     dependencies:
       '@mp/encoding':
         specifier: workspace:*
@@ -828,7 +828,7 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
-  packages/telemetry:
+  libraries/telemetry:
     dependencies:
       '@grafana/faro-web-sdk':
         specifier: ^1.12.2
@@ -844,7 +844,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/tiled-loader:
+  libraries/tiled-loader:
     dependencies:
       '@mp/std':
         specifier: workspace:*
@@ -863,7 +863,7 @@ importers:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
-  packages/tiled-renderer:
+  libraries/tiled-renderer:
     dependencies:
       '@mp/graphics':
         specifier: workspace:*
@@ -882,7 +882,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/time:
+  libraries/time:
     dependencies:
       timespan-ts:
         specifier: 1.0.3
@@ -892,7 +892,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/tsconfig:
+  libraries/tsconfig:
     devDependencies:
       '@types/node':
         specifier: 'catalog:'
@@ -901,7 +901,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.0-beta
 
-  packages/ui:
+  libraries/ui:
     dependencies:
       '@mp/state':
         specifier: workspace:*
@@ -920,7 +920,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/validate:
+  libraries/validate:
     dependencies:
       arktype:
         specifier: 2.1.20
@@ -930,7 +930,7 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  packages/ws:
+  libraries/ws:
     dependencies:
       partysocket:
         specifier: 1.1.3
@@ -1945,21 +1945,11 @@ packages:
     cpu: [x64]
     os: [win32]
 
-  '@eslint-community/eslint-utils@4.4.0':
-    resolution: {integrity: sha512-1/sA4dwrzBAyeUoQ6oxahHKmrZvsnLCg4RfxW3ZFGGmQkSNQPFNLV9CUEFQP1x9EYXHTo5p6xdhZM1Ne9p/AfA==}
-    engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
-    peerDependencies:
-      eslint: ^6.0.0 || ^7.0.0 || >=8.0.0
-
   '@eslint-community/eslint-utils@4.7.0':
     resolution: {integrity: sha512-dyybb3AcajC7uha6CvhdVRJqaKyn7w2YKqKyAN37NKYgZT36w+iRb0Dymmc5qEJ549c/S31cMMSFd75bteCpCw==}
     engines: {node: ^12.22.0 || ^14.17.0 || >=16.0.0}
     peerDependencies:
       eslint: ^6.0.0 || ^7.0.0 || >=8.0.0
-
-  '@eslint-community/regexpp@4.11.0':
-    resolution: {integrity: sha512-G/M/tIiMrTAxEWRfLfQJMmGNX28IxBg4PBz8XqQhqUHLFI6TL2htpIB1iQCj144V5ee/JaKyT9/WZ0MGZWfA7A==}
-    engines: {node: ^12.0.0 || ^14.0.0 || >=16.0.0}
 
   '@eslint-community/regexpp@4.12.1':
     resolution: {integrity: sha512-CCZCDJuduB9OUkFkY2IgppNZMi2lBQgD2qzwXkEia16cge2pijY/aXi96CJMquDMn3nJdlPV1A5KrJEXwfLNzQ==}
@@ -2133,12 +2123,6 @@ packages:
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
 
-  '@opentelemetry/core@1.27.0':
-    resolution: {integrity: sha512-yQPKnK5e+76XuiqUH/gKyS8wv/7qITd5ln56QkBTf3uggr0VkXOXfcaAuG330UfdYu83wsyoBwqwxigpIG+Jkg==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.0.0 <1.10.0'
-
   '@opentelemetry/core@1.30.0':
     resolution: {integrity: sha512-Q/3u/K73KUjTCnFUP97ZY+pBjQ1kPEgjOfXj/bJl8zW7GbXdkw6cwuyZk6ZTXkVgCBsYRYUzx4fvYK1jxdb9MA==}
     engines: {node: '>=14'}
@@ -2183,12 +2167,6 @@ packages:
 
   '@opentelemetry/resources@1.26.0':
     resolution: {integrity: sha512-CPNYchBE7MBecCSVy0HKpUISEeJOniWqcHaAHpmasZ3j9o6V3AyBzhRc90jdmemq0HOxDr6ylhUbDhBqqPpeNw==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      '@opentelemetry/api': '>=1.0.0 <1.10.0'
-
-  '@opentelemetry/resources@1.27.0':
-    resolution: {integrity: sha512-jOwt2VJ/lUD5BLc+PMNymDrUCpm5PKi1E9oSVYAvz01U/VdndGmrtV3DU1pG4AwlYhJRHbHfOUIlpBeXCPw6QQ==}
     engines: {node: '>=14'}
     peerDependencies:
       '@opentelemetry/api': '>=1.0.0 <1.10.0'
@@ -2848,9 +2826,6 @@ packages:
   '@vanilla-extract/integration@8.0.4':
     resolution: {integrity: sha512-cmOb7tR+g3ulKvFtSbmdw3YUyIS1d7MQqN+FcbwNhdieyno5xzUyfDCMjeWJhmCSMvZ6WlinkrOkgs6SHB+FRg==}
 
-  '@vanilla-extract/private@1.0.6':
-    resolution: {integrity: sha512-ytsG/JLweEjw7DBuZ/0JCN4WAQgM9erfSTdS1NQY778hFQSZ6cfCDEZZ0sgVm4k54uNz6ImKB33AYvSR//fjxw==}
-
   '@vanilla-extract/private@1.0.9':
     resolution: {integrity: sha512-gT2jbfZuaaCLrAxwXbRgIhGhcXbRZCG3v4TTUnjw0EJ7ArdBRxkq4msNJkbuRkCgfIK5ATmprB5t9ljvLeFDEA==}
 
@@ -2918,11 +2893,6 @@ packages:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
     peerDependencies:
       acorn: ^6.0.0 || ^7.0.0 || ^8.0.0
-
-  acorn@8.14.0:
-    resolution: {integrity: sha512-cl669nCJTZBsL97OF4kUQm5g5hC2uihk0NxY3WENAC0TYdILVkAyHymAntgxGkl7K+t0cXIrH5siy5S4XkFycA==}
-    engines: {node: '>=0.4.0'}
-    hasBin: true
 
   acorn@8.14.1:
     resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
@@ -4655,11 +4625,6 @@ packages:
     resolution: {integrity: sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA==}
     hasBin: true
 
-  semver@7.6.3:
-    resolution: {integrity: sha512-oVekP1cKtI+CTDvHWYFUcMtsK/00wmAEfyqKfNdARm8u1wNVhSgaX7A8d4UuIlUI5e84iEwOhs7ZPYRmzU9U6A==}
-    engines: {node: '>=10'}
-    hasBin: true
-
   semver@7.7.1:
     resolution: {integrity: sha512-hlq8tAfn0m/61p4BVRcPzIGr6LKiMwo4VM6dGi6pt4qcRkmNzTcWq6eCEjEh+qXjkMDvPlOFFSGwQjoEa6gyMA==}
     engines: {node: '>=10'}
@@ -6041,17 +6006,10 @@ snapshots:
   '@esbuild/win32-x64@0.25.6':
     optional: true
 
-  '@eslint-community/eslint-utils@4.4.0(eslint@9.32.0(jiti@2.4.2))':
-    dependencies:
-      eslint: 9.32.0(jiti@2.4.2)
-      eslint-visitor-keys: 3.4.3
-
   '@eslint-community/eslint-utils@4.7.0(eslint@9.32.0(jiti@2.4.2))':
     dependencies:
       eslint: 9.32.0(jiti@2.4.2)
       eslint-visitor-keys: 3.4.3
-
-  '@eslint-community/regexpp@4.11.0': {}
 
   '@eslint-community/regexpp@4.12.1': {}
 
@@ -6110,15 +6068,15 @@ snapshots:
       '@grafana/faro-web-sdk': 1.12.2
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/context-zone': 1.26.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/core': 1.26.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/core': 1.30.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/exporter-trace-otlp-http': 0.53.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/instrumentation': 0.53.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/instrumentation-fetch': 0.53.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/instrumentation-xml-http-request': 0.53.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/otlp-transformer': 0.53.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/resources': 1.27.0(@opentelemetry/api@1.9.0)
+      '@opentelemetry/resources': 1.30.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/sdk-trace-web': 1.30.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/semantic-conventions': 1.27.0
+      '@opentelemetry/semantic-conventions': 1.28.0
     transitivePeerDependencies:
       - supports-color
 
@@ -6251,11 +6209,6 @@ snapshots:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/semantic-conventions': 1.27.0
 
-  '@opentelemetry/core@1.27.0(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/semantic-conventions': 1.27.0
-
   '@opentelemetry/core@1.30.0(@opentelemetry/api@1.9.0)':
     dependencies:
       '@opentelemetry/api': 1.9.0
@@ -6297,7 +6250,7 @@ snapshots:
       '@types/shimmer': 1.2.0
       import-in-the-middle: 1.12.0
       require-in-the-middle: 7.4.0
-      semver: 7.6.3
+      semver: 7.7.1
       shimmer: 1.2.1
     transitivePeerDependencies:
       - supports-color
@@ -6323,12 +6276,6 @@ snapshots:
     dependencies:
       '@opentelemetry/api': 1.9.0
       '@opentelemetry/core': 1.26.0(@opentelemetry/api@1.9.0)
-      '@opentelemetry/semantic-conventions': 1.27.0
-
-  '@opentelemetry/resources@1.27.0(@opentelemetry/api@1.9.0)':
-    dependencies:
-      '@opentelemetry/api': 1.9.0
-      '@opentelemetry/core': 1.27.0(@opentelemetry/api@1.9.0)
       '@opentelemetry/semantic-conventions': 1.27.0
 
   '@opentelemetry/resources@1.30.0(@opentelemetry/api@1.9.0)':
@@ -6891,7 +6838,7 @@ snapshots:
 
   '@typescript-eslint/eslint-plugin@8.38.0(@typescript-eslint/parser@8.38.0(eslint@9.32.0(jiti@2.4.2))(typescript@5.9.0-beta))(eslint@9.32.0(jiti@2.4.2))(typescript@5.9.0-beta)':
     dependencies:
-      '@eslint-community/regexpp': 4.11.0
+      '@eslint-community/regexpp': 4.12.1
       '@typescript-eslint/parser': 8.38.0(eslint@9.32.0(jiti@2.4.2))(typescript@5.9.0-beta)
       '@typescript-eslint/scope-manager': 8.38.0
       '@typescript-eslint/type-utils': 8.38.0(eslint@9.32.0(jiti@2.4.2))(typescript@5.9.0-beta)
@@ -7012,7 +6959,7 @@ snapshots:
   '@vanilla-extract/css@1.15.5(babel-plugin-macros@3.1.0)':
     dependencies:
       '@emotion/hash': 0.9.2
-      '@vanilla-extract/private': 1.0.6
+      '@vanilla-extract/private': 1.0.9
       css-what: 6.1.0
       cssesc: 3.0.0
       csstype: 3.1.3
@@ -7058,8 +7005,6 @@ snapshots:
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
-
-  '@vanilla-extract/private@1.0.6': {}
 
   '@vanilla-extract/private@1.0.9': {}
 
@@ -7140,15 +7085,13 @@ snapshots:
       mime-types: 3.0.1
       negotiator: 1.0.0
 
-  acorn-import-attributes@1.9.5(acorn@8.14.0):
+  acorn-import-attributes@1.9.5(acorn@8.15.0):
     dependencies:
-      acorn: 8.14.0
+      acorn: 8.15.0
 
   acorn-jsx@5.3.2(acorn@8.15.0):
     dependencies:
       acorn: 8.15.0
-
-  acorn@8.14.0: {}
 
   acorn@8.14.1: {}
 
@@ -7802,7 +7745,7 @@ snapshots:
 
   eslint@9.32.0(jiti@2.4.2):
     dependencies:
-      '@eslint-community/eslint-utils': 4.4.0(eslint@9.32.0(jiti@2.4.2))
+      '@eslint-community/eslint-utils': 4.7.0(eslint@9.32.0(jiti@2.4.2))
       '@eslint-community/regexpp': 4.12.1
       '@eslint/config-array': 0.21.0
       '@eslint/config-helpers': 0.3.0
@@ -8155,8 +8098,8 @@ snapshots:
 
   import-in-the-middle@1.12.0:
     dependencies:
-      acorn: 8.14.0
-      acorn-import-attributes: 1.9.5(acorn@8.14.0)
+      acorn: 8.15.0
+      acorn-import-attributes: 1.9.5(acorn@8.15.0)
       cjs-module-lexer: 1.4.1
       module-details-from-path: 1.0.3
 
@@ -8380,7 +8323,7 @@ snapshots:
 
   mlly@1.7.3:
     dependencies:
-      acorn: 8.14.1
+      acorn: 8.15.0
       pathe: 1.1.2
       pkg-types: 1.2.1
       ufo: 1.5.4
@@ -8882,7 +8825,7 @@ snapshots:
 
   require-in-the-middle@7.4.0:
     dependencies:
-      debug: 4.4.0
+      debug: 4.4.1
       module-details-from-path: 1.0.3
       resolve: 1.22.10
     transitivePeerDependencies:
@@ -8975,8 +8918,6 @@ snapshots:
   semver@5.7.2: {}
 
   semver@6.3.1: {}
-
-  semver@7.6.3: {}
 
   semver@7.7.1: {}
 

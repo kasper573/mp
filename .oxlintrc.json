@@ -97,7 +97,7 @@
     },
     // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
     {
-      "files": ["**/packages/graphics/**"],
+      "files": ["**/libraries/graphics/**"],
       "rules": {
         "extensions": "off"
       }
