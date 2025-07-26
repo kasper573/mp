@@ -17,7 +17,6 @@ import type { WebSocket } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import { type } from "@mp/validate";
 import type { IncomingMessage } from "http";
-
 import createCors from "cors";
 import express from "express";
 import http from "http";
@@ -25,7 +24,6 @@ import proxy from "express-http-proxy";
 import {
   MetricsGague,
   MetricsHistogram,
-  MetricsRegistry,
   collectDefaultMetrics,
   exponentialBuckets,
   metricsMiddleware,
@@ -57,14 +55,13 @@ type ClientId = Branded<string, "ClientId">;
 const gameServiceSockets = new Set<WebSocket>();
 const gameClientSockets = new Map<ClientId, WebSocket>();
 const userSessions = new Map<ClientId, UserSession>();
-const metricsRegister = new MetricsRegistry();
 
-collectDefaultMetrics({ register: metricsRegister });
+collectDefaultMetrics();
 
 const webServer = express()
   .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
-  .use(metricsMiddleware(metricsRegister))
+  .use(metricsMiddleware())
   .use(createCors({ origin: opt.corsOrigin }))
   .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
 
@@ -197,7 +194,7 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
     const events = clientEvents.get(characterId);
     if (patch || events) {
       const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
-      gameStatePatchSizeHistogram.observe(encodedPatch.byteLength);
+      metrics.gameStatePatchSize.observe(encodedPatch.byteLength);
       socket.send(encodedPatch);
     }
   }
@@ -215,33 +212,32 @@ function getSocketType(req: IncomingMessage) {
 const SocketType = type.enumerated("game-client", "game-server");
 type SocketType = typeof SocketType.infer;
 
-const gameStatePatchSizeHistogram = new MetricsHistogram({
-  name: "game_state_flush_patch_size_bytes",
-  help: "Size of the game state patch sent each server tick to clients in bytes",
-  registers: [metricsRegister],
-  buckets: exponentialBuckets(1, 2, 20),
-});
+const metrics = {
+  gameStatePatchSize: new MetricsHistogram({
+    name: "game_state_flush_patch_size_bytes",
+    help: "Size of the game state patch sent each server tick to clients in bytes",
+    buckets: exponentialBuckets(1, 2, 20),
+  }),
 
-const _userCountGague = new MetricsGague({
-  name: "active_user_count",
-  help: "Number of users currently connected",
-  registers: [metricsRegister],
-  collect() {
-    this.set(
-      new Set(
-        userSessions
-          .values()
-          .flatMap((session) => (session.user ? [session.user.id] : [])),
-      ).size,
-    );
-  },
-});
+  userCount: new MetricsGague({
+    name: "active_user_count",
+    help: "Number of users currently connected",
+    collect() {
+      this.set(
+        new Set(
+          userSessions
+            .values()
+            .flatMap((session) => (session.user ? [session.user.id] : [])),
+        ).size,
+      );
+    },
+  }),
 
-const _clientCountGague = new MetricsGague({
-  name: "active_client_count",
-  help: "Number of active websocket connections",
-  registers: [metricsRegister],
-  collect() {
-    this.set(gameClientSockets.size);
-  },
-});
+  clientCount: new MetricsGague({
+    name: "active_client_count",
+    help: "Number of active websocket connections",
+    collect() {
+      this.set(gameClientSockets.size);
+    },
+  }),
+};

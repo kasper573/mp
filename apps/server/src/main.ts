@@ -2,11 +2,7 @@ import "dotenv/config";
 
 import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
-import {
-  collectDefaultMetrics,
-  MetricsRegistry,
-  Pushgateway,
-} from "@mp/telemetry/prom";
+import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
 import { WebSocket } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
@@ -67,12 +63,7 @@ RateLimiter.enabled = opt.rateLimit;
 
 const api = createApiClient(opt.apiServiceUrl);
 
-const metrics = new MetricsRegistry();
-const metricsPushgateway = new Pushgateway(
-  opt.metricsPushgateway.url,
-  undefined,
-  metrics,
-);
+const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
@@ -133,7 +124,7 @@ const gameStateServer: GameStateServer = new SyncServer({
 
 const updateTicker = new Ticker({
   onError: (error) => logger.error(error, "Update Ticker Error"),
-  middleware: createTickMetricsObserver(metrics),
+  middleware: createTickMetricsObserver(),
 });
 
 logger.info(`Getting all NPCs and spawns...`);
@@ -152,9 +143,9 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
 
-collectDefaultMetrics({ register: metrics });
-collectProcessMetrics(metrics);
-collectGameStateMetrics(metrics, gameState);
+collectDefaultMetrics();
+collectProcessMetrics();
+collectGameStateMetrics(gameState);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
@@ -163,7 +154,7 @@ updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(
-  createGameStateFlusher(gameState, gameStateServer, gatewaySocket, metrics),
+  createGameStateFlusher(gameState, gameStateServer, gatewaySocket),
 );
 updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
