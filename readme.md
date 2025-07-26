@@ -72,7 +72,7 @@ Local development is done using node and docker compose.
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.17.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
 - Run `pnpm -F db-client devenv push` to initialize your database
-- Run `pnpm -F server devenv provision` to provision keycloak roles
+- Run `pnpm -F keycloak-client devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
 ### Before each development session
