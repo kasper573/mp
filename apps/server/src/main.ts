@@ -19,6 +19,7 @@ import {
   ctxNpcSpawner,
   ctxRng,
   ctxUserSession,
+  eventWithSessionEncoding,
   gameServerEventRouter,
   NpcAi,
   NpcSpawner,
@@ -51,7 +52,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { createGameStateLoader } from "./etc/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
-import { createEventInvoker, EventTransceiver } from "@mp/event-router";
+import { createEventInvoker } from "@mp/event-router";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/game-state-db-sync";
 
 // Note that this file is an entrypoint and should not have any exports
@@ -91,15 +92,19 @@ await seed(db, area, actorModels);
 
 const wssUrl = new URL(opt.gatewayWssUrl);
 wssUrl.searchParams.set("type", "game-server");
-
-const receive = createEventInvoker(gameServerEventRouter);
-const transceiver = new EventTransceiver({ invoke: receive, logger });
+const receiveEvent = createEventInvoker(gameServerEventRouter);
 const gatewaySocket = new WebSocket(wssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
-gatewaySocket.on("message", (buffer: ArrayBuffer) =>
-  transceiver.handleMessage(buffer, ioc.provide(ctxUserSession, { id: "" })),
-);
+gatewaySocket.on("message", (buffer: ArrayBuffer) => {
+  const result = eventWithSessionEncoding.decode(buffer);
+  if (result.isOk()) {
+    receiveEvent(
+      result.value.event,
+      ioc.provide(ctxUserSession, result.value.session),
+    );
+  }
+});
 
 shouldOptimizeCollects.value = opt.patchOptimizer;
 

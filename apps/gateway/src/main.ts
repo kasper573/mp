@@ -10,6 +10,7 @@ import {
   ctxTokenResolver,
   registerEncoderExtensions,
   ctxGameEventClient,
+  eventWithSessionEncoding,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
@@ -102,19 +103,9 @@ const gatewayEventTransceiver = new EventTransceiver({
   logger,
 });
 
-const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
-  (message) => {
-    const encoded = EventTransceiver.messageEncoding.encode(message);
-    for (const socket of gameServiceSockets) {
-      socket.send(encoded);
-    }
-  },
-);
-
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
-  .provide(ctxDbClient, dbClient)
-  .provide(ctxGameEventClient, gameServiceEventBroadcast);
+  .provide(ctxDbClient, dbClient);
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
@@ -163,18 +154,29 @@ function setupGameClientSocket(socket: WebSocket) {
   userSessions.set(clientId, session);
   gameClientSockets.set(clientId, socket);
 
+  const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
+    (event) => {
+      const encoded = eventWithSessionEncoding.encode({ event, session });
+      for (const socket of gameServiceSockets) {
+        socket.send(encoded);
+      }
+    },
+  );
+
   socket.on("close", () => {
     logger.info(`Game client ${clientId} disconnected`);
     gameClientSockets.delete(clientId);
     userSessions.delete(clientId);
   });
 
-  socket.on("message", (data: ArrayBuffer) =>
+  socket.on("message", (data: ArrayBuffer) => {
     gatewayEventTransceiver.handleMessage(
       data,
-      ioc.provideIfDefined(ctxUserSession, session),
-    ),
-  );
+      ioc
+        .provideIfDefined(ctxUserSession, session)
+        .provide(ctxGameEventClient, gameServiceEventBroadcast),
+    );
+  });
 }
 
 function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {

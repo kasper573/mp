@@ -20,6 +20,7 @@ export * from "./area/area-id";
 export * from "./area/area-resource";
 export * from "./area/tiled-resource";
 export * from "./network/events";
+export * from "./network/event-with-session";
 export * from "./network/game-event-client";
 export * from "./traits/combat";
 export * from "./traits/movement";
