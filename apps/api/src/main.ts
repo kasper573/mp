@@ -8,7 +8,7 @@ import { apiRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createTokenResolver } from "@mp/auth/server";
 import type { ApiContext } from "./integrations/trpc";
-import { createFileResolver } from "./integrations/file-server";
+import { createFileResolver } from "./integrations/file-resolver";
 import type { AccessToken } from "@mp/auth";
 import type { IncomingHttpHeaders } from "http";
 import { createDbClient } from "@mp/db-client";
