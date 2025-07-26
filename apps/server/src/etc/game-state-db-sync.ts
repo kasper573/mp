@@ -46,7 +46,7 @@ export function gameStateDbSyncBehavior(
   }
 
   function onCharacterLeftGameService(char: Character) {
-    state.actors.delete(char.identity.id, char);
+    state.actors.delete(char.identity.id);
     server.markToResendFullState(char.identity.id);
     server.addEvent(
       "area.joined",
