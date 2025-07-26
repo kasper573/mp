@@ -1,10 +1,10 @@
 import type { AreaId } from "@mp/game/server";
 import type { PublicUrl } from "@mp/std";
 import path from "path";
-import { ctxFileResolver } from "../integrations/file-server";
 import { rpc } from "../integrations/trpc";
 import { type } from "@mp/validate";
 import type { InjectionContainer } from "@mp/ioc";
+import { ctxFileResolver } from "../ioc";
 
 export const areaFileUrl = rpc.procedure
   .input(type("string").brand("AreaId"))

@@ -8,15 +8,11 @@ import { apiRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createTokenResolver } from "@mp/auth/server";
 import type { ApiContext } from "./integrations/trpc";
-import {
-  createFileResolver,
-  ctxFileResolver,
-} from "./integrations/file-server";
-import { ctxToken as ctxAccessToken } from "./integrations/auth";
+import { createFileResolver } from "./integrations/file-server";
 import type { AccessToken } from "@mp/auth";
 import type { IncomingHttpHeaders } from "http";
 import { createDbClient } from "@mp/db-client";
-import { ctxDbClient } from "./context";
+import { ctxAccessToken, ctxDbClient, ctxFileResolver } from "./ioc";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 
 // Note that this file is an entrypoint and should not have any exports

@@ -1,12 +1,9 @@
-import type { AccessToken, RoleDefinition, UserId } from "@mp/auth";
+import type { RoleDefinition, UserId } from "@mp/auth";
 import type { ApiContext } from "./trpc";
 import { rpc } from "./trpc";
-import { InjectionContext } from "@mp/ioc";
-import { ctxTokenResolver } from "@mp/game/server";
 
-export const ctxToken = InjectionContext.new<AccessToken | undefined>(
-  "AccessToken",
-);
+import { ctxTokenResolver } from "@mp/game/server";
+import { ctxAccessToken } from "../ioc";
 
 export function auth() {
   return rpc.middleware(async ({ ctx, next }) => {
@@ -39,7 +36,7 @@ export function optionalAuth() {
 }
 
 function resolveAuth(ctx: ApiContext) {
-  const token = ctx.ioc.get(ctxToken);
+  const token = ctx.ioc.get(ctxAccessToken);
   const resolve = ctx.ioc.get(ctxTokenResolver);
   return resolve(token);
 }

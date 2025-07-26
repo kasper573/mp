@@ -1,9 +1,5 @@
-import { InjectionContext } from "@mp/ioc";
 import type { PublicUrl } from "@mp/std";
 import { type } from "@mp/validate";
-
-export const ctxFileResolver =
-  InjectionContext.new<FileResolver>("FileResolver");
 
 export interface FileResolver {
   abs: (...relativePath: string[]) => PublicUrl;

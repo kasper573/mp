@@ -5,9 +5,9 @@ import type {
 } from "@mp/game/server";
 import type { PublicUrl } from "@mp/std";
 import path from "path";
-import { ctxFileResolver } from "../integrations/file-server";
 import { rpc } from "../integrations/trpc";
 import type { InjectionContainer } from "@mp/ioc";
+import { ctxFileResolver } from "../ioc";
 
 export const actorSpritesheetUrls = rpc.procedure.query(({ ctx }) =>
   getActorSpritesheetUrls(ctx.ioc),

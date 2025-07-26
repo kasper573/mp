@@ -9,7 +9,7 @@ import { assert, Rng, type Tile, type TimesPerSecond } from "@mp/std";
 import { auth } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
 import { unsafe } from "@mp/validate";
-import { ctxDbClient } from "../context";
+import { ctxDbClient } from "../ioc";
 import { cardinalDirections } from "@mp/math";
 import { getActorModels } from "./actor-models";
 import { getDefaultSpawnPoint } from "./default-spawn-point";

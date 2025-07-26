@@ -1,7 +1,6 @@
 import { loadAreaResource, type AreaId } from "@mp/game/server";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Vector } from "@mp/math";
-
 import type { Tile } from "@mp/std";
 import { rpc } from "../integrations/trpc";
 
