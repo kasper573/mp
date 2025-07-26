@@ -48,7 +48,11 @@ function createGameStateClient(
   logger: Logger,
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
-  const socket = createWebSocket(env.gameServiceUrl);
+  const socket = createWebSocket(() => {
+    const url = new URL(env.gameServiceUrl);
+    url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
+    return url.toString();
+  });
 
   const eventClient: ComposedGameEventClient = createProxyEventInvoker(
     (message) => socket.send(eventMessageEncoding.encode(message)),

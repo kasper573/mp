@@ -1,2 +1,5 @@
 export { WebSocket } from "ws";
-export { WebSocketServer } from "ws";
+export {
+  WebSocketServer,
+  type ServerOptions as WebSocketServerOptions,
+} from "ws";

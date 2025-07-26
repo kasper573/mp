@@ -13,7 +13,7 @@ import {
   eventWithSessionEncoding,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
-import type { WebSocket } from "@mp/ws/server";
+import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 
 import createCors from "cors";
@@ -43,6 +43,7 @@ import { createTokenResolver } from "@mp/auth/server";
 import type { Branded } from "@mp/std";
 import { createShortId } from "@mp/std";
 import { createDbClient } from "@mp/db-client";
+import type { AccessToken } from "@mp/auth";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -72,38 +73,10 @@ const dbClient = createDbClient(opt.databaseConnectionString);
 const tokenResolver = createTokenResolver(opt.auth);
 
 const wss = new WebSocketServer({
+  ...wssConfig(),
   path: opt.wsEndpointPath,
   server: httpServer,
-  maxPayload: 5000,
-  perMessageDeflate: {
-    zlibDeflateOptions: {
-      chunkSize: 1024,
-      memLevel: 7, // default level
-      level: 6, // default is 3, max is 9
-    },
-    zlibInflateOptions: {
-      chunkSize: 10 * 1024,
-    },
-    clientNoContextTakeover: true, // defaults to negotiated value.
-    serverNoContextTakeover: true, // defaults to negotiated value.
-    serverMaxWindowBits: 10, // defaults to negotiated value.
-    concurrencyLimit: 10, // limits zlib concurrency for perf.
-    threshold: 1024, // messages under this size won't be compressed.
-  },
-  verifyClient({ req }, cb) {
-    const info = getRequestInfo(req);
-    switch (info.type) {
-      case "game-service":
-        if (info.secret === opt.gameServiceSecret) {
-          return cb(true);
-        }
-        return cb(false, 403, "Forbidden: Invalid game service secret");
-      case "game-client":
-        return cb(true);
-      default:
-        return cb(false, 400, "Bad Request: Unknown connection type");
-    }
-  },
+  verifyClient: verifySocketConnection,
 });
 
 httpServer.listen(opt.port, opt.hostname, () => {
@@ -131,7 +104,7 @@ wss.on("connection", (socket, request) => {
 
   switch (info.type) {
     case "game-client":
-      return setupGameClientSocket(socket);
+      return setupGameClientSocket(info.clientId, socket);
     case "game-service":
       return setupGameServerSocket(socket);
     default:
@@ -155,8 +128,7 @@ function setupGameServerSocket(socket: WebSocket) {
   });
 }
 
-function setupGameClientSocket(socket: WebSocket) {
-  const clientId = createShortId() as ClientId;
+function setupGameClientSocket(clientId: ClientId, socket: WebSocket) {
   const session: UserSession = { id: clientId };
   userSessions.set(clientId, session);
   gameClientSockets.set(clientId, socket);
@@ -209,16 +181,70 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   }
 }
 
+async function verifySocketConnection(
+  { req }: { req: IncomingMessage },
+  cb: (result: boolean, code?: number, message?: string) => void,
+) {
+  const info = getRequestInfo(req);
+  switch (info.type) {
+    case "game-service":
+      if (info.secret === opt.gameServiceSecret) {
+        return cb(true);
+      }
+      return cb(false, 403, "Forbidden: Invalid game service secret");
+    case "game-client": {
+      const result = await tokenResolver(info.accessToken);
+      if (result.isOk()) {
+        return cb(true);
+      }
+      return cb(false, 401, result.error);
+    }
+    default:
+      return cb(false, 400, "Bad Request: Unknown connection type");
+  }
+}
+
 function getRequestInfo(req: IncomingMessage) {
   if (!req.url) {
     return { type: "unknown" } as const;
   }
   const { searchParams } = new URL(req.url, "http://localhost");
-  const secret = searchParams.get("gameServiceSecret");
+  const secret = searchParams.get("gameServiceSecret") ?? undefined;
   if (secret) {
     return { type: "game-service", secret } as const;
   }
-  return { type: "game-client" } as const;
+  const accessToken = (searchParams.get("accessToken") ?? undefined) as
+    | AccessToken
+    | undefined;
+
+  let clientId = Reflect.get(req, "clientId") as ClientId | undefined;
+  if (!clientId) {
+    clientId = createShortId() as ClientId;
+    Reflect.set(req, "clientId", clientId);
+  }
+
+  return { type: "game-client", clientId, accessToken } as const;
+}
+
+function wssConfig(): WebSocketServerOptions {
+  return {
+    maxPayload: 5000,
+    perMessageDeflate: {
+      zlibDeflateOptions: {
+        chunkSize: 1024,
+        memLevel: 7, // default level
+        level: 6, // default is 3, max is 9
+      },
+      zlibInflateOptions: {
+        chunkSize: 10 * 1024,
+      },
+      clientNoContextTakeover: true, // defaults to negotiated value.
+      serverNoContextTakeover: true, // defaults to negotiated value.
+      serverMaxWindowBits: 10, // defaults to negotiated value.
+      concurrencyLimit: 10, // limits zlib concurrency for perf.
+      threshold: 1024, // messages under this size won't be compressed.
+    },
+  };
 }
 
 const metrics = {
