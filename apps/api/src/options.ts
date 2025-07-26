@@ -8,6 +8,7 @@ export const apiOptionsSchema = type({
   port: numeric(),
   hostname: "string",
   exposeErrorDetails: boolish(),
+  databaseConnectionString: "string",
   prettyLogs: boolish(),
   fileServerBaseUrl: "string",
   version: "string",

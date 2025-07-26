@@ -16,6 +16,8 @@ import {
 import { ctxToken as ctxAccessToken } from "./integrations/auth";
 import type { AccessToken } from "@mp/auth";
 import type { IncomingHttpHeaders } from "http";
+import { createDbClient } from "@mp/db-client";
+import { ctxDbClient } from "./context";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -26,13 +28,16 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
+const dbClient = createDbClient(opt.databaseConnectionString);
+
 const fileResolver = createFileResolver(opt.fileServerBaseUrl);
 
 const requestLimiter = new RateLimiter({ points: 20, duration: 1 });
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
-  .provide(ctxFileResolver, fileResolver);
+  .provide(ctxFileResolver, fileResolver)
+  .provide(ctxDbClient, dbClient);
 
 const app = express();
 app.use(
