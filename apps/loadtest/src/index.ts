@@ -12,7 +12,10 @@ import {
 } from "@mp/game/client";
 import { readCliOptions } from "./cli";
 import type { GameStateEvents } from "@mp/game/server";
-import { EventTransceiver, createProxyEventInvoker } from "@mp/event-router";
+import {
+  createProxyEventInvoker,
+  eventMessageEncoding,
+} from "@mp/event-router";
 import type { GatewayRouter } from "@mp/gateway";
 
 registerEncoderExtensions();
@@ -60,16 +63,13 @@ async function testOneGameClient(n: number, rng: Rng) {
   }
 
   const socket = createWebSocket(gameServiceUrl);
-  const eventTransceiver = new EventTransceiver({
-    send: (data) => socket.send(data),
-  });
 
-  const gameEvents: GameEventClient = createProxyEventInvoker(
-    eventTransceiver.send,
+  const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
+    socket.send(eventMessageEncoding.encode(message)),
   );
 
-  const gatewayEvents = createProxyEventInvoker<GatewayRouter>(
-    eventTransceiver.send,
+  const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>
+    socket.send(eventMessageEncoding.encode(message)),
   );
 
   let stopClient = () => {};

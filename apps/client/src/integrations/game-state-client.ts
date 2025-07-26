@@ -1,8 +1,8 @@
 import {
-  EventTransceiver,
   createProxyEventInvoker,
   type ProxyEventInvoker,
   type MergeEventRouterNodes,
+  eventMessageEncoding,
 } from "@mp/event-router";
 import {
   ctxAuthClient,
@@ -49,11 +49,9 @@ function createGameStateClient(
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
   const socket = createWebSocket(env.gameServiceUrl);
-  const transceiver = new EventTransceiver({
-    send: socket.send.bind(socket),
-  });
+
   const eventClient: ComposedGameEventClient = createProxyEventInvoker(
-    transceiver.send,
+    (message) => socket.send(eventMessageEncoding.encode(message)),
   );
   const accessToken = computed(() => auth.identity.value?.token);
 

@@ -33,9 +33,10 @@ import {
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
 import {
-  EventTransceiver,
+  QueuedEventInvoker,
   createEventInvoker,
   createProxyEventInvoker,
+  eventMessageEncoding,
 } from "@mp/event-router";
 import { ctxDbClient, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
@@ -98,7 +99,7 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
 });
 
-const gatewayEventTransceiver = new EventTransceiver({
+const gatewayEventInvoker = new QueuedEventInvoker({
   invoke: createEventInvoker(gatewayRouter),
   logger,
 });
@@ -170,12 +171,15 @@ function setupGameClientSocket(socket: WebSocket) {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    gatewayEventTransceiver.handleMessage(
-      data,
-      ioc
-        .provideIfDefined(ctxUserSession, session)
-        .provide(ctxGameEventClient, gameServiceEventBroadcast),
-    );
+    const result = eventMessageEncoding.decode(data);
+    if (result.isOk()) {
+      gatewayEventInvoker.addEvent(
+        result.value,
+        ioc
+          .provideIfDefined(ctxUserSession, session)
+          .provide(ctxGameEventClient, gameServiceEventBroadcast),
+      );
+    }
   });
 }
 
