@@ -1,5 +1,5 @@
 // oxlint-disable no-await-in-loop
-import { KeycloakAdminClient } from "@mp/keycloak-provision";
+import KeycloakAdminClient from "@keycloak/keycloak-admin-client";
 import { createConsoleLogger } from "@mp/logger";
 import { assert } from "@mp/std";
 import { groupedRoles, playerGroup } from "./roles";

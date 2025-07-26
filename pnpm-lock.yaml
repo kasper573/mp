@@ -430,9 +430,6 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
-      '@mp/keycloak-provision':
-        specifier: workspace:*
-        version: link:../../libraries/keycloak-provision
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -510,6 +507,25 @@ importers:
       drizzle-kit:
         specifier: 0.30.1
         version: 0.30.1
+
+  integrations/keycloak-client:
+    dependencies:
+      '@keycloak/keycloak-admin-client':
+        specifier: 26.1.2
+        version: 26.1.2
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../../apps/game
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
 
   libraries/auth:
     dependencies:
@@ -674,16 +690,6 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
-
-  libraries/keycloak-provision:
-    dependencies:
-      '@keycloak/keycloak-admin-client':
-        specifier: 26.1.2
-        version: 26.1.2
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
 
   libraries/logger:
     dependencies:
