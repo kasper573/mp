@@ -13,6 +13,9 @@ import {
   createFileResolver,
   ctxFileResolver,
 } from "./integrations/file-server";
+import { ctxToken as ctxAccessToken } from "./integrations/auth";
+import type { AccessToken } from "@mp/auth";
+import type { IncomingHttpHeaders } from "http";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -40,7 +43,7 @@ app.use(
     createContext: ({ req, info }): ApiContext => {
       requestLimiter.consume(sessionId(req));
       logger.info(info, "[req]");
-      return { ioc };
+      return { ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)) };
     },
   }),
 );
@@ -51,4 +54,12 @@ app.listen(opt.port, opt.hostname, () => {
 
 function sessionId(req: express.Request): string {
   return String(req.socket.remoteAddress);
+}
+
+function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
+  const prefix = "Bearer ";
+  const headerValue = String(headers.authorization ?? "");
+  if (headerValue.startsWith(prefix)) {
+    return headerValue.substring(prefix.length) as AccessToken;
+  }
 }

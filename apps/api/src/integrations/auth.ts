@@ -4,13 +4,15 @@ import { rpc } from "./trpc";
 import { InjectionContext } from "@mp/ioc";
 import { ctxTokenResolver } from "@mp/game/server";
 
-export const ctxToken = InjectionContext.new<AccessToken>("AccessToken");
+export const ctxToken = InjectionContext.new<AccessToken | undefined>(
+  "AccessToken",
+);
 
 export function auth() {
   return rpc.middleware(async ({ ctx, next }) => {
     const res = await resolveAuth(ctx);
     if (res.isErr()) {
-      throw new Error("Authentication failed", { cause: res.error });
+      throw new Error(res.error);
     }
     return next({ ctx: { ...ctx, user: res.value } });
   });
@@ -37,7 +39,7 @@ export function optionalAuth() {
 }
 
 function resolveAuth(ctx: ApiContext) {
-  const token = ctx.ioc.access(ctxToken).unwrapOr(undefined);
+  const token = ctx.ioc.get(ctxToken);
   const resolve = ctx.ioc.get(ctxTokenResolver);
   return resolve(token);
 }
