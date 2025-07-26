@@ -1,19 +1,15 @@
-import type {
-  ActorAnimationName,
-  ActorModelId,
-  ActorSpritesheetUrls,
-  AreaId,
-  Character,
-} from "@mp/game/server";
+import type { Character } from "@mp/game/server";
 import { systemRoles, gatewayRoles } from "@mp/game/server";
 
-import type { PublicUrl } from "@mp/std";
 import { opt } from "./options";
 import { rpc } from "./integrations/trpc";
-import { ctxFileResolver } from "./integrations/file-server";
-import path from "path";
+
 import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
+import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
+import { getOrCreateMyCharacter } from "./routes/get-or-create-my-character";
+import { actorModels } from "./routes/actor-models";
+import { areaFileUrl, areaFileUrls } from "./routes/area-file-urls";
 
 export type ApiRpcRouter = typeof apiRouter;
 export const apiRouter = rpc.router({
@@ -24,6 +20,12 @@ export const apiRouter = rpc.router({
   testError: rpc.procedure.use(roles([systemRoles.useDevTools])).query(() => {
     throw new Error("This is a test error that was thrown in the server");
   }),
+
+  getOrCreateMyCharacter,
+  actorSpritesheetUrls,
+  actorModels,
+  areaFileUrl,
+  areaFileUrls,
 
   isPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
@@ -45,54 +47,4 @@ export const apiRouter = rpc.router({
       total: 0,
     };
   }),
-
-  areaFileUrl: rpc.procedure
-    .input(type("string").brand("AreaId"))
-    .query(({ input: areaId, ctx }) =>
-      ctx.ioc.get(ctxFileResolver).abs("areas", `${areaId}.json`),
-    ),
-
-  areaFileUrls: rpc.procedure.query(
-    async ({ ctx }): Promise<ReadonlyMap<AreaId, PublicUrl>> => {
-      const fs = ctx.ioc.get(ctxFileResolver);
-      const areaFiles = await fs.dir("areas");
-      return new Map(
-        areaFiles.map((file): [AreaId, PublicUrl] => {
-          const id = path.basename(file, path.extname(file)) as AreaId;
-          const url = fs.abs("areas", file);
-          return [id, url];
-        }),
-      );
-    },
-  ),
-
-  actorSpritesheetUrls: rpc.procedure.query(
-    async ({ ctx }): Promise<ActorSpritesheetUrls> => {
-      const fs = ctx.ioc.get(ctxFileResolver);
-      const modelFolders = await fs.dir<ActorModelId>("actors");
-      return new Map(
-        await Promise.all(
-          modelFolders.map(async (modelId) => {
-            const spritesheetFiles = await fs.dir("actors", modelId);
-            const spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl> =
-              new Map(
-                await Promise.all(
-                  spritesheetFiles.map(
-                    (spritesheet): [ActorAnimationName, PublicUrl] => {
-                      const state = path.basename(
-                        spritesheet,
-                        path.extname(spritesheet),
-                      ) as ActorAnimationName;
-                      const url = fs.abs("actors", modelId, spritesheet);
-                      return [state, url];
-                    },
-                  ),
-                ),
-              );
-            return [modelId, spritesheets] as const;
-          }),
-        ),
-      );
-    },
-  ),
 });

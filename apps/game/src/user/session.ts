@@ -13,6 +13,7 @@ export interface UserSession {
   user?: {
     id: UserId;
     roles: ReadonlySetLike<RoleDefinition>;
+    name: string;
   };
 
   /**

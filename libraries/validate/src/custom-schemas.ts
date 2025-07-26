@@ -44,3 +44,10 @@ export function csv<Item extends Type>(itemType: Item) {
     str.split(",").map((v) => itemType.from(v.trim())),
   );
 }
+
+/**
+ * Returns a schema that does not validate anything at runtime.
+ */
+export function unsafe<T>(): Type<T> {
+  return type("unknown") as unknown as Type<T>;
+}

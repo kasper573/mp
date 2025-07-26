@@ -1,11 +1,10 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
 import {
-  extractRolesFromJwtPayload,
+  createUserIdentity,
   isOurJwtPayload,
   parseBypassUser,
   type AccessToken,
-  type UserId,
   type UserIdentity,
 } from "./shared";
 
@@ -72,14 +71,7 @@ export function createTokenResolver({
       return err(`Token payload is missing 'sub' claim`);
     }
 
-    const user: UserIdentity = {
-      id: jwtPayload.sub as UserId,
-      token,
-      roles: extractRolesFromJwtPayload(jwtPayload),
-      name: jwtPayload.preferred_username
-        ? String(jwtPayload.preferred_username)
-        : undefined,
-    };
+    const user = createUserIdentity(token, jwtPayload);
 
     return ok(user);
   };

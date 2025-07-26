@@ -86,6 +86,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
+      '@mp/db-client':
+        specifier: workspace:*
+        version: link:../../integrations/db-client
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -98,6 +101,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../libraries/rate-limiter
@@ -122,6 +128,9 @@ importers:
       superjson:
         specifier: 2.2.2
         version: 2.2.2
+      unique-names-generator:
+        specifier: 4.7.1
+        version: 4.7.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -466,9 +475,6 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
-      unique-names-generator:
-        specifier: 4.7.1
-        version: 4.7.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

@@ -55,8 +55,8 @@ export const gatewayRouter = evt.router({
         throw new Error("Invalid token", { cause: result.error });
       }
       const session = ctx.get(ctxUserSession);
-      const { id, roles } = result.value;
-      session.user = { id, roles };
+      const { id, roles, name } = result.value;
+      session.user = { id, roles, name };
     }),
   }),
 });

@@ -19,7 +19,9 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/env": "workspace:*",
+    "@mp/math": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/db-client": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/rate-limiter": "workspace:*",

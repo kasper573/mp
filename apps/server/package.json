@@ -27,8 +27,7 @@
     "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "dotenv": "catalog:",
-    "unique-names-generator": "4.7.1"
+    "dotenv": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

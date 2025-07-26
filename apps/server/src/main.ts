@@ -84,7 +84,7 @@ const [area, actorModels] = await Promise.all([
   api.actorSpritesheetUrls.query().then(loadActorModels),
 ]);
 
-const gameStatePersistence = createGameStateLoader(db, area, actorModels, rng);
+const gameStateLoader = createGameStateLoader(db, area);
 
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
@@ -129,13 +129,13 @@ const updateTicker = new Ticker({
 });
 
 logger.info(`Getting all NPCs and spawns...`);
-const allNpcsAndSpawns = await gameStatePersistence.getAllSpawnsAndTheirNpcs();
+const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
 
 const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxGlobalServerEventMiddleware, rateLimiterMiddleware)
-  .provide(ctxGameStateLoader, gameStatePersistence)
+  .provide(ctxGameStateLoader, gameStateLoader)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxArea, area)

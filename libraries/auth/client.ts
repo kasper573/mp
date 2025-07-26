@@ -2,12 +2,11 @@ import type { User } from "oidc-client-ts";
 import { UserManager } from "oidc-client-ts";
 import type { ReadonlySignal } from "@mp/state";
 import { computed, signal } from "@mp/state";
+import type { AccessToken } from "./shared";
 import {
-  extractRolesFromJwtPayload,
+  createUserIdentity,
   isOurJwtPayload,
-  type AccessToken,
   type JWTPayload,
-  type UserId,
   type UserIdentity,
 } from "./shared";
 
@@ -114,12 +113,7 @@ function extractIdentity(user?: User | null): UserIdentity | undefined {
     throw new Error("Invalid JWT payload");
   }
 
-  return {
-    id: user.profile.sub as UserId,
-    token: user.access_token as AccessToken,
-    name: user.profile.name,
-    roles: extractRolesFromJwtPayload(payload),
-  };
+  return createUserIdentity(user.access_token as AccessToken, payload);
 }
 
 function parseJwtPayload(jwtString: string): JWTPayload {

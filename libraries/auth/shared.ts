@@ -7,7 +7,7 @@ export type UserId = Branded<string, "UserId">;
 export interface UserIdentity {
   id: UserId;
   token: AccessToken;
-  name?: string;
+  name: string;
   roles: ReadonlySetLike<RoleDefinition>;
 }
 
@@ -25,6 +25,20 @@ export function extractRolesFromJwtPayload(
   payload: OurJwtPayload,
 ): ReadonlySetLike<RoleDefinition> {
   return new Set(payload.realm_access.roles) as ReadonlySetLike<RoleDefinition>;
+}
+
+export function createUserIdentity(
+  token: AccessToken,
+  jwtPayload: OurJwtPayload,
+): UserIdentity {
+  return {
+    id: jwtPayload.sub as UserId,
+    token,
+    roles: extractRolesFromJwtPayload(jwtPayload),
+    name: jwtPayload.preferred_username
+      ? String(jwtPayload.preferred_username)
+      : "Anonymous",
+  };
 }
 
 const bypassTokenPrefix = "bypass:";
