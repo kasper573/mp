@@ -1,10 +1,15 @@
 import "dotenv/config";
 import { opt } from "./options";
-import type { CharacterId, UserSession } from "@mp/game/server";
+import type {
+  CharacterId,
+  GameEventClient,
+  UserSession,
+} from "@mp/game/server";
 import {
   ctxUserSession,
   ctxTokenResolver,
   registerEncoderExtensions,
+  ctxGameEventClient,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket } from "@mp/ws/server";
@@ -26,7 +31,11 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
-import { EventTransceiver, createEventInvoker } from "@mp/event-router";
+import {
+  EventTransceiver,
+  createEventInvoker,
+  createProxyEventInvoker,
+} from "@mp/event-router";
 import { ctxDbClient, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 
@@ -88,14 +97,24 @@ httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);
 });
 
-const eventTransceiver = new EventTransceiver({
+const gatewayEventTransceiver = new EventTransceiver({
   invoke: createEventInvoker(gatewayRouter),
   logger,
 });
 
+const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
+  (message) => {
+    const encoded = EventTransceiver.messageEncoding.encode(message);
+    for (const socket of gameServiceSockets) {
+      socket.send(encoded);
+    }
+  },
+);
+
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
-  .provide(ctxDbClient, dbClient);
+  .provide(ctxDbClient, dbClient)
+  .provide(ctxGameEventClient, gameServiceEventBroadcast);
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
@@ -151,7 +170,7 @@ function setupGameClientSocket(socket: WebSocket) {
   });
 
   socket.on("message", (data: ArrayBuffer) =>
-    eventTransceiver.handleMessage(
+    gatewayEventTransceiver.handleMessage(
       data,
       ioc.provideIfDefined(ctxUserSession, session),
     ),

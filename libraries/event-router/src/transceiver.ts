@@ -16,7 +16,8 @@ export interface EventTransceiverOptions<Context> {
 
 export class EventTransceiver<Context = void> {
   // Claiming the range 43_000 - 43_999 for the binary event protocol
-  #messageEncoding = createEncoding<EventRouterMessage<unknown>>(43_000);
+  static readonly messageEncoding =
+    createEncoding<EventRouterMessage<unknown>>(43_000);
   #messageQueue: Array<[EventRouterMessage<unknown>, Context]> = [];
   #isInvokingEvent = false;
 
@@ -24,11 +25,11 @@ export class EventTransceiver<Context = void> {
 
   send = <Input>(message: EventRouterMessage<Input>) => {
     const sendFn = assert(this.opt.send, "No send function provided");
-    sendFn(this.#messageEncoding.encode(message));
+    sendFn(EventTransceiver.messageEncoding.encode(message));
   };
 
   handleMessage = (data: ArrayBufferLike, context: Context) => {
-    const decodeResult = this.#messageEncoding.decode(data);
+    const decodeResult = EventTransceiver.messageEncoding.decode(data);
     if (decodeResult.isOk()) {
       const path = decodeResult.value[0].join(".");
       this.opt.logger?.debug(`Queueing event: ${path}`);
