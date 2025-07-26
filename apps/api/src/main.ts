@@ -6,7 +6,6 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import express from "express";
 import { apiRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
-import { RateLimiter } from "@mp/rate-limiter";
 import { createTokenResolver } from "@mp/auth/server";
 import type { ApiContext } from "./integrations/trpc";
 import {
@@ -35,8 +34,6 @@ const dbClient = createDbClient(opt.databaseConnectionString);
 
 const fileResolver = createFileResolver(opt.fileServerBaseUrl);
 
-const requestLimiter = new RateLimiter({ points: 20, duration: 1 });
-
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
@@ -50,7 +47,6 @@ const app = express()
       router: apiRouter,
       onError: (opt) => logger.error(opt.error, "RPC error"),
       createContext: ({ req, info }): ApiContext => {
-        requestLimiter.consume(sessionId(req));
         logger.info(info, "[req]");
         return {
           ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
@@ -62,10 +58,6 @@ const app = express()
 app.listen(opt.port, opt.hostname, () => {
   logger.info(`API listening on ${opt.hostname}:${opt.port}`);
 });
-
-function sessionId(req: express.Request): string {
-  return String(req.socket.remoteAddress);
-}
 
 function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
   const prefix = "Bearer ";
