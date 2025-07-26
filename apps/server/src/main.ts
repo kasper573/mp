@@ -33,8 +33,6 @@ import {
 import { registerEncoderExtensions } from "@mp/game/server";
 import { clientViewDistance } from "@mp/game/server";
 import { seed } from "../seed";
-
-import { collectProcessMetrics } from "./metrics/process";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
@@ -149,7 +147,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxNpcSpawner, npcSpawner);
 
 collectDefaultMetrics();
-collectProcessMetrics();
 collectGameStateMetrics(gameState);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
