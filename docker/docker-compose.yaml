@@ -77,7 +77,9 @@ services:
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/keycloak-provision:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
-    depends_on: ["keycloak"]
+    depends_on:
+      keycloak-healthcheck:
+        condition: service_healthy
 
   # the keycloak image dosen't have curl so we healthcheck it externally
   keycloak-healthcheck:
