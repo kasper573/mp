@@ -19,10 +19,12 @@ export function createGameStateFlusher(
     buckets: byteBuckets,
   });
   return () => {
-    const time = new Date();
     const flushResult = server.flush(state);
-    const encoded = flushResultEncoding().encode([flushResult, time]);
-    histogram.observe(encoded.byteLength);
-    gatewaySocket.send(encoded);
+    if (flushResult.clientEvents.size || flushResult.clientPatches.size) {
+      const time = new Date();
+      const encoded = flushResultEncoding().encode([flushResult, time]);
+      histogram.observe(encoded.byteLength);
+      gatewaySocket.send(encoded);
+    }
   };
 }
