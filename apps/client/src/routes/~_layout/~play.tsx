@@ -18,8 +18,8 @@ function PlayPage() {
 
   useEffect(() => {
     // Temporary solution until we have a proper character selection UI
-    void api.getOrCreateMyCharacter.query().then((char) => {
-      events.gateway.join(char.identity.id);
+    void api.myCharacterId.query().then((id) => {
+      events.gateway.join(id);
     });
   }, [events, api]);
 

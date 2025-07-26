@@ -112,11 +112,11 @@ async function testOneGameClient(n: number, rng: Rng) {
       },
     );
 
-    const char = await api.getOrCreateMyCharacter.query();
+    const characterId = await api.myCharacterId.query();
 
-    gatewayEvents.gateway.join(char.identity.id);
+    gatewayEvents.gateway.join(characterId);
 
-    const { areaId, characterId } = await joinPromise;
+    const { areaId } = await joinPromise;
     if (verbose) {
       logger.info({ characterId }, `Socket ${n} joined`);
     }

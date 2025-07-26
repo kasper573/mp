@@ -7,7 +7,7 @@ import { rpc } from "./integrations/trpc";
 import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
 import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
-import { getOrCreateMyCharacter } from "./routes/get-or-create-my-character";
+import { myCharacterId } from "./routes/my-character-id";
 import { actorModels } from "./routes/actor-models";
 import { areaFileUrl, areaFileUrls } from "./routes/area-file-urls";
 
@@ -21,7 +21,7 @@ export const apiRouter = rpc.router({
     throw new Error("This is a test error that was thrown in the server");
   }),
 
-  getOrCreateMyCharacter,
+  myCharacterId,
   actorSpritesheetUrls,
   actorModels,
   areaFileUrl,
