@@ -40,7 +40,7 @@ export function createFileResolver(baseUrl: string): FileResolver {
 }
 
 const DirectoryEntry = type({
-  name: "string",
+  name: type("string").pipe(trimSlashes),
   size: "number",
   url: "string",
   mod_time: "string",
@@ -48,3 +48,13 @@ const DirectoryEntry = type({
   is_dir: "boolean",
   is_symlink: "boolean",
 });
+
+function trimSlashes(str: string): string {
+  if (str.startsWith("/")) {
+    str = str.substring(1);
+  }
+  if (str.endsWith("/")) {
+    str = str.substring(0, str.length - 1);
+  }
+  return str;
+}
