@@ -13,7 +13,7 @@
   "scripts": {
     "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
-    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch src/main.ts",
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/main.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {

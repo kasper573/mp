@@ -13,7 +13,7 @@
   "scripts": {
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
-    "dev": "pnpm devenv tsx watch src/main.ts",
+    "dev": "pnpm devenv tsx watch --clear-screen=false src/main.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
