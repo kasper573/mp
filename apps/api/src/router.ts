@@ -6,7 +6,6 @@ import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
 import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
 import { myCharacterId } from "./routes/my-character-id";
-import { actorModels } from "./routes/actor-models";
 import { areaFileUrl, areaFileUrls } from "./routes/area-file-urls";
 
 export type ApiRpcRouter = typeof apiRouter;
@@ -21,7 +20,6 @@ export const apiRouter = rpc.router({
 
   myCharacterId,
   actorSpritesheetUrls,
-  actorModels,
   areaFileUrl,
   areaFileUrls,
 

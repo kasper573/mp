@@ -39,7 +39,6 @@ import { clientViewDistance } from "@mp/game/server";
 import { seed } from "../seed";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
-
 import { createDbClient } from "@mp/db-client";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -49,6 +48,7 @@ import { loadAreaResource } from "@mp/game/server";
 import { createEventInvoker, QueuedEventInvoker } from "@mp/event-router";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
 import { gameStateFlushHistogram } from "./metrics/game-state-flush";
+import { createActorModelLookup } from "./db/actor-model-lookup";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -74,7 +74,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
     api.areaFileUrl
       .query(opt.areaId)
       .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorModels.query(),
+    api.actorSpritesheetUrls.query().then(createActorModelLookup),
   ]),
 ).catch((error) => {
   logger.error(error, "Failed to load area and actor data from API service");
