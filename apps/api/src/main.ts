@@ -1,6 +1,6 @@
 import "dotenv/config";
 import { opt } from "./options";
-import { ctxTokenResolver, registerEncoderExtensions } from "@mp/game/server";
+import { ctxTokenResolver } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import * as trpcExpress from "@trpc/server/adapters/express";
 import express from "express";
@@ -16,8 +16,6 @@ import { ctxAccessToken, ctxDbClient, ctxFileResolver } from "./ioc";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 
 // Note that this file is an entrypoint and should not have any exports
-
-registerEncoderExtensions();
 
 collectDefaultMetrics();
 
