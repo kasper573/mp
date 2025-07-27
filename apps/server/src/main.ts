@@ -169,8 +169,18 @@ updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
-startGameStateDbSync(db, area, gameState, gameStateServer);
+startGameStateDbSync(
+  db,
+  area,
+  gameState,
+  gameStateServer,
+  actorModels,
+  rng,
+  logger,
+);
+
 updateTicker.start(opt.tickInterval);
+
 setInterval(
   () =>
     metricsPushgateway.push({
