@@ -11,6 +11,9 @@ export interface QueuedEventInvokerOptions<Context> {
   logger?: Logger;
 }
 
+/**
+ * Allows you to add events to a queue and process them one by one in sequence.
+ */
 export class QueuedEventInvoker<Context = void> {
   #queue: Array<[EventRouterMessage<unknown>, Context]> = [];
   #isInvokingEvent = false;
