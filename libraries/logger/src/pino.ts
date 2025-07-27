@@ -2,8 +2,11 @@
 import pino from "pino";
 import type { Logger } from "./abstract";
 
-export function createPinoLogger(pretty: boolean): Logger {
-  return pino({
+export function createPinoLogger(
+  pretty: boolean,
+  bindings?: pino.Bindings,
+): Logger {
+  let logger = pino({
     level: "debug",
     ...(pretty && {
       transport: {
@@ -16,4 +19,10 @@ export function createPinoLogger(pretty: boolean): Logger {
       },
     }),
   });
+
+  if (bindings) {
+    logger = logger.child(bindings);
+  }
+
+  return logger;
 }

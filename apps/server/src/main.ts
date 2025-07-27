@@ -69,7 +69,7 @@ shouldOptimizeCollects.value = opt.patchOptimizer;
 RateLimiter.enabled = opt.rateLimit;
 
 const rng = new Rng(opt.rngSeed);
-const logger = createPinoLogger(opt.prettyLogs);
+const logger = createPinoLogger(opt.prettyLogs, { areaId: opt.areaId });
 logger.info(opt, `Starting server...`);
 
 const api = createApiClient(opt.apiServiceUrl);
@@ -79,7 +79,7 @@ const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
-logger.info(`Loading areas and actor models...`);
+logger.info(`Loading area and actor models...`);
 const [area, actorModels] = await withBackoffRetries(() =>
   Promise.all([
     api.areaFileUrl

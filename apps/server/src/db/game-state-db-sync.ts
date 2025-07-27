@@ -52,7 +52,7 @@ export function gameStateDbSyncBehavior(
 
     for (const characterId of removedIds) {
       state.actors.delete(characterId);
-      logger.debug({ characterId }, "Character left game service");
+      logger.debug({ characterId }, "Character left game service via db poll");
     }
 
     if (addedIds.size) {
@@ -67,7 +67,7 @@ export function gameStateDbSyncBehavior(
         server.markToResendFullState(char.identity.id);
         logger.debug(
           { characterId: characterFields.id },
-          "Character joined to game service",
+          "Character joined game service via db poll",
         );
       }
     }

@@ -4,7 +4,7 @@ import { ctxUserSession } from "../user/session";
 import { assert } from "@mp/std";
 import type { AreaId } from "../area/area-id";
 import type { CharacterId } from "../character/types";
-import { ctxArea } from "../context/common";
+import { ctxArea, ctxLogger } from "../context/common";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { roles } from "../user/auth";
@@ -31,10 +31,15 @@ export const networkEventRouter = evt.router({
       if (input.areaId === currentArea.id) {
         const state = ctx.get(ctxGameState);
         const server = ctx.get(ctxGameStateServer);
+        const logger = ctx.get(ctxLogger);
         const db = ctx.get(ctxGameStateLoader);
         void db
           .assignAreaIdToCharacterInDb(input.characterId, currentArea.id)
           .then((character) => {
+            logger.debug(
+              { characterId: input.characterId },
+              "Character joined game service via gateway broadcast",
+            );
             character.movement.coords = currentArea.start;
             state.actors.set(input.characterId, character);
             server.markToResendFullState(input.characterId);
