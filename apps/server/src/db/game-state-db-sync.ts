@@ -3,7 +3,6 @@ import { and, characterTable, eq, inArray } from "@mp/db-client";
 import type {
   ActorModelLookup,
   AreaResource,
-  CharacterId,
   GameState,
   GameStateServer,
 } from "@mp/game/server";
@@ -29,7 +28,7 @@ export function gameStateDbSyncBehavior(
    * but disconnect and reconnect would not work without it.)
    */
   async function poll() {
-    const characterIdsThatShouldBeInService = new Set<CharacterId>(
+    const desiredIds = new Set(
       (
         await db
           .select({ id: characterTable.id })
@@ -43,34 +42,31 @@ export function gameStateDbSyncBehavior(
       ).map((row) => row.id),
     );
 
-    const characterIdsInState = new Set<CharacterId>(
+    const activeIds = new Set(
       state.actors
         .values()
         .flatMap((a) => (a.type === "character" ? [a.identity.id] : [])),
     );
-    const expiredCharacterIds = characterIdsInState.difference(
-      characterIdsThatShouldBeInService,
-    );
-    const newCharacterIds =
-      characterIdsThatShouldBeInService.difference(characterIdsInState);
+    const removedIds = activeIds.difference(desiredIds);
+    const addedIds = desiredIds.difference(activeIds);
 
-    for (const characterId of expiredCharacterIds) {
+    for (const characterId of removedIds) {
       state.actors.delete(characterId);
       logger.debug({ characterId }, "Character left game service");
     }
 
-    if (newCharacterIds.size) {
-      const newCharacters = await db
+    if (addedIds.size) {
+      const addedCharacters = await db
         .select()
         .from(characterTable)
-        .where(inArray(characterTable.id, newCharacterIds.values().toArray()));
+        .where(inArray(characterTable.id, addedIds.values().toArray()));
 
-      for (const fields of newCharacters) {
-        const char = characterFromDbFields(fields, actorModels, rng);
+      for (const characterFields of addedCharacters) {
+        const char = characterFromDbFields(characterFields, actorModels, rng);
         state.actors.set(char.identity.id, char);
         server.markToResendFullState(char.identity.id);
         logger.debug(
-          { characterId: fields.id },
+          { characterId: characterFields.id },
           "Character joined to game service",
         );
       }
