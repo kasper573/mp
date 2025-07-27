@@ -262,7 +262,7 @@ function getRequestInfo(req: IncomingMessage): RequestInfo {
 
 function wssConfig(): WebSocketServerOptions {
   return {
-    maxPayload: 5000,
+    maxPayload: 50000,
     perMessageDeflate: {
       zlibDeflateOptions: {
         chunkSize: 1024,
