@@ -29,11 +29,13 @@ import {
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
 import { flushResultEncoding, SyncMap, syncMessageEncoding } from "@mp/sync";
+import type { EventRouterMessage } from "@mp/event-router";
 import {
   QueuedEventInvoker,
   createEventInvoker,
   createProxyEventInvoker,
   eventMessageEncoding,
+  willRouterAcceptMessage,
 } from "@mp/event-router";
 import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
@@ -153,16 +155,18 @@ function setupGameClientSocket(
   userSessions.set(session.value.id, session);
   gameClientSockets.set(session.value.id, socket);
 
-  const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
-    (event) => {
-      const encoded = eventWithSessionEncoding.encode({
-        event,
-        session: session.value,
-      });
-      for (const socket of gameServiceSockets) {
-        socket.send(encoded);
-      }
-    },
+  function broadcastEventToGameServices(event: EventRouterMessage<unknown>) {
+    const encoded = eventWithSessionEncoding.encode({
+      event,
+      session: session.value,
+    });
+    for (const socket of gameServiceSockets) {
+      socket.send(encoded);
+    }
+  }
+
+  const broadcastClient: GameEventClient = createProxyEventInvoker(
+    broadcastEventToGameServices,
   );
 
   socket.on("close", () => {
@@ -174,13 +178,17 @@ function setupGameClientSocket(
   socket.on("message", (data: ArrayBuffer) => {
     const result = eventMessageEncoding.decode(data);
     if (result.isOk()) {
-      gatewayEventInvoker.addEvent(
-        result.value,
-        ioc
-          .provide(ctxUserSession, session.value)
-          .provide(ctxUserSessionSignal, session)
-          .provide(ctxGameEventClient, gameServiceEventBroadcast),
-      );
+      if (willRouterAcceptMessage(gatewayRouter, result.value)) {
+        gatewayEventInvoker.addEvent(
+          result.value,
+          ioc
+            .provide(ctxUserSession, session.value)
+            .provide(ctxUserSessionSignal, session)
+            .provide(ctxGameEventClient, broadcastClient),
+        );
+      } else {
+        broadcastEventToGameServices(result.value);
+      }
     }
   });
 }

@@ -23,6 +23,13 @@ export function createEventInvoker<Context>(
   };
 }
 
+export function willRouterAcceptMessage<Context>(
+  root: AnyEventNode<Context>,
+  message: EventRouterMessage<unknown>,
+) {
+  return resolveEventNode(root, message[0]) !== undefined;
+}
+
 function resolveEventNode<Context>(
   start: AnyEventNode,
   path: string[],
