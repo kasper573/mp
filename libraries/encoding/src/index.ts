@@ -8,6 +8,7 @@ export { addExtension as addEncoderExtension } from "cbor-x";
 export interface Encoding<T> {
   decode(data: ArrayBufferLike): Result<T, Error | "skipped">;
   encode(value: T): ArrayBuffer;
+  matches(data: ArrayBufferLike): boolean;
 }
 
 export function createEncoding<T>(header: number): Encoding<T> {
@@ -19,6 +20,10 @@ export function createEncoding<T>(header: number): Encoding<T> {
   const decoder = new Decoder(options);
 
   return {
+    matches(data: ArrayBufferLike) {
+      const view = new DataView(data);
+      return view.getUint16(0) === header;
+    },
     decode(data) {
       try {
         const view = new DataView(data);

@@ -146,6 +146,17 @@ function setupGameServerSocket(socket: WebSocket) {
       return;
     }
 
+    // When the gateway receives an event from a game service,
+    // that means the game service wants to broadcast this event to all other game servics.
+    if (eventMessageEncoding.matches(data)) {
+      for (const gameServiceSocket of gameServiceSockets) {
+        if (gameServiceSocket !== socket) {
+          gameServiceSocket.send(data);
+        }
+      }
+      return;
+    }
+
     logger.warn(
       { size: data.byteLength },
       "Received unknown message from game service",

@@ -13,6 +13,7 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
   ctxArea,
+  ctxGameEventClient,
   ctxGameStateLoader,
   ctxGameStateServer,
   ctxLogger,
@@ -27,7 +28,11 @@ import {
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, withBackoffRetries } from "@mp/std";
-import type { GameState, GameStateServer } from "@mp/game/server";
+import type {
+  GameEventClient,
+  GameState,
+  GameStateServer,
+} from "@mp/game/server";
 import {
   movementBehavior,
   combatBehavior,
@@ -46,7 +51,12 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { createGameStateLoader } from "./db/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
-import { createEventInvoker, QueuedEventInvoker } from "@mp/event-router";
+import {
+  createEventInvoker,
+  createProxyEventInvoker,
+  eventMessageEncoding,
+  QueuedEventInvoker,
+} from "@mp/event-router";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
 import { gameStateFlushHistogram } from "./metrics/game-state-flush";
 import { createActorModelLookup } from "./db/actor-model-lookup";
@@ -100,9 +110,21 @@ gatewaySocket.addEventListener("error", (err) =>
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
 
+const gameEventBroadcastClient: GameEventClient = createProxyEventInvoker(
+  (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
+);
+
 function handleGatewayMessage(event: MessageEvent<ArrayBuffer>) {
   const message = eventWithSessionEncoding.decode(event.data);
   if (message.isOk()) {
+    const { characterId } = message.value.session;
+    if (characterId && !gameState.actors.has(characterId)) {
+      // Messages for unknown characters can be safely ignored.
+      // These are just broadcasts from the gateway,
+      // and the intent is for the appropriate game service instance to react.
+      return;
+    }
+
     eventInvoker.addEvent(
       message.value.event,
       ioc.provide(ctxUserSession, message.value.session),
@@ -162,7 +184,8 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxNpcSpawner, npcSpawner);
+  .provide(ctxNpcSpawner, npcSpawner)
+  .provide(ctxGameEventClient, gameEventBroadcastClient);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
