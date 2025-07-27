@@ -8,7 +8,7 @@ import {
 } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
-import { WebSocket } from "@mp/ws/server";
+import { ReconnectingWebSocket } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
   ctxActorModelLookup,
@@ -93,13 +93,15 @@ const eventInvoker = new QueuedEventInvoker({
   invoke: createEventInvoker(gameServerEventRouter),
   logger,
 });
-const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
+const gatewaySocket = new ReconnectingWebSocket(opt.gatewayWssUrl);
 gatewaySocket.binaryType = "arraybuffer";
-gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
-gatewaySocket.on("message", handleGatewayMessage);
+gatewaySocket.addEventListener("error", (err) =>
+  logger.error(err, "Gateway socket error"),
+);
+gatewaySocket.addEventListener("message", handleGatewayMessage);
 
-function handleGatewayMessage(data: ArrayBuffer) {
-  const message = eventWithSessionEncoding.decode(data);
+function handleGatewayMessage(event: MessageEvent<ArrayBuffer>) {
+  const message = eventWithSessionEncoding.decode(event.data);
   if (message.isOk()) {
     eventInvoker.addEvent(
       message.value.event,
