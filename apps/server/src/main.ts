@@ -114,10 +114,11 @@ const gameEventBroadcastClient: GameEventClient = createProxyEventInvoker(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
 );
 
-function handleGatewayMessage(event: MessageEvent<ArrayBuffer>) {
-  const message = eventWithSessionEncoding.decode(event.data);
-  if (message.isOk()) {
-    const { characterId } = message.value.session;
+function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
+  // Handle game client -> game service messages
+  const eventWithSession = eventWithSessionEncoding.decode(data);
+  if (eventWithSession.isOk()) {
+    const { characterId } = eventWithSession.value.session;
     if (characterId && !gameState.actors.has(characterId)) {
       // Messages for unknown characters can be safely ignored.
       // These are just broadcasts from the gateway,
@@ -126,10 +127,17 @@ function handleGatewayMessage(event: MessageEvent<ArrayBuffer>) {
     }
 
     eventInvoker.addEvent(
-      message.value.event,
-      ioc.provide(ctxUserSession, message.value.session),
-      () => perSessionEventLimit.consume(message.value.session.id),
+      eventWithSession.value.event,
+      ioc.provide(ctxUserSession, eventWithSession.value.session),
+      () => perSessionEventLimit.consume(eventWithSession.value.session.id),
     );
+    return;
+  }
+
+  // Handle game service -> game service messages
+  const event = eventMessageEncoding.decode(data);
+  if (event.isOk()) {
+    eventInvoker.addEvent(event.value, ioc);
   }
 }
 
