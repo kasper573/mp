@@ -7,6 +7,8 @@ import type { CharacterId } from "../character/types";
 import { ctxArea } from "../context/common";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
+import { roles } from "../user/auth";
+import { gatewayRoles } from "../user/roles";
 
 export type NetworkRouter = typeof networkEventRouter;
 export const networkEventRouter = evt.router({
@@ -22,6 +24,7 @@ export const networkEventRouter = evt.router({
   }),
 
   characterWantsToJoinArea: evt.event
+    .use(roles([gatewayRoles.gameServiceBroadcast]))
     .input<{ characterId: CharacterId; areaId: AreaId }>()
     .handler(({ ctx, input }) => {
       const currentArea = ctx.get(ctxArea);

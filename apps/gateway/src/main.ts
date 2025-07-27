@@ -11,6 +11,7 @@ import {
   ctxGameEventClient,
   eventWithSessionEncoding,
   ctxUserSession,
+  gatewayRoles,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
@@ -43,7 +44,7 @@ import { createTokenResolver } from "@mp/auth/server";
 import type { Branded } from "@mp/std";
 import { arrayShallowEquals, createShortId, dedupe } from "@mp/std";
 import { createDbClient } from "@mp/db-client";
-import type { AccessToken } from "@mp/auth";
+import type { AccessToken, UserId } from "@mp/auth";
 import { saveOnlineCharacters } from "./db-operations";
 import { computed, Signal } from "@mp/state";
 import { effect } from "@mp/state";
@@ -129,8 +130,16 @@ wss.on("connection", (socket, request) => {
   }
 });
 
+const gatewayUser = {
+  id: "gateway" as UserId,
+  name: "Gateway",
+  roles: new Set([gatewayRoles.gameServiceBroadcast]),
+};
+
 function setupGameServerSocket(socket: WebSocket) {
   gameServiceSockets.add(socket);
+
+  const session: UserSession = { id: createShortId(), user: gatewayUser };
 
   logger.info(`Game service connected`);
 
@@ -140,18 +149,23 @@ function setupGameServerSocket(socket: WebSocket) {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    const flushResult = flushResultEncoding<CharacterId>().decode(data);
-    if (flushResult.isOk()) {
-      flushGameState(flushResult.value);
+    const flush = flushResultEncoding<CharacterId>().decode(data);
+    if (flush.isOk()) {
+      flushGameState(flush.value);
       return;
     }
 
     // When the gateway receives an event from a game service,
     // that means the game service wants to broadcast this event to all other game servics.
-    if (eventMessageEncoding.matches(data)) {
+    const event = eventMessageEncoding.decode(data);
+    if (event.isOk()) {
+      const gatewayEvent = eventWithSessionEncoding.encode({
+        event: event.value,
+        session,
+      });
       for (const gameServiceSocket of gameServiceSockets) {
         if (gameServiceSocket !== socket) {
-          gameServiceSocket.send(data);
+          gameServiceSocket.send(gatewayEvent);
         }
       }
       return;

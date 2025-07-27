@@ -5,7 +5,11 @@ export const systemRoles = defineRoles("sys", [
   "useDevTools",
 ]);
 
-export const gatewayRoles = defineRoles("gateway", ["spectate", "join"]);
+export const gatewayRoles = defineRoles("gateway", [
+  "spectate",
+  "join",
+  "gameServiceBroadcast",
+]);
 
 export const characterRoles = defineRoles("character", [
   "move",
