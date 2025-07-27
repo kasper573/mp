@@ -1,6 +1,11 @@
 import "dotenv/config";
 
-import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
+import {
+  SyncServer,
+  SyncMap,
+  shouldOptimizeCollects,
+  flushResultEncoding,
+} from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
 import { WebSocket } from "@mp/ws/server";
@@ -35,26 +40,26 @@ import { seed } from "../seed";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
 
-import { createGameStateFlusher } from "./etc/flush-game-state";
 import { createDbClient } from "@mp/db-client";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
-import { createGameStateLoader } from "./etc/game-state-loader";
+import { createGameStateLoader } from "./db/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
 import { createEventInvoker, QueuedEventInvoker } from "@mp/event-router";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/game-state-db-sync";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
+import { gameStateFlushHistogram } from "./metrics/game-state-flush";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 collectDefaultMetrics();
+shouldOptimizeCollects.value = opt.patchOptimizer;
+RateLimiter.enabled = opt.rateLimit;
 
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger(opt.prettyLogs);
 logger.info(opt, `Starting server...`);
-
-RateLimiter.enabled = opt.rateLimit;
 
 const api = createApiClient(opt.apiServiceUrl);
 
@@ -90,18 +95,28 @@ const eventInvoker = new QueuedEventInvoker({
 const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
-gatewaySocket.on("message", (buffer: ArrayBuffer) => {
-  const result = eventWithSessionEncoding.decode(buffer);
-  if (result.isOk()) {
+gatewaySocket.on("message", handleGatewayMessage);
+
+function handleGatewayMessage(data: ArrayBuffer) {
+  const message = eventWithSessionEncoding.decode(data);
+  if (message.isOk()) {
     eventInvoker.addEvent(
-      result.value.event,
-      ioc.provide(ctxUserSession, result.value.session),
-      () => perSessionEventLimit.consume(result.value.session.id),
+      message.value.event,
+      ioc.provide(ctxUserSession, message.value.session),
+      () => perSessionEventLimit.consume(message.value.session.id),
     );
   }
-});
+}
 
-shouldOptimizeCollects.value = opt.patchOptimizer;
+function flushGameState() {
+  const flushResult = gameStateServer.flush(gameState);
+  if (flushResult.clientEvents.size || flushResult.clientPatches.size) {
+    const time = new Date();
+    const encoded = flushResultEncoding().encode([flushResult, time]);
+    gameStateFlushHistogram.observe(encoded.byteLength);
+    gatewaySocket.send(encoded);
+  }
+}
 
 const gameState: GameState = {
   actors: new SyncMap([], {
@@ -151,9 +166,7 @@ updateTicker.subscribe(movementBehavior(gameState, area));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());
-updateTicker.subscribe(
-  createGameStateFlusher(gameState, gameStateServer, gatewaySocket),
-);
+updateTicker.subscribe(flushGameState);
 updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
 startGameStateDbSync(db, area, gameState, gameStateServer);
