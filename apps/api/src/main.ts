@@ -26,14 +26,15 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const dbClient = createDbClient(opt.databaseConnectionString);
+const db = createDbClient(opt.databaseConnectionString);
+db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const fileResolver = createFileResolver(opt.fileServerBaseUrl);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
-  .provide(ctxDbClient, dbClient);
+  .provide(ctxDbClient, db);
 
 const app = express()
   .use(metricsMiddleware())
