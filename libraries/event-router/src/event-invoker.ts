@@ -25,9 +25,9 @@ function resolveEventNode<Context>(
   start: AnyEventNode,
   path: string[],
 ): AnyEventNode<Context> | undefined {
-  let node: AnyEventNode | undefined = start;
+  let node = start as AnyEventNode | undefined;
   for (const key of path) {
-    if (node.type === "router") {
+    if (node?.type === "router") {
       node = node.routes[key];
     }
   }
