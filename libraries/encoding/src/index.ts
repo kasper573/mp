@@ -7,7 +7,7 @@ export { addExtension as addEncoderExtension } from "cbor-x";
 
 export interface Encoding<T> {
   decode(data: ArrayBufferLike): Result<T, Error | "skipped">;
-  encode(value: T): ArrayBufferLike;
+  encode(value: T): ArrayBuffer;
 }
 
 export function createEncoding<T>(header: number): Encoding<T> {
