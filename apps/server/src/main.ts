@@ -84,13 +84,11 @@ const gameStateLoader = createGameStateLoader(db, area);
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
 
-const wssUrl = new URL(opt.gatewayWssUrl);
-wssUrl.searchParams.set("type", "game-server");
 const eventInvoker = new QueuedEventInvoker({
   invoke: createEventInvoker(gameServerEventRouter),
   logger,
 });
-const gatewaySocket = new WebSocket(wssUrl);
+const gatewaySocket = new WebSocket(opt.gatewayWssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.on("error", (err) => logger.error(err, "Gateway socket error"));
 gatewaySocket.on("message", (buffer: ArrayBuffer) => {
