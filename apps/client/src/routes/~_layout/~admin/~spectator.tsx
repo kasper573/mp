@@ -47,7 +47,8 @@ function RouteComponent() {
   );
 
   useSignalEffect(() => {
-    if (stateClient.characterId.value) {
+    // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
+    if (stateClient.isConnected.value && stateClient.characterId.value) {
       events.gateway.spectate(stateClient.characterId.value);
     }
   });
