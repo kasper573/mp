@@ -21,6 +21,13 @@ export function gameStateDbSyncBehavior(
   rng: Rng,
   logger: Logger,
 ) {
+  /**
+   * Even though immediate area leave/join is handled via broadgast events,
+   * we still need to poll the database for changes in online characters.
+   *
+   * (Moving between areas would still work without this polling,
+   * but disconnect and reconnect would not work without it.)
+   */
   async function poll() {
     const characterIdsThatShouldBeInService = new Set<CharacterId>(
       (
