@@ -21,12 +21,10 @@ export const playerRoles = [
 
 export const groupedRoles = {
   admin: [
-    ...playerRoles,
-    systemRoles.changeSettings,
-    systemRoles.useDevTools,
-    characterRoles.kill,
-    npcRoles.spawnRandom,
-    gatewayRoles.spectate,
+    ...Object.values(systemRoles),
+    ...Object.values(gatewayRoles),
+    ...Object.values(characterRoles),
+    ...Object.values(npcRoles),
   ],
   [playerGroup]: playerRoles,
 } satisfies Record<string, string[]>;
