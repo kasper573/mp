@@ -21,6 +21,7 @@ import {
   ctxUserSession,
   eventWithSessionEncoding,
   gameServerEventRouter,
+  GameStateAreaEntity,
   NpcAi,
   NpcSpawner,
 } from "@mp/game/server";
@@ -119,7 +120,7 @@ function flushGameState() {
 }
 
 const gameState: GameState = {
-  area: new SyncMap([["current", { id: area.id }]]),
+  area: new SyncMap([["current", new GameStateAreaEntity({ id: area.id })]]),
   actors: new SyncMap([], {
     type: (actor) => actor.type,
     alive: (actor) => actor.alive.value,

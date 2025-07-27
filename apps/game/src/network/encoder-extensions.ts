@@ -6,6 +6,8 @@ import type { NpcInstanceInit } from "../npc/types";
 import { NpcInstance } from "../npc/types";
 import type { CharacterInit } from "../character/types";
 import { Character } from "../character/types";
+import type { AreaId } from "../area/area-id";
+import { GameStateAreaEntity } from "../game-state/game-state";
 
 let hasRegistered = false;
 
@@ -65,7 +67,7 @@ export function registerEncoderExtensions(): void {
   });
 
   addEncoderExtension<Character, CharacterInit>({
-    Class: Character as never,
+    Class: Character,
     tag: nextTag(),
     encode: (character, encode) =>
       encode(character.snapshot() as CharacterInit),
@@ -73,9 +75,16 @@ export function registerEncoderExtensions(): void {
   });
 
   addEncoderExtension<NpcInstance, NpcInstanceInit>({
-    Class: NpcInstance as never,
+    Class: NpcInstance,
     tag: nextTag(),
     encode: (npc, encode) => encode(npc.snapshot() as NpcInstanceInit),
     decode: (init) => new NpcInstance(init),
+  });
+
+  addEncoderExtension<GameStateAreaEntity, { id: AreaId }>({
+    Class: GameStateAreaEntity,
+    tag: nextTag(),
+    encode: ({ id }, encode) => encode({ id }),
+    decode: (init) => new GameStateAreaEntity(init),
   });
 }
