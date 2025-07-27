@@ -9,14 +9,14 @@ export function createEventInvoker<Context>(
     const [path, input] = message;
     const node = resolveEventNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err(new EventRouterInvokerError(message, "path not found"));
+      return err(new EventRouterInvokerError(path, "path not found"));
     }
 
     try {
       await node.handler({ ctx, input, mwc });
       return ok(void 0);
     } catch (error) {
-      return err(new EventRouterInvokerError(message, error));
+      return err(new EventRouterInvokerError(path, error));
     }
   };
 }
@@ -34,9 +34,9 @@ function resolveEventNode<Context>(
   return node;
 }
 
-export class EventRouterInvokerError<Input> extends Error {
-  constructor(message: EventRouterMessage<Input>, cause?: unknown) {
-    super(`error in event handler "${message[0].join(".")}"`, {
+export class EventRouterInvokerError extends Error {
+  constructor(path: string[], cause?: unknown) {
+    super(`error invoking event "${path.join(".")}"`, {
       cause,
     });
     this.name = "EventRouterInvokerError";
@@ -46,12 +46,9 @@ export class EventRouterInvokerError<Input> extends Error {
 export type EventRouterInvoker<Context = void> = (
   message: EventRouterMessage<unknown>,
   context: Context,
-) => Promise<EventRouterInvokerResult<unknown>>;
+) => Promise<EventRouterInvokerResult>;
 
-export type EventRouterInvokerResult<Input> = Result<
-  void,
-  EventRouterInvokerError<Input>
->;
+export type EventRouterInvokerResult = Result<void, EventRouterInvokerError>;
 
 export type EventRouterMessage<Input> = [path: string[], input: Input];
 

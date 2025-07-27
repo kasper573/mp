@@ -45,9 +45,7 @@ export class QueuedEventInvoker<Context = void> {
     void this.pollQueue();
   };
 
-  private async pollQueue(): Promise<
-    EventRouterInvokerResult<unknown> | undefined
-  > {
+  private async pollQueue(): Promise<EventRouterInvokerResult | undefined> {
     if (this.#isProcessingEvent) {
       return;
     }
