@@ -12,7 +12,6 @@
   },
   "dependencies": {
     "@mp/api": "workspace:*",
-    "@mp/auth": "workspace:*",
     "@mp/db-client": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",

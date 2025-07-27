@@ -10,14 +10,14 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "@mp/logger": "workspace:*",
+    "@keycloak/keycloak-admin-client": "26.1.2",
     "@mp/game": "workspace:*",
-    "@keycloak/keycloak-admin-client": "26.1.2"
+    "@mp/logger": "workspace:*",
+    "@mp/std": "workspace:*"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
     "@mp/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
     "builtin-modules": "catalog:",
     "esbuild": "catalog:"
   }

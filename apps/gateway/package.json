@@ -18,11 +18,11 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/db-client": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/ioc": "workspace:*",
-    "@mp/db-client": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",

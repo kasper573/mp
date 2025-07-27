@@ -430,9 +430,6 @@ importers:
       '@mp/api':
         specifier: workspace:*
         version: link:../api
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/db-client':
         specifier: workspace:*
         version: link:../../integrations/db-client

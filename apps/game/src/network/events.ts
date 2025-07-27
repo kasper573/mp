@@ -32,13 +32,13 @@ export const networkEventRouter = evt.router({
         const state = ctx.get(ctxGameState);
         const server = ctx.get(ctxGameStateServer);
         const db = ctx.get(ctxGameStateLoader);
-        db.assignAreaIdToCharacterInDb(input.characterId, currentArea.id).then(
-          (character) => {
+        void db
+          .assignAreaIdToCharacterInDb(input.characterId, currentArea.id)
+          .then((character) => {
             character.movement.coords = currentArea.start;
             state.actors.set(input.characterId, character);
             server.markToResendFullState(input.characterId);
-          },
-        );
+          });
       }
     }),
 });
