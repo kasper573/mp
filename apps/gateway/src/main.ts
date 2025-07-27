@@ -116,8 +116,6 @@ wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
   const info = getRequestInfo(request);
 
-  logger.info(`New ${info.type} connection established`);
-
   socket.on("error", (err) => {
     logger.error(err, `Error in ${info.type} connection`);
   });
@@ -134,6 +132,8 @@ wss.on("connection", (socket, request) => {
 function setupGameServerSocket(socket: WebSocket) {
   gameServiceSockets.add(socket);
 
+  logger.info(`Game service connected`);
+
   socket.on("close", () => {
     logger.info(`Game service disconnected`);
     gameServiceSockets.delete(socket);
@@ -145,6 +145,11 @@ function setupGameServerSocket(socket: WebSocket) {
       flushGameState(flushResult.value);
       return;
     }
+
+    logger.warn(
+      { size: data.byteLength },
+      "Received unknown message from game service",
+    );
   });
 }
 
@@ -152,6 +157,7 @@ function setupGameClientSocket(
   socket: WebSocket,
   session: Signal<UserSession<ClientId>>,
 ) {
+  logger.info(session.value, `Game client connected`);
   userSessions.set(session.value.id, session);
   gameClientSockets.set(session.value.id, socket);
 
