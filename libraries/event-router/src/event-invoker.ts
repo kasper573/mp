@@ -9,7 +9,9 @@ export function createEventInvoker<Context>(
     const [path, input] = message;
     const node = resolveEventNode<Context>(root, path);
     if (!node || node.type === "router") {
-      return err(new EventRouterInvokerError(path, "path not found"));
+      return err(
+        new EventRouterInvokerError(path, new Error("path not found")),
+      );
     }
 
     try {
@@ -36,7 +38,7 @@ function resolveEventNode<Context>(
 
 export class EventRouterInvokerError extends Error {
   constructor(path: string[], cause?: unknown) {
-    super(`error invoking event "${path.join(".")}"`, {
+    super(`Error invoking event "${path.join(".")}"`, {
       cause,
     });
     this.name = "EventRouterInvokerError";
