@@ -31,6 +31,17 @@ faro.{$MP_DOMAIN} {
 {$MP_FILE_SERVER_DOMAIN} {
 	root * /srv/mp-public
 	file_server browse
+
+	header {
+		Access-Control-Allow-Origin "https://{$MP_CLIENT_DOMAIN}"
+		Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type"
+	}
+
+	@options {
+		method OPTIONS
+	}
+	respond @options 204
 }
 
 {$MP_CLIENT_DOMAIN} {
