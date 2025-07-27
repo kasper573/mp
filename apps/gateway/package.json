@@ -24,6 +24,7 @@
     "@mp/ioc": "workspace:*",
     "@mp/db-client": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/telemetry": "workspace:*",

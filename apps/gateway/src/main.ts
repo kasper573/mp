@@ -6,16 +6,15 @@ import type {
   UserSession,
 } from "@mp/game/server";
 import {
-  ctxUserSession,
   ctxTokenResolver,
   registerEncoderExtensions,
   ctxGameEventClient,
   eventWithSessionEncoding,
+  ctxUserSession,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
-
 import createCors from "cors";
 import express from "express";
 import type { IncomingMessage } from "http";
@@ -29,21 +28,23 @@ import {
   metricsMiddleware,
 } from "@mp/telemetry/prom";
 import type { FlushResult } from "@mp/sync";
-import { flushResultEncoding, syncMessageEncoding } from "@mp/sync";
+import { flushResultEncoding, SyncMap, syncMessageEncoding } from "@mp/sync";
 import {
   QueuedEventInvoker,
   createEventInvoker,
   createProxyEventInvoker,
   eventMessageEncoding,
 } from "@mp/event-router";
-import { ctxDbClient, gatewayRouter } from "./router";
+import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
 import { ImmutableInjectionContainer } from "@mp/ioc";
-
 import { createTokenResolver } from "@mp/auth/server";
 import type { Branded } from "@mp/std";
-import { createShortId } from "@mp/std";
+import { arrayShallowEquals, createShortId, dedupe } from "@mp/std";
 import { createDbClient } from "@mp/db-client";
 import type { AccessToken } from "@mp/auth";
+import { saveOnlineCharacters } from "./db-operations";
+import { computed, Signal } from "@mp/state";
+import { effect } from "@mp/state";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -55,7 +56,16 @@ logger.info(opt, `Starting gateway...`);
 type ClientId = Branded<string, "ClientId">;
 const gameServiceSockets = new Set<WebSocket>();
 const gameClientSockets = new Map<ClientId, WebSocket>();
-const userSessions = new Map<ClientId, UserSession<ClientId>>();
+const userSessions = new SyncMap<ClientId, Signal<UserSession<ClientId>>>();
+
+const onlineCharacterIds = computed(() => [
+  ...new Set(
+    userSessions
+      .values()
+      .map((session) => session.value.characterId)
+      .filter((id) => id !== undefined),
+  ),
+]);
 
 collectDefaultMetrics();
 
@@ -68,7 +78,8 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const dbClient = createDbClient(opt.databaseConnectionString);
+const db = createDbClient(opt.databaseConnectionString);
+db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver(opt.auth);
 
@@ -90,7 +101,14 @@ const gatewayEventInvoker = new QueuedEventInvoker({
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, resolveAccessToken)
-  .provide(ctxDbClient, dbClient);
+  .provide(ctxDbClient, db);
+
+const saveOnlineCharactersDeduped = dedupe(
+  saveOnlineCharacters,
+  ([, ids1], [, ids2]) => arrayShallowEquals(ids1, ids2),
+);
+
+effect(() => void saveOnlineCharactersDeduped(db, onlineCharacterIds.value));
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
@@ -130,14 +148,17 @@ function setupGameServerSocket(socket: WebSocket) {
 
 function setupGameClientSocket(
   socket: WebSocket,
-  session: UserSession<ClientId>,
+  session: Signal<UserSession<ClientId>>,
 ) {
-  userSessions.set(session.id, session);
-  gameClientSockets.set(session.id, socket);
+  userSessions.set(session.value.id, session);
+  gameClientSockets.set(session.value.id, socket);
 
   const gameServiceEventBroadcast: GameEventClient = createProxyEventInvoker(
     (event) => {
-      const encoded = eventWithSessionEncoding.encode({ event, session });
+      const encoded = eventWithSessionEncoding.encode({
+        event,
+        session: session.value,
+      });
       for (const socket of gameServiceSockets) {
         socket.send(encoded);
       }
@@ -145,9 +166,9 @@ function setupGameClientSocket(
   );
 
   socket.on("close", () => {
-    logger.info(`Game client ${session.id} disconnected`);
-    gameClientSockets.delete(session.id);
-    userSessions.delete(session.id);
+    logger.info(`Game client ${session.value.id} disconnected`);
+    gameClientSockets.delete(session.value.id);
+    userSessions.delete(session.value.id);
   });
 
   socket.on("message", (data: ArrayBuffer) => {
@@ -156,7 +177,8 @@ function setupGameClientSocket(
       gatewayEventInvoker.addEvent(
         result.value,
         ioc
-          .provideIfDefined(ctxUserSession, session)
+          .provide(ctxUserSession, session.value)
+          .provide(ctxUserSessionSignal, session)
           .provide(ctxGameEventClient, gameServiceEventBroadcast),
       );
     }
@@ -167,7 +189,7 @@ function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
   const { clientPatches, clientEvents } = flushResult;
 
   for (const [clientId, socket] of gameClientSockets.entries()) {
-    const characterId = userSessions.get(clientId)?.characterId;
+    const characterId = userSessions.get(clientId)?.value.characterId;
     if (characterId === undefined) {
       // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
       continue;
@@ -198,7 +220,10 @@ async function verifySocketConnection(
       const result = await resolveAccessToken(info.token);
       if (result.isOk()) {
         const { id, roles, name } = result.value;
-        info.session.user = { id, roles, name };
+        info.session.value = {
+          ...info.session.value,
+          user: { id, roles, name },
+        };
         return cb(true);
       }
       return cb(false, 401, result.error);
@@ -224,11 +249,11 @@ function getRequestInfo(req: IncomingMessage): RequestInfo {
     | undefined;
 
   let session = Reflect.get(req, "session") as
-    | UserSession<ClientId>
+    | Signal<UserSession<ClientId>>
     | undefined;
 
   if (!session) {
-    session = { id: createShortId() as ClientId };
+    session = new Signal({ id: createShortId() as ClientId });
     Reflect.set(req, "session", session);
   }
 
@@ -271,7 +296,9 @@ const metrics = {
         new Set(
           userSessions
             .values()
-            .flatMap((session) => (session.user ? [session.user.id] : [])),
+            .flatMap((session) =>
+              session.value.user ? [session.value.user.id] : [],
+            ),
         ).size,
       );
     },
@@ -287,6 +314,10 @@ const metrics = {
 };
 
 type RequestInfo =
-  | { type: "game-client"; session: UserSession<ClientId>; token?: AccessToken }
-  | { type: "game-service"; secret?: string }
-  | { type: "unknown" };
+  | Readonly<{
+      type: "game-client";
+      session: Signal<UserSession<ClientId>>;
+      token?: AccessToken;
+    }>
+  | Readonly<{ type: "game-service"; secret?: string }>
+  | Readonly<{ type: "unknown" }>;

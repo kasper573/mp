@@ -10,14 +10,14 @@ export interface UserSession<Id extends string = string> {
   /**
    * Set when the user is authenticated
    */
-  user?: {
+  readonly user?: Readonly<{
     id: UserId;
     roles: ReadonlySetLike<RoleDefinition>;
     name: string;
-  };
+  }>;
 
   /**
    * The character id that the user will be subscribing to game state patches and events for
    */
-  characterId?: CharacterId;
+  readonly characterId?: CharacterId;
 }

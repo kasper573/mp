@@ -323,6 +323,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
