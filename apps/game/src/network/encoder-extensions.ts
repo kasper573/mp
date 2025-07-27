@@ -7,7 +7,15 @@ import { NpcInstance } from "../npc/types";
 import type { CharacterInit } from "../character/types";
 import { Character } from "../character/types";
 
+let hasRegistered = false;
+
 export function registerEncoderExtensions(): void {
+  if (hasRegistered) {
+    throw new Error("Encoder extensions have already been registered");
+  }
+
+  hasRegistered = true;
+
   // All tags below this are reserved by @mp/encoding
   let startTag = 40_501;
   const nextTag = () => ++startTag;
