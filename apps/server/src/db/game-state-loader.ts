@@ -1,5 +1,6 @@
 import type {
   ActorModelLookup,
+  AreaId,
   AreaResource,
   Character,
   CharacterId,
@@ -27,12 +28,22 @@ export function createGameStateLoader(
       };
     },
 
-    async getCharacter(characterId: CharacterId): Promise<Character> {
-      const result = await db
-        .select()
-        .from(characterTable)
-        .where(eq(characterTable.id, characterId))
-        .limit(1);
+    async assignAreaIdToCharacterInDb(
+      characterId: CharacterId,
+      newAreaId: AreaId,
+    ): Promise<Character> {
+      const result = await db.transaction(async (tx) => {
+        await tx
+          .update(characterTable)
+          .set({ areaId: newAreaId })
+          .where(eq(characterTable.id, characterId));
+
+        return tx
+          .select()
+          .from(characterTable)
+          .where(eq(characterTable.id, characterId))
+          .limit(1);
+      });
 
       if (result.length === 0) {
         throw new Error(`Character with id ${characterId} not found`);

@@ -21,17 +21,21 @@ export const networkEventRouter = evt.router({
     );
   }),
 
-  characterWantsToTransportToArea: evt.event
+  characterWantsToJoinArea: evt.event
     .input<{ characterId: CharacterId; areaId: AreaId }>()
     .handler(({ ctx, input }) => {
       const currentArea = ctx.get(ctxArea);
       if (input.areaId === currentArea.id) {
-        const gameState = ctx.get(ctxGameState);
-        const loader = ctx.get(ctxGameStateLoader);
-        loader.getCharacter(input.characterId).then((character) => {
-          character.movement.coords = currentArea.start;
-          gameState.actors.set(input.characterId, character);
-        });
+        const state = ctx.get(ctxGameState);
+        const server = ctx.get(ctxGameStateServer);
+        const db = ctx.get(ctxGameStateLoader);
+        db.assignAreaIdToCharacterInDb(input.characterId, currentArea.id).then(
+          (character) => {
+            character.movement.coords = currentArea.start;
+            state.actors.set(input.characterId, character);
+            server.markToResendFullState(input.characterId);
+          },
+        );
       }
     }),
 });

@@ -76,23 +76,13 @@ export function gameStateDbSyncBehavior(
         state.actors
           .values()
           .filter((actor) => actor.type === "character")
-          .map((character) => {
-            const inputValues: typeof characterTable.$inferInsert = {
-              areaId: area.id,
-              ...character.identity.snapshot(),
-              ...character.appearance.snapshot(),
-              ...character.combat.snapshot(),
-              ...character.movement.snapshot(),
-              ...character.progression.snapshot(),
-            };
-            return tx
-              .insert(characterTable)
-              .values(inputValues)
-              .onConflictDoUpdate({
-                target: characterTable.id,
-                set: inputValues,
-              });
-          }),
+          .map((char) =>
+            tx.update(characterTable).set({
+              ...char.combat.snapshot(),
+              ...char.movement.snapshot(),
+              ...char.progression.snapshot(),
+            }),
+          ),
       ),
     );
   }
