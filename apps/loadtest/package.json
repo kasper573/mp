@@ -14,6 +14,7 @@
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/gateway": "workspace:*",
+    "@mp/state": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",

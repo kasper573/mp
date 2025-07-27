@@ -11,7 +11,7 @@ import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 import { GameActions } from "./game-actions";
 import type { Character, CharacterId } from "../character/types";
-import type { AreaId } from "../area/area-id";
+
 import type { Logger } from "@mp/logger";
 import { ioc } from "../context/ioc";
 import { ctxLogger } from "../context/common";
@@ -37,7 +37,7 @@ export class GameStateClient {
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
-  readonly areaId = signal<AreaId | undefined>(undefined);
+  readonly areaId = computed(() => this.gameState.area.get("current")?.id);
   readonly readyState: Signal<WebSocket["readyState"]>;
   readonly isConnected: ReadonlySignal<boolean>;
 
@@ -78,10 +78,6 @@ export class GameStateClient {
     const subscriptions = [
       subscribeToReadyState(socket, (readyState) => {
         this.readyState.value = readyState;
-      }),
-      this.eventBus.subscribe("area.joined", (event) => {
-        this.characterId.value = event.characterId;
-        this.areaId.value = event.areaId;
       }),
     ];
 

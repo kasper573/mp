@@ -11,6 +11,7 @@ import type { Actor, ActorId } from "../actor/actor";
 import type { MovementTrait } from "../traits/movement";
 
 export class OptimisticGameState implements GameState {
+  area: GameState["area"] = new SyncMap();
   actors: GameState["actors"] = new SyncMap();
 
   constructor(private settings: () => OptimisticGameStateSettings) {}

@@ -1,6 +1,4 @@
 import type { ActorId } from "../actor/actor";
-import type { AreaId } from "../area/area-id";
-import type { CharacterId } from "../character/types";
 
 // oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameStateEvents = {
@@ -14,8 +12,4 @@ export type GameStateEvents = {
    * It needs to know that it's okay to stop immediately and not let the interpolation finish.
    */
   "movement.stop": ActorId;
-  "area.joined": {
-    characterId: CharacterId;
-    areaId: AreaId;
-  };
 };

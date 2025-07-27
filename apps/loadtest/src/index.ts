@@ -11,12 +11,13 @@ import {
   registerEncoderExtensions,
 } from "@mp/game/client";
 import { readCliOptions } from "./cli";
-import type { GameStateEvents } from "@mp/game/server";
+
 import {
   createProxyEventInvoker,
   eventMessageEncoding,
 } from "@mp/event-router";
 import type { GatewayRouter } from "@mp/gateway";
+import type { Signal } from "@mp/state";
 
 registerEncoderExtensions();
 
@@ -98,23 +99,11 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} connected`);
     }
 
-    const joinPromise = new Promise<GameStateEvents["area.joined"]>(
-      (resolve) => {
-        const unsub = gameClient.eventBus.subscribe(
-          "area.joined",
-          (payload) => {
-            unsub();
-            resolve(payload);
-          },
-        );
-      },
-    );
-
     const characterId = await api.myCharacterId.query();
 
     gatewayEvents.gateway.join(characterId);
 
-    const { areaId } = await joinPromise;
+    const areaId = await waitUntilDefined(gameClient.areaId);
     if (verbose) {
       logger.info({ characterId }, `Socket ${n} joined`);
     }
@@ -172,4 +161,19 @@ function range(n: number) {
 
 function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function waitUntilDefined<T>(signal: Signal<T | undefined>): Promise<T> {
+  return new Promise((resolve) => {
+    if (signal.value !== undefined) {
+      resolve(signal.value);
+      return;
+    }
+    const unsubscribe = signal.subscribe((value) => {
+      if (value !== undefined) {
+        unsubscribe();
+        resolve(value);
+      }
+    });
+  });
 }

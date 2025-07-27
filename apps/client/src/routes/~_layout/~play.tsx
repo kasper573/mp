@@ -19,9 +19,10 @@ function PlayPage() {
   useEffect(() => {
     // Temporary solution until we have a proper character selection UI
     void api.myCharacterId.query().then((id) => {
+      stateClient.characterId.value = id;
       events.gateway.join(id);
     });
-  }, [events, api]);
+  }, [events, api, stateClient]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,

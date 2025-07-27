@@ -62,11 +62,6 @@ export function gameStateDbSyncBehavior(
         const char = characterFromDbFields(fields, actorModels, rng);
         state.actors.set(char.identity.id, char);
         server.markToResendFullState(char.identity.id);
-        server.addEvent(
-          "area.joined",
-          { areaId: area.id, characterId: char.identity.id },
-          { actors: [char.identity.id] },
-        );
         logger.debug(
           { characterId: fields.id },
           "Character joined to game service",

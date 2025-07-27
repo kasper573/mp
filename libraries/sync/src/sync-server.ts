@@ -124,7 +124,7 @@ export class SyncServer<
     eventName: EventName,
     payload: EventMap[EventName],
     visibility?: {
-      [EntityName in keyof State]: Iterable<inferEntityId<State[EntityName]>>;
+      [EntityName in keyof State]?: Iterable<inferEntityId<State[EntityName]>>;
     },
   ): void {
     const newEvent: ServerSyncEvent<State> = {

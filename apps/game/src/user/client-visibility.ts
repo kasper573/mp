@@ -19,6 +19,7 @@ export function deriveClientVisibility(
   return (characterId, state) => {
     return {
       actors: visibleActors(state, characterId),
+      area: new Set(["current"]),
     };
   };
 

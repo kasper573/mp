@@ -119,6 +119,7 @@ function flushGameState() {
 }
 
 const gameState: GameState = {
+  area: new SyncMap([["current", { id: area.id }]]),
   actors: new SyncMap([], {
     type: (actor) => actor.type,
     alive: (actor) => actor.alive.value,

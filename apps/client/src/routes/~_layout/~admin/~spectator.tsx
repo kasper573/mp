@@ -16,6 +16,7 @@ import { useGameAssets } from "../../../integrations/assets";
 import { useApi } from "@mp/api/sdk";
 import { useQuery } from "@mp/query";
 import { useGameStateClient } from "../../../integrations/game-state-client";
+import { useSignalEffect } from "@mp/state/react";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -45,6 +46,12 @@ function RouteComponent() {
     }),
   );
 
+  useSignalEffect(() => {
+    if (stateClient.characterId.value) {
+      events.gateway.spectate(stateClient.characterId.value);
+    }
+  });
+
   return (
     <div
       style={{
@@ -61,9 +68,6 @@ function RouteComponent() {
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi />}
             interactive={false}
-            sendSpectateRequest={(characterId) =>
-              events.gateway.spectate(characterId)
-            }
           />
         </GameAssetLoaderContext.Provider>
       </Suspense>
