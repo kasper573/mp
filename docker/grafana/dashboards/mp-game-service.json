@@ -579,10 +579,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "irate(process_cpu_user_seconds_total{instance=~\"$instance\"}[2m]) * 100",
+          "editorMode": "code",
+          "expr": "irate(process_cpu_user_seconds_total{exported_job=\"game-service\"}[2m]) * 100",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "User CPU - {{instance}}",
+          "range": true,
           "refId": "A"
         },
         {
@@ -590,10 +592,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "irate(process_cpu_system_seconds_total{instance=~\"$instance\"}[2m]) * 100",
+          "editorMode": "code",
+          "expr": "irate(process_cpu_system_seconds_total{exported_job=\"game-service\"}[2m]) * 100",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Sys CPU - {{instance}}",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -813,10 +817,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_eventloop_lag_seconds{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_eventloop_lag_seconds{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -893,10 +899,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "sum(changes(process_start_time_seconds{instance=~\"$instance\"}[1m]))",
+          "editorMode": "code",
+          "expr": "sum(changes(process_start_time_seconds{exported_job=\"game-service\"}[1m]))",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -996,10 +1004,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "process_resident_memory_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "process_resident_memory_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Process Memory - {{instance}}",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1007,10 +1017,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_heap_size_total_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_heap_size_total_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Heap Total - {{instance}}",
+          "range": true,
           "refId": "B"
         },
         {
@@ -1018,10 +1030,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_heap_size_used_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_heap_size_used_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}}",
+          "range": true,
           "refId": "C"
         },
         {
@@ -1029,10 +1043,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_external_memory_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_external_memory_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "External Memory - {{instance}}",
+          "range": true,
           "refId": "D"
         }
       ],
@@ -1132,10 +1148,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_active_handles_total{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_active_handles_total{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Active Handler - {{instance}}",
+          "range": true,
           "refId": "A"
         },
         {
@@ -1143,10 +1161,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_active_requests_total{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_active_requests_total{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Active Request - {{instance}}",
+          "range": true,
           "refId": "B"
         }
       ],
@@ -1246,10 +1266,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_heap_space_size_total_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_heap_space_size_total_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Heap Total - {{instance}} - {{space}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1349,10 +1371,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_heap_space_size_used_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_heap_space_size_used_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}} - {{space}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1452,10 +1476,12 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "expr": "nodejs_heap_space_size_available_bytes{instance=~\"$instance\"}",
+          "editorMode": "code",
+          "expr": "nodejs_heap_space_size_available_bytes{exported_job=\"game-service\"}",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}} - {{space}}",
+          "range": true,
           "refId": "A"
         }
       ],
@@ -1471,33 +1497,6 @@
   ],
   "templating": {
     "list": [
-      {
-        "allowCustomValue": false,
-        "current": {
-          "text": "pushgateway:9091",
-          "value": "pushgateway:9091"
-        },
-        "datasource": {
-          "type": "prometheus",
-          "uid": "mimir"
-        },
-        "definition": "label_values(nodejs_version_info{job=\"mp_game_service\"},instance)",
-        "description": "",
-        "hide": 2,
-        "includeAll": false,
-        "label": "NodeJS Instance",
-        "name": "instance",
-        "options": [],
-        "query": {
-          "qryType": 1,
-          "query": "label_values(nodejs_version_info{job=\"mp_game_service\"},instance)",
-          "refId": "PrometheusVariableQueryEditor-VariableQuery"
-        },
-        "refresh": 1,
-        "regex": "",
-        "sort": 1,
-        "type": "query"
-      },
       {
         "current": {
           "text": "All",
@@ -1522,12 +1521,12 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "mp-game-service",
   "uid": "PTSqcpJWk",
-  "version": 15
+  "version": 20
 }
