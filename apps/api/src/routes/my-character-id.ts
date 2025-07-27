@@ -49,6 +49,7 @@ export async function getOrCreateCharacterForUser(
       userId: user.id,
       xp: 0,
       name: user.name,
+      online: false,
       ...characterAppearance(),
     };
 

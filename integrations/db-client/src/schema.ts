@@ -9,7 +9,14 @@ import type {
 import { npcTypes } from "@mp/game/server";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
-import { varchar, real, uuid, pgTable, integer } from "drizzle-orm/pg-core";
+import {
+  varchar,
+  real,
+  uuid,
+  pgTable,
+  integer,
+  boolean,
+} from "drizzle-orm/pg-core";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 import { path } from "./types/path";
@@ -33,6 +40,7 @@ export const characterTable = pgTable("character", {
   attackRange: real().$type<Tile>().notNull(),
   modelId: actorModelId().notNull(),
   name: varchar({ length: 64 }).notNull(),
+  online: boolean().notNull().default(false),
   xp: real().notNull(),
 });
 
