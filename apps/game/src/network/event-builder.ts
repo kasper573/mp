@@ -1,11 +1,6 @@
-import { InjectionContext, type ImmutableInjectionContainer } from "@mp/ioc";
+import type { ImmutableInjectionContainer } from "@mp/ioc";
 import type { EventRouterFactories, EventMiddleware } from "@mp/event-router";
 import { EventRouterBuilder } from "@mp/event-router";
-
-export const ctxGlobalServerEventMiddleware =
-  InjectionContext.new<GameEventRouterMiddleware>(
-    "GlobalEventRouterMiddleware",
-  );
 
 export const evt = createFactories();
 
@@ -22,17 +17,9 @@ function createFactories(): EventRouterFactories<GameEventRouterContext> {
     .context<GameEventRouterContext>()
     .build();
 
-  const globalMiddleware = builder.middleware((opt) => {
-    const middleware = opt.ctx.access(ctxGlobalServerEventMiddleware);
-    if (middleware.isOk()) {
-      return middleware.value(opt);
-    }
-    return opt;
-  });
-
   return {
     router: builder.router,
-    event: builder.event.use(globalMiddleware),
+    event: builder.event,
     middleware: builder.middleware,
   };
 }

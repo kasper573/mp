@@ -10,7 +10,6 @@ import {
   ctxArea,
   ctxGameStateLoader,
   ctxGameStateServer,
-  ctxGlobalServerEventMiddleware,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
@@ -35,7 +34,7 @@ import { clientViewDistance } from "@mp/game/server";
 import { seed } from "../seed";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
-import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
+
 import { createGameStateFlusher } from "./etc/flush-game-state";
 import { createDbClient } from "@mp/db-client";
 import { createTickMetricsObserver } from "./metrics/tick";
@@ -49,6 +48,7 @@ import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/game-stat
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
+collectDefaultMetrics();
 
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger(opt.prettyLogs);
@@ -81,6 +81,8 @@ const gameStateLoader = createGameStateLoader(db, area);
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
 
+const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
+
 const eventInvoker = new QueuedEventInvoker({
   invoke: createEventInvoker(gameServerEventRouter),
   logger,
@@ -94,6 +96,7 @@ gatewaySocket.on("message", (buffer: ArrayBuffer) => {
     eventInvoker.addEvent(
       result.value.event,
       ioc.provide(ctxUserSession, result.value.session),
+      () => perSessionEventLimit.consume(result.value.session.id),
     );
   }
 });
@@ -108,6 +111,8 @@ const gameState: GameState = {
       actor.type === "npc" ? actor.identity.spawnId : undefined,
   }),
 };
+
+collectGameStateMetrics(gameState);
 
 const gameStateServer: GameStateServer = new SyncServer({
   clientIds: () =>
@@ -131,7 +136,6 @@ const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
 const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
 
 const ioc = new ImmutableInjectionContainer()
-  .provide(ctxGlobalServerEventMiddleware, rateLimiterMiddleware)
   .provide(ctxGameStateLoader, gameStateLoader)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
@@ -140,9 +144,6 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner);
-
-collectDefaultMetrics();
-collectGameStateMetrics(gameState);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
