@@ -37,12 +37,9 @@ import { collectGameStateMetrics } from "./metrics/game-state";
 import { opt } from "./options";
 import { rateLimiterMiddleware } from "./etc/rate-limiter-middleware";
 import { createGameStateFlusher } from "./etc/flush-game-state";
-import { loadActorModels } from "./etc/load-actor-models";
-
 import { createDbClient } from "@mp/db-client";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { createPinoLogger } from "@mp/logger/pino";
-
 import { createGameStateLoader } from "./etc/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
 import { loadAreaResource } from "@mp/game/server";
@@ -72,7 +69,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
     api.areaFileUrl
       .query(opt.areaId)
       .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorSpritesheetUrls.query().then(loadActorModels),
+    api.actorModels.query(),
   ]),
 ).catch((error) => {
   logger.error(error, "Failed to load area and actor data from API service");
