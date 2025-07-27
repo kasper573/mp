@@ -39,8 +39,6 @@ export class QueuedEventInvoker<Context = void> {
     context: Context,
     condition?: EventCondition,
   ) => {
-    const path = message[0].join(".");
-    this.opt.logger?.debug(`Queueing event: ${path}`);
     this.#queue.push([message, context, condition]);
     void this.pollQueue();
   };
@@ -63,7 +61,6 @@ export class QueuedEventInvoker<Context = void> {
       this.opt.logger?.error(testResult.error, `Skipped event`);
     } else {
       const path = message[0].join(".");
-      this.opt.logger?.debug(`Invoking event: ${path}`);
 
       const invokeFn = assert(this.opt.invoke, "No invoke function provided");
       const result = await invokeFn(message, context);
