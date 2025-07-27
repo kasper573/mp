@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 6,
+  "id": 11,
   "links": [],
   "panels": [
     {
@@ -551,26 +551,34 @@
             "type": "prometheus",
             "uid": "mimir"
           },
+          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "irate(process_cpu_user_seconds_total{exported_job=\"game-service\"}[2m]) * 100",
+          "expr": "irate(process_cpu_user_seconds_total{exported_job=\"game-service\", areaId=\"$v_area_id\"}[2m]) * 100",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "User CPU - {{instance}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "irate(process_cpu_system_seconds_total{exported_job=\"game-service\"}[2m]) * 100",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "irate(process_cpu_system_seconds_total{exported_job=\"game-service\", areaId=\"$v_area_id\"}[2m]) * 100",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Sys CPU - {{instance}}",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "useBackend": false
         }
       ],
       "title": "Process CPU Usage",
@@ -665,7 +673,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"major\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"major\", areaId=\"$v_area_id\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -682,7 +690,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"minor\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, max by(le) (increase(nodejs_gc_duration_seconds_bucket{kind=\"minor\", areaId=\"$v_area_id\"}[$__rate_interval])))",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -789,13 +797,17 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_eventloop_lag_seconds{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_eventloop_lag_seconds{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "{{instance}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Event Loop Lag",
@@ -894,52 +906,68 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "process_resident_memory_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "process_resident_memory_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Process Memory - {{instance}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_heap_size_total_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_heap_size_total_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Heap Total - {{instance}}",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_heap_size_used_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_heap_size_used_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}}",
           "range": true,
-          "refId": "C"
+          "refId": "C",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_external_memory_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_external_memory_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "External Memory - {{instance}}",
           "range": true,
-          "refId": "D"
+          "refId": "D",
+          "useBackend": false
         }
       ],
       "title": "Process Memory Usage",
@@ -1038,26 +1066,34 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_active_handles_total{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_active_handles_total{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Active Handler - {{instance}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         },
         {
           "datasource": {
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_active_requests_total{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_active_requests_total{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Active Request - {{instance}}",
           "range": true,
-          "refId": "B"
+          "refId": "B",
+          "useBackend": false
         }
       ],
       "title": "Active Handlers/Requests Total",
@@ -1156,13 +1192,17 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_heap_space_size_total_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_heap_space_size_total_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Heap Total - {{instance}} - {{space}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Heap Total Detail",
@@ -1261,13 +1301,17 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_heap_space_size_used_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_heap_space_size_used_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}} - {{space}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Heap Used Detail",
@@ -1366,13 +1410,17 @@
             "type": "prometheus",
             "uid": "mimir"
           },
-          "editorMode": "code",
-          "expr": "nodejs_heap_space_size_available_bytes{exported_job=\"game-service\"}",
+          "disableTextWrap": false,
+          "editorMode": "builder",
+          "expr": "nodejs_heap_space_size_available_bytes{exported_job=\"game-service\", areaId=\"$v_area_id\"}",
           "format": "time_series",
+          "fullMetaSearch": false,
+          "includeNullMetadata": true,
           "intervalFactor": 1,
           "legendFormat": "Heap Used - {{instance}} - {{space}}",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
         }
       ],
       "title": "Heap Available Detail",
@@ -1382,24 +1430,18 @@
   "preload": false,
   "refresh": "auto",
   "schemaVersion": 41,
-  "tags": [
-    "nodejs"
-  ],
+  "tags": [],
   "templating": {
     "list": [
       {
+        "allowCustomValue": false,
         "current": {
-          "text": [
-            "island"
-          ],
-          "value": [
-            "island"
-          ]
+          "text": "forest",
+          "value": "forest"
         },
         "definition": "label_values(areaId)",
-        "includeAll": true,
+        "includeAll": false,
         "label": "Area",
-        "multi": true,
         "name": "v_area_id",
         "options": [],
         "query": {
@@ -1414,12 +1456,12 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-15m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "mp-game-service",
-  "uid": "PTSqcpJWk",
-  "version": 22
+  "uid": "det89o8r7iy2od",
+  "version": 1
 }
