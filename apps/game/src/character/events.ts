@@ -11,7 +11,6 @@ import { ctxGameStateServer } from "../game-state/game-state-server";
 import { evt } from "../network/event-builder";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { sendCharacterToArea } from "../traits/movement";
-import { ctxArea } from "../context/common";
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = evt.router({
@@ -71,9 +70,10 @@ export const characterRouter = evt.router({
       const loader = ctx.get(ctxGameStateLoader);
       const spawnPoint = loader.getDefaultSpawnPoint();
       char.combat.health = char.combat.maxHealth;
+
       sendCharacterToArea(
-        char,
-        ctx.get(ctxArea),
+        ctx,
+        char.identity.id,
         spawnPoint.areaId,
         spawnPoint.coords,
       );

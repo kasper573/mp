@@ -1,18 +1,19 @@
 import type { Vector, VectorLike } from "@mp/math";
 import type { CardinalDirection, Path } from "@mp/math";
 import type { TickEventHandler } from "@mp/time";
-import type { Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { GameState } from "../game-state/game-state";
-
+import { ctxGameState } from "../game-state/game-state";
 import type { AreaId } from "../area/area-id";
 import { moveAlongPath } from "../area/move-along-path";
-
 import type { AreaResource } from "../area/area-resource";
 import { getAreaIdFromObject } from "../area/area-resource";
 import { defineSyncComponent } from "@mp/sync";
 import * as patchOptimizers from "../network/patch-optimizers";
-import type { Character } from "../character/types";
+import type { InjectionContainer } from "@mp/ioc";
+import { ctxArea } from "../context/common";
+import type { CharacterId } from "../character/types";
+import { ctxGameEventClient } from "../network/game-event-client";
 
 export type MovementTrait = typeof MovementTrait.$infer;
 
@@ -43,11 +44,10 @@ export const MovementTrait = defineSyncComponent((builder) =>
     .add<CardinalDirection>()("dir"),
 );
 
-export function movementBehavior(
-  state: GameState,
-  area: AreaResource,
-): TickEventHandler {
+export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {
+    const area = ioc.get(ctxArea);
+    const state = ioc.get(ctxGameState);
     for (const actor of state.actors.values()) {
       // The dead don't move
       if (actor.combat.health <= 0) {
@@ -80,36 +80,55 @@ export function movementBehavior(
           actor.type === "character" &&
           actor.movement.desiredPortalId === object.id
         ) {
-          sendCharacterToArea(actor, area, destinationAreaId);
+          sendCharacterToArea(ioc, actor.identity.id, destinationAreaId);
         }
       }
     }
   };
 }
 
-/**
- * Actors area ids are only stored in the database.
- * What controls which area an actor is associated with at runtime is simply if it's been added to a game server instance.
- * Each game server instance only houses one specific area, so adding an actor to a game server instance is equal to adding it to that area.
- */
 export function sendCharacterToArea(
-  char: Character,
-  currentArea: AreaResource,
+  ioc: InjectionContainer,
+  characterId: CharacterId,
   destinationAreaId: AreaId,
   coords?: Vector<Tile>,
 ) {
+  const gameState = ioc.get(ctxGameState);
+  const currentArea = ioc.get(ctxArea);
+  const char = assert(
+    gameState.actors.get(characterId),
+    `Character ${characterId} not found in game state`,
+  );
+
+  // Actors area ids are only stored in the database.
+  // What controls which area an actor is associated with at runtime is simply if it's been added to a game server instance.
+  // Each game service instance only houses one specific area,
+  // so adding an actor to a game servers game state is equal to adding it to that area.
+
   char.movement.path = undefined;
   char.movement.desiredPortalId = undefined;
+
+  // If we're portalling within the same area we can just change coords
   if (destinationAreaId === currentArea.id) {
-    // If we're portalling within the same area we can just change coords
     char.movement.coords = coords ?? currentArea.start;
-  } else {
-    // But to change to a different area we must handle sharding,
-    // which requires more intricate handling.
-    throw new Error(
-      "Sending character to a different area is not implemented yet.",
-    );
+    return;
   }
+
+  // But if we're moving to a different area we must communicate
+  // with other services and tell them to pick up this character.
+
+  // RISK: Removing the character and blindly trusting other services to
+  // reinstate them in their instance may lead to characters being left in the void.
+  // It's a minor risk. At worst, the player will have disconnect and
+  // reconnect to have a game service pick them up again.
+  gameState.actors.delete(characterId);
+
+  // Inform other services that the character wants to join another area
+  const client = ioc.get(ctxGameEventClient);
+  client.network.characterWantsToTransportToArea({
+    characterId,
+    areaId: destinationAreaId,
+  });
 }
 
 export function findPathForSubject(

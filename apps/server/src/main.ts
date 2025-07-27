@@ -82,7 +82,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
   process.exit(1);
 });
 
-const gameStateLoader = createGameStateLoader(db, area);
+const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
 
 logger.info(`Seeding database...`);
 await seed(db, area, actorModels);
@@ -166,7 +166,7 @@ const ioc = new ImmutableInjectionContainer()
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
-updateTicker.subscribe(movementBehavior(gameState, area));
+updateTicker.subscribe(movementBehavior(ioc));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());

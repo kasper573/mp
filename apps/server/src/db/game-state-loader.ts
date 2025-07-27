@@ -1,27 +1,45 @@
 import type {
+  ActorModelLookup,
   AreaResource,
+  Character,
+  CharacterId,
   GameStateLoader,
   Npc,
   NpcSpawn,
 } from "@mp/game/server";
 import { deriveNpcSpawnsFromArea } from "@mp/game/server";
 import type { DbClient } from "@mp/db-client";
-import { eq, npcSpawnTable, npcTable } from "@mp/db-client";
+import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db-client";
+import { characterFromDbFields } from "./character-transform";
+import type { Rng } from "@mp/std";
 
 export function createGameStateLoader(
   db: DbClient,
   area: AreaResource,
-  includeNpcsDerivedFromTiled = true,
+  actorModels: ActorModelLookup,
+  rng: Rng,
 ): GameStateLoader {
-  function getDefaultSpawnPoint() {
-    return {
-      areaId: area.id,
-      coords: area.start,
-    };
-  }
-
   return {
-    getDefaultSpawnPoint,
+    getDefaultSpawnPoint() {
+      return {
+        areaId: area.id,
+        coords: area.start,
+      };
+    },
+
+    async getCharacter(characterId: CharacterId): Promise<Character> {
+      const result = await db
+        .select()
+        .from(characterTable)
+        .where(eq(characterTable.id, characterId))
+        .limit(1);
+
+      if (result.length === 0) {
+        throw new Error(`Character with id ${characterId} not found`);
+      }
+
+      return characterFromDbFields(result[0], actorModels, rng);
+    },
 
     async getAllSpawnsAndTheirNpcs() {
       const result = await db
@@ -36,10 +54,6 @@ export function createGameStateLoader(
         }
         return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
       });
-
-      if (!includeNpcsDerivedFromTiled) {
-        return allFromDB;
-      }
 
       const allFromTiled = deriveNpcSpawnsFromArea(
         area,

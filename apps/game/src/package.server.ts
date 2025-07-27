@@ -1,6 +1,7 @@
 export * from "./actor/actor";
 export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
+export * from "./actor/actor-spritesheet-urls";
 export * from "./npc/npc-ai";
 export * from "./npc/npc-spawner";
 export * from "./npc/events";
@@ -15,7 +16,6 @@ export * from "./user/roles";
 export * from "./user/client-visibility";
 export * from "./user/session";
 export * from "./area/load-area-resource";
-export * from "./actor/actor-spritesheet-urls";
 export * from "./area/area-id";
 export * from "./area/area-resource";
 export * from "./area/tiled-resource";

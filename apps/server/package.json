@@ -8,7 +8,7 @@
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "pnpm devenv tsx watch --clear-screen=false src/main.ts",
-    "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 MP_SERVER_AREA_ID=forest dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+    "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
     "@mp/api": "workspace:*",
