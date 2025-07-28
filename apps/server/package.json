@@ -7,7 +7,8 @@
     "build": "tsc && tsx esbuild.ts",
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "pnpm devenv tsx --inspect-brk src/main.ts",
-    "dev": "pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "dev:instance": "pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "dev": "tsx run-dev-for-all-areas.ts",
     "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
