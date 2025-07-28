@@ -22,6 +22,9 @@ RUN cp -r /builder/apps/${APP_NAME}/dist /builder/dist
 FROM node:22.17.0-alpine3.21 AS app
 WORKDIR /app
 
+# Install curl so that we can use it in healthcheck
+RUN apk add --no-cache curl
+
 ARG APP_NAME
 ARG MP_BUILD_VERSION
 
