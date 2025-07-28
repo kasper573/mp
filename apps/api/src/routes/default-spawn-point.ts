@@ -13,7 +13,7 @@ export const defaultSpawnPoint = rpc.procedure.query(({ ctx }) =>
 export async function getDefaultSpawnPoint(
   ioc: InjectionContainer,
 ): Promise<{ areaId: AreaId; coords: Vector<Tile> }> {
-  const areaFiles = await getAreaFileUrls(ioc);
+  const areaFiles = await getAreaFileUrls(ioc, "internal");
   const someAreaInfo = areaFiles.entries().toArray()[0];
   if (!someAreaInfo) {
     throw new Error("No areas available");

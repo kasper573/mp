@@ -1,10 +1,24 @@
 import type { UrlString } from "@mp/std";
 import { type } from "@mp/validate";
 
+/**
+ * internal: url that only works within the docker network,
+ * public: on the internet
+ */
+export const FileUrlType = type.enumerated("internal", "public");
+export type FileUrlType = typeof FileUrlType.infer;
+
 export interface FileResolver {
-  abs: (...relativePath: string[]) => UrlString;
+  /**
+   * Returns an absolute URL for the given relative path.
+   */
+  abs: (relativePath: string[], type: FileUrlType) => UrlString;
+
+  /**
+   * Returns a list of filenames in the given directory.
+   */
   dir: <FileInDir extends string>(
-    ...relativePath: string[]
+    relativePath: string[],
   ) => Promise<FileInDir[]>;
 }
 
@@ -19,10 +33,22 @@ export function createFileResolver(
 
   function publicUrl(...relativePath: string[]) {
     const url = new URL(relativePath.join("/"), publicBaseUrl);
-    return url.toString() as UrlString;
+    return url.toString();
   }
 
-  async function dir<FileInDir extends string>(...relativePath: string[]) {
+  function abs(
+    relativePath: string[],
+    type: FileUrlType = "internal",
+  ): UrlString {
+    switch (type) {
+      case "internal":
+        return internalUrl(...relativePath);
+      case "public":
+        return publicUrl(...relativePath);
+    }
+  }
+
+  async function dir<FileInDir extends string>(relativePath: string[]) {
     const url = internalUrl(...relativePath);
     let response: Response;
     try {
@@ -45,7 +71,7 @@ export function createFileResolver(
   }
 
   return {
-    abs: publicUrl,
+    abs,
     dir,
   };
 }

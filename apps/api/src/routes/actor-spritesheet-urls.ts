@@ -8,20 +8,22 @@ import path from "path";
 import { rpc } from "../integrations/trpc";
 import type { InjectionContainer } from "@mp/ioc";
 import { ctxFileResolver } from "../ioc";
+import { FileUrlType } from "../integrations/file-resolver";
 
-export const actorSpritesheetUrls = rpc.procedure.query(({ ctx }) =>
-  getActorSpritesheetUrls(ctx.ioc),
-);
+export const actorSpritesheetUrls = rpc.procedure
+  .input(FileUrlType)
+  .query(({ ctx, input }) => getActorSpritesheetUrls(ctx.ioc, input));
 
 export async function getActorSpritesheetUrls(
   ioc: InjectionContainer,
+  urlType: FileUrlType,
 ): Promise<ActorSpritesheetUrls> {
   const fs = ioc.get(ctxFileResolver);
-  const modelFolders = await fs.dir<ActorModelId>("actors");
+  const modelFolders = await fs.dir<ActorModelId>(["actors"]);
   return new Map(
     await Promise.all(
       modelFolders.map(async (modelId) => {
-        const spritesheetFiles = await fs.dir("actors", modelId);
+        const spritesheetFiles = await fs.dir(["actors", modelId]);
         const spritesheets: ReadonlyMap<ActorAnimationName, UrlString> =
           new Map(
             await Promise.all(
@@ -31,7 +33,7 @@ export async function getActorSpritesheetUrls(
                     spritesheet,
                     path.extname(spritesheet),
                   ) as ActorAnimationName;
-                  const url = fs.abs("actors", modelId, spritesheet);
+                  const url = fs.abs(["actors", modelId, spritesheet], urlType);
                   return [state, url];
                 },
               ),

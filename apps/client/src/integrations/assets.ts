@@ -24,7 +24,7 @@ export const useGameAssets: GameAssetLoader = (areaId) => {
 export function useActorSpritesheets(): ActorSpritesheetLookup {
   const api = useApi();
   const { data: urls } = useSuspenseQuery(
-    api.actorSpritesheetUrls.queryOptions(void 0),
+    api.actorSpritesheetUrls.queryOptions("public"),
   );
 
   const query = useSuspenseQuery({
@@ -38,7 +38,9 @@ export function useActorSpritesheets(): ActorSpritesheetLookup {
 
 export function useAreaResource(areaId: AreaId): AreaResource {
   const api = useApi();
-  const { data: url } = useSuspenseQuery(api.areaFileUrl.queryOptions(areaId));
+  const { data: url } = useSuspenseQuery(
+    api.areaFileUrl.queryOptions({ areaId, urlType: "public" }),
+  );
   const query = useSuspenseQuery({
     queryKey: ["areaResource", url, areaId],
     staleTime: Infinity,

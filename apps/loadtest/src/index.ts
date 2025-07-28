@@ -108,7 +108,7 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info({ characterId }, `Socket ${n} joined`);
     }
 
-    const url = await api.areaFileUrl.query(areaId);
+    const url = await api.areaFileUrl.query({ areaId, urlType: "public" });
     const area = await loadAreaResource(areaId, url);
     const tiles = Array.from(area.graph.nodeIds)
       .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
