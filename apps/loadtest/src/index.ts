@@ -68,6 +68,7 @@ async function testOneGameClient(n: number, rng: Rng) {
   const url = new URL(gameServiceUrl);
   url.searchParams.set("accessToken", accessToken);
   const socket = new WebSocket(url.toString());
+  socket.binaryType = "arraybuffer";
 
   const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
     socket.send(eventMessageEncoding.encode(message)),
@@ -98,13 +99,27 @@ async function testOneGameClient(n: number, rng: Rng) {
       logger.info(`Socket ${n} connected`);
     }
 
-    const characterId = await api.myCharacterId.query();
+    if (verbose) {
+      logger.info(`Getting character id for socket ${n}`);
+    }
+    gameClient.characterId.value = await api.myCharacterId.query();
 
-    gatewayEvents.gateway.join(characterId);
+    if (verbose) {
+      logger.info(
+        `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
+      );
+    }
+    gatewayEvents.gateway.join(gameClient.characterId.value);
 
+    if (verbose) {
+      logger.info(`Socket ${n} is waiting on area id...`);
+    }
     const areaId = await waitUntilDefined(gameClient.areaId);
     if (verbose) {
-      logger.info({ characterId }, `Socket ${n} joined`);
+      logger.info(
+        { characterId: gameClient.characterId.value },
+        `Socket ${n} successfully joined gateway`,
+      );
     }
 
     const url = await api.areaFileUrl.query({ areaId, urlType: "public" });
