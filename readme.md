@@ -19,28 +19,6 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
 
-### Note on state management
-
-To keep things consistent we use signals as a reusable state management system across all systems.
-However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
-We do this to not directly couple all systems with preact.
-
-```text
-              +-----------------------------+
-              |         @mp/state           |
-              |   (@preact/signals-core)    |
-              +-------------+---------------+
-                            |
-        +-------------------+-------------------+
-        |                   |                   |
-+----------------+  +----------------+  +---------------+
-|   Game Server  |  |   Graphics     |  |      UI       |
-|      Logic     |  |   (pixi.js)    |  |   (preact)    |
-+----------------+  +----------------+  +---------------+
-```
-
-> If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
-
 ## Design goals
 
 - CI/CD: Lint, test, build, deploy in pipeline.
@@ -58,6 +36,8 @@ We do this to not directly couple all systems with preact.
 ## Development
 
 Local development is done using node and docker compose.
+
+Check out the [architecture](#architecture) section for an overview of the system.
 
 ### Initial setup (only required once)
 
@@ -157,6 +137,62 @@ Should be highly configurable and modular.
 Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many libraries will have to depend on really core stuff like [@mp/std](/libraries/std) and [@mp/time](/libraries/time), but in general you should decouple packages and instead compose them together inside an app.
 
 Does not need to handle bundling, package.json may directly export untranspiled code, ie. typescript.
+
+## Architecture
+
+### Service diagram
+
+There's also a reverse proxy (caddy) in front of everything, but it's not shown in the diagram because it's mostly visual noise.
+
+```mermaid
+flowchart LR
+  User --> WEB["Website"]
+
+  GC -->|Send game client events| GW["Gateway"]
+
+  GW -->|Cross service event broadcast| GS["Game service"]
+  GW -->|Broadcast game client events to game services| GS
+  GS -->|Flush game state to game clients| GW
+
+  WEB -->|Show game client on some pages| GC["Game client"]
+
+  GW -->|http proxy| Api
+  GS -->|Load area data required by instance| Api
+
+  WEB -->|Load assets| FS["File server (caddy)"]
+  Api -->|List game client assets| FS
+  GC -->|Load game client assets| FS
+
+  GW --> KC["Auth (keycloak)"]
+  Api --> KC
+
+  GS -->|Load/Save game state| DB["Database (postgres)"]
+  GW -->|Save player online state| DB
+  Api -->|Load/Edit game state| DB
+  KC -->|CRUD user data| DB
+```
+
+### State management
+
+To keep things consistent we use signals as a reusable state management system across all systems.
+However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
+We do this to not directly couple all systems with preact.
+
+```text
+              +-----------------------------+
+              |         @mp/state           |
+              |   (@preact/signals-core)    |
+              +-------------+---------------+
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
++----------------+  +----------------+  +---------------+
+|   Game Server  |  |   Graphics     |  |      UI       |
+|      Logic     |  |   (pixi.js)    |  |   (preact)    |
++----------------+  +----------------+  +---------------+
+```
+
+> If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
 
 ## Credits
 
