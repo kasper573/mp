@@ -12,7 +12,7 @@ services:
   alloy:
     extra_hosts:
       - "host.docker.internal:host-gateway"
-  caddy:
+  reverse-proxy:
     extra_hosts:
       - "host.docker.internal:host-gateway"
   pushgateway:

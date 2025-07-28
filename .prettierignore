@@ -2,8 +2,7 @@ out
 dist
 pnpm-lock.yaml
 integrations/db-client/drizzle
-docker/caddy/public/areas
-docker/caddy/public/tilesets
+docker/file-server/public
 docker/grafana/dashboards
 docker/keycloak/import
 **/*.generated.*

@@ -53,6 +53,7 @@ COPY --from=builder /builder/dist /app
 ENV OTEL_SERVICE_NAME="mp-${APP_NAME}"
 ENV OTEL_SERVICE_VERSION="${MP_BUILD_VERSION}"
 ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
+ENV NODE_TLS_REJECT_UNAUTHORIZED=0 
 
 # Add start script
 COPY <<EOF /app/start.sh

@@ -20,7 +20,7 @@ export default tseslint.config(
       "**/dist/**",
       "**/docker/**.js",
       "pnpm-lock.yaml",
-      "**/docker/caddy/public/**",
+      "**/docker/file-server/public/**",
       "**/.tanstack/**",
       "**/.playwright/**",
       "**/*.generated.*",

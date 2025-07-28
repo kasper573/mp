@@ -13,7 +13,7 @@ await Promise.all(areaIds.map(runDevInstance));
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fs.readdir(
-    path.resolve(__dirname, "../../docker/caddy/public/areas"),
+    path.resolve(__dirname, "../../docker/file-server/public/areas"),
     { withFileTypes: true },
   );
   return areaFiles
