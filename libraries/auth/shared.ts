@@ -47,7 +47,10 @@ export function createBypassUser(name: string): AccessToken {
   return (bypassTokenPrefix + name) as AccessToken;
 }
 
-export function parseBypassUser(token: AccessToken): UserIdentity | undefined {
+export function parseBypassUser(
+  token: AccessToken,
+  roles?: Iterable<RoleDefinition>,
+): UserIdentity | undefined {
   if (!token.startsWith(bypassTokenPrefix)) {
     return;
   }
@@ -59,7 +62,7 @@ export function parseBypassUser(token: AccessToken): UserIdentity | undefined {
       "6ba7b810-9dad-11d1-80b4-00c04fd430c8",
     ) as UserId,
     token,
-    roles: new Set(),
+    roles: new Set(roles),
     name,
   };
 }

@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { err, ok, type Result } from "@mp/std";
+import type { RoleDefinition } from "./shared";
 import {
   createUserIdentity,
   isOurJwtPayload,
@@ -18,6 +19,10 @@ export interface TokenResolverOption {
    */
   allowBypassUsers?: boolean;
   /**
+   * Give these roles to bypass users automatically.
+   */
+  bypassUserRoles?: Iterable<RoleDefinition>;
+  /**
    * Optional callback to handle the result of the token resolution.
    * This can be used for logging or other side effects.
    */
@@ -34,6 +39,7 @@ export function createTokenResolver({
   audience,
   algorithms,
   allowBypassUsers,
+  bypassUserRoles,
   onResolve,
 }: TokenResolverOption): TokenResolver {
   const jwks = createRemoteJWKSet(new URL(jwksUri));
@@ -43,7 +49,9 @@ export function createTokenResolver({
       return err("A token must be provided");
     }
 
-    const bypassUser = allowBypassUsers ? parseBypassUser(token) : undefined;
+    const bypassUser = allowBypassUsers
+      ? parseBypassUser(token, bypassUserRoles)
+      : undefined;
     if (bypassUser) {
       return ok(bypassUser);
     }

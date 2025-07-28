@@ -12,6 +12,7 @@ import {
   eventWithSessionEncoding,
   ctxUserSession,
   gatewayRoles,
+  characterRoles,
 } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
@@ -84,7 +85,13 @@ const httpServer = http.createServer(webServer);
 const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
-const resolveAccessToken = createTokenResolver(opt.auth);
+const resolveAccessToken = createTokenResolver({
+  ...opt.auth,
+  bypassUserRoles: [
+    ...Object.values(gatewayRoles),
+    ...Object.values(characterRoles),
+  ],
+});
 
 const wss = new WebSocketServer({
   ...wssConfig(),
