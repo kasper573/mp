@@ -16,17 +16,24 @@ export function createFileResolver(baseUrl: string): FileResolver {
 
   async function dir<FileInDir extends string>(...relativePath: string[]) {
     const url = abs(...relativePath);
-    const response = await fetch(url, {
-      headers: {
-        Accept: "application/json",
-      },
-    });
-    if (!response.ok) {
-      throw new Error(`Failed to fetch directory: ${response.statusText}`);
+    let response: Response;
+    try {
+      response = await fetch(url, {
+        headers: {
+          Accept: "application/json",
+        },
+      });
+      if (!response.ok) {
+        throw new Error(response.statusText);
+      }
+      const json = await response.json();
+      const entries = DirectoryEntry.array().from(json);
+      return entries.map((entry) => entry.name as FileInDir);
+    } catch (error) {
+      throw new Error(`Failed to look up directory at ${url}`, {
+        cause: error,
+      });
     }
-    const json = await response.json();
-    const entries = DirectoryEntry.array().from(json);
-    return entries.map((entry) => entry.name as FileInDir);
   }
 
   return {
