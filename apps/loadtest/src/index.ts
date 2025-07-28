@@ -1,6 +1,6 @@
 // oxlint-disable no-await-in-loop
 import { createConsoleLogger } from "@mp/logger";
-import { createWebSocket } from "@mp/ws/client";
+import { WebSocket } from "@mp/ws/server";
 import { createApiClient } from "@mp/api/sdk";
 import { createBypassUser } from "@mp/auth";
 import { Rng } from "@mp/std";
@@ -18,6 +18,7 @@ import {
 } from "@mp/event-router";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Signal } from "@mp/state";
+import { parseSocketError } from "@mp/ws/server";
 
 registerEncoderExtensions();
 
@@ -64,11 +65,9 @@ async function testOneGameClient(n: number, rng: Rng) {
   }
 
   const accessToken = createBypassUser(`Test User ${n}`);
-  const socket = createWebSocket(() => {
-    const url = new URL(gameServiceUrl);
-    url.searchParams.set("accessToken", accessToken);
-    return url.toString();
-  });
+  const url = new URL(gameServiceUrl);
+  url.searchParams.set("accessToken", accessToken);
+  const socket = new WebSocket(url.toString());
 
   const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
     socket.send(eventMessageEncoding.encode(message)),
@@ -147,11 +146,21 @@ async function testOneGameClient(n: number, rng: Rng) {
 }
 
 async function waitForOpen(socket: WebSocket) {
-  await new Promise<Event>((resolve, reject) => {
-    socket.addEventListener("error", (cause) =>
-      reject(new Error("Socket error", { cause })),
-    );
-    socket.addEventListener("open", resolve);
+  await new Promise<void>((resolve, reject) => {
+    const onOpen = () => {
+      resolve();
+      removeEventListeners();
+    };
+    const onError = (error: WebSocket.ErrorEvent) => {
+      reject(parseSocketError(error));
+      removeEventListeners();
+    };
+    function removeEventListeners() {
+      socket.removeEventListener("open", onOpen);
+      socket.removeEventListener("error", onError);
+    }
+    socket.addEventListener("error", onError);
+    socket.addEventListener("open", onOpen);
   });
 }
 
