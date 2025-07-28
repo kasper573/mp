@@ -16,6 +16,10 @@ export function build(
     external: [
       ...builtinModules,
       ...builtinModules.map((m) => `node:${m}`),
+      // We extenalize pino because of its use of __dirname which makes esbuild just fail
+      // to bundle it to something that runs in esm (i don't know why, it should work?).
+      // We'll install these dependencies in the docker image instead.
+      "pino",
       "pino-pretty",
     ],
     mainFields: ["module", "main"],
