@@ -17,8 +17,7 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/node": "catalog:",
-    "builtin-modules": "catalog:",
-    "esbuild": "catalog:"
+    "@mp/build": "workspace:*",
+    "@types/node": "catalog:"
   }
 }

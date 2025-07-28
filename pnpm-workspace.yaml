@@ -14,5 +14,3 @@ catalog:
   dotenv: 17.2.0
   express: 5.1.0
   "@types/express": 5.0.3
-  "builtin-modules": 5.0.0
-  esbuild: 0.25.6
