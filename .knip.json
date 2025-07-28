@@ -3,7 +3,6 @@
   "ignoreDependencies": [
     "@mp/tsconfig",
     "pino-pretty",
-    "tsx",
     "@mp/eslint",
     "eslint-import-resolver-typescript"
   ]

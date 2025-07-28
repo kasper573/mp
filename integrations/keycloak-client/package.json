@@ -16,8 +16,8 @@
     "@mp/std": "workspace:*"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
     "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:"
   }
 }

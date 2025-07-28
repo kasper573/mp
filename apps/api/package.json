@@ -35,8 +35,8 @@
     "superjson": "2.2.2"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
     "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
     "tsx": "catalog:"
   }
 }

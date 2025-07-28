@@ -37,8 +37,8 @@
     "express-http-proxy": "2.1.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
     "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
     "@types/cors": "2.8.17",
     "@types/express": "catalog:",
     "@types/express-http-proxy": "1.6.6",

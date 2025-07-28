@@ -15,7 +15,7 @@
     "esbuild": "0.25.8"
   },
   "devDependencies": {
-    "@types/node": "catalog:",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@types/node": "catalog:"
   }
 }
