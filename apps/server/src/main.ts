@@ -8,6 +8,7 @@ import {
 } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
+import { parseSocketError } from "@mp/ws/server";
 import { ReconnectingWebSocket } from "@mp/ws/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import {
@@ -108,7 +109,7 @@ const eventInvoker = new QueuedEventInvoker({
 const gatewaySocket = new ReconnectingWebSocket(opt.gatewayWssUrl);
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.addEventListener("error", (err) =>
-  logger.error(err, "Gateway socket error"),
+  logger.error(parseSocketError(err), "Gateway socket error"),
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
 

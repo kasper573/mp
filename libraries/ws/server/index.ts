@@ -20,3 +20,13 @@ export class ReconnectingWebSocket extends ReconnectingWebSocketImpl {
     super(url, protocols, { WebSocket, ...options });
   }
 }
+
+/**
+ * Converts a node websocket error into a node error.
+ * Always use this to ensure all error information becomes available.
+ */
+export function parseSocketError(error: WebSocket.ErrorEvent): Error {
+  return new Error(`WebSocket Error (${error.type}): ${error.message}`, {
+    cause: error.error,
+  });
+}
