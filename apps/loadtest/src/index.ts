@@ -70,100 +70,96 @@ function testOneGameClient(n: number, rng: Rng) {
       __reject(error);
     }
 
-    try {
-      (async () => {
-        if (verbose) {
-          logger.info(`Creating socket ${n}`);
-        }
+    void (async () => {
+      if (verbose) {
+        logger.info(`Creating socket ${n}`);
+      }
 
-        const accessToken = createBypassUser(`Load Test ${n}`);
-        const url = new URL(gameServiceUrl);
-        url.searchParams.set("accessToken", accessToken);
-        socket = new WebSocket(url.toString());
-        socket.binaryType = "arraybuffer";
+      const accessToken = createBypassUser(`Load Test ${n}`);
+      const url = new URL(gameServiceUrl);
+      url.searchParams.set("accessToken", accessToken);
+      socket = new WebSocket(url.toString());
+      socket.binaryType = "arraybuffer";
 
-        const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
-          socket.send(eventMessageEncoding.encode(message)),
+      const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
+        socket.send(eventMessageEncoding.encode(message)),
+      );
+
+      const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>
+        socket.send(eventMessageEncoding.encode(message)),
+      );
+
+      await waitForOpen(socket);
+
+      if (verbose) {
+        logger.info(`Socket ${n} connected`);
+      }
+
+      const gameClient = new GameStateClient({
+        socket,
+        eventClient: gameEvents,
+        logger,
+        handlePatchFailure: failTest,
+        settings: () => ({
+          useInterpolator: false,
+          usePatchOptimizer: false,
+        }),
+      });
+
+      stopClient = gameClient.start();
+
+      if (verbose) {
+        logger.info(`Getting character id for socket ${n}`);
+      }
+      const api = createApiClient(apiUrl, () => accessToken);
+      gameClient.characterId.value = await api.myCharacterId.query();
+
+      if (verbose) {
+        logger.info(
+          `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
         );
+      }
+      gatewayEvents.gateway.join(gameClient.characterId.value);
 
-        const gatewayEvents = createProxyEventInvoker<GatewayRouter>(
-          (message) => socket.send(eventMessageEncoding.encode(message)),
+      if (verbose) {
+        logger.info(`Socket ${n} is waiting on area id...`);
+      }
+      const areaId = await waitUntilDefined(gameClient.areaId);
+
+      if (verbose) {
+        logger.info(
+          { characterId: gameClient.characterId.value },
+          `Socket ${n} successfully joined gateway`,
         );
+      }
 
-        await waitForOpen(socket);
+      const areaUrl = await api.areaFileUrl.query({
+        areaId,
+        urlType: "public",
+      });
+      const area = await loadAreaResource(areaId, areaUrl);
+      const tiles = Array.from(area.graph.nodeIds)
+        .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
+        .filter((v) => v !== undefined);
 
-        if (verbose) {
-          logger.info(`Socket ${n} connected`);
+      const endTime = Date.now() + timeout.totalMilliseconds;
+      while (Date.now() < endTime && running) {
+        if (
+          gameClient.character.value &&
+          !gameClient.character.value.combat.health
+        ) {
+          gameClient.actions.respawn();
         }
-
-        const gameClient = new GameStateClient({
-          socket,
-          eventClient: gameEvents,
-          logger,
-          handlePatchFailure: failTest,
-          settings: () => ({
-            useInterpolator: false,
-            usePatchOptimizer: false,
-          }),
-        });
-
-        stopClient = gameClient.start();
-
-        if (verbose) {
-          logger.info(`Getting character id for socket ${n}`);
-        }
-        const api = createApiClient(apiUrl, () => accessToken);
-        gameClient.characterId.value = await api.myCharacterId.query();
-
-        if (verbose) {
-          logger.info(
-            `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
-          );
-        }
-        gatewayEvents.gateway.join(gameClient.characterId.value);
-
-        if (verbose) {
-          logger.info(`Socket ${n} is waiting on area id...`);
-        }
-        const areaId = await waitUntilDefined(gameClient.areaId);
-
-        if (verbose) {
-          logger.info(
-            { characterId: gameClient.characterId.value },
-            `Socket ${n} successfully joined gateway`,
-          );
-        }
-
-        const areaUrl = await api.areaFileUrl.query({
-          areaId,
-          urlType: "public",
-        });
-        const area = await loadAreaResource(areaId, areaUrl);
-        const tiles = Array.from(area.graph.nodeIds)
-          .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
-          .filter((v) => v !== undefined);
-
-        const endTime = Date.now() + timeout.totalMilliseconds;
-        while (Date.now() < endTime && running) {
-          if (
-            gameClient.character.value &&
-            !gameClient.character.value.combat.health
-          ) {
-            gameClient.actions.respawn();
-          }
-          const to = rng.oneOf(tiles);
-          gameClient.actions.move(to);
-          logger.info(`Moving character for socket ${n} to ${to}`);
-          await wait(1000 + rng.next() * 6000);
-        }
-        if (verbose) {
-          logger.info(`Socket ${n} test finished`);
-        }
-        resolve();
-      })();
-    } catch (error) {
-      failTest(error);
-    }
+        const to = rng.oneOf(tiles);
+        gameClient.actions.move(to);
+        logger.info(`Moving character for socket ${n} to ${to}`);
+        await wait(1000 + rng.next() * 6000);
+      }
+      if (verbose) {
+        logger.info(`Socket ${n} test finished`);
+      }
+      resolve();
+    })().catch(failTest);
   }).finally(() => {
     stopClient();
     socket.close();
