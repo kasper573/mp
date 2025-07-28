@@ -13,7 +13,7 @@ export const rpc = initTRPC.context<ApiContext>().create({
     // Omit the sensitive error details
     return {
       code: shape.code,
-      message: "Interval server error",
+      message: "Internal Server Error",
     };
   },
 });
