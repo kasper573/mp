@@ -142,7 +142,7 @@ Does not need to handle bundling, package.json may directly export untranspiled 
 
 ### Service diagram
 
-There's also a reverse proxy (caddy) in front of everything, but it's not shown in the diagram because it's mostly visual noise.
+There's also a reverse proxy (caddy) in front of everything, but it's not shown in the diagram because it's a proxy and doesn't help demonstrating how services interact.
 
 ```mermaid
 flowchart LR
