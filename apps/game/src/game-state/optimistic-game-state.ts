@@ -3,7 +3,8 @@ import type { FrameCallbackOptions } from "@mp/engine";
 import type { EventAccessFn, Patch } from "@mp/sync";
 import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
-import { typedKeys } from "@mp/std";
+import type { Result } from "@mp/std";
+import { err, ok, typedKeys } from "@mp/std";
 import { moveAlongPath } from "../area/move-along-path";
 import type { GameStateEvents } from "./game-state-events";
 import type { GameState } from "./game-state";
@@ -38,11 +39,18 @@ export class OptimisticGameState implements GameState {
     this.actors.flush();
   };
 
-  applyPatch = (patch: Patch, events: EventAccessFn<GameStateEvents>) => {
-    if (this.settings().usePatchOptimizer) {
-      applyPatchOptimized(this, patch, events);
-    } else {
-      applyPatch(this, patch);
+  applyPatch = (
+    patch: Patch,
+    events: EventAccessFn<GameStateEvents>,
+  ): Result<void, Error> => {
+    try {
+      if (this.settings().usePatchOptimizer) {
+        applyPatchOptimized(this, patch, events);
+      } else {
+        applyPatch(this, patch);
+      }
+    } catch (error) {
+      return err(new Error(`Failed to apply patch`, { cause: error }));
     }
 
     // Face actors toward their attack targets when they attack
@@ -57,6 +65,7 @@ export class OptimisticGameState implements GameState {
     }
 
     this.actors.flush();
+    return ok(void 0);
   };
 }
 

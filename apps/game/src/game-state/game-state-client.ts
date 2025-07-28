@@ -112,22 +112,26 @@ export class GameStateClient {
         this.refreshState();
       }
 
-      try {
-        if (patch) {
-          this.gameState.applyPatch(patch, (desiredEventName) => {
-            return (events ?? [])
-              .filter(([eventName]) => eventName === desiredEventName)
-              .map(([, payload]) => payload as never);
-          });
-        }
+      if (patch) {
+        const result = this.gameState.applyPatch(patch, (desiredEventName) => {
+          return (events ?? [])
+            .filter(([eventName]) => eventName === desiredEventName)
+            .map(([, payload]) => payload as never);
+        });
 
-        if (events) {
-          for (const event of events) {
-            this.eventBus.dispatch(event);
-          }
+        if (result.isErr()) {
+          this.logger.error(
+            result.error,
+            `Could not apply patch, requesting full state refresh`,
+          );
+          this.refreshState();
         }
-      } catch (error) {
-        this.logger.error(error, `Error applying patch`);
+      }
+
+      if (events) {
+        for (const event of events) {
+          this.eventBus.dispatch(event);
+        }
       }
     }
   };
