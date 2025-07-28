@@ -94,7 +94,10 @@ const [area, actorModels] = await withBackoffRetries(() =>
 const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
 
 logger.info(`Seeding database...`);
-await seed(db, area, actorModels);
+await withBackoffRetries(() => seed(db, area, actorModels)).catch((error) => {
+  logger.error(error, "Failed to seed database");
+  process.exit(1);
+});
 
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
