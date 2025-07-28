@@ -32,11 +32,13 @@
     "@trpc/server": "11.4.3",
     "@trpc/tanstack-react-query": "11.4.3",
     "dotenv": "catalog:",
+    "express": "catalog:",
     "superjson": "2.2.2"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
+    "@types/express": "catalog:",
     "tsx": "catalog:"
   }
 }

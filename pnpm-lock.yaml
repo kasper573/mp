@@ -119,6 +119,9 @@ importers:
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
+      express:
+        specifier: 'catalog:'
+        version: 5.1.0
       superjson:
         specifier: 2.2.2
         version: 2.2.2
@@ -129,6 +132,9 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
+      '@types/express':
+        specifier: 'catalog:'
+        version: 5.0.3
       tsx:
         specifier: 'catalog:'
         version: 4.19.2
