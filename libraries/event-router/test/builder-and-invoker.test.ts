@@ -67,7 +67,7 @@ describe("builder and invoker", () => {
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error).toBeInstanceOf(EventRouterInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error.message).toBe('error in event handler "unknown"');
+    expect(result.error.message).toBe('Error invoking event "unknown"');
   });
 
   it("returns Err when path points to a router endpoint", async () => {
@@ -85,7 +85,7 @@ describe("builder and invoker", () => {
     // @ts-expect-error ignore harmless error for lazy property accses
     expect(result.error).toBeInstanceOf(EventRouterInvokerError);
     // @ts-expect-error ignore harmless error for lazy property accses
-    expect(result.error.message).toBe('error in event handler "nested"');
+    expect(result.error.message).toBe('Error invoking event "nested"');
   });
 
   it("catches handler exceptions and returns Err with cause", async () => {
