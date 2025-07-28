@@ -2,7 +2,10 @@
  * Convenience function to subscribe to the WebSocket readyState changes.
  */
 export function subscribeToReadyState(
-  socket: WebSocket,
+  socket: Pick<
+    WebSocket,
+    "readyState" | "addEventListener" | "removeEventListener"
+  >,
   onReadyStateChanged: (readyState: number) => unknown,
 ) {
   const updateReadyState = () => onReadyStateChanged(socket.readyState);

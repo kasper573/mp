@@ -21,7 +21,7 @@ import { ctxGameEventClient } from "../network/game-event-client";
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 
 export interface GameStateClientOptions {
-  socket: WebSocket;
+  socket: WebSocketLike;
   settings: () => OptimisticGameStateSettings;
   eventClient?: GameEventClient;
   logger?: Logger;
@@ -132,6 +132,11 @@ export class GameStateClient {
     }
   };
 }
+
+type WebSocketLike = Pick<
+  WebSocket,
+  "send" | "readyState" | "addEventListener" | "removeEventListener"
+>;
 
 export const ctxGameStateClient =
   InjectionContext.new<GameStateClient>("GameStateClient");
