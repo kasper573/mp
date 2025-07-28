@@ -76,7 +76,7 @@ function testOneGameClient(n: number, rng: Rng) {
           logger.info(`Creating socket ${n}`);
         }
 
-        const accessToken = createBypassUser(`Test User ${n}`);
+        const accessToken = createBypassUser(`Load Test ${n}`);
         const url = new URL(gameServiceUrl);
         url.searchParams.set("accessToken", accessToken);
         socket = new WebSocket(url.toString());
