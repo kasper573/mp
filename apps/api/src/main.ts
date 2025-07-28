@@ -27,7 +27,10 @@ const tokenResolver = createTokenResolver(opt.auth);
 const db = createDbClient(opt.databaseConnectionString);
 db.$client.on("error", (err) => logger.error(err, "Database error"));
 
-const fileResolver = createFileResolver(opt.fileServerBaseUrl);
+const fileResolver = createFileResolver(
+  opt.fileServerInternalUrl,
+  opt.fileServerPublicUrl,
+);
 
 const ioc = new ImmutableInjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)

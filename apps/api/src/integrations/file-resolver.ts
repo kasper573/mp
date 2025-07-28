@@ -8,14 +8,22 @@ export interface FileResolver {
   ) => Promise<FileInDir[]>;
 }
 
-export function createFileResolver(baseUrl: string): FileResolver {
-  function abs(...relativePath: string[]) {
-    const url = new URL(relativePath.join("/"), baseUrl);
+export function createFileResolver(
+  internalBaseUrl: string,
+  publicBaseUrl: string,
+): FileResolver {
+  function internalUrl(...relativePath: string[]): string {
+    const url = new URL(relativePath.join("/"), internalBaseUrl);
+    return url.toString();
+  }
+
+  function publicUrl(...relativePath: string[]) {
+    const url = new URL(relativePath.join("/"), publicBaseUrl);
     return url.toString() as PublicUrl;
   }
 
   async function dir<FileInDir extends string>(...relativePath: string[]) {
-    const url = abs(...relativePath);
+    const url = internalUrl(...relativePath);
     let response: Response;
     try {
       response = await fetch(url, {
@@ -37,7 +45,7 @@ export function createFileResolver(baseUrl: string): FileResolver {
   }
 
   return {
-    abs,
+    abs: publicUrl,
     dir,
   };
 }

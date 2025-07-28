@@ -10,7 +10,8 @@ export const apiOptionsSchema = type({
   exposeErrorDetails: boolish(),
   databaseConnectionString: "string",
   prettyLogs: boolish(),
-  fileServerBaseUrl: "string",
+  fileServerInternalUrl: "string",
+  fileServerPublicUrl: "string",
   version: "string",
   auth: {
     /**
