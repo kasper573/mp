@@ -24,7 +24,7 @@ registerEncoderExtensions();
 
 const logger = createConsoleLogger();
 
-const { apiUrl, gameServiceUrl, gameClients, timeout, verbose } =
+const { apiUrl, gameServiceUrl, gameClients, timeout, verbose, exitFast } =
   readCliOptions();
 
 const start = performance.now();
@@ -45,10 +45,20 @@ async function testAllGameClients() {
   // Seeded rng to get consistent behavior over time across runs in the ci pipeline
   const rng = new Rng(1337);
 
-  const results = await Promise.allSettled(
-    range(gameClients).map((n) => testOneGameClient(n, rng)),
-  );
+  const promises = range(gameClients).map((n) => testOneGameClient(n, rng));
 
+  if (exitFast) {
+    try {
+      await Promise.all(promises);
+      logger.info(`All ${promises.length} game client tests finished`);
+      return true;
+    } catch (error) {
+      logger.error(error, `One or more game client tests failed`);
+      return false;
+    }
+  }
+
+  const results = await Promise.allSettled(promises);
   const successes = results.filter((r) => r.status === "fulfilled");
   const failures = results.filter((r) => r.status === "rejected");
 

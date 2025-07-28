@@ -35,6 +35,11 @@ export function readCliOptions(argv = process.argv) {
       demandOption: true,
       default: 0,
     })
+    .options("exitFast", {
+      alias: "ef",
+      type: "boolean",
+      default: false,
+    })
     .option("timeout", {
       alias: "t",
       type: "number",
