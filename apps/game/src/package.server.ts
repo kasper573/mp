@@ -7,7 +7,6 @@ export * from "./npc/npc-spawner";
 export * from "./npc/events";
 export * from "./npc/derive-npc-spawns-from-areas";
 export * from "./npc/types";
-export * from "./character/character-remove-behavior";
 export * from "./character/events";
 export * from "./character/types";
 export * from "./user/roles";

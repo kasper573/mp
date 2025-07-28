@@ -36,7 +36,6 @@ import type {
 import {
   movementBehavior,
   combatBehavior,
-  characterRemoveBehavior,
   ctxGameState,
   deriveClientVisibility,
 } from "@mp/game/server";
@@ -202,7 +201,6 @@ updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
-updateTicker.subscribe(characterRemoveBehavior(gameState, logger));
 
 startGameStateDbSync(
   db,
