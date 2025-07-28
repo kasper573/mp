@@ -1,6 +1,6 @@
 import { InjectionContext } from "@mp/ioc";
 import type { Rect } from "@mp/math";
-import type { Branded, PublicUrl, Tile } from "@mp/std";
+import type { Branded, UrlString, Tile } from "@mp/std";
 
 import { defineSyncComponent } from "@mp/sync";
 
@@ -16,7 +16,7 @@ export const AppearanceTrait = defineSyncComponent((builder) =>
 
 export interface ActorModel {
   id: ActorModelId;
-  spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl>;
+  spritesheets: ReadonlyMap<ActorAnimationName, UrlString>;
   hitBox: Rect<Tile>;
 }
 

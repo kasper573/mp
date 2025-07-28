@@ -19,7 +19,7 @@ export type Tile = Branded<number, "Tile">;
 
 export type LocalFile = Branded<string, "LocalFile">;
 
-export type PublicUrl = Branded<string, "PublicUrl">;
+export type UrlString = string;
 
 export type TimesPerSecond = Branded<number, "TimesPerSecond">;
 

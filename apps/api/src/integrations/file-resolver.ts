@@ -1,8 +1,8 @@
-import type { PublicUrl } from "@mp/std";
+import type { UrlString } from "@mp/std";
 import { type } from "@mp/validate";
 
 export interface FileResolver {
-  abs: (...relativePath: string[]) => PublicUrl;
+  abs: (...relativePath: string[]) => UrlString;
   dir: <FileInDir extends string>(
     ...relativePath: string[]
   ) => Promise<FileInDir[]>;
@@ -19,7 +19,7 @@ export function createFileResolver(
 
   function publicUrl(...relativePath: string[]) {
     const url = new URL(relativePath.join("/"), publicBaseUrl);
-    return url.toString() as PublicUrl;
+    return url.toString() as UrlString;
   }
 
   async function dir<FileInDir extends string>(...relativePath: string[]) {

@@ -1,5 +1,5 @@
 import type { AreaId } from "@mp/game/server";
-import type { PublicUrl } from "@mp/std";
+import type { UrlString } from "@mp/std";
 import path from "path";
 import { rpc } from "../integrations/trpc";
 import { type } from "@mp/validate";
@@ -18,11 +18,11 @@ export const areaFileUrls = rpc.procedure.query(({ ctx }) =>
 
 export async function getAreaFileUrls(
   ioc: InjectionContainer,
-): Promise<ReadonlyMap<AreaId, PublicUrl>> {
+): Promise<ReadonlyMap<AreaId, UrlString>> {
   const fs = ioc.get(ctxFileResolver);
   const areaFiles = await fs.dir("areas");
   return new Map(
-    areaFiles.map((file): [AreaId, PublicUrl] => {
+    areaFiles.map((file): [AreaId, UrlString] => {
       const id = path.basename(file, path.extname(file)) as AreaId;
       const url = fs.abs("areas", file);
       return [id, url];

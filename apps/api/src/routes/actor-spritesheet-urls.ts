@@ -3,7 +3,7 @@ import type {
   ActorModelId,
   ActorAnimationName,
 } from "@mp/game/server";
-import type { PublicUrl } from "@mp/std";
+import type { UrlString } from "@mp/std";
 import path from "path";
 import { rpc } from "../integrations/trpc";
 import type { InjectionContainer } from "@mp/ioc";
@@ -22,11 +22,11 @@ export async function getActorSpritesheetUrls(
     await Promise.all(
       modelFolders.map(async (modelId) => {
         const spritesheetFiles = await fs.dir("actors", modelId);
-        const spritesheets: ReadonlyMap<ActorAnimationName, PublicUrl> =
+        const spritesheets: ReadonlyMap<ActorAnimationName, UrlString> =
           new Map(
             await Promise.all(
               spritesheetFiles.map(
-                (spritesheet): [ActorAnimationName, PublicUrl] => {
+                (spritesheet): [ActorAnimationName, UrlString] => {
                   const state = path.basename(
                     spritesheet,
                     path.extname(spritesheet),
