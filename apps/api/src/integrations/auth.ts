@@ -4,12 +4,13 @@ import { rpc } from "./trpc";
 
 import { ctxTokenResolver } from "@mp/game/server";
 import { ctxAccessToken } from "../ioc";
+import { TRPCError } from "@trpc/server";
 
 export function auth() {
   return rpc.middleware(async ({ ctx, next }) => {
     const res = await resolveAuth(ctx);
     if (res.isErr()) {
-      throw new Error(res.error);
+      throw new TRPCError({ code: "UNAUTHORIZED", cause: res.error });
     }
     return next({ ctx: { ...ctx, user: res.value } });
   });
@@ -20,9 +21,11 @@ export function roles(requiredRoles: RoleDefinition[]) {
     const requiredRolesSet = new Set(requiredRoles);
     if (!requiredRolesSet.isSubsetOf(ctx.user.roles)) {
       const missingRoles = requiredRolesSet.difference(ctx.user.roles);
-      throw new Error(
-        "Missing permissions: " + missingRoles.values().toArray().join(", "),
-      );
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message:
+          "Missing permissions: " + missingRoles.values().toArray().join(", "),
+      });
     }
     return next({ ctx });
   });
