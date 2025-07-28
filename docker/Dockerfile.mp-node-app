@@ -1,0 +1,69 @@
+# Make sure to keep this version aligned with the version of the engine field in the root package.json
+FROM node:22.17.0-alpine3.21 AS builder
+WORKDIR /builder
+RUN npm install -g corepack@0.31.0
+RUN corepack enable
+COPY package.json .
+RUN corepack prepare
+
+# install most of node dependencies
+COPY pnpm-lock.yaml .npmrc ./
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
+
+# copy source code and install any node dependencies missed by pnpm fetch
+COPY . .
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
+
+ARG APP_NAME
+ENV NODE_ENV=production
+RUN pnpm -F ${APP_NAME} build
+RUN cp -r /builder/apps/${APP_NAME}/dist /builder/dist
+
+FROM node:22.17.0-alpine3.21 AS app
+WORKDIR /app
+
+ARG APP_NAME
+ARG MP_BUILD_VERSION
+
+# Add package json
+# We use "no code" otel instrumentation which means we install
+# opentelemetry packages in the image instead of in the application.
+# Also install pino deps since they're externalized by esbuild
+# Keep in mind that pino dependency versions should be in sync with the ones in @mp/logger
+COPY <<EOF /app/package.json
+{
+  "name": "@mp/${APP_NAME}",
+  "version": "${MP_BUILD_VERSION}",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@opentelemetry/auto-instrumentations-node": "0.62.0",
+    "@opentelemetry/instrumentation": "0.203.0",
+    "@opentelemetry/api": "1.9.0",
+    "pino": "9.7.0",
+    "pino-pretty": "13.0.0"
+  }
+}
+EOF
+
+RUN npm install
+
+COPY --from=builder /builder/dist /app
+
+ENV OTEL_SERVICE_NAME="mp-${APP_NAME}"
+ENV OTEL_SERVICE_VERSION="${MP_BUILD_VERSION}"
+ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
+
+# Add start script
+COPY <<EOF /app/start.sh
+cd /app
+echo "Starting @mp/${APP_NAME} with version ${MP_BUILD_VERSION}"
+node --enable-source-maps \\
+  --import @opentelemetry/auto-instrumentations-node/register \\
+  --experimental-loader @opentelemetry/instrumentation/hook.mjs \\
+  /app
+EOF
+
+RUN chmod +x /app/start.sh
+
+CMD ["/app/start.sh"]

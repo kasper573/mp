@@ -21,19 +21,78 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      - mp-game-service
+      - mp-api
+      - mp-gateway
 
-  mp-game-service:
+  mp-game-service-forest:
     env_file: *env_files
     logging: *logging
     build:
-      dockerfile: ./docker/Dockerfile.mp-game-service
+      dockerfile: ./docker/Dockerfile.mp-node-app
+      args:
+        APP_NAME: server
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
+    environment:
+      MP_SERVER_AREA_ID: forest
+    depends_on:
+      mp-migrations:
+        condition: service_started
+
+  mp-game-service-island:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-node-app
+      args:
+        APP_NAME: server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    environment:
+      MP_SERVER_AREA_ID: island
+    depends_on:
+      mp-migrations:
+        condition: service_started
+
+  mp-api:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-node-app
+      args:
+        APP_NAME: api
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-api:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_SERVER_PORT/health"]
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_API_PORT/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      mp-migrations:
+        condition: service_started
+      keycloak-healthcheck:
+        condition: service_healthy
+
+  mp-gateway:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-node-app
+      args:
+        APP_NAME: gateway
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-gateway:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_GATEWAY_PORT/health"]
       interval: 3s
       timeout: 5s
       retries: 20
