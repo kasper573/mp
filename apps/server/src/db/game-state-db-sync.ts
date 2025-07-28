@@ -7,7 +7,10 @@ import type {
   GameStateServer,
 } from "@mp/game/server";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
-import { characterFromDbFields } from "./character-transform";
+import {
+  characterFromDbFields,
+  dbFieldsFromCharacter,
+} from "./character-transform";
 import type { Rng } from "@mp/std";
 import type { Logger } from "@mp/logger";
 
@@ -80,11 +83,7 @@ export function gameStateDbSyncBehavior(
           .values()
           .filter((actor) => actor.type === "character")
           .map((char) =>
-            tx.update(characterTable).set({
-              ...char.combat.snapshot(),
-              ...char.movement.snapshot(),
-              ...char.progression.snapshot(),
-            }),
+            tx.update(characterTable).set(dbFieldsFromCharacter(char)),
           ),
       ),
     );

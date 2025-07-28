@@ -11,7 +11,10 @@ import type {
 import { deriveNpcSpawnsFromArea } from "@mp/game/server";
 import type { DbClient } from "@mp/db-client";
 import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db-client";
-import { characterFromDbFields } from "./character-transform";
+import {
+  characterFromDbFields,
+  dbFieldsFromCharacter,
+} from "./character-transform";
 import type { Rng } from "@mp/std";
 
 export function createGameStateLoader(
@@ -23,9 +26,16 @@ export function createGameStateLoader(
   return {
     getDefaultSpawnPoint() {
       return {
-        areaId: area.id,
+        areaId: "forest" as AreaId,
         coords: area.start,
       };
+    },
+
+    async saveCharacterToDb(character) {
+      await db
+        .update(characterTable)
+        .set(dbFieldsFromCharacter(character))
+        .where(eq(characterTable.id, character.identity.id));
     },
 
     async assignAreaIdToCharacterInDb(

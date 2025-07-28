@@ -49,3 +49,11 @@ export function characterFromDbFields(
     },
   });
 }
+
+export function dbFieldsFromCharacter(char: Character) {
+  return {
+    ...char.combat.snapshot(),
+    ...char.movement.snapshot(),
+    ...char.progression.snapshot(),
+  } satisfies Partial<typeof characterTable.$inferInsert>;
+}

@@ -12,8 +12,9 @@ import { defineSyncComponent } from "@mp/sync";
 import * as patchOptimizers from "../network/patch-optimizers";
 import type { InjectionContainer } from "@mp/ioc";
 import { ctxArea } from "../context/common";
-import type { CharacterId } from "../character/types";
+import type { Character, CharacterId } from "../character/types";
 import { ctxGameEventClient } from "../network/game-event-client";
+import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type MovementTrait = typeof MovementTrait.$infer;
 
@@ -98,7 +99,7 @@ export function sendCharacterToArea(
   const char = assert(
     gameState.actors.get(characterId),
     `Character ${characterId} not found in game state`,
-  );
+  ) as Character;
 
   // Actors area ids are only stored in the database.
   // What controls which area an actor is associated with at runtime is simply if it's been added to a game server instance.
@@ -113,6 +114,12 @@ export function sendCharacterToArea(
     char.movement.coords = coords ?? currentArea.start;
     return;
   }
+
+  // Since moving to another area means to remove the character from the current game service,
+  // any mutations that's been done to this character this server tick would be lost unless we save them explicitly right now,
+  // since regular persistence is done on interval, an interval which we would miss here.
+  const loader = ioc.get(ctxGameStateLoader);
+  void loader.saveCharacterToDb(char);
 
   // But if we're moving to a different area we must communicate
   // with other services and tell them to pick up this character.

@@ -12,6 +12,7 @@ export interface GameStateLoader {
     characterId: CharacterId,
     areaId: AreaId,
   ): Promise<Character>;
+  saveCharacterToDb(character: Character): Promise<void>;
 }
 
 export const ctxGameStateLoader =
