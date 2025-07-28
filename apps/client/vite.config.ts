@@ -7,6 +7,9 @@ import { preact } from "@preact/preset-vite";
 import type { Plugin } from "vite";
 
 export default defineConfig({
+  build: {
+    sourcemap: true,
+  },
   plugins: [
     tanstackRouterPlugin({
       target: "react",
