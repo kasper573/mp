@@ -35,6 +35,7 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxDbClient, db);
 
 const app = express()
+  .use("/health", (_, res) => res.send("OK"))
   .use(metricsMiddleware())
   .use(
     "/",
