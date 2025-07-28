@@ -25,6 +25,7 @@ export interface GameStateClientOptions {
   settings: () => OptimisticGameStateSettings;
   eventClient?: GameEventClient;
   logger?: Logger;
+  handlePatchFailure?: (error: Error) => void;
 }
 
 export class GameStateClient {
@@ -120,11 +121,16 @@ export class GameStateClient {
         });
 
         if (result.isErr()) {
-          this.logger.error(
-            result.error,
-            `Could not apply patch, requesting full state refresh`,
-          );
-          this.refreshState();
+          const { handlePatchFailure } = this.options;
+          if (handlePatchFailure) {
+            handlePatchFailure(result.error);
+          } else {
+            this.logger.error(
+              result.error,
+              `Could not apply patch, requesting full state refresh`,
+            );
+            this.refreshState();
+          }
         }
       }
 

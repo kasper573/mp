@@ -59,105 +59,115 @@ async function testAllGameClients() {
   return failures.length === 0;
 }
 
-async function testOneGameClient(n: number, rng: Rng) {
-  if (verbose) {
-    logger.info(`Creating socket ${n}`);
-  }
-
-  const accessToken = createBypassUser(`Test User ${n}`);
-  const url = new URL(gameServiceUrl);
-  url.searchParams.set("accessToken", accessToken);
-  const socket = new WebSocket(url.toString());
-  socket.binaryType = "arraybuffer";
-
-  const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
-    socket.send(eventMessageEncoding.encode(message)),
-  );
-
-  const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>
-    socket.send(eventMessageEncoding.encode(message)),
-  );
-
+function testOneGameClient(n: number, rng: Rng) {
+  let socket: WebSocket;
   let stopClient = () => {};
-  try {
-    const gameClient = new GameStateClient({
-      socket,
-      eventClient: gameEvents,
-      logger,
-      settings: () => ({
-        useInterpolator: false,
-        usePatchOptimizer: false,
-      }),
-    });
-
-    const api = createApiClient(apiUrl, () => accessToken);
-
-    stopClient = gameClient.start();
-
-    await waitForOpen(socket);
-    if (verbose) {
-      logger.info(`Socket ${n} connected`);
+  let running = true;
+  return new Promise<void>((resolve, __reject) => {
+    function failTest(error: unknown) {
+      logger.error(error, `Error in game client test for socket ${n}`);
+      running = false;
+      __reject(error);
     }
 
-    if (verbose) {
-      logger.info(`Getting character id for socket ${n}`);
-    }
-    gameClient.characterId.value = await api.myCharacterId.query();
+    try {
+      (async () => {
+        if (verbose) {
+          logger.info(`Creating socket ${n}`);
+        }
 
-    if (verbose) {
-      logger.info(
-        `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
-      );
-    }
-    gatewayEvents.gateway.join(gameClient.characterId.value);
+        const accessToken = createBypassUser(`Test User ${n}`);
+        const url = new URL(gameServiceUrl);
+        url.searchParams.set("accessToken", accessToken);
+        socket = new WebSocket(url.toString());
+        socket.binaryType = "arraybuffer";
 
-    if (verbose) {
-      logger.info(`Socket ${n} is waiting on area id...`);
-    }
-    const areaId = await waitUntilDefined(gameClient.areaId);
-    if (verbose) {
-      logger.info(
-        { characterId: gameClient.characterId.value },
-        `Socket ${n} successfully joined gateway`,
-      );
-    }
+        const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
+          socket.send(eventMessageEncoding.encode(message)),
+        );
 
-    const url = await api.areaFileUrl.query({ areaId, urlType: "public" });
-    const area = await loadAreaResource(areaId, url);
-    const tiles = Array.from(area.graph.nodeIds)
-      .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
-      .filter((v) => v !== undefined);
+        const gatewayEvents = createProxyEventInvoker<GatewayRouter>(
+          (message) => socket.send(eventMessageEncoding.encode(message)),
+        );
 
-    const endTime = Date.now() + timeout.totalMilliseconds;
-    while (Date.now() < endTime) {
-      if (
-        gameClient.character.value &&
-        !gameClient.character.value.combat.health
-      ) {
-        gameClient.actions.respawn();
-      }
-      try {
-        const to = rng.oneOf(tiles);
-        gameClient.actions.move(to);
-        logger.info(`Moving character for socket ${n} to ${to}`);
-        await wait(1000 + rng.next() * 6000);
-      } catch (error) {
-        logger.error(error, `Could not move character for socket ${n}`);
-        await wait(1000);
-      }
+        await waitForOpen(socket);
+
+        if (verbose) {
+          logger.info(`Socket ${n} connected`);
+        }
+
+        const gameClient = new GameStateClient({
+          socket,
+          eventClient: gameEvents,
+          logger,
+          handlePatchFailure: failTest,
+          settings: () => ({
+            useInterpolator: false,
+            usePatchOptimizer: false,
+          }),
+        });
+
+        stopClient = gameClient.start();
+
+        if (verbose) {
+          logger.info(`Getting character id for socket ${n}`);
+        }
+        const api = createApiClient(apiUrl, () => accessToken);
+        gameClient.characterId.value = await api.myCharacterId.query();
+
+        if (verbose) {
+          logger.info(
+            `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
+          );
+        }
+        gatewayEvents.gateway.join(gameClient.characterId.value);
+
+        if (verbose) {
+          logger.info(`Socket ${n} is waiting on area id...`);
+        }
+        const areaId = await waitUntilDefined(gameClient.areaId);
+
+        if (verbose) {
+          logger.info(
+            { characterId: gameClient.characterId.value },
+            `Socket ${n} successfully joined gateway`,
+          );
+        }
+
+        const areaUrl = await api.areaFileUrl.query({
+          areaId,
+          urlType: "public",
+        });
+        const area = await loadAreaResource(areaId, areaUrl);
+        const tiles = Array.from(area.graph.nodeIds)
+          .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
+          .filter((v) => v !== undefined);
+
+        const endTime = Date.now() + timeout.totalMilliseconds;
+        while (Date.now() < endTime && running) {
+          if (
+            gameClient.character.value &&
+            !gameClient.character.value.combat.health
+          ) {
+            gameClient.actions.respawn();
+          }
+          const to = rng.oneOf(tiles);
+          gameClient.actions.move(to);
+          logger.info(`Moving character for socket ${n} to ${to}`);
+          await wait(1000 + rng.next() * 6000);
+        }
+        if (verbose) {
+          logger.info(`Socket ${n} test finished`);
+        }
+        resolve();
+      })();
+    } catch (error) {
+      failTest(error);
     }
-    if (verbose) {
-      logger.info(`Socket ${n} test finished`);
-    }
-  } catch (error) {
-    if (verbose) {
-      logger.error(error, `Socket ${n} error`);
-    }
-    throw error;
-  } finally {
+  }).finally(() => {
     stopClient();
     socket.close();
-  }
+  });
 }
 
 async function waitForOpen(socket: WebSocket) {
