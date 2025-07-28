@@ -5,13 +5,16 @@ import { opt } from "../options";
 
 export const rpc = initTRPC.context<ApiContext>().create({
   transformer,
-  errorFormatter(error) {
+  errorFormatter({ shape }) {
     if (opt.exposeErrorDetails) {
-      return error;
+      return shape;
     }
+
     // Omit the sensitive error details
-    const { shape: _, ...alwaysSafeToExpose } = error;
-    return alwaysSafeToExpose;
+    return {
+      code: shape.code,
+      message: "Interval server error",
+    };
   },
 });
 
