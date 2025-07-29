@@ -27,6 +27,7 @@ export * from "./traits/appearance";
 export * from "./network/encoder-extensions";
 export * from "./network/event-builder";
 export * from "./network/root-event-router";
+export * from "./network/encoding";
 export * from "./clients/client-view-distance-rect";
 export * from "./clients/client-view-distance-settings";
 export * from "./clients/client-view-distance-settings";

@@ -1,11 +1,6 @@
 import "dotenv/config";
 
-import {
-  SyncServer,
-  SyncMap,
-  shouldOptimizeCollects,
-  flushResultEncoding,
-} from "@mp/sync";
+import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
 import { Ticker } from "@mp/time";
 import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
 import { parseSocketError } from "@mp/ws/server";
@@ -26,6 +21,7 @@ import {
   GameStateAreaEntity,
   NpcAi,
   NpcSpawner,
+  syncMessageWithRecipientEncoding,
 } from "@mp/game/server";
 import { RateLimiter } from "@mp/rate-limiter";
 import { Rng, withBackoffRetries } from "@mp/std";
@@ -58,7 +54,6 @@ import {
   QueuedEventInvoker,
 } from "@mp/event-router";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
-import { gameStateFlushHistogram } from "./metrics/game-state-flush";
 import { createActorModelLookup } from "./db/actor-model-lookup";
 
 // Note that this file is an entrypoint and should not have any exports
@@ -145,12 +140,27 @@ function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
 }
 
 function flushGameState() {
-  const flushResult = gameStateServer.flush(gameState);
-  if (flushResult.clientEvents.size || flushResult.clientPatches.size) {
+  const { clientEvents, clientPatches } = gameStateServer.flush(gameState);
+
+  if (clientEvents.size || clientPatches.size) {
     const time = new Date();
-    const encoded = flushResultEncoding().encode([flushResult, time]);
-    gameStateFlushHistogram.observe(encoded.byteLength);
-    gatewaySocket.send(encoded);
+
+    const recipientIds = new Set([
+      ...clientEvents.keys(),
+      ...clientPatches.keys(),
+    ]);
+
+    for (const recipientId of recipientIds) {
+      const patch = clientPatches.get(recipientId);
+      const events = clientEvents.get(recipientId);
+      if (patch?.length || events?.length) {
+        const encodedMessage = syncMessageWithRecipientEncoding.encode([
+          [patch, time, events],
+          recipientId,
+        ]);
+        gatewaySocket.send(encodedMessage);
+      }
+    }
   }
 }
 

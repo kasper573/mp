@@ -1,4 +1,3 @@
-export * from "./encoding";
 export * from "./sync-server";
 export * from "./sync-component";
 export * from "./patch";

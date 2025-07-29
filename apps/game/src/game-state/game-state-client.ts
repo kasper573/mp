@@ -1,5 +1,5 @@
 import { throttle } from "@mp/std";
-import { SyncEventBus, syncMessageEncoding } from "@mp/sync";
+import { SyncEventBus } from "@mp/sync";
 import { subscribeToReadyState } from "@mp/ws/client";
 import { TimeSpan } from "@mp/time";
 import type { Signal, ReadonlySignal } from "@mp/state";
@@ -17,6 +17,7 @@ import { ioc } from "../context/ioc";
 import { ctxLogger } from "../context/common";
 import type { GameEventClient } from "../network/game-event-client";
 import { ctxGameEventClient } from "../network/game-event-client";
+import { syncMessageEncoding } from "../network/encoding";
 
 const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 

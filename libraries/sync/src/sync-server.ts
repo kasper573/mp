@@ -114,7 +114,7 @@ export class SyncServer<
     }
   }
 
-  markToResendFullState(...clientIds: ClientId[]) {
+  markToResendFullState(...clientIds: ClientId[]): void {
     for (const clientId of clientIds) {
       this.hasBeenGivenFullState.delete(clientId);
     }

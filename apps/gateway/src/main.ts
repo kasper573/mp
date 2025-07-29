@@ -1,54 +1,51 @@
-import "dotenv/config";
-import { opt } from "./options";
-import type {
-  CharacterId,
-  GameEventClient,
-  UserSession,
-} from "@mp/game/server";
-import {
-  ctxTokenResolver,
-  registerEncoderExtensions,
-  ctxGameEventClient,
-  eventWithSessionEncoding,
-  ctxUserSession,
-  gatewayRoles,
-  characterRoles,
-} from "@mp/game/server";
-import { createPinoLogger } from "@mp/logger/pino";
-import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
-import { WebSocketServer } from "@mp/ws/server";
-import createCors from "cors";
-import express from "express";
-import type { IncomingMessage } from "http";
-import http from "http";
-import proxy from "express-http-proxy";
-import {
-  MetricsGague,
-  MetricsHistogram,
-  collectDefaultMetrics,
-  exponentialBuckets,
-  metricsMiddleware,
-} from "@mp/telemetry/prom";
-import type { FlushResult } from "@mp/sync";
-import { flushResultEncoding, SyncMap, syncMessageEncoding } from "@mp/sync";
+import type { AccessToken, UserId } from "@mp/auth";
+import { createTokenResolver } from "@mp/auth/server";
+import { createDbClient } from "@mp/db-client";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
-  QueuedEventInvoker,
   createEventInvoker,
   createProxyEventInvoker,
   eventMessageEncoding,
+  QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
+import type { GameEventClient, UserSession } from "@mp/game/server";
+import {
+  characterRoles,
+  ctxGameEventClient,
+  ctxTokenResolver,
+  ctxUserSession,
+  eventWithSessionEncoding,
+  gatewayRoles,
+  registerEncoderExtensions,
+  syncMessageEncoding,
+  syncMessageWithRecipientEncoding,
+} from "@mp/game/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
-import { createTokenResolver } from "@mp/auth/server";
+import { createPinoLogger } from "@mp/logger/pino";
+import { computed, effect, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
 import { arrayShallowEquals, createShortId, dedupe } from "@mp/std";
-import { createDbClient } from "@mp/db-client";
-import type { AccessToken, UserId } from "@mp/auth";
+import { SyncMap } from "@mp/sync";
+import {
+  collectDefaultMetrics,
+  exponentialBuckets,
+  MetricsGague,
+  MetricsHistogram,
+  metricsMiddleware,
+} from "@mp/telemetry/prom";
+import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
+import { WebSocketServer } from "@mp/ws/server";
+import createCors from "cors";
+import "dotenv/config";
+import express from "express";
+import proxy from "express-http-proxy";
+import type { IncomingMessage } from "http";
+import http from "http";
+import type { SyncMessageWithRecipient } from "../../game/src/network/encoding";
 import { saveOnlineCharacters } from "./db-operations";
-import { computed, Signal } from "@mp/state";
-import { effect } from "@mp/state";
+import { opt } from "./options";
+import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -156,9 +153,9 @@ function setupGameServerSocket(socket: WebSocket) {
   });
 
   socket.on("message", (data: ArrayBuffer) => {
-    const flush = flushResultEncoding<CharacterId>().decode(data);
-    if (flush.isOk()) {
-      flushGameState(flush.value);
+    const message = syncMessageWithRecipientEncoding.decode(data);
+    if (message.isOk()) {
+      sendSyncMessageToRecipient(message.value);
       return;
     }
 
@@ -231,20 +228,14 @@ function setupGameClientSocket(
   });
 }
 
-function flushGameState([flushResult, time]: [FlushResult<CharacterId>, Date]) {
-  const { clientPatches, clientEvents } = flushResult;
-
+function sendSyncMessageToRecipient([
+  msg,
+  recipientId,
+]: SyncMessageWithRecipient) {
   for (const [clientId, socket] of gameClientSockets.entries()) {
-    const characterId = userSessions.get(clientId)?.value.characterId;
-    if (characterId === undefined) {
-      // Socket not authenticated, should not have access to game state, also we don't know what game state to send.
-      continue;
-    }
-
-    const patch = clientPatches.get(characterId);
-    const events = clientEvents.get(characterId);
-    if (patch || events) {
-      const encodedPatch = syncMessageEncoding.encode([patch, time, events]);
+    const socketSession = userSessions.get(clientId)?.value;
+    if (socketSession?.characterId === recipientId) {
+      const encodedPatch = syncMessageEncoding.encode(msg);
       metrics.gameStatePatchSize.observe(encodedPatch.byteLength);
       socket.send(encodedPatch);
     }
