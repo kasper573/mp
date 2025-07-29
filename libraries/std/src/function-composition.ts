@@ -12,6 +12,22 @@ export function throttle<T extends (...args: never[]) => unknown>(
   };
 }
 
+export function debounce<T extends (...args: never[]) => unknown>(
+  fn: T,
+  ms: number,
+): (...args: Parameters<T>) => void {
+  let timeoutId: NodeJS.Timeout | null = null;
+  return (...args: Parameters<T>) => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    timeoutId = setTimeout(() => {
+      fn(...args);
+      timeoutId = null;
+    }, ms);
+  };
+}
+
 export function dedupe<Args extends unknown[], Output>(
   fn: (...args: Args) => Output,
   isEqual: (a: Args, b: Args) => boolean,

@@ -25,7 +25,7 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { computed, effect, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
-import { arrayShallowEquals, createShortId, dedupe, throttle } from "@mp/std";
+import { arrayShallowEquals, createShortId, debounce, dedupe } from "@mp/std";
 import { SyncMap } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -106,7 +106,7 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
-  throttle(saveOnlineCharacters(db, logger), 100),
+  debounce(saveOnlineCharacters(db, logger), 100),
   arrayShallowEquals,
 );
 
