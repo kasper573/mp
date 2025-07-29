@@ -107,9 +107,10 @@ services:
     logging: *logging
     build:
       dockerfile: ../../docker/Dockerfile.mp-migrations
-      context: ../integrations/db-client
+      context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
+    restart: "no"
     depends_on:
       postgres:
         condition: service_healthy
