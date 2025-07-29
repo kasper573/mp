@@ -25,7 +25,7 @@ import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { computed, effect, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
-import { arrayShallowEquals, createShortId, dedupe } from "@mp/std";
+import { arrayShallowEquals, createShortId, dedupe, throttle } from "@mp/std";
 import { SyncMap } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -106,19 +106,11 @@ const ioc = new ImmutableInjectionContainer()
   .provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
-  saveOnlineCharacters,
-  ([, ids1], [, ids2]) => arrayShallowEquals(ids1, ids2),
+  throttle(saveOnlineCharacters(db, logger), 100),
+  arrayShallowEquals,
 );
 
-effect(
-  () =>
-    void saveOnlineCharactersDeduped(db, onlineCharacterIds.value).catch(
-      (error) =>
-        logger.error(
-          new Error("Failed to save online characters", { cause: error }),
-        ),
-    ),
-);
+effect(() => saveOnlineCharactersDeduped(onlineCharacterIds.value));
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";

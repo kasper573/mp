@@ -2,14 +2,19 @@ import type { UserId } from "@mp/auth";
 import type { DbClient } from "@mp/db-client";
 import { and, characterTable, eq, inArray } from "@mp/db-client";
 import type { CharacterId } from "@mp/game/server";
+import type { Logger } from "@mp/logger";
 
-export async function saveOnlineCharacters(
-  db: DbClient,
-  onlineCharacterIds: CharacterId[],
-) {
-  await db
-    .update(characterTable)
-    .set({ online: inArray(characterTable.id, onlineCharacterIds) });
+export function saveOnlineCharacters(db: DbClient, logger: Logger) {
+  return function save(onlineCharacterIds: CharacterId[]) {
+    void db
+      .update(characterTable)
+      .set({ online: inArray(characterTable.id, onlineCharacterIds) })
+      .catch((error) =>
+        logger.error(
+          new Error("Failed to save online characters", { cause: error }),
+        ),
+      );
+  };
 }
 
 export async function hasAccessToCharacter(
