@@ -156,19 +156,19 @@ flowchart LR
 
   WEB -->|Show game client on some pages| GC["Game client"]
 
-  GW -->|http proxy| Api["API service (trpc)"]
-  GS -->|Load area data required by instance| Api
+  GC -->|CRUD character data| API["API service"]
+  GS -->|Load area data required by instance| API
 
   WEB -->|Load assets| FS["File server (caddy)"]
-  Api -->|List game client assets| FS
+  API -->|List game client assets| FS
   GC -->|Load game client assets| FS
 
   GW --> KC["Auth service (keycloak)"]
-  Api --> KC
+  API --> KC
 
   GS -->|Load/Save game state| DB["Database (postgres)"]
   GW -->|Save player online state| DB
-  Api -->|Load/Edit game state| DB
+  API -->|Load/Edit game state| DB
   KC -->|CRUD user data| DB
 ```
 

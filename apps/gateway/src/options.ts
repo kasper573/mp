@@ -1,6 +1,6 @@
-import { boolish, csv, numeric, type } from "@mp/validate";
-import { assertEnv } from "@mp/env";
 import { authAlgorithms } from "@mp/auth/server";
+import { assertEnv } from "@mp/env";
+import { boolish, csv, numeric, type } from "@mp/validate";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;
 
@@ -18,19 +18,9 @@ export const serverOptionsSchema = type({
    */
   hostname: "string",
   /**
-   * The CORS origin to allow
-   */
-  corsOrigin: "string",
-  /**
    * Whether to show pretty logs (Useful for development)
    */
   prettyLogs: boolish(),
-  /**
-   * Whether to trust the X-Forwarded-For header
-   */
-  trustProxy: boolish(),
-  apiEndpointPath: "string",
-  apiServiceUrl: "string",
   databaseConnectionString: "string",
   /**
    * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.

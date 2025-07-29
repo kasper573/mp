@@ -36,10 +36,8 @@ import {
 } from "@mp/telemetry/prom";
 import type { WebSocket, WebSocketServerOptions } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
-import createCors from "cors";
 import "dotenv/config";
 import express from "express";
-import proxy from "express-http-proxy";
 import type { IncomingMessage } from "http";
 import http from "http";
 import type { SyncMessageWithRecipient } from "../../game/src/network/encoding";
@@ -71,11 +69,8 @@ const onlineCharacterIds = computed(() => [
 collectDefaultMetrics();
 
 const webServer = express()
-  .set("trust proxy", opt.trustProxy)
   .use("/health", (req, res) => res.send("OK"))
-  .use(metricsMiddleware())
-  .use(createCors({ origin: opt.corsOrigin }))
-  .use(opt.apiEndpointPath, proxy(opt.apiServiceUrl));
+  .use(metricsMiddleware());
 
 const httpServer = http.createServer(webServer);
 

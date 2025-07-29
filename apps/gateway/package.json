@@ -31,17 +31,13 @@
     "@mp/telemetry": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "cors": "2.8.5",
     "dotenv": "catalog:",
-    "express": "catalog:",
-    "express-http-proxy": "2.1.1"
+    "express": "catalog:"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "@types/cors": "2.8.17",
     "@types/express": "catalog:",
-    "@types/express-http-proxy": "1.6.6",
     "tsx": "catalog:"
   }
 }
