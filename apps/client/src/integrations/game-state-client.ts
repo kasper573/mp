@@ -12,7 +12,7 @@ import {
   ioc,
   type GameServerEventRouter,
 } from "@mp/game/client";
-import { createWebSocket } from "@mp/ws/client";
+import { WebSocket } from "@mp/ws/client";
 import type { GatewayRouter } from "@mp/gateway";
 
 import { env } from "../env";
@@ -47,11 +47,12 @@ function createGameStateClient(
   logger: Logger,
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
-  const socket = createWebSocket(() => {
+  const socket = new WebSocket(() => {
     const url = new URL(env.gameServiceUrl);
     url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
     return url.toString();
   });
+  socket.binaryType = "arraybuffer";
 
   const eventClient: ComposedGameEventClient = createProxyEventInvoker(
     (message) => socket.send(eventMessageEncoding.encode(message)),
