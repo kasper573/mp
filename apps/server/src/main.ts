@@ -103,7 +103,12 @@ const eventInvoker = new QueuedEventInvoker({
   invoke: createEventInvoker(gameServerEventRouter),
   logger,
 });
-const gatewaySocket = new ReconnectingWebSocket(opt.gatewayWssUrl);
+
+const gatewayWssUrl = new URL(opt.gatewayWssUrl);
+gatewayWssUrl.searchParams.set("gameServiceSecret", opt.gatewaySecret);
+gatewayWssUrl.searchParams.set("gameServiceAreaId", opt.areaId);
+
+const gatewaySocket = new ReconnectingWebSocket(gatewayWssUrl.toString());
 gatewaySocket.binaryType = "arraybuffer";
 gatewaySocket.addEventListener("error", (err) =>
   logger.error(parseSocketError(err), "Gateway socket error"),
@@ -169,7 +174,7 @@ function flushGameState() {
 
 const syncMessageSizeHistogram = new MetricsHistogram({
   name: "game_service_to_gateway_sync_message_byte_size",
-  help: "Size in bytes of SyncMessageWithRecipient messages sent to the gateway",
+  help: "This measures the data sent over the internal network",
   buckets: byteBuckets,
 });
 

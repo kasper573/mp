@@ -1,6 +1,6 @@
+import { assertEnv } from "@mp/env";
 import { TimeSpan } from "@mp/time";
 import { boolish, numeric, type } from "@mp/validate";
-import { assertEnv } from "@mp/env";
 
 export type GameServiceOptions = typeof gameServiceOptionsSchema.infer;
 
@@ -15,6 +15,10 @@ export const gameServiceOptionsSchema = type({
    * The URL to the gateway WebSocket server.
    */
   gatewayWssUrl: "string",
+  /**
+   * The secret used to authenticate with the gateway web socket server.
+   */
+  gatewaySecret: "string",
   /**
    * The URL to the API service
    */

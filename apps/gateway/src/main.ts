@@ -9,7 +9,7 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type { GameEventClient, UserSession } from "@mp/game/server";
+import type { AreaId, GameEventClient, UserSession } from "@mp/game/server";
 import {
   characterRoles,
   ctxGameEventClient,
@@ -129,7 +129,7 @@ wss.on("connection", (socket, request) => {
     case "game-client":
       return setupGameClientSocket(socket, info.session);
     case "game-service":
-      return setupGameServerSocket(socket);
+      return setupGameServerSocket(socket, info.areaId);
     default:
   }
 });
@@ -140,7 +140,7 @@ const gatewayUser = {
   roles: new Set([gatewayRoles.gameServiceBroadcast]),
 };
 
-function setupGameServerSocket(socket: WebSocket) {
+function setupGameServerSocket(socket: WebSocket, areaId: AreaId) {
   gameServiceSockets.add(socket);
 
   const session: UserSession = { id: createShortId(), user: gatewayUser };
@@ -155,7 +155,7 @@ function setupGameServerSocket(socket: WebSocket) {
   socket.on("message", (data: ArrayBuffer) => {
     const message = syncMessageWithRecipientEncoding.decode(data);
     if (message.isOk()) {
-      sendSyncMessageToRecipient(message.value);
+      sendSyncMessageToRecipient(message.value, areaId);
       return;
     }
 
@@ -228,15 +228,18 @@ function setupGameClientSocket(
   });
 }
 
-function sendSyncMessageToRecipient([
-  msg,
-  recipientId,
-]: SyncMessageWithRecipient) {
+function sendSyncMessageToRecipient(
+  [msg, recipientId]: SyncMessageWithRecipient,
+  originatingGameServiceAreaId: AreaId,
+) {
   for (const [clientId, socket] of gameClientSockets.entries()) {
     const socketSession = userSessions.get(clientId)?.value;
     if (socketSession?.characterId === recipientId) {
       const encodedPatch = syncMessageEncoding.encode(msg);
-      metrics.gameStatePatchSize.observe(encodedPatch.byteLength);
+      metrics.syncMessageSizeSize.observe(
+        { areaId: originatingGameServiceAreaId },
+        encodedPatch.byteLength,
+      );
       socket.send(encodedPatch);
     }
   }
@@ -277,8 +280,11 @@ function getRequestInfo(req: IncomingMessage): RequestInfo {
 
   const { searchParams } = new URL(req.url ?? "", "http://localhost");
   const secret = searchParams.get("gameServiceSecret") ?? undefined;
-  if (secret) {
-    return { type: "game-service", secret } as const;
+  const areaId = (searchParams.get("gameServiceAreaId") ?? undefined) as
+    | AreaId
+    | undefined;
+  if (secret && areaId) {
+    return { type: "game-service", secret, areaId } as const;
   }
 
   const token = (searchParams.get("accessToken") ?? undefined) as
@@ -319,10 +325,11 @@ function wssConfig(): WebSocketServerOptions {
 }
 
 const metrics = {
-  gameStatePatchSize: new MetricsHistogram({
-    name: "game_state_flush_patch_size_bytes",
-    help: "Size of the game state patch sent each server tick to clients in bytes",
+  syncMessageSizeSize: new MetricsHistogram({
+    name: "gateway_to_game_client_sync_message_byte_size",
+    help: "This measures the actual data send over the internet to players",
     buckets: exponentialBuckets(1, 2, 20),
+    labelNames: ["areaId"],
   }),
 
   userCount: new MetricsGague({
@@ -356,5 +363,5 @@ type RequestInfo =
       session: Signal<UserSession<ClientId>>;
       token?: AccessToken;
     }>
-  | Readonly<{ type: "game-service"; secret?: string }>
+  | Readonly<{ type: "game-service"; secret?: string; areaId: AreaId }>
   | Readonly<{ type: "unknown" }>;

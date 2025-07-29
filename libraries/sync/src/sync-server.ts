@@ -8,8 +8,7 @@ import {
 import { SyncMap } from "./sync-map";
 
 import { dedupePatch } from "./patch-deduper";
-import type { EventAccessFn } from "./sync-event";
-import type { SyncEvent, SyncEventMap } from "./sync-event";
+import type { EventAccessFn, SyncEvent, SyncEventMap } from "./sync-event";
 
 export class SyncServer<
   State extends PatchableState,

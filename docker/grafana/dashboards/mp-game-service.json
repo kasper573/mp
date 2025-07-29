@@ -373,7 +373,7 @@
           "useBackend": false
         }
       ],
-      "title": "Patch",
+      "title": "Patch (Game Service -> Gateway)",
       "type": "timeseries"
     },
     {
@@ -381,23 +381,46 @@
         "type": "prometheus",
         "uid": "mimir"
       },
+      "description": "Game state patch sent per flush",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "fixedColor": "#F2495C",
-            "mode": "fixed"
+            "mode": "palette-classic"
           },
-          "mappings": [
-            {
-              "options": {
-                "match": "null",
-                "result": {
-                  "text": "N/A"
-                }
-              },
-              "type": "special"
+          "custom": {
+            "axisBorderShow": false,
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "barWidthFactor": 0.6,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "insertNulls": false,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
             }
-          ],
+          },
+          "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
@@ -410,7 +433,7 @@
               }
             ]
           },
-          "unit": "none"
+          "unit": "decbytes"
         },
         "overrides": []
       },
@@ -420,24 +443,19 @@
         "x": 18,
         "y": 0
       },
-      "id": 4,
-      "maxDataPoints": 100,
+      "id": 18,
       "options": {
-        "colorMode": "none",
-        "graphMode": "area",
-        "justifyMode": "auto",
-        "orientation": "horizontal",
-        "percentChangeColorMode": "standard",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showPercentChange": false,
-        "textMode": "auto",
-        "wideLayout": true
+        "tooltip": {
+          "hideZeros": false,
+          "mode": "single",
+          "sort": "none"
+        }
       },
       "pluginVersion": "11.6.1",
       "targets": [
@@ -446,17 +464,38 @@
             "type": "prometheus",
             "uid": "mimir"
           },
+          "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "sum(changes(process_start_time_seconds{exported_job=\"game-service\"}[1m]))",
-          "format": "time_series",
-          "intervalFactor": 1,
-          "legendFormat": "{{instance}}",
+          "expr": "rate(gateway_to_game_client_sync_message_byte_size_sum{areaId=\"$v_area_id\"}[1m])",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Throughput (per minute)",
           "range": true,
-          "refId": "A"
+          "refId": "A",
+          "useBackend": false
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "disableTextWrap": false,
+          "editorMode": "code",
+          "expr": "rate(gateway_to_game_client_sync_message_byte_size_sum{areaId=\"$v_area_id\"}[1m]) / rate(gateway_to_game_client_sync_message_byte_size_count[1m])",
+          "fullMetaSearch": false,
+          "hide": false,
+          "includeNullMetadata": true,
+          "instant": false,
+          "legendFormat": "Average patch size",
+          "range": true,
+          "refId": "B",
+          "useBackend": false
         }
       ],
-      "title": "Process Restart Times",
-      "type": "stat"
+      "title": "Patch (Gateway->Client)",
+      "type": "timeseries"
     },
     {
       "datasource": {
@@ -520,7 +559,7 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
+        "w": 7,
         "x": 0,
         "y": 6
       },
@@ -646,8 +685,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
-        "x": 8,
+        "w": 7,
+        "x": 7,
         "y": 6
       },
       "id": 17,
@@ -766,8 +805,8 @@
       },
       "gridPos": {
         "h": 6,
-        "w": 8,
-        "x": 16,
+        "w": 7,
+        "x": 14,
         "y": 6
       },
       "id": 8,
@@ -812,6 +851,88 @@
       ],
       "title": "Event Loop Lag",
       "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "mimir"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "fixedColor": "#F2495C",
+            "mode": "fixed"
+          },
+          "mappings": [
+            {
+              "options": {
+                "match": "null",
+                "result": {
+                  "text": "N/A"
+                }
+              },
+              "type": "special"
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green"
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 6,
+        "w": 3,
+        "x": 21,
+        "y": 6
+      },
+      "id": 4,
+      "maxDataPoints": 100,
+      "options": {
+        "colorMode": "none",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "horizontal",
+        "percentChangeColorMode": "standard",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "showPercentChange": false,
+        "textMode": "auto",
+        "wideLayout": true
+      },
+      "pluginVersion": "11.6.1",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "mimir"
+          },
+          "editorMode": "code",
+          "expr": "sum(changes(process_start_time_seconds{exported_job=\"game-service\"}[1m]))",
+          "format": "time_series",
+          "intervalFactor": 1,
+          "legendFormat": "{{instance}}",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Restarts",
+      "type": "stat"
     },
     {
       "datasource": {
@@ -1463,5 +1584,5 @@
   "timezone": "",
   "title": "mp-game-service",
   "uid": "det89o8r7iy2od",
-  "version": 2
+  "version": 4
 }
