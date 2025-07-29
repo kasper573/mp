@@ -1,60 +1,62 @@
 import "dotenv/config";
 
-import { SyncServer, SyncMap, shouldOptimizeCollects } from "@mp/sync";
-import { Ticker } from "@mp/time";
-import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
-import { parseSocketError } from "@mp/ws/server";
-import { ReconnectingWebSocket } from "@mp/ws/server";
-import { ImmutableInjectionContainer } from "@mp/ioc";
-import {
-  ctxActorModelLookup,
-  ctxArea,
-  ctxGameEventClient,
-  ctxGameStateLoader,
-  ctxGameStateServer,
-  ctxLogger,
-  ctxNpcSpawner,
-  ctxRng,
-  ctxUserSession,
-  eventWithSessionEncoding,
-  gameServerEventRouter,
-  GameStateAreaEntity,
-  NpcAi,
-  NpcSpawner,
-  syncMessageWithRecipientEncoding,
-} from "@mp/game/server";
-import { RateLimiter } from "@mp/rate-limiter";
-import { Rng, withBackoffRetries } from "@mp/std";
-import type {
-  GameEventClient,
-  GameState,
-  GameStateServer,
-} from "@mp/game/server";
-import {
-  movementBehavior,
-  combatBehavior,
-  ctxGameState,
-  deriveClientVisibility,
-} from "@mp/game/server";
-import { registerEncoderExtensions } from "@mp/game/server";
-import { clientViewDistance } from "@mp/game/server";
-import { seed } from "../seed";
-import { collectGameStateMetrics } from "./metrics/game-state";
-import { opt } from "./options";
-import { createDbClient } from "@mp/db-client";
-import { createTickMetricsObserver } from "./metrics/tick";
-import { createPinoLogger } from "@mp/logger/pino";
-import { createGameStateLoader } from "./db/game-state-loader";
 import { createApiClient } from "@mp/api/sdk";
-import { loadAreaResource } from "@mp/game/server";
+import { createDbClient } from "@mp/db-client";
 import {
   createEventInvoker,
   createProxyEventInvoker,
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
+import type {
+  GameEventClient,
+  GameState,
+  GameStateServer,
+} from "@mp/game/server";
+import {
+  clientViewDistance,
+  combatBehavior,
+  ctxActorModelLookup,
+  ctxArea,
+  ctxGameEventClient,
+  ctxGameState,
+  ctxGameStateLoader,
+  ctxGameStateServer,
+  ctxLogger,
+  ctxNpcSpawner,
+  ctxRng,
+  ctxUserSession,
+  deriveClientVisibility,
+  eventWithSessionEncoding,
+  gameServerEventRouter,
+  GameStateAreaEntity,
+  loadAreaResource,
+  movementBehavior,
+  NpcAi,
+  NpcSpawner,
+  registerEncoderExtensions,
+  syncMessageWithRecipientEncoding,
+} from "@mp/game/server";
+import { ImmutableInjectionContainer } from "@mp/ioc";
+import { createPinoLogger } from "@mp/logger/pino";
+import { RateLimiter } from "@mp/rate-limiter";
+import { Rng, withBackoffRetries } from "@mp/std";
+import { shouldOptimizeCollects, SyncMap, SyncServer } from "@mp/sync";
+import {
+  collectDefaultMetrics,
+  MetricsHistogram,
+  Pushgateway,
+} from "@mp/telemetry/prom";
+import { Ticker } from "@mp/time";
+import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
+import { seed } from "../seed";
 import { createActorModelLookup } from "./db/actor-model-lookup";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
+import { createGameStateLoader } from "./db/game-state-loader";
+import { collectGameStateMetrics } from "./metrics/game-state";
+import { byteBuckets } from "./metrics/shared";
+import { createTickMetricsObserver } from "./metrics/tick";
+import { opt } from "./options";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -158,11 +160,18 @@ function flushGameState() {
           [patch, time, events],
           recipientId,
         ]);
+        syncMessageSizeHistogram.observe(encodedMessage.byteLength);
         gatewaySocket.send(encodedMessage);
       }
     }
   }
 }
+
+const syncMessageSizeHistogram = new MetricsHistogram({
+  name: "game_service_to_gateway_sync_message_byte_size",
+  help: "Size in bytes of SyncMessageWithRecipient messages sent to the gateway",
+  buckets: byteBuckets,
+});
 
 const gameState: GameState = {
   area: new SyncMap([["current", new GameStateAreaEntity({ id: area.id })]]),

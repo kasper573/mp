@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 11,
+  "id": 18,
   "links": [],
   "panels": [
     {
@@ -345,7 +345,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(game_state_flush_size_bytes_sum{areaId=\"$v_area_id\"}[1m])",
+          "expr": "rate(game_service_to_gateway_sync_message_byte_size_sum{areaId=\"$v_area_id\"}[1m])",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -362,7 +362,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "rate(game_state_flush_size_bytes_sum{areaId=\"$v_area_id\"}[1m]) / rate(game_state_flush_size_bytes_count[1m])",
+          "expr": "rate(game_service_to_gateway_sync_message_byte_size_sum{areaId=\"$v_area_id\"}[1m]) / rate(game_service_to_gateway_sync_message_byte_size_count[1m])",
           "fullMetaSearch": false,
           "hide": false,
           "includeNullMetadata": true,
@@ -1463,5 +1463,5 @@
   "timezone": "",
   "title": "mp-game-service",
   "uid": "det89o8r7iy2od",
-  "version": 1
+  "version": 2
 }
