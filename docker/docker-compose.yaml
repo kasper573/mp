@@ -106,7 +106,7 @@ services:
     env_file: *env_files
     logging: *logging
     build:
-      dockerfile: ../../docker/Dockerfile.mp-migrations
+      dockerfile: ./docker/Dockerfile.mp-migrations
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
