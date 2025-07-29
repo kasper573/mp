@@ -149,10 +149,10 @@ flowchart LR
   User --> WEB["Website"]
 
   GC -->|Send game client events| GW["Gateway"]
+  GS -->|Flush game state to game clients| GW
 
   GW -->|Cross service event broadcast| GS["Game service"]
   GW -->|Broadcast game client events to game services| GS
-  GS -->|Flush game state to game clients| GW
 
   WEB -->|Show game client on some pages| GC["Game client"]
 
