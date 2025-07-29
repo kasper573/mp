@@ -110,7 +110,15 @@ const saveOnlineCharactersDeduped = dedupe(
   ([, ids1], [, ids2]) => arrayShallowEquals(ids1, ids2),
 );
 
-effect(() => void saveOnlineCharactersDeduped(db, onlineCharacterIds.value));
+effect(
+  () =>
+    void saveOnlineCharactersDeduped(db, onlineCharacterIds.value).catch(
+      (error) =>
+        logger.error(
+          new Error("Failed to save online characters", { cause: error }),
+        ),
+    ),
+);
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";
