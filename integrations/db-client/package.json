@@ -20,9 +20,9 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/logger": "workspace:*",
     "drizzle-orm": "0.38.3",
     "pg": "8.13.1"
   },
