@@ -83,7 +83,8 @@
     "catch-or-return": "off",
     "react/react-in-jsx-scope": "off",
     "react/button-has-type": "off",
-    "react/no-array-index-key": "off"
+    "react/no-array-index-key": "off",
+    "explicit-module-boundary-types": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.
