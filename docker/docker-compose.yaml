@@ -137,6 +137,7 @@ services:
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/keycloak-provision:${DOCKER_IMAGE_VERSION:-latest}
     profiles: ["prod", "test"]
+    restart: "no"
     depends_on:
       keycloak-healthcheck:
         condition: service_healthy
