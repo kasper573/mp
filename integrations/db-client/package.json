@@ -14,6 +14,7 @@
     "push": "drizzle-kit push",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
+    "seed": "tsx seed.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
@@ -21,6 +22,7 @@
     "@mp/game": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
+    "@mp/logger": "workspace:*",
     "drizzle-orm": "0.38.3",
     "pg": "8.13.1"
   },

@@ -488,6 +488,9 @@ importers:
       '@mp/game':
         specifier: workspace:*
         version: link:../../apps/game
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math

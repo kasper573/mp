@@ -49,7 +49,6 @@ import {
 } from "@mp/telemetry/prom";
 import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
-import { seed } from "../seed";
 import { createActorModelLookup } from "./db/actor-model-lookup";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
 import { createGameStateLoader } from "./db/game-state-loader";
@@ -90,13 +89,6 @@ const [area, actorModels] = await withBackoffRetries(() =>
 });
 
 const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
-
-logger.info(`Seeding database...`);
-await withBackoffRetries(() => seed(db, area, actorModels)).catch((error) => {
-  logger.error(error, "Failed to seed database");
-  process.exit(1);
-});
-
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
