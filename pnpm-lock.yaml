@@ -860,9 +860,6 @@ importers:
 
   libraries/sync:
     dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../encoding
       '@mp/index':
         specifier: workspace:*
         version: link:../index
