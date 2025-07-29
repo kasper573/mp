@@ -1,15 +1,15 @@
 // oxlint-disable no-await-in-loop
-import { createConsoleLogger } from "@mp/logger";
-import { WebSocket } from "@mp/ws/server";
 import { createApiClient } from "@mp/api/sdk";
 import { createBypassUser } from "@mp/auth";
-import { Rng } from "@mp/std";
 import type { GameEventClient } from "@mp/game/client";
 import {
   GameStateClient,
   loadAreaResource,
   registerEncoderExtensions,
 } from "@mp/game/client";
+import { createConsoleLogger } from "@mp/logger";
+import { Rng } from "@mp/std";
+import { WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
 
 import {
@@ -66,6 +66,12 @@ async function testAllGameClients() {
     `Game client test finished: ${successes.length} successes, ${failures.length} failures`,
   );
 
+  if (verbose) {
+    for (let i = 0; i < failures.length; i++) {
+      logger.error(failures[i].reason, `Error for game client test ${i + 1}`);
+    }
+  }
+
   return failures.length === 0;
 }
 
@@ -75,7 +81,6 @@ function testOneGameClient(n: number, rng: Rng) {
   let running = true;
   return new Promise<void>((resolve, __reject) => {
     function failTest(error: unknown) {
-      logger.error(error, `Error in game client test for socket ${n}`);
       running = false;
       __reject(error);
     }
