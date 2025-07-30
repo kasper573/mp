@@ -1,14 +1,11 @@
-import type {
-  ActorSpritesheetUrls,
-  ActorModelId,
-  ActorAnimationName,
-} from "@mp/game/server";
+import type { ActorModelId } from "@mp/db/types";
+import type { ActorAnimationName, ActorSpritesheetUrls } from "@mp/game/server";
+import type { InjectionContainer } from "@mp/ioc";
 import type { UrlString } from "@mp/std";
 import path from "path";
-import { rpc } from "../integrations/trpc";
-import type { InjectionContainer } from "@mp/ioc";
-import { ctxFileResolver } from "../ioc";
 import { FileUrlType } from "../integrations/file-resolver";
+import { rpc } from "../integrations/trpc";
+import { ctxFileResolver } from "../ioc";
 
 export const actorSpritesheetUrls = rpc.procedure
   .input(FileUrlType)

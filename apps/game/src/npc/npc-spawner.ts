@@ -1,15 +1,16 @@
-import type { TickEventHandler } from "@mp/time";
-import { TimeSpan } from "@mp/time";
-import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import type { NpcType } from "@mp/db/types";
+import { InjectionContext } from "@mp/ioc";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
-import { InjectionContext } from "@mp/ioc";
-import type { GameState } from "../game-state/game-state";
+import type { Rng, Tile } from "@mp/std";
+import { assert, createShortId } from "@mp/std";
+import type { TickEventHandler } from "@mp/time";
+import { TimeSpan } from "@mp/time";
 import type { AreaResource } from "../area/area-resource";
+import type { GameState } from "../game-state/game-state";
 import type { ActorModelLookup } from "../traits/appearance";
+import type { Npc, NpcInstanceId, NpcSpawn } from "./types";
 import { NpcInstance } from "./types";
-import type { Npc, NpcType, NpcInstanceId, NpcSpawn } from "./types";
 
 export class NpcSpawner {
   constructor(

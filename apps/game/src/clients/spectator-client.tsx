@@ -1,7 +1,7 @@
+import type { CharacterId } from "@mp/db/types";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner, Select } from "@mp/ui";
 import { Suspense } from "preact/compat";
-import type { CharacterId } from "../character/types";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 

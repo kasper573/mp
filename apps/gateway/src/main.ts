@@ -1,4 +1,5 @@
 import { createDbClient } from "@mp/db";
+import type { AreaId } from "@mp/db/types";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
@@ -7,7 +8,7 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type { AreaId, GameEventClient, UserSession } from "@mp/game/server";
+import type { GameEventClient, UserSession } from "@mp/game/server";
 import {
   ctxGameEventClient,
   ctxTokenResolver,

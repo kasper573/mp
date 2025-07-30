@@ -1,12 +1,11 @@
+import type { CharacterId } from "@mp/db/types";
 import type { UserId } from "@mp/oauth";
-import type { Branded } from "@mp/std";
+import { computed } from "@mp/state";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
 import { AppearanceTrait } from "../traits/appearance";
 import { CombatTrait } from "../traits/combat";
 import { MovementTrait } from "../traits/movement";
-
-import { computed } from "@mp/state";
 
 type CharacterProgression = typeof CharacterProgression.$infer;
 
@@ -50,5 +49,3 @@ export class Character extends CharacterCommons {
     this.progression = new CharacterProgression(init.progression);
   }
 }
-
-export type CharacterId = Branded<string, "CharacterId">;

@@ -1,3 +1,4 @@
+import type { CharacterId } from "@mp/db/types";
 import { characterRoles } from "@mp/keycloak";
 import { Vector, type VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
@@ -10,7 +11,6 @@ import { evt } from "../network/event-builder";
 import { sendCharacterToArea } from "../traits/movement";
 import { roles } from "../user/auth";
 import { accessCharacter } from "./access";
-import type { CharacterId } from "./types";
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = evt.router({

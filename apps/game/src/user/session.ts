@@ -1,6 +1,6 @@
+import type { CharacterId } from "@mp/db/types";
 import { InjectionContext } from "@mp/ioc";
 import type { RoleDefinition, UserId } from "@mp/oauth";
-import type { CharacterId } from "../character/types";
 
 export const ctxUserSession = InjectionContext.new<UserSession>("UserSession");
 

@@ -1,8 +1,8 @@
+import type { CharacterId } from "@mp/db/types";
 import { InjectionContext } from "@mp/ioc";
 import type { SyncServer } from "@mp/sync";
-import type { GameStateEvents } from "./game-state-events";
 import type { GameState } from "./game-state";
-import type { CharacterId } from "../character/types";
+import type { GameStateEvents } from "./game-state-events";
 
 export type GameStateServer = SyncServer<
   GameState,

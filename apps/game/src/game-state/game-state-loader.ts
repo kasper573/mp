@@ -1,9 +1,9 @@
+import type { AreaId, CharacterId } from "@mp/db/types";
 import { InjectionContext } from "@mp/ioc";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
-import type { AreaId } from "../area/area-id";
+import type { Character } from "../character/types";
 import type { Npc, NpcSpawn } from "../npc/types";
-import type { Character, CharacterId } from "../character/types";
 
 export interface GameStateLoader {
   getAllSpawnsAndTheirNpcs: () => Promise<Array<{ spawn: NpcSpawn; npc: Npc }>>;

@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/game/server";
+import type { AreaId } from "@mp/db/types";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";

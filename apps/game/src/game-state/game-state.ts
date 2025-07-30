@@ -1,9 +1,7 @@
+import type { AreaId, NpcSpawnId } from "@mp/db/types";
 import { InjectionContext } from "@mp/ioc";
-
 import { defineSyncComponent, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "../actor/actor";
-import type { NpcSpawnId } from "../npc/types";
-import type { AreaId } from "../area/area-id";
 
 const Commons = defineSyncComponent((b) => b.add<AreaId>()("id"));
 

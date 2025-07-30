@@ -1,5 +1,5 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { CharacterId } from "@mp/game/client";
+import type { CharacterId } from "@mp/db/types";
 import {
   ctxAuthClient,
   GameAssetLoaderContext,

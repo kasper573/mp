@@ -1,6 +1,6 @@
 import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
-import type { CharacterId } from "@mp/game/server";
+import type { CharacterId } from "@mp/db/types";
 import type { Logger } from "@mp/logger";
 import type { UserId } from "@mp/oauth";
 

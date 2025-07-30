@@ -2,7 +2,6 @@ export * from "./actor/actor";
 export * from "./actor/actor-spritesheet";
 export * from "./actor/actor-spritesheet-lookup";
 export * from "./actor/actor-spritesheet-urls";
-export * from "./area/area-id";
 export * from "./area/area-resource";
 export * from "./area/load-area-resource";
 export * from "./area/tiled-resource";

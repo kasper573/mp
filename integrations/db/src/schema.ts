@@ -1,11 +1,3 @@
-import type {
-  ActorModelId,
-  AreaId,
-  CharacterId,
-  NpcId,
-  NpcSpawnId,
-} from "@mp/game/server";
-import { npcTypes } from "@mp/game/server";
 import type { UserId } from "@mp/oauth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
@@ -17,6 +9,14 @@ import {
   uuid,
   varchar,
 } from "drizzle-orm/pg-core";
+import type {
+  ActorModelId,
+  AreaId,
+  CharacterId,
+  NpcId,
+  NpcSpawnId,
+} from "./types";
+import { npcTypes } from "./types";
 import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";

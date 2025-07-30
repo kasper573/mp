@@ -1,11 +1,10 @@
 import type { DbClient } from "@mp/db";
 import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
+import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,
-  AreaId,
   AreaResource,
   Character,
-  CharacterId,
   GameStateLoader,
   Npc,
   NpcSpawn,

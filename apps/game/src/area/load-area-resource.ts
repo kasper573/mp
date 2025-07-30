@@ -1,7 +1,7 @@
+import type { AreaId } from "@mp/db/types";
 import { createTiledLoader } from "@mp/tiled-loader";
-import type { AreaId } from "./area-id";
-import { TiledResource } from "./tiled-resource";
 import { AreaResource } from "./area-resource";
+import { TiledResource } from "./tiled-resource";
 
 export async function loadAreaResource(
   areaId: AreaId,

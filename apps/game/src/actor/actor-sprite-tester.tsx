@@ -1,28 +1,27 @@
-import { useState } from "preact/hooks";
+import type { ActorModelId } from "@mp/db/types";
+import { Engine } from "@mp/engine";
 import { Container, Text } from "@mp/graphics";
+import { useGraphics } from "@mp/graphics/react";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import { Select } from "@mp/ui";
-import { Engine } from "@mp/engine";
-import { useGraphics } from "@mp/graphics/react";
-import type { CSSProperties } from "@mp/style";
+import type { Signal } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
+import type { CSSProperties } from "@mp/style";
+import { Select } from "@mp/ui";
+import { useState } from "preact/hooks";
+import { ctxEngine } from "../context/common";
+import { ioc } from "../context/ioc";
 import {
   actorAnimationNames,
-  type ActorModelId,
   type ActorAnimationName,
 } from "../traits/appearance";
-import { ioc } from "../context/ioc";
-
-import { ctxEngine } from "../context/common";
+import { useObjectSignal } from "../use-object-signal";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
-import { useObjectSignal } from "../use-object-signal";
-import type { Signal } from "@mp/state";
 
 export function ActorSpriteTester({
   spritesheets,

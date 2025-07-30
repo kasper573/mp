@@ -1,11 +1,11 @@
-import type { ClientVisibilityFactory } from "@mp/sync";
+import type { CharacterId } from "@mp/db/types";
 import type { Tile } from "@mp/std";
-import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
+import type { ClientVisibilityFactory } from "@mp/sync";
 import type { MovementTrait } from "../../src/traits/movement";
 import type { ActorId } from "../actor/actor";
-import type { GameState } from "../game-state/game-state";
 import type { AreaResource } from "../area/area-resource";
-import type { CharacterId } from "../character/types";
+import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
+import type { GameState } from "../game-state/game-state";
 
 /**
  * Removes any information that the given client should not have access to.

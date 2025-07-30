@@ -1,3 +1,4 @@
+import type { AreaId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
@@ -11,7 +12,6 @@ import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
 } from "../area/area-debug-settings-form";
-import type { AreaId } from "../area/area-id";
 import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
 import { ctxEngine } from "../context/common";

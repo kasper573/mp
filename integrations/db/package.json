@@ -8,6 +8,11 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts",
+      "require": "./src/types.ts"
     }
   },
   "scripts": {
@@ -18,7 +23,6 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/game": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",

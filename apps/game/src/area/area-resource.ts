@@ -1,14 +1,14 @@
+import type { AreaId } from "@mp/db/types";
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
-import type { Layer, TiledObject } from "@mp/tiled-loader";
+import type { VectorGraph } from "@mp/path-finding";
 import type { Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
-import type { VectorGraph } from "@mp/path-finding";
-import type { TiledResource } from "./tiled-resource";
+import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { graphFromTiled } from "./graph-from-tiled";
-import { TiledFixture } from "./tiled-fixture";
 import { hitTestTiledObject } from "./hit-test-tiled-object";
-import type { AreaId } from "./area-id";
+import { TiledFixture } from "./tiled-fixture";
+import type { TiledResource } from "./tiled-resource";
 
 export class AreaResource {
   readonly start: Vector<Tile>;

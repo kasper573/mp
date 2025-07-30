@@ -1,10 +1,10 @@
+import type { CharacterId } from "@mp/db/types";
 import type { Vector } from "@mp/math";
 import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { GameEventClient } from "../network/game-event-client";
-import type { CharacterId } from "../character/types";
 import type { ActorId } from "../actor/actor";
+import type { GameEventClient } from "../network/game-event-client";
 
 export class GameActions {
   constructor(

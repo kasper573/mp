@@ -1,8 +1,8 @@
-import { createContext } from "preact";
+import type { AreaId } from "@mp/db/types";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import { createContext } from "preact";
 import type { ActorSpritesheetLookup } from "../actor/actor-spritesheet-lookup";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId } from "../area/area-id";
 
 export interface GameAssets {
   areaSpritesheets: TiledSpritesheetRecord;

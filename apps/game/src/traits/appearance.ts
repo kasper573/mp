@@ -1,7 +1,7 @@
+import type { ActorModelId } from "@mp/db/types";
 import { InjectionContext } from "@mp/ioc";
 import type { Rect } from "@mp/math";
-import type { Branded, UrlString, Tile } from "@mp/std";
-
+import type { Tile, UrlString } from "@mp/std";
 import { defineSyncComponent } from "@mp/sync";
 
 export type AppearanceTrait = typeof AppearanceTrait.$infer;
@@ -24,8 +24,6 @@ export type ActorModelLookup = ReadonlyMap<ActorModelId, ActorModel>;
 
 export const ctxActorModelLookup =
   InjectionContext.new<ActorModelLookup>("ActorModelLookup");
-
-export type ActorModelId = Branded<string, "ActorModelId">;
 
 export type ActorAnimationName = (typeof actorAnimationNames)[number];
 

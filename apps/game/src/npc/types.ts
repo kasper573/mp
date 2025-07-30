@@ -1,42 +1,12 @@
-import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import type { ActorModelId, NpcId, NpcSpawnId, NpcType } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
+import { computed } from "@mp/state";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
-
-import { MovementTrait } from "../traits/movement";
-import type { ActorModelId } from "../traits/appearance";
 import { AppearanceTrait } from "../traits/appearance";
 import { CombatTrait } from "../traits/combat";
-
-import { computed } from "@mp/state";
-
-export type NpcType = (typeof npcTypes)[number];
-export const npcTypes = [
-  /**
-   * Just stands still and does nothing.
-   */
-  "static",
-  /**
-   * Patrols a path.
-   */
-  "patrol",
-  /**
-   * Will never aggro.
-   */
-  "pacifist",
-  /**
-   * Will aggro if attacked.
-   */
-  "defensive",
-  /**
-   * Will aggro if an actor considered an enemy is present.
-   */
-  "aggressive",
-  /**
-   * Will aggro if attacked or if an actor considered an ally is attacked.
-   */
-  "protective",
-] as const;
+import { MovementTrait } from "../traits/movement";
 
 export interface Npc {
   id: NpcId;
@@ -52,8 +22,6 @@ export interface Npc {
   xpReward: number;
 }
 
-export type NpcSpawnId = Branded<string, "NpcSpawnId">;
-
 export interface NpcSpawn {
   id: NpcSpawnId;
   count: number;
@@ -67,8 +35,6 @@ export interface NpcSpawn {
    */
   npcType?: NpcType;
 }
-
-export type NpcId = Branded<string, "NPCId">;
 
 export interface NpcInstanceInit {
   identity: NpcInstanceIdentity;

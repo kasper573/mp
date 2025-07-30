@@ -1,11 +1,11 @@
-import type { AreaId } from "@mp/game/server";
-import type { UrlString } from "@mp/std";
-import path from "path";
-import { rpc } from "../integrations/trpc";
-import { type } from "@mp/validate";
+import type { AreaId } from "@mp/db/types";
 import type { InjectionContainer } from "@mp/ioc";
-import { ctxFileResolver } from "../ioc";
+import type { UrlString } from "@mp/std";
+import { type } from "@mp/validate";
+import path from "path";
 import { FileUrlType } from "../integrations/file-resolver";
+import { rpc } from "../integrations/trpc";
+import { ctxFileResolver } from "../ioc";
 
 export const areaFileUrl = rpc.procedure
   .input(

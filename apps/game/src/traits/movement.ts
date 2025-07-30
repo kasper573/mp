@@ -1,20 +1,19 @@
-import type { Vector, VectorLike } from "@mp/math";
-import type { CardinalDirection, Path } from "@mp/math";
-import type { TickEventHandler } from "@mp/time";
+import type { AreaId, CharacterId } from "@mp/db/types";
+import type { InjectionContainer } from "@mp/ioc";
+import type { CardinalDirection, Path, Vector, VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
+import { defineSyncComponent } from "@mp/sync";
 import type { ObjectId } from "@mp/tiled-loader";
-import { ctxGameState } from "../game-state/game-state";
-import type { AreaId } from "../area/area-id";
-import { moveAlongPath } from "../area/move-along-path";
+import type { TickEventHandler } from "@mp/time";
 import type { AreaResource } from "../area/area-resource";
 import { getAreaIdFromObject } from "../area/area-resource";
-import { defineSyncComponent } from "@mp/sync";
-import * as patchOptimizers from "../network/patch-optimizers";
-import type { InjectionContainer } from "@mp/ioc";
+import { moveAlongPath } from "../area/move-along-path";
+import type { Character } from "../character/types";
 import { ctxArea } from "../context/common";
-import type { Character, CharacterId } from "../character/types";
-import { ctxGameEventClient } from "../network/game-event-client";
+import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
+import { ctxGameEventClient } from "../network/game-event-client";
+import * as patchOptimizers from "../network/patch-optimizers";
 
 export type MovementTrait = typeof MovementTrait.$infer;
 

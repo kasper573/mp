@@ -69,7 +69,7 @@ export default tseslint.config(
           message: "${file.type} is not allowed to import ${dependency.type}",
           rules: [
             { from: "app", allow: ["app", "integration", "library"] },
-            { from: "integration", allow: ["app", "library"] },
+            { from: "integration", allow: ["library"] },
             { from: "library", allow: ["library"] },
           ],
         },

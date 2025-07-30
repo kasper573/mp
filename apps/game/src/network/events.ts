@@ -1,7 +1,6 @@
+import type { AreaId, CharacterId } from "@mp/db/types";
 import { gatewayRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
-import type { AreaId } from "../area/area-id";
-import type { CharacterId } from "../character/types";
 import { ctxArea, ctxLogger } from "../context/common";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
