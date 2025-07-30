@@ -1,5 +1,5 @@
 import { useApiClient } from "@mp/api-service/sdk";
-import { GameAssetLoaderContext, GameClient } from "@mp/game/client";
+import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
 import { useSignalEffect } from "@mp/state/react";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";

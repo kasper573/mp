@@ -302,6 +302,9 @@ importers:
       '@mp/game':
         specifier: workspace:*
         version: link:../../integrations/game
+      '@mp/game-client':
+        specifier: workspace:*
+        version: link:../../integrations/game-client
       '@mp/gateway':
         specifier: workspace:*
         version: link:../gateway
@@ -366,6 +369,9 @@ importers:
       '@mp/game':
         specifier: workspace:*
         version: link:../../integrations/game
+      '@mp/game-client':
+        specifier: workspace:*
+        version: link:../../integrations/game-client
       '@mp/gateway':
         specifier: workspace:*
         version: link:../gateway

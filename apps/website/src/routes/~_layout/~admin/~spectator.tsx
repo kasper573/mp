@@ -5,7 +5,7 @@ import {
   GameAssetLoaderContext,
   ioc,
   SpectatorClient,
-} from "@mp/game/client";
+} from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
 import { useQuery } from "@mp/query";
 import { useSignalEffect } from "@mp/state/react";

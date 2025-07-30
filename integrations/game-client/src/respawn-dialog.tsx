@@ -1,6 +1,7 @@
-import { ctxGameStateClient, ioc } from "@mp/game/client";
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
+import { ctxGameStateClient } from "./game-state-client";
+import { ioc } from "./ioc";
 
 export function RespawnDialog(props: DialogProps) {
   const client = ioc.get(ctxGameStateClient);

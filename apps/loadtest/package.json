@@ -12,6 +12,7 @@
     "@mp/api-service": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
+    "@mp/game-client": "workspace:*",
     "@mp/gateway": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/oauth": "workspace:*",

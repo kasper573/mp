@@ -1,4 +1,4 @@
-import { ctxAuthClient, ioc } from "@mp/game/client";
+import { ctxAuthClient, ioc } from "@mp/game-client";
 import type { AuthClient } from "@mp/oauth/client";
 import type { UseNavigateResult } from "@tanstack/react-router";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";

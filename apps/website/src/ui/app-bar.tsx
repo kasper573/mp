@@ -1,4 +1,4 @@
-import { ctxAuthClient, ioc } from "@mp/game/client";
+import { ctxAuthClient, ioc } from "@mp/game-client";
 import { gatewayRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
 import { Button, LinearProgress } from "@mp/ui";
