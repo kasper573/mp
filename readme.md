@@ -127,7 +127,7 @@ The apps are responsible for bundling.
 
 ### integrations
 
-Integrations between apps, ie. sdks for communicating with services, like a database client or websocket client abstraction. May not directly depend on application code via import, but may loosely couple with apps via protocol (ie. http requests).
+Integrations with third party services. May depend on libraries, but not apps.
 
 ### libraries
 
