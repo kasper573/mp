@@ -38,27 +38,24 @@ import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
 import "dotenv/config";
 import { ctxArea, ctxGameEventClient, ctxRng } from "./context";
-import { createActorModelLookup } from "./domains/character/actor-model-lookup";
+import { createActorModelLookup } from "./domains/actor-model-lookup";
+import { deriveClientVisibility } from "./domains/client-visibility";
 import { combatBehavior } from "./domains/combat";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./domains/game-state/game-state-db-sync";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./domains/game-state-db-sync";
 import {
   createGameStateLoader,
   ctxGameStateLoader,
-} from "./domains/game-state/game-state-loader";
-import type { GameStateServer } from "./domains/game-state/game-state-server";
-import { ctxGameStateServer } from "./domains/game-state/game-state-server";
+} from "./domains/game-state-loader";
+import type { GameStateServer } from "./domains/game-state-server";
+import { ctxGameStateServer } from "./domains/game-state-server";
 import { movementBehavior } from "./domains/movement";
-import { deriveClientVisibility } from "./domains/network/client-visibility";
-import {
-  gameServerEventRouter,
-  type GameServerEventRouter,
-} from "./domains/network/root-event-router";
 import { NpcAi } from "./domains/npc/npc-ai";
 import { ctxNpcSpawner, NpcSpawner } from "./domains/npc/npc-spawner";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
+import { gameServerEventRouter, type GameServerEventRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 

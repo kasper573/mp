@@ -6,7 +6,7 @@ import type {
 } from "@mp/game-shared";
 import type { Rng } from "@mp/std";
 import type { TickEvent } from "@mp/time";
-import type { GameStateServer } from "../../game-state/game-state-server";
+import type { GameStateServer } from "../../game-state-server";
 import type { NpcAiCombatMemory } from "../npc-ai-combat-memory";
 
 export interface NpcAiTaskContext {

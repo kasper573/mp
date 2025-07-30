@@ -14,8 +14,8 @@ import type { Rng, Tile } from "@mp/std";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
-} from "../character/character-transform";
-import { deriveNpcSpawnsFromArea } from "../npc/derive-npc-spawns-from-areas";
+} from "./character-transform";
+import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
 
 export function createGameStateLoader(
   db: DbClient,

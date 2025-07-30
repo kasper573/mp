@@ -11,7 +11,7 @@ import { startAsyncInterval, TimeSpan } from "@mp/time";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
-} from "../character/character-transform";
+} from "./character-transform";
 import type { GameStateServer } from "./game-state-server";
 
 export function gameStateDbSyncBehavior(

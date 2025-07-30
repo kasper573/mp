@@ -10,7 +10,7 @@ import type { Path, Vector, VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { ctxArea, ctxGameEventClient } from "../context";
-import { ctxGameStateLoader } from "./game-state/game-state-loader";
+import { ctxGameStateLoader } from "./game-state-loader";
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {

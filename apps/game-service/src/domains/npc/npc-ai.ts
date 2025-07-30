@@ -7,7 +7,7 @@ import type {
 import { assert, type Rng } from "@mp/std";
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import type { GameStateServer } from "../game-state/game-state-server";
+import type { GameStateServer } from "../game-state-server";
 import type { NpcAiTaskContext, Task } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 

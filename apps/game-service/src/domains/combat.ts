@@ -4,7 +4,7 @@ import { clamp } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
-import type { GameStateServer } from "./game-state/game-state-server";
+import type { GameStateServer } from "./game-state-server";
 import { findPathForSubject } from "./movement";
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
