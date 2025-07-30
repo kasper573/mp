@@ -1,22 +1,22 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { useApi } from "@mp/api/sdk";
+import type { CharacterId } from "@mp/game/client";
 import {
   ctxAuthClient,
   GameAssetLoaderContext,
+  gatewayRoles,
   ioc,
   SpectatorClient,
-  gatewayRoles,
 } from "@mp/game/client";
+import { useQuery } from "@mp/query";
+import { useSignalEffect } from "@mp/state/react";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
+import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
+import { useGameAssets } from "../../../integrations/assets";
+import { useGameStateClient } from "../../../integrations/game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import type { CharacterId } from "@mp/game/client";
-import { useGameAssets } from "../../../integrations/assets";
-import { useApi } from "@mp/api/sdk";
-import { useQuery } from "@mp/query";
-import { useGameStateClient } from "../../../integrations/game-state-client";
-import { useSignalEffect } from "@mp/state/react";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -33,14 +33,14 @@ function RouteComponent() {
     api.characterList.queryOptions(void 0, {
       refetchInterval: 5000,
       enabled: !!auth.identity.value,
-      select: (result): SelectOption<CharacterId>[] => [
+      select: (characters): SelectOption<CharacterId>[] => [
         {
           value: undefined as unknown as CharacterId,
           label: "Select character",
         },
-        ...result.items.map((char) => ({
-          value: char.identity.id,
-          label: char.appearance.name,
+        ...characters.map((char) => ({
+          value: char.id,
+          label: char.name,
         })),
       ],
     }),

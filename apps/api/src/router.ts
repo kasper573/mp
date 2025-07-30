@@ -1,12 +1,12 @@
-import type { Character } from "@mp/game/server";
-import { systemRoles, gatewayRoles } from "@mp/game/server";
-import { opt } from "./options";
-import { rpc } from "./integrations/trpc";
+import { systemRoles } from "@mp/game/server";
 import { type } from "@mp/validate";
 import { roles } from "./integrations/auth";
+import { rpc } from "./integrations/trpc";
+import { opt } from "./options";
 import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
-import { myCharacterId } from "./routes/my-character-id";
 import { areaFileUrl, areaFileUrls } from "./routes/area-file-urls";
+import { characterList } from "./routes/character-list";
+import { myCharacterId } from "./routes/my-character-id";
 
 export type ApiRpcRouter = typeof apiRouter;
 export const apiRouter = rpc.router({
@@ -22,6 +22,7 @@ export const apiRouter = rpc.router({
   actorSpritesheetUrls,
   areaFileUrl,
   areaFileUrls,
+  characterList,
 
   isPatchOptimizerEnabled: rpc.procedure
     .use(roles([systemRoles.changeSettings]))
@@ -36,11 +37,4 @@ export const apiRouter = rpc.router({
     .mutation(() => {
       // noop
     }),
-
-  characterList: rpc.procedure.use(roles([gatewayRoles.spectate])).query(() => {
-    return {
-      items: [] as Character[],
-      total: 0,
-    };
-  }),
 });
