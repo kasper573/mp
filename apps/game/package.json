@@ -17,11 +17,11 @@
     }
   },
   "dependencies": {
+    "@mp/db": "workspace:*",
     "@mp/encoding": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/graphics": "workspace:*",
-    "@mp/db": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",

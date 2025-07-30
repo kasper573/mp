@@ -11,11 +11,11 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
+    "@mp/db": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
-    "@mp/db": "workspace:*",
     "@mp/gateway": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
