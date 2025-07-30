@@ -16,81 +16,73 @@ import {
 } from "./character-transform";
 import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
 
-export function createGameStateLoader(
-  db: DbClient,
-  area: AreaResource,
-  actorModels: ActorModelLookup,
-  rng: Rng,
-): GameStateLoader {
-  return {
-    getDefaultSpawnPoint() {
-      return {
-        areaId: "forest" as AreaId,
-        coords: area.start,
-      };
-    },
+export class GameStateLoader {
+  constructor(
+    private db: DbClient,
+    private area: AreaResource,
+    private actorModels: ActorModelLookup,
+    private rng: Rng,
+  ) {}
 
-    async saveCharacterToDb(character) {
-      await db
-        .update(characterTable)
-        .set(dbFieldsFromCharacter(character))
-        .where(eq(characterTable.id, character.identity.id));
-    },
+  getDefaultSpawnPoint(): { areaId: AreaId; coords: Vector<Tile> } {
+    return {
+      areaId: "forest" as AreaId,
+      coords: this.area.start,
+    };
+  }
 
-    async assignAreaIdToCharacterInDb(
-      characterId: CharacterId,
-      newAreaId: AreaId,
-    ): Promise<Character> {
-      const result = await db.transaction(async (tx) => {
-        await tx
-          .update(characterTable)
-          .set({ areaId: newAreaId })
-          .where(eq(characterTable.id, characterId));
+  async saveCharacterToDb(character: Character) {
+    await this.db
+      .update(characterTable)
+      .set(dbFieldsFromCharacter(character))
+      .where(eq(characterTable.id, character.identity.id));
+  }
 
-        return tx
-          .select()
-          .from(characterTable)
-          .where(eq(characterTable.id, characterId))
-          .limit(1);
-      });
-
-      if (result.length === 0) {
-        throw new Error(`Character with id ${characterId} not found`);
-      }
-
-      return characterFromDbFields(result[0], actorModels, rng);
-    },
-
-    async getAllSpawnsAndTheirNpcs() {
-      const result = await db
-        .select()
-        .from(npcSpawnTable)
-        .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
-        .where(eq(npcSpawnTable.areaId, area.id));
-
-      const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
-        if (!npc) {
-          throw new Error(`NPC spawn ${spawn.id} has no NPC`);
-        }
-        return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
-      });
-
-      const allFromTiled = deriveNpcSpawnsFromArea(
-        area,
-        allFromDB.map(({ npc }) => npc),
-      );
-
-      return [...allFromDB, ...allFromTiled];
-    },
-  };
-}
-
-export interface GameStateLoader {
-  getAllSpawnsAndTheirNpcs: () => Promise<Array<{ spawn: NpcSpawn; npc: Npc }>>;
-  getDefaultSpawnPoint(): { areaId: AreaId; coords: Vector<Tile> };
-  assignAreaIdToCharacterInDb(
+  async assignAreaIdToCharacterInDb(
     characterId: CharacterId,
-    areaId: AreaId,
-  ): Promise<Character>;
-  saveCharacterToDb(character: Character): Promise<void>;
+    newAreaId: AreaId,
+  ): Promise<Character> {
+    const result = await this.db.transaction(async (tx) => {
+      await tx
+        .update(characterTable)
+        .set({ areaId: newAreaId })
+        .where(eq(characterTable.id, characterId));
+
+      return tx
+        .select()
+        .from(characterTable)
+        .where(eq(characterTable.id, characterId))
+        .limit(1);
+    });
+
+    if (result.length === 0) {
+      throw new Error(`Character with id ${characterId} not found`);
+    }
+
+    return characterFromDbFields(result[0], this.actorModels, this.rng);
+  }
+
+  async getAllSpawnsAndTheirNpcs(): Promise<
+    Array<{ spawn: NpcSpawn; npc: Npc }>
+  > {
+    const result = await this.db
+      .select()
+      .from(npcSpawnTable)
+      .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
+      .where(eq(npcSpawnTable.areaId, this.area.id));
+
+    const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
+      if (!npc) {
+        throw new Error(`NPC spawn ${spawn.id} has no NPC`);
+      }
+      return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
+    });
+
+    const allFromTiled = deriveNpcSpawnsFromArea(
+      this.area,
+      allFromDB.map(({ npc }) => npc),
+    );
+
+    return [...allFromDB, ...allFromTiled];
+  }
 }

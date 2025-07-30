@@ -6,7 +6,6 @@ import {
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-
 import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
@@ -49,7 +48,7 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
-import { createGameStateLoader } from "./etc/game-state-loader";
+import { GameStateLoader } from "./etc/game-state-loader";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcAi } from "./etc/npc/npc-ai";
@@ -107,7 +106,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
   process.exit(1);
 });
 
-const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
+const gameStateLoader = new GameStateLoader(db, area, actorModels, rng);
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
