@@ -28,8 +28,7 @@
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
-    "@mp/time": "workspace:*",
-    "@mp/validate": "workspace:*"
+    "@mp/time": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

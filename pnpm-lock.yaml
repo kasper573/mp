@@ -509,9 +509,6 @@ importers:
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

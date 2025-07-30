@@ -19,7 +19,6 @@
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/validate": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/state": "workspace:*",
@@ -27,7 +26,8 @@
     "@mp/sync": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
-    "@mp/time": "workspace:*"
+    "@mp/time": "workspace:*",
+    "@mp/validate": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
