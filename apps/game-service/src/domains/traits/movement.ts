@@ -1,48 +1,16 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
-import type { AreaResource, Character } from "@mp/game-shared";
+import type { AreaResource, Character, MovementTrait } from "@mp/game-shared";
 import {
   ctxGameState,
   getAreaIdFromObject,
   moveAlongPath,
-  patchOptimizers,
 } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
-import type { CardinalDirection, Path, Vector, VectorLike } from "@mp/math";
+import type { Path, Vector, VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
-import { defineSyncComponent } from "@mp/sync";
-import type { ObjectId } from "@mp/tiled-loader";
 import type { TickEventHandler } from "@mp/time";
 import { ctxArea, ctxGameEventClient } from "../context/server";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
-
-export type MovementTrait = typeof MovementTrait.$infer;
-
-export const MovementTrait = defineSyncComponent((builder) =>
-  builder
-    /**
-     * Current position of the subject.
-     */
-    .add<Vector<Tile>>(patchOptimizers.coords)("coords")
-    .add<Tile>()("speed")
-    /**
-     * A desired target. Will be consumed by the movement behavior to find a new path.
-     */
-    .add<Vector<Tile> | undefined>()("moveTarget")
-    /**
-     * Has to be explicitly set by the client for portal traversal to be able to happen.
-     * This avoids unintended portal traversal by actors that are not supposed to use portals.
-     * The movement behavior will continuously check if the actor has reached this portal.
-     */
-    .add<ObjectId | undefined>()("desiredPortalId")
-    /**
-     * The current path the subject is following.
-     */
-    .add<Path<Tile> | undefined>(patchOptimizers.path)("path")
-    /**
-     * The direction the subject is facing.
-     */
-    .add<CardinalDirection>()("dir"),
-);
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {
