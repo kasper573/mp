@@ -1,13 +1,13 @@
+import { PropertySignal, StorageSignal } from "@mp/state";
+import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CheckboxState } from "@mp/ui";
 import { Checkbox } from "@mp/ui";
-import { useSignal, useSignalEffect } from "@mp/state/react";
-import { PropertySignal, StorageSignal } from "@mp/state";
 
+import { useApi, useApiClient } from "@mp/api/sdk";
+import { useMutation, useQuery } from "@mp/query";
+import { useEffect } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
-import { useEffect } from "preact/hooks";
-import { useMutation, useQuery } from "@mp/query";
-import { useApi, useApiClient } from "@mp/api/sdk";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
@@ -66,22 +66,20 @@ function PingIndicator() {
 function useServerPatchOptimizerSignal() {
   const api = useApi();
   const enabled = useSignal<CheckboxState>("indeterminate");
-  const isRemoteEnabled = useQuery(api.isPatchOptimizerEnabled.queryOptions());
-  const setRemoteEnabled = useMutation(
-    api.setPatchOptimizerEnabled.mutationOptions(),
-  );
+  const settings = useQuery(api.gameServiceSettings.queryOptions());
+  const setSettings = useMutation(api.setGameServiceSettings.mutationOptions());
 
   useSignalEffect(() => {
     if (enabled.value !== "indeterminate") {
-      setRemoteEnabled.mutate(enabled.value);
+      setSettings.mutate({ isPatchOptimizerEnabled: enabled.value });
     }
   });
 
   useEffect(() => {
-    if (isRemoteEnabled.data !== undefined) {
-      enabled.value = isRemoteEnabled.data;
+    if (settings.data !== undefined) {
+      enabled.value = settings.data.isPatchOptimizerEnabled;
     }
-  }, [isRemoteEnabled.data, enabled]);
+  }, [settings.data, enabled]);
 
   return enabled;
 }
