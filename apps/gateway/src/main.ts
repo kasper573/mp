@@ -8,7 +8,6 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import { ctxGameEventClient, ctxTokenResolver } from "@mp/game/server";
 import type {
   GameEventClient,
   SyncMessageWithRecipient,
@@ -45,7 +44,12 @@ import type { IncomingMessage } from "http";
 import http from "http";
 import { saveOnlineCharacters } from "./db-operations";
 import { opt } from "./options";
-import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
+import {
+  ctxDbClient,
+  ctxGameEventClient,
+  ctxUserSessionSignal,
+  gatewayRouter,
+} from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -100,9 +104,7 @@ const gatewayEventInvoker = new QueuedEventInvoker({
   logger,
 });
 
-const ioc = new ImmutableInjectionContainer()
-  .provide(ctxTokenResolver, resolveAccessToken)
-  .provide(ctxDbClient, db);
+const ioc = new ImmutableInjectionContainer().provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
   debounce(saveOnlineCharacters(db, logger), 100),

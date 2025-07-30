@@ -1,5 +1,4 @@
 import { createDbClient } from "@mp/db";
-import { ctxTokenResolver } from "@mp/game/server";
 import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game/shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -14,7 +13,12 @@ import express from "express";
 import type { IncomingHttpHeaders } from "http";
 import { createFileResolver } from "./integrations/file-resolver";
 import type { ApiContext } from "./integrations/trpc";
-import { ctxAccessToken, ctxDbClient, ctxFileResolver } from "./ioc";
+import {
+  ctxAccessToken,
+  ctxDbClient,
+  ctxFileResolver,
+  ctxTokenResolver,
+} from "./ioc";
 import { opt } from "./options";
 import { apiRouter } from "./router";
 import { ctxGameServiceConfig } from "./routes/game-service-settings";
