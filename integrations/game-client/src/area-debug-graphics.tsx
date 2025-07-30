@@ -21,8 +21,7 @@ import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
-import { ctxEngine } from "./context";
-import { ioc } from "./ioc";
+import { ctxEngine, ioc } from "./context";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;

@@ -10,9 +10,8 @@ import { throttle } from "@mp/std";
 import { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { subscribeToReadyState } from "@mp/ws/client";
-import { ctxGameEventClient } from "./context";
+import { ctxGameEventClient, ioc } from "./context";
 import { GameActions } from "./game-actions";
-import { ioc } from "./ioc";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 

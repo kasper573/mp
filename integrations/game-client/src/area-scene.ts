@@ -22,9 +22,8 @@ import { TimeSpan } from "@mp/time";
 import { ActorController } from "./actor-controller";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
-import { ctxEngine } from "./context";
+import { ctxEngine, ioc } from "./context";
 import { ctxGameStateClient } from "./game-state-client";
-import { ioc } from "./ioc";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 

@@ -19,8 +19,7 @@ import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
-import { ctxEngine } from "./context";
-import { ioc } from "./ioc";
+import { ctxEngine, ioc } from "./context";
 import { useObjectSignal } from "./use-object-signal";
 
 export function ActorSpriteTester({

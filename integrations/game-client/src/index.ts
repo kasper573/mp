@@ -5,7 +5,6 @@ export * from "./context";
 export * from "./game-asset-loader";
 export * from "./game-client";
 export * from "./game-state-client";
-export * from "./ioc";
 export * from "./optimistic-game-state";
 export * from "./spectator-client";
 export * from "./tile-renderer-tester";

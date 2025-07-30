@@ -11,8 +11,8 @@ import { effect } from "@mp/state";
 import { assert } from "@mp/std";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
+import { ioc } from "./context";
 import { ctxGameStateClient } from "./game-state-client";
-import { ioc } from "./ioc";
 
 export class ActorController extends Container {
   private subscriptions: Array<() => void>;

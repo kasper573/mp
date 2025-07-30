@@ -14,11 +14,10 @@ import {
 } from "./area-debug-settings-form";
 import { AreaScene, ctxAreaSpritesheets } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import { ctxEngine } from "./context";
+import { ctxEngine, ioc } from "./context";
 import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import { GameStateDebugInfo } from "./game-state-debug-info";
-import { ioc } from "./ioc";
 import type { OptimisticGameState } from "./optimistic-game-state";
 import { useObjectSignal } from "./use-object-signal";
 
