@@ -1,5 +1,5 @@
 import { createDbClient } from "@mp/db";
-import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game/shared";
+import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/oauth";

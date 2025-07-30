@@ -8,18 +8,15 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type {
-  GameEventClient,
-  SyncMessageWithRecipient,
-  UserSession,
-} from "@mp/game/shared";
+import type { GameServerEventRouter } from "@mp/game-service";
+import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
   ctxUserSession,
   eventWithSessionEncoding,
   registerEncoderExtensions,
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
-} from "@mp/game/shared";
+} from "@mp/game-shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -196,7 +193,7 @@ function setupGameClientSocket(
     }
   }
 
-  const broadcastClient: GameEventClient = createProxyEventInvoker(
+  const broadcastClient = createProxyEventInvoker<GameServerEventRouter>(
     broadcastEventToGameServices,
   );
 

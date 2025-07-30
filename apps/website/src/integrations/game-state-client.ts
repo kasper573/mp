@@ -5,8 +5,8 @@ import {
   type ProxyEventInvoker,
 } from "@mp/event-router";
 import { ctxAuthClient, GameStateClient, ioc } from "@mp/game-client";
-import type { GameServerEventRouter } from "@mp/game/server";
-import { ctxLogger } from "@mp/game/shared";
+import type { GameServerEventRouter } from "@mp/game-service";
+import { ctxLogger } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/oauth/client";

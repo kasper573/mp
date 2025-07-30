@@ -1,16 +1,16 @@
 import type { DbClient } from "@mp/db";
 import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
-import type { GameStateLoader } from "@mp/game/server";
-import { deriveNpcSpawnsFromArea } from "@mp/game/server";
 import type {
   ActorModelLookup,
   AreaResource,
   Character,
   Npc,
   NpcSpawn,
-} from "@mp/game/shared";
+} from "@mp/game-shared";
 import type { Rng } from "@mp/std";
+import type { GameStateLoader } from "../domains/game-state/game-state-loader";
+import { deriveNpcSpawnsFromArea } from "../domains/npc/derive-npc-spawns-from-areas";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,

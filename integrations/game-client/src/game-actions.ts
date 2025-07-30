@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
+import type { GameEventClient } from "@mp/game-service";
 import type { ActorId } from "@mp/game-shared";
-import type { GameEventClient } from "@mp/game/server";
 import type { Vector } from "@mp/math";
 import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";

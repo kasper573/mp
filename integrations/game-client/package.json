@@ -14,7 +14,7 @@
   "dependencies": {
     "@mp/db": "workspace:*",
     "@mp/engine": "workspace:*",
-    "@mp/game": "workspace:*",
+    "@mp/game-service": "workspace:*",
     "@mp/game-shared": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/ioc": "workspace:*",

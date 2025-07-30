@@ -1,4 +1,4 @@
-import type { GameState } from "@mp/game/shared";
+import type { GameState } from "@mp/game-shared";
 import { MetricsGague } from "@mp/telemetry/prom";
 
 export function collectGameStateMetrics(state: GameState) {

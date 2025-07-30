@@ -5,8 +5,8 @@ import {
   eventMessageEncoding,
 } from "@mp/event-router";
 import { GameStateClient } from "@mp/game-client";
-import type { GameEventClient } from "@mp/game/shared";
-import { loadAreaResource, registerEncoderExtensions } from "@mp/game/shared";
+import type { GameServerEventRouter } from "@mp/game-service";
+import { loadAreaResource, registerEncoderExtensions } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";
@@ -91,8 +91,8 @@ function testOneGameClient(n: number, rng: Rng) {
       socket = new WebSocket(url.toString());
       socket.binaryType = "arraybuffer";
 
-      const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
-        socket.send(eventMessageEncoding.encode(message)),
+      const gameEvents = createProxyEventInvoker<GameServerEventRouter>(
+        (message) => socket.send(eventMessageEncoding.encode(message)),
       );
 
       const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>

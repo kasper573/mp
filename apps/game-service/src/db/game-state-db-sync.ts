@@ -1,14 +1,14 @@
 import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
-import type { GameStateServer } from "@mp/game/server";
 import type {
   ActorModelLookup,
   AreaResource,
   GameState,
-} from "@mp/game/shared";
+} from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import type { Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
+import type { GameStateServer } from "../domains/game-state/game-state-server";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,

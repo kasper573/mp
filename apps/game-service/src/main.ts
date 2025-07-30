@@ -6,22 +6,8 @@ import {
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import type { GameStateServer } from "@mp/game/server";
-import {
-  combatBehavior,
-  ctxArea,
-  ctxGameEventClient,
-  ctxGameStateLoader,
-  ctxGameStateServer,
-  ctxNpcSpawner,
-  ctxRng,
-  deriveClientVisibility,
-  gameServerEventRouter,
-  movementBehavior,
-  NpcAi,
-  NpcSpawner,
-} from "@mp/game/server";
-import type { GameEventClient, GameState } from "@mp/game/shared";
+
+import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
   ctxActorModelLookup,
@@ -35,7 +21,7 @@ import {
   loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
-} from "@mp/game/shared";
+} from "@mp/game-shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
@@ -54,6 +40,20 @@ import "dotenv/config";
 import { createActorModelLookup } from "./db/actor-model-lookup";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
 import { createGameStateLoader } from "./db/game-state-loader";
+import { ctxArea, ctxGameEventClient } from "./domains/context/server";
+import { ctxGameStateLoader } from "./domains/game-state/game-state-loader";
+import type { GameStateServer } from "./domains/game-state/game-state-server";
+import { ctxGameStateServer } from "./domains/game-state/game-state-server";
+import {
+  gameServerEventRouter,
+  type GameServerEventRouter,
+} from "./domains/network/root-event-router";
+import { NpcAi } from "./domains/npc/npc-ai";
+import { ctxNpcSpawner, NpcSpawner } from "./domains/npc/npc-spawner";
+import { ctxRng } from "./domains/rng";
+import { combatBehavior } from "./domains/traits/combat";
+import { movementBehavior } from "./domains/traits/movement";
+import { deriveClientVisibility } from "./domains/user/client-visibility";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
@@ -125,7 +125,7 @@ gatewaySocket.addEventListener("error", (err) =>
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
 
-const gameEventBroadcastClient: GameEventClient = createProxyEventInvoker(
+const gameEventBroadcastClient = createProxyEventInvoker<GameServerEventRouter>(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
 );
 

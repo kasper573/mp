@@ -20,7 +20,7 @@
   "dependencies": {
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/game": "workspace:*",
+    "@mp/game-shared": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",

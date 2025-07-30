@@ -1,4 +1,5 @@
 import type { FrameCallbackOptions } from "@mp/engine";
+import type { GameStateEvents } from "@mp/game-service";
 import type { MovementTrait } from "@mp/game-shared";
 import {
   moveAlongPath,
@@ -6,7 +7,6 @@ import {
   type ActorId,
   type GameState,
 } from "@mp/game-shared";
-import type { GameStateEvents } from "@mp/game/server";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import type { Result } from "@mp/std";
 import { err, ok, typedKeys } from "@mp/std";

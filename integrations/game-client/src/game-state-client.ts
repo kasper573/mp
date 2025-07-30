@@ -1,7 +1,7 @@
 import type { CharacterId } from "@mp/db/types";
+import type { GameEventClient, GameStateEvents } from "@mp/game-service";
 import type { Actor, Character } from "@mp/game-shared";
 import { ctxLogger, syncMessageEncoding } from "@mp/game-shared";
-import type { GameEventClient, GameStateEvents } from "@mp/game/server";
 import { InjectionContext } from "@mp/ioc";
 import type { Logger } from "@mp/logger";
 import type { ReadonlySignal, Signal } from "@mp/state";

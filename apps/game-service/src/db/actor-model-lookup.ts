@@ -2,7 +2,7 @@ import type {
   ActorModel,
   ActorModelLookup,
   ActorSpritesheetUrls,
-} from "@mp/game/shared";
+} from "@mp/game-shared";
 import { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 

@@ -1,7 +1,9 @@
 import type { DbClient } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
-import { evt, roles } from "@mp/game/server";
-import type { GameEventClient, UserSession } from "@mp/game/shared";
+import type { ProxyEventInvoker } from "@mp/event-router";
+import type { GameServerEventRouter } from "@mp/game-service";
+import { evt, roles } from "@mp/game-service";
+import type { UserSession } from "@mp/game-shared";
 import { InjectionContext } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
 import type { Signal } from "@mp/state";
@@ -46,4 +48,6 @@ export const ctxUserSessionSignal =
 export const ctxDbClient = InjectionContext.new<DbClient>("DbClient");
 
 export const ctxGameEventClient =
-  InjectionContext.new<GameEventClient>("GameEventClient");
+  InjectionContext.new<ProxyEventInvoker<GameServerEventRouter>>(
+    "GameEventClient",
+  );

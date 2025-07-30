@@ -1,5 +1,5 @@
 import type { Engine } from "@mp/engine";
-import type { GameEventClient } from "@mp/game/server";
+import type { GameEventClient } from "@mp/game-service";
 import { InjectionContext } from "@mp/ioc";
 import type { AuthClient } from "@mp/oauth/client";
 
