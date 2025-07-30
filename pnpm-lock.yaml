@@ -148,94 +148,6 @@ importers:
         specifier: 'catalog:'
         version: 4.19.2
 
-  apps/client:
-    dependencies:
-      '@mp/api-service':
-        specifier: workspace:*
-        version: link:../api-service
-      '@mp/db':
-        specifier: workspace:*
-        version: link:../../integrations/db
-      '@mp/engine':
-        specifier: workspace:*
-        version: link:../../libraries/engine
-      '@mp/env':
-        specifier: workspace:*
-        version: link:../../libraries/env
-      '@mp/event-router':
-        specifier: workspace:*
-        version: link:../../libraries/event-router
-      '@mp/game':
-        specifier: workspace:*
-        version: link:../game
-      '@mp/gateway':
-        specifier: workspace:*
-        version: link:../gateway
-      '@mp/keycloak':
-        specifier: workspace:*
-        version: link:../../integrations/keycloak
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../../libraries/logger
-      '@mp/oauth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
-      '@mp/query':
-        specifier: workspace:*
-        version: link:../../libraries/query
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-      '@mp/style':
-        specifier: workspace:*
-        version: link:../../libraries/style
-      '@mp/telemetry':
-        specifier: workspace:*
-        version: link:../../libraries/telemetry
-      '@mp/tiled-renderer':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-renderer
-      '@mp/ui':
-        specifier: workspace:*
-        version: link:../../libraries/ui
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
-      '@mp/ws':
-        specifier: workspace:*
-        version: link:../../libraries/ws
-      '@tanstack/react-router':
-        specifier: 1.126.2
-        version: 1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@tanstack/react-router-devtools':
-        specifier: 1.126.2
-        version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@tanstack/router-core@1.126.2)(csstype@3.1.3)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(solid-js@1.9.5)(tiny-invariant@1.3.3)
-      preact:
-        specifier: 'catalog:'
-        version: 10.26.9
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-      '@preact/preset-vite':
-        specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-      '@tanstack/router-plugin':
-        specifier: 1.126.2
-        version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-      '@vanilla-extract/vite-plugin':
-        specifier: 'catalog:'
-        version: 5.0.6(@types/node@22.13.10)(babel-plugin-macros@3.1.0)(jiti@2.4.2)(tsx@4.19.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-      vite:
-        specifier: 'catalog:'
-        version: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
-      vite-plugin-checker:
-        specifier: 0.9.3
-        version: 0.9.3(eslint@9.32.0(jiti@2.4.2))(optionator@0.9.4)(typescript@5.8.3)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-
   apps/e2e:
     devDependencies:
       '@faker-js/faker':
@@ -496,7 +408,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -512,6 +424,94 @@ importers:
       yargs:
         specifier: 17.7.2
         version: 17.7.2
+
+  apps/website:
+    dependencies:
+      '@mp/api-service':
+        specifier: workspace:*
+        version: link:../api-service
+      '@mp/db':
+        specifier: workspace:*
+        version: link:../../integrations/db
+      '@mp/engine':
+        specifier: workspace:*
+        version: link:../../libraries/engine
+      '@mp/env':
+        specifier: workspace:*
+        version: link:../../libraries/env
+      '@mp/event-router':
+        specifier: workspace:*
+        version: link:../../libraries/event-router
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../game
+      '@mp/gateway':
+        specifier: workspace:*
+        version: link:../gateway
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/query':
+        specifier: workspace:*
+        version: link:../../libraries/query
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../libraries/state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/style':
+        specifier: workspace:*
+        version: link:../../libraries/style
+      '@mp/telemetry':
+        specifier: workspace:*
+        version: link:../../libraries/telemetry
+      '@mp/tiled-renderer':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-renderer
+      '@mp/ui':
+        specifier: workspace:*
+        version: link:../../libraries/ui
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
+      '@tanstack/react-router':
+        specifier: 1.126.2
+        version: 1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      '@tanstack/react-router-devtools':
+        specifier: 1.126.2
+        version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@tanstack/router-core@1.126.2)(csstype@3.1.3)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(solid-js@1.9.5)(tiny-invariant@1.3.3)
+      preact:
+        specifier: 'catalog:'
+        version: 10.26.9
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      '@preact/preset-vite':
+        specifier: 'catalog:'
+        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+      '@tanstack/router-plugin':
+        specifier: 1.126.2
+        version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+      '@vanilla-extract/vite-plugin':
+        specifier: 'catalog:'
+        version: 5.0.6(@types/node@22.13.10)(babel-plugin-macros@3.1.0)(jiti@2.4.2)(tsx@4.19.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+      vite:
+        specifier: 'catalog:'
+        version: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
+      vite-plugin-checker:
+        specifier: 0.9.3
+        version: 0.9.3(eslint@9.32.0(jiti@2.4.2))(optionator@0.9.4)(typescript@5.8.3)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
 
   integrations/db:
     dependencies:
@@ -2723,9 +2723,6 @@ packages:
     resolution: {integrity: sha512-u7ubq1xPBtNiU7Fm+EOWlVWdgFLzuKOa1thhqdscVn8R4dNMUd1VoOjZ6AKmLw201VaUhFtlX+u0pjzI6szX7A==}
     engines: {node: '>=12'}
 
-  '@tanstack/store@0.7.0':
-    resolution: {integrity: sha512-CNIhdoUsmD2NolYuaIs8VfWM467RK6oIBAW4nPEKZhg1smZ+/CwtCdpURgp7nxSqOaV9oKkzdWD80+bC66F/Jg==}
-
   '@tanstack/store@0.7.2':
     resolution: {integrity: sha512-RP80Z30BYiPX2Pyo0Nyw4s1SJFH2jyM6f9i3HfX4pA+gm5jsnYryscdq2aIQLnL4TaGuQMO+zXmN9nh1Qck+Pg==}
 
@@ -3077,11 +3074,6 @@ packages:
     resolution: {integrity: sha512-rq9s+JNhf0IChjtDXxllJ7g41oZk5SlXtp0LHwyA5cejwn7vKmKp4pPri6YEePv2PU65sAsegbXtIinmDFDXgQ==}
     peerDependencies:
       acorn: ^6.0.0 || ^7.0.0 || ^8.0.0
-
-  acorn@8.14.1:
-    resolution: {integrity: sha512-OvQ/2pUDKmgfCg++xsTX1wGxfTaszcHVcTctW4UJB4hibJx2HXxxO5UmVgyjMa+ZDsiaf5wWLXYpRWMmBI0QHg==}
-    engines: {node: '>=0.4.0'}
-    hasBin: true
 
   acorn@8.15.0:
     resolution: {integrity: sha512-NZyJarBfL7nWwIq+FDL6Zp/yHEhePMNnnJ0y3qfieCrmNvYct8uvtiV41UvlSe6apAfk0fY1FbWx+NwfmpvtTg==}
@@ -5562,7 +5554,7 @@ snapshots:
       '@babel/helper-optimise-call-expression': 7.27.1
       '@babel/helper-replace-supers': 7.27.1(@babel/core@7.28.0)
       '@babel/helper-skip-transparent-expression-wrappers': 7.27.1
-      '@babel/traverse': 7.27.4
+      '@babel/traverse': 7.28.0
       semver: 6.3.1
     transitivePeerDependencies:
       - supports-color
@@ -5571,8 +5563,8 @@ snapshots:
 
   '@babel/helper-member-expression-to-functions@7.27.1':
     dependencies:
-      '@babel/traverse': 7.27.4
-      '@babel/types': 7.27.6
+      '@babel/traverse': 7.28.0
+      '@babel/types': 7.28.0
     transitivePeerDependencies:
       - supports-color
 
@@ -5608,7 +5600,7 @@ snapshots:
 
   '@babel/helper-optimise-call-expression@7.27.1':
     dependencies:
-      '@babel/types': 7.27.6
+      '@babel/types': 7.28.0
 
   '@babel/helper-plugin-utils@7.27.1': {}
 
@@ -5617,14 +5609,14 @@ snapshots:
       '@babel/core': 7.28.0
       '@babel/helper-member-expression-to-functions': 7.27.1
       '@babel/helper-optimise-call-expression': 7.27.1
-      '@babel/traverse': 7.27.4
+      '@babel/traverse': 7.28.0
     transitivePeerDependencies:
       - supports-color
 
   '@babel/helper-skip-transparent-expression-wrappers@7.27.1':
     dependencies:
-      '@babel/traverse': 7.27.4
-      '@babel/types': 7.27.6
+      '@babel/traverse': 7.28.0
+      '@babel/types': 7.28.0
     transitivePeerDependencies:
       - supports-color
 
@@ -6850,7 +6842,7 @@ snapshots:
   '@tanstack/router-core@1.126.2':
     dependencies:
       '@tanstack/history': 1.121.34
-      '@tanstack/store': 0.7.0
+      '@tanstack/store': 0.7.2
       cookie-es: 1.2.2
       jsesc: 3.1.0
       tiny-invariant: 1.3.3
@@ -6905,15 +6897,13 @@ snapshots:
   '@tanstack/router-utils@1.121.21':
     dependencies:
       '@babel/core': 7.28.0
-      '@babel/generator': 7.27.5
-      '@babel/parser': 7.27.5
+      '@babel/generator': 7.28.0
+      '@babel/parser': 7.28.0
       '@babel/preset-typescript': 7.27.1(@babel/core@7.28.0)
       ansis: 4.1.0
       diff: 8.0.2
     transitivePeerDependencies:
       - supports-color
-
-  '@tanstack/store@0.7.0': {}
 
   '@tanstack/store@0.7.2': {}
 
@@ -7366,8 +7356,6 @@ snapshots:
     dependencies:
       acorn: 8.15.0
 
-  acorn@8.14.1: {}
-
   acorn@8.15.0: {}
 
   agent-base@7.1.3:
@@ -7416,7 +7404,7 @@ snapshots:
   babel-dead-code-elimination@1.0.10:
     dependencies:
       '@babel/core': 7.28.0
-      '@babel/parser': 7.27.5
+      '@babel/parser': 7.28.0
       '@babel/traverse': 7.28.0
       '@babel/types': 7.28.0
     transitivePeerDependencies:
@@ -9509,7 +9497,7 @@ snapshots:
 
   unplugin@2.2.2:
     dependencies:
-      acorn: 8.14.1
+      acorn: 8.15.0
       webpack-virtual-modules: 0.6.2
 
   unrs-resolver@1.11.1:
@@ -9625,7 +9613,7 @@ snapshots:
       picomatch: 4.0.2
       strip-ansi: 7.1.0
       tiny-invariant: 1.3.3
-      tinyglobby: 0.2.13
+      tinyglobby: 0.2.14
       vite: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
       vscode-uri: 3.1.0
     optionalDependencies:

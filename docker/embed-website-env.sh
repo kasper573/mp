@@ -1,7 +1,7 @@
 #!/bin/sh
 
 file="/usr/share/nginx/html/index.html"
-prefix="MP_CLIENT_"
+prefix="MP_WEBSITE_"
 placeholder="__ENV_PLACEHOLDER__"
 
 # Select environment variables

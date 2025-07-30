@@ -138,7 +138,7 @@ loki.write "default" {
 	external_labels = {}
 }
 
-loki.process "mp_client" {
+loki.process "mp_website" {
 	forward_to = [loki.write.default.receiver]
 
 	stage.logfmt {
@@ -160,9 +160,9 @@ logging {
 	level = "info"
 }
 
-faro.receiver "mp_client" {
+faro.receiver "mp_website" {
 	extra_log_labels = {
-		app  = "mp-client",
+		app  = "mp-website",
 		kind = "",
 	}
 
@@ -180,7 +180,7 @@ faro.receiver "mp_client" {
 	sourcemaps { }
 
 	output {
-		logs   = [loki.process.mp_client.receiver]
+		logs   = [loki.process.mp_website.receiver]
 		traces = [otelcol.exporter.otlp.default.input]
 	}
 }

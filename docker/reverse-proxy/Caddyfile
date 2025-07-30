@@ -18,7 +18,7 @@
         method OPTIONS
     }
     header {
-        Access-Control-Allow-Origin "https://{$MP_CLIENT_DOMAIN}"
+        Access-Control-Allow-Origin "https://{$MP_WEBSITE_DOMAIN}"
         Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
         Access-Control-Allow-Headers "Content-Type, Authorization"
         Access-Control-Allow-Credentials true
@@ -50,9 +50,9 @@ faro.{$MP_DOMAIN} {
     import common_cors
 }
 
-{$MP_CLIENT_DOMAIN} {
+{$MP_WEBSITE_DOMAIN} {
     import common_rate_limit
-    reverse_proxy {$MP_CLIENT_PROXY_HOST}
+    reverse_proxy {$MP_WEBSITE_PROXY_HOST}
 }
 
 {$MP_API_DOMAIN} {

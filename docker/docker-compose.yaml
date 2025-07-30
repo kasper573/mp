@@ -11,13 +11,13 @@ x-logging: &logging
     tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
 
 services:
-  mp-client:
+  mp-website:
     env_file: *env_files
     logging: *logging
     build:
-      dockerfile: ./docker/Dockerfile.mp-client
+      dockerfile: ./docker/Dockerfile.mp-website
       context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-client:${DOCKER_IMAGE_VERSION:-latest}
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-website:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
     depends_on:

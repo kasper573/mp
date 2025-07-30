@@ -1,5 +1,5 @@
-import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
+import path from "node:path";
 
 const outputDir = ".playwright"; // Same value should also be defined in .gitignore
 const artifactsDir = path.join(outputDir, "artifacts");
@@ -21,7 +21,7 @@ export default defineConfig({
   workers: process.env.CI ? 1 : undefined,
   reporter: process.env.CI ? [htmlReporter, ["github"]] : [htmlReporter],
   use: {
-    baseURL: `https://${process.env.MP_CLIENT_DOMAIN}`,
+    baseURL: `https://${process.env.MP_WEBSITE_DOMAIN}`,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     video: "retain-on-failure",

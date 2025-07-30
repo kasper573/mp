@@ -13,7 +13,7 @@ export function createFaroClient() {
     url: env.faro.receiverUrl,
     isolate: true,
     app: {
-      name: "mp_client",
+      name: "mp-website",
       version: env.version,
     },
     instrumentations: [

@@ -716,16 +716,16 @@
       "description": "",
       "rootUrl": "${KC_HOSTNAME}",
       "adminUrl": "${KC_HOSTNAME}",
-      "baseUrl": "https://${MP_CLIENT_DOMAIN}",
+      "baseUrl": "https://${MP_WEBSITE_DOMAIN}",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://${MP_CLIENT_DOMAIN}/*"
+        "https://${MP_WEBSITE_DOMAIN}/*"
       ],
       "webOrigins": [
-        "https://${MP_CLIENT_DOMAIN}"
+        "https://${MP_WEBSITE_DOMAIN}"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -740,7 +740,7 @@
       "attributes": {
         "client.secret.creation.time": "1732430152",
         "client.introspection.response.allow.jwt.claim.enabled": "false",
-        "post.logout.redirect.uris": "https://${MP_CLIENT_DOMAIN}/*",
+        "post.logout.redirect.uris": "https://${MP_WEBSITE_DOMAIN}/*",
         "oauth2.device.authorization.grant.enabled": "false",
         "use.jwks.url": "false",
         "backchannel.logout.revoke.offline.tokens": "false",

@@ -31,7 +31,7 @@ function getClientEnv(): ClientEnv {
     throw new Error("Client env vars is missing");
   }
 
-  const res = parseEnv(clientEnvSchema, obj, "MP_CLIENT_");
+  const res = parseEnv(clientEnvSchema, obj, "MP_WEBSITE_");
 
   if (res.isErr()) {
     throw new Error("Invalid client env vars:\n\n" + res.error);

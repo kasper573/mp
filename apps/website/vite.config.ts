@@ -1,8 +1,8 @@
+import { preact } from "@preact/preset-vite";
+import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
+import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
-import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
-import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
-import { preact } from "@preact/preset-vite";
 
 import type { Plugin } from "vite";
 
@@ -22,7 +22,7 @@ export default defineConfig({
     vanillaExtractPlugin(),
     preact(),
     checker({ typescript: true }),
-    ...(process.env.MP_CLIENT_EMBED_ENV ? [embedEnvPlugin()] : []),
+    ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],
 });
 
@@ -32,7 +32,7 @@ function embedEnvPlugin(): Plugin {
     transformIndexHtml(html) {
       const env = Object.fromEntries(
         Object.entries(process.env).filter(([key]) =>
-          key.startsWith("MP_CLIENT_"),
+          key.startsWith("MP_WEBSITE_"),
         ),
       );
       return html.replaceAll("__ENV_PLACEHOLDER__", JSON.stringify(env));
