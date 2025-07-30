@@ -1,3 +1,10 @@
+import type {
+  Actor,
+  AreaResource,
+  NpcInstance,
+  TiledResource,
+} from "@mp/game-shared";
+import { clientViewDistance, WalkableChecker } from "@mp/game-shared";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
@@ -6,19 +13,13 @@ import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@mp/state";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";
-import type { Actor } from "../actor/actor";
 import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
-import { clientViewDistance } from "../clients/client-view-distance-settings";
 import { ctxEngine } from "../context/client";
 import { ioc } from "../context/ioc";
-import type { NpcInstance } from "../npc/types";
 import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
-import type { AreaResource } from "./area-resource";
-import type { TiledResource } from "./tiled-resource";
-import { WalkableChecker } from "./tiled-walkable-checker";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;

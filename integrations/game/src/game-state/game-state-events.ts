@@ -1,4 +1,4 @@
-import type { ActorId } from "../actor/actor";
+import type { ActorId } from "@mp/game-shared";
 
 // oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameStateEvents = {

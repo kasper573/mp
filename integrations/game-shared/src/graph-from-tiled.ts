@@ -1,7 +1,7 @@
+import { Vector } from "@mp/math";
 import { VectorGraph } from "@mp/path-finding";
 import type { Tile } from "@mp/std";
 import type { TiledResource } from "./tiled-resource";
-import { Vector } from "@mp/math";
 import { WalkableChecker } from "./tiled-walkable-checker";
 
 export function graphFromTiled(tiled: TiledResource): VectorGraph<Tile> {

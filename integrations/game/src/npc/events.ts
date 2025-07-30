@@ -1,5 +1,4 @@
-import { ctxGameState } from "../game-state/game-state";
-
+import { ctxGameState } from "@mp/game-shared";
 import { npcRoles } from "@mp/keycloak";
 import { evt } from "../network/event-builder";
 import { ctxRng } from "../rng";

@@ -1,4 +1,5 @@
-import { assert } from "@mp/std";
+import type { Actor, TiledResource } from "@mp/game-shared";
+import { ctxActorSpritesheetLookup } from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   ColorMatrixFilter,
@@ -6,14 +7,12 @@ import {
   createTintFilterMatrix,
   Text,
 } from "@mp/graphics";
-import { TimeSpan } from "@mp/time";
 import { effect } from "@mp/state";
-import type { TiledResource } from "../area/tiled-resource";
-import type { Actor } from "./actor";
+import { assert } from "@mp/std";
+import { TimeSpan } from "@mp/time";
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { ActorSprite } from "./actor-sprite";
-import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
 export class ActorController extends Container {
   private subscriptions: Array<() => void>;

@@ -1,5 +1,6 @@
 import type { AreaId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
+import { ctxActorSpritesheetLookup } from "@mp/game-shared";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import type { Signal } from "@mp/state";
@@ -7,7 +8,6 @@ import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
 import { useContext, useState } from "preact/hooks";
-import { ctxActorSpritesheetLookup } from "../actor/actor-spritesheet-lookup";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,

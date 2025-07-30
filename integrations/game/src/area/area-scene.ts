@@ -1,4 +1,9 @@
 import { VectorSpring } from "@mp/engine";
+import {
+  clientViewDistance,
+  getAreaIdFromObject,
+  type AreaResource,
+} from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   Container,
@@ -15,13 +20,11 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import { ActorController } from "../actor/actor-controller";
-import { clientViewDistance } from "../clients/client-view-distance-settings";
 import { ctxEngine } from "../context/client";
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
-import { getAreaIdFromObject, type AreaResource } from "./area-resource";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 

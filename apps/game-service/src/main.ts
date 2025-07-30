@@ -6,35 +6,35 @@ import {
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import type { GameState, GameStateServer } from "@mp/game/server";
+import type { GameStateServer } from "@mp/game/server";
 import {
   combatBehavior,
-  ctxActorModelLookup,
   ctxArea,
-  ctxGameState,
   ctxGameStateLoader,
   ctxGameStateServer,
   ctxNpcSpawner,
   ctxRng,
-  ctxUserSession,
   deriveClientVisibility,
-  eventWithSessionEncoding,
   gameServerEventRouter,
   GameServiceConfig,
   gameServiceConfigRedisKey,
-  GameStateAreaEntity,
-  loadAreaResource,
   movementBehavior,
   NpcAi,
   NpcSpawner,
-  syncMessageWithRecipientEncoding,
 } from "@mp/game/server";
-import type { GameEventClient } from "@mp/game/shared";
+import type { GameEventClient, GameState } from "@mp/game/shared";
 import {
   clientViewDistance,
+  ctxActorModelLookup,
   ctxGameEventClient,
+  ctxGameState,
   ctxLogger,
+  ctxUserSession,
+  eventWithSessionEncoding,
+  GameStateAreaEntity,
+  loadAreaResource,
   registerEncoderExtensions,
+  syncMessageWithRecipientEncoding,
 } from "@mp/game/shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";

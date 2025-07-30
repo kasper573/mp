@@ -1,9 +1,8 @@
 import type { NpcSpawnId } from "@mp/db/types";
+import type { AreaResource, Npc, NpcSpawn } from "@mp/game-shared";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
 import type { TiledClass, TiledObject } from "@mp/tiled-loader";
-import type { AreaResource } from "../area/area-resource";
-import type { Npc, NpcSpawn } from "./types";
 
 export function deriveNpcSpawnsFromArea(
   area: AreaResource,

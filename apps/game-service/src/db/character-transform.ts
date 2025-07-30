@@ -1,5 +1,5 @@
 import type { characterTable } from "@mp/db";
-import type { ActorModelLookup } from "@mp/game/server";
+import type { ActorModelLookup } from "@mp/game/shared";
 import { Character } from "@mp/game/shared";
 import { cardinalDirections } from "@mp/math";
 import type { Rng } from "@mp/std";

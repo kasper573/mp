@@ -1,23 +1,26 @@
+import type {
+  ActorId,
+  GameState,
+  NpcInstance,
+  NpcInstanceId,
+} from "@mp/game-shared";
+import { assert, type Rng } from "@mp/std";
 import type { TickEvent } from "@mp/time";
 import { TimeSpan, type TickEventHandler } from "@mp/time";
-import { assert, type Rng } from "@mp/std";
-import type { GameState } from "../game-state/game-state";
-import type { ActorId } from "../actor/actor";
 import type { GameStateServer } from "../game-state/game-state-server";
-import type { NpcInstance, NpcInstanceId } from "./types";
 import type { NpcAiTaskContext, Task } from "./ai-tasks/task";
 import { NpcAiCombatMemory } from "./npc-ai-combat-memory";
 
-import { createIdleTask } from "./ai-tasks/idle";
+import type { AreaResource } from "@mp/game-shared";
 import {
   aggressiveHuntFilter,
   createHuntTask,
   defensiveHuntFilter,
   protectiveHuntFilter,
 } from "./ai-tasks/hunt";
-import { createWanderTask } from "./ai-tasks/wander";
+import { createIdleTask } from "./ai-tasks/idle";
 import { createPatrolTask } from "./ai-tasks/patrol";
-import type { AreaResource } from "../area/area-resource";
+import { createWanderTask } from "./ai-tasks/wander";
 
 export class NpcAi {
   private npcTasks = new Map<NpcInstanceId, Task>();

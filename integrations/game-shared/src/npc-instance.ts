@@ -4,9 +4,9 @@ import { computed } from "@mp/state";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
-import { AppearanceTrait } from "../traits/appearance";
-import { CombatTrait } from "../traits/combat";
-import { MovementTrait } from "../traits/movement";
+import { AppearanceTrait } from "./appearance";
+import { CombatTrait } from "./combat";
+import { MovementTrait } from "./movement";
 
 export interface Npc {
   id: NpcId;

@@ -2,10 +2,10 @@ import type { ActorModelId } from "@mp/db/types";
 import type { Texture } from "@mp/graphics";
 import { Assets } from "@mp/graphics";
 import { InjectionContext } from "@mp/ioc";
-import type { ActorAnimationName } from "../traits/appearance";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
 import type { ActorSpritesheetUrls } from "./actor-spritesheet-urls";
+import type { ActorAnimationName } from "./appearance";
 
 export type ActorSpritesheetLookup = ReadonlyMap<
   ActorModelId,

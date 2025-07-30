@@ -1,8 +1,7 @@
+import type { ActorId, NpcInstance } from "@mp/game-shared";
 import type { Tile } from "@mp/std";
 import { assert } from "@mp/std";
-import type { ActorId } from "../../actor/actor";
 import type { NpcAiTaskContext, Task } from "./task";
-import type { NpcInstance } from "../types";
 
 export function createHuntTask(findNewEnemy: HuntFilter): Task {
   return function hunt(context, npc) {

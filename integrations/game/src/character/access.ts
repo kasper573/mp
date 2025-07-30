@@ -1,8 +1,7 @@
 import type { CharacterId } from "@mp/db/types";
-import { ctxGameState } from "../game-state/game-state";
+import type { Character } from "@mp/game-shared";
+import { ctxGameState, ctxUserSession } from "@mp/game-shared";
 import type { GameEventRouterContext } from "../network/event-builder";
-import { ctxUserSession } from "../user/session";
-import type { Character } from "./types";
 
 export function accessCharacter(
   ctx: GameEventRouterContext,

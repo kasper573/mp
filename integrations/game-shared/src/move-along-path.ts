@@ -1,7 +1,7 @@
 import { Vector } from "@mp/math";
-import type { TimeSpan } from "@mp/time";
 import type { Tile } from "@mp/std";
-import type { MovementTrait } from "../traits/movement";
+import type { TimeSpan } from "@mp/time";
+import type { MovementTrait } from "./movement";
 
 /**
  * Mutates the given target so that it walks along its current path.

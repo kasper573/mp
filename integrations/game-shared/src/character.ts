@@ -3,9 +3,9 @@ import type { UserId } from "@mp/oauth";
 import { computed } from "@mp/state";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
-import { AppearanceTrait } from "../traits/appearance";
-import { CombatTrait } from "../traits/combat";
-import { MovementTrait } from "../traits/movement";
+import { AppearanceTrait } from "./appearance";
+import { CombatTrait } from "./combat";
+import { MovementTrait } from "./movement";
 
 type CharacterProgression = typeof CharacterProgression.$infer;
 

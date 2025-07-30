@@ -1,25 +1,25 @@
+import { dynamicLayerName } from "@mp/game-shared";
 import type { Container, Size, Texture } from "@mp/graphics";
 import { Assets, FpsIndicator, Spritesheet } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
-import { useState } from "preact/hooks";
+import { Vector } from "@mp/math";
+import { skipToken, useQuery, useQuerySignal } from "@mp/query";
+import { useSignal, useSignalEffect } from "@mp/state/react";
+import type { Pixel, Tile } from "@mp/std";
+import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
 import type { TiledSpritesheet } from "@mp/tiled-renderer";
 import {
   createTiledTextureLookup,
   createTilesetSpritesheetData,
   TiledRenderer,
 } from "@mp/tiled-renderer";
-import { dynamicLayerName } from "./area-resource";
-import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
-import type { Pixel, Tile } from "@mp/std";
-import { Vector } from "@mp/math";
 import { Checkbox, Select } from "@mp/ui";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import { useState } from "preact/hooks";
 import {
   generateRepeatedTileLayer,
   generateTileset,
   generateTilesetTile,
 } from "./test-tile-map-generator";
-import { skipToken, useQuery, useQuerySignal } from "@mp/query";
 import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
 
 export function TileRendererTester() {

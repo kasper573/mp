@@ -8,16 +8,20 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type { SyncMessageWithRecipient, UserSession } from "@mp/game/server";
+import { ctxTokenResolver } from "@mp/game/server";
+import type {
+  GameEventClient,
+  SyncMessageWithRecipient,
+  UserSession,
+} from "@mp/game/shared";
 import {
-  ctxTokenResolver,
+  ctxGameEventClient,
   ctxUserSession,
   eventWithSessionEncoding,
+  registerEncoderExtensions,
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
-} from "@mp/game/server";
-import type { GameEventClient } from "@mp/game/shared";
-import { ctxGameEventClient, registerEncoderExtensions } from "@mp/game/shared";
+} from "@mp/game/shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";

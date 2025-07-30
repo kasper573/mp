@@ -1,24 +1,14 @@
 {
-  "name": "@mp/game",
+  "name": "@mp/game-shared",
   "version": "0.0.0",
   "sideEffects": false,
   "type": "module",
   "license": "MIT",
   "exports": {
-    "./client": {
-      "types": "./src/package.client.ts",
-      "import": "./src/package.client.ts",
-      "require": "./src/package.client.ts"
-    },
-    "./server": {
-      "types": "./src/package.server.ts",
-      "import": "./src/package.server.ts",
-      "require": "./src/package.server.ts"
-    },
-    "./shared": {
-      "types": "./src/package.shared.ts",
-      "import": "./src/package.shared.ts",
-      "require": "./src/package.shared.ts"
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
     }
   },
   "dependencies": {

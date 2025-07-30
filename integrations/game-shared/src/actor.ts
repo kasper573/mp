@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
-import type { Character } from "../character/types";
-import type { NpcInstance, NpcInstanceId } from "../npc/types";
+import type { Character } from "./character";
+import type { NpcInstance, NpcInstanceId } from "./npc-instance";
 
 export type ActorId = NpcInstanceId | CharacterId;
 

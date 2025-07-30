@@ -1,13 +1,13 @@
-import type { CardinalDirection } from "@mp/math";
-import type { TiledSpritesheetData } from "@mp/tiled-renderer";
 import type {
   Size,
-  Texture,
-  SpritesheetFrameData,
   SpritesheetData,
+  SpritesheetFrameData,
+  Texture,
 } from "@mp/graphics";
 import { Spritesheet } from "@mp/graphics";
-import type { ActorAnimationName } from "../traits/appearance";
+import type { CardinalDirection } from "@mp/math";
+import type { TiledSpritesheetData } from "@mp/tiled-renderer";
+import type { ActorAnimationName } from "./appearance";
 
 export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;
 

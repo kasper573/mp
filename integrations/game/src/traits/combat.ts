@@ -1,29 +1,11 @@
-import { type Vector, type Rect, clamp } from "@mp/math";
-import type { Tile, TimesPerSecond } from "@mp/std";
-import { TimeSpan, type TickEventHandler } from "@mp/time";
-import type { GameState } from "../game-state/game-state";
+import type { Actor, AreaResource, GameState } from "@mp/game-shared";
+import type { Vector } from "@mp/math";
+import { clamp } from "@mp/math";
+import type { Tile } from "@mp/std";
+import type { TickEventHandler } from "@mp/time";
+import { TimeSpan } from "@mp/time";
 import type { GameStateServer } from "../game-state/game-state-server";
-import type { ActorId, Actor } from "../actor/actor";
 import { findPathForSubject } from "./movement";
-import { defineSyncComponent } from "@mp/sync";
-import type { AreaResource } from "../area/area-resource";
-
-export type CombatTrait = typeof CombatTrait.$infer;
-
-export const CombatTrait = defineSyncComponent((builder) =>
-  builder
-    /**
-     * Relative to the actor's position.
-     */
-    .add<Rect<Tile>>()("hitBox")
-    .add<number>()("health")
-    .add<number>()("maxHealth")
-    .add<number>()("attackDamage")
-    .add<TimesPerSecond>()("attackSpeed")
-    .add<Tile>()("attackRange")
-    .add<ActorId | undefined>()("attackTargetId")
-    .add<TimeSpan | undefined>()("lastAttack"),
-);
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
 

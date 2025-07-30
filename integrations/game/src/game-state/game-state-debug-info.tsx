@@ -1,6 +1,6 @@
+import type { TiledResource } from "@mp/game-shared";
 import type { TimeSpan } from "@mp/time";
 import { useEffect, useState } from "preact/hooks";
-import type { TiledResource } from "../area/tiled-resource";
 import { ctxEngine } from "../context/client";
 import { ioc } from "../context/ioc";
 import { ctxGameStateClient } from "./game-state-client";

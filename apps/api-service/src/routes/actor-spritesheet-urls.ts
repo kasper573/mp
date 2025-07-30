@@ -1,5 +1,5 @@
 import type { ActorModelId } from "@mp/db/types";
-import type { ActorAnimationName, ActorSpritesheetUrls } from "@mp/game/server";
+import type { ActorAnimationName, ActorSpritesheetUrls } from "@mp/game/shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { UrlString } from "@mp/std";
 import path from "path";

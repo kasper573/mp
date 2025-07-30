@@ -1,15 +1,18 @@
-import { TimeSpan } from "@mp/time";
 import type { FrameCallbackOptions } from "@mp/engine";
-import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
+import {
+  moveAlongPath,
+  type Actor,
+  type ActorId,
+  type GameState,
+} from "@mp/game-shared";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import type { Result } from "@mp/std";
 import { err, ok, typedKeys } from "@mp/std";
-import { moveAlongPath } from "../area/move-along-path";
-import type { GameStateEvents } from "./game-state-events";
-import type { GameState } from "./game-state";
-import type { Actor, ActorId } from "../actor/actor";
+import type { EventAccessFn, Patch } from "@mp/sync";
+import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
+import { TimeSpan } from "@mp/time";
 import type { MovementTrait } from "../traits/movement";
+import type { GameStateEvents } from "./game-state-events";
 
 export class OptimisticGameState implements GameState {
   area: GameState["area"] = new SyncMap();

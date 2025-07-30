@@ -1,9 +1,9 @@
 import type { CharacterId } from "@mp/db/types";
+import type { ActorId } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
 import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { ActorId } from "../actor/actor";
 import type { GameEventClient } from "../context/shared";
 
 export class GameActions {

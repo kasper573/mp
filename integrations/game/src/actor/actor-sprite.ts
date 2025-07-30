@@ -1,8 +1,8 @@
-import type { TimesPerSecond } from "@mp/std";
-import { TimeSpan } from "@mp/time";
+import type { ActorAnimationName } from "@mp/game-shared";
 import type { Animation } from "@mp/graphics";
 import { AnimationController } from "@mp/graphics";
-import type { ActorAnimationName } from "../traits/appearance";
+import type { TimesPerSecond } from "@mp/std";
+import { TimeSpan } from "@mp/time";
 
 export class ActorSprite extends AnimationController<ActorAnimationName> {
   attackSpeed = 1 as TimesPerSecond;

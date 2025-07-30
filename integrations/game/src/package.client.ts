@@ -1,7 +1,6 @@
 export * from "./actor/actor-sprite-tester";
 export * from "./area/area-debug-graphics";
 export * from "./area/area-scene";
-export * from "./area/load-area-resource";
 export * from "./area/tile-renderer-tester";
 export * from "./clients/game-asset-loader";
 export * from "./clients/game-client";
@@ -10,4 +9,3 @@ export * from "./context/client";
 export * from "./context/ioc";
 export * from "./game-state/game-state-client";
 export * from "./game-state/optimistic-game-state";
-export type * from "./network/root-event-router";

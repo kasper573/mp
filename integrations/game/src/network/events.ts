@@ -1,13 +1,11 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
+import { ctxGameState, ctxLogger, ctxUserSession } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
 import { ctxArea } from "../context/server";
-import { ctxLogger } from "../context/shared";
-import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { roles } from "../user/auth";
-import { ctxUserSession } from "../user/session";
 import { evt } from "./event-builder";
 
 export type NetworkRouter = typeof networkEventRouter;

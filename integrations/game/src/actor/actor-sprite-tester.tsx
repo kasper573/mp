@@ -1,5 +1,11 @@
 import type { ActorModelId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
+import type { ActorSpritesheetLookup } from "@mp/game-shared";
+import {
+  actorAnimationNames,
+  ctxActorSpritesheetLookup,
+  type ActorAnimationName,
+} from "@mp/game-shared";
 import { Container, Text } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import {
@@ -14,14 +20,8 @@ import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ctxEngine } from "../context/client";
 import { ioc } from "../context/ioc";
-import {
-  actorAnimationNames,
-  type ActorAnimationName,
-} from "../traits/appearance";
 import { useObjectSignal } from "../use-object-signal";
 import { ActorSprite } from "./actor-sprite";
-import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
-import { ctxActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
 export function ActorSpriteTester({
   spritesheets,

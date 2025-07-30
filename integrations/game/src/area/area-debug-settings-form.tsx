@@ -1,33 +1,13 @@
 import { PropertySignal, type Signal } from "@mp/state";
-import { assert } from "@mp/std";
-import { Button, Checkbox, Select } from "@mp/ui";
-import { ioc } from "../context/ioc";
-import { ctxGameEventClient } from "../context/shared";
-import { ctxGameStateClient } from "../game-state/game-state-client";
+import { Checkbox, Select } from "@mp/ui";
 
 export interface AreaDebugSettingsFormProps {
   signal: Signal<AreaDebugSettings>;
 }
 
 export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
-  const events = ioc.get(ctxGameEventClient);
-  const client = ioc.get(ctxGameStateClient);
   return (
     <>
-      <div>
-        <Button onClick={() => void events.npc.spawnRandomNpc()}>
-          Spawn random NPC
-        </Button>
-        <Button
-          onClick={() =>
-            void events.character.kill({
-              targetId: assert(client.characterId.value),
-            })
-          }
-        >
-          Die
-        </Button>
-      </div>
       <div>
         Visible Graph lines:{" "}
         <Select

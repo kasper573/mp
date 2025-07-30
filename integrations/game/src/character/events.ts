@@ -1,10 +1,10 @@
 import type { CharacterId } from "@mp/db/types";
+import type { ActorId } from "@mp/game-shared";
+import { ctxGameState } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { Vector, type VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { ActorId } from "../actor/actor";
-import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { evt } from "../network/event-builder";

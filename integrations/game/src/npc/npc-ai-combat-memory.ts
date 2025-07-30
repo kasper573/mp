@@ -1,5 +1,5 @@
+import type { ActorId } from "@mp/game-shared";
 import type { Branded } from "@mp/std";
-import type { ActorId } from "../actor/actor";
 
 /**
  * Combats that a single npc has observed

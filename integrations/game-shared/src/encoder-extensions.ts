@@ -3,11 +3,11 @@ import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
 import { SyncMap } from "@mp/sync";
-import type { CharacterInit } from "../character/types";
-import { Character } from "../character/types";
-import { GameStateAreaEntity } from "../game-state/game-state";
-import type { NpcInstanceInit } from "../npc/types";
-import { NpcInstance } from "../npc/types";
+import type { CharacterInit } from "./character";
+import { Character } from "./character";
+import { GameStateAreaEntity } from "./game-state";
+import type { NpcInstanceInit } from "./npc-instance";
+import { NpcInstance } from "./npc-instance";
 
 let hasRegistered = false;
 

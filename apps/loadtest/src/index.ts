@@ -4,11 +4,9 @@ import {
   createProxyEventInvoker,
   eventMessageEncoding,
 } from "@mp/event-router";
-import { GameStateClient, loadAreaResource } from "@mp/game/client";
-import {
-  registerEncoderExtensions,
-  type GameEventClient,
-} from "@mp/game/shared";
+import { GameStateClient } from "@mp/game/client";
+import type { GameEventClient } from "@mp/game/shared";
+import { loadAreaResource, registerEncoderExtensions } from "@mp/game/shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";
