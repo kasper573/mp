@@ -7,8 +7,8 @@ import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
+import { sendCharacterToArea } from "../movement";
 import { evt } from "../network/event-builder";
-import { sendCharacterToArea } from "../traits/movement";
 import { roles } from "../user/auth";
 import { accessCharacter } from "./access";
 

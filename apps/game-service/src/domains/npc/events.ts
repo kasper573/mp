@@ -1,7 +1,7 @@
 import { ctxGameState } from "@mp/game-shared";
 import { npcRoles } from "@mp/keycloak";
+import { ctxRng } from "../../context";
 import { evt } from "../network/event-builder";
-import { ctxRng } from "../rng";
 import { roles } from "../user/auth";
 import { ctxNpcSpawner } from "./npc-spawner";
 
