@@ -37,20 +37,23 @@ import {
 import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
 import "dotenv/config";
-import { ctxArea, ctxGameEventClient, ctxRng } from "./context";
+import {
+  ctxArea,
+  ctxGameEventClient,
+  ctxGameStateLoader,
+  ctxGameStateServer,
+  ctxNpcSpawner,
+  ctxRng,
+} from "./context";
 import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
-import {
-  createGameStateLoader,
-  ctxGameStateLoader,
-} from "./etc/game-state-loader";
+import { createGameStateLoader } from "./etc/game-state-loader";
 import type { GameStateServer } from "./etc/game-state-server";
-import { ctxGameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcAi } from "./etc/npc/npc-ai";
-import { ctxNpcSpawner, NpcSpawner } from "./etc/npc/npc-spawner";
+import { NpcSpawner } from "./etc/npc/npc-spawner";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";

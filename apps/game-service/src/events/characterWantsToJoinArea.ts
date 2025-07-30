@@ -1,9 +1,7 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
 import { ctxGameState, ctxLogger } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
-import { ctxArea } from "../context";
-import { ctxGameStateLoader } from "../etc/game-state-loader";
-import { ctxGameStateServer } from "../etc/game-state-server";
+import { ctxArea, ctxGameStateLoader, ctxGameStateServer } from "../context";
 import { evt, roles } from "../package";
 
 export const characterWantsToJoinArea = evt.event

@@ -8,7 +8,6 @@ import type {
   Npc,
   NpcSpawn,
 } from "@mp/game-shared";
-import { InjectionContext } from "@mp/ioc";
 import type { Vector } from "@mp/math";
 import type { Rng, Tile } from "@mp/std";
 import {
@@ -95,6 +94,3 @@ export interface GameStateLoader {
   ): Promise<Character>;
   saveCharacterToDb(character: Character): Promise<void>;
 }
-
-export const ctxGameStateLoader =
-  InjectionContext.new<GameStateLoader>("GameStateLoader");

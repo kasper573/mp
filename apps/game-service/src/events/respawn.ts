@@ -1,7 +1,7 @@
 import type { CharacterId } from "@mp/db/types";
 import { characterRoles } from "@mp/keycloak";
+import { ctxGameStateLoader } from "../context";
 import { accessCharacter } from "../etc/access-character";
-import { ctxGameStateLoader } from "../etc/game-state-loader";
 import { sendCharacterToArea } from "../etc/movement-behavior";
 import { evt, roles } from "../package";
 

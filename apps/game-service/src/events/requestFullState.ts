@@ -1,6 +1,6 @@
 import { ctxUserSession } from "@mp/game-shared";
 import { assert } from "@mp/std";
-import { ctxGameStateServer } from "../etc/game-state-server";
+import { ctxGameStateServer } from "../context";
 import { evt } from "../package";
 
 export const requestFullState = evt.event.handler(({ ctx }) => {

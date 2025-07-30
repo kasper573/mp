@@ -8,7 +8,6 @@ import type {
   NpcSpawn,
 } from "@mp/game-shared";
 import { NpcInstance } from "@mp/game-shared";
-import { InjectionContext } from "@mp/ioc";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
@@ -104,8 +103,6 @@ export class NpcSpawner {
     });
   }
 }
-
-export const ctxNpcSpawner = InjectionContext.new<NpcSpawner>("NpcSpawner");
 
 const npcTypeColorIndication: Record<NpcType, number> = {
   aggressive: 0xff_00_00,
