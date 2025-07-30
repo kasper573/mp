@@ -8,7 +8,11 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type { GameEventClient, UserSession } from "@mp/game/server";
+import type {
+  GameEventClient,
+  SyncMessageWithRecipient,
+  UserSession,
+} from "@mp/game/server";
 import {
   ctxGameEventClient,
   ctxTokenResolver,
@@ -40,7 +44,6 @@ import "dotenv/config";
 import express from "express";
 import type { IncomingMessage } from "http";
 import http from "http";
-import type { SyncMessageWithRecipient } from "../../game/src/network/encoding";
 import { saveOnlineCharacters } from "./db-operations";
 import { opt } from "./options";
 import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
