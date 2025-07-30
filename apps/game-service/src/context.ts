@@ -3,7 +3,7 @@ import type { AreaResource } from "@mp/game-shared";
 import { InjectionContext } from "@mp/ioc";
 import type { TokenResolver } from "@mp/oauth/server";
 import type { Rng } from "@mp/std";
-import type { GameServerEventRouter } from "./router";
+import type { GameServerEventRouter } from "./event-router";
 
 export const ctxArea = InjectionContext.new<AreaResource>("Area");
 

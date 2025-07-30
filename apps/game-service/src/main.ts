@@ -51,11 +51,14 @@ import { ctxGameStateServer } from "./domains/game-state-server";
 import { movementBehavior } from "./domains/movement";
 import { NpcAi } from "./domains/npc/npc-ai";
 import { ctxNpcSpawner, NpcSpawner } from "./domains/npc/npc-spawner";
+import {
+  gameServerEventRouter,
+  type GameServerEventRouter,
+} from "./event-router";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
-import { gameServerEventRouter, type GameServerEventRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
