@@ -24,6 +24,7 @@
     "@mp/graphics": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/keycloak": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/query": "workspace:*",

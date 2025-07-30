@@ -34,5 +34,4 @@ export * from "./traits/combat";
 export * from "./traits/movement";
 export * from "./user/auth";
 export * from "./user/client-visibility";
-export * from "./user/roles";
 export * from "./user/session";

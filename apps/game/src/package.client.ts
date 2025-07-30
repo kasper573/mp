@@ -19,4 +19,3 @@ export * from "./game-state/optimistic-game-state";
 export * from "./network/encoder-extensions";
 export * from "./network/game-event-client";
 export type * from "./network/root-event-router";
-export * from "./user/roles";

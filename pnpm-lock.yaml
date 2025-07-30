@@ -92,6 +92,9 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -168,6 +171,9 @@ importers:
       '@mp/gateway':
         specifier: workspace:*
         version: link:../gateway
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -259,6 +265,9 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -399,6 +408,9 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -534,9 +546,9 @@ importers:
       '@keycloak/keycloak-admin-client':
         specifier: 26.1.2
         version: 26.1.2
-      '@mp/game':
+      '@mp/auth':
         specifier: workspace:*
-        version: link:../../apps/game
+        version: link:../../libraries/auth
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger

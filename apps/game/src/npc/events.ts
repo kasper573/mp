@@ -1,10 +1,10 @@
 import { ctxGameState } from "../game-state/game-state";
 
-import { ctxRng } from "../rng";
-import { npcRoles } from "../user/roles";
-import { ctxNpcSpawner } from "./npc-spawner";
-import { roles } from "../user/auth";
+import { npcRoles } from "@mp/keycloak";
 import { evt } from "../network/event-builder";
+import { ctxRng } from "../rng";
+import { roles } from "../user/auth";
+import { ctxNpcSpawner } from "./npc-spawner";
 
 export type NpcEventRouter = typeof npcEventRouter;
 export const npcEventRouter = evt.router({

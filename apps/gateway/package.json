@@ -22,6 +22,7 @@
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
+    "@mp/keycloak": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",

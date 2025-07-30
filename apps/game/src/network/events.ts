@@ -1,3 +1,4 @@
+import { gatewayRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
 import type { AreaId } from "../area/area-id";
 import type { CharacterId } from "../character/types";
@@ -6,7 +7,6 @@ import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { roles } from "../user/auth";
-import { gatewayRoles } from "../user/roles";
 import { ctxUserSession } from "../user/session";
 import { evt } from "./event-builder";
 

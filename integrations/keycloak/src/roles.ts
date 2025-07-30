@@ -1,14 +1,27 @@
-import {
-  characterRoles,
-  npcRoles,
-  systemRoles,
-  gatewayRoles,
-} from "@mp/game/server";
+import { defineRoles } from "@mp/auth";
 
-/**
- * This is the single source of truth of groups and roles.
- * Changing this will provision updates in keycloak when pushed to production.
- */
+// This is the single source of truth of groups and roles.
+// Changing this will provision updates in keycloak when pushed to production.
+
+export const systemRoles = defineRoles("sys", [
+  "changeSettings",
+  "useDevTools",
+]);
+
+export const gatewayRoles = defineRoles("gateway", [
+  "spectate",
+  "join",
+  "gameServiceBroadcast",
+]);
+
+export const characterRoles = defineRoles("character", [
+  "move",
+  "attack",
+  "kill",
+  "respawn",
+]);
+
+export const npcRoles = defineRoles("npc", ["spawnRandom"]);
 
 export const playerGroup = "player";
 

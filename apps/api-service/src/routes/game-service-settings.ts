@@ -1,5 +1,6 @@
-import { GameServiceConfig, systemRoles } from "@mp/game/server";
+import { GameServiceConfig } from "@mp/game/server";
 import { InjectionContext } from "@mp/ioc";
+import { systemRoles } from "@mp/keycloak";
 import type { Signal } from "@mp/state";
 import { roles } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";

@@ -1,7 +1,8 @@
+import { ctxAuthClient, ioc } from "@mp/game/client";
+import { gatewayRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
-import { useRouterState } from "@tanstack/react-router";
 import { Button, LinearProgress } from "@mp/ui";
-import { ctxAuthClient, ioc, systemRoles, gatewayRoles } from "@mp/game/client";
+import { useRouterState } from "@tanstack/react-router";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";

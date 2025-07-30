@@ -11,17 +11,16 @@ import {
 } from "@mp/event-router";
 import type { AreaId, GameEventClient, UserSession } from "@mp/game/server";
 import {
-  characterRoles,
   ctxGameEventClient,
   ctxTokenResolver,
   ctxUserSession,
   eventWithSessionEncoding,
-  gatewayRoles,
   registerEncoderExtensions,
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
 } from "@mp/game/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
+import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
 import { computed, effect, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
@@ -79,10 +78,7 @@ db.$client.on("error", (err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,
-  bypassUserRoles: [
-    ...Object.values(gatewayRoles),
-    ...Object.values(characterRoles),
-  ],
+  bypassUserRoles: playerRoles,
 });
 
 const wss = new WebSocketServer({

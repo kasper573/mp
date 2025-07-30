@@ -1,4 +1,4 @@
-import { systemRoles } from "@mp/game/server";
+import { systemRoles } from "@mp/keycloak";
 import { roles } from "./integrations/auth";
 import { rpc } from "./integrations/trpc";
 import { opt } from "./options";

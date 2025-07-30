@@ -1,5 +1,5 @@
 import { characterTable, eq } from "@mp/db";
-import { gatewayRoles } from "@mp/game/server";
+import { gatewayRoles } from "@mp/keycloak";
 import { roles } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
 import { ctxDbClient } from "../ioc";

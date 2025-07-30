@@ -1,16 +1,16 @@
+import { characterRoles } from "@mp/keycloak";
 import { Vector, type VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import { roles } from "../user/auth";
-import { characterRoles } from "../user/roles";
-import type { CharacterId } from "./types";
-import { accessCharacter } from "./access";
 import type { ActorId } from "../actor/actor";
 import { ctxGameState } from "../game-state/game-state";
+import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
 import { evt } from "../network/event-builder";
-import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { sendCharacterToArea } from "../traits/movement";
+import { roles } from "../user/auth";
+import { accessCharacter } from "./access";
+import type { CharacterId } from "./types";
 
 export type CharacterRouter = typeof characterRouter;
 export const characterRouter = evt.router({
