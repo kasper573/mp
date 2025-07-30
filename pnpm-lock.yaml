@@ -332,7 +332,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -426,7 +426,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@tanstack/router-plugin':
         specifier: 1.126.2
         version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -476,30 +476,18 @@ importers:
       '@mp/db':
         specifier: workspace:*
         version: link:../db
-      '@mp/engine':
-        specifier: workspace:*
-        version: link:../../libraries/engine
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/game-client':
-        specifier: workspace:*
-        version: link:../game-client
       '@mp/game-shared':
         specifier: workspace:*
         version: link:../game-shared
-      '@mp/graphics':
-        specifier: workspace:*
-        version: link:../../libraries/graphics
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
       '@mp/keycloak':
         specifier: workspace:*
         version: link:../keycloak
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
@@ -509,45 +497,21 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
-      '@mp/query':
-        specifier: workspace:*
-        version: link:../../libraries/query
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
-      '@mp/style':
-        specifier: workspace:*
-        version: link:../../libraries/style
       '@mp/sync':
         specifier: workspace:*
         version: link:../../libraries/sync
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../../libraries/tiled-loader
-      '@mp/tiled-renderer':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-renderer
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
-      '@mp/ui':
-        specifier: workspace:*
-        version: link:../../libraries/ui
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
-      '@mp/ws':
-        specifier: workspace:*
-        version: link:../../libraries/ws
-      preact:
-        specifier: 'catalog:'
-        version: 10.26.9
-      uniqolor:
-        specifier: 1.1.1
-        version: 1.1.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -561,9 +525,6 @@ importers:
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
-      '@mp/event-router':
-        specifier: workspace:*
-        version: link:../../libraries/event-router
       '@mp/game':
         specifier: workspace:*
         version: link:../game
@@ -576,9 +537,6 @@ importers:
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
-      '@mp/keycloak':
-        specifier: workspace:*
-        version: link:../keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -618,9 +576,6 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../libraries/ui
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
         version: link:../../libraries/ws
