@@ -20,8 +20,8 @@ import {
   ctxTokenResolver,
 } from "./ioc";
 import { opt } from "./options";
+import { ctxGameServiceConfig } from "./procedures/game-service-settings";
 import { apiRouter } from "./router";
-import { ctxGameServiceConfig } from "./routes/game-service-settings";
 
 // Note that this file is an entrypoint and should not have any exports
 
