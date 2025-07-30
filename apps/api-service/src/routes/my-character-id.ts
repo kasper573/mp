@@ -7,8 +7,8 @@ import { auth } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
 import { ctxDbClient } from "../ioc";
 
-import type { UserIdentity } from "@mp/auth";
 import type { InjectionContainer } from "@mp/ioc";
+import type { UserIdentity } from "@mp/oauth";
 import { getDefaultSpawnPoint } from "./default-spawn-point";
 
 export const myCharacterId = rpc.procedure

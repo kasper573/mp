@@ -1,5 +1,3 @@
-import type { AccessToken, UserId } from "@mp/auth";
-import { createTokenResolver } from "@mp/auth/server";
 import { createDbClient } from "@mp/db";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
@@ -22,6 +20,8 @@ import {
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
+import type { AccessToken, UserId } from "@mp/oauth";
+import { createTokenResolver } from "@mp/oauth/server";
 import { computed, effect, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
 import { arrayShallowEquals, createShortId, debounce, dedupe } from "@mp/std";

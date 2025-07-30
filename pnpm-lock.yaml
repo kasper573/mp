@@ -77,9 +77,6 @@ importers:
 
   apps/api-service:
     dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/db':
         specifier: workspace:*
         version: link:../../integrations/db
@@ -101,6 +98,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/redis':
         specifier: workspace:*
         version: link:../../integrations/redis
@@ -153,9 +153,6 @@ importers:
       '@mp/api-service':
         specifier: workspace:*
         version: link:../api-service
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
@@ -177,6 +174,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/query':
         specifier: workspace:*
         version: link:../../libraries/query
@@ -247,9 +247,6 @@ importers:
 
   apps/game:
     dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/encoding':
         specifier: workspace:*
         version: link:../../libraries/encoding
@@ -274,6 +271,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
@@ -390,9 +390,6 @@ importers:
 
   apps/gateway:
     dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/db':
         specifier: workspace:*
         version: link:../../integrations/db
@@ -414,6 +411,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state
@@ -457,9 +457,6 @@ importers:
       '@mp/api-service':
         specifier: workspace:*
         version: link:../api-service
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
@@ -472,6 +469,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state
@@ -509,9 +509,6 @@ importers:
 
   integrations/db:
     dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/game':
         specifier: workspace:*
         version: link:../../apps/game
@@ -521,6 +518,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
@@ -546,12 +546,12 @@ importers:
       '@keycloak/keycloak-admin-client':
         specifier: 26.1.2
         version: 26.1.2
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std

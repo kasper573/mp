@@ -1,8 +1,8 @@
-import type { AuthClient } from "@mp/auth/client";
-import type { TokenResolver } from "@mp/auth/server";
 import type { Engine } from "@mp/engine";
 import { InjectionContext } from "@mp/ioc";
 import type { Logger } from "@mp/logger";
+import type { AuthClient } from "@mp/oauth/client";
+import type { TokenResolver } from "@mp/oauth/server";
 import type { AreaResource } from "../area/area-resource";
 
 export const ctxEngine = InjectionContext.new<Engine>("Engine");

@@ -1,5 +1,5 @@
-import { authAlgorithms } from "@mp/auth/server";
 import { assertEnv } from "@mp/env";
+import { authAlgorithms } from "@mp/oauth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;

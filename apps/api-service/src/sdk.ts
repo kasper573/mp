@@ -1,6 +1,6 @@
 // This is the file that represents what the @mp/api-service/sdk package exports.
 // This module should only ever export the trpc client sdk.
-import type { AccessToken } from "@mp/auth";
+import type { AccessToken } from "@mp/oauth";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import { createTRPCContext } from "@trpc/tanstack-react-query";
 import type { ApiRpcRouter } from "./router";

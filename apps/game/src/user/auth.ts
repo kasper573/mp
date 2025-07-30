@@ -1,4 +1,4 @@
-import type { RoleDefinition } from "@mp/auth";
+import type { RoleDefinition } from "@mp/oauth";
 import { evt } from "../network/event-builder";
 
 import { ctxUserSession } from "./session";

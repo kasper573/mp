@@ -1,4 +1,4 @@
-import { defineRoles } from "@mp/auth";
+import { defineRoles } from "@mp/oauth";
 
 // This is the single source of truth of groups and roles.
 // Changing this will provision updates in keycloak when pushed to production.

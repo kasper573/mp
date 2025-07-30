@@ -1,7 +1,7 @@
-import type { ComponentType, ComponentChildren } from "preact";
-import type { RoleDefinition } from "@mp/auth";
-import { ioc, ctxAuthClient } from "@mp/game/client";
+import { ctxAuthClient, ioc } from "@mp/game/client";
+import type { RoleDefinition } from "@mp/oauth";
 import { useComputed } from "@mp/state/react";
+import type { ComponentChildren, ComponentType } from "preact";
 import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {

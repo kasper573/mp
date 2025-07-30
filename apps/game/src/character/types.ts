@@ -1,10 +1,10 @@
+import type { UserId } from "@mp/oauth";
 import type { Branded } from "@mp/std";
-import type { UserId } from "@mp/auth";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
-import { MovementTrait } from "../traits/movement";
 import { AppearanceTrait } from "../traits/appearance";
 import { CombatTrait } from "../traits/combat";
+import { MovementTrait } from "../traits/movement";
 
 import { computed } from "@mp/state";
 

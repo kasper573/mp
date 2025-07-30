@@ -1,8 +1,8 @@
 import {
   createProxyEventInvoker,
-  type ProxyEventInvoker,
-  type MergeEventRouterNodes,
   eventMessageEncoding,
+  type MergeEventRouterNodes,
+  type ProxyEventInvoker,
 } from "@mp/event-router";
 import {
   ctxAuthClient,
@@ -12,14 +12,14 @@ import {
   ioc,
   type GameServerEventRouter,
 } from "@mp/game/client";
-import { WebSocket } from "@mp/ws/client";
 import type { GatewayRouter } from "@mp/gateway";
+import { WebSocket } from "@mp/ws/client";
 
-import { env } from "../env";
-import { useEffect, useMemo } from "preact/hooks";
-import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import type { Logger } from "@mp/logger";
-import type { AuthClient } from "@mp/auth/client";
+import type { AuthClient } from "@mp/oauth/client";
+import { useEffect, useMemo } from "preact/hooks";
+import { env } from "../env";
+import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 
 export type ComposedGameEventClient = ProxyEventInvoker<
   MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>

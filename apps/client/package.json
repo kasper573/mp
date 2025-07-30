@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/auth": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/env": "workspace:*",

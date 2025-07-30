@@ -1,10 +1,10 @@
-import type { RoleDefinition, UserId } from "@mp/auth";
+import type { RoleDefinition, UserId } from "@mp/oauth";
 import type { ApiContext } from "./trpc";
 import { rpc } from "./trpc";
 
 import { ctxTokenResolver } from "@mp/game/server";
-import { ctxAccessToken } from "../ioc";
 import { TRPCError } from "@trpc/server";
+import { ctxAccessToken } from "../ioc";
 
 export function auth() {
   return rpc.middleware(async ({ ctx, next }) => {

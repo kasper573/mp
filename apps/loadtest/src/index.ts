@@ -1,6 +1,5 @@
 // oxlint-disable no-await-in-loop
 import { createApiClient } from "@mp/api-service/sdk";
-import { createBypassUser } from "@mp/auth";
 import type { GameEventClient } from "@mp/game/client";
 import {
   GameStateClient,
@@ -8,6 +7,7 @@ import {
   registerEncoderExtensions,
 } from "@mp/game/client";
 import { createConsoleLogger } from "@mp/logger";
+import { createBypassUser } from "@mp/oauth";
 import { Rng } from "@mp/std";
 import { WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";

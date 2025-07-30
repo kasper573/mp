@@ -1,11 +1,11 @@
-import type { UserIdentity } from "@mp/auth";
+import type { UserIdentity } from "@mp/oauth";
+import type { ReadonlySignal } from "@mp/state";
 import type { Faro, FaroUser } from "@mp/telemetry/faro";
 import {
   getWebInstrumentations,
   initializeFaro,
   TracingInstrumentation,
 } from "@mp/telemetry/faro";
-import type { ReadonlySignal } from "@mp/state";
 import { env } from "../env";
 
 export function createFaroClient() {

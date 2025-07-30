@@ -1,4 +1,3 @@
-import type { UserId } from "@mp/auth";
 import type {
   ActorModelId,
   AreaId,
@@ -7,19 +6,20 @@ import type {
   NpcSpawnId,
 } from "@mp/game/server";
 import { npcTypes } from "@mp/game/server";
+import type { UserId } from "@mp/oauth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { relations } from "drizzle-orm";
 import {
-  varchar,
+  boolean,
+  integer,
+  pgTable,
   real,
   uuid,
-  pgTable,
-  integer,
-  boolean,
+  varchar,
 } from "drizzle-orm/pg-core";
+import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
-import { path } from "./types/path";
 
 export const areaId = () => varchar({ length: 60 }).$type<AreaId>();
 

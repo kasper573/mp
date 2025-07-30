@@ -1,5 +1,4 @@
 import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
-import { createAuthClient } from "@mp/auth/client";
 import {
   ctxAuthClient,
   ctxLogger,
@@ -7,6 +6,7 @@ import {
   registerEncoderExtensions,
 } from "@mp/game/client";
 import { createConsoleLogger } from "@mp/logger";
+import { createAuthClient } from "@mp/oauth/client";
 import {
   QueryClient,
   QueryClientProvider,

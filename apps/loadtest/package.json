@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/auth": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/gateway": "workspace:*",
