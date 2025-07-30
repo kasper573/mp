@@ -1,4 +1,4 @@
-import { GameServiceConfig } from "@mp/game/server";
+import { GameServiceConfig } from "@mp/game/shared";
 import { InjectionContext } from "@mp/ioc";
 import { systemRoles } from "@mp/keycloak";
 import type { Signal } from "@mp/state";

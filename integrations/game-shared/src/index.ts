@@ -10,6 +10,7 @@ export * from "./combat";
 export * from "./context";
 export * from "./encoder-extensions";
 export * from "./encoding";
+export * from "./game-service-config";
 export * from "./game-state";
 export * from "./graph-from-tiled";
 export * from "./hit-test-tiled-object";

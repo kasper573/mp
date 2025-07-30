@@ -1,5 +1,4 @@
 export * from "./character/events";
-export * from "./config";
 export * from "./context/server";
 export * from "./context/shared";
 export * from "./game-state/game-state-events";

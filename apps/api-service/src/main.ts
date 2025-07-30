@@ -1,9 +1,6 @@
 import { createDbClient } from "@mp/db";
-import {
-  ctxTokenResolver,
-  GameServiceConfig,
-  gameServiceConfigRedisKey,
-} from "@mp/game/server";
+import { ctxTokenResolver } from "@mp/game/server";
+import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game/shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/oauth";
