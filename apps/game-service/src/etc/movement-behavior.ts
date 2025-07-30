@@ -98,7 +98,7 @@ export function sendCharacterToArea(
 
   // Inform other services that the character wants to join another area
   const client = ioc.get(ctxGameEventClient);
-  client.network.characterWantsToJoinArea({
+  client.network.changeGameService({
     characterId,
     areaId: destinationAreaId,
   });

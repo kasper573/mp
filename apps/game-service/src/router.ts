@@ -1,8 +1,8 @@
 import { attack } from "./events/attack";
-import { characterWantsToJoinArea } from "./events/characterWantsToJoinArea";
+import { changeGameService } from "./events/change-game-service";
 import { kill } from "./events/kill";
 import { move } from "./events/move";
-import { requestFullState } from "./events/requestFullState";
+import { requestFullState } from "./events/request-full-state";
 import { respawn } from "./events/respawn";
 import { evt } from "./integrations/event-router";
 
@@ -15,7 +15,7 @@ export const gameServiceEvents = evt.router({
     respawn: respawn,
   }),
   network: evt.router({
-    characterWantsToJoinArea,
+    changeGameService,
     requestFullState,
   }),
 });

@@ -4,7 +4,10 @@ import { gatewayRoles } from "@mp/keycloak";
 import { ctxArea, ctxGameStateLoader, ctxGameStateServer } from "../context";
 import { evt, roles } from "../package";
 
-export const characterWantsToJoinArea = evt.event
+/**
+ * Emitted by a game service when a character wants to join another game service.
+ */
+export const changeGameService = evt.event
   .use(roles([gatewayRoles.gameServiceBroadcast]))
   .input<{ characterId: CharacterId; areaId: AreaId }>()
   .handler(({ ctx, input }) => {
