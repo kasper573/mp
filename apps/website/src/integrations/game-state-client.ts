@@ -6,7 +6,7 @@ import {
 } from "@mp/event-router";
 import { ctxAuthClient, GameStateClient, ioc } from "@mp/game/client";
 import type { GameServerEventRouter } from "@mp/game/server";
-import { ctxGameEventClient, ctxLogger } from "@mp/game/shared";
+import { ctxLogger } from "@mp/game/shared";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/oauth/client";
@@ -55,10 +55,8 @@ function createGameStateClient(
   function initialize() {
     const logSocketError = (e: Event) => logger.error(e, "Socket error");
     socket.addEventListener("error", logSocketError);
-    const unregister = ioc.register(ctxGameEventClient, eventClient);
 
     return () => {
-      unregister();
       socket.removeEventListener("error", logSocketError);
       socket.close();
     };

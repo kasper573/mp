@@ -1,8 +1,7 @@
 import type { DbClient } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
-import { evt, roles } from "@mp/game/server";
+import { ctxGameEventClient, evt, roles } from "@mp/game/server";
 import type { UserSession } from "@mp/game/shared";
-import { ctxGameEventClient } from "@mp/game/shared";
 import { InjectionContext } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
 import type { Signal } from "@mp/state";

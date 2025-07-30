@@ -12,8 +12,7 @@ import { assert, type Tile } from "@mp/std";
 import { defineSyncComponent } from "@mp/sync";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { TickEventHandler } from "@mp/time";
-import { ctxArea } from "../context/server";
-import { ctxGameEventClient } from "../context/shared";
+import { ctxArea, ctxGameEventClient } from "../context/server";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 
 export type MovementTrait = typeof MovementTrait.$infer;

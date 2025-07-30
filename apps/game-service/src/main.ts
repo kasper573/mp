@@ -10,6 +10,7 @@ import type { GameStateServer } from "@mp/game/server";
 import {
   combatBehavior,
   ctxArea,
+  ctxGameEventClient,
   ctxGameStateLoader,
   ctxGameStateServer,
   ctxNpcSpawner,
@@ -26,7 +27,6 @@ import type { GameEventClient, GameState } from "@mp/game/shared";
 import {
   clientViewDistance,
   ctxActorModelLookup,
-  ctxGameEventClient,
   ctxGameState,
   ctxLogger,
   ctxUserSession,

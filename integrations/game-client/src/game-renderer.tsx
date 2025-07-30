@@ -11,16 +11,16 @@ import { useContext, useState } from "preact/hooks";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
-} from "../area/area-debug-settings-form";
-import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
-import { AreaUi } from "../area/area-ui";
-import { ctxEngine } from "../context/client";
-import { ioc } from "../context/ioc";
-import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
-import type { OptimisticGameState } from "../game-state/optimistic-game-state";
-import { useObjectSignal } from "../use-object-signal";
+} from "./area-debug-settings-form";
+import { AreaScene, ctxAreaSpritesheets } from "./area-scene";
+import { AreaUi } from "./area-ui";
+import { ctxEngine } from "./context";
 import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
+import { GameStateDebugInfo } from "./game-state-debug-info";
+import { ioc } from "./ioc";
+import type { OptimisticGameState } from "./optimistic-game-state";
+import { useObjectSignal } from "./use-object-signal";
 
 interface GameRendererProps {
   interactive: boolean;

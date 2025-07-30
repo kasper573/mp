@@ -1,9 +1,9 @@
 import type { CharacterId } from "@mp/db/types";
 import type { ActorId, AreaResource, GameState } from "@mp/game-shared";
+import { clientViewDistanceRect } from "@mp/game-shared";
 import type { Tile } from "@mp/std";
 import type { ClientVisibilityFactory } from "@mp/sync";
 import type { MovementTrait } from "../../src/traits/movement";
-import { clientViewDistanceRect } from "../clients/client-view-distance-rect";
 
 /**
  * Removes any information that the given client should not have access to.

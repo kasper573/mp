@@ -1,6 +1,7 @@
 import type { CharacterId } from "@mp/db/types";
 import type { Actor, Character } from "@mp/game-shared";
 import { ctxLogger, syncMessageEncoding } from "@mp/game-shared";
+import type { GameEventClient, GameStateEvents } from "@mp/game/server";
 import { InjectionContext } from "@mp/ioc";
 import type { Logger } from "@mp/logger";
 import type { ReadonlySignal, Signal } from "@mp/state";
@@ -9,11 +10,9 @@ import { throttle } from "@mp/std";
 import { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { subscribeToReadyState } from "@mp/ws/client";
-import { ioc } from "../context/ioc";
-import type { GameEventClient } from "../context/shared";
-import { ctxGameEventClient } from "../context/shared";
+import { ctxGameEventClient } from "./context";
 import { GameActions } from "./game-actions";
-import type { GameStateEvents } from "./game-state-events";
+import { ioc } from "./ioc";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
 

@@ -18,10 +18,10 @@ import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
-import { ctxEngine } from "../context/client";
-import { ioc } from "../context/ioc";
-import { useObjectSignal } from "../use-object-signal";
 import { ActorSprite } from "./actor-sprite";
+import { ctxEngine } from "./context";
+import { ioc } from "./ioc";
+import { useObjectSignal } from "./use-object-signal";
 
 export function ActorSpriteTester({
   spritesheets,

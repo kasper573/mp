@@ -1,9 +1,9 @@
 import type { TiledResource } from "@mp/game-shared";
 import type { TimeSpan } from "@mp/time";
 import { useEffect, useState } from "preact/hooks";
-import { ctxEngine } from "../context/client";
-import { ioc } from "../context/ioc";
+import { ctxEngine } from "./context";
 import { ctxGameStateClient } from "./game-state-client";
+import { ioc } from "./ioc";
 
 export function GameStateDebugInfo(props: { tiled: TiledResource }) {
   const client = ioc.get(ctxGameStateClient);

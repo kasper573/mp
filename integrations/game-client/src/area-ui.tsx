@@ -1,5 +1,5 @@
-import { ioc } from "../context/ioc";
-import { ctxGameStateClient } from "../game-state/game-state-client";
+import { ctxGameStateClient } from "./game-state-client";
+import { ioc } from "./ioc";
 import { RespawnDialog } from "./respawn-dialog";
 
 export function AreaUi() {

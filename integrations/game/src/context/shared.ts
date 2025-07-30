@@ -1,8 +1,4 @@
 import type { ProxyEventInvoker } from "@mp/event-router";
-import { InjectionContext } from "@mp/ioc";
-import type { GameServerEventRouter } from "../package.server";
-
-export const ctxGameEventClient =
-  InjectionContext.new<GameEventClient>("GameEventClient");
+import type { GameServerEventRouter } from "../network/root-event-router";
 
 export type GameEventClient = ProxyEventInvoker<GameServerEventRouter>;

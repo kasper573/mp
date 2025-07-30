@@ -8,14 +8,13 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import { ctxTokenResolver } from "@mp/game/server";
+import { ctxGameEventClient, ctxTokenResolver } from "@mp/game/server";
 import type {
   GameEventClient,
   SyncMessageWithRecipient,
   UserSession,
 } from "@mp/game/shared";
 import {
-  ctxGameEventClient,
   ctxUserSession,
   eventWithSessionEncoding,
   registerEncoderExtensions,

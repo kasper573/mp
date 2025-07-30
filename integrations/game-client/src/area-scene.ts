@@ -19,12 +19,12 @@ import type { ObjectId } from "@mp/tiled-loader";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
-import { ActorController } from "../actor/actor-controller";
-import { ctxEngine } from "../context/client";
-import { ioc } from "../context/ioc";
-import { ctxGameStateClient } from "../game-state/game-state-client";
+import { ActorController } from "./actor-controller";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
+import { ctxEngine } from "./context";
+import { ctxGameStateClient } from "./game-state-client";
+import { ioc } from "./ioc";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 
