@@ -30,13 +30,13 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp-node-app
       args:
-        APP_NAME: server
+        APP_NAME: game-service
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
     environment:
-      MP_SERVER_AREA_ID: forest
+      MP_GAME_SERVICE_AREA_ID: forest
     depends_on:
       mp-migrations:
         condition: service_started
@@ -47,13 +47,13 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp-node-app
       args:
-        APP_NAME: server
+        APP_NAME: game-service
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
     environment:
-      MP_SERVER_AREA_ID: island
+      MP_GAME_SERVICE_AREA_ID: island
     depends_on:
       mp-migrations:
         condition: service_started
@@ -64,7 +64,7 @@ services:
     build:
       dockerfile: ./docker/Dockerfile.mp-node-app
       args:
-        APP_NAME: api
+        APP_NAME: api-service
       context: ..
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-api:${DOCKER_IMAGE_VERSION:-latest}
     restart: always

@@ -1,7 +1,7 @@
-import { spawn } from "child_process";
-import path from "path";
-import fs from "fs/promises";
 import type { AreaId } from "@mp/game/server";
+import { spawn } from "child_process";
+import fs from "fs/promises";
+import path from "path";
 
 const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
@@ -28,7 +28,7 @@ function runDevInstance(areaId: AreaId): Promise<void> {
     const child = spawn("pnpm", ["dev:instance"], {
       env: {
         ...process.env,
-        MP_SERVER_AREA_ID: areaId,
+        MP_GAME_SERVICE_AREA_ID: areaId,
       },
       stdio: "inherit",
     });

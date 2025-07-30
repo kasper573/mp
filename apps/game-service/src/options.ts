@@ -69,5 +69,5 @@ export const gameServiceOptionsSchema = type({
 export const opt = assertEnv(
   gameServiceOptionsSchema,
   process.env,
-  "MP_SERVER_",
+  "MP_GAME_SERVICE_",
 );
