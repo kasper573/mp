@@ -8,11 +8,11 @@ import type {
 import type { Logger } from "@mp/logger";
 import type { Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
-import type { GameStateServer } from "../domains/game-state/game-state-server";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
-} from "./character-transform";
+} from "../character/character-transform";
+import type { GameStateServer } from "./game-state-server";
 
 export function gameStateDbSyncBehavior(
   db: DbClient,

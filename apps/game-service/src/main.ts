@@ -37,11 +37,13 @@ import {
 import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
 import "dotenv/config";
-import { createActorModelLookup } from "./db/actor-model-lookup";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
-import { createGameStateLoader } from "./db/game-state-loader";
+import { createActorModelLookup } from "./domains/character/actor-model-lookup";
 import { ctxArea, ctxGameEventClient } from "./domains/context/server";
-import { ctxGameStateLoader } from "./domains/game-state/game-state-loader";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./domains/game-state/game-state-db-sync";
+import {
+  createGameStateLoader,
+  ctxGameStateLoader,
+} from "./domains/game-state/game-state-loader";
 import type { GameStateServer } from "./domains/game-state/game-state-server";
 import { ctxGameStateServer } from "./domains/game-state/game-state-server";
 import {
