@@ -48,13 +48,13 @@ import {
 import type { GameStateServer } from "./domains/game-state/game-state-server";
 import { ctxGameStateServer } from "./domains/game-state/game-state-server";
 import { movementBehavior } from "./domains/movement";
+import { deriveClientVisibility } from "./domains/network/client-visibility";
 import {
   gameServerEventRouter,
   type GameServerEventRouter,
 } from "./domains/network/root-event-router";
 import { NpcAi } from "./domains/npc/npc-ai";
 import { ctxNpcSpawner, NpcSpawner } from "./domains/npc/npc-spawner";
-import { deriveClientVisibility } from "./domains/user/client-visibility";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";

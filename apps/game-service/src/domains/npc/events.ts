@@ -1,8 +1,8 @@
 import { ctxGameState } from "@mp/game-shared";
 import { npcRoles } from "@mp/keycloak";
 import { ctxRng } from "../../context";
+import { roles } from "../../middlewares/auth";
 import { evt } from "../network/event-builder";
-import { roles } from "../user/auth";
 import { ctxNpcSpawner } from "./npc-spawner";
 
 export type NpcEventRouter = typeof npcEventRouter;

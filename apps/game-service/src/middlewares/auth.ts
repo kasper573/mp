@@ -1,6 +1,6 @@
 import { ctxUserSession } from "@mp/game-shared";
 import type { RoleDefinition } from "@mp/oauth";
-import { evt } from "../network/event-builder";
+import { evt } from "../domains/network/event-builder";
 
 export function roles(requiredRoles: Iterable<RoleDefinition>) {
   const requiredRolesSet = new Set(requiredRoles);

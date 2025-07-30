@@ -9,4 +9,4 @@ export type GameEventClient = ProxyEventInvoker<GameServerEventRouter>;
 
 // We also export event builder tools for the gateway to use to build its own router.
 export { evt } from "./domains/network/event-builder";
-export { roles } from "./domains/user/auth";
+export { roles } from "./middlewares/auth";

@@ -3,9 +3,9 @@ import { ctxGameState, ctxLogger, ctxUserSession } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
 import { ctxArea } from "../../context";
+import { roles } from "../../middlewares/auth";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
 import { ctxGameStateServer } from "../game-state/game-state-server";
-import { roles } from "../user/auth";
 import { evt } from "./event-builder";
 
 export type NetworkRouter = typeof networkEventRouter;
