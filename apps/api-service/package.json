@@ -18,14 +18,14 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/oauth": "workspace:*",
     "@mp/db": "workspace:*",
-    "@mp/keycloak": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/ioc": "workspace:*",
+    "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/redis": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",

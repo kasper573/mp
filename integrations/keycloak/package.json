@@ -18,8 +18,8 @@
   },
   "dependencies": {
     "@keycloak/keycloak-admin-client": "26.1.2",
-    "@mp/oauth": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*"
   },
   "devDependencies": {

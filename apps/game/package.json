@@ -17,15 +17,15 @@
     }
   },
   "dependencies": {
-    "@mp/oauth": "workspace:*",
     "@mp/encoding": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/ioc": "workspace:*",
-    "@mp/logger": "workspace:*",
     "@mp/keycloak": "workspace:*",
+    "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/query": "workspace:*",
     "@mp/state": "workspace:*",

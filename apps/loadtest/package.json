@@ -10,11 +10,11 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/oauth": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
     "@mp/gateway": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/oauth": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",
