@@ -1,12 +1,11 @@
-import type { DbClient } from "@mp/db-client";
+import type { DbClient } from "@mp/db";
 
 import type { CharacterId, UserSession } from "@mp/game/server";
-import { evt, roles, gatewayRoles } from "@mp/game/server";
-import { ctxGameEventClient } from "@mp/game/server";
+import { ctxGameEventClient, evt, gatewayRoles, roles } from "@mp/game/server";
 
 import { InjectionContext } from "@mp/ioc";
-import { hasAccessToCharacter } from "./db-operations";
 import type { Signal } from "@mp/state";
+import { hasAccessToCharacter } from "./db-operations";
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({

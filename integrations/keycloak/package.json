@@ -1,5 +1,5 @@
 {
-  "name": "@mp/keycloak-client",
+  "name": "@mp/keycloak",
   "version": "0.0.0",
   "private": true,
   "type": "module",

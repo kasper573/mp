@@ -80,9 +80,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/db-client':
+      '@mp/db':
         specifier: workspace:*
-        version: link:../../integrations/db-client
+        version: link:../../integrations/db
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -98,9 +98,9 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
-      '@mp/redis-client':
+      '@mp/redis':
         specifier: workspace:*
-        version: link:../../integrations/redis-client
+        version: link:../../integrations/redis
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state
@@ -317,9 +317,9 @@ importers:
       '@mp/api-service':
         specifier: workspace:*
         version: link:../api-service
-      '@mp/db-client':
+      '@mp/db':
         specifier: workspace:*
-        version: link:../../integrations/db-client
+        version: link:../../integrations/db
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -341,9 +341,9 @@ importers:
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../libraries/rate-limiter
-      '@mp/redis-client':
+      '@mp/redis':
         specifier: workspace:*
-        version: link:../../integrations/redis-client
+        version: link:../../integrations/redis
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state
@@ -384,9 +384,9 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/db-client':
+      '@mp/db':
         specifier: workspace:*
-        version: link:../../integrations/db-client
+        version: link:../../integrations/db
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
@@ -495,7 +495,7 @@ importers:
         specifier: 17.7.2
         version: 17.7.2
 
-  integrations/db-client:
+  integrations/db:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
@@ -529,7 +529,7 @@ importers:
         specifier: 0.30.1
         version: 0.30.1
 
-  integrations/keycloak-client:
+  integrations/keycloak:
     dependencies:
       '@keycloak/keycloak-admin-client':
         specifier: 26.1.2
@@ -554,7 +554,7 @@ importers:
         specifier: 'catalog:'
         version: 22.13.10
 
-  integrations/redis-client:
+  integrations/redis:
     dependencies:
       '@mp/state':
         specifier: workspace:*
@@ -3904,9 +3904,6 @@ packages:
     resolution: {integrity: sha512-ts6Wi+2j3jQjqi70w5AlN8DFnkSwC+MqmxEzdEALB2qXZYV3X/b1CTfgPLGJNMeAWxdPfU8FO1ms3NUfaHCPYg==}
     engines: {node: '>=10'}
 
-  get-tsconfig@4.10.0:
-    resolution: {integrity: sha512-kGzZ3LWWQcGIAmg6iWvXn0ei6WDtV26wzHRMwDSzmAbcXrTEXxHy6IehI6/4eT6VRKyMP1eF1VqwrVUmE/LR7A==}
-
   get-tsconfig@4.10.1:
     resolution: {integrity: sha512-auHyJ4AgMz7vgS8Hp3N6HXSmlMdUyhSUrfBF16w153rxtLIEOE+HGqaBppczZvnHLqQJfiHotCYpNhl0lUROFQ==}
 
@@ -5857,7 +5854,7 @@ snapshots:
   '@esbuild-kit/esm-loader@2.6.5':
     dependencies:
       '@esbuild-kit/core-utils': 3.3.2
-      get-tsconfig: 4.10.0
+      get-tsconfig: 4.10.1
 
   '@esbuild/aix-ppc64@0.19.12':
     optional: true
@@ -8271,10 +8268,6 @@ snapshots:
       es-object-atoms: 1.1.1
 
   get-stream@6.0.1: {}
-
-  get-tsconfig@4.10.0:
-    dependencies:
-      resolve-pkg-maps: 1.0.0
 
   get-tsconfig@4.10.1:
     dependencies:

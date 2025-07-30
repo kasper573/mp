@@ -19,7 +19,7 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
-    "@mp/db-client": "workspace:*",
+    "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",

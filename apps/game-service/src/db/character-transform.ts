@@ -1,4 +1,4 @@
-import type { characterTable } from "@mp/db-client";
+import type { characterTable } from "@mp/db";
 import type { ActorModelLookup } from "@mp/game/server";
 import { Character } from "@mp/game/server";
 import { cardinalDirections } from "@mp/math";

@@ -1,4 +1,4 @@
-import { characterTable, eq } from "@mp/db-client";
+import { characterTable, eq } from "@mp/db";
 import { gatewayRoles } from "@mp/game/server";
 import { roles } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";

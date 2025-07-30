@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/db-client": "workspace:*",
+    "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",
@@ -21,7 +21,7 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
-    "@mp/redis-client": "workspace:*",
+    "@mp/redis": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",

@@ -1,3 +1,5 @@
+import type { DbClient } from "@mp/db";
+import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
 import type {
   ActorModelLookup,
   AreaId,
@@ -9,13 +11,11 @@ import type {
   NpcSpawn,
 } from "@mp/game/server";
 import { deriveNpcSpawnsFromArea } from "@mp/game/server";
-import type { DbClient } from "@mp/db-client";
-import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db-client";
+import type { Rng } from "@mp/std";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
 } from "./character-transform";
-import type { Rng } from "@mp/std";
 
 export function createGameStateLoader(
   db: DbClient,

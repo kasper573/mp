@@ -1,5 +1,5 @@
 import { createApiClient } from "@mp/api-service/sdk";
-import { createDbClient } from "@mp/db-client";
+import { createDbClient } from "@mp/db";
 import {
   createEventInvoker,
   createProxyEventInvoker,
@@ -40,7 +40,7 @@ import {
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createRedisSyncEffect, Redis } from "@mp/redis-client";
+import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
 import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeCollects, SyncMap, SyncServer } from "@mp/sync";

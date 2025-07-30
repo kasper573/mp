@@ -1,5 +1,5 @@
 import type { AccessToken } from "@mp/auth";
-import type { DbClient } from "@mp/db-client";
+import type { DbClient } from "@mp/db";
 import { InjectionContext } from "@mp/ioc";
 import type { FileResolver } from "./integrations/file-resolver";
 

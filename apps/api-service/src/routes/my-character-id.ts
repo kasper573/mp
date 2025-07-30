@@ -1,15 +1,15 @@
-import { characterTable, eq } from "@mp/db-client";
+import { characterTable, eq } from "@mp/db";
 import type { ActorModelId, CharacterId } from "@mp/game/server";
 
 import type { Tile, TimesPerSecond } from "@mp/std";
+import { unsafe } from "@mp/validate";
 import { auth } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
-import { unsafe } from "@mp/validate";
 import { ctxDbClient } from "../ioc";
 
-import { getDefaultSpawnPoint } from "./default-spawn-point";
-import type { InjectionContainer } from "@mp/ioc";
 import type { UserIdentity } from "@mp/auth";
+import type { InjectionContainer } from "@mp/ioc";
+import { getDefaultSpawnPoint } from "./default-spawn-point";
 
 export const myCharacterId = rpc.procedure
   .use(auth())

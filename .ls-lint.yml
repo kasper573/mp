@@ -13,7 +13,7 @@ ignore:
   - node_modules
   - .git
   - "./*/Dockerfile*"
-  - "integrations/db-client/drizzle/**"
+  - "integrations/db/drizzle/**"
   - "apps/e2e/.playwright"
   - "apps/client/.tanstack"
   - "./{apps,integrations,libraries}/*/.turbo"

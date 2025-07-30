@@ -15,8 +15,8 @@ COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 COPY <<EOF /app/start.sh
-pnpm -F db-client migrate
-pnpm -F db-client seed
+pnpm -F db migrate
+pnpm -F db seed
 EOF
 
 RUN chmod +x /app/start.sh

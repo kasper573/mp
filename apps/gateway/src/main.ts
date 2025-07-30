@@ -1,6 +1,6 @@
 import type { AccessToken, UserId } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import { createDbClient } from "@mp/db-client";
+import { createDbClient } from "@mp/db";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,

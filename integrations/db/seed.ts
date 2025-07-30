@@ -1,4 +1,4 @@
-import { createDbClient, eq, npcSpawnTable, npcTable } from "@mp/db-client";
+import { createDbClient, eq, npcSpawnTable, npcTable } from "@mp/db";
 import type {
   ActorModelId,
   AreaId,

@@ -1,6 +1,6 @@
 import type { AccessToken } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import { createDbClient } from "@mp/db-client";
+import { createDbClient } from "@mp/db";
 import {
   ctxTokenResolver,
   GameServiceConfig,
@@ -8,7 +8,7 @@ import {
 } from "@mp/game/server";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
-import { createRedisSyncEffect, Redis } from "@mp/redis-client";
+import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 import * as trpcExpress from "@trpc/server/adapters/express";

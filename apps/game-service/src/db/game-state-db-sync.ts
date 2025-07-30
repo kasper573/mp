@@ -1,18 +1,18 @@
-import type { DbClient } from "@mp/db-client";
-import { and, characterTable, eq, inArray } from "@mp/db-client";
+import type { DbClient } from "@mp/db";
+import { and, characterTable, eq, inArray } from "@mp/db";
 import type {
   ActorModelLookup,
   AreaResource,
   GameState,
   GameStateServer,
 } from "@mp/game/server";
+import type { Logger } from "@mp/logger";
+import type { Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
 } from "./character-transform";
-import type { Rng } from "@mp/std";
-import type { Logger } from "@mp/logger";
 
 export function gameStateDbSyncBehavior(
   db: DbClient,
