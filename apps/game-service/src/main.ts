@@ -6,21 +6,14 @@ import {
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import type {
-  GameEventClient,
-  GameState,
-  GameStateServer,
-} from "@mp/game/server";
+import type { GameState, GameStateServer } from "@mp/game/server";
 import {
-  clientViewDistance,
   combatBehavior,
   ctxActorModelLookup,
   ctxArea,
-  ctxGameEventClient,
   ctxGameState,
   ctxGameStateLoader,
   ctxGameStateServer,
-  ctxLogger,
   ctxNpcSpawner,
   ctxRng,
   ctxUserSession,
@@ -34,9 +27,15 @@ import {
   movementBehavior,
   NpcAi,
   NpcSpawner,
-  registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
 } from "@mp/game/server";
+import type { GameEventClient } from "@mp/game/shared";
+import {
+  clientViewDistance,
+  ctxGameEventClient,
+  ctxLogger,
+  registerEncoderExtensions,
+} from "@mp/game/shared";
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";

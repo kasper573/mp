@@ -2,7 +2,7 @@ import { PropertySignal, type Signal } from "@mp/state";
 import { assert } from "@mp/std";
 import { Button, Checkbox, Select } from "@mp/ui";
 import { ioc } from "../context/ioc";
-import { ctxGameEventClient } from "../network/game-event-client";
+import { ctxGameEventClient } from "../context/shared";
 import { ctxGameStateClient } from "../game-state/game-state-client";
 
 export interface AreaDebugSettingsFormProps {

@@ -9,10 +9,10 @@ import type { AreaResource } from "../area/area-resource";
 import { getAreaIdFromObject } from "../area/area-resource";
 import { moveAlongPath } from "../area/move-along-path";
 import type { Character } from "../character/types";
-import { ctxArea } from "../context/common";
+import { ctxArea } from "../context/server";
+import { ctxGameEventClient } from "../context/shared";
 import { ctxGameState } from "../game-state/game-state";
 import { ctxGameStateLoader } from "../game-state/game-state-loader";
-import { ctxGameEventClient } from "../network/game-event-client";
 import * as patchOptimizers from "../network/patch-optimizers";
 
 export type MovementTrait = typeof MovementTrait.$infer;

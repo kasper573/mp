@@ -14,7 +14,7 @@ import {
 } from "../area/area-debug-settings-form";
 import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
-import { ctxEngine } from "../context/common";
+import { ctxEngine } from "../context/client";
 import { ioc } from "../context/ioc";
 import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
 import type { OptimisticGameState } from "../game-state/optimistic-game-state";

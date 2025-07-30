@@ -4,7 +4,7 @@ import type { Signal } from "@mp/state";
 import { type Tile, assert } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { ActorId } from "../actor/actor";
-import type { GameEventClient } from "../network/game-event-client";
+import type { GameEventClient } from "../context/shared";
 
 export class GameActions {
   constructor(

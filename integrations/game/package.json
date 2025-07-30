@@ -14,6 +14,11 @@
       "types": "./src/package.server.ts",
       "import": "./src/package.server.ts",
       "require": "./src/package.server.ts"
+    },
+    "./shared": {
+      "types": "./src/package.shared.ts",
+      "import": "./src/package.shared.ts",
+      "require": "./src/package.shared.ts"
     }
   },
   "dependencies": {

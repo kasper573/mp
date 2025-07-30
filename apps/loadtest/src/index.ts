@@ -1,24 +1,21 @@
 // oxlint-disable no-await-in-loop
 import { createApiClient } from "@mp/api-service/sdk";
-import type { GameEventClient } from "@mp/game/client";
-import {
-  GameStateClient,
-  loadAreaResource,
-  registerEncoderExtensions,
-} from "@mp/game/client";
-import { createConsoleLogger } from "@mp/logger";
-import { createBypassUser } from "@mp/oauth";
-import { Rng } from "@mp/std";
-import { WebSocket } from "@mp/ws/server";
-import { readCliOptions } from "./cli";
-
 import {
   createProxyEventInvoker,
   eventMessageEncoding,
 } from "@mp/event-router";
+import { GameStateClient, loadAreaResource } from "@mp/game/client";
+import {
+  registerEncoderExtensions,
+  type GameEventClient,
+} from "@mp/game/shared";
 import type { GatewayRouter } from "@mp/gateway";
+import { createConsoleLogger } from "@mp/logger";
+import { createBypassUser } from "@mp/oauth";
 import type { Signal } from "@mp/state";
-import { parseSocketError } from "@mp/ws/server";
+import { Rng } from "@mp/std";
+import { parseSocketError, WebSocket } from "@mp/ws/server";
+import { readCliOptions } from "./cli";
 
 registerEncoderExtensions();
 

@@ -2,10 +2,10 @@ import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
 import type {
   ActorModelLookup,
-  AreaResource,
   GameState,
   GameStateServer,
 } from "@mp/game/server";
+import type { AreaResource } from "@mp/game/shared";
 import type { Logger } from "@mp/logger";
 import type { Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";

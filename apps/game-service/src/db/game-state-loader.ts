@@ -3,13 +3,12 @@ import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,
-  AreaResource,
-  Character,
   GameStateLoader,
   Npc,
   NpcSpawn,
 } from "@mp/game/server";
 import { deriveNpcSpawnsFromArea } from "@mp/game/server";
+import type { AreaResource, Character } from "@mp/game/shared";
 import type { Rng } from "@mp/std";
 import {
   characterFromDbFields,

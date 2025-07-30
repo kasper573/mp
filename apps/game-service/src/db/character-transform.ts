@@ -1,6 +1,6 @@
 import type { characterTable } from "@mp/db";
 import type { ActorModelLookup } from "@mp/game/server";
-import { Character } from "@mp/game/server";
+import { Character } from "@mp/game/shared";
 import { cardinalDirections } from "@mp/math";
 import type { Rng } from "@mp/std";
 import { assert } from "@mp/std";

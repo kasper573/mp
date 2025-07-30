@@ -6,17 +6,15 @@ import {
 } from "@mp/event-router";
 import {
   ctxAuthClient,
-  ctxGameEventClient,
-  ctxLogger,
   GameStateClient,
   ioc,
   type GameServerEventRouter,
 } from "@mp/game/client";
+import { ctxGameEventClient, ctxLogger } from "@mp/game/shared";
 import type { GatewayRouter } from "@mp/gateway";
-import { WebSocket } from "@mp/ws/client";
-
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/oauth/client";
+import { WebSocket } from "@mp/ws/client";
 import { useEffect, useMemo } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
