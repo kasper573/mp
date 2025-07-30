@@ -1,5 +1,9 @@
 import type { ActorId } from "@mp/game-shared";
 
+/**
+ * Events that originate from a game service server tick
+ * and are sent to clients together with game state patches.
+ */
 // oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameStateEvents = {
   "combat.attack": {
