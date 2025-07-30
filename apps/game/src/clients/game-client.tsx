@@ -1,18 +1,19 @@
-import type { JSX } from "preact";
-import { useEffect } from "preact/hooks";
-import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
+import type { JSX } from "preact";
+import { Suspense } from "preact/compat";
+import { useEffect } from "preact/hooks";
+import { ioc } from "../context/ioc";
 import {
   ctxGameStateClient,
   type GameStateClient,
 } from "../game-state/game-state-client";
-import { ioc } from "../context/ioc";
 import { GameRenderer } from "./game-renderer";
 
 export interface GameClientProps {
   stateClient: GameStateClient;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;
+  enableUi?: boolean;
 }
 
 /**
@@ -45,6 +46,7 @@ export function GameClient(props: GameClientProps) {
         gameState={props.stateClient.gameState}
         additionalDebugUi={props.additionalDebugUi}
         areaIdToLoadAssetsFor={areaId}
+        enableUi={props.enableUi}
       />
     </Suspense>
   );

@@ -1,10 +1,9 @@
 import type { SelectOption } from "@mp/ui";
-import { LoadingSpinner } from "@mp/ui";
-import { Select } from "@mp/ui";
+import { LoadingSpinner, Select } from "@mp/ui";
 import { Suspense } from "preact/compat";
+import type { CharacterId } from "../character/types";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
-import type { CharacterId } from "../character/types";
 
 export interface SpectatorClientProps extends GameClientProps {
   characterOptions: SelectOption<CharacterId>[];
@@ -23,7 +22,7 @@ export function SpectatorClient(props: SpectatorClientProps) {
       />
 
       <Suspense fallback={<LoadingSpinner debugId="SpectatorClient" />}>
-        <GameClient {...props} interactive={props.interactive} />
+        <GameClient enableUi={false} {...props} />
       </Suspense>
     </>
   );

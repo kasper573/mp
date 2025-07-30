@@ -1,32 +1,33 @@
 import { Engine } from "@mp/engine";
-import type { JSX } from "preact";
-import { useContext, useState } from "preact/hooks";
+import type { Application } from "@mp/graphics";
+import { useGraphics } from "@mp/graphics/react";
 import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
-import { useGraphics } from "@mp/graphics/react";
-import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
-import { ioc } from "../context/ioc";
-import { ctxEngine } from "../context/common";
-import type { OptimisticGameState } from "../game-state/optimistic-game-state";
-import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
+import { useSignal, useSignalEffect } from "@mp/state/react";
+import type { JSX } from "preact";
+import { useContext, useState } from "preact/hooks";
+import { ctxActorSpritesheetLookup } from "../actor/actor-spritesheet-lookup";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
 } from "../area/area-debug-settings-form";
+import type { AreaId } from "../area/area-id";
+import { AreaScene, ctxAreaSpritesheets } from "../area/area-scene";
 import { AreaUi } from "../area/area-ui";
-import { GameDebugUi } from "./game-debug-ui";
-import type { Application } from "@mp/graphics";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import { ctxEngine } from "../context/common";
+import { ioc } from "../context/ioc";
+import { GameStateDebugInfo } from "../game-state/game-state-debug-info";
+import type { OptimisticGameState } from "../game-state/optimistic-game-state";
 import { useObjectSignal } from "../use-object-signal";
 import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
-import type { AreaId } from "../area/area-id";
-import { ctxActorSpritesheetLookup } from "../actor/actor-spritesheet-lookup";
+import { GameDebugUi } from "./game-debug-ui";
 
 interface GameRendererProps {
   interactive: boolean;
   gameState: OptimisticGameState;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
+  enableUi?: boolean;
 }
 
 /**
@@ -37,6 +38,7 @@ export function GameRenderer({
   gameState,
   areaIdToLoadAssetsFor,
   additionalDebugUi,
+  enableUi = true,
 }: GameRendererProps) {
   const useGameAssets = useContext(GameAssetLoaderContext);
 
@@ -62,13 +64,17 @@ export function GameRenderer({
   return (
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
-      <AreaUi />
-      {showDebugUi.value && (
-        <GameDebugUi>
-          {additionalDebugUi}
-          <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
-          <GameStateDebugInfo tiled={assets.area.tiled} />
-        </GameDebugUi>
+      {enableUi && (
+        <>
+          <AreaUi />
+          {showDebugUi.value && (
+            <GameDebugUi>
+              {additionalDebugUi}
+              <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
+              <GameStateDebugInfo tiled={assets.area.tiled} />
+            </GameDebugUi>
+          )}
+        </>
       )}
     </>
   );
