@@ -4,10 +4,10 @@ import { kill } from "./events/kill";
 import { move } from "./events/move";
 import { requestFullState } from "./events/requestFullState";
 import { respawn } from "./events/respawn";
-import { evt } from "./integrations/event";
+import { evt } from "./integrations/event-router";
 
-export type GameServerEventRouter = typeof gameServerEventRouter;
-export const gameServerEventRouter = evt.router({
+export type GameServiceEvents = typeof gameServiceEvents;
+export const gameServiceEvents = evt.router({
   character: evt.router({
     attack: attack,
     kill: kill,

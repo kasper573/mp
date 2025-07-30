@@ -51,14 +51,11 @@ import { ctxGameStateServer } from "./domains/game-state-server";
 import { movementBehavior } from "./domains/movement";
 import { NpcAi } from "./domains/npc/npc-ai";
 import { ctxNpcSpawner, NpcSpawner } from "./domains/npc/npc-spawner";
-import {
-  gameServerEventRouter,
-  type GameServerEventRouter,
-} from "./event-router";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
+import { gameServiceEvents, type GameServiceEvents } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -111,7 +108,7 @@ const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
-  invoke: createEventInvoker(gameServerEventRouter),
+  invoke: createEventInvoker(gameServiceEvents),
   logger,
 });
 
@@ -126,7 +123,7 @@ gatewaySocket.addEventListener("error", (err) =>
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
 
-const gameEventBroadcastClient = createProxyEventInvoker<GameServerEventRouter>(
+const gameEventBroadcastClient = createProxyEventInvoker<GameServiceEvents>(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
 );
 
