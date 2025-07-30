@@ -1,16 +1,15 @@
 import { createDbClient, eq, npcSpawnTable, npcTable } from "@mp/db";
-import type {
-  ActorModelId,
-  AreaId,
-  Npc,
-  NpcId,
-  NpcSpawnId,
-} from "@mp/game/server";
-import { npcTypes } from "@mp/game/server";
 import { createPinoLogger } from "@mp/logger/pino";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
+import {
+  npcTypes,
+  type ActorModelId,
+  type AreaId,
+  type NpcId,
+  type NpcSpawnId,
+} from "./src/types";
 
 // This is not a long term plan.
 // The proper solution is to provision game data via an external repository
@@ -39,7 +38,7 @@ await db.transaction((tx) => {
     yield tx.delete(npcTable);
 
     const oneTile = 1 as Tile;
-    const soldier: Npc = {
+    const soldier: typeof npcTable.$inferInsert = {
       id: "1" as NpcId,
       aggroRange: 7 as Tile,
       npcType: "protective",
