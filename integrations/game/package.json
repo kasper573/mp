@@ -23,10 +23,9 @@
   },
   "dependencies": {
     "@mp/db": "workspace:*",
-    "@mp/game-shared": "workspace:*",
-    "@mp/encoding": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/event-router": "workspace:*",
+    "@mp/game-shared": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
