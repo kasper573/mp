@@ -10,7 +10,7 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- "
   },
   "dependencies": {
-    "@mp/api": "workspace:*",
+    "@mp/api-service": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",

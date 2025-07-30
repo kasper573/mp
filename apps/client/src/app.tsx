@@ -1,24 +1,24 @@
-import { createConsoleLogger } from "@mp/logger";
+import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
 import { createAuthClient } from "@mp/auth/client";
-import { ErrorFallbackContext } from "@mp/ui";
-import { RouterProvider } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import {
   ctxAuthClient,
   ctxLogger,
   ioc,
   registerEncoderExtensions,
 } from "@mp/game/client";
+import { createConsoleLogger } from "@mp/logger";
 import {
   QueryClient,
   QueryClientProvider,
   ReactQueryDevtools,
 } from "@mp/query";
+import { ErrorFallbackContext } from "@mp/ui";
+import { RouterProvider } from "@tanstack/react-router";
+import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useEffect, useMemo } from "preact/hooks";
-import { createClientRouter } from "./integrations/router/router";
 import { env } from "./env";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
-import { ApiProvider, createApiClient } from "@mp/api/sdk";
+import { createClientRouter } from "./integrations/router/router";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.

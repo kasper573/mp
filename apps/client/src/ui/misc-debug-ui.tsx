@@ -3,7 +3,7 @@ import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CheckboxState } from "@mp/ui";
 import { Checkbox } from "@mp/ui";
 
-import { useApi, useApiClient } from "@mp/api/sdk";
+import { useApi, useApiClient } from "@mp/api-service/sdk";
 import { useMutation, useQuery } from "@mp/query";
 import { useEffect } from "preact/hooks";
 import { env } from "../env";

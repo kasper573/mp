@@ -1,4 +1,4 @@
-import { createApiClient } from "@mp/api/sdk";
+import { createApiClient } from "@mp/api-service/sdk";
 import { createDbClient } from "@mp/db-client";
 import {
   createEventInvoker,

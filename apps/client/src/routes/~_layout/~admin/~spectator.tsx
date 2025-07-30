@@ -1,4 +1,4 @@
-import { useApi } from "@mp/api/sdk";
+import { useApi } from "@mp/api-service/sdk";
 import type { CharacterId } from "@mp/game/client";
 import {
   ctxAuthClient,

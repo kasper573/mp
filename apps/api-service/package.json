@@ -1,5 +1,5 @@
 {
-  "name": "@mp/api",
+  "name": "@mp/api-service",
   "version": "0.0.0",
   "private": true,
   "type": "module",

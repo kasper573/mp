@@ -75,7 +75,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.0-beta
 
-  apps/api:
+  apps/api-service:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
@@ -147,9 +147,9 @@ importers:
 
   apps/client:
     dependencies:
-      '@mp/api':
+      '@mp/api-service':
         specifier: workspace:*
-        version: link:../api
+        version: link:../api-service
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
@@ -312,6 +312,73 @@ importers:
         specifier: workspace:*
         version: link:../../libraries/tsconfig
 
+  apps/game-service:
+    dependencies:
+      '@mp/api-service':
+        specifier: workspace:*
+        version: link:../api-service
+      '@mp/db-client':
+        specifier: workspace:*
+        version: link:../../integrations/db-client
+      '@mp/env':
+        specifier: workspace:*
+        version: link:../../libraries/env
+      '@mp/event-router':
+        specifier: workspace:*
+        version: link:../../libraries/event-router
+      '@mp/game':
+        specifier: workspace:*
+        version: link:../game
+      '@mp/ioc':
+        specifier: workspace:*
+        version: link:../../libraries/ioc
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/rate-limiter':
+        specifier: workspace:*
+        version: link:../../libraries/rate-limiter
+      '@mp/redis-client':
+        specifier: workspace:*
+        version: link:../../integrations/redis-client
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../libraries/state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/sync':
+        specifier: workspace:*
+        version: link:../../libraries/sync
+      '@mp/telemetry':
+        specifier: workspace:*
+        version: link:../../libraries/telemetry
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../libraries/time
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
+      dotenv:
+        specifier: 'catalog:'
+        version: 17.2.0
+    devDependencies:
+      '@mp/build':
+        specifier: workspace:*
+        version: link:../../libraries/build
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      tsx:
+        specifier: 'catalog:'
+        version: 4.19.2
+
   apps/gateway:
     dependencies:
       '@mp/auth':
@@ -375,9 +442,9 @@ importers:
 
   apps/loadtest:
     dependencies:
-      '@mp/api':
+      '@mp/api-service':
         specifier: workspace:*
-        version: link:../api
+        version: link:../api-service
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
@@ -427,73 +494,6 @@ importers:
       yargs:
         specifier: 17.7.2
         version: 17.7.2
-
-  apps/server:
-    dependencies:
-      '@mp/api':
-        specifier: workspace:*
-        version: link:../api
-      '@mp/db-client':
-        specifier: workspace:*
-        version: link:../../integrations/db-client
-      '@mp/env':
-        specifier: workspace:*
-        version: link:../../libraries/env
-      '@mp/event-router':
-        specifier: workspace:*
-        version: link:../../libraries/event-router
-      '@mp/game':
-        specifier: workspace:*
-        version: link:../game
-      '@mp/ioc':
-        specifier: workspace:*
-        version: link:../../libraries/ioc
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../../libraries/logger
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
-      '@mp/rate-limiter':
-        specifier: workspace:*
-        version: link:../../libraries/rate-limiter
-      '@mp/redis-client':
-        specifier: workspace:*
-        version: link:../../integrations/redis-client
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-      '@mp/sync':
-        specifier: workspace:*
-        version: link:../../libraries/sync
-      '@mp/telemetry':
-        specifier: workspace:*
-        version: link:../../libraries/telemetry
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../../libraries/time
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
-      '@mp/ws':
-        specifier: workspace:*
-        version: link:../../libraries/ws
-      dotenv:
-        specifier: 'catalog:'
-        version: 17.2.0
-    devDependencies:
-      '@mp/build':
-        specifier: workspace:*
-        version: link:../../libraries/build
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-      tsx:
-        specifier: 'catalog:'
-        version: 4.19.2
 
   integrations/db-client:
     dependencies:
@@ -9455,7 +9455,7 @@ snapshots:
   tsx@4.19.2:
     dependencies:
       esbuild: 0.23.1
-      get-tsconfig: 4.10.0
+      get-tsconfig: 4.10.1
     optionalDependencies:
       fsevents: 2.3.3
 

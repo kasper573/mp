@@ -9,7 +9,7 @@
     "start:test": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- vite-node src/index.ts"
   },
   "dependencies": {
-    "@mp/api": "workspace:*",
+    "@mp/api-service": "workspace:*",
     "@mp/auth": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game": "workspace:*",

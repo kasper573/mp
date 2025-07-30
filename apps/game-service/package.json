@@ -1,5 +1,5 @@
 {
-  "name": "@mp/server",
+  "name": "@mp/game-service",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,7 +12,7 @@
     "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@mp/api": "workspace:*",
+    "@mp/api-service": "workspace:*",
     "@mp/db-client": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",

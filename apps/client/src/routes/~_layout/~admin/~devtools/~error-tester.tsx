@@ -1,9 +1,9 @@
+import { useApi } from "@mp/api-service/sdk";
 import { skipToken, useQuery } from "@mp/query";
+import { useSignal } from "@mp/state/react";
 import { Checkbox, ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "preact/hooks";
-import { useSignal } from "@mp/state/react";
-import { useApi } from "@mp/api/sdk";
 
 export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({
   component: RouteComponent,

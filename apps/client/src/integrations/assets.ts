@@ -1,16 +1,15 @@
-import type { GameAssetLoader } from "@mp/game/client";
-import { loadAreaResource } from "@mp/game/client";
 import type {
   ActorSpritesheetLookup,
   AreaId,
   AreaResource,
+  GameAssetLoader,
 } from "@mp/game/client";
-import { loadActorSpritesheets } from "@mp/game/client";
+import { loadActorSpritesheets, loadAreaResource } from "@mp/game/client";
 
+import { useApi } from "@mp/api-service/sdk";
 import { useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
-import { useApi } from "@mp/api/sdk";
 
 export const useGameAssets: GameAssetLoader = (areaId) => {
   const area = useAreaResource(areaId);

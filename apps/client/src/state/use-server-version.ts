@@ -1,6 +1,6 @@
+import { useApi } from "@mp/api-service/sdk";
 import { useQuery } from "@mp/query";
 import { env } from "../env";
-import { useApi } from "@mp/api/sdk";
 
 export const useVersionCompatibility = () => {
   const api = useApi();
