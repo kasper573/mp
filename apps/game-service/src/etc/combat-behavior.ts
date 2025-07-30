@@ -5,7 +5,7 @@ import type { Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { GameStateServer } from "./game-state-server";
-import { findPathForSubject } from "./movement";
+import { findPathForSubject } from "./movement-behavior";
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
 

@@ -3,7 +3,7 @@ import { characterRoles } from "@mp/keycloak";
 import { type VectorLike, Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import { accessCharacter } from "../domains/access-character";
+import { accessCharacter } from "../etc/access-character";
 import { evt, roles } from "../package";
 
 export const move = evt.event

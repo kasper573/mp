@@ -1,8 +1,8 @@
 import type { CharacterId } from "@mp/db/types";
 import { characterRoles } from "@mp/keycloak";
-import { accessCharacter } from "../domains/access-character";
-import { ctxGameStateLoader } from "../domains/game-state-loader";
-import { sendCharacterToArea } from "../domains/movement";
+import { accessCharacter } from "../etc/access-character";
+import { ctxGameStateLoader } from "../etc/game-state-loader";
+import { sendCharacterToArea } from "../etc/movement-behavior";
 import { evt, roles } from "../package";
 
 export const respawn = evt.event

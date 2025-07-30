@@ -1,7 +1,7 @@
 import { type ActorId, ctxGameState } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
-import { ctxGameStateServer } from "../domains/game-state-server";
+import { ctxGameStateServer } from "../etc/game-state-server";
 import { evt, roles } from "../package";
 
 export const kill = evt.event
