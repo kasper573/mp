@@ -1,5 +1,3 @@
-import "dotenv/config";
-
 import { createApiClient } from "@mp/api/sdk";
 import { createDbClient } from "@mp/db-client";
 import {
@@ -29,6 +27,8 @@ import {
   deriveClientVisibility,
   eventWithSessionEncoding,
   gameServerEventRouter,
+  GameServiceConfig,
+  gameServiceConfigRedisKey,
   GameStateAreaEntity,
   loadAreaResource,
   movementBehavior,
@@ -40,6 +40,8 @@ import {
 import { ImmutableInjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
+import { createRedisSyncEffect, Redis } from "@mp/redis-client";
+import { signal } from "@mp/state";
 import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeCollects, SyncMap, SyncServer } from "@mp/sync";
 import {
@@ -49,6 +51,7 @@ import {
 } from "@mp/telemetry/prom";
 import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
+import "dotenv/config";
 import { createActorModelLookup } from "./db/actor-model-lookup";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
 import { createGameStateLoader } from "./db/game-state-loader";
@@ -61,7 +64,6 @@ import { opt } from "./options";
 
 registerEncoderExtensions();
 collectDefaultMetrics();
-shouldOptimizeCollects.value = opt.patchOptimizer;
 RateLimiter.enabled = opt.rateLimit;
 
 const rng = new Rng(opt.rngSeed);
@@ -69,6 +71,23 @@ const logger = createPinoLogger(opt.prettyLogs, { areaId: opt.areaId });
 logger.info(opt, `Starting server...`);
 
 const api = createApiClient(opt.apiServiceUrl);
+
+const redisClient = new Redis(opt.redisPath);
+
+const gameServiceConfig = signal<GameServiceConfig>({
+  isPatchOptimizerEnabled: true,
+});
+
+createRedisSyncEffect(
+  redisClient,
+  gameServiceConfigRedisKey,
+  GameServiceConfig,
+  gameServiceConfig,
+);
+
+gameServiceConfig.subscribe((config) => {
+  shouldOptimizeCollects.value = config.isPatchOptimizerEnabled;
+});
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 

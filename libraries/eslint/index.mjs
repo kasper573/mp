@@ -1,10 +1,10 @@
 // @ts-check
 
-import tseslint from "typescript-eslint";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import boundariesPlugin from "eslint-plugin-boundaries";
 import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import tseslint from "typescript-eslint";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),

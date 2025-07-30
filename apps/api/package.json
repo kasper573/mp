@@ -25,6 +25,8 @@
     "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
+    "@mp/redis-client": "workspace:*",
+    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/validate": "workspace:*",

@@ -35,6 +35,7 @@
     "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
+    "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "preact": "catalog:",
     "uniqolor": "1.1.1"

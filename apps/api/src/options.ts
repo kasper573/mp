@@ -1,6 +1,6 @@
-import { boolish, csv, numeric, type } from "@mp/validate";
-import { assertEnv } from "@mp/env";
 import { authAlgorithms } from "@mp/auth/server";
+import { assertEnv } from "@mp/env";
+import { boolish, csv, numeric, type } from "@mp/validate";
 
 export type ApiOptions = typeof apiOptionsSchema.infer;
 
@@ -13,6 +13,7 @@ export const apiOptionsSchema = type({
   fileServerInternalUrl: "string",
   fileServerPublicUrl: "string",
   version: "string",
+  redisPath: "string",
   auth: {
     /**
      * OIDC issuer

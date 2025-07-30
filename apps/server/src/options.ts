@@ -24,6 +24,10 @@ export const gameServiceOptionsSchema = type({
    */
   apiServiceUrl: "string",
   /**
+   * The path to the redis server to use for game service config
+   */
+  redisPath: "string",
+  /**
    * The server tick interval
    */
   tickInterval: msSchema,
@@ -55,11 +59,6 @@ export const gameServiceOptionsSchema = type({
    * If not provided, a random seed will be used.
    */
   "rngSeed?": numeric(),
-
-  /**
-   * Set to true to enable the patch optimizer on the server side.
-   */
-  patchOptimizer: boolish(),
 
   /**
    * Whether to use pretty logging format.
