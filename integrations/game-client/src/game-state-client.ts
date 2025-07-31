@@ -9,7 +9,6 @@ import { throttle } from "@mp/std";
 import { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { subscribeToReadyState } from "@mp/ws/client";
-import { ctxGameEventClient, ctxLogger, ioc } from "./context";
 import { GameActions } from "./game-actions";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
@@ -19,17 +18,14 @@ const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
 export interface GameStateClientOptions {
   socket: WebSocketLike;
   settings: () => OptimisticGameStateSettings;
-  eventClient?: GameEventClient;
-  logger?: Logger;
+  eventClient: GameEventClient;
+  logger: Logger;
   handlePatchFailure?: (error: Error) => void;
 }
 
 export class GameStateClient {
   readonly eventBus = new SyncEventBus<GameStateEvents>();
   readonly actions: GameActions;
-
-  private events: GameEventClient;
-  private logger: Logger;
 
   // State
   readonly gameState: OptimisticGameState;
@@ -48,14 +44,15 @@ export class GameStateClient {
       this.options.socket.readyState,
     );
     this.isConnected = computed(() => this.readyState.value === WebSocket.OPEN);
-    this.events = this.options.eventClient ?? ioc.get(ctxGameEventClient);
-    this.logger = this.options.logger ?? ioc.get(ctxLogger);
 
-    this.actions = new GameActions(this.events, this.characterId);
+    this.actions = new GameActions(this.options.eventClient, this.characterId);
 
     // We throttle because when stale patches are detected, they usually come in batches,
     // and we only want to send one request for full state.
-    this.refreshState = throttle(this.events.network.requestFullState, 5000);
+    this.refreshState = throttle(
+      this.options.eventClient.network.requestFullState,
+      5000,
+    );
 
     this.actorList = computed(() => this.gameState.actors.values().toArray());
 
@@ -103,7 +100,7 @@ export class GameStateClient {
 
       const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
       if (lag.compareTo(stalePatchThreshold) > 0) {
-        this.logger.warn(
+        this.options.logger.warn(
           `Stale patch detected, requesting full state refresh (lag: ${lag.totalMilliseconds}ms)`,
         );
         this.refreshState();
@@ -121,7 +118,7 @@ export class GameStateClient {
           if (handlePatchFailure) {
             handlePatchFailure(result.error);
           } else {
-            this.logger.error(
+            this.options.logger.error(
               result.error,
               `Could not apply patch, requesting full state refresh`,
             );

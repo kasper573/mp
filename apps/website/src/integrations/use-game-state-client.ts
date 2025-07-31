@@ -4,20 +4,16 @@ import {
   type MergeEventRouterNodes,
   type ProxyEventInvoker,
 } from "@mp/event-router";
-import {
-  ctxAuthClient,
-  ctxLogger,
-  GameStateClient,
-  ioc,
-} from "@mp/game-client";
+import { ctxAuthClient, GameStateClient, ioc } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/oauth/client";
 import { WebSocket } from "@mp/ws/client";
-import { useEffect, useMemo } from "preact/hooks";
+import { useContext, useEffect, useMemo } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
+import { LoggerContext } from "./logger";
 
 export type ComposedGameEventClient = ProxyEventInvoker<
   MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
@@ -27,7 +23,7 @@ export function useGameStateClient(): [
   GameStateClient,
   ComposedGameEventClient,
 ] {
-  const logger = ioc.get(ctxLogger);
+  const logger = useContext(LoggerContext);
   const auth = ioc.get(ctxAuthClient);
 
   const [stateClient, eventClient, initialize] = useMemo(
@@ -69,6 +65,7 @@ function createGameStateClient(
   const stateClient = new GameStateClient({
     socket,
     eventClient,
+    logger,
     settings: () => miscDebugSettings.value,
   });
 

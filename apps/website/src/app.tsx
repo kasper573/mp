@@ -1,5 +1,5 @@
 import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
-import { ctxAuthClient, ctxLogger, ioc } from "@mp/game-client";
+import { ctxAuthClient, ioc } from "@mp/game-client";
 import { registerEncoderExtensions } from "@mp/game-shared";
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
@@ -14,6 +14,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useEffect, useMemo } from "preact/hooks";
 import { env } from "./env";
 import { createFaroBindings, createFaroClient } from "./integrations/faro";
+import { LoggerContext } from "./integrations/logger";
 import { createClientRouter } from "./integrations/router/router";
 
 // This is effectively the composition root of the application.
@@ -35,7 +36,9 @@ export default function App() {
         }}
       >
         <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
-          <RouterProvider router={systems.router} />
+          <LoggerContext.Provider value={systems.logger}>
+            <RouterProvider router={systems.router} />
+          </LoggerContext.Provider>
           {showDevTools && (
             <>
               <TanStackRouterDevtools router={systems.router} />
@@ -70,7 +73,6 @@ function createSystems() {
     const subscriptions = [
       auth.initialize(),
       ioc.register(ctxAuthClient, auth),
-      ioc.register(ctxLogger, logger),
       createFaroBindings(faro, auth.identity),
     ];
 
