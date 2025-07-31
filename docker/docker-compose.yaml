@@ -10,6 +10,21 @@ x-logging: &logging
     # Used by alloy to produce labels for Loki
     tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
 
+x-game-service: &game_service
+  env_file: *env_files
+  logging: *logging
+  build:
+    dockerfile: ./docker/Dockerfile.mp-node-app
+    args:
+      APP_NAME: game-service
+    context: ..
+  image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
+  restart: always
+  profiles: ["prod", "test"]
+  depends_on:
+    mp-migrations:
+      condition: service_started
+
 services:
   mp-website:
     env_file: *env_files
@@ -25,38 +40,14 @@ services:
       - mp-gateway
 
   mp-game-service-forest:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ./docker/Dockerfile.mp-node-app
-      args:
-        APP_NAME: game-service
-      context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
-    restart: always
-    profiles: ["prod", "test"]
+    <<: *game_service
     environment:
       MP_GAME_SERVICE_AREA_ID: forest
-    depends_on:
-      mp-migrations:
-        condition: service_started
 
   mp-game-service-island:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ./docker/Dockerfile.mp-node-app
-      args:
-        APP_NAME: game-service
-      context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
-    restart: always
-    profiles: ["prod", "test"]
+    <<: *game_service
     environment:
       MP_GAME_SERVICE_AREA_ID: island
-    depends_on:
-      mp-migrations:
-        condition: service_started
 
   mp-api:
     env_file: *env_files
