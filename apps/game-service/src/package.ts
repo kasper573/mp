@@ -6,7 +6,3 @@ import type { GameServiceEvents } from "./router";
 export type { GameStateEvents } from "./etc/game-state-events";
 export type { GameServiceEvents as GameServerEventRouter } from "./router";
 export type GameEventClient = ProxyEventInvoker<GameServiceEvents>;
-
-// We also export event builder tools for the gateway to use to build its own router.
-export { roles } from "./integrations/auth";
-export { evt } from "./integrations/event-router";

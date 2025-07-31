@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import type { Character } from "@mp/game-shared";
-import { ctxGameState, ctxUserSession } from "@mp/game-shared";
+import { ctxGameState, ctxUserSession } from "../context";
 import type { GameServiceContext } from "../integrations/event-router";
 
 export function accessCharacter(

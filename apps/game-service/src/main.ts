@@ -9,10 +9,6 @@ import {
 import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
-  ctxActorModelLookup,
-  ctxGameState,
-  ctxLogger,
-  ctxUserSession,
   eventWithSessionEncoding,
   GameServiceConfig,
   gameServiceConfigRedisKey,
@@ -37,12 +33,16 @@ import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
 import "dotenv/config";
 import {
+  ctxActorModelLookup,
   ctxArea,
   ctxGameEventClient,
+  ctxGameState,
   ctxGameStateLoader,
   ctxGameStateServer,
+  ctxLogger,
   ctxNpcSpawner,
   ctxRng,
+  ctxUserSession,
 } from "./context";
 import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";

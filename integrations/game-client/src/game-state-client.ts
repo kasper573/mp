@@ -1,8 +1,7 @@
 import type { CharacterId } from "@mp/db/types";
 import type { GameEventClient, GameStateEvents } from "@mp/game-service";
 import type { Actor, Character } from "@mp/game-shared";
-import { ctxLogger, syncMessageEncoding } from "@mp/game-shared";
-import { InjectionContext } from "@mp/ioc";
+import { syncMessageEncoding } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import type { ReadonlySignal, Signal } from "@mp/state";
 import { computed, signal } from "@mp/state";
@@ -10,7 +9,7 @@ import { throttle } from "@mp/std";
 import { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { subscribeToReadyState } from "@mp/ws/client";
-import { ctxGameEventClient, ioc } from "./context";
+import { ctxGameEventClient, ctxLogger, ioc } from "./context";
 import { GameActions } from "./game-actions";
 import type { OptimisticGameStateSettings } from "./optimistic-game-state";
 import { OptimisticGameState } from "./optimistic-game-state";
@@ -144,6 +143,3 @@ type WebSocketLike = Pick<
   WebSocket,
   "send" | "readyState" | "addEventListener" | "removeEventListener"
 >;
-
-export const ctxGameStateClient =
-  InjectionContext.new<GameStateClient>("GameStateClient");

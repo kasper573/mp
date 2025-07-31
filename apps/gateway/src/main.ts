@@ -11,7 +11,6 @@ import {
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
-  ctxUserSession,
   eventWithSessionEncoding,
   registerEncoderExtensions,
   syncMessageEncoding,
@@ -39,14 +38,15 @@ import "dotenv/config";
 import express from "express";
 import type { IncomingMessage } from "http";
 import http from "http";
-import { saveOnlineCharacters } from "./db-operations";
-import { opt } from "./options";
 import {
   ctxDbClient,
   ctxGameEventClient,
+  ctxUserSession,
   ctxUserSessionSignal,
-  gatewayRouter,
-} from "./router";
+} from "./context";
+import { saveOnlineCharacters } from "./db-operations";
+import { opt } from "./options";
+import { gatewayRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 

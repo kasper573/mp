@@ -4,9 +4,9 @@ import type { InjectionContainer } from "@mp/ioc";
 import type { UserIdentity } from "@mp/oauth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { unsafe } from "@mp/validate";
+import { ctxDbClient } from "../context";
 import { auth } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
-import { ctxDbClient } from "../ioc";
 import { getDefaultSpawnPoint } from "./default-spawn-point";
 
 export const myCharacterId = rpc.procedure

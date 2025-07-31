@@ -1,8 +1,14 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
-import { ctxGameState, ctxLogger } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
-import { ctxArea, ctxGameStateLoader, ctxGameStateServer } from "../context";
-import { evt, roles } from "../package";
+import {
+  ctxArea,
+  ctxGameState,
+  ctxGameStateLoader,
+  ctxGameStateServer,
+  ctxLogger,
+} from "../context";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 /**
  * Emitted by a game service when a character wants to join another game service.

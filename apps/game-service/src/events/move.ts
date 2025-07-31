@@ -4,7 +4,8 @@ import { type VectorLike, Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import { accessCharacter } from "../etc/access-character";
-import { evt, roles } from "../package";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 export const move = evt.event
   .input<{

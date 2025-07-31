@@ -1,13 +1,20 @@
-import type { DbClient } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
-import type { ProxyEventInvoker } from "@mp/event-router";
-import type { GameServerEventRouter } from "@mp/game-service";
-import { evt, roles } from "@mp/game-service";
-import type { UserSession } from "@mp/game-shared";
-import { InjectionContext } from "@mp/ioc";
+import { EventRouterBuilder } from "@mp/event-router";
+import type { ImmutableInjectionContainer } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
-import type { Signal } from "@mp/state";
+import type { RoleDefinition } from "@mp/oauth";
+import { assertRoles } from "@mp/oauth";
+import {
+  ctxDbClient,
+  ctxGameEventClient,
+  ctxUserSession,
+  ctxUserSessionSignal,
+} from "./context";
 import { hasAccessToCharacter } from "./db-operations";
+
+const evt = new EventRouterBuilder()
+  .context<ImmutableInjectionContainer>()
+  .build();
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
@@ -42,12 +49,14 @@ export const gatewayRouter = evt.router({
   }),
 });
 
-export const ctxUserSessionSignal =
-  InjectionContext.new<Signal<UserSession>>("UserSessionSignal");
-
-export const ctxDbClient = InjectionContext.new<DbClient>("DbClient");
-
-export const ctxGameEventClient =
-  InjectionContext.new<ProxyEventInvoker<GameServerEventRouter>>(
-    "GameEventClient",
-  );
+export function roles(requiredRoles: Iterable<RoleDefinition>) {
+  const requiredRolesSet = new Set(requiredRoles);
+  return evt.middleware(({ ctx }) => {
+    const session = ctx.get(ctxUserSession);
+    if (!session.user) {
+      throw new Error("User is not authenticated");
+    }
+    assertRoles(requiredRolesSet, session.user.roles);
+    return { user: session.user };
+  });
+}

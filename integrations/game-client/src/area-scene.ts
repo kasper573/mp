@@ -11,19 +11,21 @@ import {
   reactiveCollectionBinding,
   Ticker,
 } from "@mp/graphics";
-import { InjectionContext } from "@mp/ioc";
 import { Rect, Vector } from "@mp/math";
 import { computed } from "@mp/state";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import { ActorController } from "./actor-controller";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
-import { ctxEngine, ioc } from "./context";
-import { ctxGameStateClient } from "./game-state-client";
+import {
+  ctxAreaSpritesheets,
+  ctxEngine,
+  ctxGameStateClient,
+  ioc,
+} from "./context";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 
@@ -196,6 +198,3 @@ function createZoomLevelForViewDistance(
       : cameraSize.y / tileSize.y;
   return numTilesFitInCamera / tileViewDistance;
 }
-
-export const ctxAreaSpritesheets =
-  InjectionContext.new<TiledSpritesheetRecord>("AreaSpritesheets");

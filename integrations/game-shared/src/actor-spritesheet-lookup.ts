@@ -1,7 +1,6 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Texture } from "@mp/graphics";
 import { Assets } from "@mp/graphics";
-import { InjectionContext } from "@mp/ioc";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
 import type { ActorSpritesheetUrls } from "./actor-spritesheet-urls";
@@ -40,6 +39,3 @@ export async function loadActorSpritesheets(
     ),
   );
 }
-
-export const ctxActorSpritesheetLookup =
-  InjectionContext.new<ActorSpritesheetLookup>("ActorSpritesheetLookup");

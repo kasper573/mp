@@ -1,6 +1,5 @@
 import type { AreaId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
-import { ctxActorSpritesheetLookup } from "@mp/game-shared";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import type { Signal } from "@mp/state";
@@ -12,9 +11,14 @@ import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
 } from "./area-debug-settings-form";
-import { AreaScene, ctxAreaSpritesheets } from "./area-scene";
+import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import { ctxEngine, ioc } from "./context";
+import {
+  ctxActorSpritesheetLookup,
+  ctxAreaSpritesheets,
+  ctxEngine,
+  ioc,
+} from "./context";
 import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import { GameStateDebugInfo } from "./game-state-debug-info";

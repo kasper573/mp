@@ -1,23 +1,15 @@
-import { ctxUserSession } from "@mp/game-shared";
-import type { RoleDefinition } from "@mp/oauth";
+import { assertRoles, type RoleDefinition } from "@mp/oauth";
+import { ctxUserSession } from "../context";
 import { evt } from "./event-router";
 
 export function roles(requiredRoles: Iterable<RoleDefinition>) {
   const requiredRolesSet = new Set(requiredRoles);
   return evt.middleware(({ ctx }) => {
-    const session = ctx.access(ctxUserSession).unwrapOr(undefined);
-    if (!session) {
-      throw new Error("No user session available");
-    }
+    const session = ctx.get(ctxUserSession);
     if (!session.user) {
       throw new Error("User is not authenticated");
     }
-    if (!requiredRolesSet.isSubsetOf(session.user.roles)) {
-      const missingRoles = requiredRolesSet.difference(session.user.roles);
-      throw new Error(
-        "Missing permissions: " + missingRoles.values().toArray().join(", "),
-      );
-    }
+    assertRoles(requiredRolesSet, session.user.roles);
     return { user: session.user };
   });
 }

@@ -1,6 +1,6 @@
 import type { RoleDefinition, UserId } from "@mp/oauth";
 import { TRPCError } from "@trpc/server";
-import { ctxAccessToken, ctxTokenResolver } from "../ioc";
+import { ctxAccessToken, ctxTokenResolver } from "../context";
 import type { ApiContext } from "./trpc";
 import { rpc } from "./trpc";
 

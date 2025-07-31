@@ -1,5 +1,4 @@
 import type { AreaId, NpcSpawnId } from "@mp/db/types";
-import { InjectionContext } from "@mp/ioc";
 import { defineSyncComponent, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
 
@@ -20,5 +19,3 @@ export type GameState = {
     }
   >;
 };
-
-export const ctxGameState = InjectionContext.new<GameState>("GameState");

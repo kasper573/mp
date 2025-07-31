@@ -3,9 +3,9 @@ import type { ActorAnimationName, ActorSpritesheetUrls } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { UrlString } from "@mp/std";
 import path from "path";
+import { ctxFileResolver } from "../context";
 import { FileUrlType } from "../integrations/file-resolver";
 import { rpc } from "../integrations/trpc";
-import { ctxFileResolver } from "../ioc";
 
 export const actorSpritesheetUrls = rpc.procedure
   .input(FileUrlType)

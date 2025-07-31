@@ -81,6 +81,20 @@ export function defineRoles<const RoleNames extends string[]>(
   return record as RoleDefinitionRecord<RoleNames>;
 }
 
+export function assertRoles(
+  required: ReadonlySet<RoleDefinition> = empty,
+  available: ReadonlySetLike<RoleDefinition> = empty,
+): void {
+  if (!required.isSubsetOf(available)) {
+    const missingRoles = required.difference(available);
+    throw new Error(
+      "Missing permissions: " + missingRoles.values().toArray().join(", "),
+    );
+  }
+}
+
+const empty = Object.freeze(new Set<RoleDefinition>());
+
 export type RoleDefinition = Branded<string, "RoleDefinition">;
 
 export type RoleDefinitionRecord<ShortNames extends string[]> = {

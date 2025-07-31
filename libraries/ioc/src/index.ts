@@ -74,7 +74,28 @@ export class InjectionContext<Value> {
       return err(`"${name}" context is missing in IOC container`);
     });
   }
+
+  static record<Values>(): ContextRecordFor<Values> {
+    return new Proxy({} as ContextRecordFor<Values>, {
+      get: <K extends keyof Values>(
+        target: ContextRecordFor<Values>,
+        prop: PropertyKey,
+      ) => {
+        const key = prop as K;
+        if (key in target) {
+          return target[key];
+        }
+        const context = InjectionContext.new<Values[K]>(prop as string);
+        target[key] = context;
+        return context;
+      },
+    });
+  }
 }
+
+type ContextRecordFor<T> = {
+  [K in keyof T]: InjectionContext<T[K]>;
+};
 
 type InjectionMap = Map<InjectionContext<unknown>, unknown>;
 

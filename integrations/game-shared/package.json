@@ -16,8 +16,6 @@
     "@mp/encoding": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/graphics": "workspace:*",
-    "@mp/ioc": "workspace:*",
-    "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/path-finding": "workspace:*",

@@ -11,16 +11,16 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import "dotenv/config";
 import express from "express";
 import type { IncomingHttpHeaders } from "http";
-import { createFileResolver } from "./integrations/file-resolver";
-import type { ApiContext } from "./integrations/trpc";
 import {
   ctxAccessToken,
   ctxDbClient,
   ctxFileResolver,
+  ctxGameServiceConfig,
   ctxTokenResolver,
-} from "./ioc";
+} from "./context";
+import { createFileResolver } from "./integrations/file-resolver";
+import type { ApiContext } from "./integrations/trpc";
 import { opt } from "./options";
-import { ctxGameServiceConfig } from "./procedures/game-service-settings";
 import { apiRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports

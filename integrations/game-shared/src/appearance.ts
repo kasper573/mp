@@ -1,5 +1,4 @@
 import type { ActorModelId } from "@mp/db/types";
-import { InjectionContext } from "@mp/ioc";
 import type { Rect } from "@mp/math";
 import type { Tile, UrlString } from "@mp/std";
 import { defineSyncComponent } from "@mp/sync";
@@ -21,9 +20,6 @@ export interface ActorModel {
 }
 
 export type ActorModelLookup = ReadonlyMap<ActorModelId, ActorModel>;
-
-export const ctxActorModelLookup =
-  InjectionContext.new<ActorModelLookup>("ActorModelLookup");
 
 export type ActorAnimationName = (typeof actorAnimationNames)[number];
 

@@ -1,15 +1,16 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type { AreaResource, Character, MovementTrait } from "@mp/game-shared";
-import {
-  ctxGameState,
-  getAreaIdFromObject,
-  moveAlongPath,
-} from "@mp/game-shared";
+import { getAreaIdFromObject, moveAlongPath } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Path, Vector, VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
-import { ctxArea, ctxGameEventClient, ctxGameStateLoader } from "../context";
+import {
+  ctxArea,
+  ctxGameEventClient,
+  ctxGameState,
+  ctxGameStateLoader,
+} from "../context";
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {

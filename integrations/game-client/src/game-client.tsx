@@ -2,9 +2,9 @@ import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
 import { Suspense } from "preact/compat";
 import { useEffect } from "preact/hooks";
-import { ioc } from "./context";
+import { ctxGameStateClient, ioc } from "./context";
 import { GameRenderer } from "./game-renderer";
-import { ctxGameStateClient, type GameStateClient } from "./game-state-client";
+import type { GameStateClient } from "./game-state-client";
 
 export interface GameClientProps {
   stateClient: GameStateClient;
