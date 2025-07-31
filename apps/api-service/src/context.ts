@@ -8,11 +8,15 @@ import type { FileResolver } from "./integrations/file-resolver";
 
 export const ctxGameServiceConfig =
   InjectionContext.new<Signal<GameServiceConfig>>("gameServiceConfig");
+
 export const ctxDbClient = InjectionContext.new<DbClient>("dbClient");
+
 export const ctxFileResolver =
   InjectionContext.new<FileResolver>("fileResolver");
+
 export const ctxAccessToken = InjectionContext.new<AccessToken | undefined>(
   "accessToken",
 );
+
 export const ctxTokenResolver =
   InjectionContext.new<TokenResolver>("tokenResolver");

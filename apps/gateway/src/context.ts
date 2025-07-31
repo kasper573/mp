@@ -5,8 +5,11 @@ import { InjectionContext } from "@mp/ioc";
 import type { Signal } from "@mp/state";
 
 export const ctxUserSession = InjectionContext.new<UserSession>("userSession");
+
 export const ctxDbClient = InjectionContext.new<DbClient>("dbClient");
+
 export const ctxGameEventClient =
   InjectionContext.new<GameEventClient>("gameEventClient");
+
 export const ctxUserSessionSignal =
   InjectionContext.new<Signal<UserSession>>("userSessionSignal");
