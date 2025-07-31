@@ -1,6 +1,6 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
-import type { Tile, UrlString } from "@mp/std";
+import type { Tile } from "@mp/std";
 import { defineSyncComponent } from "@mp/sync";
 
 export type AppearanceTrait = typeof AppearanceTrait.$infer;
@@ -15,15 +15,14 @@ export const AppearanceTrait = defineSyncComponent((builder) =>
 
 export interface ActorModel {
   id: ActorModelId;
-  spritesheets: ReadonlyMap<ActorAnimationName, UrlString>;
   hitBox: Rect<Tile>;
 }
 
 export type ActorModelLookup = ReadonlyMap<ActorModelId, ActorModel>;
 
-export type ActorAnimationName = (typeof actorAnimationNames)[number];
+export type ActorModelState = (typeof actorModelStates)[number];
 
-export const actorAnimationNames = Object.freeze([
+export const actorModelStates = Object.freeze([
   "attack-shooting",
   "attack-spear",
   "dash-dust",
@@ -58,3 +57,9 @@ export const actorAnimationNames = Object.freeze([
   "walk-shooting",
   "walk-spear",
 ] as const);
+
+export function isActorModelState(str: string): str is ActorModelState {
+  return actorModelStatesSet.has(str as ActorModelState);
+}
+
+const actorModelStatesSet = new Set(actorModelStates);

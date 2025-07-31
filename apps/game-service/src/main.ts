@@ -99,7 +99,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
     api.areaFileUrl
       .query({ areaId: opt.areaId, urlType: "internal" })
       .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorSpritesheetUrls.query("internal").then(createActorModelLookup),
+    api.actorModelIds.query().then(createActorModelLookup),
   ]),
 ).catch((error) => {
   logger.error(error, "Failed to load area and actor data from API service");

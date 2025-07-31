@@ -1,5 +1,4 @@
 export * from "./actor";
-export * from "./actor-spritesheet-urls";
 export * from "./appearance";
 export * from "./area-resource";
 export * from "./character";

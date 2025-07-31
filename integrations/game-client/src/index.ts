@@ -1,5 +1,5 @@
 export * from "./actor-sprite-tester";
-export * from "./actor-spritesheet-lookup";
+export * from "./actor-texture-lookup";
 export * from "./area-debug-graphics";
 export * from "./area-scene";
 export * from "./context";
