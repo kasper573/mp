@@ -1,6 +1,6 @@
 import { Vector } from "@mp/math";
 import type { ReadonlySignal } from "@mp/state";
-import { computed, signal } from "@mp/state";
+import { computed, effect, signal, untracked } from "@mp/state";
 import type { Pixel } from "@mp/std";
 import type { Camera } from "./camera";
 
@@ -36,6 +36,19 @@ export class Pointer {
     const relativeX = (e.clientX - targetBounds.left) as Pixel;
     const relativeY = (e.clientY - targetBounds.top) as Pixel;
     this.#position.value = new Vector(relativeX, relativeY);
+  };
+
+  /**
+   * Method for creating an effect that runs only once the pointer is clicked.
+   * It's best practice to always use this when you want to handle pointer clicks,
+   * even if the underlying implementation is simple. It allows us to change the implementation later if we want.
+   */
+  onClick = (callback: () => void) => {
+    return effect(() => {
+      if (this.isDown.value) {
+        untracked(callback);
+      }
+    });
   };
 }
 

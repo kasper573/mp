@@ -204,6 +204,14 @@ function setupGameClientSocket(
   });
 
   socket.on("message", (data: ArrayBuffer) => {
+    if (data.byteLength > maxMessageSizeFromGameClient) {
+      logger.warn(
+        { size: data.byteLength },
+        `Received too large message from game client ${session.value.id}. Ignoring message and closing connection.`,
+      );
+      socket.close(1009, "Message too large");
+      return;
+    }
     const result = eventMessageEncoding.decode(data);
     if (result.isOk()) {
       if (willRouterAcceptMessage(gatewayRouter, result.value)) {
@@ -296,9 +304,16 @@ function getRequestInfo(req: IncomingMessage): RequestInfo {
   return { type: "game-client", session, token };
 }
 
+// In practice most game client inputs should be ~100B,
+// but we add some margin to avoid accidentally disconnecting non malicious clients.
+// This safety limit just exist to prevent abuse.
+const maxMessageSizeFromGameClient = 500;
+
 function wssConfig(): WebSocketServerOptions {
   return {
-    maxPayload: 50000,
+    // Arbitrary safety limit to never send too much data,
+    // however, in practice we will limit game client sockets to a much smaller size manually.
+    maxPayload: 50_000,
     perMessageDeflate: {
       zlibDeflateOptions: {
         chunkSize: 1024,
