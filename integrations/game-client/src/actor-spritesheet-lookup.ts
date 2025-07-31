@@ -1,10 +1,9 @@
 import type { ActorModelId } from "@mp/db/types";
+import type { ActorAnimationName, ActorSpritesheetUrls } from "@mp/game-shared";
 import type { Texture } from "@mp/graphics";
 import { Assets } from "@mp/graphics";
 import type { ActorSpritesheet } from "./actor-spritesheet";
 import { createActorSpritesheet } from "./actor-spritesheet";
-import type { ActorSpritesheetUrls } from "./actor-spritesheet-urls";
-import type { ActorAnimationName } from "./appearance";
 
 export type ActorSpritesheetLookup = ReadonlyMap<
   ActorModelId,

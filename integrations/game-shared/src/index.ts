@@ -1,6 +1,4 @@
 export * from "./actor";
-export * from "./actor-spritesheet";
-export * from "./actor-spritesheet-lookup";
 export * from "./actor-spritesheet-urls";
 export * from "./appearance";
 export * from "./area-resource";

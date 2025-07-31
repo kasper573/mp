@@ -1,8 +1,9 @@
 import { useApi } from "@mp/api-service/sdk";
 import type { AreaId } from "@mp/db/types";
-import type { GameAssetLoader } from "@mp/game-client";
-import type { ActorSpritesheetLookup, AreaResource } from "@mp/game-shared";
-import { loadActorSpritesheets, loadAreaResource } from "@mp/game-shared";
+import type { ActorSpritesheetLookup } from "@mp/game-client";
+import { loadActorSpritesheets, type GameAssetLoader } from "@mp/game-client";
+import type { AreaResource } from "@mp/game-shared";
+import { loadAreaResource } from "@mp/game-shared";
 import { useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";

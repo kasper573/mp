@@ -1,6 +1,5 @@
 import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
-import type { ActorSpritesheetLookup } from "@mp/game-shared";
 import {
   clientViewDistance,
   getAreaIdFromObject,
@@ -21,6 +20,7 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import { ActorController } from "./actor-controller";
+import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { GameStateClient } from "./game-state-client";

@@ -1,6 +1,5 @@
 import type { ActorModelId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
-import type { ActorSpritesheetLookup } from "@mp/game-shared";
 import { actorAnimationNames, type ActorAnimationName } from "@mp/game-shared";
 import { Container, Text } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
@@ -15,6 +14,7 @@ import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
+import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 import { useObjectSignal } from "./use-object-signal";
 
 export function ActorSpriteTester({

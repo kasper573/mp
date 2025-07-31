@@ -1,9 +1,5 @@
 import type { GameStateEvents } from "@mp/game-service";
-import type {
-  Actor,
-  ActorSpritesheetLookup,
-  TiledResource,
-} from "@mp/game-shared";
+import type { Actor, TiledResource } from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   ColorMatrixFilter,
@@ -16,6 +12,7 @@ import { assert } from "@mp/std";
 import type { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
+import type { ActorSpritesheetLookup } from "./actor-spritesheet-lookup";
 
 export interface ActorControllerOptions {
   tiled: TiledResource;

@@ -1,3 +1,4 @@
+import type { ActorAnimationName } from "@mp/game-shared";
 import type {
   Size,
   SpritesheetData,
@@ -7,7 +8,6 @@ import type {
 import { Spritesheet } from "@mp/graphics";
 import type { CardinalDirection } from "@mp/math";
 import type { TiledSpritesheetData } from "@mp/tiled-renderer";
-import type { ActorAnimationName } from "./appearance";
 
 export type ActorSpritesheet = Spritesheet<TiledSpritesheetData>;
 
