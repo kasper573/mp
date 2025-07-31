@@ -1,4 +1,4 @@
-import type { RoleDefinition, UserId } from "@mp/oauth";
+import { assertRoles, type RoleDefinition, type UserId } from "@mp/oauth";
 import { TRPCError } from "@trpc/server";
 import { ctxAccessToken, ctxTokenResolver } from "../context";
 import type { ApiContext } from "./trpc";
@@ -15,15 +15,11 @@ export function auth() {
 }
 
 export function roles(requiredRoles: RoleDefinition[]) {
+  const requiredRolesSet = new Set(requiredRoles);
   return auth().unstable_pipe(({ ctx, next }) => {
-    const requiredRolesSet = new Set(requiredRoles);
-    if (!requiredRolesSet.isSubsetOf(ctx.user.roles)) {
-      const missingRoles = requiredRolesSet.difference(ctx.user.roles);
-      throw new TRPCError({
-        code: "FORBIDDEN",
-        message:
-          "Missing permissions: " + missingRoles.values().toArray().join(", "),
-      });
+    const result = assertRoles(requiredRolesSet, ctx.user.roles);
+    if (result.isErr()) {
+      throw new TRPCError({ code: "FORBIDDEN", message: result.error });
     }
     return next({ ctx });
   });
