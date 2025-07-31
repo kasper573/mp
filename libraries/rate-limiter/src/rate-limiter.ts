@@ -1,7 +1,6 @@
+import { okAsync, ResultAsync } from "@mp/std";
 import type { IRateLimiterOptions } from "rate-limiter-flexible";
 import { RateLimiterMemory } from "rate-limiter-flexible";
-import { ResultAsync } from "@mp/std";
-import { okAsync } from "@mp/std";
 
 export type RateLimiterOptions = IRateLimiterOptions;
 
@@ -18,8 +17,11 @@ export class RateLimiter {
     }
 
     return ResultAsync.fromPromise(
-      this.memoryLimiter.consume(key).then(() => "accepted"),
-      String,
+      this.memoryLimiter.consume(key).then(() => "accepted" as const),
+      (error) =>
+        new Error(`Rate limit exceeded for key: ${key}`, {
+          cause: error,
+        }),
     );
   }
 
@@ -32,4 +34,4 @@ export class RateLimiter {
 
 export type RateLimiterOk = "skipped-due-to-disabled" | "accepted";
 
-export type RateLimiterResult = ResultAsync<RateLimiterOk, string>;
+export type RateLimiterResult = ResultAsync<RateLimiterOk, Error>;
