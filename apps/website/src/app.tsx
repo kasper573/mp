@@ -1,5 +1,4 @@
 import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
-import { registerEncoderExtensions } from "@mp/game-shared";
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
 import {
@@ -21,8 +20,6 @@ import { createClientRouter } from "./integrations/router/router";
 // They should be passed down to the component tree via context.
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
-
-registerEncoderExtensions();
 
 export default function App() {
   const systems = useMemo(() => createSystems(), []);

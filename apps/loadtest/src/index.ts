@@ -6,7 +6,7 @@ import {
 } from "@mp/event-router";
 import { GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
-import { loadAreaResource, registerEncoderExtensions } from "@mp/game-shared";
+import { loadAreaResource } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";
@@ -14,8 +14,6 @@ import type { Signal } from "@mp/state";
 import { Rng } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
-
-registerEncoderExtensions();
 
 const logger = createConsoleLogger();
 
