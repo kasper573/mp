@@ -121,17 +121,21 @@ These are the workspaces, in order:
 
 ### apps
 
-Deployable executables. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
+Deployable executables. Most business logic exist here.
+
+May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
 The apps are responsible for bundling.
 
 ### integrations
 
-Integrations with third party services. May depend on libraries, but not apps.
+Compositions of libraries or integrations with third party services.
+
+May depend on libraries, but not apps, with one exception: `@mp/game-service` exposes event router typedefs that is okay to use. It allows clients to get a type safe event emitter for the game service.
 
 ### libraries
 
-Generic and low level systems.
+Generic and low level systems. No business logic.
 
 Should be highly configurable and modular.
 
