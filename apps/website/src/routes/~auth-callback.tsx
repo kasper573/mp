@@ -1,8 +1,8 @@
-import { ctxAuthClient, ioc } from "@mp/game/client";
 import type { AuthClient } from "@mp/oauth/client";
 import type { UseNavigateResult } from "@tanstack/react-router";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "preact/hooks";
+import { useContext, useEffect } from "preact/hooks";
+import { AuthContext } from "../integrations/contexts";
 
 /**
  * The auth callback route is intentionally placed outside the layout.
@@ -20,7 +20,7 @@ export const Route = createFileRoute("/auth-callback")({
 
 function RouteComponent() {
   const navigate = useNavigate();
-  const auth = ioc.get(ctxAuthClient);
+  const auth = useContext(AuthContext);
 
   useEffect(() => {
     void handleAuthCallback(auth, navigate);

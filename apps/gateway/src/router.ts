@@ -1,11 +1,18 @@
-import type { DbClient } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
-import type { UserSession } from "@mp/game/server";
-import { ctxGameEventClient, evt, roles } from "@mp/game/server";
-import { InjectionContext } from "@mp/ioc";
+import { EventRouterBuilder } from "@mp/event-router";
+import type { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
-import type { Signal } from "@mp/state";
+import type { RoleDefinition } from "@mp/oauth";
+import { assertRoles } from "@mp/oauth";
+import {
+  ctxDbClient,
+  ctxGameEventClient,
+  ctxUserSession,
+  ctxUserSessionSignal,
+} from "./context";
 import { hasAccessToCharacter } from "./db-operations";
+
+const evt = new EventRouterBuilder().context<InjectionContainer>().build();
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
@@ -40,7 +47,14 @@ export const gatewayRouter = evt.router({
   }),
 });
 
-export const ctxUserSessionSignal =
-  InjectionContext.new<Signal<UserSession>>("UserSessionSignal");
-
-export const ctxDbClient = InjectionContext.new<DbClient>("DbClient");
+export function roles(requiredRoles: Iterable<RoleDefinition>) {
+  const requiredRolesSet = new Set(requiredRoles);
+  return evt.middleware(({ ctx }) => {
+    const session = ctx.get(ctxUserSession);
+    if (!session.user) {
+      throw new Error("User is not authenticated");
+    }
+    assertRoles(requiredRolesSet, session.user.roles)._unsafeUnwrap();
+    return { user: session.user };
+  });
+}

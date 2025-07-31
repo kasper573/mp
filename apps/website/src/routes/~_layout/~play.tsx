@@ -1,11 +1,11 @@
 import { useApiClient } from "@mp/api-service/sdk";
-import { GameAssetLoaderContext, GameClient } from "@mp/game/client";
+import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
 import { useSignalEffect } from "@mp/state/react";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
 import { useGameAssets } from "../../integrations/assets";
-import { useGameStateClient } from "../../integrations/game-state-client";
+import { useGameStateClient } from "../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 

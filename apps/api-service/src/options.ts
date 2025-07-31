@@ -39,4 +39,8 @@ export const apiOptionsSchema = type({
   },
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(apiOptionsSchema, process.env, "MP_API_");
+export const opt = assertEnv(
+  (v) => apiOptionsSchema.assert(v),
+  process.env,
+  "MP_API_",
+);

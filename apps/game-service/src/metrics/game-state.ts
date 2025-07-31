@@ -1,5 +1,5 @@
+import type { GameState } from "@mp/game-shared";
 import { MetricsGague } from "@mp/telemetry/prom";
-import type { GameState } from "@mp/game/server";
 
 export function collectGameStateMetrics(state: GameState) {
   return [

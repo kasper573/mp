@@ -1,8 +1,9 @@
-import { ioc, ctxAuthClient } from "@mp/game/client";
 import { Button } from "@mp/ui";
+import { useContext } from "preact/hooks";
+import { AuthContext } from "../integrations/contexts";
 
 export default function PermissionDenied() {
-  const auth = ioc.get(ctxAuthClient);
+  const auth = useContext(AuthContext);
 
   return (
     <div

@@ -83,9 +83,9 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
-      '@mp/game':
+      '@mp/game-shared':
         specifier: workspace:*
-        version: link:../../integrations/game
+        version: link:../../integrations/game-shared
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
@@ -174,18 +174,27 @@ importers:
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/game':
+      '@mp/game-shared':
         specifier: workspace:*
-        version: link:../../integrations/game
+        version: link:../../integrations/game-shared
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
+      '@mp/keycloak':
+        specifier: workspace:*
+        version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../libraries/path-finding
       '@mp/rate-limiter':
         specifier: workspace:*
         version: link:../../libraries/rate-limiter
@@ -204,6 +213,9 @@ importers:
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
@@ -238,9 +250,12 @@ importers:
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/game':
+      '@mp/game-service':
         specifier: workspace:*
-        version: link:../../integrations/game
+        version: link:../game-service
+      '@mp/game-shared':
+        specifier: workspace:*
+        version: link:../../integrations/game-shared
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
@@ -299,9 +314,15 @@ importers:
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/game':
+      '@mp/game-client':
         specifier: workspace:*
-        version: link:../../integrations/game
+        version: link:../../integrations/game-client
+      '@mp/game-service':
+        specifier: workspace:*
+        version: link:../game-service
+      '@mp/game-shared':
+        specifier: workspace:*
+        version: link:../../integrations/game-shared
       '@mp/gateway':
         specifier: workspace:*
         version: link:../gateway
@@ -363,9 +384,15 @@ importers:
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/game':
+      '@mp/game-client':
         specifier: workspace:*
-        version: link:../../integrations/game
+        version: link:../../integrations/game-client
+      '@mp/game-service':
+        specifier: workspace:*
+        version: link:../game-service
+      '@mp/game-shared':
+        specifier: workspace:*
+        version: link:../../integrations/game-shared
       '@mp/gateway':
         specifier: workspace:*
         version: link:../gateway
@@ -399,9 +426,6 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../libraries/ui
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
         version: link:../../libraries/ws
@@ -465,38 +489,29 @@ importers:
         specifier: 0.30.1
         version: 0.30.1
 
-  integrations/game:
+  integrations/game-client:
     dependencies:
       '@mp/db':
         specifier: workspace:*
         version: link:../db
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../../libraries/encoding
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
-      '@mp/event-router':
+      '@mp/game-service':
         specifier: workspace:*
-        version: link:../../libraries/event-router
+        version: link:../../apps/game-service
+      '@mp/game-shared':
+        specifier: workspace:*
+        version: link:../game-shared
       '@mp/graphics':
         specifier: workspace:*
         version: link:../../libraries/graphics
-      '@mp/ioc':
-        specifier: workspace:*
-        version: link:../../libraries/ioc
-      '@mp/keycloak':
-        specifier: workspace:*
-        version: link:../keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
-      '@mp/oauth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
@@ -527,9 +542,6 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../libraries/ui
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
       '@mp/ws':
         specifier: workspace:*
         version: link:../../libraries/ws
@@ -539,6 +551,55 @@ importers:
       uniqolor:
         specifier: 1.1.1
         version: 1.1.1
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
+  integrations/game-shared:
+    dependencies:
+      '@mp/db':
+        specifier: workspace:*
+        version: link:../db
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../../libraries/encoding
+      '@mp/event-router':
+        specifier: workspace:*
+        version: link:../../libraries/event-router
+      '@mp/graphics':
+        specifier: workspace:*
+        version: link:../../libraries/graphics
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/oauth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../libraries/path-finding
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../libraries/state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+      '@mp/sync':
+        specifier: workspace:*
+        version: link:../../libraries/sync
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+      '@mp/tiled-renderer':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-renderer
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../libraries/time
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -660,9 +721,6 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../validate
       dot-prop:
         specifier: 9.0.0
         version: 9.0.0
@@ -670,9 +728,6 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
-      vitest:
-        specifier: 'catalog:'
-        version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
 
   libraries/eslint:
     devDependencies:

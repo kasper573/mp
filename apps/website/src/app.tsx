@@ -1,10 +1,4 @@
 import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
-import {
-  ctxAuthClient,
-  ctxLogger,
-  ioc,
-  registerEncoderExtensions,
-} from "@mp/game/client";
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
 import {
@@ -17,7 +11,8 @@ import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useEffect, useMemo } from "preact/hooks";
 import { env } from "./env";
-import { createFaroBindings, createFaroClient } from "./integrations/faro";
+import { AuthContext, LoggerContext } from "./integrations/contexts";
+import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
 
 // This is effectively the composition root of the application.
@@ -25,8 +20,6 @@ import { createClientRouter } from "./integrations/router/router";
 // They should be passed down to the component tree via context.
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
-
-registerEncoderExtensions();
 
 export default function App() {
   const systems = useMemo(() => createSystems(), []);
@@ -39,7 +32,11 @@ export default function App() {
         }}
       >
         <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
-          <RouterProvider router={systems.router} />
+          <LoggerContext.Provider value={systems.logger}>
+            <AuthContext.Provider value={systems.auth}>
+              <RouterProvider router={systems.router} />
+            </AuthContext.Provider>
+          </LoggerContext.Provider>
           {showDevTools && (
             <>
               <TanStackRouterDevtools router={systems.router} />
@@ -56,7 +53,6 @@ function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const faro = createFaroClient();
   const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const query = new QueryClient({
@@ -71,12 +67,7 @@ function createSystems() {
   function initialize() {
     void auth.refresh();
 
-    const subscriptions = [
-      auth.initialize(),
-      ioc.register(ctxAuthClient, auth),
-      ioc.register(ctxLogger, logger),
-      createFaroBindings(faro, auth.identity),
-    ];
+    const subscriptions = [auth.initialize(), initializeFaro(auth.identity)];
 
     return () => {
       for (const unsubscribe of subscriptions) {
@@ -90,7 +81,6 @@ function createSystems() {
     api,
     logger,
     router,
-    faro,
     query,
     initialize,
   };

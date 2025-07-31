@@ -1,4 +1,5 @@
-import { createSeededUuid, type Branded } from "@mp/std";
+import type { Result } from "@mp/std";
+import { createSeededUuid, err, ok, type Branded } from "@mp/std";
 import type { JWTPayload } from "jose";
 
 export type AccessToken = Branded<string, "AccessToken">;
@@ -80,6 +81,21 @@ export function defineRoles<const RoleNames extends string[]>(
 
   return record as RoleDefinitionRecord<RoleNames>;
 }
+
+export function assertRoles(
+  required: ReadonlySet<RoleDefinition> = empty,
+  available: ReadonlySetLike<RoleDefinition> = empty,
+): Result<void, string> {
+  if (!required.isSubsetOf(available)) {
+    const missingRoles = required.difference(available);
+    return err(
+      "Missing permissions: " + missingRoles.values().toArray().join(", "),
+    );
+  }
+  return ok(void 0);
+}
+
+const empty = Object.freeze(new Set<RoleDefinition>());
 
 export type RoleDefinition = Branded<string, "RoleDefinition">;
 

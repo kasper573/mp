@@ -48,6 +48,11 @@ export default tseslint.config(
     },
     settings: {
       "boundaries/elements": [
+        {
+          type: "game-service-typedef",
+          pattern: "apps/game-service/src/package.ts",
+          mode: "file",
+        },
         { type: "app", pattern: "apps/*/src/**" },
         { type: "integration", pattern: "integrations/*/src/**" },
         { type: "library", pattern: "libraries/**" },
@@ -68,8 +73,16 @@ export default tseslint.config(
           default: "disallow",
           message: "${file.type} is not allowed to import ${dependency.type}",
           rules: [
-            { from: "app", allow: ["app", "integration", "library"] },
-            { from: "integration", allow: ["integration", "library"] },
+            // Dependency order: app -> integration -> library
+            // Exception: integrations may use game service typedefs
+            {
+              from: ["app", "game-service-typedef"],
+              allow: ["app", "game-service-typedef", "integration", "library"],
+            },
+            {
+              from: "integration",
+              allow: ["game-service-typedef", "integration", "library"],
+            },
             { from: "library", allow: ["library"] },
           ],
         },

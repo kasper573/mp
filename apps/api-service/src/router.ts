@@ -2,14 +2,14 @@ import { systemRoles } from "@mp/keycloak";
 import { roles } from "./integrations/auth";
 import { rpc } from "./integrations/trpc";
 import { opt } from "./options";
-import { actorSpritesheetUrls } from "./routes/actor-spritesheet-urls";
-import { areaFileUrl, areaFileUrls } from "./routes/area-file-urls";
-import { characterList } from "./routes/character-list";
+import { actorSpritesheetUrls } from "./procedures/actor-spritesheet-urls";
+import { areaFileUrl, areaFileUrls } from "./procedures/area-file-urls";
+import { characterList } from "./procedures/character-list";
 import {
   gameServiceSettings,
   setGameServiceSettings,
-} from "./routes/game-service-settings";
-import { myCharacterId } from "./routes/my-character-id";
+} from "./procedures/game-service-settings";
+import { myCharacterId } from "./procedures/my-character-id";
 
 export type ApiRpcRouter = typeof apiRouter;
 export const apiRouter = rpc.router({

@@ -1,10 +1,6 @@
 import { createDbClient } from "@mp/db";
-import {
-  ctxTokenResolver,
-  GameServiceConfig,
-  gameServiceConfigRedisKey,
-} from "@mp/game/server";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
+import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/oauth";
 import { createTokenResolver } from "@mp/oauth/server";
@@ -15,12 +11,17 @@ import * as trpcExpress from "@trpc/server/adapters/express";
 import "dotenv/config";
 import express from "express";
 import type { IncomingHttpHeaders } from "http";
+import {
+  ctxAccessToken,
+  ctxDbClient,
+  ctxFileResolver,
+  ctxGameServiceConfig,
+  ctxTokenResolver,
+} from "./context";
 import { createFileResolver } from "./integrations/file-resolver";
 import type { ApiContext } from "./integrations/trpc";
-import { ctxAccessToken, ctxDbClient, ctxFileResolver } from "./ioc";
 import { opt } from "./options";
 import { apiRouter } from "./router";
-import { ctxGameServiceConfig } from "./routes/game-service-settings";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -52,7 +53,7 @@ const fileResolver = createFileResolver(
   opt.fileServerPublicUrl,
 );
 
-const ioc = new ImmutableInjectionContainer()
+const ioc = new InjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
   .provide(ctxDbClient, db)

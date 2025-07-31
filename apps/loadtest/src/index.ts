@@ -1,26 +1,19 @@
 // oxlint-disable no-await-in-loop
 import { createApiClient } from "@mp/api-service/sdk";
-import type { GameEventClient } from "@mp/game/client";
-import {
-  GameStateClient,
-  loadAreaResource,
-  registerEncoderExtensions,
-} from "@mp/game/client";
-import { createConsoleLogger } from "@mp/logger";
-import { createBypassUser } from "@mp/oauth";
-import { Rng } from "@mp/std";
-import { WebSocket } from "@mp/ws/server";
-import { readCliOptions } from "./cli";
-
 import {
   createProxyEventInvoker,
   eventMessageEncoding,
 } from "@mp/event-router";
+import { GameStateClient } from "@mp/game-client";
+import type { GameServerEventRouter } from "@mp/game-service";
+import { loadAreaResource } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
+import { createConsoleLogger } from "@mp/logger";
+import { createBypassUser } from "@mp/oauth";
 import type { Signal } from "@mp/state";
-import { parseSocketError } from "@mp/ws/server";
-
-registerEncoderExtensions();
+import { Rng } from "@mp/std";
+import { parseSocketError, WebSocket } from "@mp/ws/server";
+import { readCliOptions } from "./cli";
 
 const logger = createConsoleLogger();
 
@@ -96,8 +89,8 @@ function testOneGameClient(n: number, rng: Rng) {
       socket = new WebSocket(url.toString());
       socket.binaryType = "arraybuffer";
 
-      const gameEvents: GameEventClient = createProxyEventInvoker((message) =>
-        socket.send(eventMessageEncoding.encode(message)),
+      const gameEvents = createProxyEventInvoker<GameServerEventRouter>(
+        (message) => socket.send(eventMessageEncoding.encode(message)),
       );
 
       const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>

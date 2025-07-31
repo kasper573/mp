@@ -51,4 +51,8 @@ export const serverOptionsSchema = type({
   },
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(serverOptionsSchema, process.env, "MP_GATEWAY_");
+export const opt = assertEnv(
+  (v) => serverOptionsSchema.assert(v),
+  process.env,
+  "MP_GATEWAY_",
+);

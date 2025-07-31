@@ -1,4 +1,4 @@
-import { ActorSpriteTester } from "@mp/game/client";
+import { ActorSpriteTester } from "@mp/game-client";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActorSpritesheets } from "../../../../integrations/assets";
 

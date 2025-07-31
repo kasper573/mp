@@ -8,21 +8,15 @@ import {
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
-import type {
-  GameEventClient,
-  SyncMessageWithRecipient,
-  UserSession,
-} from "@mp/game/server";
+import type { GameServerEventRouter } from "@mp/game-service";
+import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
-  ctxGameEventClient,
-  ctxTokenResolver,
-  ctxUserSession,
   eventWithSessionEncoding,
   registerEncoderExtensions,
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
-} from "@mp/game/server";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+} from "@mp/game-shared";
+import { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken, UserId } from "@mp/oauth";
@@ -44,9 +38,15 @@ import "dotenv/config";
 import express from "express";
 import type { IncomingMessage } from "http";
 import http from "http";
+import {
+  ctxDbClient,
+  ctxGameEventClient,
+  ctxUserSession,
+  ctxUserSessionSignal,
+} from "./context";
 import { saveOnlineCharacters } from "./db-operations";
 import { opt } from "./options";
-import { ctxDbClient, ctxUserSessionSignal, gatewayRouter } from "./router";
+import { gatewayRouter } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -101,9 +101,7 @@ const gatewayEventInvoker = new QueuedEventInvoker({
   logger,
 });
 
-const ioc = new ImmutableInjectionContainer()
-  .provide(ctxTokenResolver, resolveAccessToken)
-  .provide(ctxDbClient, db);
+const ioc = new InjectionContainer().provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
   debounce(saveOnlineCharacters(db, logger), 100),
@@ -195,7 +193,7 @@ function setupGameClientSocket(
     }
   }
 
-  const broadcastClient: GameEventClient = createProxyEventInvoker(
+  const broadcastClient = createProxyEventInvoker<GameServerEventRouter>(
     broadcastEventToGameServices,
   );
 

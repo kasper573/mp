@@ -6,38 +6,18 @@ import {
   eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import type {
-  GameEventClient,
-  GameState,
-  GameStateServer,
-} from "@mp/game/server";
+import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
-  combatBehavior,
-  ctxActorModelLookup,
-  ctxArea,
-  ctxGameEventClient,
-  ctxGameState,
-  ctxGameStateLoader,
-  ctxGameStateServer,
-  ctxLogger,
-  ctxNpcSpawner,
-  ctxRng,
-  ctxUserSession,
-  deriveClientVisibility,
   eventWithSessionEncoding,
-  gameServerEventRouter,
   GameServiceConfig,
   gameServiceConfigRedisKey,
   GameStateAreaEntity,
   loadAreaResource,
-  movementBehavior,
-  NpcAi,
-  NpcSpawner,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
-} from "@mp/game/server";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+} from "@mp/game-shared";
+import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
@@ -52,13 +32,32 @@ import {
 import { Ticker } from "@mp/time";
 import { parseSocketError, ReconnectingWebSocket } from "@mp/ws/server";
 import "dotenv/config";
-import { createActorModelLookup } from "./db/actor-model-lookup";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./db/game-state-db-sync";
-import { createGameStateLoader } from "./db/game-state-loader";
+import {
+  ctxActorModelLookup,
+  ctxArea,
+  ctxGameEventClient,
+  ctxGameState,
+  ctxGameStateLoader,
+  ctxGameStateServer,
+  ctxLogger,
+  ctxNpcSpawner,
+  ctxRng,
+  ctxUserSession,
+} from "./context";
+import { createActorModelLookup } from "./etc/actor-model-lookup";
+import { deriveClientVisibility } from "./etc/client-visibility";
+import { combatBehavior } from "./etc/combat-behavior";
+import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
+import { GameStateLoader } from "./etc/game-state-loader";
+import type { GameStateServer } from "./etc/game-state-server";
+import { movementBehavior } from "./etc/movement-behavior";
+import { NpcAi } from "./etc/npc/npc-ai";
+import { NpcSpawner } from "./etc/npc/npc-spawner";
 import { collectGameStateMetrics } from "./metrics/game-state";
 import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
+import { gameServiceEvents, type GameServiceEvents } from "./router";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -107,11 +106,11 @@ const [area, actorModels] = await withBackoffRetries(() =>
   process.exit(1);
 });
 
-const gameStateLoader = createGameStateLoader(db, area, actorModels, rng);
+const gameStateLoader = new GameStateLoader(db, area, actorModels, rng);
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
-  invoke: createEventInvoker(gameServerEventRouter),
+  invoke: createEventInvoker(gameServiceEvents),
   logger,
 });
 
@@ -126,7 +125,7 @@ gatewaySocket.addEventListener("error", (err) =>
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
 
-const gameEventBroadcastClient: GameEventClient = createProxyEventInvoker(
+const gameEventBroadcastClient = createProxyEventInvoker<GameServiceEvents>(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
 );
 
@@ -222,7 +221,7 @@ const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
 
 const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
 
-const ioc = new ImmutableInjectionContainer()
+const ioc = new InjectionContainer()
   .provide(ctxGameStateLoader, gameStateLoader)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
