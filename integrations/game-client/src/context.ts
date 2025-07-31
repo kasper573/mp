@@ -2,12 +2,10 @@ import type { Engine } from "@mp/engine";
 import type { GameEventClient } from "@mp/game-service";
 import type { ActorModelLookup, ActorSpritesheetLookup } from "@mp/game-shared";
 import { InjectionContext, MutableInjectionContainer } from "@mp/ioc";
-import type { AuthClient } from "@mp/oauth/client";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { GameStateClient } from "./game-state-client";
 
 export const ctxEngine = InjectionContext.new<Engine>("Engine");
-export const ctxAuthClient = InjectionContext.new<AuthClient>("AuthClient");
 export const ctxGameEventClient =
   InjectionContext.new<GameEventClient>("GameEventClient");
 export const ctxGameStateClient =

@@ -1,19 +1,15 @@
 import { useApi } from "@mp/api-service/sdk";
 import type { CharacterId } from "@mp/db/types";
-import {
-  ctxAuthClient,
-  GameAssetLoaderContext,
-  ioc,
-  SpectatorClient,
-} from "@mp/game-client";
+import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
 import { useQuery } from "@mp/query";
 import { useSignalEffect } from "@mp/state/react";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense } from "preact/compat";
+import { Suspense, useContext } from "preact/compat";
 import { useGameAssets } from "../../../integrations/assets";
+import { AuthContext } from "../../../integrations/contexts";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
@@ -26,7 +22,7 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 
 function RouteComponent() {
   const api = useApi();
-  const auth = ioc.get(ctxAuthClient);
+  const auth = useContext(AuthContext);
   const [stateClient, events] = useGameStateClient();
 
   const characterOptions = useQuery(

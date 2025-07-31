@@ -1,8 +1,9 @@
-import { ctxAuthClient, ioc } from "@mp/game-client";
 import { gatewayRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
 import { Button, LinearProgress } from "@mp/ui";
 import { useRouterState } from "@tanstack/react-router";
+import { useContext } from "preact/hooks";
+import { AuthContext } from "../integrations/contexts";
 import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
@@ -11,7 +12,7 @@ export default function AppBar() {
   const state = useRouterState();
   const isNavigating = state.status === "pending";
 
-  const auth = ioc.get(ctxAuthClient);
+  const auth = useContext(AuthContext);
   const versionCompatibility = useVersionCompatibility();
 
   return (
