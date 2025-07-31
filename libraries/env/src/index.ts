@@ -1,33 +1,27 @@
 import type { Result } from "@mp/std";
-import { ok, err } from "@mp/std";
+import { err, ok } from "@mp/std";
 import { setProperty } from "dot-prop";
-import { type, type Type } from "@mp/validate";
 
-export function assertEnv<EnvType extends Type>(
-  envType: EnvType,
+export function assertEnv<T>(
+  assert: (value: unknown) => T,
   envInput: FlatObject,
   prefix = "",
-): EnvType["infer"] {
-  const result = parseEnv(envType, envInput, prefix);
-  if (result.isErr()) {
-    throw new Error(result.error);
-  }
-  return result.value;
-}
-
-export function parseEnv<EnvType extends Type>(
-  envType: EnvType,
-  envInput: FlatObject,
-  prefix = "",
-): Result<EnvType["infer"], string> {
+): T {
   const selected = selectProperties(envInput, prefix);
   const nested = flatToNestedObject(selected);
+  return assert(nested);
+}
 
-  const parsed = envType(nested);
-  if (parsed instanceof type.errors) {
-    return err(parsed.summary);
+export function parseEnv<T>(
+  assert: (value: unknown) => T,
+  envInput: FlatObject,
+  prefix = "",
+): Result<T, Error> {
+  try {
+    return ok(assertEnv(assert, envInput, prefix));
+  } catch (error) {
+    return err(new Error("Failed to parse env", { cause: error }));
   }
-  return ok(parsed);
 }
 
 type Primitive = string | number | boolean | null | undefined;

@@ -67,7 +67,7 @@ export const gameServiceOptionsSchema = type({
 }).onDeepUndeclaredKey("delete");
 
 export const opt = assertEnv(
-  gameServiceOptionsSchema,
+  (v) => gameServiceOptionsSchema.assert(v),
   process.env,
   "MP_GAME_SERVICE_",
 );

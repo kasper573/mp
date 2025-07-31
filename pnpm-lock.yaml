@@ -457,6 +457,9 @@ importers:
       vite:
         specifier: 'catalog:'
         version: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
+      vite-bundle-analyzer:
+        specifier: 1.1.0
+        version: 1.1.0
       vite-plugin-checker:
         specifier: 0.9.3
         version: 0.9.3(eslint@9.32.0(jiti@2.4.2))(optionator@0.9.4)(typescript@5.8.3)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -724,9 +727,6 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../validate
       dot-prop:
         specifier: 9.0.0
         version: 9.0.0
@@ -5249,6 +5249,10 @@ packages:
     resolution: {integrity: sha512-BNGbWLfd0eUPabhkXUVm0j8uuvREyTh5ovRa/dyow/BqAbZJyC+5fU+IzQOzmAKzYqYRAISoRhdQr3eIZ/PXqg==}
     engines: {node: '>= 0.8'}
 
+  vite-bundle-analyzer@1.1.0:
+    resolution: {integrity: sha512-f/9m+6S5yPOHf/QS00rLOkyQ0icZeF67roM3O5LZZMPTOZFU1bHJTptNHCKMJc2yxXzj0Hunwcetrc+vM2LEQQ==}
+    hasBin: true
+
   vite-node@3.1.4:
     resolution: {integrity: sha512-6enNwYnpyDo4hEgytbmc6mYWHXDHYEn0D1/rw4Q+tnHUGtKTJsn8T1YkX6Q18wI5LCrS8CTYlBaiCqxOy2kvUA==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
@@ -9625,6 +9629,8 @@ snapshots:
   validate-npm-package-name@6.0.0: {}
 
   vary@1.1.2: {}
+
+  vite-bundle-analyzer@1.1.0: {}
 
   vite-node@3.1.4(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2):
     dependencies:
