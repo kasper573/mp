@@ -518,9 +518,6 @@ importers:
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math
-      '@mp/oauth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
