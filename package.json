@@ -6,27 +6,29 @@
   "license": "MIT",
   "workspaces": [
     "apps/*",
-    "packages/*"
+    "integrations/*",
+    "libraries/*"
   ],
   "scripts": {
     "build": "pnpm -r --stream build",
     "dev": "pnpm -r --parallel dev",
     "test": "pnpm -r --stream test",
-    "lint": "oxlint . && ls-lint && manypkg check && knip",
-    "lint:fix": "oxlint . --fix --fix-suggestions --fix-dangerously && manypkg fix",
+    "lint": "oxlint . && ls-lint && manypkg check && knip && eslint . --max-warnings 0",
+    "lint:fix": "oxlint . --fix --fix-suggestions --fix-dangerously && manypkg fix && eslint . --fix",
+    "eslint": "",
     "format": "prettier --check .",
-    "format:fix": "prettier --write .",
-    "postinstall": "pnpm -F game build"
+    "format:fix": "prettier --write ."
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "1.31.3",
     "@ls-lint/ls-lint": "2.3.0",
     "@manypkg/cli": "^0.24.0",
+    "@mp/eslint": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "knip": "5.61.3",
-    "oxlint": "1.6.0",
-    "prettier": "3.3.3",
+    "oxlint": "1.9.0",
+    "prettier": "3.6.2",
     "typescript": "catalog:"
   },
   "engines": {

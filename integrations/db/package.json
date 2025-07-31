@@ -1,0 +1,38 @@
+{
+  "name": "@mp/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    },
+    "./types": {
+      "types": "./src/types.ts",
+      "import": "./src/types.ts",
+      "require": "./src/types.ts"
+    }
+  },
+  "scripts": {
+    "push": "drizzle-kit push",
+    "generate": "drizzle-kit generate",
+    "migrate": "drizzle-kit migrate",
+    "seed": "tsx seed.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/logger": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/oauth": "workspace:*",
+    "@mp/std": "workspace:*",
+    "drizzle-orm": "0.38.3",
+    "pg": "8.13.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/pg": "8.11.10",
+    "drizzle-kit": "0.30.1"
+  }
+}

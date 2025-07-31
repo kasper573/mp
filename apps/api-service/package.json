@@ -1,0 +1,47 @@
+{
+  "name": "@mp/api-service",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sdk": {
+      "types": "./src/sdk.ts",
+      "import": "./src/sdk.ts",
+      "require": "./src/sdk.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc && tsx esbuild.ts",
+    "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
+    "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/db": "workspace:*",
+    "@mp/env": "workspace:*",
+    "@mp/game-shared": "workspace:*",
+    "@mp/ioc": "workspace:*",
+    "@mp/keycloak": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/oauth": "workspace:*",
+    "@mp/redis": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/telemetry": "workspace:*",
+    "@mp/validate": "workspace:*",
+    "@trpc/client": "11.4.3",
+    "@trpc/server": "11.4.3",
+    "@trpc/tanstack-react-query": "11.4.3",
+    "dotenv": "catalog:",
+    "express": "catalog:",
+    "superjson": "2.2.2"
+  },
+  "devDependencies": {
+    "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
+    "@types/express": "catalog:",
+    "tsx": "catalog:"
+  }
+}

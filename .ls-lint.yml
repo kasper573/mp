@@ -6,16 +6,16 @@ ls:
     .dir: regex:.*
   .github:
     .dir: regex:.*
-  apps/client/src/routes/**:
+  apps/website/src/routes/**:
     .*: regex:~?(__)?[a-z0-9\-]+
 
 ignore:
   - node_modules
   - .git
   - "./*/Dockerfile*"
-  - "apps/server/drizzle/**"
+  - "integrations/db/drizzle/**"
   - "apps/e2e/.playwright"
-  - "apps/client/.tanstack"
-  - "./{apps,packages}/*/.turbo"
-  - "./{apps,packages}/*/dist"
-  - "./{apps,packages}/*/node_modules"
+  - "apps/website/.tanstack"
+  - "./{apps,integrations,libraries}/*/.turbo"
+  - "./{apps,integrations,libraries}/*/dist"
+  - "./{apps,integrations,libraries}/*/node_modules"

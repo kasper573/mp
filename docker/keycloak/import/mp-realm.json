@@ -1,6 +1,6 @@
 {
   "id": "024a6c08-e66b-4433-8686-f58644f3bbc3",
-  "realm": "${MP_SERVER_AUTH__AUDIENCE}",
+  "realm": "${MP_GATEWAY_AUTH__AUDIENCE}",
   "notBefore": 0,
   "defaultSignatureAlgorithm": "RS256",
   "revokeRefreshToken": false,
@@ -522,13 +522,13 @@
       "clientId": "account",
       "name": "${client_account}",
       "rootUrl": "${authBaseUrl}",
-      "baseUrl": "/realms/${MP_SERVER_AUTH__AUDIENCE}/account/",
+      "baseUrl": "/realms/${MP_GATEWAY_AUTH__AUDIENCE}/account/",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "/realms/${MP_SERVER_AUTH__AUDIENCE}/account/*"
+        "/realms/${MP_GATEWAY_AUTH__AUDIENCE}/account/*"
       ],
       "webOrigins": [],
       "notBefore": 0,
@@ -569,13 +569,13 @@
       "clientId": "account-console",
       "name": "${client_account-console}",
       "rootUrl": "${authBaseUrl}",
-      "baseUrl": "/realms/${MP_SERVER_AUTH__AUDIENCE}/account/",
+      "baseUrl": "/realms/${MP_GATEWAY_AUTH__AUDIENCE}/account/",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "/realms/${MP_SERVER_AUTH__AUDIENCE}/account/*"
+        "/realms/${MP_GATEWAY_AUTH__AUDIENCE}/account/*"
       ],
       "webOrigins": [],
       "notBefore": 0,
@@ -711,21 +711,21 @@
     },
     {
       "id": "824b20eb-5841-4c4b-ae47-2e0a17268f68",
-      "clientId": "${MP_SERVER_AUTH__AUDIENCE}",
-      "name": "${MP_SERVER_AUTH__AUDIENCE}",
+      "clientId": "${MP_GATEWAY_AUTH__AUDIENCE}",
+      "name": "${MP_GATEWAY_AUTH__AUDIENCE}",
       "description": "",
       "rootUrl": "${KC_HOSTNAME}",
       "adminUrl": "${KC_HOSTNAME}",
-      "baseUrl": "https://${MP_CLIENT_DOMAIN}",
+      "baseUrl": "https://${MP_WEBSITE_DOMAIN}",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": true,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "https://${MP_CLIENT_DOMAIN}/*"
+        "https://${MP_WEBSITE_DOMAIN}/*"
       ],
       "webOrigins": [
-        "https://${MP_CLIENT_DOMAIN}"
+        "https://${MP_WEBSITE_DOMAIN}"
       ],
       "notBefore": 0,
       "bearerOnly": false,
@@ -740,7 +740,7 @@
       "attributes": {
         "client.secret.creation.time": "1732430152",
         "client.introspection.response.allow.jwt.claim.enabled": "false",
-        "post.logout.redirect.uris": "https://${MP_CLIENT_DOMAIN}/*",
+        "post.logout.redirect.uris": "https://${MP_WEBSITE_DOMAIN}/*",
         "oauth2.device.authorization.grant.enabled": "false",
         "use.jwks.url": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -870,13 +870,13 @@
       "clientId": "security-admin-console",
       "name": "${client_security-admin-console}",
       "rootUrl": "${authAdminUrl}",
-      "baseUrl": "/admin/${MP_SERVER_AUTH__AUDIENCE}/console/",
+      "baseUrl": "/admin/${MP_GATEWAY_AUTH__AUDIENCE}/console/",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "redirectUris": [
-        "/admin/${MP_SERVER_AUTH__AUDIENCE}/console/*"
+        "/admin/${MP_GATEWAY_AUTH__AUDIENCE}/console/*"
       ],
       "webOrigins": [
         "+"

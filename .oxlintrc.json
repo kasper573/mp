@@ -83,7 +83,8 @@
     "catch-or-return": "off",
     "react/react-in-jsx-scope": "off",
     "react/button-has-type": "off",
-    "react/no-array-index-key": "off"
+    "react/no-array-index-key": "off",
+    "explicit-module-boundary-types": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.
@@ -97,11 +98,12 @@
     },
     // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
     {
-      "files": ["**/packages/graphics/**"],
+      "files": ["**/libraries/graphics/**"],
       "rules": {
         "extensions": "off"
       }
     },
+    // Ensure that the game package does not import from its export files
     {
       "files": ["**/apps/game/**"],
       "rules": {

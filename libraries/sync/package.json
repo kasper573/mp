@@ -1,0 +1,25 @@
+{
+  "name": "@mp/sync",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mp/index": "workspace:*",
+    "@mp/state": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "vitest": "catalog:"
+  }
+}

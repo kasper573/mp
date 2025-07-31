@@ -1,0 +1,28 @@
+{
+  "name": "@mp/ws",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    "./client": {
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
+    },
+    "./server": {
+      "types": "./server/index.ts",
+      "import": "./server/index.ts",
+      "require": "./server/index.ts"
+    }
+  },
+  "dependencies": {
+    "partysocket": "1.1.3",
+    "reconnecting-websocket": "4.4.0",
+    "ws": "8.18.1"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/ws": "8.18.1"
+  }
+}

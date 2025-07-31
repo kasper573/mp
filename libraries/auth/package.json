@@ -1,0 +1,32 @@
+{
+  "name": "@mp/oauth",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": {
+      "types": "./shared.ts",
+      "import": "./shared.ts",
+      "require": "./shared.ts"
+    },
+    "./client": {
+      "types": "./client.ts",
+      "import": "./client.ts",
+      "require": "./client.ts"
+    },
+    "./server": {
+      "types": "./server.ts",
+      "import": "./server.ts",
+      "require": "./server.ts"
+    }
+  },
+  "dependencies": {
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "jose": "5.9.6",
+    "oidc-client-ts": "3.1.0"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

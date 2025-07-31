@@ -11,35 +11,13 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 
 - graphics: [pixi.js](https://pixijs.com/)
 - maps: [tiled](https://www.mapeditor.org/) (+custom
-  [loader](packages/tiled-loader)/[renderer](packages/tiled-renderer))
+  [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
 - ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws) (+custom [rpc](packages/rpc) & [sync](packages/sync))
+- network: [ws](https://www.npmjs.com/package/ws), [trpc](https://trpc.io/), [custom sync lib](libraries/sync)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
-
-### Note on state management
-
-To keep things consistent we use signals as a reusable state management system across all systems.
-However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
-We do this to not directly couple all systems with preact.
-
-```text
-              +-----------------------------+
-              |         @mp/state           |
-              |   (@preact/signals-core)    |
-              +-------------+---------------+
-                            |
-        +-------------------+-------------------+
-        |                   |                   |
-+----------------+  +----------------+  +---------------+
-|   Game Server  |  |   Graphics     |  |      UI       |
-|      Logic     |  |   (pixi.js)    |  |   (preact)    |
-+----------------+  +----------------+  +---------------+
-```
-
-> If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
 
 ## Design goals
 
@@ -59,6 +37,8 @@ We do this to not directly couple all systems with preact.
 
 Local development is done using node and docker compose.
 
+Check out the [architecture](#architecture) section for an overview of the system.
+
 ### Initial setup (only required once)
 
 - Install [Docker](https://www.docker.com/)
@@ -71,8 +51,9 @@ Local development is done using node and docker compose.
   > on which browser you are using.
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.17.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `pnpm -F server devenv db push` to initialize your database
-- Run `pnpm -F server devenv provision` to provision keycloak roles
+- Run `pnpm -F db devenv push` to initialize your database
+- Run `pnpm -F db devenv seed` to seed the database
+- Run `pnpm -F keycloak devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
 ### Before each development session
@@ -88,7 +69,7 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
 
-Run its cli against the development environment using `pnpm -F server devenv db <drizzle-kit command>`.
+Run its cli against the development environment using `pnpm -F db devenv <drizzle-kit command>`.
 
 ### If you change user roles
 
@@ -140,19 +121,83 @@ These are the workspaces, in order:
 
 ### apps
 
-Compositions of packages. Often has deployable artifacts, but is not required to. May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
+Deployable executables. Most business logic exist here.
+
+May depend on other apps, but it's preferable to do so via protocol (ie. http requests) rather than direct dependency on code.
 
 The apps are responsible for bundling.
 
-### packages
+### integrations
 
-Generic and low level systems.
+Compositions of libraries or integrations with third party services.
+
+May depend on libraries, but not apps, with one exception: `@mp/game-service` exposes event router typedefs that is okay to use. It allows clients to get a type safe event emitter for the game service.
+
+### libraries
+
+Generic and low level systems. No business logic.
 
 Should be highly configurable and modular.
 
-Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many packages will have to depend on really core stuff like [@mp/std](/packages/std) and [@mp/time](/packages/time), but in general you should decouple packages and instead compose them together inside an app.
+Optimally each package is standalone and has no dependencies on other packages in the repo. However this is more of a goal rather than a rule. Many libraries will have to depend on really core stuff like [@mp/std](/libraries/std) and [@mp/time](/libraries/time), but in general you should decouple packages and instead compose them together inside an app.
 
 Does not need to handle bundling, package.json may directly export untranspiled code, ie. typescript.
+
+## Architecture
+
+### Service diagram
+
+There's also a reverse proxy (caddy) in front of everything, but it's not shown in the diagram because it's a proxy and doesn't help demonstrating how services interact.
+
+```mermaid
+flowchart LR
+  User --> WEB["Website"]
+
+  GC -->|Send game client events| GW["Gateway"]
+  GS -->|Flush game state to game clients| GW
+
+  GW -->|Cross service event broadcast| GS["Game service"]
+  GW -->|Broadcast game client events to game services| GS
+
+  WEB -->|Show game client on some pages| GC["Game client"]
+
+  GC -->|CRUD character data| API["API service"]
+  GS -->|Load area data required by instance| API
+
+  WEB -->|Load assets| FS["File server (caddy)"]
+  API -->|List game client assets| FS
+  GC -->|Load game client assets| FS
+
+  GW --> KC["Auth service (keycloak)"]
+  API --> KC
+
+  GS -->|Load/Save game state| DB["Database (postgres)"]
+  GW -->|Save player online state| DB
+  API -->|Load/Edit game state| DB
+  KC -->|CRUD user data| DB
+```
+
+### State management
+
+To keep things consistent we use signals as a reusable state management system across all systems.
+However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
+We do this to not directly couple all systems with preact.
+
+```text
+              +-----------------------------+
+              |         @mp/state           |
+              |   (@preact/signals-core)    |
+              +-------------+---------------+
+                            |
+        +-------------------+-------------------+
+        |                   |                   |
++----------------+  +----------------+  +---------------+
+|   Game Server  |  |   Graphics     |  |      UI       |
+|      Logic     |  |   (pixi.js)    |  |   (preact)    |
++----------------+  +----------------+  +---------------+
+```
+
+> If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
 
 ## Credits
 

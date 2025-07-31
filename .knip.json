@@ -1,8 +1,9 @@
 {
   "include": ["dependencies"],
   "ignoreDependencies": [
-    "@babel/plugin-proposal-decorators",
     "@mp/tsconfig",
-    "pino-pretty"
+    "pino-pretty",
+    "@mp/eslint",
+    "eslint-import-resolver-typescript"
   ]
 }

@@ -1,0 +1,45 @@
+{
+  "name": "@mp/website",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "pnpm devenv vite --host 0.0.0.0",
+    "build": "vite build",
+    "preview": "vite preview --port 5173 --host 0.0.0.0",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- "
+  },
+  "dependencies": {
+    "@mp/api-service": "workspace:*",
+    "@mp/db": "workspace:*",
+    "@mp/engine": "workspace:*",
+    "@mp/env": "workspace:*",
+    "@mp/event-router": "workspace:*",
+    "@mp/game-client": "workspace:*",
+    "@mp/game-service": "workspace:*",
+    "@mp/game-shared": "workspace:*",
+    "@mp/gateway": "workspace:*",
+    "@mp/keycloak": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/oauth": "workspace:*",
+    "@mp/query": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/style": "workspace:*",
+    "@mp/telemetry": "workspace:*",
+    "@mp/tiled-renderer": "workspace:*",
+    "@mp/ui": "workspace:*",
+    "@mp/ws": "workspace:*",
+    "@tanstack/react-router": "1.126.2",
+    "@tanstack/react-router-devtools": "1.126.2",
+    "preact": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@preact/preset-vite": "catalog:",
+    "@tanstack/router-plugin": "1.126.2",
+    "@vanilla-extract/vite-plugin": "catalog:",
+    "vite": "catalog:",
+    "vite-plugin-checker": "0.9.3"
+  }
+}

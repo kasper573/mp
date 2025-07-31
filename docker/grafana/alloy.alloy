@@ -1,10 +1,31 @@
-prometheus.scrape "mp_server" {
+prometheus.scrape "mp_api" {
 	targets = [{
-		__address__ = env("MP_SERVER_PROXY_HOST"),
+		__address__ = env("MP_API_PROXY_HOST"),
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
-	job_name        = "mp_server"
+	job_name        = "mp_api"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
+}
+
+prometheus.scrape "mp_gateway" {
+	targets = [{
+		__address__ = env("MP_GATEWAY_PROXY_HOST"),
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "mp_gateway"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
+}
+
+prometheus.scrape "pushgateway" {
+	targets = [{
+		__address__ = "pushgateway:9091",
+	}]
+	forward_to      = [prometheus.remote_write.default.receiver]
+	job_name        = "pushgateway"
+	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.scrape "node_exporter" {
@@ -14,6 +35,7 @@ prometheus.scrape "node_exporter" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.scrape "keycloak" {
@@ -23,6 +45,7 @@ prometheus.scrape "keycloak" {
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "keycloak"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
+	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
 prometheus.remote_write "default" {
@@ -115,7 +138,7 @@ loki.write "default" {
 	external_labels = {}
 }
 
-loki.process "mp_client" {
+loki.process "mp_website" {
 	forward_to = [loki.write.default.receiver]
 
 	stage.logfmt {
@@ -137,16 +160,16 @@ logging {
 	level = "info"
 }
 
-faro.receiver "mp_client" {
+faro.receiver "mp_website" {
 	extra_log_labels = {
-		app  = "mp-client",
+		app  = "mp-website",
 		kind = "",
 	}
 
 	server {
 		listen_address           = "0.0.0.0"
 		listen_port              = "18273"
-		cors_allowed_origins     = [env("MP_SERVER_CORS_ORIGIN")]
+		cors_allowed_origins     = [env("FARO_RECEIVER_CORS_ALLOWED_ORIGIN")]
 		max_allowed_payload_size = "10MiB"
 
 		rate_limiting {
@@ -157,7 +180,7 @@ faro.receiver "mp_client" {
 	sourcemaps { }
 
 	output {
-		logs   = [loki.process.mp_client.receiver]
+		logs   = [loki.process.mp_website.receiver]
 		traces = [otelcol.exporter.otlp.default.input]
 	}
 }

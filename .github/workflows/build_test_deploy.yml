@@ -96,7 +96,7 @@ jobs:
       - name: Typecheck load test
         run: pnpm -F loadtest build
       - name: Run load tests
-        run: pnpm -F loadtest start:test --verbose --gc 100 --http 100 --timeout 30
+        run: pnpm -F loadtest start:test --verbose --gc 100 --timeout 30 --ef
       - name: Dump docker logs
         if: always()
         run: |
@@ -145,8 +145,7 @@ jobs:
             # Set production host env vars
             echo "DOCKER_REGISTRY_URL=\"${{ env.DOCKER_REGISTRY_URL }}\"" > .env
             echo "DOCKER_IMAGE_VERSION=\"${{ env.DOCKER_IMAGE_VERSION }}\"" >> .env
-            echo "MP_SERVER_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
-            echo "MP_CLIENT_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
+            echo "MP_BUILD_VERSION=\"${{ env.BUILD_VERSION }}\"" >> .env
             echo "MP_DOMAIN=\"${{ vars.MP_DOMAIN }}\"" >> .env
             echo "KC_SMTP_HOST=\"${{ vars.KC_SMTP_HOST }}\"" >> .env
             echo "KC_SMTP_PORT=\"${{ vars.KC_SMTP_PORT }}\"" >> .env
@@ -154,6 +153,7 @@ jobs:
             echo "KC_SMTP_PASSWORD=\"${{ secrets.KC_SMTP_PASSWORD }}\"" >> .env
             echo "KC_ADMIN_USERNAME=\"${{ secrets.KC_ADMIN_USERNAME }}\"" >> .env
             echo "KC_ADMIN_PASSWORD=\"${{ secrets.KC_ADMIN_PASSWORD }}\"" >> .env
+            echo "MP_GATEWAY_GAME_SERVICE_SECRET=\"$(openssl rand -hex 32)\"" >> .env
 
             echo ${{ env.DOCKER_PASSWORD }} | docker login ${{ env.DOCKER_REGISTRY }} -u ${{ env.DOCKER_USERNAME }} --password-stdin
             ./dockerctl.sh prod pull

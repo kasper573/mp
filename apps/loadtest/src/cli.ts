@@ -1,6 +1,6 @@
-import { hideBin } from "yargs/helpers";
-import yargs from "yargs";
 import { TimeSpan } from "@mp/time";
+import yargs from "yargs";
+import { hideBin } from "yargs/helpers";
 
 export type CliOptions = RemoveIndexSignature<
   ReturnType<typeof readCliOptions>
@@ -19,26 +19,26 @@ export function readCliOptions(argv = process.argv) {
       type: "boolean",
       default: false,
     })
-    .option("wsUrl", {
+    .option("gameServiceUrl", {
       type: "string",
-      default: process.env.MP_CLIENT_WS_URL,
+      default: process.env.MP_WEBSITE_GAME_SERVICE_URL,
       demandOption: true,
     })
-    .option("httpServerUrl", {
+    .option("apiUrl", {
       type: "string",
-      default: `https://${process.env.MP_CLIENT_DOMAIN}`,
+      default: process.env.MP_WEBSITE_API_URL,
       demandOption: true,
-    })
-    .option("httpRequests", {
-      alias: "http",
-      type: "number",
-      default: 1,
     })
     .option("gameClients", {
       alias: "gc",
       type: "number",
       demandOption: true,
       default: 0,
+    })
+    .options("exitFast", {
+      alias: "ef",
+      type: "boolean",
+      default: false,
     })
     .option("timeout", {
       alias: "t",
