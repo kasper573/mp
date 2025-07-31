@@ -37,7 +37,7 @@ export interface AreaSceneOptions {
 }
 
 export class AreaScene extends Container {
-  private cleanup: () => void;
+  private cleanupFns: Array<() => void>;
 
   constructor(private options: AreaSceneOptions) {
     super({ sortableChildren: true });
@@ -46,18 +46,6 @@ export class AreaScene extends Container {
       options.area.tiled.map.layers,
       options.area.dynamicLayer.name,
       createTiledTextureLookup(options.areaSpritesheets),
-    );
-
-    this.cleanup = reactiveCollectionBinding(
-      tiledRenderer.dynamicLayer,
-      options.state.actorList,
-      (actor) =>
-        new ActorController({
-          eventBus: options.state.eventBus,
-          actorSpritesheets: options.actorSpritesheets,
-          actor,
-          tiled: options.area.tiled,
-        }),
     );
 
     const areaDebug = new AreaDebugGraphics(
@@ -79,17 +67,20 @@ export class AreaScene extends Container {
       this.addChild(tileHighlight);
     }
 
-    this.cleanup = reactiveCollectionBinding(
-      tiledRenderer.dynamicLayer,
-      options.state.actorList,
-      (actor) =>
-        new ActorController({
-          actor,
-          eventBus: options.state.eventBus,
-          actorSpritesheets: options.actorSpritesheets,
-          tiled: options.area.tiled,
-        }),
-    );
+    this.cleanupFns = [
+      reactiveCollectionBinding(
+        tiledRenderer.dynamicLayer,
+        options.state.actorList,
+        (actor) =>
+          new ActorController({
+            actor,
+            eventBus: options.state.eventBus,
+            actorSpritesheets: options.actorSpritesheets,
+            tiled: options.area.tiled,
+          }),
+      ),
+      this.options.engine.pointer.onClick(this.onPointerClick),
+    ];
 
     this.onRender = this.#onRender;
 
@@ -109,7 +100,9 @@ export class AreaScene extends Container {
   }
 
   override destroy(options?: DestroyOptions): void {
-    this.cleanup();
+    for (const cleanup of this.cleanupFns) {
+      cleanup();
+    }
     super.destroy(options);
   }
 
@@ -158,6 +151,13 @@ export class AreaScene extends Container {
     }
   });
 
+  private onPointerClick = () => {
+    const target = this.highlightTarget.value;
+    if (target?.type === "attack") {
+      void this.options.state.actions.attack(target.actor.identity.id);
+    }
+  };
+
   moveThrottled = dedupe(
     throttle(
       (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
@@ -181,18 +181,12 @@ export class AreaScene extends Container {
 
     if (this.options.engine.pointer.isDown.value) {
       const target = this.highlightTarget.value;
-      switch (target?.type) {
-        case "attack":
-          void this.options.state.actions.attack(target.actor.identity.id);
-          break;
-        case "move": {
-          const portal = this.options.area
-            .hitTestObjects(this.options.engine.pointer.worldPosition.value)
-            .find(getAreaIdFromObject);
+      if (target?.type === "move") {
+        const portal = this.options.area
+          .hitTestObjects(this.options.engine.pointer.worldPosition.value)
+          .find(getAreaIdFromObject);
 
-          this.moveThrottled(Vector.from(target.rect), portal?.id);
-          break;
-        }
+        this.moveThrottled(Vector.from(target.rect), portal?.id);
       }
     } else {
       this.moveThrottled.clear();
