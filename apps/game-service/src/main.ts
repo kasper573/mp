@@ -17,7 +17,7 @@ import {
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
 } from "@mp/game-shared";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
@@ -221,7 +221,7 @@ const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
 
 const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
 
-const ioc = new ImmutableInjectionContainer()
+const ioc = new InjectionContainer()
   .provide(ctxGameStateLoader, gameStateLoader)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)

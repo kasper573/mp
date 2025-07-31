@@ -16,7 +16,7 @@ import {
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
 } from "@mp/game-shared";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+import { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken, UserId } from "@mp/oauth";
@@ -101,7 +101,7 @@ const gatewayEventInvoker = new QueuedEventInvoker({
   logger,
 });
 
-const ioc = new ImmutableInjectionContainer().provide(ctxDbClient, db);
+const ioc = new InjectionContainer().provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
   debounce(saveOnlineCharacters(db, logger), 100),

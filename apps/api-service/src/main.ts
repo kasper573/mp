@@ -1,6 +1,6 @@
 import { createDbClient } from "@mp/db";
 import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
-import { ImmutableInjectionContainer } from "@mp/ioc";
+import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/oauth";
 import { createTokenResolver } from "@mp/oauth/server";
@@ -53,7 +53,7 @@ const fileResolver = createFileResolver(
   opt.fileServerPublicUrl,
 );
 
-const ioc = new ImmutableInjectionContainer()
+const ioc = new InjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
   .provide(ctxDbClient, db)

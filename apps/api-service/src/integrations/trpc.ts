@@ -1,7 +1,7 @@
-import type { ImmutableInjectionContainer } from "@mp/ioc";
+import type { InjectionContainer } from "@mp/ioc";
 import { initTRPC } from "@trpc/server";
-import { transformer } from "../transformer";
 import { opt } from "../options";
+import { transformer } from "../transformer";
 
 export const rpc = initTRPC.context<ApiContext>().create({
   transformer,
@@ -19,5 +19,5 @@ export const rpc = initTRPC.context<ApiContext>().create({
 });
 
 export interface ApiContext {
-  ioc: ImmutableInjectionContainer;
+  ioc: InjectionContainer;
 }

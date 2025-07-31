@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import { EventRouterBuilder } from "@mp/event-router";
-import type { ImmutableInjectionContainer } from "@mp/ioc";
+import type { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
 import type { RoleDefinition } from "@mp/oauth";
 import { assertRoles } from "@mp/oauth";
@@ -12,9 +12,7 @@ import {
 } from "./context";
 import { hasAccessToCharacter } from "./db-operations";
 
-const evt = new EventRouterBuilder()
-  .context<ImmutableInjectionContainer>()
-  .build();
+const evt = new EventRouterBuilder().context<InjectionContainer>().build();
 
 export type GatewayRouter = typeof gatewayRouter;
 export const gatewayRouter = evt.router({
