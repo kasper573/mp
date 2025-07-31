@@ -1,10 +1,10 @@
 import type { CharacterId } from "@mp/db/types";
 import type { Character } from "@mp/game-shared";
+import type { InjectionContainer } from "@mp/ioc";
 import { ctxGameState, ctxUserSession } from "../context";
-import type { GameServiceContext } from "../integrations/event-router";
 
 export function accessCharacter(
-  ctx: GameServiceContext,
+  ctx: InjectionContainer,
   characterId: CharacterId,
 ): Character {
   const session = ctx.get(ctxUserSession);
