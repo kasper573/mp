@@ -2,7 +2,8 @@ import { systemRoles } from "@mp/keycloak";
 import { roles } from "./integrations/auth";
 import { rpc } from "./integrations/trpc";
 import { opt } from "./options";
-import { actorSpritesheetUrls } from "./procedures/actor-spritesheet-urls";
+import { actorModelIds } from "./procedures/actor-model-ids";
+import { actorSpritesheetUrl } from "./procedures/actor-spritesheet-url";
 import { areaFileUrl, areaFileUrls } from "./procedures/area-file-urls";
 import { characterList } from "./procedures/character-list";
 import {
@@ -22,7 +23,8 @@ export const apiRouter = rpc.router({
   }),
 
   myCharacterId,
-  actorSpritesheetUrls,
+  actorSpritesheetUrl,
+  actorModelIds,
   areaFileUrl,
   areaFileUrls,
   characterList,

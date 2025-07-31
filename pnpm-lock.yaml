@@ -567,9 +567,6 @@ importers:
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
-      '@mp/graphics':
-        specifier: workspace:*
-        version: link:../../libraries/graphics
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math

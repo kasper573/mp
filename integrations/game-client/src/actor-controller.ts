@@ -1,9 +1,5 @@
 import type { GameStateEvents } from "@mp/game-service";
-import type {
-  Actor,
-  ActorSpritesheetLookup,
-  TiledResource,
-} from "@mp/game-shared";
+import type { Actor, TiledResource } from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   ColorMatrixFilter,
@@ -12,16 +8,16 @@ import {
   Text,
 } from "@mp/graphics";
 import { effect } from "@mp/state";
-import { assert } from "@mp/std";
 import type { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
+import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface ActorControllerOptions {
   tiled: TiledResource;
   actor: Actor;
   eventBus: SyncEventBus<GameStateEvents>;
-  actorSpritesheets: ActorSpritesheetLookup;
+  actorTextures: ActorTextureLookup;
 }
 
 export class ActorController extends Container {
@@ -47,6 +43,12 @@ export class ActorController extends Container {
             type: "fixed-at-end",
           },
     );
+    this.sprite.textureLookup = (animationName, direction) =>
+      options.actorTextures(
+        options.actor.appearance.modelId,
+        animationName,
+        direction,
+      );
 
     this.text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
 
@@ -95,15 +97,8 @@ export class ActorController extends Container {
   };
 
   #onRender = () => {
-    const {
-      actor,
-      tiled,
-      actorSpritesheets: actorSpritesheetLookup,
-    } = this.options;
+    const { actor, tiled } = this.options;
 
-    this.sprite.spritesheets = assert(
-      actorSpritesheetLookup.get(actor.appearance.modelId),
-    );
     this.sprite.attackSpeed = actor.combat.attackSpeed;
     this.sprite.direction = actor.movement.dir;
 

@@ -1,9 +1,10 @@
 import { useApi } from "@mp/api-service/sdk";
 import type { AreaId } from "@mp/db/types";
-import type { GameAssetLoader } from "@mp/game-client";
-import type { ActorSpritesheetLookup, AreaResource } from "@mp/game-shared";
-import { loadActorSpritesheets, loadAreaResource } from "@mp/game-shared";
-import { useSuspenseQuery } from "@mp/query";
+import type { ActorTextureLookup } from "@mp/game-client";
+import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
+import type { AreaResource } from "@mp/game-shared";
+import { loadAreaResource } from "@mp/game-shared";
+import { useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
@@ -12,20 +13,23 @@ export const useGameAssets: GameAssetLoader = (areaId) => {
   return {
     area,
     areaSpritesheets: useAreaSpritesheets(area),
-    actorSpritesheets: useActorSpritesheets(),
+    actorTextures: useActorTextureLookup(),
   };
 };
 
-export function useActorSpritesheets(): ActorSpritesheetLookup {
+export function useActorTextureLookup(): ActorTextureLookup {
   const api = useApi();
-  const { data: urls } = useSuspenseQuery(
-    api.actorSpritesheetUrls.queryOptions("public"),
-  );
+  const [{ data: url }, { data: modelIds }] = useSuspenseQueries({
+    queries: [
+      api.actorSpritesheetUrl.queryOptions("public"),
+      api.actorModelIds.queryOptions(),
+    ],
+  });
 
   const query = useSuspenseQuery({
-    queryKey: ["actorSpritesheets", urls],
+    queryKey: ["actor-spritesheet-lookup", url],
     staleTime: Infinity,
-    queryFn: () => loadActorSpritesheets(urls),
+    queryFn: () => loadActorTextureLookup(modelIds, url),
   });
 
   return query.data;

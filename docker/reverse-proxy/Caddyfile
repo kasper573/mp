@@ -42,6 +42,7 @@ faro.{$MP_DOMAIN} {
 }
 
 {$MP_FILE_SERVER_DOMAIN} {
+    import common_rate_limit
     tracing {
         span file_server
     }

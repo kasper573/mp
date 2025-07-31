@@ -1,10 +1,11 @@
 import type { AreaId } from "@mp/db/types";
-import type { ActorSpritesheetLookup, AreaResource } from "@mp/game-shared";
+import type { AreaResource } from "@mp/game-shared";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface GameAssets {
   areaSpritesheets: TiledSpritesheetRecord;
-  actorSpritesheets: ActorSpritesheetLookup;
+  actorTextures: ActorTextureLookup;
   area: AreaResource;
 }
 

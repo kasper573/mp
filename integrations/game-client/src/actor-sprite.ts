@@ -1,13 +1,13 @@
-import type { ActorAnimationName } from "@mp/game-shared";
+import type { ActorModelState } from "@mp/game-shared";
 import type { Animation } from "@mp/graphics";
 import { AnimationController } from "@mp/graphics";
 import type { TimesPerSecond } from "@mp/std";
 import { TimeSpan } from "@mp/time";
 
-export class ActorSprite extends AnimationController<ActorAnimationName> {
+export class ActorSprite extends AnimationController<ActorModelState> {
   attackSpeed = 1 as TimesPerSecond;
 
-  constructor(initialAnimation?: Animation<ActorAnimationName>) {
+  constructor(initialAnimation?: Animation<ActorModelState>) {
     super({
       width: 48,
       height: 64,
@@ -21,6 +21,6 @@ export class ActorSprite extends AnimationController<ActorAnimationName> {
   }
 }
 
-function isAttackAnimation(name?: ActorAnimationName): boolean {
+function isAttackAnimation(name?: ActorModelState): boolean {
   return name === "attack-shooting" || name === "attack-spear";
 }

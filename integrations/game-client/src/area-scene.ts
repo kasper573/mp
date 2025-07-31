@@ -1,6 +1,5 @@
 import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
-import type { ActorSpritesheetLookup } from "@mp/game-shared";
 import {
   clientViewDistance,
   getAreaIdFromObject,
@@ -21,6 +20,7 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import { ActorController } from "./actor-controller";
+import type { ActorTextureLookup } from "./actor-texture-lookup";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
 import type { GameStateClient } from "./game-state-client";
@@ -31,7 +31,7 @@ export interface AreaSceneOptions {
   area: AreaResource;
   engine: Engine;
   state: GameStateClient;
-  actorSpritesheets: ActorSpritesheetLookup;
+  actorTextures: ActorTextureLookup;
   areaSpritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
 }
@@ -75,7 +75,7 @@ export class AreaScene extends Container {
           new ActorController({
             actor,
             eventBus: options.state.eventBus,
-            actorSpritesheets: options.actorSpritesheets,
+            actorTextures: options.actorTextures,
             tiled: options.area.tiled,
           }),
       ),

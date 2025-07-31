@@ -1,7 +1,6 @@
 import type { ActorModelId } from "@mp/db/types";
 import { Engine } from "@mp/engine";
-import type { ActorSpritesheetLookup } from "@mp/game-shared";
-import { actorAnimationNames, type ActorAnimationName } from "@mp/game-shared";
+import { actorModelStates, type ActorModelState } from "@mp/game-shared";
 import { Container, Text } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import {
@@ -15,28 +14,30 @@ import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
+import type { ActorTextureLookup } from "./actor-texture-lookup";
 import { useObjectSignal } from "./use-object-signal";
 
 export function ActorSpriteTester({
-  spritesheets,
+  modelIds,
+  actorTextures,
 }: {
-  spritesheets: ActorSpritesheetLookup;
+  modelIds: ActorModelId[];
+  actorTextures: ActorTextureLookup;
 }) {
-  const allModelIds = Array.from(spritesheets.keys());
-  const animationName = useSignal<ActorAnimationName>("walk-normal");
-  const modelId = useSignal<ActorModelId>(allModelIds[0]);
+  const animationName = useSignal<ActorModelState>("walk-normal");
+  const modelId = useSignal<ActorModelId>(modelIds[0]);
 
   const settings = useObjectSignal({
     animationName: animationName.value,
     modelId: modelId.value,
-    spritesheetsLookup: spritesheets,
+    actorTextures,
   });
 
   return (
     <>
       <div id="form" style={styles.settingsForm}>
-        <Select signal={animationName} options={actorAnimationNames} />
-        <Select signal={modelId} options={allModelIds} />
+        <Select signal={animationName} options={actorModelStates} />
+        <Select signal={modelId} options={modelIds} />
       </div>
       {modelId.value ? <PixiApp settings={settings} /> : null}
     </>
@@ -109,8 +110,8 @@ class ActorSpriteList extends Container {
 
 interface ActorTestSettings {
   modelId: ActorModelId;
-  animationName: ActorAnimationName;
-  spritesheetsLookup: ActorSpritesheetLookup;
+  animationName: ActorModelState;
+  actorTextures: ActorTextureLookup;
   engine: Engine;
 }
 
@@ -141,21 +142,11 @@ class SpecificActorAngle extends Container {
   }
 
   #onRender = () => {
-    const {
-      modelId,
-      angle,
-      name,
-      pos,
-      anchor,
-      animationName,
-      spritesheetsLookup,
-    } = this.options();
+    const { modelId, angle, name, pos, anchor, animationName, actorTextures } =
+      this.options();
 
-    const spritesheets = spritesheetsLookup.get(modelId);
-
-    if (spritesheets) {
-      this.sprite.spritesheets = spritesheets;
-    }
+    this.sprite.textureLookup = (animationName, direction) =>
+      actorTextures(modelId, animationName, direction);
     this.sprite.direction = nearestCardinalDirection(angle);
     this.sprite.switchAnimationSmoothly(animationName);
 

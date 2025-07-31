@@ -15,7 +15,6 @@
     "@mp/db": "workspace:*",
     "@mp/encoding": "workspace:*",
     "@mp/event-router": "workspace:*",
-    "@mp/graphics": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/path-finding": "workspace:*",
