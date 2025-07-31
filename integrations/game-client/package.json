@@ -17,7 +17,6 @@
     "@mp/game-service": "workspace:*",
     "@mp/game-shared": "workspace:*",
     "@mp/graphics": "workspace:*",
-    "@mp/ioc": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
