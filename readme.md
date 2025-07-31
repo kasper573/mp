@@ -183,18 +183,11 @@ To keep things consistent we use signals as a reusable state management system a
 However, we have an encapsulation package in `@mp/state` that essentially just re-exports `@preact/signals-core`.
 We do this to not directly couple all systems with preact.
 
-```text
-              +-----------------------------+
-              |         @mp/state           |
-              |   (@preact/signals-core)    |
-              +-------------+---------------+
-                            |
-        +-------------------+-------------------+
-        |                   |                   |
-+----------------+  +----------------+  +---------------+
-|   Game Server  |  |   Graphics     |  |      UI       |
-|      Logic     |  |   (pixi.js)    |  |   (preact)    |
-+----------------+  +----------------+  +---------------+
+```mermaid
+flowchart LR
+  State["@mp/state (@preact/signals-core)"] --> GS["Game service"]
+  State --> GFX["Graphics (pixi.js)"]
+  State --> UI["UI (preact)"]
 ```
 
 > If you're writing code in the UI layer you're free to use preact signals directly, but if you're in any other part of the system you should depend on `@mp/state` instead of preact directly.
