@@ -1,29 +1,19 @@
-import type { Engine } from "@mp/engine";
-import type { GameEventClient } from "@mp/game-service";
-import type { ActorModelLookup, ActorSpritesheetLookup } from "@mp/game-shared";
-import { InjectionContext, MutableInjectionContainer } from "@mp/ioc";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import { createContext } from "preact";
+import type { GameAssetLoader } from "./game-asset-loader";
 import type { GameStateClient } from "./game-state-client";
 
-export const ctxEngine = InjectionContext.new<Engine>("Engine");
-
-export const ctxGameEventClient =
-  InjectionContext.new<GameEventClient>("GameEventClient");
-
-export const ctxGameStateClient =
-  InjectionContext.new<GameStateClient>("GameStateClient");
-
-export const ctxAreaSpritesheets = InjectionContext.new<TiledSpritesheetRecord>(
-  "TiledSpritesheetRecord",
+export const GameStateClientContext = createContext(
+  new Proxy({} as GameStateClient, {
+    get() {
+      throw new Error("GameStateClientContext has not been provided");
+    },
+  }),
 );
-export const ctxActorSpritesheetLookup =
-  InjectionContext.new<ActorSpritesheetLookup>("ActorSpritesheetLookup");
 
-export const ctxActorModelLookup =
-  InjectionContext.new<ActorModelLookup>("ActorModelLookup");
-
-/**
- * The global injection container for the game client.
- */
-
-export const ioc = new MutableInjectionContainer();
+export const GameAssetLoaderContext = createContext(
+  new Proxy({} as GameAssetLoader, {
+    get() {
+      throw new Error("GameAssetLoaderContext has not been provided");
+    },
+  }),
+);

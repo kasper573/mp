@@ -1,9 +1,10 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { ctxGameStateClient, ioc } from "./context";
+import { useContext } from "preact/hooks";
+import { GameStateClientContext } from "./context";
 
 export function RespawnDialog(props: DialogProps) {
-  const client = ioc.get(ctxGameStateClient);
+  const client = useContext(GameStateClientContext);
 
   return (
     <Dialog {...props}>

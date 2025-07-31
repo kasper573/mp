@@ -1,3 +1,4 @@
+import type { Engine } from "@mp/engine";
 import type {
   Actor,
   AreaResource,
@@ -21,7 +22,6 @@ import type {
   AreaDebugSettings,
   VisibleGraphType,
 } from "./area-debug-settings-form";
-import { ctxEngine, ioc } from "./context";
 
 export class AreaDebugGraphics extends Container {
   private actorPaths: ReactiveCollection<DebugPath>;
@@ -30,6 +30,7 @@ export class AreaDebugGraphics extends Container {
   private fogOfWar: DebugNetworkFogOfWar;
 
   constructor(
+    engine: Engine,
     area: AreaResource,
     actors: ReadonlySignal<Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
@@ -38,6 +39,7 @@ export class AreaDebugGraphics extends Container {
     super();
 
     const debugTiled = new DebugTiledGraph(
+      engine,
       area,
       () => this.settings().visibleGraphType,
     );
@@ -113,6 +115,7 @@ class DebugTiledGraph extends Container {
   private walkableChecker: WalkableChecker;
 
   constructor(
+    private engine: Engine,
     private area: AreaResource,
     private visibleGraphType: () => VisibleGraphType,
   ) {
@@ -132,9 +135,8 @@ class DebugTiledGraph extends Container {
 
   private redrawGraph = () => {
     this.gfx.clear();
-    const engine = ioc.get(ctxEngine);
     const { tiled, graph } = this.area;
-    const { worldPosition } = engine.pointer;
+    const { worldPosition } = this.engine.pointer;
     this.text.visible = false;
 
     switch (this.visibleGraphType()) {

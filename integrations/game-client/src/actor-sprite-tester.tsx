@@ -15,7 +15,6 @@ import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
-import { ctxActorSpritesheetLookup, ctxEngine, ioc } from "./context";
 import { useObjectSignal } from "./use-object-signal";
 
 export function ActorSpriteTester({
@@ -30,7 +29,7 @@ export function ActorSpriteTester({
   const settings = useObjectSignal({
     animationName: animationName.value,
     modelId: modelId.value,
-    spritesheets,
+    spritesheetsLookup: spritesheets,
   });
 
   return (
@@ -47,9 +46,7 @@ export function ActorSpriteTester({
 function PixiApp({
   settings,
 }: {
-  settings: Signal<
-    ActorTestSettings & { spritesheets: ActorSpritesheetLookup }
-  >;
+  settings: Signal<Omit<ActorTestSettings, "engine">>;
 }) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const appSignal = useGraphics(container);
@@ -61,18 +58,17 @@ function PixiApp({
     }
 
     const engine = new Engine(app.canvas);
-    const subs = [
-      engine.start(true),
-      ioc.register(ctxEngine, engine),
-      ioc.register(ctxActorSpritesheetLookup, settings.value.spritesheets),
-    ];
-    app.stage.addChild(new ActorSpriteList(settings.value));
+    engine.start(true);
+    app.stage.addChild(
+      new ActorSpriteList({
+        ...settings.value,
+        engine,
+      }),
+    );
 
     return function cleanup() {
+      engine.stop();
       app.stage.removeChildren();
-      for (const unsubscribe of subs) {
-        unsubscribe();
-      }
     };
   });
 
@@ -114,6 +110,8 @@ class ActorSpriteList extends Container {
 interface ActorTestSettings {
   modelId: ActorModelId;
   animationName: ActorAnimationName;
+  spritesheetsLookup: ActorSpritesheetLookup;
+  engine: Engine;
 }
 
 class SpecificActorAngle extends Container {
@@ -143,9 +141,17 @@ class SpecificActorAngle extends Container {
   }
 
   #onRender = () => {
-    const { modelId, angle, name, pos, anchor, animationName } = this.options();
+    const {
+      modelId,
+      angle,
+      name,
+      pos,
+      anchor,
+      animationName,
+      spritesheetsLookup,
+    } = this.options();
 
-    const spritesheets = ioc.get(ctxActorSpritesheetLookup)?.get(modelId);
+    const spritesheets = spritesheetsLookup.get(modelId);
 
     if (spritesheets) {
       this.sprite.spritesheets = spritesheets;
@@ -168,10 +174,9 @@ class SpecificActorAngle extends Container {
 class LookAtPointerActor extends SpecificActorAngle {
   constructor(options: ActorTestSettings) {
     super(() => {
-      const engine = ioc.get(ctxEngine);
-      const { x, y } = engine.camera.cameraSize.value;
+      const { x, y } = options.engine.camera.cameraSize.value;
       const center = new Vector(x / 2, y / 2);
-      const angle = center.angle(engine.pointer.position.value);
+      const angle = center.angle(options.engine.pointer.position.value);
       return {
         ...options,
         angle,

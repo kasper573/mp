@@ -1,8 +1,6 @@
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
 import { Suspense } from "preact/compat";
-import { useEffect } from "preact/hooks";
-import { ctxGameStateClient, ioc } from "./context";
 import { GameRenderer } from "./game-renderer";
 import type { GameStateClient } from "./game-state-client";
 
@@ -21,11 +19,6 @@ export interface GameClientProps {
 export function GameClient(props: GameClientProps) {
   const areaId = props.stateClient.areaId.value;
 
-  useEffect(
-    () => ioc.register(ctxGameStateClient, props.stateClient),
-    [props.stateClient],
-  );
-
   if (!props.stateClient.isConnected.value) {
     return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
   }
@@ -40,7 +33,7 @@ export function GameClient(props: GameClientProps) {
     <Suspense fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}>
       <GameRenderer
         interactive={props.interactive}
-        gameState={props.stateClient.gameState}
+        gameStateClient={props.stateClient}
         additionalDebugUi={props.additionalDebugUi}
         areaIdToLoadAssetsFor={areaId}
         enableUi={props.enableUi}

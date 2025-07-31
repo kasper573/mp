@@ -13,21 +13,15 @@ import {
 } from "./area-debug-settings-form";
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import {
-  ctxActorSpritesheetLookup,
-  ctxAreaSpritesheets,
-  ctxEngine,
-  ioc,
-} from "./context";
-import { GameAssetLoaderContext, type GameAssets } from "./game-asset-loader";
+import { GameAssetLoaderContext, GameStateClientContext } from "./context";
+import type { GameAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
-import { GameStateDebugInfo } from "./game-state-debug-info";
-import type { OptimisticGameState } from "./optimistic-game-state";
+import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
 
 interface GameRendererProps {
   interactive: boolean;
-  gameState: OptimisticGameState;
+  gameStateClient: GameStateClient;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
   enableUi?: boolean;
@@ -38,7 +32,7 @@ interface GameRendererProps {
  */
 export function GameRenderer({
   interactive,
-  gameState,
+  gameStateClient,
   areaIdToLoadAssetsFor,
   additionalDebugUi,
   enableUi = true,
@@ -51,7 +45,7 @@ export function GameRenderer({
   const appSignal = useGraphics(container);
   const optionsSignal = useObjectSignal({
     interactive,
-    gameState,
+    gameStateClient,
     assets,
     showDebugUi,
   });
@@ -68,16 +62,15 @@ export function GameRenderer({
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
-        <>
-          <AreaUi />
+        <GameStateClientContext.Provider value={gameStateClient}>
+          <AreaUi state={gameStateClient} />
           {showDebugUi.value && (
             <GameDebugUi>
               {additionalDebugUi}
               <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
-              <GameStateDebugInfo tiled={assets.area.tiled} />
             </GameDebugUi>
           )}
-        </>
+        </GameStateClientContext.Provider>
       )}
     </>
   );
@@ -87,7 +80,7 @@ function buildStage(
   app: Application,
   opt: {
     interactive: boolean;
-    gameState: OptimisticGameState;
+    gameStateClient: GameStateClient;
     assets: GameAssets;
     showDebugUi: Signal<boolean>;
   },
@@ -95,10 +88,7 @@ function buildStage(
   const engine = new Engine(app.canvas);
   const subscriptions = [
     engine.start(opt.interactive),
-    ioc.register(ctxEngine, engine),
-    ioc.register(ctxAreaSpritesheets, opt.assets.areaSpritesheets),
-    ioc.register(ctxActorSpritesheetLookup, opt.assets.actorSpritesheets),
-    engine.frameEmitter.subscribe(opt.gameState.frameCallback),
+    engine.frameEmitter.subscribe(opt.gameStateClient.gameState.frameCallback),
     engine.keyboard.on(
       "keydown",
       "F2",
@@ -106,8 +96,10 @@ function buildStage(
     ),
   ];
   const areaScene = new AreaScene({
-    area: opt.assets.area,
+    engine,
     debugSettings: () => areaDebugSettingsStorage.value,
+    state: opt.gameStateClient,
+    ...opt.assets,
   });
   app.stage.addChild(areaScene);
   return function cleanup() {

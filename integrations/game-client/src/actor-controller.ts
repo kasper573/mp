@@ -1,4 +1,9 @@
-import type { Actor, TiledResource } from "@mp/game-shared";
+import type { GameStateEvents } from "@mp/game-service";
+import type {
+  Actor,
+  ActorSpritesheetLookup,
+  TiledResource,
+} from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   ColorMatrixFilter,
@@ -8,9 +13,16 @@ import {
 } from "@mp/graphics";
 import { effect } from "@mp/state";
 import { assert } from "@mp/std";
+import type { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
-import { ctxActorSpritesheetLookup, ctxGameStateClient, ioc } from "./context";
+
+export interface ActorControllerOptions {
+  tiled: TiledResource;
+  actor: Actor;
+  eventBus: SyncEventBus<GameStateEvents>;
+  actorSpritesheets: ActorSpritesheetLookup;
+}
 
 export class ActorController extends Container {
   private subscriptions: Array<() => void>;
@@ -18,7 +30,7 @@ export class ActorController extends Container {
   private text: Text;
   private tintFilter = new ColorMatrixFilter();
 
-  constructor(private options: { tiled: TiledResource; actor: Actor }) {
+  constructor(private options: ActorControllerOptions) {
     super();
 
     const { actor } = this.options;
@@ -41,18 +53,16 @@ export class ActorController extends Container {
     this.addChild(this.sprite);
     this.addChild(this.text);
 
-    const state = ioc.get(ctxGameStateClient);
-
     this.subscriptions = [
       effect(this.switchAnimationToMovingOrIdle),
-      state.eventBus.subscribe("combat.attack", (attack) => {
+      options.eventBus.subscribe("combat.attack", (attack) => {
         if (attack.actorId === actor.identity.id) {
           void this.sprite
             .playToEndAndStop("attack-spear")
             .then(this.switchAnimationToMovingOrIdle);
         }
       }),
-      state.eventBus.subscribe("actor.death", (deadActorId) => {
+      options.eventBus.subscribe("actor.death", (deadActorId) => {
         if (deadActorId === actor.identity.id) {
           void this.sprite.playToEndAndStop("death-spear");
         }
@@ -85,11 +95,14 @@ export class ActorController extends Container {
   };
 
   #onRender = () => {
-    const { actor, tiled } = this.options;
+    const {
+      actor,
+      tiled,
+      actorSpritesheets: actorSpritesheetLookup,
+    } = this.options;
 
-    const allSpritesheets = ioc.get(ctxActorSpritesheetLookup);
     this.sprite.spritesheets = assert(
-      allSpritesheets.get(actor.appearance.modelId),
+      actorSpritesheetLookup.get(actor.appearance.modelId),
     );
     this.sprite.attackSpeed = actor.combat.attackSpeed;
     this.sprite.direction = actor.movement.dir;

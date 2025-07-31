@@ -1,4 +1,6 @@
+import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
+import type { ActorSpritesheetLookup } from "@mp/game-shared";
 import {
   clientViewDistance,
   getAreaIdFromObject,
@@ -15,29 +17,26 @@ import { Rect, Vector } from "@mp/math";
 import { computed } from "@mp/state";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
+import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import { ActorController } from "./actor-controller";
 import { AreaDebugGraphics } from "./area-debug-graphics";
 import type { AreaDebugSettings } from "./area-debug-settings-form";
-import {
-  ctxAreaSpritesheets,
-  ctxEngine,
-  ctxGameStateClient,
-  ioc,
-} from "./context";
+import type { GameStateClient } from "./game-state-client";
 import type { TileHighlightTarget } from "./tile-highlight";
 import { TileHighlight } from "./tile-highlight";
 
 export interface AreaSceneOptions {
   area: AreaResource;
+  engine: Engine;
+  state: GameStateClient;
+  actorSpritesheets: ActorSpritesheetLookup;
+  areaSpritesheets: TiledSpritesheetRecord;
   debugSettings: () => AreaDebugSettings;
 }
 
 export class AreaScene extends Container {
-  private engine = ioc.get(ctxEngine);
-  private state = ioc.get(ctxGameStateClient);
-  private areaSpritesheets = ioc.get(ctxAreaSpritesheets);
   private cleanup: () => void;
 
   constructor(private options: AreaSceneOptions) {
@@ -46,26 +45,33 @@ export class AreaScene extends Container {
     const tiledRenderer = new TiledRenderer(
       options.area.tiled.map.layers,
       options.area.dynamicLayer.name,
-      createTiledTextureLookup(this.areaSpritesheets),
+      createTiledTextureLookup(options.areaSpritesheets),
     );
 
     this.cleanup = reactiveCollectionBinding(
       tiledRenderer.dynamicLayer,
-      this.state.actorList,
-      (actor) => new ActorController({ actor, tiled: options.area.tiled }),
+      options.state.actorList,
+      (actor) =>
+        new ActorController({
+          eventBus: options.state.eventBus,
+          actorSpritesheets: options.actorSpritesheets,
+          actor,
+          tiled: options.area.tiled,
+        }),
     );
 
     const areaDebug = new AreaDebugGraphics(
+      options.engine,
       options.area,
-      this.state.actorList,
-      () => this.state.character.value?.movement.coords,
+      options.state.actorList,
+      () => options.state.character.value?.movement.coords,
       options.debugSettings,
     );
 
     this.addChild(tiledRenderer);
     this.addChild(areaDebug);
 
-    if (this.engine.isInteractive) {
+    if (options.engine.isInteractive) {
       const tileHighlight = new TileHighlight(() => ({
         area: options.area,
         target: this.highlightTarget.value,
@@ -75,8 +81,14 @@ export class AreaScene extends Container {
 
     this.cleanup = reactiveCollectionBinding(
       tiledRenderer.dynamicLayer,
-      this.state.actorList,
-      (actor) => new ActorController({ actor, tiled: options.area.tiled }),
+      options.state.actorList,
+      (actor) =>
+        new ActorController({
+          actor,
+          eventBus: options.state.eventBus,
+          actorSpritesheets: options.actorSpritesheets,
+          tiled: options.area.tiled,
+        }),
     );
 
     this.onRender = this.#onRender;
@@ -84,7 +96,7 @@ export class AreaScene extends Container {
     this.cameraPos = new VectorSpring(
       computed(() =>
         options.area.tiled.tileCoordToWorld(
-          this.state.character.value?.movement.coords ?? Vector.zero(),
+          options.state.character.value?.movement.coords ?? Vector.zero(),
         ),
       ),
       () => ({
@@ -106,19 +118,19 @@ export class AreaScene extends Container {
   cameraZoom = computed(() =>
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      this.engine.camera.cameraSize.value,
+      this.options.engine.camera.cameraSize.value,
       clientViewDistance.renderedTileCount,
     ),
   );
 
   pointerTile = computed(() =>
     this.options.area.tiled.worldCoordToTile(
-      this.engine.pointer.worldPosition.value,
+      this.options.engine.pointer.worldPosition.value,
     ),
   );
 
   actorAtPointer = computed(() => {
-    return this.state.actorList.value.find(
+    return this.options.state.actorList.value.find(
       (actor) =>
         actor.combat.health > 0 &&
         actor.combat.hitBox
@@ -129,7 +141,7 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    if (actor && actor?.identity.id !== this.state.characterId.value) {
+    if (actor && actor?.identity.id !== this.options.state.characterId.value) {
       return {
         actor,
         type: "attack",
@@ -149,7 +161,7 @@ export class AreaScene extends Container {
   moveThrottled = dedupe(
     throttle(
       (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
-        this.state.actions.move(to, desiredPortalId),
+        this.options.state.actions.move(to, desiredPortalId),
       100,
     ),
     ([aVector, aPortalId], [bVector, bPortalId]) =>
@@ -158,22 +170,24 @@ export class AreaScene extends Container {
 
   #onRender = () => {
     this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.elapsedMS));
-    this.engine.camera.update(
+    this.options.engine.camera.update(
       this.options.area.tiled.mapSize,
       this.cameraZoom.value,
       this.cameraPos.value.value,
     );
-    this.setFromMatrix(new Matrix(...this.engine.camera.transform.value.data));
+    this.setFromMatrix(
+      new Matrix(...this.options.engine.camera.transform.value.data),
+    );
 
-    if (this.engine.pointer.isDown.value) {
+    if (this.options.engine.pointer.isDown.value) {
       const target = this.highlightTarget.value;
       switch (target?.type) {
         case "attack":
-          void this.state.actions.attack(target.actor.identity.id);
+          void this.options.state.actions.attack(target.actor.identity.id);
           break;
         case "move": {
           const portal = this.options.area
-            .hitTestObjects(this.engine.pointer.worldPosition.value)
+            .hitTestObjects(this.options.engine.pointer.worldPosition.value)
             .find(getAreaIdFromObject);
 
           this.moveThrottled(Vector.from(target.rect), portal?.id);
