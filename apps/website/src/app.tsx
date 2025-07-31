@@ -13,7 +13,7 @@ import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
 import { useEffect, useMemo } from "preact/hooks";
 import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
-import { createFaroBindings, createFaroClient } from "./integrations/faro";
+import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
 
 // This is effectively the composition root of the application.
@@ -56,7 +56,6 @@ function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const faro = createFaroClient();
   const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const query = new QueryClient({
@@ -71,10 +70,7 @@ function createSystems() {
   function initialize() {
     void auth.refresh();
 
-    const subscriptions = [
-      auth.initialize(),
-      createFaroBindings(faro, auth.identity),
-    ];
+    const subscriptions = [auth.initialize(), initializeFaro(auth.identity)];
 
     return () => {
       for (const unsubscribe of subscriptions) {
@@ -88,7 +84,6 @@ function createSystems() {
     api,
     logger,
     router,
-    faro,
     query,
     initialize,
   };
