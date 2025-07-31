@@ -2,7 +2,8 @@ import type { ActorId } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
 import { ctxGameState, ctxGameStateServer } from "../context";
-import { evt, roles } from "../integrations/event-router";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 export const kill = evt.event
   .input<{ targetId: ActorId }>()

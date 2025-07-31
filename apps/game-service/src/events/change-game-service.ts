@@ -7,7 +7,8 @@ import {
   ctxGameStateServer,
   ctxLogger,
 } from "../context";
-import { evt, roles } from "../integrations/event-router";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 /**
  * Emitted by a game service when a character wants to join another game service.

@@ -2,7 +2,8 @@ import type { CharacterId } from "@mp/db/types";
 import type { ActorId } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { accessCharacter } from "../etc/access-character";
-import { evt, roles } from "../integrations/event-router";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 export const attack = evt.event
   .input<{ characterId: CharacterId; targetId: ActorId }>()

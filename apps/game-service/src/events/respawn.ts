@@ -3,7 +3,8 @@ import { characterRoles } from "@mp/keycloak";
 import { ctxGameStateLoader } from "../context";
 import { accessCharacter } from "../etc/access-character";
 import { sendCharacterToArea } from "../etc/movement-behavior";
-import { evt, roles } from "../integrations/event-router";
+import { roles } from "../integrations/auth";
+import { evt } from "../integrations/event-router";
 
 export const respawn = evt.event
   .input<CharacterId>()
