@@ -1,26 +1,23 @@
 import { parseEnv, type FlatObject } from "@mp/env";
-import { csv, numeric, type } from "@mp/validate";
 
-export type ClientEnv = typeof clientEnvSchema.infer;
-
-const clientEnvSchema = type({
-  gameServiceUrl: "string",
-  apiUrl: "string",
-  version: "string",
-  retryApiQueries: numeric().default(0),
+export interface ClientEnv {
+  gameServiceUrl: string;
+  apiUrl: string;
+  version: string;
+  retryApiQueries: number;
   auth: {
-    authority: "string",
-    audience: "string",
+    authority: string;
+    audience: string;
     /**
      * The full URI that OIDC should redirect back to
      */
-    redirectUri: "string",
-  },
+    redirectUri: string;
+  };
   faro: {
-    receiverUrl: "string",
-    propagateTraceHeaderCorsUrls: csv(type("string")),
-  },
-});
+    receiverUrl: string;
+    propagateTraceHeaderCorsUrls: string[];
+  };
+}
 
 export const env: ClientEnv = getClientEnv();
 
@@ -31,7 +28,9 @@ function getClientEnv(): ClientEnv {
     throw new Error("Client env vars is missing");
   }
 
-  const res = parseEnv((v) => clientEnvSchema.assert(v), obj, "MP_WEBSITE_");
+  // We blind trust the env object instead of using @mp/validate,
+  // since @mp/validate adds ~100kb to the client bundle size.
+  const res = parseEnv((v) => v as ClientEnv, obj, "MP_WEBSITE_");
 
   if (res.isErr()) {
     throw new Error("Invalid client env vars:\n\n" + res.error);

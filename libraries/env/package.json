@@ -15,7 +15,6 @@
     "dot-prop": "9.0.0"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "vitest": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }

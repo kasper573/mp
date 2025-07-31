@@ -29,7 +29,6 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@mp/ui": "workspace:*",
-    "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "@tanstack/react-router": "1.126.2",
     "@tanstack/react-router-devtools": "1.126.2",
@@ -38,7 +37,6 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
-    "vite-bundle-analyzer": "1.1.0",
     "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
