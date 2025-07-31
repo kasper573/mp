@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 18,
+  "id": 9,
   "links": [],
   "panels": [
     {
@@ -1560,6 +1560,10 @@
           "text": "forest",
           "value": "forest"
         },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "mimir"
+        },
         "definition": "label_values(areaId)",
         "includeAll": false,
         "label": "Area",
@@ -1584,5 +1588,5 @@
   "timezone": "",
   "title": "mp-game-service",
   "uid": "det89o8r7iy2od",
-  "version": 4
+  "version": 2
 }
