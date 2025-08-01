@@ -51,6 +51,7 @@ import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-b
 import { GameStateLoader } from "./etc/game-state-loader";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
+import { NpcRewardSystem } from "./etc/npc-reward-system";
 import { NpcAi } from "./etc/npc/npc-ai";
 import { NpcSpawner } from "./etc/npc/npc-spawner";
 import { collectGameStateMetrics } from "./metrics/game-state";
@@ -217,9 +218,19 @@ const updateTicker = new Ticker({
 });
 
 logger.info(`Getting all NPCs and spawns...`);
-const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
+const npcSpawner = new NpcSpawner(
+  area,
+  actorModels,
+  await gameStateLoader.getAllSpawnsAndTheirNpcs(),
+  rng,
+);
 
-const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
+logger.info(`Getting all NPC rewards...`);
+const npcRewardSystem = new NpcRewardSystem(
+  logger,
+  gameState,
+  await gameStateLoader.getAllNpcRewards(),
+);
 
 const ioc = new InjectionContainer()
   .provide(ctxGameStateLoader, gameStateLoader)
@@ -236,7 +247,9 @@ const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
 updateTicker.subscribe(movementBehavior(ioc));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
+updateTicker.subscribe(
+  combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
+);
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 

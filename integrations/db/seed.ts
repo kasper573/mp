@@ -80,7 +80,6 @@ const [soldier] = await db
     attackSpeed: 1 as TimesPerSecond,
     speed: oneTile,
     maxHealth: 25,
-    xpReward: 10,
     modelId: actorModelIds[0],
     name: "Soldier",
   })

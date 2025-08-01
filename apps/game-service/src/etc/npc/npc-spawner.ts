@@ -88,7 +88,6 @@ export class NpcSpawner {
         lastAttack: undefined,
       },
       etc: {
-        xpReward: npc.xpReward,
         patrol: spawn.patrol ?? undefined,
         aggroRange: npc.aggroRange,
       },

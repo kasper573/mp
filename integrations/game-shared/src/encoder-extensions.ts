@@ -6,8 +6,8 @@ import { SyncMap } from "@mp/sync";
 import type { CharacterInit } from "./character";
 import { Character } from "./character";
 import { GameStateAreaEntity } from "./game-state";
-import type { NpcInstanceInit } from "./npc-instance";
-import { NpcInstance } from "./npc-instance";
+import type { NpcInstanceInit } from "./npc";
+import { NpcInstance } from "./npc";
 
 let hasRegistered = false;
 

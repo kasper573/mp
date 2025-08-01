@@ -6,6 +6,7 @@ import type {
   AreaResource,
   Character,
   Npc,
+  NpcReward,
   NpcSpawn,
 } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
@@ -84,5 +85,9 @@ export class GameStateLoader {
     );
 
     return [...allFromDB, ...allFromTiled];
+  }
+
+  async getAllNpcRewards(): Promise<NpcReward[]> {
+    return [];
   }
 }

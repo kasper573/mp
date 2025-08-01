@@ -110,7 +110,6 @@ export const npcTable = pgTable("npc", {
   name: varchar({ length: 64 }).notNull(),
   npcType: npcType.notNull(),
   aggroRange: real().$type<Tile>().notNull(),
-  xpReward: real().notNull(),
 });
 
 export const npcRewardId = () => shortId().$type<NpcRewardId>();

@@ -1,4 +1,10 @@
-import type { ActorModelId, NpcId, NpcSpawnId, NpcType } from "@mp/db/types";
+import type {
+  ActorModelId,
+  ItemId,
+  NpcId,
+  NpcSpawnId,
+  NpcType,
+} from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
 import { computed } from "@mp/state";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
@@ -19,7 +25,21 @@ export interface Npc {
   name: string;
   npcType: NpcType;
   aggroRange: Tile;
-  xpReward: number;
+}
+
+export type NpcReward = NpcItemReward | NpcXpReward;
+
+export interface NpcRewardBase<T extends string> {
+  type: T;
+  npcId: NpcId;
+}
+
+export interface NpcItemReward extends NpcRewardBase<"item"> {
+  itemId: ItemId;
+}
+
+export interface NpcXpReward extends NpcRewardBase<"xp"> {
+  xp: number;
 }
 
 export interface NpcSpawn {
@@ -57,10 +77,7 @@ const NpcInstanceIdentity = defineSyncComponent((builder) =>
 export type NpcEtc = typeof NpcEtc.$infer;
 
 const NpcEtc = defineSyncComponent((builder) =>
-  builder
-    .add<number>()("xpReward")
-    .add<Tile>()("aggroRange")
-    .add<Path<Tile> | undefined>()("patrol"),
+  builder.add<Tile>()("aggroRange").add<Path<Tile> | undefined>()("patrol"),
 );
 
 export const NpcInstanceCommons = defineSyncComponent((builder) => builder);

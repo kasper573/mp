@@ -13,7 +13,7 @@ export * from "./hit-test-tiled-object";
 export * from "./load-area-resource";
 export * from "./move-along-path";
 export * from "./movement";
-export * from "./npc-instance";
+export * from "./npc";
 export * as patchOptimizers from "./patch-optimizers";
 export * from "./session";
 export * from "./tiled-fixture";
