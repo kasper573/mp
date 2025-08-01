@@ -1,5 +1,5 @@
 import type { UserId } from "@mp/oauth";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import {
   boolean,
   integer,
@@ -12,7 +12,11 @@ import type {
   ActorModelId,
   AreaId,
   CharacterId,
+  ItemContainerId,
+  ItemId,
+  ItemInstanceId,
   NpcId,
+  NpcRewardId,
   NpcSpawnId,
 } from "./types";
 import { npcTypes } from "./types";
@@ -30,12 +34,39 @@ export const areaTable = pgTable("area", {
   id: areaId().primaryKey(),
 });
 
+export const itemId = () => shortId().$type<ItemId>();
+export const itemTable = pgTable("item", {
+  id: itemId().$defaultFn(createShortId).primaryKey(),
+  name: varchar({ length: 64 }).notNull(),
+});
+
+export const itemInstanceId = () => shortId().$type<ItemInstanceId>();
+export const itemInstanceTable = pgTable("item_instance", {
+  id: itemInstanceId().$defaultFn(createShortId).primaryKey(),
+  itemId: itemId()
+    .notNull()
+    .references(() => itemTable.id),
+});
+
+export const itemContainerId = () => shortId().$type<ItemContainerId>();
+export const itemContainerTable = pgTable("item_container", {
+  id: itemContainerId().$defaultFn(createShortId).primaryKey(),
+});
+
+export const itemInstanceToContainerTable = pgTable(
+  "item_instance_to_item_container",
+  {
+    instanceId: itemInstanceId().references(() => itemInstanceTable.id),
+    containerId: itemContainerId().references(() => itemContainerTable.id),
+  },
+);
+
 export const userId = () => uuid().$type<UserId>();
 
 export const characterId = () => shortId().$type<CharacterId>();
 
 export const characterTable = pgTable("character", {
-  id: characterId().primaryKey(),
+  id: characterId().$defaultFn(createShortId).primaryKey(),
   coords: vector<Tile>().notNull(),
   areaId: areaId()
     .notNull()
@@ -53,6 +84,9 @@ export const characterTable = pgTable("character", {
   name: varchar({ length: 64 }).notNull(),
   online: boolean().notNull().default(false),
   xp: real().notNull(),
+  inventoryId: itemContainerId()
+    .notNull()
+    .references(() => itemContainerTable.id),
 });
 
 export const npcId = () => shortId().$type<NpcId>();
@@ -64,7 +98,7 @@ export const npcType = varchar({ enum: npcTypes });
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
-  id: npcId().primaryKey(),
+  id: npcId().$defaultFn(createShortId).primaryKey(),
   speed: integer().$type<Tile>().notNull(),
   maxHealth: real().notNull(),
   attackDamage: real().notNull(),
@@ -79,20 +113,32 @@ export const npcTable = pgTable("npc", {
   xpReward: real().notNull(),
 });
 
+export const npcRewardId = () => shortId().$type<NpcRewardId>();
+
+export const npcRewardTable = pgTable("npc_reward", {
+  id: npcRewardId().$defaultFn(createShortId).primaryKey(),
+  npcId: npcId()
+    .notNull()
+    .references(() => npcTable.id),
+  itemId: itemId()
+    .notNull()
+    .references(() => itemTable.id),
+});
+
 export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
 
 /**
  * Information about how npc instances should be spawned
  */
 export const npcSpawnTable = pgTable("npc_spawn", {
-  id: npcSpawnId().primaryKey(),
+  id: npcSpawnId().$defaultFn(createShortId).primaryKey(),
   count: integer().notNull(),
   areaId: areaId()
     .notNull()
     .references(() => areaTable.id),
   npcId: npcId()
     .notNull()
-    .references(() => npcTable.id, { onDelete: "cascade" }),
+    .references(() => npcTable.id),
   coords: vector<Tile>(),
   randomRadius: integer(),
   patrol: path<Tile>(),

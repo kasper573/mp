@@ -8,6 +8,10 @@ import {
   actorModelTable,
   areaTable,
   characterTable,
+  itemInstanceTable,
+  itemInstanceToContainerTable,
+  itemTable,
+  npcRewardTable,
   npcSpawnTable,
   npcTable,
 } from "./src/schema";
@@ -38,6 +42,10 @@ if (!areaIds.length) {
 const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
 
 const tablesToTruncate = {
+  npcRewardTable,
+  itemInstanceToContainerTable,
+  itemInstanceTable,
+  itemTable,
   npcSpawnTable,
   npcTable,
   characterTable,
@@ -59,22 +67,24 @@ await db.transaction((tx) =>
 );
 
 const oneTile = 1 as Tile;
-const soldier: typeof npcTable.$inferInsert = {
-  id: "1" as NpcId,
-  aggroRange: 7 as Tile,
-  npcType: "protective",
-  attackDamage: 3,
-  attackRange: oneTile,
-  attackSpeed: 1 as TimesPerSecond,
-  speed: oneTile,
-  maxHealth: 25,
-  xpReward: 10,
-  modelId: actorModelIds[0],
-  name: "Soldier",
-};
 
 logger.info("Inserting npcs...");
-await db.insert(npcTable).values(soldier);
+const [soldier] = await db
+  .insert(npcTable)
+  .values({
+    id: "1" as NpcId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
+    aggroRange: 7 as Tile,
+    npcType: "protective",
+    attackDamage: 3,
+    attackRange: oneTile,
+    attackSpeed: 1 as TimesPerSecond,
+    speed: oneTile,
+    maxHealth: 25,
+    xpReward: 10,
+    modelId: actorModelIds[0],
+    name: "Soldier",
+  })
+  .returning({ id: npcTable.id });
 
 await db.transaction(async (tx) => {
   await Promise.all(
@@ -100,6 +110,21 @@ await db.transaction(async (tx) => {
     })(),
   );
 });
+
+logger.info("Inserting items...");
+const [apple] = await db
+  .insert(itemTable)
+  .values({ name: "Apple" })
+  .returning({ id: itemTable.id });
+
+logger.info("Inserting npc rewards...");
+await db.insert(npcRewardTable).values({
+  npcId: soldier.id,
+  itemId: apple.id,
+});
+
+logger.info("Ending database connection...");
+await db.$client.end();
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fileServerDir("areas");

@@ -8,6 +8,27 @@
       "when": 1754072875452,
       "tag": "0000_nervous_venus",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1754076715756,
+      "tag": "0001_quick_rattler",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1754076944085,
+      "tag": "0002_happy_silver_sable",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1754079018302,
+      "tag": "0003_melted_big_bertha",
+      "breakpoints": true
     }
   ]
 }
