@@ -76,22 +76,30 @@ const soldier: typeof npcTable.$inferInsert = {
 logger.info("Inserting npcs...");
 await db.insert(npcTable).values(soldier);
 
-for (const npcType of npcTypes.values()) {
-  if (npcType === "patrol" || npcType === "static") {
-    continue;
-  }
+await db.transaction(async (tx) => {
+  await Promise.all(
+    (function* () {
+      for (const npcType of npcTypes.values()) {
+        if (npcType === "patrol" || npcType === "static") {
+          continue;
+        }
 
-  for (const areaId of areaIds) {
-    logger.info(`Inserting npc spawns for ${npcType} in area ${areaId}...`);
-    await db.insert(npcSpawnTable).values({
-      npcType,
-      areaId,
-      count: 0,
-      id: createShortId() as NpcSpawnId,
-      npcId: soldier.id,
-    });
-  }
-}
+        for (const areaId of areaIds) {
+          logger.info(
+            `Inserting npc spawns for ${npcType} in area ${areaId}...`,
+          );
+          yield tx.insert(npcSpawnTable).values({
+            npcType,
+            areaId,
+            count: 0,
+            id: createShortId() as NpcSpawnId,
+            npcId: soldier.id,
+          });
+        }
+      }
+    })(),
+  );
+});
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fileServerDir("areas");
