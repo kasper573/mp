@@ -1,6 +1,5 @@
 import type { UserId } from "@mp/oauth";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { relations } from "drizzle-orm";
 import {
   boolean,
   integer,
@@ -21,7 +20,15 @@ import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 
+export const actorModelId = () => varchar({ length: 64 }).$type<ActorModelId>();
+export const actorModelTable = pgTable("actor_model", {
+  id: actorModelId().primaryKey(),
+});
+
 export const areaId = () => varchar({ length: 60 }).$type<AreaId>();
+export const areaTable = pgTable("area", {
+  id: areaId().primaryKey(),
+});
 
 export const userId = () => uuid().$type<UserId>();
 
@@ -30,7 +37,9 @@ export const characterId = () => shortId().$type<CharacterId>();
 export const characterTable = pgTable("character", {
   id: characterId().primaryKey(),
   coords: vector<Tile>().notNull(),
-  areaId: areaId().notNull(),
+  areaId: areaId()
+    .notNull()
+    .references(() => areaTable.id),
   speed: real().$type<Tile>().notNull(),
   userId: userId().notNull(),
   health: real().notNull(),
@@ -38,7 +47,9 @@ export const characterTable = pgTable("character", {
   attackDamage: real().notNull(),
   attackSpeed: real().$type<TimesPerSecond>().notNull(),
   attackRange: real().$type<Tile>().notNull(),
-  modelId: actorModelId().notNull(),
+  modelId: actorModelId()
+    .notNull()
+    .references(() => actorModelTable.id),
   name: varchar({ length: 64 }).notNull(),
   online: boolean().notNull().default(false),
   xp: real().notNull(),
@@ -59,16 +70,14 @@ export const npcTable = pgTable("npc", {
   attackDamage: real().notNull(),
   attackSpeed: real().$type<TimesPerSecond>().notNull(),
   attackRange: real().$type<Tile>().notNull(),
-  modelId: actorModelId().notNull(),
+  modelId: actorModelId()
+    .notNull()
+    .references(() => actorModelTable.id),
   name: varchar({ length: 64 }).notNull(),
   npcType: npcType.notNull(),
   aggroRange: real().$type<Tile>().notNull(),
   xpReward: real().notNull(),
 });
-
-export const npcRelations = relations(npcTable, ({ many }) => ({
-  posts: many(npcSpawnTable),
-}));
 
 export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
 
@@ -78,7 +87,9 @@ export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
 export const npcSpawnTable = pgTable("npc_spawn", {
   id: npcSpawnId().primaryKey(),
   count: integer().notNull(),
-  areaId: areaId().notNull(),
+  areaId: areaId()
+    .notNull()
+    .references(() => areaTable.id),
   npcId: npcId()
     .notNull()
     .references(() => npcTable.id, { onDelete: "cascade" }),
@@ -91,7 +102,3 @@ export const npcSpawnTable = pgTable("npc_spawn", {
    */
   npcType,
 });
-
-export function actorModelId() {
-  return varchar({ length: 64 }).$type<ActorModelId>();
-}

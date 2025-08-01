@@ -1,8 +1,16 @@
-import { createDbClient, eq, npcSpawnTable, npcTable } from "@mp/db";
+// oxlint-disable no-await-in-loop
 import { createPinoLogger } from "@mp/logger/pino";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
+import { createDbClient } from "./src/client";
+import {
+  actorModelTable,
+  areaTable,
+  characterTable,
+  npcSpawnTable,
+  npcTable,
+} from "./src/schema";
 import {
   npcTypes,
   type ActorModelId,
@@ -18,61 +26,72 @@ import {
 
 const logger = createPinoLogger(true);
 
-logger.info("Looking up area and actor model ids...");
-const [areaIds, actorModelIds] = await Promise.all([
-  getAreaIds(),
-  getActorModelIds(),
-]);
+const actorModelIds = ["adventurer"] as ActorModelId[];
+
+logger.info("Deriving area ids from file server files on disk...");
+const areaIds = await getAreaIds();
+
+if (!areaIds.length) {
+  throw new Error("No area ids found");
+}
 
 const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
 
-await db.transaction((tx) => {
-  return Promise.all(Array.from(generateNpcsAndSpawns()));
+const tablesToTruncate = {
+  npcSpawnTable,
+  npcTable,
+  characterTable,
+  actorModelTable,
+  areaTable,
+};
 
-  function* generateNpcsAndSpawns() {
-    logger.info("Deleting existing npc spawns...");
-    for (const areaId of areaIds) {
-      yield tx.delete(npcSpawnTable).where(eq(npcSpawnTable.areaId, areaId));
-    }
-    logger.info("Deleting existing npcs...");
-    yield tx.delete(npcTable);
+for (const [tableName, table] of Object.entries(tablesToTruncate)) {
+  logger.info(`Truncating table ${tableName}...`);
+  await db.delete(table);
+}
 
-    const oneTile = 1 as Tile;
-    const soldier: typeof npcTable.$inferInsert = {
-      id: "1" as NpcId,
-      aggroRange: 7 as Tile,
-      npcType: "protective",
-      attackDamage: 3,
-      attackRange: oneTile,
-      attackSpeed: 1 as TimesPerSecond,
-      speed: oneTile,
-      maxHealth: 25,
-      xpReward: 10,
-      modelId: actorModelIds[0],
-      name: "Soldier",
-    };
+logger.info("Inserting areas and actor models...");
+await db.transaction((tx) =>
+  Promise.all([
+    ...areaIds.map((id) => tx.insert(areaTable).values({ id })),
+    ...actorModelIds.map((id) => tx.insert(actorModelTable).values({ id })),
+  ]),
+);
 
-    logger.info("Inserting npcs...");
-    yield tx.insert(npcTable).values(soldier);
+const oneTile = 1 as Tile;
+const soldier: typeof npcTable.$inferInsert = {
+  id: "1" as NpcId,
+  aggroRange: 7 as Tile,
+  npcType: "protective",
+  attackDamage: 3,
+  attackRange: oneTile,
+  attackSpeed: 1 as TimesPerSecond,
+  speed: oneTile,
+  maxHealth: 25,
+  xpReward: 10,
+  modelId: actorModelIds[0],
+  name: "Soldier",
+};
 
-    for (const npcType of npcTypes.values()) {
-      if (npcType === "patrol" || npcType === "static") {
-        continue;
-      }
+logger.info("Inserting npcs...");
+await db.insert(npcTable).values(soldier);
 
-      for (const areaId of areaIds) {
-        logger.info(`Inserting npc spawns for ${npcType} in area ${areaId}...`);
-        yield tx.insert(npcSpawnTable).values({
-          npcType,
-          areaId,
-          count: 10,
-          id: createShortId() as NpcSpawnId,
-          npcId: soldier.id,
-        });
-      }
-    }
+for (const npcType of npcTypes.values()) {
+  if (npcType === "patrol" || npcType === "static") {
+    continue;
   }
-});
+
+  for (const areaId of areaIds) {
+    logger.info(`Inserting npc spawns for ${npcType} in area ${areaId}...`);
+    await db.insert(npcSpawnTable).values({
+      npcType,
+      areaId,
+      count: 0,
+      id: createShortId() as NpcSpawnId,
+      npcId: soldier.id,
+    });
+  }
+}
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fileServerDir("areas");
@@ -81,13 +100,6 @@ async function getAreaIds(): Promise<AreaId[]> {
     .map(
       (entry) => path.basename(entry.name, path.extname(entry.name)) as AreaId,
     );
-}
-
-async function getActorModelIds(): Promise<ActorModelId[]> {
-  const areaFiles = await fileServerDir("actors");
-  return areaFiles
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name as ActorModelId);
 }
 
 function fileServerDir(...parts: string[]) {
