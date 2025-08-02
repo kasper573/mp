@@ -10,6 +10,10 @@
       "require": "./src/index.ts"
     }
   },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
   "dependencies": {
     "@mp/std": "workspace:*",
     "cbor-x": "1.6.0"
