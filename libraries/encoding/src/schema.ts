@@ -363,7 +363,7 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
     const result = {} as InferProps<P>;
     for (const key of this.sortedPropertyNames) {
       const res = this.props[key].decodeFrom(dataView, ptr);
-      result[key as keyof InferProps<P>] = res.value as InferProps<P>[keyof P];
+      result[key] = res.value as InferProps<P>[keyof P];
       ptr = res.offset;
     }
     return { value: result, offset: ptr };
