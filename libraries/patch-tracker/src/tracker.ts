@@ -28,7 +28,7 @@ export class TrackedObject<T extends object> extends TrackerBase {
   private basePath: string;
 
   constructor(
-    private typeInfo: ObjectNode | ObjectUnionNode,
+    typeInfo: ObjectNode | ObjectUnionNode,
     private path: PathSegment[],
     initial: T,
   ) {
@@ -70,12 +70,7 @@ export class TrackedObject<T extends object> extends TrackerBase {
             return this.wrapperCache[key];
           }
           const childPath = [...this.path, key];
-          const wrapped = wrapValue(
-            this,
-            childPath,
-            childType,
-            this.values[key],
-          );
+          const wrapped = wrapValue(childPath, childType, this.values[key]);
           this.wrapperCache[key] = wrapped;
           return wrapped;
         },
@@ -105,15 +100,13 @@ export class TrackedArray extends TrackerBase {
   ) {
     super();
     this.basePath = buildPath(path);
-    this.arr = initial.map((v, i) =>
-      wrapValue(this, [...path, i], node.value, v),
-    );
+    this.arr = initial.map((v, i) => wrapValue([...path, i], node.value, v));
   }
 
   push(...items: unknown[]): number {
     const start = this.arr.length;
     const wrapped = items.map((v, i) =>
-      wrapValue(this, [...this.path, start + i], this.node.value, v),
+      wrapValue([...this.path, start + i], this.node.value, v),
     );
     const res = this.arr.push(...wrapped);
     // Snapshot only when recording
@@ -147,7 +140,7 @@ export class TrackedArray extends TrackerBase {
 
   unshift(...items: unknown[]): number {
     const wrapped = items.map((v, i) =>
-      wrapValue(this, [...this.path, i], this.node.value, v),
+      wrapValue([...this.path, i], this.node.value, v),
     );
     const res = this.arr.unshift(...wrapped);
     this.changes.push({
@@ -160,7 +153,7 @@ export class TrackedArray extends TrackerBase {
 
   splice(start: number, deleteCount?: number, ...items: unknown[]): unknown[] {
     const wrapped = items.map((v, i) =>
-      wrapValue(this, [...this.path, start + i], this.node.value, v),
+      wrapValue([...this.path, start + i], this.node.value, v),
     );
     const res = this.arr.splice(start, deleteCount as number, ...wrapped);
     this.changes.push({
@@ -172,12 +165,7 @@ export class TrackedArray extends TrackerBase {
   }
 
   setIndex(index: number, value: unknown): void {
-    const wrapped = wrapValue(
-      this,
-      [...this.path, index],
-      this.node.value,
-      value,
-    );
+    const wrapped = wrapValue([...this.path, index], this.node.value, value);
     this.arr[index] = wrapped;
     const ptr = this.basePath + "/" + encodePath(index);
     this.changes.push({
@@ -200,7 +188,7 @@ export class TrackedMap extends Map<unknown, unknown> {
     super();
     this.basePath = buildPath(path);
     initial.forEach((v, k) => {
-      super.set(k, wrapValue(this, [...path, String(k)], this.node.value, v));
+      super.set(k, wrapValue([...path, String(k)], this.node.value, v));
     });
   }
 
@@ -214,10 +202,7 @@ export class TrackedMap extends Map<unknown, unknown> {
     const keyStr = String(key);
     const ptr = this.basePath + "/" + encodePath(keyStr);
     this.changes.push({ op: PatchOpCode.Replace, path: ptr, value });
-    super.set(
-      key,
-      wrapValue(this, [...this.path, keyStr], this.node.value, value),
-    );
+    super.set(key, wrapValue([...this.path, keyStr], this.node.value, value));
     return this;
   }
 
@@ -233,11 +218,7 @@ export class TrackedSet extends Set<unknown> {
   private changes: Operation[] = [];
   private basePath: string;
 
-  constructor(
-    private node: SetNode,
-    private path: PathSegment[],
-    initial: Set<unknown>,
-  ) {
+  constructor(node: SetNode, path: PathSegment[], initial: Set<unknown>) {
     super();
     this.basePath = buildPath(path);
     initial.forEach((v) => super.add(v));
@@ -271,7 +252,6 @@ export class TrackedSet extends Set<unknown> {
 }
 
 function wrapValue(
-  root: unknown,
   path: PathSegment[],
   node: TypeNode,
   value: unknown,
