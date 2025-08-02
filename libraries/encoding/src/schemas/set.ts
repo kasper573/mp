@@ -1,14 +1,14 @@
 import { Schema } from "./abstract";
 
 export class SetSchema<V> extends Schema<Set<V>> {
-  constructor(private element: Schema<V>) {
+  constructor(public readonly valueSchema: Schema<V>) {
     super();
   }
 
   sizeOf(value: this["$infer"]): number {
     let size = 4;
     for (const el of value) {
-      size += this.element.sizeOf(el);
+      size += this.valueSchema.sizeOf(el);
     }
     return size;
   }
@@ -17,7 +17,7 @@ export class SetSchema<V> extends Schema<Set<V>> {
     dataView.setUint32(offset, value.size, true);
     let ptr = offset + 4;
     for (const el of value) {
-      ptr = this.element.encodeTo(dataView, ptr, el);
+      ptr = this.valueSchema.encodeTo(dataView, ptr, el);
     }
     return ptr;
   }
@@ -27,7 +27,7 @@ export class SetSchema<V> extends Schema<Set<V>> {
     let ptr = offset + 4;
     const value: this["$infer"] = new Set<V>();
     for (let i = 0; i < length; i += 1) {
-      const result = this.element.decodeFrom(dataView, ptr);
+      const result = this.valueSchema.decodeFrom(dataView, ptr);
       value.add(result.value);
       ptr = result.offset;
     }

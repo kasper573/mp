@@ -2,8 +2,8 @@ import { Schema } from "./abstract";
 
 export class MapSchema<K, V> extends Schema<Map<K, V>> {
   constructor(
-    private keySchema: Schema<K>,
-    private valueSchema: Schema<V>,
+    public readonly keySchema: Schema<K>,
+    public readonly valueSchema: Schema<V>,
   ) {
     super();
   }

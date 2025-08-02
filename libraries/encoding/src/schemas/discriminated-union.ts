@@ -6,22 +6,22 @@ type UnionType<Schemas extends AnyUnionSchemaTuple> = Schemas[number]["$infer"];
 // oxlint-disable-next-line no-explicit-any
 type AnyUnionSchemaTuple = readonly [...ObjectSchema<any>[]];
 
-type DiscriminatorFor<Schemas extends AnyUnionSchemaTuple> =
+type DiscriminantFor<Schemas extends AnyUnionSchemaTuple> =
   keyof UnionType<Schemas>;
 
 export class DiscriminatedUnionSchema<
   VariantSchemas extends AnyUnionSchemaTuple,
-  Discriminator extends DiscriminatorFor<VariantSchemas>,
+  Discriminant extends DiscriminantFor<VariantSchemas>,
 > extends Schema<UnionType<VariantSchemas>> {
   private schemaByTypeId: Map<number, ObjectSchema<unknown>>;
 
   constructor(
-    schemas: VariantSchemas,
-    private discriminator: Discriminator,
+    public readonly variantSchemas: VariantSchemas,
+    public readonly discriminant: Discriminant,
   ) {
     super();
     this.schemaByTypeId = new Map();
-    for (const schema of schemas) {
+    for (const schema of variantSchemas) {
       if (this.schemaByTypeId.has(schema.typeId)) {
         throw new Error(`Duplicate typeId ${schema.typeId} in union variants.`);
       }
@@ -30,7 +30,7 @@ export class DiscriminatedUnionSchema<
   }
 
   private getVariantSchema(value: this["$infer"]) {
-    const discVal = value[this.discriminator] as number;
+    const discVal = value[this.discriminant] as number;
     const schema = this.schemaByTypeId.get(discVal);
     if (!schema) {
       throw new Error(
@@ -64,7 +64,7 @@ export class DiscriminatedUnionSchema<
 
 export function discriminatedUnion<
   VariantSchemas extends AnyUnionSchemaTuple,
-  Discriminator extends DiscriminatorFor<VariantSchemas>,
+  Discriminator extends DiscriminantFor<VariantSchemas>,
 >(
   schemas: VariantSchemas,
   discriminator: Discriminator,

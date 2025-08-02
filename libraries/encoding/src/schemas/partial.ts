@@ -7,8 +7,10 @@ export class PartialObjectSchema<T> extends Schema<Partial<T>> {
   private typeId: number;
   private bitsetSize: number;
 
-  constructor({ typeId, propertySchemas }: ObjectSchema<T>) {
+  constructor(public readonly objectSchema: ObjectSchema<T>) {
     super();
+
+    const { typeId, propertySchemas } = objectSchema;
     this.propertySchemas = propertySchemas;
     this.sortedKeys = Object.keys(propertySchemas).sort() as Array<keyof T>;
     this.typeId = typeId;

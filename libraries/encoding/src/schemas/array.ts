@@ -1,7 +1,7 @@
 import { Schema } from "./abstract";
 
 export class ArraySchema<V> extends Schema<V[]> {
-  constructor(private elementSchema: Schema<V>) {
+  constructor(public readonly elementSchema: Schema<V>) {
     super();
   }
 

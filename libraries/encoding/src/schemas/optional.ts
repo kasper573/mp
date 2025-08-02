@@ -1,12 +1,12 @@
 import { Schema } from "./abstract";
 
 export class OptionalSchema<V> extends Schema<V | undefined> {
-  constructor(private inner: Schema<V>) {
+  constructor(public readonly valueSchema: Schema<V>) {
     super();
   }
 
   sizeOf(value: V | undefined): number {
-    return 1 + (value === undefined ? 0 : this.inner.sizeOf(value));
+    return 1 + (value === undefined ? 0 : this.valueSchema.sizeOf(value));
   }
 
   encodeTo(dataView: DataView, offset: number, value: V | undefined): number {
@@ -15,7 +15,7 @@ export class OptionalSchema<V> extends Schema<V | undefined> {
       return offset + 1;
     }
     dataView.setUint8(offset, 1);
-    return this.inner.encodeTo(dataView, offset + 1, value);
+    return this.valueSchema.encodeTo(dataView, offset + 1, value);
   }
 
   decodeFrom(
@@ -26,7 +26,7 @@ export class OptionalSchema<V> extends Schema<V | undefined> {
     if (flag === 0) {
       return { value: undefined, offset: offset + 1 };
     }
-    const result = this.inner.decodeFrom(dataView, offset + 1);
+    const result = this.valueSchema.decodeFrom(dataView, offset + 1);
     return { value: result.value, offset: result.offset };
   }
 }
