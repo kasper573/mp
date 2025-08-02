@@ -38,120 +38,59 @@ export function applyPatch(target: unknown, patch: Patch): void {
       case PatchOpCode.Replace: {
         const value = op.value;
 
-        if (parent instanceof Map) {
-          if (!parent.has(key)) {
-            throw new Error(`Key '${key}' not found at '${op.path}'`);
-          }
+        if (isMapLike(parent)) {
           parent.set(key, value);
-        } else if (Array.isArray(parent)) {
-          const idx = Number(key);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= parent.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
-          parent[idx] = value;
-        } else if (parent instanceof Set) {
+        } else if (isSetLike(parent)) {
           const idx = Number(key);
           const arr = Array.from(parent);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= arr.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
           // Replace in place by rebuilding the Set
           arr[idx] = value;
           parent.clear();
           for (const el of arr) parent.add(el);
-        } else if (isObject(parent)) {
-          if (!(key in parent)) {
-            throw new Error(`Property '${key}' not found at '${op.path}'`);
-          }
-          (parent as Record<string, unknown>)[key] = value;
+        } else if (Array.isArray(parent)) {
+          parent[Number(key)] = value;
         } else {
-          throw new Error(`Cannot traverse non-container at '${op.path}'`);
+          (parent as Record<string, unknown>)[key] = value;
         }
         break;
       }
 
       case PatchOpCode.Delete: {
-        if (parent instanceof Map) {
-          if (!parent.delete(key)) {
-            throw new Error(`Key '${key}' not found at '${op.path}'`);
-          }
-        } else if (Array.isArray(parent)) {
-          const idx = Number(key);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= parent.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
-          parent.splice(idx, 1);
-        } else if (parent instanceof Set) {
+        if (isMapLike(parent)) {
+          parent.delete(key);
+        } else if (isSetLike(parent)) {
           const idx = Number(key);
           const arr = Array.from(parent);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= arr.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
           // Delete by rebuilding the Set without the element
           arr.splice(idx, 1);
           parent.clear();
           for (const el of arr) parent.add(el);
-        } else if (isObject(parent)) {
-          if (!(key in parent)) {
-            throw new Error(`Property '${key}' not found at '${op.path}'`);
-          }
-          delete (parent as Record<string, unknown>)[key];
+        } else if (Array.isArray(parent)) {
+          const idx = Number(key);
+          parent.splice(idx, 1);
         } else {
-          throw new Error(`Cannot delete on non-container at '${op.path}'`);
+          delete (parent as Record<string, unknown>)[key];
         }
         break;
       }
 
       case PatchOpCode.Assign: {
         const val = op.value;
-        if (!isObject(val)) {
-          throw new Error(`Assign value must be an object at '${op.path}'`);
-        }
-
-        if (parent instanceof Map) {
+        if (isMapLike(parent)) {
           const existing = parent.get(key);
-          if (isObject(existing)) {
-            Object.assign(existing, val);
-          } else {
-            throw new Error(`Target is not an object in Map at '${op.path}'`);
-          }
-        } else if (Array.isArray(parent)) {
-          const idx = Number(key);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= parent.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
-          const existing = parent[idx];
-          if (isObject(existing)) {
-            Object.assign(existing, val);
-          } else {
-            throw new Error(`Target is not an object in Array at '${op.path}'`);
-          }
-        } else if (parent instanceof Set) {
+          Object.assign(existing as object, val);
+        } else if (isSetLike(parent)) {
           const idx = Number(key);
           const arr = Array.from(parent);
-          if (!Number.isInteger(idx) || idx < 0 || idx >= arr.length) {
-            throw new Error(`Index '${key}' out of bounds at '${op.path}'`);
-          }
           const element = arr[idx];
-          if (isObject(element)) {
-            Object.assign(element, val);
-          } else {
-            throw new Error(`Target is not an object in Set at '${op.path}'`);
-          }
-        } else if (isObject(parent)) {
-          if (!(key in parent)) {
-            throw new Error(`Property '${key}' not found at '${op.path}'`);
-          }
-          const existing = (parent as Record<string, unknown>)[key];
-          if (isObject(existing)) {
-            Object.assign(existing, val);
-          } else {
-            throw new Error(
-              `Target is not an object in Object at '${op.path}'`,
-            );
-          }
+          Object.assign(element as object, val);
+        } else if (Array.isArray(parent)) {
+          const idx = Number(key);
+          const existing = parent[idx];
+          Object.assign(existing as object, val);
         } else {
-          throw new Error(`Cannot assign on non-container at '${op.path}'`);
+          const existing = (parent as Record<string, unknown>)[key];
+          Object.assign(existing as object, val);
         }
         break;
       }
@@ -177,11 +116,11 @@ function getContainer(root: unknown, segments: string[]) {
   let parent: unknown = root;
   for (let i = 0; i < segments.length - 1; i++) {
     const seg = segments[i];
-    if (parent instanceof Map) {
+    if (isMapLike(parent)) {
       parent = parent.get(seg);
     } else if (Array.isArray(parent)) {
       parent = parent[Number(seg)];
-    } else if (parent instanceof Set) {
+    } else if (isSetLike(parent)) {
       parent = Array.from(parent)[Number(seg)];
     } else if (isObject(parent)) {
       parent = (parent as Record<string, unknown>)[seg];
@@ -204,7 +143,32 @@ function isObject(val: unknown): val is Record<string, unknown> {
     typeof val === "object" &&
     val !== null &&
     !Array.isArray(val) &&
-    !(val instanceof Map) &&
-    !(val instanceof Set)
+    !isMapLike(val) &&
+    !isSetLike(val)
   );
 }
+
+function isMapLike<K, V>(value: unknown): value is Map<K, V> {
+  return (
+    value instanceof Map ||
+    (typeof value === "object" &&
+      value !== null &&
+      mapLikeProps.every((prop) => prop in value))
+  );
+}
+
+function isSetLike<T>(value: unknown): value is Set<T> {
+  return (
+    value instanceof Set ||
+    (typeof value === "object" &&
+      value !== null &&
+      setLikeProps.every((prop) => prop in value))
+  );
+}
+
+const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
+  keyof Map<unknown, unknown>
+>;
+const setLikeProps = ["add", "delete", "clear"] satisfies Array<
+  keyof Set<unknown>
+>;

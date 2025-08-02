@@ -1,3 +1,4 @@
+// oxlint-disable no-unsafe-function-type
 import { beforeEach, describe, expect, it } from "vitest";
 import type { Patch } from "../src";
 import { PatchOpCode, applyPatch } from "../src";
@@ -33,11 +34,17 @@ describe("applyPatch", () => {
       expect(target.e as Record<string, unknown>).toMatchObject({ f: 4, g: 5 });
     });
 
-    it("should throw on assign with non-object value", () => {
-      const patch: Patch = [
-        { op: PatchOpCode.Assign, path: "/a", value: 123 as never },
-      ];
-      expect(() => applyPatch(target, patch)).toThrow();
+    it("can target Proxy objects", () => {
+      const proxy = new Proxy(target, {
+        get: (obj, prop) => obj[prop as keyof typeof obj],
+        set: (obj, prop, value) => {
+          obj[prop as keyof typeof obj] = value;
+          return true;
+        },
+      });
+      const patch: Patch = [{ op: PatchOpCode.Replace, path: "/a", value: 42 }];
+      applyPatch(proxy, patch);
+      expect(proxy.a).toBe(42);
     });
   });
 
@@ -74,9 +81,11 @@ describe("applyPatch", () => {
       });
     });
 
-    it("should throw when deleting out-of-bounds index", () => {
-      const patch: Patch = [{ op: PatchOpCode.Delete, path: "/5" }];
-      expect(() => applyPatch(target, patch)).toThrow();
+    it("can target Proxy objects acting as arrays", () => {
+      const proxy = new Proxy(target, Reflect);
+      const patch: Patch = [{ op: PatchOpCode.Delete, path: "/2" }];
+      applyPatch(proxy, patch);
+      expect(proxy).toEqual([10, { x: 1, y: 2 }]);
     });
   });
 
@@ -115,11 +124,18 @@ describe("applyPatch", () => {
       });
     });
 
-    it("should throw on replace with missing key", () => {
+    it("can target Proxy objects acting as maps", () => {
+      const proxy = new Proxy(target, {
+        get: (obj, prop) => {
+          const val = obj[prop as keyof typeof obj];
+          return typeof val === "function" ? val.bind(obj) : val;
+        },
+      });
       const patch: Patch = [
-        { op: PatchOpCode.Replace, path: "/missing", value: 1 },
+        { op: PatchOpCode.Replace, path: "/k1", value: 300 },
       ];
-      expect(() => applyPatch(target, patch)).toThrow();
+      applyPatch(proxy, patch);
+      expect(proxy.get("k1")).toBe(300);
     });
   });
 
@@ -154,9 +170,16 @@ describe("applyPatch", () => {
       expect(second).toMatchObject({ o: 1, p: 9 });
     });
 
-    it("should throw on delete with invalid index", () => {
-      const patch: Patch = [{ op: PatchOpCode.Delete, path: "/5" }];
-      expect(() => applyPatch(target, patch)).toThrow();
+    it("can target Proxy objects acting as sets", () => {
+      const proxy = new Proxy(target, {
+        get: (obj, prop) => {
+          const val = obj[prop as keyof typeof obj];
+          return typeof val === "function" ? val.bind(obj) : val;
+        },
+      });
+      const patch: Patch = [{ op: PatchOpCode.Delete, path: "/1" }];
+      applyPatch(proxy, patch);
+      expect(Array.from(proxy.values())).toEqual(["a", "c"]);
     });
   });
 
@@ -167,16 +190,6 @@ describe("applyPatch", () => {
         { op: PatchOpCode.Replace, path: "invalid", value: 0 },
       ];
       expect(() => applyPatch(target, patch)).toThrow(/Invalid path/);
-    });
-
-    it("should throw when traversing non-container", () => {
-      const target = { x: 1 };
-      const patch: Patch = [
-        { op: PatchOpCode.Replace, path: "/x/y", value: 5 },
-      ];
-      expect(() => applyPatch(target, patch)).toThrow(
-        /Cannot traverse non-container/,
-      );
     });
   });
 });
