@@ -694,6 +694,19 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  libraries/encoding-graph:
+    dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../encoding
+      '@mp/patch-tracker':
+        specifier: workspace:*
+        version: link:../patch-tracker
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   libraries/engine:
     dependencies:
       '@mp/math':
@@ -843,6 +856,16 @@ importers:
         version: link:../tsconfig
 
   libraries/patch:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
+  libraries/patch-tracker:
+    dependencies:
+      '@mp/patch':
+        specifier: workspace:*
+        version: link:../patch
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

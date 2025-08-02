@@ -1,0 +1,28 @@
+{
+  "name": "@mp/patch-tracker",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/tracker.ts",
+      "import": "./src/tracker.ts",
+      "require": "./src/tracker.ts"
+    },
+    "./graph": {
+      "types": "./src/graph.ts",
+      "import": "./src/graph.ts",
+      "require": "./src/graph.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@mp/patch": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}
