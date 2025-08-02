@@ -842,6 +842,12 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
+  libraries/patch:
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+
   libraries/path-finding:
     dependencies:
       '@mp/math':
