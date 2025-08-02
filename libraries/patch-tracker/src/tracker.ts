@@ -9,66 +9,85 @@ import type {
   TypeNode,
 } from "./graph";
 
+type PathSegment = string | number;
+
 abstract class TrackerBase {
   protected changes: Operation[] = [];
 
-  protected makePath(segments: Array<string | number>): string {
-    if (segments.length === 0) return "";
-    return "/" + segments.map((s) => encodeURIComponent(String(s))).join("/");
-  }
-
   flush(): Patch {
-    const out = [...this.changes];
-    this.changes.length = 0;
+    const out = this.changes;
+    this.changes = [];
     return out;
   }
 }
 
 export class TrackedObject<T extends object> extends TrackerBase {
   private values: Record<string, unknown>;
+  private wrapperCache: Record<string, unknown> = {};
+  private encodedKeys: Record<string, string>;
+  private basePath: string;
 
   constructor(
     private typeInfo: ObjectNode | ObjectUnionNode,
-    private path: Array<string | number>,
+    private path: PathSegment[],
     initial: T,
   ) {
     super();
-    // bind flush to the instance
+    this.basePath = buildPath(path);
+
+    // Bind flush for external callers
     Object.defineProperty(this, "flush", {
-      value: this.flush,
+      value: this.flush.bind(this),
       writable: false,
     });
-    // clone initial values
+
+    // Clone initial values
     this.values = { ...(initial as object) };
 
-    // collect all properties from Object or Union
+    // Collect properties
     const props: Record<string, TypeNode> =
       typeInfo.type === "Object"
         ? typeInfo.properties
         : (typeInfo as ObjectUnionNode).members.reduce(
-            (acc, m) => {
-              Object.assign(acc, m.properties);
-              return acc;
-            },
+            (acc, m) => Object.assign(acc, m.properties),
             {} as Record<string, TypeNode>,
           );
 
-    // define getters/setters for each prop
+    // Pre-encode property keys
+    this.encodedKeys = {};
+    for (const key of Object.keys(props)) {
+      this.encodedKeys[key] = encodePath(key);
+    }
+
+    // Define getter/setter hooks
     for (const key of Object.keys(props)) {
       const childType = props[key];
       Object.defineProperty(this, key, {
         enumerable: true,
         configurable: true,
-        get: () =>
-          wrapValue(this, [...this.path, key], childType, this.values[key]),
+        get: () => {
+          if (this.wrapperCache[key] !== undefined) {
+            return this.wrapperCache[key];
+          }
+          const childPath = [...this.path, key];
+          const wrapped = wrapValue(
+            this,
+            childPath,
+            childType,
+            this.values[key],
+          );
+          this.wrapperCache[key] = wrapped;
+          return wrapped;
+        },
         set: (v: unknown) => {
-          const ptr = this.makePath([...this.path, key]);
+          const ptr = this.basePath + "/" + this.encodedKeys[key];
           this.changes.push({
             op: PatchOpCode.Replace,
             path: ptr,
             value: v,
           });
           this.values[key] = v;
+          delete this.wrapperCache[key];
         },
       });
     }
@@ -77,53 +96,55 @@ export class TrackedObject<T extends object> extends TrackerBase {
 
 export class TrackedArray extends TrackerBase {
   private arr: unknown[];
-  private node: ArrayNode;
-  private path: Array<string | number>;
+  private basePath: string;
 
   constructor(
-    node: ArrayNode,
-    path: Array<string | number>,
+    private node: ArrayNode,
+    private path: PathSegment[],
     initial: unknown[],
   ) {
     super();
-    this.node = node;
-    this.path = path;
-    // copy and wrap each element
+    this.basePath = buildPath(path);
     this.arr = initial.map((v, i) =>
       wrapValue(this, [...path, i], node.value, v),
     );
   }
 
   push(...items: unknown[]): number {
+    const start = this.arr.length;
     const wrapped = items.map((v, i) =>
-      wrapValue(this, [...this.path, this.arr.length + i], this.node.value, v),
+      wrapValue(this, [...this.path, start + i], this.node.value, v),
     );
     const res = this.arr.push(...wrapped);
+    // Snapshot only when recording
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
-      value: [...this.arr],
+      path: this.basePath,
+      value: this.arr.slice(),
     });
     return res;
   }
+
   pop(): unknown {
     const res = this.arr.pop();
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
-      value: [...this.arr],
+      path: this.basePath,
+      value: this.arr.slice(),
     });
     return res;
   }
+
   shift(): unknown {
     const res = this.arr.shift();
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
-      value: [...this.arr],
+      path: this.basePath,
+      value: this.arr.slice(),
     });
     return res;
   }
+
   unshift(...items: unknown[]): number {
     const wrapped = items.map((v, i) =>
       wrapValue(this, [...this.path, i], this.node.value, v),
@@ -131,11 +152,12 @@ export class TrackedArray extends TrackerBase {
     const res = this.arr.unshift(...wrapped);
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
-      value: [...this.arr],
+      path: this.basePath,
+      value: this.arr.slice(),
     });
     return res;
   }
+
   splice(start: number, deleteCount?: number, ...items: unknown[]): unknown[] {
     const wrapped = items.map((v, i) =>
       wrapValue(this, [...this.path, start + i], this.node.value, v),
@@ -143,11 +165,12 @@ export class TrackedArray extends TrackerBase {
     const res = this.arr.splice(start, deleteCount as number, ...wrapped);
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
-      value: [...this.arr],
+      path: this.basePath,
+      value: this.arr.slice(),
     });
     return res;
   }
+
   setIndex(index: number, value: unknown): void {
     const wrapped = wrapValue(
       this,
@@ -156,109 +179,81 @@ export class TrackedArray extends TrackerBase {
       value,
     );
     this.arr[index] = wrapped;
+    const ptr = this.basePath + "/" + encodePath(index);
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath([...this.path, index]),
+      path: ptr,
       value,
     });
   }
 }
 
-/**
- * Tracks Map mutations by subclassing Map.
- */
 export class TrackedMap extends Map<unknown, unknown> {
   private changes: Operation[] = [];
-  private node: MapNode;
-  private path: Array<string | number>;
+  private basePath: string;
 
   constructor(
-    node: MapNode,
-    path: Array<string | number>,
+    private node: MapNode,
+    private path: PathSegment[],
     initial: Map<unknown, unknown>,
   ) {
     super();
-    this.node = node;
-    this.path = path;
-    // populate without recording initial ops
+    this.basePath = buildPath(path);
     initial.forEach((v, k) => {
-      const wrapped = wrapValue(
-        this,
-        [...this.path, String(k)],
-        this.node.value,
-        v,
-      );
-      super.set(k, wrapped);
+      super.set(k, wrapValue(this, [...path, String(k)], this.node.value, v));
     });
   }
 
   flush(): Patch {
-    const out = [...this.changes];
-    this.changes.length = 0;
+    const out = this.changes;
+    this.changes = [];
     return out;
   }
 
-  private makePath(segments: Array<string | number>): string {
-    if (segments.length === 0) return "";
-    return "/" + segments.map((s) => encodeURIComponent(String(s))).join("/");
-  }
-
   override set(key: unknown, value: unknown): this {
-    const wrapped = wrapValue(
-      this,
-      [...this.path, String(key)],
-      this.node.value,
-      value,
-    );
-    const ptr = this.makePath([...this.path, String(key)]);
+    const keyStr = String(key);
+    const ptr = this.basePath + "/" + encodePath(keyStr);
     this.changes.push({ op: PatchOpCode.Replace, path: ptr, value });
-    super.set(key, wrapped);
+    super.set(
+      key,
+      wrapValue(this, [...this.path, keyStr], this.node.value, value),
+    );
     return this;
   }
 
   override delete(key: unknown): boolean {
-    const ptr = this.makePath([...this.path, String(key)]);
+    const keyStr = String(key);
+    const ptr = this.basePath + "/" + encodePath(keyStr);
     this.changes.push({ op: PatchOpCode.Delete, path: ptr });
     return super.delete(key);
   }
 }
 
-/**
- * Tracks Set mutations by subclassing Set.
- */
 export class TrackedSet extends Set<unknown> {
   private changes: Operation[] = [];
-  private node: SetNode;
-  private path: Array<string | number>;
+  private basePath: string;
 
   constructor(
-    node: SetNode,
-    path: Array<string | number>,
+    private node: SetNode,
+    private path: PathSegment[],
     initial: Set<unknown>,
   ) {
     super();
-    this.node = node;
-    this.path = path;
-    // populate without recording initial ops
+    this.basePath = buildPath(path);
     initial.forEach((v) => super.add(v));
   }
 
   flush(): Patch {
-    const out = [...this.changes];
-    this.changes.length = 0;
+    const out = this.changes;
+    this.changes = [];
     return out;
-  }
-
-  private makePath(segments: Array<string | number>): string {
-    if (segments.length === 0) return "";
-    return "/" + segments.map((s) => encodeURIComponent(String(s))).join("/");
   }
 
   override add(value: unknown): this {
     super.add(value);
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
+      path: this.basePath,
       value: Array.from(this),
     });
     return this;
@@ -268,7 +263,7 @@ export class TrackedSet extends Set<unknown> {
     const res = super.delete(value);
     this.changes.push({
       op: PatchOpCode.Replace,
-      path: this.makePath(this.path),
+      path: this.basePath,
       value: Array.from(this),
     });
     return res;
@@ -277,7 +272,7 @@ export class TrackedSet extends Set<unknown> {
 
 function wrapValue(
   root: unknown,
-  path: Array<string | number>,
+  path: PathSegment[],
   node: TypeNode,
   value: unknown,
 ): unknown {
@@ -294,4 +289,17 @@ function wrapValue(
     case "Set":
       return new TrackedSet(node, path, value as Set<unknown>);
   }
+}
+
+function encodePath(segment: PathSegment): string {
+  return encodeURIComponent(String(segment));
+}
+
+function buildPath(segments: PathSegment[]): string {
+  if (!segments.length) return "";
+  let path = "";
+  for (const seg of segments) {
+    path += "/" + encodePath(seg);
+  }
+  return path;
 }
