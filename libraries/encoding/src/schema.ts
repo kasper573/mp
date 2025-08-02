@@ -313,46 +313,39 @@ export class OptionalSchema<T> extends Schema<T | undefined> {
   }
 }
 
-type AnySchemaRecord = Record<string, Schema<unknown>>;
-
-type InferProps<P extends AnySchemaRecord> = {
-  [K in keyof P]: P[K] extends Schema<infer U> ? U : never;
+type PropertySchemas<T> = {
+  [K in keyof T]: Schema<T[K]>;
 };
 
-export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
-  InferProps<P>
-> {
-  private sortedPropertyNames: Array<keyof P>;
+export class ObjectSchema<T> extends Schema<T> {
+  private sortedKeys: Array<keyof T>;
   constructor(
     private typeId: number,
-    private props: P,
+    private propertySchemas: PropertySchemas<T>,
   ) {
     super();
-    this.sortedPropertyNames = Object.keys(props).sort() as Array<keyof P>;
+    this.sortedKeys = Object.keys(propertySchemas).sort() as Array<keyof T>;
   }
 
-  sizeOf(value: InferProps<P>): number {
+  sizeOf(value: T): number {
     let size = 2; // 2 bytes for type ID
-    for (const key of this.sortedPropertyNames) {
-      const schema = this.props[key];
-      size += schema.sizeOf(value[key as string]);
+    for (const key of this.sortedKeys) {
+      const schema = this.propertySchemas[key];
+      size += schema.sizeOf(value[key]);
     }
     return size;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: InferProps<P>): number {
+  encodeTo(dataView: DataView, offset: number, value: T): number {
     dataView.setUint16(offset, this.typeId, true);
     let ptr = offset + 2;
-    for (const key of this.sortedPropertyNames) {
-      ptr = this.props[key].encodeTo(dataView, ptr, value[key as string]);
+    for (const key of this.sortedKeys) {
+      ptr = this.propertySchemas[key].encodeTo(dataView, ptr, value[key]);
     }
     return ptr;
   }
 
-  decodeFrom(
-    dataView: DataView,
-    offset: number,
-  ): { value: InferProps<P>; offset: number } {
+  decodeFrom(dataView: DataView, offset: number): { value: T; offset: number } {
     const typeId = dataView.getUint16(offset, true);
     if (typeId !== this.typeId) {
       throw new Error(
@@ -360,10 +353,10 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
       );
     }
     let ptr = offset + 2;
-    const result = {} as InferProps<P>;
-    for (const key of this.sortedPropertyNames) {
-      const res = this.props[key].decodeFrom(dataView, ptr);
-      result[key] = res.value as InferProps<P>[keyof P];
+    const result = {} as T;
+    for (const key of this.sortedKeys) {
+      const res = this.propertySchemas[key].decodeFrom(dataView, ptr);
+      result[key] = res.value;
       ptr = res.offset;
     }
     return { value: result, offset: ptr };
@@ -402,9 +395,9 @@ export function map<K, V>(key: Schema<K>, value: Schema<V>): MapSchema<K, V> {
 export function optional<T>(inner: Schema<T>): OptionalSchema<T> {
   return new OptionalSchema(inner);
 }
-export function object<P extends AnySchemaRecord>(
+export function object<T>(
   typeId: number,
-  props: P,
-): ObjectSchema<P> {
-  return new ObjectSchema(typeId, props);
+  propertySchemas: PropertySchemas<T>,
+): ObjectSchema<T> {
+  return new ObjectSchema(typeId, propertySchemas);
 }
