@@ -1,28 +1,14 @@
-/*
- * High-Performance Binary Schema Encoder/Decoder
- * No use of `any`, no non-null assertions, flat binary packing via DataView
- */
-
-// -----------------------------------------------------------------------------
-// Core Schema Abstractions
-// -----------------------------------------------------------------------------
-
 export abstract class Schema<T> {
-  /** Compute byte length required to encode value */
   abstract sizeOf(value: T): number;
-  /** Encode value into DataView at offset, return new offset */
   abstract encodeTo(dataView: DataView, offset: number, value: T): number;
-  /** Decode value from DataView at offset, return value and new offset */
   abstract decodeFrom(
     dataView: DataView,
     offset: number,
   ): { value: T; offset: number };
-  /** Type inference placeholder */
   get infer(): T {
     throw new Error("Not for runtime");
   }
 
-  /** Two-pass encode: compute size, allocate buffer, write, return Uint8Array */
   encode(value: T): Uint8Array {
     const length = this.sizeOf(value);
     const buffer = new ArrayBuffer(length);
@@ -31,7 +17,6 @@ export abstract class Schema<T> {
     return new Uint8Array(buffer);
   }
 
-  /** Top-level decode: wrap Uint8Array in DataView, read entire object */
   decode(buffer: Uint8Array): T {
     const dv = new DataView(
       buffer.buffer,
@@ -42,39 +27,6 @@ export abstract class Schema<T> {
     return result.value;
   }
 }
-
-// -----------------------------------------------------------------------------
-// Registry for Object Schemas (assigns unique type IDs)
-// -----------------------------------------------------------------------------
-
-let nextObjectTypeId = 1;
-const objectSchemaRegistry = new Map<number, ObjectSchema<AnySchemaRecord>>();
-
-function registerObject<T extends AnySchemaRecord>(
-  schema: ObjectSchema<T>,
-): number {
-  const id = nextObjectTypeId;
-  nextObjectTypeId += 1;
-  objectSchemaRegistry.set(id, schema);
-  return id;
-}
-
-function getObjectSchema<T extends AnySchemaRecord>(
-  id: number,
-): ObjectSchema<T> {
-  const schema = objectSchemaRegistry.get(id);
-  if (schema === undefined) {
-    throw new Error(`Unknown object type id: ${id}`);
-  }
-  return schema as ObjectSchema<T>;
-}
-
-// -----------------------------------------------------------------------------
-// Primitive Type Schemas
-// -----------------------------------------------------------------------------
-
-const TEXT_ENCODER = new TextEncoder();
-const TEXT_DECODER = new TextDecoder();
 
 export class BooleanSchema extends Schema<boolean> {
   sizeOf(_: boolean): number {
@@ -95,13 +47,13 @@ export class BooleanSchema extends Schema<boolean> {
   }
 }
 
-export class ShortSchema extends Schema<number> {
+export class Int16Schema extends Schema<number> {
   sizeOf(_: number): number {
     return 2;
   }
 
   encodeTo(dataView: DataView, offset: number, value: number): number {
-    dataView.setUint16(offset, value, true);
+    dataView.setInt16(offset, value, true);
     return offset + 2;
   }
 
@@ -109,31 +61,50 @@ export class ShortSchema extends Schema<number> {
     dataView: DataView,
     offset: number,
   ): { value: number; offset: number } {
-    const val = dataView.getUint16(offset, true);
+    const val = dataView.getInt16(offset, true);
     return { value: val, offset: offset + 2 };
   }
 }
 
-export class LongSchema extends Schema<bigint> {
-  sizeOf(_: bigint): number {
-    return 8;
+export class Int32Schema extends Schema<number> {
+  sizeOf(_: number): number {
+    return 4;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: bigint): number {
-    dataView.setBigInt64(offset, value, true);
-    return offset + 8;
+  encodeTo(dataView: DataView, offset: number, value: number): number {
+    dataView.setInt32(offset, value, true);
+    return offset + 4;
   }
 
   decodeFrom(
     dataView: DataView,
     offset: number,
-  ): { value: bigint; offset: number } {
-    const val = dataView.getBigInt64(offset, true);
-    return { value: val, offset: offset + 8 };
+  ): { value: number; offset: number } {
+    const val = dataView.getInt32(offset, true);
+    return { value: val, offset: offset + 4 };
   }
 }
 
-export class FloatSchema extends Schema<number> {
+export class Float32Schema extends Schema<number> {
+  sizeOf(_: number): number {
+    return 4;
+  }
+
+  encodeTo(dataView: DataView, offset: number, value: number): number {
+    dataView.setFloat32(offset, value, true);
+    return offset + 4;
+  }
+
+  decodeFrom(
+    dataView: DataView,
+    offset: number,
+  ): { value: number; offset: number } {
+    const val = dataView.getFloat32(offset, true);
+    return { value: val, offset: offset + 4 };
+  }
+}
+
+export class Float64Schema extends Schema<number> {
   sizeOf(_: number): number {
     return 8;
   }
@@ -152,6 +123,9 @@ export class FloatSchema extends Schema<number> {
   }
 }
 
+const TEXT_ENCODER = new TextEncoder();
+const TEXT_DECODER = new TextDecoder();
+
 export class StringSchema extends Schema<string> {
   sizeOf(value: string): number {
     const bytes = TEXT_ENCODER.encode(value);
@@ -162,8 +136,12 @@ export class StringSchema extends Schema<string> {
     const bytes = TEXT_ENCODER.encode(value);
     dataView.setUint32(offset, bytes.byteLength, true);
     let ptr = offset + 4;
-    const u8 = new Uint8Array(dataView.buffer);
-    u8.set(bytes, ptr);
+    const u8 = new Uint8Array(
+      dataView.buffer,
+      dataView.byteOffset + ptr,
+      bytes.byteLength,
+    );
+    u8.set(bytes);
     return ptr + bytes.byteLength;
   }
 
@@ -182,10 +160,6 @@ export class StringSchema extends Schema<string> {
     return { value: str, offset: start + length };
   }
 }
-
-// -----------------------------------------------------------------------------
-// Composite Schemas: array, set, map, optional
-// -----------------------------------------------------------------------------
 
 export class ArraySchema<T> extends Schema<T[]> {
   constructor(private element: Schema<T>) {
@@ -339,10 +313,6 @@ export class OptionalSchema<T> extends Schema<T | undefined> {
   }
 }
 
-// -----------------------------------------------------------------------------
-// Object Schema (with type ID header)
-// -----------------------------------------------------------------------------
-
 type AnySchemaRecord = Record<string, Schema<unknown>>;
 
 type InferProps<P extends AnySchemaRecord> = {
@@ -352,18 +322,15 @@ type InferProps<P extends AnySchemaRecord> = {
 export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
   InferProps<P>
 > {
-  readonly props: P;
-  private readonly typeId: number;
-
-  constructor(props: P) {
+  constructor(
+    private typeId: number,
+    private props: P,
+  ) {
     super();
-    this.props = props;
-    this.typeId = registerObject(this);
   }
 
   sizeOf(value: InferProps<P>): number {
-    // 2 bytes for type ID
-    let size = 2;
+    let size = 2; // 2 bytes for type ID
     for (const key of Object.keys(this.props) as Array<keyof P>) {
       const schema = this.props[key];
       size += schema.sizeOf(value[key as string]);
@@ -385,11 +352,15 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
     offset: number,
   ): { value: InferProps<P>; offset: number } {
     const typeId = dataView.getUint16(offset, true);
-    const schema = getObjectSchema<P>(typeId);
+    if (typeId !== this.typeId) {
+      throw new Error(
+        `Type ID mismatch: expected ${this.typeId}, got ${typeId}`,
+      );
+    }
     let ptr = offset + 2;
     const result = {} as InferProps<P>;
-    for (const key in schema.props) {
-      const res = schema.props[key].decodeFrom(dataView, ptr);
+    for (const key in this.props) {
+      const res = this.props[key].decodeFrom(dataView, ptr);
       result[key as keyof InferProps<P>] = res.value as InferProps<P>[keyof P];
       ptr = res.offset;
     }
@@ -397,21 +368,22 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
   }
 }
 
-// -----------------------------------------------------------------------------
-// Factory Aliases
-// -----------------------------------------------------------------------------
+// Function aliases
 
 export function boolean(): BooleanSchema {
   return new BooleanSchema();
 }
-export function short(): ShortSchema {
-  return new ShortSchema();
+export function int16(): Int16Schema {
+  return new Int16Schema();
 }
-export function long(): LongSchema {
-  return new LongSchema();
+export function int32(): Int32Schema {
+  return new Int32Schema();
 }
-export function float(): FloatSchema {
-  return new FloatSchema();
+export function float32(): Float32Schema {
+  return new Float32Schema();
+}
+export function float64(): Float64Schema {
+  return new Float64Schema();
 }
 export function string(): StringSchema {
   return new StringSchema();
@@ -428,6 +400,9 @@ export function map<K, V>(key: Schema<K>, value: Schema<V>): MapSchema<K, V> {
 export function optional<T>(inner: Schema<T>): OptionalSchema<T> {
   return new OptionalSchema(inner);
 }
-export function object<P extends AnySchemaRecord>(props: P): ObjectSchema<P> {
-  return new ObjectSchema(props);
+export function object<P extends AnySchemaRecord>(
+  typeId: number,
+  props: P,
+): ObjectSchema<P> {
+  return new ObjectSchema(typeId, props);
 }

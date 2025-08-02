@@ -2,13 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   array,
   boolean,
-  float,
-  long,
+  float32,
+  float64,
+  int16,
+  int32,
   map,
   object,
   optional,
   set,
-  short,
   string,
 } from "../src/schema";
 
@@ -19,22 +20,24 @@ describe("Primitive Schemas", () => {
     expect(schema.decode(schema.encode(false))).toBe(false);
   });
 
-  it("Short encode/decode", () => {
-    const schema = short();
+  it("int16 encode/decode", () => {
+    const schema = int16();
     expect(schema.decode(schema.encode(12345))).toBe(12345);
   });
 
-  it("Long encode/decode", () => {
-    const schema = long();
-    expect(schema.decode(schema.encode(1234567890123456789n))).toBe(
-      1234567890123456789n,
-    );
+  it("int32 encode/decode", () => {
+    const schema = int32();
+    expect(schema.decode(schema.encode(1234567890))).toBe(1234567890);
   });
 
-  it("Float encode/decode", () => {
-    const schema = float();
-    // oxlint-disable-next-line approx-constant
-    expect(schema.decode(schema.encode(3.14159))).toBeCloseTo(3.14159);
+  it("float32 encode/decode", () => {
+    const schema = float32();
+    expect(schema.decode(schema.encode(3.14))).toBeCloseTo(3.14);
+  });
+
+  it("float64 encode/decode", () => {
+    const schema = float64();
+    expect(schema.decode(schema.encode(Math.PI))).toBeCloseTo(Math.PI);
   });
 
   it("String encode/decode", () => {
@@ -45,8 +48,8 @@ describe("Primitive Schemas", () => {
 
 describe("Composite Schemas", () => {
   it("Array encode/decode", () => {
-    const schema = array(short());
-    const arr = [1, 2, 3, 65535];
+    const schema = array(int16());
+    const arr = [1, 2, 3, 32767];
     expect(schema.decode(schema.encode(arr))).toEqual(arr);
   });
 
@@ -57,7 +60,7 @@ describe("Composite Schemas", () => {
   });
 
   it("Map encode/decode", () => {
-    const schema = map(string(), short());
+    const schema = map(string(), int16());
     const m = new Map<string, number>([
       ["x", 1],
       ["y", 2],
@@ -73,11 +76,17 @@ describe("Composite Schemas", () => {
 });
 
 describe("Object Schemas", () => {
+  enum TypeId {
+    Primitives = 1,
+    Entity = 3,
+    Root = 4,
+  }
   const primitiveShape = {
     str: string(),
-    short: short(),
-    long: long(),
-    float: float(),
+    int16: int16(),
+    int32: int32(),
+    float32: float32(),
+    float64: float64(),
     bool: boolean(),
     optionalBool: optional(boolean()),
     array: array(string()),
@@ -85,13 +94,13 @@ describe("Object Schemas", () => {
     map: map(string(), string()),
   };
 
-  const Primitives = object(primitiveShape);
+  const Primitives = object(TypeId.Primitives, primitiveShape);
   type Primitives = typeof Primitives.infer;
 
   const Trait = Primitives;
   type Trait = Primitives;
 
-  const Entity = object({
+  const Entity = object(TypeId.Entity, {
     ...primitiveShape,
     trait: Trait,
     traitSet: set(Trait),
@@ -100,7 +109,7 @@ describe("Object Schemas", () => {
   });
   type Entity = typeof Entity.infer;
 
-  const Root = object({
+  const Root = object(TypeId.Root, {
     ...primitiveShape,
     entitySet: set(Entity),
     entityArray: array(Entity),
@@ -111,9 +120,10 @@ describe("Object Schemas", () => {
   it("Nested object encode/decode", () => {
     const sample: Root = {
       str: "root",
-      short: 42,
-      long: 9007199254740991n,
-      float: 1.618,
+      int16: 42,
+      int32: 1234567890,
+      float32: 1.618,
+      float64: Math.PI,
       bool: true,
       optionalBool: undefined,
       array: ["a", "b"],
@@ -124,6 +134,15 @@ describe("Object Schemas", () => {
       entityMap: new Map(),
     };
     const decoded = Root.decode(Root.encode(sample));
+
+    expect(decoded.float32).toBeCloseTo(sample.float32);
+    expect(decoded.float64).toBeCloseTo(sample.float64);
+
+    // Since above expectations passed, we can assign exact values so that
+    // the following toEqual doesn't fail due to floating point precision issues.
+    decoded.float32 = sample.float32;
+    decoded.float64 = sample.float64;
+
     expect(decoded).toEqual(sample);
   });
 });
