@@ -87,7 +87,7 @@ export class GameStateLoader {
     return [...allFromDB, ...allFromTiled];
   }
 
-  async getAllNpcRewards(): Promise<NpcReward[]> {
-    return [];
+  getAllNpcRewards(): Promise<NpcReward[]> {
+    return Promise.resolve([]);
   }
 }
