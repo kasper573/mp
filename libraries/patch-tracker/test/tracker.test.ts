@@ -1,13 +1,7 @@
 // oxlint-disable no-explicit-any
 import { PatchOpCode } from "@mp/patch";
 import { beforeEach, describe, expect, it } from "vitest";
-import type {
-  ArrayNode,
-  MapNode,
-  ObjectNode,
-  ObjectUnionNode,
-  SetNode,
-} from "../src/graph";
+import type { ObjectNode, ObjectUnionNode } from "../src/graph";
 import {
   TrackedArray,
   TrackedMap,
@@ -108,11 +102,9 @@ describe("TrackedObject with nested properties", () => {
 });
 
 describe("TrackedArray", () => {
-  let arr: TrackedArray;
-  const arrType: ArrayNode = { type: "Array", value: { type: "Primitive" } };
-
+  let arr: TrackedArray<unknown>;
   beforeEach(() => {
-    arr = new TrackedArray(arrType, [], [1, 2, 3]);
+    arr = new TrackedArray([], [1, 2, 3]);
   });
 
   it("records push/pop/shift/unshift/splice", () => {
@@ -145,15 +137,9 @@ describe("TrackedArray", () => {
 });
 
 describe("TrackedMap", () => {
-  let m: TrackedMap;
-  const mapType: MapNode = {
-    type: "Map",
-    key: { type: "Primitive" },
-    value: { type: "Primitive" },
-  };
-
+  let m: TrackedMap<unknown, unknown>;
   beforeEach(() => {
-    m = new TrackedMap(mapType, [], new Map([["a", 1]]));
+    m = new TrackedMap([], new Map([["a", 1]]));
   });
 
   it("records set and delete", () => {
@@ -165,11 +151,10 @@ describe("TrackedMap", () => {
 });
 
 describe("TrackedSet", () => {
-  let s: TrackedSet;
-  const setType: SetNode = { type: "Set", value: { type: "Primitive" } };
+  let s: TrackedSet<unknown>;
 
   beforeEach(() => {
-    s = new TrackedSet(setType, [], new Set(["x"]));
+    s = new TrackedSet([], new Set(["x"]));
   });
 
   it("records add and delete", () => {
@@ -190,7 +175,7 @@ describe("Nested collections via TrackedObject", () => {
       properties: { arr: { type: "Array", value: { type: "Primitive" } } },
     };
     const obj = new TrackedObject(objType, [], { arr: [1, 2] });
-    const arrWrap = (obj as any).arr as TrackedArray;
+    const arrWrap = (obj as any).arr as TrackedArray<unknown>;
     arrWrap.push(3);
     const patch = arrWrap.flush();
     expect(patch).toEqual([replaceOp("/arr", [1, 2, 3])]);
@@ -209,7 +194,7 @@ describe("Nested collections via TrackedObject", () => {
       },
     };
     const obj = new TrackedObject(objType, [], { m: new Map() });
-    const mWrap = (obj as any).m as TrackedMap;
+    const mWrap = (obj as any).m as TrackedMap<unknown, unknown>;
     mWrap.set("k", 7);
     const patch = mWrap.flush();
     expect(patch).toEqual([replaceOp("/m/k", 7)]);
@@ -222,7 +207,7 @@ describe("Nested collections via TrackedObject", () => {
       properties: { s: { type: "Set", value: { type: "Primitive" } } },
     };
     const obj = new TrackedObject(objType, [], { s: new Set(["a"]) });
-    const sWrap = (obj as any).s as TrackedSet;
+    const sWrap = (obj as any).s as TrackedSet<unknown>;
     sWrap.add("b");
     const patch = sWrap.flush();
     expect(patch).toEqual([replaceOp("/s", ["a", "b"])]);
