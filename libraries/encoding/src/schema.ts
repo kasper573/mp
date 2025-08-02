@@ -322,16 +322,18 @@ type InferProps<P extends AnySchemaRecord> = {
 export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
   InferProps<P>
 > {
+  private sortedPropertyNames: Array<keyof P>;
   constructor(
     private typeId: number,
     private props: P,
   ) {
     super();
+    this.sortedPropertyNames = Object.keys(props).sort() as Array<keyof P>;
   }
 
   sizeOf(value: InferProps<P>): number {
     let size = 2; // 2 bytes for type ID
-    for (const key of Object.keys(this.props) as Array<keyof P>) {
+    for (const key of this.sortedPropertyNames) {
       const schema = this.props[key];
       size += schema.sizeOf(value[key as string]);
     }
@@ -341,7 +343,7 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
   encodeTo(dataView: DataView, offset: number, value: InferProps<P>): number {
     dataView.setUint16(offset, this.typeId, true);
     let ptr = offset + 2;
-    for (const key of Object.keys(this.props) as Array<keyof P>) {
+    for (const key of this.sortedPropertyNames) {
       ptr = this.props[key].encodeTo(dataView, ptr, value[key as string]);
     }
     return ptr;
@@ -359,7 +361,7 @@ export class ObjectSchema<P extends AnySchemaRecord> extends Schema<
     }
     let ptr = offset + 2;
     const result = {} as InferProps<P>;
-    for (const key in this.props) {
+    for (const key of this.sortedPropertyNames) {
       const res = this.props[key].decodeFrom(dataView, ptr);
       result[key as keyof InferProps<P>] = res.value as InferProps<P>[keyof P];
       ptr = res.offset;
