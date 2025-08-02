@@ -1,15 +1,18 @@
-export abstract class Schema<T> {
-  abstract sizeOf(value: T): number;
-  abstract encodeTo(dataView: DataView, offset: number, value: T): number;
+export abstract class Schema<V> {
+  abstract sizeOf(value: V): number;
+  abstract encodeTo(dataView: DataView, offset: number, value: V): number;
   abstract decodeFrom(
     dataView: DataView,
     offset: number,
-  ): { value: T; offset: number };
-  get infer(): T {
-    throw new Error("Not for runtime");
+  ): { value: V; offset: number };
+
+  get $infer(): V {
+    throw new Error(
+      "This should not be used at runtime. It exists only for type inference.",
+    );
   }
 
-  encode(value: T): Uint8Array {
+  encode(value: V): Uint8Array {
     const length = this.sizeOf(value);
     const buffer = new ArrayBuffer(length);
     const dv = new DataView(buffer);
@@ -17,7 +20,7 @@ export abstract class Schema<T> {
     return new Uint8Array(buffer);
   }
 
-  decode(buffer: Uint8Array): T {
+  decode(buffer: Uint8Array): V {
     const dv = new DataView(
       buffer.buffer,
       buffer.byteOffset,
@@ -161,37 +164,34 @@ export class StringSchema extends Schema<string> {
   }
 }
 
-export class ArraySchema<T> extends Schema<T[]> {
-  constructor(private element: Schema<T>) {
+export class ArraySchema<V> extends Schema<V[]> {
+  constructor(private elementSchema: Schema<V>) {
     super();
   }
 
-  sizeOf(value: T[]): number {
+  sizeOf(value: this["$infer"]): number {
     let size = 4;
     for (const el of value) {
-      size += this.element.sizeOf(el);
+      size += this.elementSchema.sizeOf(el);
     }
     return size;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: T[]): number {
+  encodeTo(dataView: DataView, offset: number, value: this["$infer"]): number {
     dataView.setUint32(offset, value.length, true);
     let ptr = offset + 4;
     for (const el of value) {
-      ptr = this.element.encodeTo(dataView, ptr, el);
+      ptr = this.elementSchema.encodeTo(dataView, ptr, el);
     }
     return ptr;
   }
 
-  decodeFrom(
-    dataView: DataView,
-    offset: number,
-  ): { value: T[]; offset: number } {
+  decodeFrom(dataView: DataView, offset: number) {
     const length = dataView.getUint32(offset, true);
     let ptr = offset + 4;
-    const arr: T[] = [];
+    const arr: this["$infer"] = [];
     for (let i = 0; i < length; i += 1) {
-      const result = this.element.decodeFrom(dataView, ptr);
+      const result = this.elementSchema.decodeFrom(dataView, ptr);
       arr.push(result.value);
       ptr = result.offset;
     }
@@ -199,12 +199,12 @@ export class ArraySchema<T> extends Schema<T[]> {
   }
 }
 
-export class SetSchema<T> extends Schema<Set<T>> {
-  constructor(private element: Schema<T>) {
+export class SetSchema<V> extends Schema<Set<V>> {
+  constructor(private element: Schema<V>) {
     super();
   }
 
-  sizeOf(value: Set<T>): number {
+  sizeOf(value: this["$infer"]): number {
     let size = 4;
     for (const el of value) {
       size += this.element.sizeOf(el);
@@ -212,7 +212,7 @@ export class SetSchema<T> extends Schema<Set<T>> {
     return size;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: Set<T>): number {
+  encodeTo(dataView: DataView, offset: number, value: this["$infer"]): number {
     dataView.setUint32(offset, value.size, true);
     let ptr = offset + 4;
     for (const el of value) {
@@ -221,19 +221,16 @@ export class SetSchema<T> extends Schema<Set<T>> {
     return ptr;
   }
 
-  decodeFrom(
-    dataView: DataView,
-    offset: number,
-  ): { value: Set<T>; offset: number } {
+  decodeFrom(dataView: DataView, offset: number) {
     const length = dataView.getUint32(offset, true);
     let ptr = offset + 4;
-    const resultSet = new Set<T>();
+    const value: this["$infer"] = new Set<V>();
     for (let i = 0; i < length; i += 1) {
       const result = this.element.decodeFrom(dataView, ptr);
-      resultSet.add(result.value);
+      value.add(result.value);
       ptr = result.offset;
     }
-    return { value: resultSet, offset: ptr };
+    return { value: value, offset: ptr };
   }
 }
 
@@ -245,7 +242,7 @@ export class MapSchema<K, V> extends Schema<Map<K, V>> {
     super();
   }
 
-  sizeOf(value: Map<K, V>): number {
+  sizeOf(value: this["$infer"]): number {
     let size = 4;
     for (const [k, v] of value.entries()) {
       size += this.keySchema.sizeOf(k);
@@ -254,7 +251,7 @@ export class MapSchema<K, V> extends Schema<Map<K, V>> {
     return size;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: Map<K, V>): number {
+  encodeTo(dataView: DataView, offset: number, value: this["$infer"]): number {
     dataView.setUint32(offset, value.size, true);
     let ptr = offset + 4;
     for (const [k, v] of value.entries()) {
@@ -264,34 +261,31 @@ export class MapSchema<K, V> extends Schema<Map<K, V>> {
     return ptr;
   }
 
-  decodeFrom(
-    dataView: DataView,
-    offset: number,
-  ): { value: Map<K, V>; offset: number } {
+  decodeFrom(dataView: DataView, offset: number) {
     const length = dataView.getUint32(offset, true);
     let ptr = offset + 4;
-    const resultMap = new Map<K, V>();
+    const value: this["$infer"] = new Map();
     for (let i = 0; i < length; i += 1) {
       const keyRes = this.keySchema.decodeFrom(dataView, ptr);
       ptr = keyRes.offset;
       const valRes = this.valueSchema.decodeFrom(dataView, ptr);
       ptr = valRes.offset;
-      resultMap.set(keyRes.value, valRes.value);
+      value.set(keyRes.value, valRes.value);
     }
-    return { value: resultMap, offset: ptr };
+    return { value: value, offset: ptr };
   }
 }
 
-export class OptionalSchema<T> extends Schema<T | undefined> {
-  constructor(private inner: Schema<T>) {
+export class OptionalSchema<V> extends Schema<V | undefined> {
+  constructor(private inner: Schema<V>) {
     super();
   }
 
-  sizeOf(value: T | undefined): number {
+  sizeOf(value: V | undefined): number {
     return 1 + (value === undefined ? 0 : this.inner.sizeOf(value));
   }
 
-  encodeTo(dataView: DataView, offset: number, value: T | undefined): number {
+  encodeTo(dataView: DataView, offset: number, value: V | undefined): number {
     if (value === undefined) {
       dataView.setUint8(offset, 0);
       return offset + 1;
@@ -303,7 +297,7 @@ export class OptionalSchema<T> extends Schema<T | undefined> {
   decodeFrom(
     dataView: DataView,
     offset: number,
-  ): { value: T | undefined; offset: number } {
+  ): { value: V | undefined; offset: number } {
     const flag = dataView.getUint8(offset);
     if (flag === 0) {
       return { value: undefined, offset: offset + 1 };
@@ -313,21 +307,19 @@ export class OptionalSchema<T> extends Schema<T | undefined> {
   }
 }
 
-type PropertySchemas<T> = {
-  [K in keyof T]: Schema<T[K]>;
-};
+type PropertySchemas<T> = { [K in keyof T]: Schema<T[K]> };
 
 export class ObjectSchema<T> extends Schema<T> {
   private sortedKeys: Array<keyof T>;
   constructor(
     private typeId: number,
-    private propertySchemas: PropertySchemas<T>,
+    public readonly propertySchemas: PropertySchemas<T>,
   ) {
     super();
     this.sortedKeys = Object.keys(propertySchemas).sort() as Array<keyof T>;
   }
 
-  sizeOf(value: T): number {
+  sizeOf(value: this["$infer"]): number {
     let size = 2; // 2 bytes for type ID
     for (const key of this.sortedKeys) {
       const schema = this.propertySchemas[key];
@@ -336,7 +328,7 @@ export class ObjectSchema<T> extends Schema<T> {
     return size;
   }
 
-  encodeTo(dataView: DataView, offset: number, value: T): number {
+  encodeTo(dataView: DataView, offset: number, value: this["$infer"]): number {
     dataView.setUint16(offset, this.typeId, true);
     let ptr = offset + 2;
     for (const key of this.sortedKeys) {
@@ -345,7 +337,7 @@ export class ObjectSchema<T> extends Schema<T> {
     return ptr;
   }
 
-  decodeFrom(dataView: DataView, offset: number): { value: T; offset: number } {
+  decodeFrom(dataView: DataView, offset: number) {
     const typeId = dataView.getUint16(offset, true);
     if (typeId !== this.typeId) {
       throw new Error(
@@ -353,10 +345,10 @@ export class ObjectSchema<T> extends Schema<T> {
       );
     }
     let ptr = offset + 2;
-    const result = {} as T;
+    const result: this["$infer"] = {} as this["$infer"];
     for (const key of this.sortedKeys) {
       const res = this.propertySchemas[key].decodeFrom(dataView, ptr);
-      result[key] = res.value;
+      result[key] = res.value as this["$infer"][typeof key];
       ptr = res.offset;
     }
     return { value: result, offset: ptr };
@@ -404,6 +396,6 @@ export function object<T>(
 ): ObjectSchema<T> {
   return new ObjectSchema(typeId, propertySchemas);
 }
-export function partial<T>(inner: ObjectSchema<T>): ObjectSchema<Partial<T>> {
-  throw new Error("Partial schema not implemented yet");
+export function partial<T>(inner: ObjectSchema<T>): ObjectSchema<T> {
+  throw new Error("Not implemnted");
 }

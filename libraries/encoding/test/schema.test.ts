@@ -114,19 +114,14 @@ describe("Object Schemas", () => {
   };
 
   const Primitives = object(TypeId.Primitives, primitiveShape);
-  type Primitives = typeof Primitives.infer;
-
-  const Trait = Primitives;
-  type Trait = Primitives;
 
   const Entity = object(TypeId.Entity, {
     ...primitiveShape,
-    trait: Trait,
-    traitSet: set(Trait),
-    traitArray: array(Trait),
-    traitMap: map(string(), Trait),
+    trait: Primitives,
+    traitSet: set(Primitives),
+    traitArray: array(Primitives),
+    traitMap: map(string(), Primitives),
   });
-  type Entity = typeof Entity.infer;
 
   const Root = object(TypeId.Root, {
     ...primitiveShape,
@@ -134,10 +129,10 @@ describe("Object Schemas", () => {
     entityArray: array(Entity),
     entityMap: map(string(), Entity),
   });
-  type Root = typeof Root.infer;
+  type TRoot = typeof Root.$infer;
 
   it("Nested object encode/decode", () => {
-    const sample: Root = {
+    const sample: TRoot = {
       str: "root",
       int16: 42,
       int32: 1234567890,
