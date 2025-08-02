@@ -3,8 +3,6 @@ import { err, ok } from "@mp/std";
 import type { Options } from "cbor-x";
 import { Decoder, Encoder, FLOAT32_OPTIONS } from "cbor-x";
 
-export * as s from "./schema";
-
 export { addExtension as addEncoderExtension } from "cbor-x";
 
 export interface Encoding<T> {

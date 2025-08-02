@@ -1,12 +1,10 @@
-import {
-  ArraySchema,
-  MapSchema,
-  ObjectSchema,
-  OptionalSchema,
-  PartialObjectSchema,
-  SetSchema,
-  type Schema,
-} from "./schema";
+import type { Schema } from "./schemas/abstract";
+import { ArraySchema } from "./schemas/array";
+import { MapSchema } from "./schemas/map";
+import { ObjectSchema } from "./schemas/object";
+import { OptionalSchema } from "./schemas/optional";
+import { PartialObjectSchema } from "./schemas/partial";
+import { SetSchema } from "./schemas/set";
 
 export type TypeNode =
   | ObjectNode
@@ -16,7 +14,7 @@ export type TypeNode =
   | PrimitiveNode
   | ObjectUnionNode;
 
-interface ObjectNode {
+export interface ObjectNode {
   id: number; // Unique identifier
   type: "Object";
   properties: Record<string, TypeNode>;
@@ -26,7 +24,7 @@ interface ObjectNode {
  * Represents a union of multiple object types.
  * This is used to represent cases where a property can be one of several object types, identified by their unique IDs.
  */
-interface ObjectUnionNode {
+export interface ObjectUnionNode {
   type: "Union";
   members: ObjectNode[];
 }
@@ -34,7 +32,7 @@ interface ObjectUnionNode {
 /**
  * Represents a JS Array
  */
-interface ArrayNode {
+export interface ArrayNode {
   type: "Array";
   value: TypeNode;
 }
@@ -42,7 +40,7 @@ interface ArrayNode {
 /**
  * Represents a JS Map
  */
-interface MapNode {
+export interface MapNode {
   type: "Map";
   key: TypeNode;
   value: TypeNode;
@@ -51,7 +49,7 @@ interface MapNode {
 /**
  * Represents a JS Set
  */
-interface SetNode {
+export interface SetNode {
   type: "Set";
   value: TypeNode;
 }
@@ -59,7 +57,7 @@ interface SetNode {
 /**
  * Represents a primitive value like string, number, boolean, null, or undefined.
  */
-interface PrimitiveNode {
+export interface PrimitiveNode {
   type: "Primitive";
 }
 

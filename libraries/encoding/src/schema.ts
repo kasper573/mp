@@ -1,6 +1,7 @@
 export * from "./schemas/abstract";
 export * from "./schemas/array";
 export * from "./schemas/boolean";
+export * from "./schemas/discriminated-union";
 export * from "./schemas/float32";
 export * from "./schemas/float64";
 export * from "./schemas/int16";
@@ -11,3 +12,4 @@ export * from "./schemas/optional";
 export * from "./schemas/partial";
 export * from "./schemas/set";
 export * from "./schemas/string";
+export * from "./type-info-graph";
