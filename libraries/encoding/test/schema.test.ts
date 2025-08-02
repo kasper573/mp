@@ -8,6 +8,7 @@ import { int32 } from "../src/schema/int32";
 import { map } from "../src/schema/map";
 import { object } from "../src/schema/object";
 import { optional } from "../src/schema/optional";
+import { partial } from "../src/schema/partial";
 import { set } from "../src/schema/set";
 import { string } from "../src/schema/string";
 
@@ -79,7 +80,7 @@ describe("Composite Schemas", () => {
     expect(schema.decode(schema.encode(false))).toBe(false);
   });
 
-  it("Optional stacked ecodes to identical data as single optional", () => {
+  it("Optional stacked encodes to identical data as single optional", () => {
     const stackedSchema = optional(optional(boolean()));
     const singleSchema = optional(boolean());
 

@@ -3,7 +3,7 @@ import { Schema } from "./abstract";
 export class ObjectSchema<T> extends Schema<T> {
   private sortedKeys: Array<keyof T>;
   constructor(
-    private typeId: number,
+    public readonly typeId: number,
     public readonly propertySchemas: PropertySchemas<T>,
   ) {
     super();
