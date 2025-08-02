@@ -1,17 +1,17 @@
 import { describe, expect, it } from "vitest";
-import { array } from "../src/schema/array";
-import { boolean } from "../src/schema/boolean";
-import { discriminatedUnion } from "../src/schema/discriminated-union";
-import { float32 } from "../src/schema/float32";
-import { float64 } from "../src/schema/float64";
-import { int16 } from "../src/schema/int16";
-import { int32 } from "../src/schema/int32";
-import { map } from "../src/schema/map";
-import { object } from "../src/schema/object";
-import { optional } from "../src/schema/optional";
-import { partial } from "../src/schema/partial";
-import { set } from "../src/schema/set";
-import { string } from "../src/schema/string";
+import { array } from "../src/schemas/array";
+import { boolean } from "../src/schemas/boolean";
+import { discriminatedUnion } from "../src/schemas/discriminated-union";
+import { float32 } from "../src/schemas/float32";
+import { float64 } from "../src/schemas/float64";
+import { int16 } from "../src/schemas/int16";
+import { int32 } from "../src/schemas/int32";
+import { map } from "../src/schemas/map";
+import { object } from "../src/schemas/object";
+import { optional } from "../src/schemas/optional";
+import { partial } from "../src/schemas/partial";
+import { set } from "../src/schemas/set";
+import { string } from "../src/schemas/string";
 
 describe("Primitive Schemas", () => {
   it("Boolean encode/decode", () => {
