@@ -61,12 +61,12 @@ export interface PrimitiveNode {
   type: "Primitive";
 }
 
-export function getTypeInfo<T>(schema: Schema<T>): TypeNode {
+export function getTypeGraph<T>(schema: Schema<T>): TypeNode {
   if (schema instanceof PartialObjectSchema) {
-    return getTypeInfo(schema.objectSchema);
+    return getTypeGraph(schema.objectSchema);
   }
   if (schema instanceof OptionalSchema) {
-    return getTypeInfo(schema.valueSchema);
+    return getTypeGraph(schema.valueSchema);
   }
   if (schema instanceof ObjectSchema) {
     return {
@@ -75,7 +75,7 @@ export function getTypeInfo<T>(schema: Schema<T>): TypeNode {
       properties: Object.fromEntries(
         Object.entries(schema.propertySchemas).map(([key, value]) => [
           key,
-          getTypeInfo(value),
+          getTypeGraph(value),
         ]),
       ),
     };
@@ -83,20 +83,20 @@ export function getTypeInfo<T>(schema: Schema<T>): TypeNode {
   if (schema instanceof ArraySchema) {
     return {
       type: "Array",
-      value: getTypeInfo(schema.elementSchema),
+      value: getTypeGraph(schema.elementSchema),
     };
   }
   if (schema instanceof MapSchema) {
     return {
       type: "Map",
-      key: getTypeInfo(schema.keySchema),
-      value: getTypeInfo(schema.valueSchema),
+      key: getTypeGraph(schema.keySchema),
+      value: getTypeGraph(schema.valueSchema),
     };
   }
   if (schema instanceof SetSchema) {
     return {
       type: "Set",
-      value: getTypeInfo(schema.valueSchema),
+      value: getTypeGraph(schema.valueSchema),
     };
   }
   return { type: "Primitive" };

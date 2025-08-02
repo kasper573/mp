@@ -12,4 +12,3 @@ export * from "./schemas/optional";
 export * from "./schemas/partial";
 export * from "./schemas/set";
 export * from "./schemas/string";
-export * from "./type-info-graph";

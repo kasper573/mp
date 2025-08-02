@@ -13,6 +13,11 @@
       "types": "./src/schema.ts",
       "import": "./src/schema.ts",
       "require": "./src/schema.ts"
+    },
+    "./graph": {
+      "types": "./src/graph.ts",
+      "import": "./src/graph.ts",
+      "require": "./src/graph.ts"
     }
   },
   "scripts": {
