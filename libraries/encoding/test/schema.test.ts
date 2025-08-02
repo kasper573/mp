@@ -1,18 +1,15 @@
 import { describe, expect, it } from "vitest";
-import {
-  array,
-  boolean,
-  float32,
-  float64,
-  int16,
-  int32,
-  map,
-  object,
-  optional,
-  partial,
-  set,
-  string,
-} from "../src/schema";
+import { array } from "../src/schema/array";
+import { boolean } from "../src/schema/boolean";
+import { float32 } from "../src/schema/float32";
+import { float64 } from "../src/schema/float64";
+import { int16 } from "../src/schema/int16";
+import { int32 } from "../src/schema/int32";
+import { map } from "../src/schema/map";
+import { object } from "../src/schema/object";
+import { optional } from "../src/schema/optional";
+import { set } from "../src/schema/set";
+import { string } from "../src/schema/string";
 
 describe("Primitive Schemas", () => {
   it("Boolean encode/decode", () => {
