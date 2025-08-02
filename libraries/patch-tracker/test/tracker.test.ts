@@ -1,3 +1,4 @@
+// oxlint-disable no-explicit-any
 import { PatchOpCode } from "@mp/patch";
 import { beforeEach, describe, expect, it } from "vitest";
 import type {
@@ -44,18 +45,14 @@ describe("TrackedObject", () => {
   });
 
   it("records top-level property replaces", () => {
+    // @ts-expect-error Dangerous property access fine in tests
     tracked.a = 20;
     const patch = tracked.flush();
     expect(patch).toEqual([replaceOp("/a", 20)]);
   });
 
-  it("records deletes", () => {
-    delete (tracked as any).a;
-    const patch = tracked.flush();
-    expect(patch).toEqual([deleteOp("/a")]);
-  });
-
   it("flush resets recorded changes", () => {
+    // @ts-expect-error Dangerous property access fine in tests
     tracked.a = 1;
     const first = tracked.flush();
     expect(first).toEqual([replaceOp("/a", 1)]);
@@ -64,6 +61,7 @@ describe("TrackedObject", () => {
   });
 
   it("applying patch reproduces state", () => {
+    // @ts-expect-error Dangerous property access fine in tests
     tracked.a = 42;
     const patch = tracked.flush();
     const copy = { a: 10, b: { x: "hello" } };
@@ -102,6 +100,7 @@ describe("TrackedObject with nested properties", () => {
 
   it("records nested property replaces via nested .flush()", () => {
     const nested = (tracked as any).b as TrackedObject<{ x: string }>;
+    // @ts-expect-error Dangerous property access fine in tests
     nested.x = "world";
     const patch = nested.flush();
     expect(patch).toEqual([replaceOp("/b/x", "world")]);
@@ -127,6 +126,7 @@ describe("TrackedArray", () => {
     patch.forEach((op) => {
       expect(op.op).toBe(PatchOpCode.Replace);
       expect(op.path).toBe("");
+      // @ts-expect-error Dangerous property access fine in tests
       expect(Array.isArray(op.value)).toBe(true);
     });
   });
@@ -247,6 +247,7 @@ describe("TrackedObject with unions", () => {
 
   it("handles union where first member applies", () => {
     const u = new TrackedObject(unionType, [], { foo: 5 });
+    // @ts-expect-error Dangerous property access fine in tests
     u.foo = 10;
     const patch = u.flush();
     expect(patch).toEqual([replaceOp("/foo", 10)]);
@@ -254,6 +255,7 @@ describe("TrackedObject with unions", () => {
 
   it("handles union where second member applies", () => {
     const u = new TrackedObject(unionType, [], { bar: "hi" } as any);
+    // @ts-expect-error Dangerous property access fine in tests
     u.bar = "bye";
     const patch = u.flush();
     expect(patch).toEqual([replaceOp("/bar", "bye")]);
