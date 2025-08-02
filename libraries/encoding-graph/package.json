@@ -1,5 +1,5 @@
 {
-  "name": "@mp/encoding",
+  "name": "@mp/encoding-graph",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,11 +8,6 @@
       "types": "./src/index.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
-    },
-    "./schema": {
-      "types": "./src/schema.ts",
-      "import": "./src/schema.ts",
-      "require": "./src/schema.ts"
     }
   },
   "scripts": {
@@ -20,8 +15,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/std": "workspace:*",
-    "cbor-x": "1.6.0"
+    "@mp/encoding": "workspace:*",
+    "@mp/patch-tracker": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

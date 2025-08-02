@@ -1,18 +1,20 @@
+import {
+  array,
+  boolean,
+  float32,
+  float64,
+  int16,
+  int32,
+  map,
+  object,
+  optional,
+  partial,
+  set,
+  string,
+} from "@mp/encoding/schema";
+import type { TypeNode } from "@mp/patch-tracker/graph";
 import { expect, it } from "vitest";
-import type { TypeNode } from "../src/graph";
-import { getTypeGraph } from "../src/graph";
-import { array } from "../src/schemas/array";
-import { boolean } from "../src/schemas/boolean";
-import { float32 } from "../src/schemas/float32";
-import { float64 } from "../src/schemas/float64";
-import { int16 } from "../src/schemas/int16";
-import { int32 } from "../src/schemas/int32";
-import { map } from "../src/schemas/map";
-import { object } from "../src/schemas/object";
-import { optional } from "../src/schemas/optional";
-import { partial } from "../src/schemas/partial";
-import { set } from "../src/schemas/set";
-import { string } from "../src/schemas/string";
+import { getTypeGraph } from "../src";
 
 it("can get type info for schemas", () => {
   const schemaContainingEverything = optional(
