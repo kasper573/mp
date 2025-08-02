@@ -393,6 +393,9 @@ export function map<K, V>(key: Schema<K>, value: Schema<V>): MapSchema<K, V> {
   return new MapSchema(key, value);
 }
 export function optional<T>(inner: Schema<T>): OptionalSchema<T> {
+  if (inner instanceof OptionalSchema) {
+    return inner;
+  }
   return new OptionalSchema(inner);
 }
 export function object<T>(
@@ -400,4 +403,7 @@ export function object<T>(
   propertySchemas: PropertySchemas<T>,
 ): ObjectSchema<T> {
   return new ObjectSchema(typeId, propertySchemas);
+}
+export function partial<T>(inner: ObjectSchema<T>): ObjectSchema<Partial<T>> {
+  throw new Error("Partial schema not implemented yet");
 }

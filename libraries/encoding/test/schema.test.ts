@@ -9,6 +9,7 @@ import {
   map,
   object,
   optional,
+  partial,
   set,
   string,
 } from "../src/schema";
@@ -72,6 +73,24 @@ describe("Composite Schemas", () => {
     const schema = optional(boolean());
     expect(schema.decode(schema.encode(undefined))).toBeUndefined();
     expect(schema.decode(schema.encode(true))).toBe(true);
+  });
+
+  it("Optional stacked still behaves as if it's only one optional", () => {
+    const schema = optional(optional(boolean()));
+    expect(schema.decode(schema.encode(undefined))).toBeUndefined();
+    expect(schema.decode(schema.encode(true))).toBe(true);
+    expect(schema.decode(schema.encode(false))).toBe(false);
+  });
+
+  it("Optional stacked ecodes to identical data as single optional", () => {
+    const stackedSchema = optional(optional(boolean()));
+    const singleSchema = optional(boolean());
+
+    const data = true;
+    const stackedEncoded = stackedSchema.encode(data);
+    const singleEncoded = singleSchema.encode(data);
+
+    expect(stackedEncoded).toEqual(singleEncoded);
   });
 });
 
@@ -144,5 +163,44 @@ describe("Object Schemas", () => {
     decoded.float64 = sample.float64;
 
     expect(decoded).toEqual(sample);
+  });
+
+  it("Partial object encode/decode", () => {
+    const schema = partial(
+      object(1, {
+        str: string(),
+        int16: int16(),
+      }),
+    );
+
+    const p = { str: "test" };
+    const encoded = schema.encode(p);
+    const decoded = schema.decode(encoded);
+
+    expect(decoded).toEqual(p);
+    expect(decoded.int16).toBeUndefined();
+  });
+
+  it("Partial object encoded size does change as schema gets more properties as long as input data remains the same", () => {
+    const twoFieldSchema = partial(
+      object(1, {
+        str: string(),
+        int16: int16(),
+      }),
+    );
+
+    const threeFieldSchema = partial(
+      object(1, {
+        str: string(),
+        int16: int16(),
+        int32: int32(),
+      }),
+    );
+
+    const input = { str: "test" };
+    const twoSize = twoFieldSchema.encode(input).byteLength;
+    const threeSize = threeFieldSchema.encode(input).byteLength;
+
+    expect(twoSize).toEqual(threeSize);
   });
 });
