@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { array } from "../src/schema/array";
 import { boolean } from "../src/schema/boolean";
+import { discriminatedUnion } from "../src/schema/discriminated-union";
 import { float32 } from "../src/schema/float32";
 import { float64 } from "../src/schema/float64";
 import { int16 } from "../src/schema/int16";
@@ -195,5 +196,59 @@ describe("Object Schemas", () => {
     const threeSize = threeFieldSchema.encode(input).byteLength;
 
     expect(twoSize).toEqual(threeSize);
+  });
+});
+
+describe("ObjectUnionSchema", () => {
+  // Define two variant schemas with a shared discriminator property 'kind'
+  const A = object(1, { kind: int16(), name: string(), age: int16() });
+  const B = object(2, { kind: int16(), title: string(), weight: int16() });
+  const unionSchema = discriminatedUnion([A, B], "kind");
+
+  it("encodes and decodes variant A correctly", () => {
+    const valueA = { kind: 1, name: "Alice", age: 30 };
+    const encoded = unionSchema.encode(valueA);
+    const decoded = unionSchema.decode(encoded);
+    expect(decoded).toEqual(valueA);
+  });
+
+  it("encodes and decodes variant B correctly", () => {
+    const valueB = { kind: 2, title: "Engineer", weight: 70 };
+    const encoded = unionSchema.encode(valueB);
+    const decoded = unionSchema.decode(encoded);
+    expect(decoded).toEqual(valueB);
+  });
+
+  it("sizeOf returns the same as underlying schema size", () => {
+    const valueA = { kind: 1, name: "Bob", age: 25 };
+    const sizeUnion = unionSchema.sizeOf(valueA);
+    const sizeA = A.sizeOf(valueA);
+    expect(sizeUnion).toEqual(sizeA);
+  });
+
+  it("throws on encoding unknown discriminator value", () => {
+    const badValue = { kind: 3, unknown: "x" };
+    // @ts-expect-error: Invalid discriminator
+    expect(() => unionSchema.encode(badValue)).toThrow(
+      /No matching variant for discriminator value: 3/,
+    );
+  });
+
+  it("throws on decoding unknown typeId prefix", () => {
+    // Create a buffer with an invalid typeId
+    const invalidTypeId = 999;
+    const buffer = new Uint8Array(2);
+    const dv = new DataView(buffer.buffer);
+    dv.setUint16(0, invalidTypeId, true);
+    expect(() => unionSchema.decode(buffer)).toThrow(
+      /Unknown variant with typeId: 999/,
+    );
+  });
+
+  it("throws when duplicate typeIds are provided", () => {
+    const C = object(1, { kind: int16(), extra: string() });
+    expect(() => discriminatedUnion([A, C] as const, "kind")).toThrow(
+      /Duplicate typeId 1 in union variants\./,
+    );
   });
 });
