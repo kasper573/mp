@@ -3,63 +3,64 @@ import { PatchOpCode } from "@mp/patch";
 import { NotifiableSignal } from "@mp/state";
 import { isSyncComponent } from "./sync-component";
 
-export class SyncMap<K, V> implements Map<K, V> {
+export class SyncMap<K, V> extends Map<K, V> {
   #keysLastFlush = new Set<K>();
   #signal: NotifiableSignal<Map<K, V>>;
 
   constructor(entries?: Iterable<readonly [K, V]> | null) {
+    super();
     this.#signal = new NotifiableSignal(new Map<K, V>(entries));
   }
 
   // Reactive Map implementation
 
-  clear(): void {
+  override clear(): void {
     const map = this.#signal.value;
     if (map.size > 0) {
       map.clear();
       this.#signal.notify();
     }
   }
-  delete(key: K): boolean {
+  override delete(key: K): boolean {
     const deleted = this.#signal.value.delete(key);
     if (deleted) {
       this.#signal.notify();
     }
     return deleted;
   }
-  forEach<ThisArg>(
+  override forEach<ThisArg>(
     callbackfn: (value: V, key: K, map: Map<K, V>) => void,
     thisArg?: ThisArg,
   ): void {
     this.#signal.value.forEach(callbackfn, thisArg);
   }
-  get(key: K): V | undefined {
+  override get(key: K): V | undefined {
     return this.#signal.value.get(key);
   }
-  has(key: K): boolean {
+  override has(key: K): boolean {
     return this.#signal.value.has(key);
   }
-  set(key: K, value: V): this {
+  override set(key: K, value: V): this {
     this.#signal.value.set(key, value);
     this.#signal.notify();
     return this;
   }
-  get size(): number {
+  override get size(): number {
     return this.#signal.value.size;
   }
-  entries(): MapIterator<[K, V]> {
+  override entries(): MapIterator<[K, V]> {
     return this.#signal.value.entries();
   }
-  keys(): MapIterator<K> {
+  override keys(): MapIterator<K> {
     return this.#signal.value.keys();
   }
-  values(): MapIterator<V> {
+  override values(): MapIterator<V> {
     return this.#signal.value.values();
   }
-  [Symbol.iterator](): MapIterator<[K, V]> {
+  override [Symbol.iterator](): MapIterator<[K, V]> {
     return this.#signal.value[Symbol.iterator]();
   }
-  get [Symbol.toStringTag](): string {
+  override get [Symbol.toStringTag](): string {
     return this.#signal.value[Symbol.toStringTag];
   }
 

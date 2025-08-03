@@ -136,9 +136,9 @@ export function applyOperation(target: unknown, op: Operation): void {
 function getValueAtPath<Ret>(root: unknown, path: Path): Ret {
   let current: unknown = root;
   for (const segment of path) {
-    if (isMapLike(current)) {
+    if (current instanceof Map) {
       current = current.get(segment);
-    } else if (isSetLike(current)) {
+    } else if (current instanceof Set) {
       current = Array.from(current)[segment as number];
     } else {
       current = (current as Record<string, unknown>)[segment];
@@ -146,29 +146,3 @@ function getValueAtPath<Ret>(root: unknown, path: Path): Ret {
   }
   return current as Ret;
 }
-
-function isMapLike<K, V>(value: unknown): value is Map<K, V> {
-  return (
-    value instanceof Map ||
-    (value !== null &&
-      typeof value === "object" &&
-      mapLikeProps.every((prop) => prop in value))
-  );
-}
-
-function isSetLike<T>(value: unknown): value is Set<T> {
-  return (
-    value instanceof Set ||
-    (value !== null &&
-      typeof value === "object" &&
-      setLikeProps.every((prop) => prop in value))
-  );
-}
-
-const setLikeProps = ["add", "has", "size", "clear"] satisfies Array<
-  keyof Set<unknown>
->;
-
-const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
-  keyof Map<unknown, unknown>
->;
