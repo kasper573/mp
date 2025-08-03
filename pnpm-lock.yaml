@@ -489,6 +489,22 @@ importers:
         specifier: 0.30.1
         version: 0.30.1
 
+  integrations/experiment:
+    dependencies:
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/state':
+        specifier: workspace:*
+        version: link:../../libraries/state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+
   integrations/game-client:
     dependencies:
       '@mp/db':

@@ -1,0 +1,15 @@
+{
+  "name": "@mp/experiment",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "dependencies": {
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/math": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}
