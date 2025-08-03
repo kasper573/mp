@@ -166,7 +166,7 @@ it("can access events by name before flushing", () => {
   expect(updates1).toEqual(["broadcast", "direct"]);
 });
 
-it.only("markToResendFullState forces a client to get full patch again", () => {
+it("markToResendFullState forces a client to get full patch again", () => {
   const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({
