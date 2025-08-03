@@ -794,16 +794,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  libraries/index:
-    dependencies:
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   libraries/invocation-proxy:
     devDependencies:
       '@mp/tsconfig':
@@ -971,9 +961,6 @@ importers:
 
   libraries/sync:
     dependencies:
-      '@mp/index':
-        specifier: workspace:*
-        version: link:../index
       '@mp/patch':
         specifier: workspace:*
         version: link:../patch
