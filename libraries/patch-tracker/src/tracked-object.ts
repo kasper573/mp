@@ -29,9 +29,13 @@ export function defineTrackedObject<T extends object>(
         return this.values[prop];
       },
       set(value) {
-        this.changes ??= {};
-        this.changes[prop] = value;
         this.values[prop] = value;
+
+        // Trackers will flush themselves recursively
+        if (!isTracker(value)) {
+          this.changes ??= {};
+          this.changes[prop] = value;
+        }
       },
     });
   }
