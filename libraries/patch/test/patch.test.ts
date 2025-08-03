@@ -100,7 +100,7 @@ describe("applyPatch", () => {
     expect(target.m.get("k2")).toBe(undefined);
   });
 
-  it("should replace map entries at the given path (bug: leaves map empty)", () => {
+  it("should replace map entries at the given path", () => {
     const target = { m: new Map<string, number>([["old", 99]]) };
     const patch: Patch = [
       {
@@ -114,8 +114,10 @@ describe("applyPatch", () => {
     ];
 
     applyPatch(target, patch);
-    // Due to a bug in the implementation, map.entries() is used instead of op.entries, so the map becomes empty
-    expect(target.m.size).toBe(0);
+    expect(Array.from(target.m.entries())).toEqual([
+      ["a", 1],
+      ["b", 2],
+    ]);
   });
 
   it("should throw for unsupported operation codes", () => {

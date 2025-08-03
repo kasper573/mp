@@ -115,7 +115,7 @@ export function applyPatch(target: unknown, patch: Patch): void {
       case PatchOpCode.MapReplace: {
         const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
         map.clear();
-        for (const [k, v] of map.entries()) {
+        for (const [k, v] of op.entries) {
           map.set(k, v);
         }
         break;
