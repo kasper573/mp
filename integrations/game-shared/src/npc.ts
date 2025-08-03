@@ -6,7 +6,6 @@ import type {
   NpcType,
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
-import { computed } from "@mp/state";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
@@ -94,7 +93,9 @@ export class NpcInstance extends NpcInstanceCommons {
   readonly combat: SyncComponent<CombatTrait>;
   readonly etc: SyncComponent<NpcEtc>;
 
-  alive = computed(() => this.combat.health > 0);
+  get alive() {
+    return this.combat.health > 0;
+  }
 
   constructor(init: NpcInstanceInit) {
     super({});

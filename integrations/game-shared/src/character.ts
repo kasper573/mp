@@ -1,6 +1,5 @@
 import type { CharacterId } from "@mp/db/types";
 import type { UserId } from "@mp/oauth";
-import { computed } from "@mp/state";
 import type { SyncComponent } from "@mp/sync";
 import { defineSyncComponent } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
@@ -37,7 +36,9 @@ export class Character extends CharacterCommons {
   readonly combat: SyncComponent<CombatTrait>;
   readonly progression: SyncComponent<CharacterProgression>;
 
-  alive = computed(() => this.combat.health > 0);
+  get alive() {
+    return this.combat.health > 0;
+  }
 
   constructor(init: CharacterInit) {
     super({});
