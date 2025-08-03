@@ -1,7 +1,5 @@
-// test/tracker.test.ts
 import { applyPatch } from "@mp/patch";
 import { describe, expect, it } from "vitest";
-import type { TrackedObject } from "../src/tracker";
 import {
   defineTrackedObject,
   TrackedArray,
@@ -163,82 +161,4 @@ describe("TrackedSet", () => {
     applyPatch(target, patch);
     expect(target.has(1)).toBe(false);
   });
-});
-
-it.skip("Complex combination", () => {
-  type ItemContainerId = string;
-  interface State {
-    areaId: string;
-    itemContainers: TrackedMap<ItemContainerId, TrackedArray<Item>>;
-    actors: TrackedMap<string, TrackedObject<Actor>>;
-  }
-  interface Item {
-    id: string;
-    name: string;
-    power: number;
-  }
-  interface Actor {
-    id: string;
-    name: string;
-    health: number;
-    inventoryId: ItemContainerId;
-  }
-  const State = defineTrackedObject<State>([
-    "areaId",
-    "itemContainers",
-    "actors",
-  ]);
-  const Item = defineTrackedObject<Item>(["id", "name", "power"]);
-  const Actor = defineTrackedObject<Actor>([
-    "id",
-    "name",
-    "health",
-    "inventoryId",
-  ]);
-
-  const source = createComplexState();
-
-  source.state.areaId = "forest";
-  source.actor.health = 50;
-  source.item.power = 100;
-
-  const patch = source.state.flush();
-
-  expect(patch).toEqual([]);
-
-  const target = createComplexState();
-
-  applyPatch(target, patch);
-
-  expect(target.state.areaId).toBe("forest");
-  expect(target.actor.health).toBe(50);
-  expect(target.item.power).toBe(100);
-
-  function createComplexState() {
-    const item = new Item({
-      id: "1",
-      name: "Sword",
-      power: 20,
-    });
-
-    const itemContainer = {
-      id: "A",
-      items: new TrackedArray(item),
-    };
-
-    const actor = new Actor({
-      id: "Z",
-      inventoryId: itemContainer.id,
-      name: "John",
-      health: 100,
-    });
-
-    const state = new State({
-      actors: new TrackedMap([[actor.id, actor]]),
-      areaId: "initial",
-      itemContainers: new TrackedMap([[itemContainer.id, itemContainer.items]]),
-    });
-
-    return { state, actor, item };
-  }
 });
