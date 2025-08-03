@@ -31,7 +31,10 @@ export function defineTrackedObject<T extends object>(
 class TrackedObjectImpl implements Tracker {
   #changes?: ObjectAssignOperation["changes"];
 
-  constructor(trackedPropertyNames: Path, object: Record<string, unknown>) {
+  constructor(
+    private trackedPropertyNames: Path,
+    object: Record<string, unknown>,
+  ) {
     for (const prop of trackedPropertyNames) {
       Object.defineProperty(this, prop, {
         enumerable: true,
@@ -54,6 +57,12 @@ class TrackedObjectImpl implements Tracker {
         changes: this.#changes,
       });
       this.#changes = undefined;
+    }
+    for (const prop of this.trackedPropertyNames) {
+      const value = (this as Record<string, unknown>)[prop];
+      if (isTracker(value)) {
+        value.flush([...path, prop], outPatch);
+      }
     }
     return outPatch;
   }
@@ -99,6 +108,12 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
         elements: this.slice(), // Copy so future mutations won't affect the patch
       });
     }
+    for (let i = 0; i < this.length; i++) {
+      const v = this[i];
+      if (isTracker(v)) {
+        v.flush([...path, i], outPatch);
+      }
+    }
     return outPatch;
   }
 }
@@ -140,6 +155,13 @@ export class TrackedSet<V> extends Set<V> implements Tracker {
         values: Array.from(this), // Copy so future mutations won't affect the patch
       });
     }
+    let i = 0;
+    for (const v of this) {
+      if (isTracker(v)) {
+        v.flush([...path, i], outPatch);
+      }
+      i++;
+    }
     return outPatch;
   }
 }
@@ -148,7 +170,6 @@ export class TrackedMap<K extends PathSegment, V>
   extends Map<K, V>
   implements Tracker
 {
-  // Track dirty "set" and "delete" keys to be able to produce the most minimal patch
   #setKeys: Set<K>;
   #deleteKeys: Set<K>;
 
@@ -173,33 +194,61 @@ export class TrackedMap<K extends PathSegment, V>
   }
 
   override delete(key: K): boolean {
-    this.#deleteKeys.add(key);
-    this.#setKeys.delete(key);
-    return super.delete(key);
+    if (super.delete(key)) {
+      this.#deleteKeys.add(key);
+      this.#setKeys.delete(key);
+      return true;
+    }
+    return false;
   }
 
-  flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
-    if (this.#setKeys.size || this.#deleteKeys.size) {
-      for (const key of this.#setKeys) {
-        outPatch.push({
-          op: PatchOpCode.MapSet,
-          path,
-          key,
-          value: this.get(key),
-        });
+  override clear() {
+    this.#setKeys.clear();
+    this.#deleteKeys = new Set(this.keys());
+    return super.clear();
+  }
+
+  flush(path: Path = emptyPath, patch: Patch = []): Patch {
+    // Stale keys may still contain patches if they are trackers, so we need to flush those as well.
+    const staleKeys = new Set(this.keys()).difference(this.#setKeys);
+    for (const key of staleKeys) {
+      const v = this.get(key);
+      if (isTracker(v)) {
+        v.flush([...path, key], patch);
       }
-      for (const key of this.#deleteKeys) {
-        outPatch.push({
-          op: PatchOpCode.MapDelete,
-          path,
-          key,
-        });
-      }
-      this.#setKeys.clear();
-      this.#deleteKeys.clear();
     }
-    return outPatch;
+
+    for (const key of this.#setKeys) {
+      patch.push({
+        op: PatchOpCode.MapSet,
+        path,
+        key,
+        value: this.get(key),
+      });
+    }
+
+    for (const key of this.#deleteKeys) {
+      patch.push({
+        op: PatchOpCode.MapDelete,
+        path,
+        key,
+      });
+    }
+
+    this.#setKeys.clear();
+    this.#deleteKeys.clear();
+
+    return patch;
   }
 }
 
 const emptyPath: Path = Object.freeze([]);
+
+function isTracker(target: unknown): target is Tracker {
+  return (
+    target !== null &&
+    typeof target === "object" &&
+    "flush" in target &&
+    typeof (target as Tracker).flush === "function"
+  );
+}

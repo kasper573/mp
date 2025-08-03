@@ -1,5 +1,6 @@
 import { applyPatch } from "@mp/patch";
 import { describe, expect, it } from "vitest";
+import type { TrackedObject } from "../src/tracker";
 import {
   defineTrackedObject,
   TrackedArray,
@@ -216,15 +217,21 @@ describe("TrackedMap", () => {
     expect(tgt.get("k")).toBe(9);
   });
 
-  it("inherited clear does not track", () => {
-    const m = new TrackedMap<string, number>([["a", 1]]);
+  it("clear produces patch that removes all entries", () => {
+    const m = new TrackedMap<string, number>([
+      ["a", 1],
+      ["b", 2],
+    ]);
     m.clear();
-    const tgt = new Map<string, number>([["a", 9]]);
+    const tgt = new Map<string, number>([
+      ["a", 9],
+      ["b", 10],
+    ]);
     applyPatch(tgt, m.flush());
-    expect(tgt.get("a")).toBe(9);
+    expect(tgt.size).toBe(0);
   });
 
-  it("set then delete yields only delete effect", () => {
+  it("set then delete still yields a delete patch", () => {
     const m = new TrackedMap<string, number>();
     m.set("x", 10);
     m.delete("x");
@@ -233,7 +240,7 @@ describe("TrackedMap", () => {
     expect(tgt.has("x")).toBe(false);
   });
 
-  it("delete then set yields only set effect", () => {
+  it("delete then set will still produce a patch that updates the entry value", () => {
     const m = new TrackedMap<string, number>([["y", 2]]);
     m.delete("y");
     m.set("y", 3);
@@ -318,5 +325,124 @@ describe("TrackedSet", () => {
     const tgt2 = new Set<number>();
     applyPatch(tgt2, s.flush());
     expect(new Set(tgt2)).toEqual(new Set()); // no second replace
+  });
+});
+
+interface Simple {
+  foo: number;
+}
+const SimpleTracked = defineTrackedObject<Simple>(["foo"]);
+
+describe("nested TrackedObject", () => {
+  it("flush on TrackedArray also applies inner TrackedObject changes", () => {
+    const obj = new SimpleTracked({ foo: 1 });
+    const arr = new TrackedArray<TrackedObject<Simple>>();
+    arr.push(obj);
+
+    obj.foo = 42;
+
+    const patches = arr.flush();
+    const target: Simple[] = [{ foo: 1 }];
+
+    applyPatch(target, patches);
+    expect(target[0].foo).toBe(42);
+  });
+
+  it("flush on TrackedMap also applies inner TrackedObject changes", () => {
+    const obj = new SimpleTracked({ foo: 5 });
+    const map = new TrackedMap<string, TrackedObject<Simple>>();
+    map.set("key", obj);
+
+    obj.foo = 7;
+
+    const patches = map.flush();
+    const target = new Map<string, Simple>([["key", { foo: 5 }]]);
+
+    applyPatch(target, patches);
+    expect(target.get("key")!.foo).toBe(7);
+  });
+
+  it("flush on TrackedSet also applies inner TrackedObject changes", () => {
+    const obj = new SimpleTracked({ foo: 9 });
+    const set = new TrackedSet<TrackedObject<Simple>>([obj]);
+
+    obj.foo = 11;
+
+    const patches = set.flush();
+    const initial = new Set<Simple>([{ foo: 9 }]);
+
+    applyPatch(initial, patches);
+    // With one element, iteration order is preserved
+    expect(Array.from(initial)[0].foo).toBe(11);
+  });
+});
+
+interface Inner {
+  x: number;
+}
+interface Outer {
+  inner: Inner;
+  other: string;
+}
+
+const InnerTracked = defineTrackedObject<Inner>(["x"]);
+const OuterTracked = defineTrackedObject<Outer>(["inner", "other"]);
+
+describe("Nested TrackedObject properties (recursive flush)", () => {
+  it("flush on outer also applies inner changes", () => {
+    const inner = new InnerTracked({ x: 1 });
+    const outer = new OuterTracked({ inner, other: "foo" });
+
+    inner.x = 2;
+    outer.other = "bar";
+
+    const patches = outer.flush();
+    const target: Outer = { inner: { x: 1 }, other: "foo" };
+
+    applyPatch(target, patches);
+    expect(target.other).toBe("bar");
+    expect(target.inner.x).toBe(2);
+  });
+});
+
+describe("TrackedArray as property of TrackedObject (recursive flush)", () => {
+  const ListTracked = defineTrackedObject<{ list: TrackedArray<number> }>([
+    "list",
+  ]);
+
+  it("flush on holder also applies array changes", () => {
+    const arr = new TrackedArray<number>(1, 2);
+    const holder = new ListTracked({ list: arr });
+
+    arr.push(3);
+
+    const patches = holder.flush();
+    const target: { list: number[] } = { list: [1, 2] };
+
+    applyPatch(target, patches);
+    expect(target.list).toEqual([1, 2, 3]);
+  });
+});
+
+interface Item {
+  val: string;
+}
+const ItemTracked = defineTrackedObject<Item>(["val"]);
+
+describe("Deep combination: TrackedArray of TrackedMap of TrackedObject", () => {
+  it("one flush on array applies all nested changes", () => {
+    const item = new ItemTracked({ val: "a" });
+    const map = new TrackedMap<string, TrackedObject<Item>>();
+    map.set("k", item);
+    const arr = new TrackedArray<TrackedMap<string, TrackedObject<Item>>>();
+    arr.push(map);
+
+    item.val = "b";
+
+    const patches = arr.flush();
+    const target: Map<string, Item>[] = [new Map([["k", { val: "a" }]])];
+
+    applyPatch(target, patches);
+    expect(target[0].get("k")!.val).toBe("b");
   });
 });

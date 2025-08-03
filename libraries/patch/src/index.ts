@@ -132,9 +132,13 @@ export function applyPatch(target: unknown, patch: Patch): void {
 function getValueAtPath<Ret>(root: unknown, path: Path): Ret {
   let current: unknown = root;
   for (const segment of path) {
-    current = isMapLike(current)
-      ? current.get(segment)
-      : (current as Record<string, unknown>)[segment];
+    if (isMapLike(current)) {
+      current = current.get(segment);
+    } else if (isSetLike(current)) {
+      current = Array.from(current)[segment as number];
+    } else {
+      current = (current as Record<string, unknown>)[segment];
+    }
   }
   return current as Ret;
 }
@@ -147,6 +151,19 @@ function isMapLike<K, V>(value: unknown): value is Map<K, V> {
       mapLikeProps.every((prop) => prop in value))
   );
 }
+
+function isSetLike<T>(value: unknown): value is Set<T> {
+  return (
+    value instanceof Set ||
+    (value !== null &&
+      typeof value === "object" &&
+      setLikeProps.every((prop) => prop in value))
+  );
+}
+
+const setLikeProps = ["add", "has", "size", "clear"] satisfies Array<
+  keyof Set<unknown>
+>;
 
 const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
   keyof Map<unknown, unknown>
