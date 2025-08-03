@@ -1,4 +1,9 @@
-import type { Patch } from "@mp/patch";
+import type {
+  ObjectAssignOperation,
+  Patch,
+  Path,
+  PathSegment,
+} from "@mp/patch";
 import { PatchOpCode } from "@mp/patch";
 
 export type TrackedObjectConstructor<T extends object> = new (
@@ -6,6 +11,10 @@ export type TrackedObjectConstructor<T extends object> = new (
 ) => TrackedObject<T>;
 
 export type TrackedObject<T extends object> = T & Tracker;
+
+export interface Tracker {
+  flush(prefix?: Path, outPatch?: Patch): Patch;
+}
 
 export function defineTrackedObject<T extends object>(
   trackedProperties: Array<keyof T>,
@@ -20,7 +29,7 @@ export function defineTrackedObject<T extends object>(
 }
 
 class TrackedObjectImpl implements Tracker {
-  #patch: Patch = [];
+  #changes?: ObjectAssignOperation["changes"];
 
   constructor(trackedPropertyNames: Path, object: Record<string, unknown>) {
     for (const prop of trackedPropertyNames) {
@@ -29,24 +38,31 @@ class TrackedObjectImpl implements Tracker {
         configurable: true,
         get: () => object[prop],
         set: (value) => {
-          this.#patch.push({
-            op: PatchOpCode.ObjectPropertySet,
-            path: emptyPath,
-            prop,
-            value,
-          });
+          this.#changes ??= {};
+          this.#changes[prop] = value;
           object[prop] = value;
         },
       });
     }
   }
 
-  flush(prefix?: Path, outPatch?: Patch): Patch {
-    return transferPatch(this.#patch, prefix, outPatch);
+  flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
+    if (this.#changes) {
+      outPatch.push({
+        op: PatchOpCode.ObjectAssign,
+        path,
+        changes: this.#changes,
+      });
+      this.#changes = undefined;
+    }
+    return outPatch;
   }
 }
 
 export class TrackedArray<V> extends Array<V> implements Tracker {
+  // We simply track dirty state and flush the entire array.
+  // It's fine since all our use cases are for small arrays.
+  // If we require larger ararys, we can optimize by changing from dirty tracking to another approach.
   #dirty = false;
 
   override push(...items: V[]): number {
@@ -74,13 +90,13 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
     return super.splice(start, deleteCount as number, ...items);
   }
 
-  flush(prefix: Path = emptyPath, outPatch: Patch = []): Patch {
+  flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
     if (this.#dirty) {
       this.#dirty = false;
       outPatch.push({
         op: PatchOpCode.ArrayReplace,
-        path: prefix ?? emptyPath,
-        elements: this.slice(),
+        path,
+        elements: this.slice(), // Copy so future mutations won't affect the patch
       });
     }
     return outPatch;
@@ -88,6 +104,9 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
 }
 
 export class TrackedSet<V> extends Set<V> implements Tracker {
+  // We simply track dirty state and flush the entire set.
+  // It's fine since all our use cases are for small sets.
+  // If we require larger sets, we can optimize by changing from dirty tracking to another approach.
   #dirty: boolean;
 
   constructor(values?: readonly V[]) {
@@ -112,13 +131,13 @@ export class TrackedSet<V> extends Set<V> implements Tracker {
     return super.delete(value);
   }
 
-  flush(prefix: Path = emptyPath, outPatch: Patch = []): Patch {
+  flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
     if (this.#dirty) {
       this.#dirty = false;
       outPatch.push({
         op: PatchOpCode.SetReplace,
-        path: prefix ?? emptyPath,
-        values: Array.from(this),
+        path,
+        values: Array.from(this), // Copy so future mutations won't affect the patch
       });
     }
     return outPatch;
@@ -129,13 +148,16 @@ export class TrackedMap<K extends PathSegment, V>
   extends Map<K, V>
   implements Tracker
 {
-  #patch: Patch;
+  // Track dirty "set" and "delete" keys to be able to produce the most minimal patch
+  #setKeys: Set<K>;
+  #deleteKeys: Set<K>;
 
   constructor(entries?: readonly (readonly [K, V])[] | null) {
     // Must call super with no arguments since our overrides access private properties
     super();
 
-    this.#patch = [];
+    this.#setKeys = new Set();
+    this.#deleteKeys = new Set();
     if (entries) {
       for (const [k, v] of entries) {
         super.set(k, v);
@@ -144,48 +166,38 @@ export class TrackedMap<K extends PathSegment, V>
   }
 
   override set(key: K, value: V): this {
-    this.#patch.push({
-      op: PatchOpCode.MapSet,
-      path: emptyPath,
-      key,
-      value,
-    });
+    this.#setKeys.add(key);
+    this.#deleteKeys.delete(key);
     super.set(key, value);
     return this;
   }
 
   override delete(key: K): boolean {
-    this.#patch.push({
-      op: PatchOpCode.MapDelete,
-      path: emptyPath,
-      key,
-    });
+    this.#deleteKeys.add(key);
+    this.#setKeys.delete(key);
     return super.delete(key);
   }
 
-  flush(prefix?: Path, outPatch?: Patch): Patch {
-    return transferPatch(this.#patch, prefix, outPatch);
+  flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
+    if (this.#setKeys.size || this.#deleteKeys.size) {
+      for (const key of this.#setKeys) {
+        outPatch.push({
+          op: PatchOpCode.MapSet,
+          path,
+          key,
+          value: this.get(key),
+        });
+      }
+      for (const key of this.#deleteKeys) {
+        outPatch.push({
+          op: PatchOpCode.MapDelete,
+          path,
+          key,
+        });
+      }
+    }
+    return outPatch;
   }
 }
 
 const emptyPath: Path = Object.freeze([]);
-
-type Path = readonly PathSegment[];
-type PathSegment = string | number;
-
-function transferPatch(
-  from: Patch = [],
-  prefix: Path = [],
-  to: Patch = [],
-): Patch {
-  for (const op of from) {
-    op.path = [...prefix, ...op.path];
-    to.push(op);
-  }
-  from.splice(0, from.length); // Clear the original patch
-  return to;
-}
-
-export interface Tracker {
-  flush(prefix?: Path, outPatch?: Patch): Patch;
-}

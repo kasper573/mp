@@ -53,7 +53,7 @@ export interface ObjectPropertySetOperation {
 export interface ObjectAssignOperation {
   op: PatchOpCode.ObjectAssign;
   path: Path;
-  changes: object;
+  changes: Record<PathSegment, unknown>;
 }
 
 export type Operation =
