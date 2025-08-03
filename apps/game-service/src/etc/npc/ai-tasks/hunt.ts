@@ -86,10 +86,12 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
   { gameState },
   npc,
 ) {
-  const target = gameState.actors.index
-    .access({ alive: true, type: "character" })
+  const target = gameState.actors
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
+      if (candidate.type !== "character" || !candidate.alive) {
+        return false;
+      }
       return candidate.movement.coords.isWithinDistance(
         npc.movement.coords,
         npc.etc.aggroRange,
