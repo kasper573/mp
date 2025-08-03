@@ -191,12 +191,7 @@ const syncMessageSizeHistogram = new MetricsHistogram({
 
 const gameState: GameState = {
   area: new SyncMap([["current", new GameStateAreaEntity({ id: area.id })]]),
-  actors: new SyncMap([], {
-    type: (actor) => actor.type,
-    alive: (actor) => actor.alive.value,
-    spawnId: (actor) =>
-      actor.type === "npc" ? actor.identity.spawnId : undefined,
-  }),
+  actors: new SyncMap([]),
 };
 
 collectGameStateMetrics(gameState);
