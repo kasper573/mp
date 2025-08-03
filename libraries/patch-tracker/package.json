@@ -5,14 +5,9 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./src/tracker.ts",
-      "import": "./src/tracker.ts",
-      "require": "./src/tracker.ts"
-    },
-    "./graph": {
-      "types": "./src/graph.ts",
-      "import": "./src/graph.ts",
-      "require": "./src/graph.ts"
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
     }
   },
   "scripts": {

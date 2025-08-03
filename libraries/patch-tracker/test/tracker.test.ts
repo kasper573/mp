@@ -1,12 +1,12 @@
 import { applyPatch } from "@mp/patch";
 import { describe, expect, it } from "vitest";
-import type { TrackedObject } from "../src/tracker";
+import type { TrackedObject } from "../src";
 import {
   defineTrackedObject,
   TrackedArray,
   TrackedMap,
   TrackedSet,
-} from "../src/tracker";
+} from "../src";
 
 interface EO {
   a: number;
