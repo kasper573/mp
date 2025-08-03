@@ -34,7 +34,7 @@ export interface MapDeleteOperation {
 export interface ArrayReplaceOperation {
   op: PatchOpCode.ArrayReplace;
   path: Path;
-  elements: unknown[];
+  values: unknown[];
 }
 
 export interface SetReplaceOperation {
@@ -46,7 +46,7 @@ export interface SetReplaceOperation {
 export interface ObjectPropertySetOperation {
   op: PatchOpCode.ObjectPropertySet;
   path: Path;
-  prop: PathSegment;
+  key: PathSegment;
   value: unknown;
 }
 
@@ -75,7 +75,7 @@ export function applyPatch(target: unknown, patch: Patch): void {
     switch (op.op) {
       case PatchOpCode.ObjectPropertySet: {
         const parent = getValueAtPath<Record<string, unknown>>(target, op.path);
-        parent[op.prop] = op.value;
+        parent[op.key] = op.value;
         break;
       }
 
@@ -87,7 +87,7 @@ export function applyPatch(target: unknown, patch: Patch): void {
 
       case PatchOpCode.ArrayReplace: {
         const arr = getValueAtPath<unknown[]>(target, op.path);
-        arr.splice(0, arr.length, ...op.elements);
+        arr.splice(0, arr.length, ...op.values);
         break;
       }
 

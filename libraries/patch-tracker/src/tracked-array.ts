@@ -39,7 +39,7 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
       outPatch.push({
         op: PatchOpCode.ArrayReplace,
         path,
-        elements: this.slice(), // Copy so future mutations won't affect the patch
+        values: this.slice(), // Copy so future mutations won't affect the patch
       });
     }
     for (let i = 0; i < this.length; i++) {

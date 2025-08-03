@@ -9,7 +9,7 @@ describe("applyPatch", () => {
       {
         op: PatchOpCode.ObjectPropertySet,
         path: ["a"],
-        prop: "b",
+        key: "b",
         value: 2,
       },
     ];
@@ -42,7 +42,7 @@ describe("applyPatch", () => {
       {
         op: PatchOpCode.ArrayReplace,
         path: ["arr"],
-        elements: [4, 5],
+        values: [4, 5],
       },
     ];
 
