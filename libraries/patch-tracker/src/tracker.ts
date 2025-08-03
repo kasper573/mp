@@ -1,101 +1,138 @@
-import type { Operation, Patch } from "@mp/patch";
+import type { Patch } from "@mp/patch";
 import { PatchOpCode } from "@mp/patch";
 
-export class TrackedObject<T extends object> implements Tracker {
+export type TrackedObjectConstructor<T extends object> = new (
+  initial: T,
+) => TrackedObject<T>;
+
+export type TrackedObject<T extends object> = T & Tracker;
+
+export function defineTrackedObject<T extends object>(
+  trackedProperties: Array<keyof T>,
+): TrackedObjectConstructor<T> {
+  class SpecificTrackedObject extends TrackedObjectImpl {
+    constructor(initial: T) {
+      super(trackedProperties as Path, initial as Record<string, unknown>);
+    }
+  }
+
+  return SpecificTrackedObject as unknown as TrackedObjectConstructor<T>;
+}
+
+class TrackedObjectImpl implements Tracker {
   #patch: Patch = [];
 
-  constructor(trackedPropertyNames: string[], object: T) {
-    for (const key of trackedPropertyNames) {
-      Object.defineProperty(this, key, {
+  constructor(trackedPropertyNames: Path, object: Record<string, unknown>) {
+    for (const prop of trackedPropertyNames) {
+      Object.defineProperty(this, prop, {
         enumerable: true,
         configurable: true,
-        set: (v: unknown) => {
+        get: () => object[prop],
+        set: (value) => {
           this.#patch.push({
-            op: PatchOpCode.Replace,
-            path: segmentToJSONPointer(key),
-            value: v,
+            op: PatchOpCode.ObjectPropertySet,
+            path: emptyPath,
+            prop,
+            value,
           });
-          object[key as keyof T] = v as T[keyof T];
+          object[prop] = value;
         },
       });
     }
   }
 
-  flush(prefix?: PathSegment[], outPatch?: Patch): Patch {
+  flush(prefix?: Path, outPatch?: Patch): Patch {
     return transferPatch(this.#patch, prefix, outPatch);
   }
 }
 
-export class TrackedArray<V> extends Array<V> {
-  #patch: Operation[] = [];
-
-  constructor(...items: V[]) {
-    super();
-    this.#patch = [];
-    for (const item of items) {
-      super.push(item);
-    }
-  }
+export class TrackedArray<V> extends Array<V> implements Tracker {
+  #dirty = false;
 
   override push(...items: V[]): number {
-    const res = super.push(...items);
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: super.slice(),
-    });
-    return res;
+    this.#dirty = true;
+    return super.push(...items);
   }
 
   override pop(): V | undefined {
-    const res = super.pop();
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: super.slice(),
-    });
-    return res;
+    this.#dirty = true;
+    return super.pop();
   }
 
   override shift(): V | undefined {
-    const res = super.shift();
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: super.slice(),
-    });
-    return res;
+    this.#dirty = true;
+    return super.shift();
   }
 
   override unshift(...items: V[]): number {
-    const res = super.unshift(...items);
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: super.slice(),
-    });
-    return res;
+    this.#dirty = true;
+    return super.unshift(...items);
   }
 
   override splice(start: number, deleteCount?: number, ...items: V[]): V[] {
-    const res = super.splice(start, deleteCount as number, ...items);
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: super.slice(),
-    });
-    return res;
+    this.#dirty = true;
+    return super.splice(start, deleteCount as number, ...items);
   }
 
-  flush(prefix?: PathSegment[], outPatch?: Patch): Patch {
-    return transferPatch(this.#patch, prefix, outPatch);
+  flush(prefix: Path = emptyPath, outPatch: Patch = []): Patch {
+    if (this.#dirty) {
+      this.#dirty = false;
+      outPatch.push({
+        op: PatchOpCode.ArrayReplace,
+        path: prefix ?? emptyPath,
+        elements: this.slice(),
+      });
+    }
+    return outPatch;
   }
 }
 
-export class TrackedMap<K, V> extends Map<K, V> implements Tracker {
+export class TrackedSet<V> extends Set<V> implements Tracker {
+  #dirty: boolean;
+
+  constructor(values?: readonly V[]) {
+    // Must call super with no arguments since our overrides access private properties
+    super();
+
+    this.#dirty = false;
+    if (values) {
+      for (const v of values) {
+        super.add(v);
+      }
+    }
+  }
+
+  override add(value: V): this {
+    this.#dirty = true;
+    return super.add(value);
+  }
+
+  override delete(value: V): boolean {
+    this.#dirty = true;
+    return super.delete(value);
+  }
+
+  flush(prefix: Path = emptyPath, outPatch: Patch = []): Patch {
+    if (this.#dirty) {
+      this.#dirty = false;
+      outPatch.push({
+        op: PatchOpCode.SetReplace,
+        path: prefix ?? emptyPath,
+        values: Array.from(this),
+      });
+    }
+    return outPatch;
+  }
+}
+
+export class TrackedMap<K extends PathSegment, V>
+  extends Map<K, V>
+  implements Tracker
+{
   #patch: Patch;
 
   constructor(entries?: readonly (readonly [K, V])[] | null) {
+    // Must call super with no arguments since our overrides access private properties
     super();
 
     this.#patch = [];
@@ -107,10 +144,10 @@ export class TrackedMap<K, V> extends Map<K, V> implements Tracker {
   }
 
   override set(key: K, value: V): this {
-    const keyStr = String(key);
     this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: segmentToJSONPointer(keyStr),
+      op: PatchOpCode.MapSet,
+      path: emptyPath,
+      key,
       value,
     });
     super.set(key, value);
@@ -118,79 +155,31 @@ export class TrackedMap<K, V> extends Map<K, V> implements Tracker {
   }
 
   override delete(key: K): boolean {
-    const keyStr = String(key);
     this.#patch.push({
-      op: PatchOpCode.Delete,
-      path: segmentToJSONPointer(keyStr),
+      op: PatchOpCode.MapDelete,
+      path: emptyPath,
+      key,
     });
     return super.delete(key);
   }
 
-  flush(prefix?: PathSegment[], outPatch?: Patch): Patch {
+  flush(prefix?: Path, outPatch?: Patch): Patch {
     return transferPatch(this.#patch, prefix, outPatch);
   }
 }
 
-export class TrackedSet<V> extends Set<V> implements Tracker {
-  #patch: Operation[] = [];
+const emptyPath: Path = Object.freeze([]);
 
-  constructor(initial?: Iterable<V>) {
-    super();
-    this.#patch = [];
-    if (initial) {
-      for (const v of initial) {
-        super.add(v);
-      }
-    }
-  }
-
-  override add(value: V): this {
-    super.add(value);
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: Array.from(this),
-    });
-    return this;
-  }
-
-  override delete(value: V): boolean {
-    const res = super.delete(value);
-    this.#patch.push({
-      op: PatchOpCode.Replace,
-      path: emptyPath,
-      value: Array.from(this),
-    });
-    return res;
-  }
-
-  flush(prefix?: PathSegment[], outPatch?: Patch): Patch {
-    return transferPatch(this.#patch, prefix, outPatch);
-  }
-}
-
-function segmentToJSONPointer(segment: PathSegment): string {
-  return encodeURIComponent(String(segment));
-}
-
-function pathToJSONPointer(path: PathSegment[]): string {
-  if (!path.length) {
-    return emptyPath;
-  }
-  return path.map((seg) => `/${segmentToJSONPointer(seg)}`).join("");
-}
-
+type Path = readonly PathSegment[];
 type PathSegment = string | number;
-
-const emptyPath = "";
 
 function transferPatch(
   from: Patch = [],
-  prefix: PathSegment[] = [],
+  prefix: Path = [],
   to: Patch = [],
 ): Patch {
   for (const op of from) {
-    op.path = pathToJSONPointer([...prefix, ...op.path]);
+    op.path = [...prefix, ...op.path];
     to.push(op);
   }
   from.splice(0, from.length); // Clear the original patch
@@ -198,5 +187,5 @@ function transferPatch(
 }
 
 export interface Tracker {
-  flush(prefix?: PathSegment[], outPatch?: Patch): Patch;
+  flush(prefix?: Path, outPatch?: Patch): Patch;
 }

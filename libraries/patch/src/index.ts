@@ -1,174 +1,153 @@
 export enum PatchOpCode {
-  Replace = 1,
-  Delete = 2,
-  Assign = 3,
+  ObjectPropertySet = 1,
+  ObjectAssign = 2,
+  ArrayReplace = 4,
+  SetReplace = 5,
+  MapSet = 6,
+  MapDelete = 7,
+  MapReplace = 8,
 }
 
-export interface ReplaceOperation {
-  op: PatchOpCode.Replace;
-  path: string; // JSON-Pointer style, e.g. "/a/b/0"
+export type PathSegment = string | number;
+
+export type Path = readonly PathSegment[];
+
+export interface MapReplaceOperation {
+  op: PatchOpCode.MapReplace;
+  path: Path;
+  entries: Array<[key: unknown, value: unknown]>;
+}
+
+export interface MapSetOperation {
+  op: PatchOpCode.MapSet;
+  path: Path;
+  key: PathSegment;
   value: unknown;
 }
 
-export interface DeleteOperation {
-  op: PatchOpCode.Delete;
-  path: string;
+export interface MapDeleteOperation {
+  op: PatchOpCode.MapDelete;
+  path: Path;
+  key: PathSegment;
 }
 
-export interface AssignOperation {
-  op: PatchOpCode.Assign;
-  path: string;
-  value: object;
+export interface ArrayReplaceOperation {
+  op: PatchOpCode.ArrayReplace;
+  path: Path;
+  elements: unknown[];
 }
 
-export type Operation = ReplaceOperation | DeleteOperation | AssignOperation;
+export interface SetReplaceOperation {
+  op: PatchOpCode.SetReplace;
+  path: Path;
+  values: unknown[];
+}
+
+export interface ObjectPropertySetOperation {
+  op: PatchOpCode.ObjectPropertySet;
+  path: Path;
+  prop: PathSegment;
+  value: unknown;
+}
+
+export interface ObjectAssignOperation {
+  op: PatchOpCode.ObjectAssign;
+  path: Path;
+  changes: object;
+}
+
+export type Operation =
+  | ObjectPropertySetOperation
+  | ObjectAssignOperation
+  | ArrayReplaceOperation
+  | SetReplaceOperation
+  | MapSetOperation
+  | MapDeleteOperation
+  | MapReplaceOperation;
 
 export type Patch = Operation[];
 
 /**
- * Applies an RFC6902-inspired patch (supporting only replace, delete, assign)
- * to the given target in place. Supports Objects, Arrays, Maps and Sets.
+ * Applies an RFC6902-inspired patch to the given target object
  */
 export function applyPatch(target: unknown, patch: Patch): void {
   for (const op of patch) {
-    const segments = parsePath(op.path);
-    const { parent, key } = getContainer(target, segments);
-
     switch (op.op) {
-      case PatchOpCode.Replace: {
-        const value = op.value;
+      case PatchOpCode.ObjectPropertySet: {
+        const parent = getValueAtPath<Record<string, unknown>>(target, op.path);
+        parent[op.prop] = op.value;
+        break;
+      }
 
-        if (isMapLike(parent)) {
-          parent.set(key, value);
-        } else if (isSetLike(parent)) {
-          const idx = Number(key);
-          const arr = Array.from(parent);
-          // Replace in place by rebuilding the Set
-          arr[idx] = value;
-          parent.clear();
-          for (const el of arr) parent.add(el);
-        } else if (Array.isArray(parent)) {
-          parent[Number(key)] = value;
-        } else {
-          (parent as Record<string, unknown>)[key] = value;
+      case PatchOpCode.ObjectAssign: {
+        const obj = getValueAtPath<object>(target, op.path);
+        Object.assign(obj as object, op.changes);
+        break;
+      }
+
+      case PatchOpCode.ArrayReplace: {
+        const arr = getValueAtPath<unknown[]>(target, op.path);
+        arr.splice(0, arr.length, ...op.elements);
+        break;
+      }
+
+      case PatchOpCode.SetReplace: {
+        const set = getValueAtPath<Set<unknown>>(target, op.path);
+        set.clear();
+        for (const value of op.values) {
+          set.add(value);
         }
         break;
       }
 
-      case PatchOpCode.Delete: {
-        if (isMapLike(parent)) {
-          parent.delete(key);
-        } else if (isSetLike(parent)) {
-          const idx = Number(key);
-          const arr = Array.from(parent);
-          // Delete by rebuilding the Set without the element
-          arr.splice(idx, 1);
-          parent.clear();
-          for (const el of arr) parent.add(el);
-        } else if (Array.isArray(parent)) {
-          const idx = Number(key);
-          parent.splice(idx, 1);
-        } else {
-          delete (parent as Record<string, unknown>)[key];
-        }
+      case PatchOpCode.MapSet: {
+        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+        map.set(op.key, op.value);
         break;
       }
 
-      case PatchOpCode.Assign: {
-        const val = op.value;
-        if (isMapLike(parent)) {
-          const existing = parent.get(key);
-          Object.assign(existing as object, val);
-        } else if (isSetLike(parent)) {
-          const idx = Number(key);
-          const arr = Array.from(parent);
-          const element = arr[idx];
-          Object.assign(element as object, val);
-        } else if (Array.isArray(parent)) {
-          const idx = Number(key);
-          const existing = parent[idx];
-          Object.assign(existing as object, val);
-        } else {
-          const existing = (parent as Record<string, unknown>)[key];
-          Object.assign(existing as object, val);
-        }
+      case PatchOpCode.MapDelete: {
+        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+        map.delete(op.key);
         break;
       }
 
+      case PatchOpCode.MapReplace: {
+        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+        map.clear();
+        for (const [k, v] of map.entries()) {
+          map.set(k, v);
+        }
+        break;
+      }
       default:
-        throw new Error(`Unsupported operation`, { cause: op });
+        throw new Error(`Unsupported patch operation`, { cause: op });
     }
   }
 }
 
-function parsePath(path: string): string[] {
-  if (!path.startsWith("/")) {
-    throw new Error(`Invalid path '${path}'. Must start with '/'.`);
+/**
+ * Retrieve the value at the given path, traversing Maps, arrays, and objects.
+ */
+function getValueAtPath<Ret>(root: unknown, path: Path): Ret {
+  let current: unknown = root;
+  for (const segment of path) {
+    current = isMapLike(current)
+      ? current.get(segment)
+      : (current as Record<string, unknown>)[segment];
   }
-  return path
-    .split("/")
-    .slice(1)
-    .map((seg) => seg.replace(/~1/g, "/").replace(/~0/g, "~"));
-}
-
-// Walk all but the final segment to find the parent container
-function getContainer(root: unknown, segments: string[]) {
-  let parent: unknown = root;
-  for (let i = 0; i < segments.length - 1; i++) {
-    const seg = segments[i];
-    if (isMapLike(parent)) {
-      parent = parent.get(seg);
-    } else if (Array.isArray(parent)) {
-      parent = parent[Number(seg)];
-    } else if (isSetLike(parent)) {
-      parent = Array.from(parent)[Number(seg)];
-    } else if (isObject(parent)) {
-      parent = (parent as Record<string, unknown>)[seg];
-    } else {
-      throw new Error(`Cannot traverse non-container at segment '${seg}'`);
-    }
-    if (parent === undefined) {
-      throw new Error(`Path not found at segment '${seg}'`);
-    }
-  }
-  return {
-    parent,
-    key: segments[segments.length - 1],
-  };
-}
-
-// Type‐guard for plain JS objects
-function isObject(val: unknown): val is Record<string, unknown> {
-  return (
-    typeof val === "object" &&
-    val !== null &&
-    !Array.isArray(val) &&
-    !isMapLike(val) &&
-    !isSetLike(val)
-  );
+  return current as Ret;
 }
 
 function isMapLike<K, V>(value: unknown): value is Map<K, V> {
   return (
     value instanceof Map ||
-    (typeof value === "object" &&
-      value !== null &&
+    (value !== null &&
+      typeof value === "object" &&
       mapLikeProps.every((prop) => prop in value))
-  );
-}
-
-function isSetLike<T>(value: unknown): value is Set<T> {
-  return (
-    value instanceof Set ||
-    (typeof value === "object" &&
-      value !== null &&
-      setLikeProps.every((prop) => prop in value))
   );
 }
 
 const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
   keyof Map<unknown, unknown>
->;
-const setLikeProps = ["add", "delete", "clear"] satisfies Array<
-  keyof Set<unknown>
 >;
