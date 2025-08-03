@@ -1,6 +1,6 @@
+import type { Patch, Path } from "@mp/patch";
+import { PatchOpCode } from "@mp/patch";
 import { signal, type Signal } from "@mp/state";
-import type { PatchPath, PatchPathStep } from "./patch";
-import { PatchType, type Patch } from "./patch";
 
 export function defineSyncComponent<Values extends object>(
   nextBuilder: (
@@ -45,9 +45,13 @@ class SyncComponentBuilder<Values extends object> {
       #changes: Record<PropertyKey, unknown> | undefined;
       #observables: Record<PropertyKey, Signal<unknown>> = {};
 
-      flush(path: PatchPathStep[] = [], patch: Patch = []): Patch {
+      flush(path: Path = [], patch: Patch = []): Patch {
         if (this.#changes) {
-          patch.push([PatchType.Update, path as PatchPath, this.#changes]);
+          patch.push({
+            op: PatchOpCode.ObjectAssign,
+            path,
+            changes: this.#changes,
+          });
           this.#changes = undefined;
         }
         for (const key in this) {
@@ -146,7 +150,7 @@ interface SyncComponentConstructor<Values> {
  * Allows collecting changes on fields decorated with @collect.
  */
 export type SyncComponent<Values> = Values & {
-  flush(path?: PatchPathStep[], patch?: Patch): Patch;
+  flush(path?: Path, patch?: Patch): Patch;
   snapshot(): Values;
 };
 

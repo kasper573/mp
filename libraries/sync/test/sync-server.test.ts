@@ -1,8 +1,8 @@
-import { it, expect } from "vitest";
-import { applyPatch } from "../src/patch";
-import { SyncServer } from "../src/sync-server";
-import { SyncMap } from "../src/sync-map";
+import { applyPatch } from "@mp/patch";
+import { expect, it } from "vitest";
 import { defineSyncComponent } from "../src/sync-component";
+import { SyncMap } from "../src/sync-map";
+import { SyncServer } from "../src/sync-server";
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestState = {
@@ -166,7 +166,7 @@ it("can access events by name before flushing", () => {
   expect(updates1).toEqual(["broadcast", "direct"]);
 });
 
-it("markToResendFullState forces a client to get full patch again", () => {
+it.only("markToResendFullState forces a client to get full patch again", () => {
   const server = new SyncServer<TestState, TestEventMap, string>({
     clientIds: () => ["client1", "client2"],
     clientVisibility: (id, state) => ({

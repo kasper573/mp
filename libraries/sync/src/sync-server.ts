@@ -1,13 +1,6 @@
-import type { Operation } from "./patch";
-import {
-  PatchType,
-  prefixOperation,
-  type Patch,
-  type PatchPath,
-} from "./patch";
+import { PatchOpCode, type Operation, type Patch } from "@mp/patch";
 import { SyncMap } from "./sync-map";
 
-import { dedupePatch } from "./patch-deduper";
 import type { EventAccessFn, SyncEvent, SyncEventMap } from "./sync-event";
 
 export class SyncServer<
@@ -34,7 +27,7 @@ export class SyncServer<
       ]),
     );
 
-    const serverPatch: Patch = Array.from(this.flushState(state));
+    const serverPatch = this.flushState(state);
 
     const clientPatches: ClientPatches<ClientId> = new Map();
     const clientEvents: ClientEvents<ClientId> = new Map();
@@ -49,7 +42,7 @@ export class SyncServer<
 
       if (!this.hasBeenGivenFullState.has(clientId)) {
         const clientState = deriveClientState(state, nextVisibility);
-        clientPatch.push(...createFullStatePatch(clientState));
+        appendFullStatePatch(clientState, clientPatch);
         this.hasBeenGivenFullState.add(clientId);
       }
 
@@ -60,25 +53,28 @@ export class SyncServer<
         const nextIds = nextVisibility[entityName];
 
         for (const addedId of nextIds.difference(prevIds)) {
-          clientPatch.push([
-            PatchType.Set,
-            [entityName, addedId] as PatchPath,
-            state[entityName].get(addedId),
-          ]);
+          clientPatch.push({
+            op: PatchOpCode.MapSet,
+            path: [entityName],
+            key: addedId,
+            value: state[entityName].get(addedId),
+          });
         }
 
         for (const removedId of prevIds.difference(nextIds)) {
-          clientPatch.push([
-            PatchType.Remove,
-            [entityName, removedId] as PatchPath,
-          ]);
+          clientPatch.push({
+            op: PatchOpCode.MapDelete,
+            path: [entityName],
+            key: removedId,
+          });
         }
       }
 
       // Select the patches visible to the client
 
       clientPatch.push(
-        ...serverPatch.filter(([_, [entityName, entityId]]) => {
+        ...serverPatch.filter((op) => {
+          const { entityName, entityId } = inspectOperation(op);
           return entityId === undefined
             ? false
             : nextVisibility[entityName].has(entityId as never);
@@ -86,7 +82,7 @@ export class SyncServer<
       );
 
       if (clientPatch.length > 0) {
-        clientPatches.set(clientId, dedupePatch(clientPatch));
+        clientPatches.set(clientId, clientPatch);
       }
 
       const visibleClientEvents = this.events
@@ -103,14 +99,14 @@ export class SyncServer<
     return { clientPatches, clientEvents };
   }
 
-  private *flushState(state: State): Generator<Operation> {
+  private flushState(state: State): Patch {
+    const patch: Patch = [];
     for (const [entityName, map] of Object.entries(state)) {
       if (map instanceof SyncMap) {
-        for (const operation of map.flush()) {
-          yield prefixOperation(entityName, operation);
-        }
+        map.flush([entityName], patch);
       }
     }
+    return patch;
   }
 
   markToResendFullState(...clientIds: ClientId[]): void {
@@ -145,6 +141,17 @@ export class SyncServer<
   };
 }
 
+function inspectOperation(op: Operation) {
+  const [entityName, entityId] = op.path;
+  if (entityId !== undefined) {
+    return { entityName, entityId };
+  }
+  if ("key" in op) {
+    return { entityName, entityId: op.key };
+  }
+  return { entityName };
+}
+
 function deriveClientState<State extends PatchableState>(
   state: State,
   visibilities: ClientVisibility<State>,
@@ -177,15 +184,18 @@ function isVisible<State extends PatchableState>(
   return true;
 }
 
-function createFullStatePatch<State extends PatchableState>(
+function appendFullStatePatch<State extends PatchableState>(
   state: State,
-): Patch {
-  const patch: Patch = [];
-  for (const key in state) {
-    const entities = state[key as keyof typeof state];
-    patch.push([PatchType.Set, [key], entities]);
+  patch: Patch,
+): void {
+  for (const entityName in state) {
+    const entities = state[entityName as keyof typeof state];
+    patch.push({
+      op: PatchOpCode.MapReplace,
+      path: [entityName],
+      entries: Array.from(entities.entries()),
+    });
   }
-  return patch;
 }
 
 export interface FlushResult<ClientId> {

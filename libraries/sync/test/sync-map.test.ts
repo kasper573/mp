@@ -1,8 +1,8 @@
-import { describe, expect, it, vi } from "vitest";
+import { applyPatch } from "@mp/patch";
 import { effect } from "@mp/state";
+import { describe, expect, it, vi } from "vitest";
 import { defineSyncComponent } from "../src/sync-component";
 import { SyncMap } from "../src/sync-map";
-import { applyPatch } from "../src/patch";
 
 describe("can collect changes from map of components", () => {
   const Entity = defineSyncComponent((builder) =>
@@ -17,10 +17,10 @@ describe("can collect changes from map of components", () => {
 
     const patch = map.flush();
 
-    const receiver: Record<string, Entity> = {};
+    const receiver = new Map<string, Entity>();
     applyPatch(receiver, patch);
 
-    expect(receiver.john.cash).toBe(50);
+    expect(receiver.get("john")?.cash).toBe(50);
   });
 
   it("delete", () => {
@@ -35,15 +35,15 @@ describe("can collect changes from map of components", () => {
     ]);
 
     // Flush initial state
-    const receiver: Record<string, Entity> = {};
+    const receiver = new Map<string, Entity>();
     applyPatch(receiver, map.flush());
 
     // Apply and flush delete
     map.delete("john");
     applyPatch(receiver, map.flush());
 
-    expect(receiver.john).toBeUndefined();
-    expect(receiver.jane.cash).toBe(50);
+    expect(receiver.get("john")).toBeUndefined();
+    expect(receiver.get("jane")?.cash).toBe(50);
   });
 
   it("entity mutation", () => {
@@ -57,10 +57,12 @@ describe("can collect changes from map of components", () => {
     // Apply and flush entity mutation
     john.cash = 25;
     const patch = map.flush();
-    const receiver: Record<string, Entity> = { john: new Entity({ cash: 0 }) };
+    const receiver = new Map<string, Entity>([
+      ["john", new Entity({ cash: 0 })],
+    ]);
     applyPatch(receiver, patch);
 
-    expect(receiver.john.cash).toBe(25);
+    expect(receiver.get("john")?.cash).toBe(25);
   });
 });
 
@@ -78,10 +80,10 @@ describe("can collect changes from map of nested components", () => {
 
     const patch = map.flush();
 
-    const receiver: Record<string, Entity> = {};
+    const receiver = new Map<string, Entity>();
     applyPatch(receiver, patch);
 
-    expect(receiver.john.bank.cash).toBe(50);
+    expect(receiver.get("john")?.bank.cash).toBe(50);
   });
 
   it("delete", () => {
@@ -96,15 +98,15 @@ describe("can collect changes from map of nested components", () => {
     ]);
 
     // Flush initial state
-    const receiver: Record<string, Entity> = {};
+    const receiver = new Map<string, Entity>();
     applyPatch(receiver, map.flush());
 
     // Apply and flush delete
     map.delete("john");
     applyPatch(receiver, map.flush());
 
-    expect(receiver.john).toBeUndefined();
-    expect(receiver.jane.bank.cash).toBe(50);
+    expect(receiver.get("john")).toBeUndefined();
+    expect(receiver.get("jane")?.bank.cash).toBe(50);
   });
 
   it("entity mutation", () => {
@@ -118,10 +120,10 @@ describe("can collect changes from map of nested components", () => {
     // Apply and flush entity mutation
     john.bank.cash = 25;
     const patch = map.flush();
-    const receiver: Record<string, Entity> = { john: new Entity({}) };
+    const receiver = new Map<string, Entity>([["john", new Entity({})]]);
     applyPatch(receiver, patch);
 
-    expect(receiver.john.bank.cash).toBe(25);
+    expect(receiver.get("john")?.bank.cash).toBe(25);
   });
 });
 

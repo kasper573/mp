@@ -19,6 +19,7 @@
     "@mp/graphics": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
+    "@mp/patch": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/query": "workspace:*",
     "@mp/state": "workspace:*",

@@ -72,57 +72,61 @@ export type Patch = Operation[];
  */
 export function applyPatch(target: unknown, patch: Patch): void {
   for (const op of patch) {
-    switch (op.op) {
-      case PatchOpCode.ObjectPropertySet: {
-        const parent = getValueAtPath<Record<string, unknown>>(target, op.path);
-        parent[op.key] = op.value;
-        break;
-      }
+    applyOperation(target, op);
+  }
+}
 
-      case PatchOpCode.ObjectAssign: {
-        const obj = getValueAtPath<object>(target, op.path);
-        Object.assign(obj as object, op.changes);
-        break;
-      }
-
-      case PatchOpCode.ArrayReplace: {
-        const arr = getValueAtPath<unknown[]>(target, op.path);
-        arr.splice(0, arr.length, ...op.values);
-        break;
-      }
-
-      case PatchOpCode.SetReplace: {
-        const set = getValueAtPath<Set<unknown>>(target, op.path);
-        set.clear();
-        for (const value of op.values) {
-          set.add(value);
-        }
-        break;
-      }
-
-      case PatchOpCode.MapSet: {
-        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
-        map.set(op.key, op.value);
-        break;
-      }
-
-      case PatchOpCode.MapDelete: {
-        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
-        map.delete(op.key);
-        break;
-      }
-
-      case PatchOpCode.MapReplace: {
-        const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
-        map.clear();
-        for (const [k, v] of op.entries) {
-          map.set(k, v);
-        }
-        break;
-      }
-      default:
-        throw new Error(`Unsupported patch operation`, { cause: op });
+export function applyOperation(target: unknown, op: Operation): void {
+  switch (op.op) {
+    case PatchOpCode.ObjectPropertySet: {
+      const parent = getValueAtPath<Record<string, unknown>>(target, op.path);
+      parent[op.key] = op.value;
+      break;
     }
+
+    case PatchOpCode.ObjectAssign: {
+      const obj = getValueAtPath<object>(target, op.path);
+      Object.assign(obj as object, op.changes);
+      break;
+    }
+
+    case PatchOpCode.ArrayReplace: {
+      const arr = getValueAtPath<unknown[]>(target, op.path);
+      arr.splice(0, arr.length, ...op.values);
+      break;
+    }
+
+    case PatchOpCode.SetReplace: {
+      const set = getValueAtPath<Set<unknown>>(target, op.path);
+      set.clear();
+      for (const value of op.values) {
+        set.add(value);
+      }
+      break;
+    }
+
+    case PatchOpCode.MapSet: {
+      const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+      map.set(op.key, op.value);
+      break;
+    }
+
+    case PatchOpCode.MapDelete: {
+      const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+      map.delete(op.key);
+      break;
+    }
+
+    case PatchOpCode.MapReplace: {
+      const map = getValueAtPath<Map<unknown, unknown>>(target, op.path);
+      map.clear();
+      for (const [k, v] of op.entries) {
+        map.set(k, v);
+      }
+      break;
+    }
+    default:
+      throw new Error(`Unsupported patch operation`, { cause: op });
   }
 }
 

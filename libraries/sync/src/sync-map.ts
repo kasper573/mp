@@ -1,14 +1,9 @@
-import { NotifiableSignal } from "@mp/state";
-import {
-  type PatchPathStep,
-  type Patch,
-  PatchType,
-  type PatchPath,
-} from "./patch";
-import { isSyncComponent } from "./sync-component";
-
 import type { IndexDefinition, IndexResolvers } from "@mp/index";
 import { Index } from "@mp/index";
+import type { Patch, PathSegment } from "@mp/patch";
+import { PatchOpCode } from "@mp/patch";
+import { NotifiableSignal } from "@mp/state";
+import { isSyncComponent } from "./sync-component";
 
 export class SyncMap<K, V, Def extends IndexDefinition = {}>
   implements Map<K, V>
@@ -84,19 +79,26 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
   /**
    * Produces a patch that represents all changes since the last flush.
    */
-  flush(...path: PatchPathStep[]): Patch {
-    const patch: Patch = [];
+  flush(path: PathSegment[] = [], patch: Patch = []): Patch {
     const currentKeys = new Set(this.keys());
 
     const addedKeys = currentKeys.difference(this.#keysLastFlush);
     for (const key of addedKeys) {
-      const value = this.get(key) as V;
-      patch.push([PatchType.Set, [...path, String(key)] as PatchPath, value]);
+      patch.push({
+        op: PatchOpCode.MapSet,
+        path,
+        key: String(key),
+        value: this.get(key),
+      });
     }
 
     const removedKeys = this.#keysLastFlush.difference(currentKeys);
     for (const key of removedKeys) {
-      patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
+      patch.push({
+        op: PatchOpCode.MapDelete,
+        path,
+        key: String(key),
+      });
     }
 
     const staleKeys = this.#keysLastFlush.intersection(currentKeys);
