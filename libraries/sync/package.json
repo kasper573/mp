@@ -15,7 +15,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/index": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/patch": "workspace:*"
   },

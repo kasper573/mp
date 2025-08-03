@@ -1,27 +1,14 @@
-import type { IndexDefinition, IndexResolvers } from "@mp/index";
-import { Index } from "@mp/index";
 import type { Patch, PathSegment } from "@mp/patch";
 import { PatchOpCode } from "@mp/patch";
 import { NotifiableSignal } from "@mp/state";
 import { isSyncComponent } from "./sync-component";
 
-export class SyncMap<K, V, Def extends IndexDefinition = {}>
-  implements Map<K, V>
-{
+export class SyncMap<K, V> implements Map<K, V> {
   #keysLastFlush = new Set<K>();
   #signal: NotifiableSignal<Map<K, V>>;
-  readonly index: Index<V, Def>;
 
-  constructor(
-    entries?: Iterable<readonly [K, V]> | null,
-    indexResolvers?: IndexResolvers<V, Def>,
-  ) {
+  constructor(entries?: Iterable<readonly [K, V]> | null) {
     this.#signal = new NotifiableSignal(new Map<K, V>(entries));
-
-    this.index = new Index(
-      () => this.#signal.value.values(),
-      indexResolvers ?? ({} as IndexResolvers<V, Def>),
-    );
   }
 
   // Reactive Map implementation
