@@ -62,10 +62,12 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
   npc,
 ) {
   const combatMemory = npcCombatMemories.get(npc.identity.id);
-  const target = gameState.actors.index
-    .access({ alive: true, type: "character" })
+  const target = gameState.actors
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
+      if (candidate.type !== "character" || !candidate.alive) {
+        return false;
+      }
       return (
         candidate.movement.coords.isWithinDistance(
           npc.movement.coords,
@@ -102,9 +104,13 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
 ) {
   const combatMemory = npcCombatMemories.get(npc.identity.id);
 
-  const allies = gameState.actors.index.access({
-    spawnId: npc.identity.spawnId,
-  });
+  const allies = new Set(
+    gameState.actors
+      .values()
+      .filter(
+        (a) => a.type === "npc" && a.identity.spawnId === npc.identity.spawnId,
+      ),
+  );
 
   // Actors attacking allies are considered enemies
   const enemyIds = combatMemory?.combats.reduce((acc, [actorId1, actorId2]) => {

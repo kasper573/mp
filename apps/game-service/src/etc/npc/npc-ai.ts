@@ -44,10 +44,10 @@ export class NpcAi {
         rng: this.rng,
       };
 
-      for (const subject of this.gameState.actors.index.access<NpcInstance>({
-        type: "npc",
-        alive: true,
-      })) {
+      for (const subject of this.gameState.actors.values()) {
+        if (subject.type !== "npc" || !subject.alive) {
+          continue;
+        }
         this.observeAttacksDoneThisTick(subject);
 
         const task =
