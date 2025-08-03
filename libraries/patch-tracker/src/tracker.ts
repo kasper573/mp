@@ -195,6 +195,8 @@ export class TrackedMap<K extends PathSegment, V>
           key,
         });
       }
+      this.#setKeys.clear();
+      this.#deleteKeys.clear();
     }
     return outPatch;
   }
