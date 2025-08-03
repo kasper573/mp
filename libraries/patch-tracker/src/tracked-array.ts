@@ -8,6 +8,15 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
   // If we require larger ararys, we can optimize by changing from dirty tracking to another approach.
   #dirty = false;
 
+  constructor(...values: V[]) {
+    // Must call super with no arguments since our overrides access private properties
+    super();
+
+    if (values.length) {
+      this.push(...values);
+    }
+  }
+
   override push(...items: V[]): number {
     this.#dirty = true;
     return super.push(...items);
@@ -31,6 +40,11 @@ export class TrackedArray<V> extends Array<V> implements Tracker {
   override splice(start: number, deleteCount?: number, ...items: V[]): V[] {
     this.#dirty = true;
     return super.splice(start, deleteCount as number, ...items);
+  }
+
+  override sort(compareFn?: ((a: V, b: V) => number) | undefined): this {
+    this.#dirty = true;
+    return super.sort(compareFn);
   }
 
   flush(path: Path = emptyPath, outPatch: Patch = []): Patch {

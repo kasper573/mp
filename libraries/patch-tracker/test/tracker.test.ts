@@ -69,6 +69,7 @@ describe("TrackedObject", () => {
 
   it("setting to the same value still applies an assign", () => {
     const t = new EOTracked({ a: 1, b: "x" });
+    t.flush(); // discard initial flush
     t.a = 1;
     const target = { a: 0, b: "" };
     applyPatch(target, t.flush());
@@ -156,19 +157,19 @@ describe("TrackedArray", () => {
   });
 
   it("direct index assignment is not tracked", () => {
-    const arr = new TrackedArray<number>(10, 20);
+    const arr = new TrackedArray<number>();
     arr[0] = 99;
-    const tgt: number[] = [0, 0];
-    applyPatch(tgt, arr.flush());
-    expect(tgt).toEqual([0, 0]); // unchanged
-  });
-
-  it("non-overridden methods do not produce a patch", () => {
-    const arr = new TrackedArray<number>(3, 1, 2);
-    arr.sort(); // inherited
     const tgt: number[] = [];
     applyPatch(tgt, arr.flush());
-    expect(tgt).toEqual([]); // no patch
+    expect(tgt).toEqual([]); // unchanged
+  });
+
+  it("sorting produces a patch", () => {
+    const arr = new TrackedArray<number>(3, 1, 2);
+    arr.sort();
+    const tgt: number[] = [];
+    applyPatch(tgt, arr.flush());
+    expect(tgt).toEqual([1, 2, 3]); // no patch
   });
 
   it("pop on empty array still replaces entire array", () => {
@@ -210,11 +211,11 @@ describe("TrackedMap", () => {
     expect(target.nested.get("qux")).toBe(4);
   });
 
-  it("initial entries do not emit patch", () => {
+  it("initial state will be emitted as patch", () => {
     const m = new TrackedMap<string, number>([["k", 1]]);
     const tgt = new Map<string, number>([["k", 9]]);
     applyPatch(tgt, m.flush());
-    expect(tgt.get("k")).toBe(9);
+    expect(Array.from(tgt.entries())).toEqual([["k", 1]]);
   });
 
   it("clear produces patch that removes all entries", () => {
@@ -284,11 +285,11 @@ describe("TrackedSet", () => {
     expect(target.has(1)).toBe(false);
   });
 
-  it("initial values do not emit a patch", () => {
+  it("initial state will be emitted as patch", () => {
     const s = new TrackedSet<number>([1, 2, 3]);
     const tgt = new Set<number>([9]);
     applyPatch(tgt, s.flush());
-    expect(Array.from(tgt)).toEqual([9]);
+    expect(Array.from(tgt)).toEqual([1, 2, 3]);
   });
 
   it("adding duplicate still replaces full set", () => {
@@ -307,12 +308,12 @@ describe("TrackedSet", () => {
     expect(new Set(tgt)).toEqual(new Set(["x"]));
   });
 
-  it("inherited clear does not track", () => {
+  it("clear produces a patch", () => {
     const s = new TrackedSet<number>([4, 5]);
     s.clear();
     const tgt = new Set<number>([100]);
     applyPatch(tgt, s.flush());
-    expect(new Set(tgt)).toEqual(new Set([100]));
+    expect(new Set(tgt)).toEqual(new Set([]));
   });
 
   it("flush twice: only first replace applies", () => {

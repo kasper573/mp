@@ -41,11 +41,17 @@ export function defineTrackedObject<T extends object>(
 
 class TrackedObjectImpl implements Tracker {
   protected changes?: ObjectAssignOperation["changes"];
+  protected values: Record<string, unknown> = {};
 
   constructor(
     private trackedProperties: PropertyKey[],
-    protected values: Record<string, unknown>,
-  ) {}
+    protected initial: Record<string, unknown>,
+  ) {
+    // Assign initial values to property setters to trigger tracking behavior
+    for (const key in initial) {
+      this[key as keyof typeof this] = initial[key] as never;
+    }
+  }
 
   flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
     if (this.changes) {

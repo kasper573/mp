@@ -22,7 +22,7 @@ export class TrackedMap<K extends PathSegment, V>
     this.#deleteKeys = new Set();
     if (entries) {
       for (const [k, v] of entries) {
-        super.set(k, v);
+        this.set(k, v);
       }
     }
   }

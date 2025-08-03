@@ -15,7 +15,7 @@ export class TrackedSet<V> extends Set<V> implements Tracker {
     this.#dirty = false;
     if (values) {
       for (const v of values) {
-        super.add(v);
+        this.add(v);
       }
     }
   }
@@ -28,6 +28,13 @@ export class TrackedSet<V> extends Set<V> implements Tracker {
   override delete(value: V): boolean {
     this.#dirty = true;
     return super.delete(value);
+  }
+
+  override clear(): void {
+    if (this.size) {
+      this.#dirty = true;
+      super.clear();
+    }
   }
 
   flush(path: Path = emptyPath, outPatch: Patch = []): Patch {
