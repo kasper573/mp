@@ -1,104 +1,212 @@
-import { beforeEach, expect, it } from "vitest";
+import { int16, object, string } from "@mp/encoding/schema";
+import { beforeEach, describe, expect, it } from "vitest";
+import type { SyncSchema } from "../src";
 import { SyncSystem } from "../src";
 
-let systemA: SyncSystem;
-let systemB: SyncSystem;
+describe("can flush and patch", () => {
+  // oxlint-disable-next-line consistent-type-definitions
+  type State = {
+    users: {
+      name: string;
+      cash: number;
+    };
+  };
 
-beforeEach(() => {
-  systemA = new SyncSystem();
-  systemB = new SyncSystem();
+  const schemas: SyncSchema<State> = {
+    users: object(1, {
+      name: string(),
+      cash: int16(),
+    }),
+  };
+
+  let systemA: SyncSystem<State>;
+  let systemB: SyncSystem<State>;
+  let user: typeof systemA.controls.users.create;
+
+  beforeEach(() => {
+    systemA = new SyncSystem(schemas);
+    systemB = new SyncSystem(schemas);
+    user = systemA.controls.users.create;
+  });
+
+  it("can create entity instances", () => {
+    const instance = user({ name: "John", cash: 100 });
+    expect(instance).toEqual({
+      name: "John",
+      cash: 100,
+    });
+  });
+
+  describe("map", () => {
+    it("set", () => {
+      // Assert that map set work in local system
+      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      expect(systemA.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
+
+      // Assert that flush and update works across systems
+      const patch = systemA.flush();
+      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.update(patch);
+      expect(systemB.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
+    });
+
+    it("delete", () => {
+      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+
+      // Omit patch and manually update systemB to align with systemA before the deletes
+      systemA.flush();
+      systemB.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.controls.users.set("3", user({ name: "3", cash: 3 }));
+
+      // Now delete the entity and flush to send a delete patch
+      systemA.controls.users.delete("2");
+      const patch = systemA.flush();
+      systemB.update(patch);
+
+      expect(systemB.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
+      expect(systemB.controls.users.get("2")).toBeUndefined();
+      expect(systemB.controls.users.get("3")).toEqual({ name: "3", cash: 3 });
+    });
+
+    it("clear", () => {
+      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+
+      // Omit patch and manually update systemB to align with systemA before the clear
+      systemA.flush();
+      systemB.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.controls.users.set("3", user({ name: "3", cash: 3 }));
+
+      // Now clear the map and flush to send a clear patch
+      systemA.controls.users.clear();
+      const patch = systemA.flush();
+      systemB.update(patch);
+      expect(systemB.controls.users.size).toBe(0);
+    });
+
+    it("flushing one entity produces a smaller patch than flushing two entities", () => {
+      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
+
+      const patch1 = systemA.flush();
+
+      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+      const patch2 = systemA.flush();
+
+      expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
+    });
+  });
+
+  describe("component", () => {
+    it("changes before adding to map", () => {
+      const instance = user({ name: "John", cash: 100 });
+      instance.name = "Jane";
+      instance.cash = 200;
+
+      systemA.controls.users.set("1", instance);
+      const patch = systemA.flush();
+      systemB.update(patch);
+      expect(systemB.controls.users.get("1")).toEqual({
+        name: "Jane",
+        cash: 200,
+      });
+    });
+
+    it("changes after adding to map", () => {
+      const instance = user({ name: "John", cash: 100 });
+      systemA.controls.users.set("1", instance);
+      instance.name = "Jane";
+      instance.cash = 200;
+
+      const patch = systemA.flush();
+      systemB.update(patch);
+      expect(systemB.controls.users.get("1")).toEqual({
+        name: "Jane",
+        cash: 200,
+      });
+    });
+
+    it("changing one component produces a smaller flush than changing two components", () => {
+      const instance = user({ name: "John", cash: 100 });
+      systemA.controls.users.set("1", instance);
+      instance.name = "Jane";
+      const patch1 = systemA.flush();
+
+      instance.cash = 200;
+      instance.name = "Foobar";
+      const patch2 = systemA.flush();
+
+      expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
+    });
+  });
 });
 
-it("initially has no entities or components", () => {
-  expect([...systemA.entities]).toEqual([]);
-  expect([...systemA.components]).toEqual([]);
-});
+describe("deeply nested state", () => {
+  interface Movement {
+    x: number;
+    y: number;
+    speed: number;
+  }
 
-it("set adds component to entity and stores component value", () => {
-  const value = { foo: "bar" };
-  systemA.set("entity1", "component1", value);
-  expect([...systemA.entities]).toEqual([["entity1", new Set(["component1"])]]);
-  expect(systemA.components.get("component1")).toBe(value);
-});
+  // oxlint-disable-next-line consistent-type-definitions
+  type State = {
+    users: {
+      name: string;
+      cash: number;
+      movement: Movement;
+    };
+  };
 
-it("set on same component updates value and does not duplicate entity mapping", () => {
-  systemA.set("e1", "c1", 1);
-  systemA.set("e1", "c1", 2);
-  expect([...systemA.entities]).toEqual([["e1", new Set(["c1"])]]);
-  expect(systemA.components.get("c1")).toBe(2);
-});
+  const schemas: SyncSchema<State> = {
+    users: object(1, {
+      name: string(),
+      cash: int16(),
+      movement: object(2, {
+        x: int16(),
+        y: int16(),
+        speed: int16(),
+      }),
+    }),
+  };
 
-it("delete removes entity and its components", () => {
-  systemA.set("e1", "c1", 1);
-  systemA.set("e1", "c2", 2);
-  systemA.set("e2", "c3", 3);
-  systemA.delete("e1");
+  let systemA: SyncSystem<State>;
+  let systemB: SyncSystem<State>;
+  let user: typeof systemA.controls.users.create;
 
-  expect(systemA.entities.has("e1")).toBe(false);
-  expect(systemA.components.has("c1")).toBe(false);
-  expect(systemA.components.has("c2")).toBe(false);
+  beforeEach(() => {
+    systemA = new SyncSystem(schemas);
+    systemB = new SyncSystem(schemas);
+    user = systemA.controls.users.create;
+  });
 
-  // Other entities/components remain unaffected
-  expect(systemA.entities.has("e2")).toBe(true);
-  expect(systemA.components.get("c3")).toBe(3);
-});
+  it("can flush and patch", () => {
+    const instance = user({
+      name: "John",
+      cash: 100,
+      movement: { x: 10, y: 20, speed: 30 },
+    });
+    systemA.controls.users.set("1", instance);
 
-it("delete non-existent entity is no-op", () => {
-  expect(() => systemA.delete("nope")).not.toThrow();
-  expect([...systemA.entities]).toEqual([]);
-  expect([...systemA.components]).toEqual([]);
-});
+    systemB.update(systemA.flush());
 
-it("flush and applyPatch replicates state to another system", () => {
-  systemA.set("e1", "c1", 1);
-  systemA.set("e2", "c2", { a: 2 });
+    if (!instance.movement) {
+      throw new Error("Expected movement to be defined");
+    }
 
-  const patch = systemA.flush();
+    instance.movement.x = 20;
+    instance.movement.y = 30;
+    instance.movement.speed = 40;
+    systemB.update(systemA.flush());
 
-  // Original remains correct
-  expect([...systemA.entities]).toHaveLength(2);
-  expect([...systemA.components]).toHaveLength(2);
-
-  // Apply to fresh system
-  systemB.applyPatch(patch);
-  expect([...systemB.entities]).toEqual([...systemA.entities]);
-  expect([...systemB.components]).toEqual([...systemA.components]);
-});
-
-it("flush resets patches so subsequent flush is empty", () => {
-  systemA.set("e1", "c1", 1);
-  const patch1 = systemA.flush();
-  systemB.applyPatch(patch1);
-
-  // No new changes
-  const patch2 = systemA.flush();
-  const before = [...systemB.entities];
-
-  systemB.applyPatch(patch2);
-  expect([...systemB.entities]).toEqual(before);
-});
-
-it("applyPatch is idempotent when applied multiple times", () => {
-  systemA.set("e", "c", true);
-  const patch = systemA.flush();
-
-  systemB.applyPatch(patch);
-  systemB.applyPatch(patch);
-
-  expect([...systemB.entities]).toEqual([...systemA.entities]);
-  expect([...systemB.components]).toEqual([...systemA.components]);
-});
-
-it("supports arbitrary value types including null and undefined", () => {
-  systemA.set("e", "cNull", null);
-  systemA.set("e", "cUndef", undefined);
-
-  expect(systemA.components.get("cNull")).toBeNull();
-  expect(systemA.components.get("cUndef")).toBeUndefined();
-
-  const patch = systemA.flush();
-  systemB.applyPatch(patch);
-
-  expect(systemB.components.get("cNull")).toBeNull();
-  expect(systemB.components.get("cUndef")).toBeUndefined();
+    expect(systemB.controls.users.get("1")).toEqual({
+      name: "John",
+      cash: 100,
+      movement: { x: 20, y: 30, speed: 40 },
+    });
+  });
 });

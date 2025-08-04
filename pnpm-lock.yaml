@@ -491,6 +491,9 @@ importers:
 
   integrations/experiment:
     dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../../libraries/encoding
       '@mp/math':
         specifier: workspace:*
         version: link:../../libraries/math

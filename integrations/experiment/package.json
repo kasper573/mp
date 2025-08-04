@@ -6,6 +6,7 @@
   "license": "MIT",
   "dependencies": {
     "@mp/state": "workspace:*",
+    "@mp/encoding": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/math": "workspace:*"
   },
