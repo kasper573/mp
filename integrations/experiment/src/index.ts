@@ -1,1 +1,1 @@
-export * from "./ecs";
+export * from "./sync-system";
