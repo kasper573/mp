@@ -47,7 +47,9 @@ describe("can flush and patch", () => {
       const patch = systemA.flush();
       systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
       systemB.update(patch);
+      expect(systemB.controls.users.size).toBe(2);
       expect(systemB.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
+      expect(systemB.controls.users.get("2")).toEqual({ name: "2", cash: 2 });
     });
 
     it("delete", () => {
@@ -100,6 +102,13 @@ describe("can flush and patch", () => {
 
       expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
     });
+
+    it("double flush always yields empty patch", () => {
+      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.flush();
+      const patch = systemA.flush();
+      expect(patch.length).toBe(0);
+    });
   });
 
   describe("component", () => {
@@ -142,6 +151,18 @@ describe("can flush and patch", () => {
       const patch2 = systemA.flush();
 
       expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
+    });
+
+    it("double flush always yields empty patch", () => {
+      const instance = user({ name: "John", cash: 100 });
+      instance.name = "Jane";
+      instance.cash = 200;
+
+      systemA.controls.users.set("1", instance);
+      systemA.flush();
+      const patch = systemA.flush();
+
+      expect(patch.length).toBe(0);
     });
   });
 });
@@ -192,21 +213,36 @@ describe("deeply nested state", () => {
     });
     systemA.controls.users.set("1", instance);
 
-    systemB.update(systemA.flush());
-
-    if (!instance.movement) {
-      throw new Error("Expected movement to be defined");
-    }
+    let patch = systemA.flush();
+    systemB.update(patch);
 
     instance.movement.x = 20;
     instance.movement.y = 30;
     instance.movement.speed = 40;
-    systemB.update(systemA.flush());
+    patch = systemA.flush();
+    systemB.update(patch);
 
     expect(systemB.controls.users.get("1")).toEqual({
       name: "John",
       cash: 100,
       movement: { x: 20, y: 30, speed: 40 },
     });
+  });
+
+  it("double flush always yields empty patch", () => {
+    const instance = user({
+      name: "John",
+      cash: 100,
+      movement: { x: 10, y: 20, speed: 30 },
+    });
+    systemA.controls.users.set("1", instance);
+    instance.movement.x = 20;
+    instance.movement.y = 30;
+    instance.movement.speed = 40;
+
+    systemA.flush();
+    const patch = systemA.flush();
+
+    expect(patch.length).toBe(0);
   });
 });
