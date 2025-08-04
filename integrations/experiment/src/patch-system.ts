@@ -24,11 +24,11 @@ export class PatchSystem<State> {
       if (addedIds.size > 0) {
         patch.push({
           entityName,
-          changes: map.selectFlatSlice(addedIds),
+          changes: map.selectFlat(addedIds),
         });
       }
 
-      if (removedIds.size > 0) {
+      if (removedIds.size) {
         patch.push({
           entityName,
           removedIds,
@@ -51,7 +51,7 @@ export class PatchSystem<State> {
         });
       }
 
-      this.#entityIdsLastFlush.set(entityName, staleIds);
+      this.#entityIdsLastFlush.set(entityName, currentIds);
     }
     return patch;
   }
@@ -71,7 +71,12 @@ export class PatchSystem<State> {
     }
     if (op.changes) {
       for (const entityId in op.changes) {
-        map.get(entityId)?.$apply(op.changes[entityId]);
+        const existing = map.get(entityId);
+        if (existing) {
+          existing.$apply(op.changes[entityId]);
+        } else {
+          map.set(entityId, map.createFromFlat(op.changes[entityId]));
+        }
       }
     }
   }

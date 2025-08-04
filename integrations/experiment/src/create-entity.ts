@@ -1,12 +1,24 @@
 import { Signal } from "@mp/state";
 import type { Graph } from "./type-graph";
 
-export function createEntity<T>(graph: Graph, data: T): SyncEntity<T> {
+export function createEntity<T>(
+  graph: Graph,
+  initialData: { nested: T } | { flat: FlatEntity },
+): SyncEntity<T> {
   const signals: ComponentSignals = {};
   const dirty = new Set<ComponentId>();
-  const entity = defineProperties(graph, data, "", {
-    init(path, value) {
-      (signals as Record<ComponentId, Signal>)[path] = new Signal(value);
+
+  if ("flat" in initialData) {
+    for (const key in initialData.flat) {
+      signals[key] = new Signal(initialData.flat[key]);
+      dirty.add(key);
+    }
+  }
+
+  const nestedData = "nested" in initialData ? initialData.nested : undefined;
+  const entity = defineProperties(graph, nestedData, "", {
+    init(path, resolvedValue) {
+      signals[path] ??= new Signal(resolvedValue);
       dirty.add(path);
     },
     get(path) {
@@ -57,7 +69,7 @@ export function createEntity<T>(graph: Graph, data: T): SyncEntity<T> {
   return entity as SyncEntity<T>;
 }
 
-export type ComponentSignals = Readonly<Record<ComponentId, Signal>>;
+export type ComponentSignals = Record<ComponentId, Signal>;
 
 export type ComponentId = string | number;
 
@@ -85,7 +97,7 @@ export type FlatEntity = Record<ComponentId, unknown>;
 
 function defineProperties<T>(
   graph: Graph,
-  data: T,
+  data: T | undefined,
   prefix: string,
   ops: {
     init: (path: string, value: unknown) => void;

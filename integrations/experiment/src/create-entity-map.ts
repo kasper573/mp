@@ -9,8 +9,9 @@ export function createEntityMap<Entity>(
 ): SyncEntityMap<Entity> {
   const graph = objectSchemaToTypeGraph(schema);
   const entityMap = new SignalMap() as SyncEntityMap<Entity>;
-  entityMap.create = (data) => createEntity(graph, data) as SyncEntity<Entity>;
-  entityMap.selectFlatSlice = (ids) => {
+  entityMap.create = (nested) => createEntity(graph, { nested });
+  entityMap.createFromFlat = (flat) => createEntity(graph, { flat });
+  entityMap.selectFlat = (ids) => {
     const slice: FlatEntityRecord = {};
     for (const entityId of ids) {
       const entity = entityMap.get(entityId);
@@ -29,7 +30,8 @@ export type SyncEntityMapRecord<State> = {
 
 export type SyncEntityMap<Entity> = SignalMap<EntityId, SyncEntity<Entity>> & {
   create: (data: Entity) => SyncEntity<Entity>;
-  selectFlatSlice(ids: Iterable<EntityId>): FlatEntityRecord;
+  createFromFlat: (flat: FlatEntity) => SyncEntity<Entity>;
+  selectFlat(ids: Iterable<EntityId>): FlatEntityRecord;
 };
 
 export type FlatEntityRecord = Record<EntityId, FlatEntity>;
