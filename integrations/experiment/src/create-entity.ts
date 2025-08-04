@@ -33,15 +33,14 @@ export function createEntity<T>(
   Object.defineProperties(entity, {
     $flush: {
       value() {
-        if (!dirty.size) {
-          return;
+        if (dirty.size) {
+          const flat: FlatEntity = {};
+          for (const key in dirty) {
+            flat[key] = signals[key].value;
+          }
+          dirty.clear();
+          return flat;
         }
-        const flat: FlatEntity = {};
-        for (const key in dirty) {
-          flat[key] = signals[key].value;
-        }
-        dirty.clear();
-        return flat;
       },
     },
     $flat: {

@@ -107,7 +107,7 @@ describe("can flush and patch", () => {
       systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
       systemA.flush();
       const patch = systemA.flush();
-      expect(patch.length).toBe(0);
+      expect(patch).toBeUndefined();
     });
   });
 
@@ -162,7 +162,7 @@ describe("can flush and patch", () => {
       systemA.flush();
       const patch = systemA.flush();
 
-      expect(patch.length).toBe(0);
+      expect(patch).toBeUndefined();
     });
   });
 });
@@ -243,6 +243,6 @@ describe("deeply nested state", () => {
     systemA.flush();
     const patch = systemA.flush();
 
-    expect(patch.length).toBe(0);
+    expect(patch).toBeUndefined();
   });
 });
