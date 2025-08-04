@@ -35,7 +35,7 @@ export function createEntity<T>(
       value() {
         if (dirty.size) {
           const flat: FlatEntity = {};
-          for (const key in dirty) {
+          for (const key of dirty) {
             flat[key] = signals[key].value;
           }
           dirty.clear();
