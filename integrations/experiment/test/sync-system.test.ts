@@ -21,12 +21,12 @@ describe("can flush and patch", () => {
 
   let systemA: SyncSystem<State>;
   let systemB: SyncSystem<State>;
-  let user: typeof systemA.controls.users.create;
+  let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
     systemA = new SyncSystem(schemas);
     systemB = new SyncSystem(schemas);
-    user = systemA.controls.users.create;
+    user = systemA.entities.users.create;
   });
 
   it("can create entity instances", () => {
@@ -40,71 +40,71 @@ describe("can flush and patch", () => {
   describe("map", () => {
     it("set", () => {
       // Assert that map set work in local system
-      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
-      expect(systemA.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
+      systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
+      expect(systemA.entities.users.get("1")).toEqual({ name: "1", cash: 1 });
 
       // Assert that flush and update works across systems
       const patch = systemA.flush();
-      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.entities.users.set("2", user({ name: "2", cash: 2 }));
       systemB.update(patch);
-      expect(systemB.controls.users.size).toBe(2);
-      expect(systemB.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
-      expect(systemB.controls.users.get("2")).toEqual({ name: "2", cash: 2 });
+      expect(systemB.entities.users.size).toBe(2);
+      expect(systemB.entities.users.get("1")).toEqual({ name: "1", cash: 1 });
+      expect(systemB.entities.users.get("2")).toEqual({ name: "2", cash: 2 });
     });
 
     it("delete", () => {
-      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
-      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
-      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+      systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.entities.users.set("2", user({ name: "2", cash: 2 }));
+      systemA.entities.users.set("3", user({ name: "3", cash: 3 }));
 
       // Omit patch and manually update systemB to align with systemA before the deletes
       systemA.flush();
-      systemB.controls.users.set("1", user({ name: "1", cash: 1 }));
-      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
-      systemB.controls.users.set("3", user({ name: "3", cash: 3 }));
+      systemB.entities.users.set("1", user({ name: "1", cash: 1 }));
+      systemB.entities.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.entities.users.set("3", user({ name: "3", cash: 3 }));
 
       // Now delete the entity and flush to send a delete patch
-      systemA.controls.users.delete("2");
+      systemA.entities.users.delete("2");
       const patch = systemA.flush();
       systemB.update(patch);
 
-      expect(systemB.controls.users.get("1")).toEqual({ name: "1", cash: 1 });
-      expect(systemB.controls.users.get("2")).toBeUndefined();
-      expect(systemB.controls.users.get("3")).toEqual({ name: "3", cash: 3 });
+      expect(systemB.entities.users.get("1")).toEqual({ name: "1", cash: 1 });
+      expect(systemB.entities.users.get("2")).toBeUndefined();
+      expect(systemB.entities.users.get("3")).toEqual({ name: "3", cash: 3 });
     });
 
     it("clear", () => {
-      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
-      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
-      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+      systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.entities.users.set("2", user({ name: "2", cash: 2 }));
+      systemA.entities.users.set("3", user({ name: "3", cash: 3 }));
 
       // Omit patch and manually update systemB to align with systemA before the clear
       systemA.flush();
-      systemB.controls.users.set("1", user({ name: "1", cash: 1 }));
-      systemB.controls.users.set("2", user({ name: "2", cash: 2 }));
-      systemB.controls.users.set("3", user({ name: "3", cash: 3 }));
+      systemB.entities.users.set("1", user({ name: "1", cash: 1 }));
+      systemB.entities.users.set("2", user({ name: "2", cash: 2 }));
+      systemB.entities.users.set("3", user({ name: "3", cash: 3 }));
 
       // Now clear the map and flush to send a clear patch
-      systemA.controls.users.clear();
+      systemA.entities.users.clear();
       const patch = systemA.flush();
       systemB.update(patch);
-      expect(systemB.controls.users.size).toBe(0);
+      expect(systemB.entities.users.size).toBe(0);
     });
 
     it("flushing one entity produces a smaller patch than flushing two entities", () => {
-      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
-      systemA.controls.users.set("2", user({ name: "2", cash: 2 }));
+      systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.entities.users.set("2", user({ name: "2", cash: 2 }));
 
       const patch1 = systemA.flush();
 
-      systemA.controls.users.set("3", user({ name: "3", cash: 3 }));
+      systemA.entities.users.set("3", user({ name: "3", cash: 3 }));
       const patch2 = systemA.flush();
 
       expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
     });
 
     it("double flush always yields empty patch", () => {
-      systemA.controls.users.set("1", user({ name: "1", cash: 1 }));
+      systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
       systemA.flush();
       const patch = systemA.flush();
       expect(patch).toHaveLength(0);
@@ -117,10 +117,10 @@ describe("can flush and patch", () => {
       instance.name = "Jane";
       instance.cash = 200;
 
-      systemA.controls.users.set("1", instance);
+      systemA.entities.users.set("1", instance);
       const patch = systemA.flush();
       systemB.update(patch);
-      expect(systemB.controls.users.get("1")).toEqual({
+      expect(systemB.entities.users.get("1")).toEqual({
         name: "Jane",
         cash: 200,
       });
@@ -128,13 +128,13 @@ describe("can flush and patch", () => {
 
     it("changes after adding to map", () => {
       const instance = user({ name: "John", cash: 100 });
-      systemA.controls.users.set("1", instance);
+      systemA.entities.users.set("1", instance);
       instance.name = "Jane";
       instance.cash = 200;
 
       const patch = systemA.flush();
       systemB.update(patch);
-      expect(systemB.controls.users.get("1")).toEqual({
+      expect(systemB.entities.users.get("1")).toEqual({
         name: "Jane",
         cash: 200,
       });
@@ -142,7 +142,7 @@ describe("can flush and patch", () => {
 
     it("changing one component produces a smaller flush than changing two components", () => {
       const instance = user({ name: "John", cash: 100 });
-      systemA.controls.users.set("1", instance);
+      systemA.entities.users.set("1", instance);
       instance.name = "Jane";
       const patch1 = systemA.flush();
 
@@ -158,7 +158,7 @@ describe("can flush and patch", () => {
       instance.name = "Jane";
       instance.cash = 200;
 
-      systemA.controls.users.set("1", instance);
+      systemA.entities.users.set("1", instance);
       systemA.flush();
       const patch = systemA.flush();
 
@@ -197,12 +197,12 @@ describe("deeply nested state", () => {
 
   let systemA: SyncSystem<State>;
   let systemB: SyncSystem<State>;
-  let user: typeof systemA.controls.users.create;
+  let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
     systemA = new SyncSystem(schemas);
     systemB = new SyncSystem(schemas);
-    user = systemA.controls.users.create;
+    user = systemA.entities.users.create;
   });
 
   it("can flush and patch", () => {
@@ -211,7 +211,7 @@ describe("deeply nested state", () => {
       cash: 100,
       movement: { x: 10, y: 20, speed: 30 },
     });
-    systemA.controls.users.set("1", instance);
+    systemA.entities.users.set("1", instance);
 
     let patch = systemA.flush();
     systemB.update(patch);
@@ -222,7 +222,7 @@ describe("deeply nested state", () => {
     patch = systemA.flush();
     systemB.update(patch);
 
-    expect(systemB.controls.users.get("1")).toEqual({
+    expect(systemB.entities.users.get("1")).toEqual({
       name: "John",
       cash: 100,
       movement: { x: 20, y: 30, speed: 40 },
@@ -235,7 +235,7 @@ describe("deeply nested state", () => {
       cash: 100,
       movement: { x: 10, y: 20, speed: 30 },
     });
-    systemA.controls.users.set("1", instance);
+    systemA.entities.users.set("1", instance);
     instance.movement.x = 20;
     instance.movement.y = 30;
     instance.movement.speed = 40;

@@ -5,14 +5,14 @@ import type { Patch } from "./patch-system";
 import { PatchSystem } from "./patch-system";
 
 export class SyncSystem<State> {
-  readonly controls = {} as SyncEntityMapRecord<State>;
+  readonly entities = {} as SyncEntityMapRecord<State>;
   #patchSystem: PatchSystem<State>;
 
   constructor(private entitySchemas: SyncSchema<State>) {
     for (const entityName in entitySchemas) {
-      this.controls[entityName] = createEntityMap(entitySchemas[entityName]);
+      this.entities[entityName] = createEntityMap(entitySchemas[entityName]);
     }
-    this.#patchSystem = new PatchSystem(this.controls);
+    this.#patchSystem = new PatchSystem(this.entities);
   }
 
   flush(): Patch {
