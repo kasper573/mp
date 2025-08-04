@@ -26,6 +26,12 @@ export class PatchSystem<State> {
           entityName,
           changes: map.selectFlat(addedIds),
         });
+
+        // Ensure the added entities have their dirty state flushed
+        // since we're producing an add patch which already contains all their data.
+        for (const entityId of addedIds) {
+          map.get(entityId)?.$flush();
+        }
       }
 
       if (removedIds.size) {
