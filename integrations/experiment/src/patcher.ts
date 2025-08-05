@@ -4,7 +4,7 @@ import type {
   SyncEntityMapRecord,
 } from "./create-entity-map";
 
-export class PatchSystem<State> {
+export class Patcher<State> {
   #entityIdsLastFlush = new Map<keyof State, ReadonlySet<EntityId>>();
 
   constructor(private entities: SyncEntityMapRecord<State>) {}

@@ -8,7 +8,8 @@
     "@mp/state": "workspace:*",
     "@mp/encoding": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/math": "workspace:*"
+    "@mp/math": "workspace:*",
+    "superjson": "2.2.2"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

@@ -1,16 +1,12 @@
-import type { ObjectSchema } from "@mp/encoding/schema";
 import { SignalMap } from "@mp/state";
 import type { FlatEntity, SyncEntity } from "./create-entity";
 import { createEntity } from "./create-entity";
-import { objectSchemaToTypeGraph } from "./type-graph";
+import type { Shape } from "./schema-analysis";
 
-export function createEntityMap<Entity>(
-  schema: ObjectSchema<Entity>,
-): SyncEntityMap<Entity> {
-  const graph = objectSchemaToTypeGraph(schema);
+export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
   const entityMap = new SignalMap() as SyncEntityMap<Entity>;
-  entityMap.create = (nested) => createEntity(graph, { nested });
-  entityMap.createFromFlat = (flat) => createEntity(graph, { flat });
+  entityMap.create = (nested) => createEntity(shape, { nested });
+  entityMap.createFromFlat = (flat) => createEntity(shape, { flat });
   entityMap.selectFlat = (ids) => {
     const slice: FlatEntityRecord = {};
     for (const entityId of ids) {
@@ -36,4 +32,4 @@ export type SyncEntityMap<Entity> = SignalMap<EntityId, SyncEntity<Entity>> & {
 
 export type FlatEntityRecord = Record<EntityId, FlatEntity>;
 
-export type EntityId = string | number;
+export type EntityId = string;

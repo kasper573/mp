@@ -1,7 +1,7 @@
 import { int16, object, string } from "@mp/encoding/schema";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SyncSchema } from "../src";
 import { SyncSystem } from "../src";
+import type { SyncSchema } from "../src/patch-encoding";
 
 describe("can flush and patch", () => {
   // oxlint-disable-next-line consistent-type-definitions
@@ -100,14 +100,14 @@ describe("can flush and patch", () => {
       systemA.entities.users.set("3", user({ name: "3", cash: 3 }));
       const patch2 = systemA.flush();
 
-      expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
+      expect(patch2!.byteLength).toBeLessThan(patch1!.byteLength);
     });
 
     it("double flush always yields empty patch", () => {
       systemA.entities.users.set("1", user({ name: "1", cash: 1 }));
       systemA.flush();
       const patch = systemA.flush();
-      expect(patch).toHaveLength(0);
+      expect(patch).toBeUndefined();
     });
   });
 
@@ -150,7 +150,7 @@ describe("can flush and patch", () => {
       instance.name = "Foobar";
       const patch2 = systemA.flush();
 
-      expect(patch1.byteLength).toBeLessThan(patch2.byteLength);
+      expect(patch1!.byteLength).toBeLessThan(patch2!.byteLength);
     });
 
     it("double flush always yields empty patch", () => {
@@ -162,7 +162,7 @@ describe("can flush and patch", () => {
       systemA.flush();
       const patch = systemA.flush();
 
-      expect(patch).toHaveLength(0);
+      expect(patch).toBeUndefined();
     });
   });
 });
@@ -243,6 +243,6 @@ describe("deeply nested state", () => {
     systemA.flush();
     const patch = systemA.flush();
 
-    expect(patch).toHaveLength(0);
+    expect(patch).toBeUndefined();
   });
 });

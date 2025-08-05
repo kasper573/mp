@@ -1,8 +1,8 @@
 import { Signal } from "@mp/state";
-import type { Graph } from "./type-graph";
+import type { Shape } from "./schema-analysis";
 
 export function createEntity<T>(
-  graph: Graph,
+  shape: Shape,
   initialData: { nested: T } | { flat: FlatEntity },
 ): SyncEntity<T> {
   const signals: ComponentSignals = {};
@@ -16,7 +16,7 @@ export function createEntity<T>(
   }
 
   const nestedData = "nested" in initialData ? initialData.nested : undefined;
-  const entity = defineProperties(graph, nestedData, "", {
+  const entity = defineProperties(shape, nestedData, "", {
     init(path, resolvedValue) {
       signals[path] ??= new Signal(resolvedValue);
       dirty.add(path);
@@ -95,7 +95,7 @@ export type SyncEntity<T> = T & SyncEntityInternals;
 export type FlatEntity = Record<ComponentId, unknown>;
 
 function defineProperties<T>(
-  graph: Graph,
+  shape: Shape,
   data: T | undefined,
   prefix: string,
   ops: {
@@ -106,8 +106,8 @@ function defineProperties<T>(
 ): object {
   const instance: object = {};
 
-  for (const key in graph) {
-    const node = graph[key];
+  for (const key in shape) {
+    const node = shape[key];
     const value = data?.[key as keyof T];
     const path = `${prefix}${String(key)}`;
     if (node) {
