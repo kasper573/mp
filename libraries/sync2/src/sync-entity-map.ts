@@ -1,12 +1,14 @@
 import { SignalMap } from "@mp/state";
-import type { FlatEntity, SyncEntity } from "./create-entity";
-import { createEntity } from "./create-entity";
-import type { Shape, ShapesFor } from "./shape";
+import type { SyncSchema, SyncSchemaFor } from "./schema";
+import type { FlatEntity, SyncEntity } from "./sync-entity";
+import { createEntity } from "./sync-entity";
 
-export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
+export function createEntityMap<Entity>(
+  schema: SyncSchema,
+): SyncEntityMap<Entity> {
   const entityMap = new SignalMap() as SyncEntityMap<Entity>;
-  entityMap.create = (nested) => createEntity(shape, { nested });
-  entityMap.createFromFlat = (flat) => createEntity(shape, { flat });
+  entityMap.create = (nested) => createEntity(schema, { nested });
+  entityMap.createFromFlat = (flat) => createEntity(schema, { flat });
   entityMap.selectFlat = (ids) => {
     const slice: FlatEntityRecord = {};
     for (const entityId of ids) {
@@ -21,17 +23,17 @@ export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
 }
 
 export function createEntityMapRecord<State>(
-  shapes: ShapesFor<State>,
-): SyncEntityMapRecord<State> {
-  const record = {} as SyncEntityMapRecord<State>;
-  for (const entityName in shapes) {
-    record[entityName] = createEntityMap(shapes[entityName] as Shape);
+  schema: SyncSchemaFor<State>,
+): SyncEntities<State> {
+  const record = {} as SyncEntities<State>;
+  for (const entityName in schema) {
+    record[entityName] = createEntityMap(schema[entityName] as SyncSchema);
   }
   return record;
 }
 
-export type SyncEntityMapRecord<State> = {
-  [Entity in keyof State]: SyncEntityMap<State[Entity]>;
+export type SyncEntities<State> = {
+  [EntityName in keyof State]: SyncEntityMap<State[EntityName]>;
 };
 
 export type SyncEntityMap<Entity> = SignalMap<EntityId, SyncEntity<Entity>> & {

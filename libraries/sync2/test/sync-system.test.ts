@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import type { SyncSchemaFor } from "../src";
 import { SyncSystem } from "../src";
-import type { ShapesFor } from "../src/shape";
 
 describe("can flush and patch", () => {
   // oxlint-disable-next-line consistent-type-definitions
@@ -11,7 +11,7 @@ describe("can flush and patch", () => {
     };
   };
 
-  const shapes: ShapesFor<State> = {
+  const schema: SyncSchemaFor<State> = {
     users: {
       name: null,
       cash: null,
@@ -23,8 +23,8 @@ describe("can flush and patch", () => {
   let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
-    systemA = new SyncSystem(shapes);
-    systemB = new SyncSystem(shapes);
+    systemA = new SyncSystem(schema);
+    systemB = new SyncSystem(schema);
     user = systemA.entities.users.create;
   });
 
@@ -182,7 +182,7 @@ describe("deeply nested state", () => {
     };
   };
 
-  const shapes: ShapesFor<State> = {
+  const schema: SyncSchemaFor<State> = {
     users: {
       name: null,
       cash: null,
@@ -199,8 +199,8 @@ describe("deeply nested state", () => {
   let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
-    systemA = new SyncSystem(shapes);
-    systemB = new SyncSystem(shapes);
+    systemA = new SyncSystem(schema);
+    systemB = new SyncSystem(schema);
     user = systemA.entities.users.create;
   });
 

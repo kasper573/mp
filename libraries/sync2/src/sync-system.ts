@@ -1,17 +1,32 @@
+import type { SyncSchemaFor } from "./schema";
 import type {
   EntityId,
   FlatEntityRecord,
-  SyncEntityMapRecord,
-} from "./create-entity-map";
-import { createEntityMapRecord } from "./create-entity-map";
-import type { ShapesFor } from "./shape";
+  SyncEntities,
+} from "./sync-entity-map";
+import { createEntityMapRecord } from "./sync-entity-map";
 
 export class SyncSystem<State> {
-  readonly entities: SyncEntityMapRecord<State>;
+  readonly entities: SyncEntities<State>;
   #entityIdsLastFlush = new Map<keyof State, ReadonlySet<EntityId>>();
 
-  constructor(entityShapes: ShapesFor<State>) {
-    this.entities = createEntityMapRecord<State>(entityShapes);
+  constructor(
+    schema: SyncSchemaFor<State>,
+    initialState?: {
+      [EntityName in keyof State]?: Iterable<[EntityId, State[EntityName]]>;
+    },
+  ) {
+    this.entities = createEntityMapRecord<State>(schema);
+
+    if (initialState) {
+      for (const entityName in initialState) {
+        const map = this.entities[entityName];
+        // oxlint-disable-next-line no-non-null-assertion
+        for (const [entityId, entityData] of initialState[entityName]!) {
+          map.set(entityId, map.create(entityData));
+        }
+      }
+    }
   }
 
   flush(): Patch {
@@ -26,24 +41,12 @@ export class SyncSystem<State> {
       const removedIds = lastIds.difference(currentIds);
       const staleIds = currentIds.intersection(lastIds);
 
-      if (addedIds.size > 0) {
-        patch.push({
-          entityName,
-          changes: map.selectFlat(addedIds),
-        });
-
-        // Ensure the added entities have their dirty state flushed
-        // since we're producing an add patch which already contains all their data.
-        for (const entityId of addedIds) {
-          map.get(entityId)?.$flush();
-        }
+      if (addedIds.size) {
+        this.emulateAddPatches(entityName, addedIds, patch);
       }
 
       if (removedIds.size) {
-        patch.push({
-          entityName,
-          removedIds,
-        });
+        patch.push({ entityName, removedIds });
       }
 
       let changesPerEntity: FlatEntityRecord | undefined;
@@ -65,6 +68,24 @@ export class SyncSystem<State> {
       this.#entityIdsLastFlush.set(entityName, currentIds);
     }
     return patch;
+  }
+
+  emulateAddPatches(
+    entityName: keyof State & string,
+    addedIds: Iterable<EntityId>,
+    patch: Patch,
+  ) {
+    const map = this.entities[entityName];
+    patch.push({
+      entityName,
+      changes: map.selectFlat(addedIds),
+    });
+
+    // Ensure the added entities have their dirty state flushed
+    // since we're producing an add patch which already contains all their data.
+    for (const entityId of addedIds) {
+      map.get(entityId)?.$flush();
+    }
   }
 
   update(patch: Patch) {
