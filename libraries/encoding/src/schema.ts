@@ -10,5 +10,6 @@ export * from "./schemas/map";
 export * from "./schemas/object";
 export * from "./schemas/optional";
 export * from "./schemas/partial";
+export * from "./schemas/record";
 export * from "./schemas/set";
 export * from "./schemas/string";
