@@ -1,7 +1,6 @@
-import { int16, object, string } from "@mp/encoding/schema";
 import { beforeEach, describe, expect, it } from "vitest";
-import type { SyncSchema } from "../src";
 import { SyncSystem } from "../src";
+import type { ShapesFor } from "../src/shape";
 
 describe("can flush and patch", () => {
   // oxlint-disable-next-line consistent-type-definitions
@@ -12,11 +11,11 @@ describe("can flush and patch", () => {
     };
   };
 
-  const schemas: SyncSchema<State> = {
-    users: object(1, {
-      name: string(),
-      cash: int16(),
-    }),
+  const shapes: ShapesFor<State> = {
+    users: {
+      name: null,
+      cash: null,
+    },
   };
 
   let systemA: SyncSystem<State>;
@@ -24,8 +23,8 @@ describe("can flush and patch", () => {
   let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
-    systemA = new SyncSystem(schemas);
-    systemB = new SyncSystem(schemas);
+    systemA = new SyncSystem(shapes);
+    systemB = new SyncSystem(shapes);
     user = systemA.entities.users.create;
   });
 
@@ -183,16 +182,16 @@ describe("deeply nested state", () => {
     };
   };
 
-  const schemas: SyncSchema<State> = {
-    users: object(1, {
-      name: string(),
-      cash: int16(),
-      movement: object(2, {
-        x: int16(),
-        y: int16(),
-        speed: int16(),
-      }),
-    }),
+  const shapes: ShapesFor<State> = {
+    users: {
+      name: null,
+      cash: null,
+      movement: {
+        x: null,
+        y: null,
+        speed: null,
+      },
+    },
   };
 
   let systemA: SyncSystem<State>;
@@ -200,8 +199,8 @@ describe("deeply nested state", () => {
   let user: typeof systemA.entities.users.create;
 
   beforeEach(() => {
-    systemA = new SyncSystem(schemas);
-    systemB = new SyncSystem(schemas);
+    systemA = new SyncSystem(shapes);
+    systemB = new SyncSystem(shapes);
     user = systemA.entities.users.create;
   });
 

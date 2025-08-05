@@ -491,18 +491,9 @@ importers:
 
   integrations/experiment:
     dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../../libraries/encoding
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
       superjson:
         specifier: 2.2.2
         version: 2.2.2

@@ -1,7 +1,7 @@
 import { SignalMap } from "@mp/state";
 import type { FlatEntity, SyncEntity } from "./create-entity";
 import { createEntity } from "./create-entity";
-import type { Shape } from "./schema-analysis";
+import type { Shape, ShapesFor } from "./shape";
 
 export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
   const entityMap = new SignalMap() as SyncEntityMap<Entity>;
@@ -18,6 +18,16 @@ export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
     return slice;
   };
   return entityMap;
+}
+
+export function createEntityMapRecord<State>(
+  shapes: ShapesFor<State>,
+): SyncEntityMapRecord<State> {
+  const record: SyncEntityMapRecord<State> = {} as SyncEntityMapRecord<State>;
+  for (const entityName in shapes) {
+    record[entityName] = createEntityMap(shapes[entityName] as Shape);
+  }
+  return record;
 }
 
 export type SyncEntityMapRecord<State> = {

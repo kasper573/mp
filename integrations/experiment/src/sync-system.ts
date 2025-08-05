@@ -1,21 +1,17 @@
-import type { ObjectSchema } from "@mp/encoding/schema";
 import type {
   EntityId,
   FlatEntityRecord,
   SyncEntityMapRecord,
 } from "./create-entity-map";
-import { createEntityMap } from "./create-entity-map";
-import { analyzeSchema } from "./schema-analysis";
+import { createEntityMapRecord } from "./create-entity-map";
+import type { ShapesFor } from "./shape";
 
 export class SyncSystem<State> {
-  readonly entities = {} as SyncEntityMapRecord<State>;
+  readonly entities: SyncEntityMapRecord<State>;
   #entityIdsLastFlush = new Map<keyof State, ReadonlySet<EntityId>>();
 
-  constructor(schema: SyncSchema<State>) {
-    for (const entityName in schema) {
-      const analysis = analyzeSchema(schema[entityName]);
-      this.entities[entityName] = createEntityMap(analysis.shape);
-    }
+  constructor(entityShapes: ShapesFor<State>) {
+    this.entities = createEntityMapRecord<State>(entityShapes);
   }
 
   flush(): Patch {
@@ -92,10 +88,6 @@ export class SyncSystem<State> {
     }
   }
 }
-
-export type SyncSchema<State> = {
-  [EntityName in keyof State]: ObjectSchema<State[EntityName]>;
-};
 
 export type Patch = Operation[];
 

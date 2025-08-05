@@ -1,5 +1,5 @@
 import { Signal } from "@mp/state";
-import type { Shape } from "./schema-analysis";
+import type { Shape } from "./shape";
 
 export function createEntity<T>(
   shape: Shape,
