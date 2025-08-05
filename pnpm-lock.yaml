@@ -980,9 +980,6 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
-      superjson:
-        specifier: 2.2.2
-        version: 2.2.2
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

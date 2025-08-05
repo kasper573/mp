@@ -5,8 +5,7 @@
   "type": "module",
   "license": "MIT",
   "dependencies": {
-    "@mp/state": "workspace:*",
-    "superjson": "2.2.2"
+    "@mp/state": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
