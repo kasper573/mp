@@ -16,7 +16,7 @@
   },
   "dependencies": {
     "@mp/state": "workspace:*",
-    "@mp/patch": "workspace:*"
+    "@mp/sync2": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

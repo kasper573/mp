@@ -1,17 +1,24 @@
-import { applyPatch } from "@mp/patch";
+import type { SyncSchemaFor } from "@mp/sync2";
+import { SyncSystem } from "@mp/sync2";
 import { expect, it } from "vitest";
-import { defineSyncComponent } from "../src/sync-component";
-import { SyncMap } from "../src/sync-map";
 import { SyncServer } from "../src/sync-server";
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestState = {
-  items: SyncMap<string, number>;
+  items: {
+    cash: number;
+  };
 };
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestEventMap = {
   message: string;
+};
+
+const schema: SyncSchemaFor<TestState> = {
+  items: {
+    cash: null,
+  },
 };
 
 it("sends full state patch on initial flush and respects client visibility config", () => {
@@ -22,31 +29,29 @@ it("sends full state patch on initial flush and respects client visibility confi
     }),
   });
 
-  const initialState: TestState = {
-    items: new SyncMap([
-      ["1", 10],
-      ["2", 20],
-      ["3", 30],
-    ]),
-  };
-  const { clientPatches } = server.flush(initialState);
-
-  const client1State: TestState = { items: new SyncMap() };
-  const client2State: TestState = { items: new SyncMap() };
-
-  applyPatch(client1State, clientPatches.get("client1")!);
-  applyPatch(client2State, clientPatches.get("client2")!);
-
-  expect(client1State).toEqual({
-    items: new SyncMap([
-      ["1", 10],
-      ["2", 20],
-      ["3", 30],
-    ]),
+  const serverState = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 10 }],
+      ["2", { cash: 20 }],
+      ["3", { cash: 30 }],
+    ],
   });
-  expect(client2State).toEqual({
-    items: new SyncMap([["2", 20]]),
-  });
+  const { clientPatches } = server.flush(serverState);
+
+  const client1State = new SyncSystem(schema);
+  const client2State = new SyncSystem(schema);
+
+  client1State.update(clientPatches.get("client1") ?? []);
+  client2State.update(clientPatches.get("client2") ?? []);
+
+  expect(Array.from(client1State.entities.items.entries())).toEqual([
+    ["1", { cash: 10 }],
+    ["2", { cash: 20 }],
+    ["3", { cash: 30 }],
+  ]);
+  expect(Array.from(client2State.entities.items.entries())).toEqual([
+    ["2", { cash: 20 }],
+  ]);
 });
 
 it("returns no patches or events when flushed twice with no changes", () => {
@@ -57,12 +62,12 @@ it("returns no patches or events when flushed twice with no changes", () => {
     }),
   });
 
-  const state: TestState = {
-    items: new SyncMap([
-      ["1", 1],
-      ["2", 2],
-    ]),
-  };
+  const state = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 1 }],
+      ["2", { cash: 2 }],
+    ],
+  });
   server.flush(state);
   const { clientPatches, clientEvents } = server.flush(state);
 
@@ -71,15 +76,14 @@ it("returns no patches or events when flushed twice with no changes", () => {
 });
 
 it("can collect patches", () => {
-  const Person = defineSyncComponent((builder) =>
-    builder.add<string>()("id").add<number>()("cash"),
-  );
-  type Person = typeof Person.$infer;
+  interface Person {
+    id: string;
+    cash: number;
+  }
 
-  // oxlint-disable-next-line consistent-type-definitions
-  type TestState = {
-    persons: SyncMap<Person["id"], Person>;
-  };
+  interface TestState {
+    persons: Person;
+  }
 
   const server = new SyncServer<TestState, {}, string>({
     clientIds: () => ["client"],
@@ -88,20 +92,24 @@ it("can collect patches", () => {
     }),
   });
 
-  const john = new Person({ id: "john", cash: 0 });
-  const jane = new Person({ id: "jane", cash: 50 });
-  const serverState = {
-    persons: new SyncMap([
-      [john.id, john],
-      [jane.id, jane],
-    ]),
+  const schema: SyncSchemaFor<TestState> = {
+    persons: {
+      id: null,
+      cash: null,
+    },
   };
 
-  const clientState: TestState = { persons: new SyncMap() };
+  const serverState = new SyncSystem(schema);
+  const john = serverState.entities.persons.create({ id: "john", cash: 0 });
+  const jane = serverState.entities.persons.create({ id: "jane", cash: 50 });
+  serverState.entities.persons.set("john", john);
+  serverState.entities.persons.set("jane", jane);
+
+  const clientState = new SyncSystem(schema);
 
   // Flush initial state
   const flush1 = server.flush(serverState);
-  applyPatch(clientState, flush1.clientPatches.get("client") ?? []);
+  clientState.update(flush1.clientPatches.get("client") ?? []);
 
   // Mutating server state should trigger patch observers
   john.cash += 25;
@@ -109,10 +117,10 @@ it("can collect patches", () => {
 
   // Flush changes
   const flush2 = server.flush(serverState);
-  applyPatch(clientState, flush2.clientPatches.get("client") ?? []);
+  clientState.update(flush2.clientPatches.get("client") ?? []);
 
-  expect(clientState.persons.get("john")?.cash).toBe(25);
-  expect(clientState.persons.get("jane")?.cash).toBe(25);
+  expect(clientState.entities.persons.get("john")?.cash).toBe(25);
+  expect(clientState.entities.persons.get("jane")?.cash).toBe(25);
 });
 
 it("delivers events according to visibility", () => {
@@ -123,13 +131,13 @@ it("delivers events according to visibility", () => {
     }),
   });
 
-  const state: TestState = {
-    items: new SyncMap([
-      ["1", 10],
-      ["2", 20],
-      ["3", 30],
-    ]),
-  };
+  const state = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 10 }],
+      ["2", { cash: 20 }],
+      ["3", { cash: 30 }],
+    ],
+  });
 
   server.addEvent("message", "broadcast");
   server.addEvent("message", "direct", { items: ["3"] });
@@ -173,24 +181,26 @@ it("markToResendFullState forces a client to get full patch again", () => {
       items: new Set(id === "client1" ? state.items.keys() : ["2"]),
     }),
   });
-  const serverState: TestState = {
-    items: new SyncMap([
-      ["1", 1],
-      ["2", 2],
-    ]),
-  };
+  const serverState = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 1 }],
+      ["2", { cash: 2 }],
+    ],
+  });
   server.flush(serverState); // Throw away initial flush output
   server.markToResendFullState("client1");
   const { clientPatches } = server.flush(serverState); // Flush again, but only for client1
 
-  const client1State: TestState = { items: new SyncMap() };
-  const client2State: TestState = { items: new SyncMap() };
+  const client1State = new SyncSystem(schema);
+  const client2State = new SyncSystem(schema);
 
-  applyPatch(client1State, clientPatches.get("client1") ?? []);
-  applyPatch(client2State, clientPatches.get("client2") ?? []);
+  client1State.update(clientPatches.get("client1") ?? []);
+  client2State.update(clientPatches.get("client2") ?? []);
 
-  expect(client1State).toEqual(serverState);
-  expect(client2State.items.size).toBe(0);
+  expect(Array.from(client1State.entities.items.entries())).toEqual(
+    Array.from(serverState.entities.items.entries()),
+  );
+  expect(client2State.entities.items.size).toBe(0);
 });
 
 it("fabricates 'remove' operations when entities leave visibility", () => {
@@ -200,40 +210,38 @@ it("fabricates 'remove' operations when entities leave visibility", () => {
       items: new Set(
         state.items
           .entries()
-          .filter(([, value]) => value > 10)
+          .filter(([, item]) => item.cash > 10)
           .map(([key]) => key),
       ),
     }),
   });
-  const state1: TestState = {
-    items: new SyncMap([
-      ["1", 20],
-      ["2", 30],
-      ["3", 40],
-    ]),
-  };
-  const state2: TestState = {
-    items: new SyncMap([
-      ["1", 20],
-      ["2", 5],
-      ["3", 40],
-    ]),
-  };
+  const state1 = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      ["2", { cash: 30 }],
+      ["3", { cash: 40 }],
+    ],
+  });
+  const state2 = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      ["2", { cash: 5 }],
+      ["3", { cash: 40 }],
+    ],
+  });
 
-  const clientState: TestState = { items: new SyncMap() };
+  const clientState = new SyncSystem(schema);
 
   const flush1 = server.flush(state1);
-  applyPatch(clientState, flush1.clientPatches.get("client")!);
+  clientState.update(flush1.clientPatches.get("client") ?? []);
   const flush2 = server.flush(state2);
-  applyPatch(clientState, flush2.clientPatches.get("client")!);
+  clientState.update(flush2.clientPatches.get("client") ?? []);
 
-  expect(clientState).toEqual({
-    items: new SyncMap([
-      ["1", 20],
-      // '2' no longer visible since it's less than 10
-      ["3", 40],
-    ]),
-  });
+  expect(Array.from(clientState.entities.items.entries())).toEqual([
+    ["1", { cash: 20 }],
+    // '2' no longer visible since it's less than 10
+    ["3", { cash: 40 }],
+  ]);
 });
 
 it("fabricates 'set' operations when new entities enter visibility", () => {
@@ -243,38 +251,99 @@ it("fabricates 'set' operations when new entities enter visibility", () => {
       items: new Set(
         state.items
           .entries()
-          .filter(([, value]) => value > 10)
+          .filter(([, item]) => item.cash > 10)
           .map(([key]) => key),
       ),
     }),
   });
-  const state1: TestState = {
-    items: new SyncMap([
-      ["1", 20],
-      ["2", 5],
-      ["3", 40],
-    ]),
-  };
-  const state2: TestState = {
-    items: new SyncMap([
-      ["1", 20],
-      ["2", 30],
-      ["3", 40],
-    ]),
-  };
+  const state1 = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      ["2", { cash: 5 }],
+      ["3", { cash: 40 }],
+    ],
+  });
+  const state2 = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      ["2", { cash: 30 }],
+      ["3", { cash: 40 }],
+    ],
+  });
 
-  const clientState: TestState = { items: new SyncMap() };
+  const clientState = new SyncSystem(schema);
 
   const flush1 = server.flush(state1);
-  applyPatch(clientState, flush1.clientPatches.get("client")!);
+  clientState.update(flush1.clientPatches.get("client") ?? []);
   const flush2 = server.flush(state2);
-  applyPatch(clientState, flush2.clientPatches.get("client")!);
+  clientState.update(flush2.clientPatches.get("client") ?? []);
 
-  expect(clientState).toEqual({
-    items: new SyncMap([
-      ["1", 20],
-      ["2", 30],
-      ["3", 40],
-    ]),
+  expect(clientState.entities.items.size).toBe(3);
+  expect(clientState.entities.items.get("1")).toEqual({ cash: 20 });
+  expect(clientState.entities.items.get("2")).toEqual({ cash: 30 });
+  expect(clientState.entities.items.get("3")).toEqual({ cash: 40 });
+});
+
+it("does not expose invisible data on initial state flush", () => {
+  const secretValue = 1337;
+  const secretEntityId = "secret-entity-id";
+  const server = new SyncServer<TestState, TestEventMap, string>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      items: new Set(
+        state.items
+          .entries()
+          .filter(([, item]) => item.cash !== secretValue)
+          .map(([key]) => key),
+      ),
+    }),
   });
+
+  const state = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      [secretEntityId, { cash: secretValue }],
+      ["3", { cash: 40 }],
+    ],
+  });
+
+  const { clientPatches } = server.flush(state);
+  const serializedPatch = JSON.stringify(clientPatches.get("client"));
+  expect(serializedPatch).not.toContain(secretValue);
+  expect(serializedPatch).not.toContain(secretEntityId);
+});
+
+it("does not expose invisible data on update flush", () => {
+  const secretValue = 1337;
+  const secretEntityId = "secret-entity-id";
+  const server = new SyncServer<TestState, TestEventMap, string>({
+    clientIds: () => ["client"],
+    clientVisibility: (id, state) => ({
+      items: new Set(
+        state.items
+          .entries()
+          .filter(([, item]) => item.cash !== secretValue)
+          .map(([key]) => key),
+      ),
+    }),
+  });
+
+  const state = new SyncSystem(schema, {
+    items: [
+      ["1", { cash: 20 }],
+      ["3", { cash: 40 }],
+    ],
+  });
+
+  server.flush(state); //  Omit initial flush
+
+  // Create secret update
+  const secret = state.entities.items.create({ cash: 20 });
+  state.entities.items.set(secretEntityId, secret);
+  secret.cash = secretValue;
+
+  const { clientPatches } = server.flush(state);
+  const serializedPatch = JSON.stringify(clientPatches.get("client"));
+  expect(serializedPatch).not.toContain(secretValue);
+  expect(serializedPatch).not.toContain(secretEntityId);
 });

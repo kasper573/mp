@@ -961,12 +961,12 @@ importers:
 
   libraries/sync:
     dependencies:
-      '@mp/patch':
-        specifier: workspace:*
-        version: link:../patch
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/sync2':
+        specifier: workspace:*
+        version: link:../sync2
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
