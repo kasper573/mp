@@ -23,7 +23,7 @@ export function createEntityMap<Entity>(shape: Shape): SyncEntityMap<Entity> {
 export function createEntityMapRecord<State>(
   shapes: ShapesFor<State>,
 ): SyncEntityMapRecord<State> {
-  const record: SyncEntityMapRecord<State> = {} as SyncEntityMapRecord<State>;
+  const record = {} as SyncEntityMapRecord<State>;
   for (const entityName in shapes) {
     record[entityName] = createEntityMap(shapes[entityName] as Shape);
   }
