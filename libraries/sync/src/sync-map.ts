@@ -1,104 +1,146 @@
-import type { Patch, PathSegment } from "@mp/patch";
-import { PatchOpCode } from "@mp/patch";
 import { NotifiableSignal } from "@mp/state";
-import { isSyncComponent } from "./sync-component";
+import { assert } from "@mp/std";
+import type { SyncInstanceFlush } from "./sync-entity";
+import { flushEntity, updateEntity } from "./sync-entity";
+import { PatchOperationType, type Operation, type Patch } from "./types";
 
-export class SyncMap<K, V> extends Map<K, V> {
-  #keysLastFlush = new Set<K>();
-  #signal: NotifiableSignal<Map<K, V>>;
+export class SyncMap<EntityId, Entity> {
+  #signal: NotifiableSignal<Map<EntityId, Entity>>;
+  #keysLastFlush = new Set<EntityId>();
 
-  constructor(entries?: Iterable<readonly [K, V]> | null) {
-    super();
-    this.#signal = new NotifiableSignal(new Map<K, V>(entries));
+  constructor(entries?: Iterable<readonly [EntityId, Entity]> | null) {
+    this.#signal = new NotifiableSignal(new Map(entries));
   }
 
-  // Reactive Map implementation
-
-  override clear(): void {
+  clear(): void {
     const map = this.#signal.value;
     if (map.size > 0) {
       map.clear();
       this.#signal.notify();
     }
   }
-  override delete(key: K): boolean {
+  delete(key: EntityId): boolean {
     const deleted = this.#signal.value.delete(key);
     if (deleted) {
       this.#signal.notify();
     }
     return deleted;
   }
-  override forEach<ThisArg>(
-    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
-    thisArg?: ThisArg,
-  ): void {
-    this.#signal.value.forEach(callbackfn, thisArg);
-  }
-  override get(key: K): V | undefined {
+  get(key: EntityId): Entity | undefined {
     return this.#signal.value.get(key);
   }
-  override has(key: K): boolean {
+  has(key: EntityId): boolean {
     return this.#signal.value.has(key);
   }
-  override set(key: K, value: V): this {
+  set(key: EntityId, value: Entity): this {
     this.#signal.value.set(key, value);
     this.#signal.notify();
     return this;
   }
-  override get size(): number {
+  get size(): number {
     return this.#signal.value.size;
   }
-  override entries(): MapIterator<[K, V]> {
+  entries(): MapIterator<[EntityId, Entity]> {
     return this.#signal.value.entries();
   }
-  override keys(): MapIterator<K> {
+  keys(): MapIterator<EntityId> {
     return this.#signal.value.keys();
   }
-  override values(): MapIterator<V> {
+  values(): MapIterator<Entity> {
     return this.#signal.value.values();
   }
-  override [Symbol.iterator](): MapIterator<[K, V]> {
+  [Symbol.iterator](): MapIterator<[EntityId, Entity]> {
     return this.#signal.value[Symbol.iterator]();
   }
-  override get [Symbol.toStringTag](): string {
+  get [Symbol.toStringTag](): string {
     return this.#signal.value[Symbol.toStringTag];
   }
 
-  /**
-   * Produces a patch that represents all changes since the last flush.
-   */
-  flush(path: PathSegment[] = [], patch: Patch = []): Patch {
-    const currentKeys = new Set(this.keys());
-
-    const addedKeys = currentKeys.difference(this.#keysLastFlush);
-    for (const key of addedKeys) {
-      patch.push({
-        op: PatchOpCode.MapSet,
-        path,
-        key: String(key),
-        value: this.get(key),
-      });
+  *sliceMap<T>(
+    keys: Iterable<EntityId>,
+    map: (v: Entity) => T,
+  ): MapIterator<[EntityId, T]> {
+    for (const key of keys) {
+      const entity = this.get(key);
+      if (entity) {
+        yield [key, map(entity)];
+      }
     }
+  }
 
-    const removedKeys = this.#keysLastFlush.difference(currentKeys);
-    for (const key of removedKeys) {
+  flush<EntityName>(
+    entityName: EntityName,
+    patch: Patch<EntityName, EntityId, Entity>,
+  ) {
+    const currentIds = new Set(this.keys());
+    const addedIds = currentIds.difference(this.#keysLastFlush);
+    const removedIds = this.#keysLastFlush.difference(currentIds);
+    const staleIds = currentIds.intersection(this.#keysLastFlush);
+
+    if (addedIds.size) {
       patch.push({
-        op: PatchOpCode.MapDelete,
-        path,
-        key: String(key),
+        type: PatchOperationType.MapAdd,
+        entityName,
+        added: this.sliceMap(addedIds, (v) => v).toArray(),
       });
-    }
 
-    const staleKeys = this.#keysLastFlush.intersection(currentKeys);
-    for (const key of staleKeys) {
-      const v = this.get(key);
-      if (isSyncComponent(v)) {
-        v.flush([...path, String(key)], patch);
+      // Ensure the added entities have their dirty state flushed and omitted
+      // since we're producing an add patch which already contains all their data.
+      for (const entityId of addedIds) {
+        flushEntity(this.get(entityId) as Entity);
       }
     }
 
-    this.#keysLastFlush = currentKeys;
+    if (removedIds.size) {
+      patch.push({
+        type: PatchOperationType.MapDelete,
+        entityName,
+        removedIds,
+      });
+    }
 
-    return patch;
+    const instanceFlushes: Array<[EntityId, SyncInstanceFlush]> = [];
+    for (const entityId of staleIds) {
+      const changes = flushEntity(this.get(entityId) as Entity);
+      if (changes) {
+        instanceFlushes.push([entityId, changes]);
+      }
+    }
+
+    if (instanceFlushes.length) {
+      patch.push({
+        type: PatchOperationType.EntityUpdate,
+        entityName,
+        changes: instanceFlushes,
+      });
+    }
+
+    this.#keysLastFlush = currentIds;
+  }
+
+  applyOperation<EntityName>(
+    op: Operation<EntityName, EntityId, Entity>,
+  ): void {
+    switch (op.type) {
+      case PatchOperationType.MapAdd:
+        for (const [entityId, entity] of op.added) {
+          this.set(entityId, entity);
+        }
+        break;
+      case PatchOperationType.MapDelete:
+        for (const entityId of op.removedIds) {
+          this.delete(entityId);
+        }
+        break;
+      case PatchOperationType.EntityUpdate:
+        for (const [entityId, changes] of op.changes) {
+          const entity = assert(
+            this.get(entityId),
+            `Entity not found for update: ${entityId}`,
+          );
+          updateEntity(entity, changes);
+        }
+        break;
+    }
   }
 }

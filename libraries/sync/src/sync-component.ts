@@ -1,6 +1,6 @@
-import type { Patch, Path } from "@mp/patch";
-import { PatchOpCode } from "@mp/patch";
 import { signal, type Signal } from "@mp/state";
+import type { Path } from "./path";
+import type { Patch } from "./sync-state";
 
 export function defineSyncComponent<Values extends object>(
   nextBuilder: (

@@ -1,7 +1,7 @@
-import type { SyncSchemaFor } from "@mp/sync2";
-import { SyncSystem } from "@mp/sync2";
 import { expect, it } from "vitest";
+import type { SyncSchemaFor } from "../src/schema";
 import { SyncServer } from "../src/sync-server";
+import { SyncSystem } from "../src/sync-state";
 
 // oxlint-disable-next-line consistent-type-definitions
 type TestState = {

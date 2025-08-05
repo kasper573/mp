@@ -8,12 +8,10 @@ import {
   type GameState,
 } from "@mp/game-shared";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
-import type { Patch } from "@mp/patch";
-import { applyOperation, applyPatch, PatchOpCode } from "@mp/patch";
 import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
-import type { EventAccessFn } from "@mp/sync";
-import { SyncMap } from "@mp/sync";
+import type { EventAccessFn, Patch } from "@mp/sync";
+import { applyOperation, applyPatch, PatchOpCode, SyncMap } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 
 export class OptimisticGameState implements GameState {

@@ -1,12 +1,5 @@
-import type {
-  EntityId,
-  Operation,
-  Patch,
-  SyncEntities,
-  SyncSystem,
-} from "@mp/sync2";
-
 import type { EventAccessFn, SyncEvent, SyncEventMap } from "./sync-event";
+import type { Operation, Patch } from "./types";
 
 export class SyncServer<State, EventMap extends SyncEventMap, ClientId> {
   private events: ServerSyncEvent<State>[] = [];
@@ -17,10 +10,7 @@ export class SyncServer<State, EventMap extends SyncEventMap, ClientId> {
 
   flush(system: SyncSystem<State>): FlushResult<ClientId> {
     const clientIds = Array.from(this.options.clientIds());
-    const prevVisibilities: Record<
-      ClientId & string,
-      ClientVisibility<State>
-    > = Object.fromEntries(
+    const prevVisibilities = Object.fromEntries(
       clientIds.map((clientId) => [
         clientId,
         this.visibilities.get(clientId) ?? // Reuse last if it exists
