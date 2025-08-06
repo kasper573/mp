@@ -16,7 +16,7 @@ export interface TrackedPropertyOptimizer<T> {
    * If provided, the change will only be recorded if this returns true.
    * Even if the filter returns false, the property is still updated to the new value.
    */
-  filter?: (prev: T, next: T) => boolean;
+  filter?: (prev: T | undefined, next: T) => boolean;
 
   /**
    * A transform function that takes the "new" value and returns
