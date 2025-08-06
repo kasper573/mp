@@ -2,7 +2,7 @@ import { NotifiableSignal } from "@mp/state";
 import { assert } from "@mp/std";
 import { PatchOperationType, type Operation, type Patch } from "./patch";
 import type { FlatTrackedValues } from "./tracked";
-import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
+import { flushEntity, updateEntity } from "./tracked";
 
 export class SyncMap<EntityId, Entity> {
   #signal: NotifiableSignal<Map<EntityId, Entity>>;
@@ -91,7 +91,7 @@ export class SyncMap<EntityId, Entity> {
 
     const instanceFlushes: Array<[EntityId, FlatTrackedValues]> = [];
     for (const entityId of staleIds) {
-      const changes = flushTrackedInstance(this.get(entityId) as Entity);
+      const changes = flushEntity(this.get(entityId) as Entity);
       if (changes) {
         instanceFlushes.push([entityId, changes]);
       }
@@ -123,7 +123,7 @@ export class SyncMap<EntityId, Entity> {
     // Ensure the added entities have their dirty state flushed and omitted
     // since we're producing an add patch which already contains all their data.
     for (const entityId of addedIds) {
-      flushTrackedInstance(this.get(entityId) as Entity);
+      flushEntity(this.get(entityId) as Entity);
     }
   }
 
@@ -148,7 +148,7 @@ export class SyncMap<EntityId, Entity> {
             this.get(entityId),
             `Entity not found for update: ${entityId}`,
           );
-          updateTrackedInstance(entity, changes);
+          updateEntity(entity, changes);
         }
         break;
     }
