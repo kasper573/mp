@@ -23,11 +23,10 @@ export function registerEncoderExtensions(): void {
 
   hasRegistered = true;
 
-  addTrackedClassToEncoder(EncoderTag.MovementTrait, MovementTrait);
-  addTrackedClassToEncoder(EncoderTag.AppearanceTrait, AppearanceTrait);
-  addTrackedClassToEncoder(EncoderTag.AppearanceTrait, AppearanceTrait);
   addTrackedClassToEncoder(EncoderTag.NpcInstance, NpcInstance);
   addTrackedClassToEncoder(EncoderTag.NpcEtc, NpcEtc);
+  addTrackedClassToEncoder(EncoderTag.AppearanceTrait, AppearanceTrait);
+  addTrackedClassToEncoder(EncoderTag.MovementTrait, MovementTrait);
   addTrackedClassToEncoder(EncoderTag.CombatTrait, CombatTrait);
   addTrackedClassToEncoder(EncoderTag.Character, Character);
   addTrackedClassToEncoder(

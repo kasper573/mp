@@ -7,21 +7,26 @@ import type { UserSession } from "./session";
 // Claiming the range 40_501+ for the game protocol
 // (Anything below 40_500 is reserved by cbor)
 export enum EncoderTag {
+  // General
   Vector = 40_501,
   Rect = 40_502,
   Error = 40_503,
-  NpcInstance = 40_504,
-  NpcEtc = 40_505,
-  AppearanceTrait = 40_506,
-  MovementTrait = 40_507,
-  CombatTrait = 40_508,
-  Character = 40_509,
-  CharacterProgression = 40_510,
-  GameServiceArea = 40_511,
-  SyncMessage = 40_512,
-  SyncMessageWithRecipient = 40_513,
-  EventMessage = 40_514,
-  EventWithSession = 40_515,
+
+  // System
+  SyncMessage = 40_504,
+  SyncMessageWithRecipient = 40_505,
+  EventMessage = 40_506,
+  EventWithSession = 40_507,
+
+  // Game data
+  NpcInstance = 40_508,
+  NpcEtc = 40_509,
+  AppearanceTrait = 40_510,
+  MovementTrait = 40_511,
+  CombatTrait = 40_512,
+  Character = 40_513,
+  CharacterProgression = 40_514,
+  GameServiceArea = 40_515,
 }
 
 // Makes the @tracked decorator use the EncoderTag type
