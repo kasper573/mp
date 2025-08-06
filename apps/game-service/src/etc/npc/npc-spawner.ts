@@ -11,7 +11,7 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import { assert, createShortId, typedAssign } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 
@@ -65,7 +65,7 @@ export class NpcSpawner {
     const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
 
-    return new NpcInstance({
+    return typedAssign(new NpcInstance(), {
       identity: {
         id,
         npcId: npc.id,

@@ -6,12 +6,7 @@ import type {
   NpcType,
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
-import {
-  typedAssign,
-  type Branded,
-  type Tile,
-  type TimesPerSecond,
-} from "@mp/std";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
@@ -87,22 +82,14 @@ export class NpcEtc {
 @tracked()
 export class NpcInstance {
   readonly type = "npc" as const;
-  readonly identity: NpcInstanceIdentity;
-  readonly appearance: AppearanceTrait;
-  readonly movement: MovementTrait;
-  readonly combat: CombatTrait;
-  readonly etc: NpcEtc;
+  readonly identity!: NpcInstanceIdentity;
+  readonly appearance = new AppearanceTrait();
+  readonly movement = new MovementTrait();
+  readonly combat = new CombatTrait();
+  readonly etc = new NpcEtc();
 
   get alive() {
     return this.combat.health > 0;
-  }
-
-  constructor(init: NpcInstanceInit) {
-    this.identity = init.identity;
-    this.appearance = typedAssign(new AppearanceTrait(), init.appearance);
-    this.movement = typedAssign(new MovementTrait(), init.movement);
-    this.combat = typedAssign(new CombatTrait(), init.combat);
-    this.etc = typedAssign(new NpcEtc(), init.etc);
   }
 }
 

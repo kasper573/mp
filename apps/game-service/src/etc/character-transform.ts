@@ -3,7 +3,7 @@ import type { ActorModelLookup } from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
 import { cardinalDirections } from "@mp/math";
 import type { Rng } from "@mp/std";
-import { assert } from "@mp/std";
+import { assert, typedAssign } from "@mp/std";
 
 export function characterFromDbFields(
   fields: typeof characterTable.$inferSelect,
@@ -15,7 +15,7 @@ export function characterFromDbFields(
     `Actor model not found: ${fields.modelId}`,
   );
 
-  return new Character({
+  return typedAssign(new Character(), {
     appearance: {
       modelId: fields.modelId,
       name: fields.name,
