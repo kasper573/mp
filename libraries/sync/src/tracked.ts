@@ -5,27 +5,30 @@ import { assert, type Branded } from "@mp/std";
 
 export const shouldOptimizeTrackedProperties = signal(true);
 
-export function object<Values extends object>(
-  properties: PropertySchemas<Values>,
-): ObjectSchema<Values> {
+export function object<T extends object>(
+  properties: PropertySchemas<T>,
+): ObjectSchema<T> {
   return new ObjectSchema(properties);
 }
 
-export function value<Value>(optimizer?: PatchOptimizer<Value>): Schema<Value> {
+export function value<T>(optimizer?: PatchOptimizer<T>): Schema<T> {
   return new ValueSchema(optimizer);
 }
 
-export function flushEntity<Entity extends object>(
-  target: Entity,
-): DeepPartial<Entity> | undefined {
-  return getEntityMemory(target)?.flush(target);
+export function flushTrackedInstance<T extends object>(
+  target: T,
+): DeepPartial<T> | undefined {
+  return getTrackedMemory(target)?.flush(target);
 }
 
-export function updateEntity<Entity extends object>(
-  target: Entity,
-  changes: DeepPartial<Entity>,
+export function updateTrackedInstance<T extends object>(
+  target: T,
+  changes: DeepPartial<T>,
 ): void {
-  const mem = assert(getEntityMemory(target), "Target not an entity instance");
+  const mem = assert(
+    getTrackedMemory(target),
+    "Target not an tracked instance",
+  );
   mem.update(target, changes);
 }
 
@@ -53,18 +56,18 @@ abstract class Schema<T> {
   }
 }
 
-class ObjectSchema<Entity extends object> extends Schema<Entity> {
-  constructor(public readonly properties: PropertySchemas<Entity>) {
+class ObjectSchema<T extends object> extends Schema<T> {
+  constructor(public readonly properties: PropertySchemas<T>) {
     super();
   }
 
-  create(initialValues: Entity): Entity {
-    return new EntityInstance(this, initialValues) as Entity;
+  create(initialValues: T): T {
+    return new TrackedInstance(this, initialValues) as T;
   }
 }
 
-type PropertySchemas<Values> = {
-  readonly [K in keyof Values]: Schema<Values[K]>;
+type PropertySchemas<T> = {
+  readonly [K in keyof T]: Schema<T[K]>;
 };
 
 class ValueSchema<T> extends Schema<T> {
@@ -91,14 +94,14 @@ class ValueSchema<T> extends Schema<T> {
   }
 }
 
-class EntityInstance<Entity extends object> {
-  constructor(schema: ObjectSchema<Entity>, initialValues: Entity) {
-    const memory = new EntityMemory(schema);
+class TrackedInstance<T extends object> {
+  constructor(schema: ObjectSchema<T>, initialValues: T) {
+    const memory = new TrackedMemory(schema);
 
-    Reflect.set(this, entityMemorySymbol, memory);
+    Reflect.set(this, trackedMemorySymbol, memory);
 
     Object.keys(schema.properties).forEach((p) => {
-      const key = p as keyof Entity;
+      const key = p as keyof T;
       const propertySchema = schema.properties[key];
 
       if (propertySchema instanceof ObjectSchema) {
@@ -115,7 +118,7 @@ class EntityInstance<Entity extends object> {
       }
 
       if (propertySchema instanceof ValueSchema) {
-        const signal = createSignal<Entity[typeof key]>(initialValues[key]);
+        const signal = createSignal<T[typeof key]>(initialValues[key]);
         Object.defineProperty(this, key, {
           configurable: false,
           enumerable: true,
@@ -137,7 +140,7 @@ class EntityInstance<Entity extends object> {
 }
 
 // Deriving a schema from a POJO when decoding is a way to allow us
-// to have only a single encoder extension for all entity instances.
+// to have only a single encoder extension for all tracked instances.
 // The only caveat is that we cannot look up the exact schema instance,
 // but we can estimate it from the shape of the POJO.
 // this will give us the same shape, but not the same instance,
@@ -157,16 +160,16 @@ function deriveSchema<T extends object>(pojo: T): ObjectSchema<T> {
 }
 
 addEncoderExtension<object, DeepPOJO<object>>({
-  Class: EntityInstance,
+  Class: TrackedInstance,
   tag: 99_999, // Special enough to avoid conflicts with other tags
   encode: (instance, encode) =>
-    encode(assert(getEntityMemory(instance)).toPOJO(instance)),
-  decode: (pojo) => new EntityInstance(deriveSchema(pojo), pojo),
+    encode(assert(getTrackedMemory(instance)).toPOJO(instance)),
+  decode: (pojo) => new TrackedInstance(deriveSchema(pojo), pojo),
 });
 
-const entityMemorySymbol = Symbol("EntityMemory");
+const trackedMemorySymbol = Symbol("TrackedMemory");
 
-class EntityMemory<T extends object> {
+class TrackedMemory<T extends object> {
   constructor(private schema: ObjectSchema<T>) {}
   dirty = new Set<keyof T>();
 
@@ -180,7 +183,7 @@ class EntityMemory<T extends object> {
       const value = target[key];
       const propertySchema = this.schema.properties[key];
       if (propertySchema instanceof ObjectSchema) {
-        pojo[key] = getEntityMemory(value as object)?.toPOJO(
+        pojo[key] = getTrackedMemory(value as object)?.toPOJO(
           value as object,
         ) as never;
       } else if (propertySchema instanceof ValueSchema) {
@@ -204,7 +207,7 @@ class EntityMemory<T extends object> {
       const propertySchema = this.schema.properties[key];
       const value = target[key];
       if (propertySchema instanceof ObjectSchema) {
-        const childPartial = getEntityMemory(value as object)?.flush(
+        const childPartial = getTrackedMemory(value as object)?.flush(
           value as object,
         );
         if (childPartial) {
@@ -238,7 +241,7 @@ class EntityMemory<T extends object> {
     newValue: T[K],
   ): void {
     if (this.schema.properties[key] instanceof ObjectSchema) {
-      const propMemory = assert(getEntityMemory(target[key] as object));
+      const propMemory = assert(getTrackedMemory(target[key] as object));
       propMemory.update(target, newValue as DeepPartial<T[K] & object>);
     } else {
       target[key] = newValue;
@@ -249,10 +252,10 @@ class EntityMemory<T extends object> {
 type DeepPOJO<T> = Branded<T, "DeepPOJO">;
 type DeepPartial<T> = Branded<T, "DeepPartial">;
 
-function getEntityMemory<T extends object>(
+function getTrackedMemory<T extends object>(
   target: T,
-): EntityMemory<T> | undefined {
-  return Reflect.get(target, entityMemorySymbol) as EntityMemory<T>;
+): TrackedMemory<T> | undefined {
+  return Reflect.get(target, trackedMemorySymbol) as TrackedMemory<T>;
 }
 
 const passThrough = <T>(v: T): T => v;

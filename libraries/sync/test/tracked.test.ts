@@ -5,7 +5,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEncoding } from "@mp/encoding";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
-import { flushEntity, object, updateEntity, value } from "../src/tracked";
+import {
+  flushTrackedInstance,
+  object,
+  updateTrackedInstance,
+  value,
+} from "../src/tracked";
 
 describe("can flush and patch", () => {
   type State = {
@@ -307,7 +312,7 @@ it("can encode and decode", () => {
 
   // If flushing is still successful that means the decode worked since flush only works on entity instances
   after.value = 20;
-  const patch = flushEntity(after);
+  const patch = flushTrackedInstance(after);
   expect(patch).toBeDefined();
 });
 
@@ -342,11 +347,11 @@ describe("property tracking optimization", () => {
   it("can transform", () => {
     const e = Entity.create({ value: 10.123456789 });
 
-    const changes = flushEntity(e);
+    const changes = flushTrackedInstance(e);
 
     const e2 = Entity.create({ value: 0 });
 
-    updateEntity(e2, changes!);
+    updateTrackedInstance(e2, changes!);
 
     expect(e2.value).toBe(10.123);
   });
@@ -354,25 +359,25 @@ describe("property tracking optimization", () => {
   it("can filter", () => {
     const e = Entity.create({ value: 10 });
 
-    flushEntity(e); // Flush and omit initial state change for test control
+    flushTrackedInstance(e); // Flush and omit initial state change for test control
 
     e.value = 10.5; // Not a whole new number, should not trigger a patch
 
     expect(e.value).toBe(10.5); // But value should still be updated
 
-    const flush1 = flushEntity(e);
+    const flush1 = flushTrackedInstance(e);
 
     expect(flush1).toBeUndefined(); // No changes should be recorded
 
     e.value = 11; // Now a whole new number, should trigger a patch
 
-    const flush2 = flushEntity(e);
+    const flush2 = flushTrackedInstance(e);
 
     expect(flush2).toBeDefined();
 
     const e2 = Entity.create({ value: 0 });
 
-    updateEntity(e2, flush2!);
+    updateTrackedInstance(e2, flush2!);
 
     expect(e2.value).toBe(11);
   });
