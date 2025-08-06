@@ -25,11 +25,8 @@ export function updateTrackedInstance<T extends object>(
   target: T,
   changes: DeepPartial<T>,
 ): void {
-  const mem = assert(
-    getTrackedMemory(target),
-    "Target not an tracked instance",
-  );
-  mem.update(target, changes);
+  // Nothing special needs to be done, property descriptors will already handle this.
+  Object.assign(target, changes);
 }
 
 export interface PatchOptimizer<T> {
@@ -226,25 +223,6 @@ class TrackedMemory<T extends object> {
 
     if (Object.keys(partial).length) {
       return partial;
-    }
-  }
-
-  update(target: T, changes: DeepPartial<T>): void {
-    for (const key in changes) {
-      this.updateKey(target, key as keyof T, changes[key as keyof T]);
-    }
-  }
-
-  private updateKey<K extends keyof T>(
-    target: T,
-    key: K,
-    newValue: T[K],
-  ): void {
-    if (this.schema.properties[key] instanceof ObjectSchema) {
-      const propMemory = assert(getTrackedMemory(target[key] as object));
-      propMemory.update(target, newValue as DeepPartial<T[K] & object>);
-    } else {
-      target[key] = newValue;
     }
   }
 }
