@@ -1,26 +1,25 @@
 import type { AnyPatch } from "./patch";
-import { SyncMap } from "./sync-map";
+import type { SyncMap } from "./sync-map";
 
-export function flushState<State, P extends AnyPatch>(
-  state: State,
+export function flushState<P extends AnyPatch>(
+  state: AnySyncState,
   patch: P = [] as unknown as P,
 ): P {
   for (const entityName in state) {
     const value = state[entityName];
-    if (value instanceof SyncMap) {
-      value.flush(entityName, patch);
-    }
+    value.flush(entityName, patch);
   }
   return patch;
 }
 
-export function updateState<State>(state: State, patch: AnyPatch): void {
+export function updateState(state: AnySyncState, patch: AnyPatch): void {
   for (const op of patch) {
-    const map = state[op.entityName as keyof State];
-    if (map instanceof SyncMap) {
-      map.applyOperation(op);
-    } else {
-      throw new Error(`State key "${op.entityName}" is not a SyncMap`);
-    }
+    const map = state[op.entityName];
+    map.applyOperation(op);
   }
+}
+
+export interface AnySyncState {
+  // oxlint-disable-next-line no-explicit-any
+  [entityName: PropertyKey]: SyncMap<any, any>;
 }

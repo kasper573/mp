@@ -56,18 +56,18 @@ export class SyncMap<EntityId, Entity> {
     return this.#signal.value[Symbol.toStringTag];
   }
 
-  *sliceMap<T>(
-    keys: Iterable<EntityId>,
-    map: (v: Entity) => T,
-  ): MapIterator<[EntityId, T]> {
+  slice(keys: Iterable<EntityId>): Array<[EntityId, Entity]> {
+    const array: Array<[EntityId, Entity]> = [];
     for (const key of keys) {
       const entity = this.get(key);
       if (entity) {
-        yield [key, map(entity)];
+        array.push([key, entity]);
       }
     }
+    return array;
   }
 
+  /** @internal */
   flush<EntityName>(
     entityName: EntityName,
     patch: Patch<EntityName, EntityId, Entity>,
@@ -78,17 +78,7 @@ export class SyncMap<EntityId, Entity> {
     const staleIds = currentIds.intersection(this.#keysLastFlush);
 
     if (addedIds.size) {
-      patch.push({
-        type: PatchOperationType.MapAdd,
-        entityName,
-        added: this.sliceMap(addedIds, (v) => v).toArray(),
-      });
-
-      // Ensure the added entities have their dirty state flushed and omitted
-      // since we're producing an add patch which already contains all their data.
-      for (const entityId of addedIds) {
-        flushTrackedInstance(this.get(entityId) as Entity);
-      }
+      this.appendAddOperationToPatch(entityName, addedIds, patch);
     }
 
     if (removedIds.size) {
@@ -118,6 +108,26 @@ export class SyncMap<EntityId, Entity> {
     this.#keysLastFlush = currentIds;
   }
 
+  /** @internal */
+  appendAddOperationToPatch<EntityName>(
+    entityName: EntityName,
+    addedIds: Iterable<EntityId>,
+    patch: Patch<EntityName, EntityId, Entity>,
+  ) {
+    patch.push({
+      type: PatchOperationType.MapAdd,
+      entityName,
+      added: this.slice(addedIds),
+    });
+
+    // Ensure the added entities have their dirty state flushed and omitted
+    // since we're producing an add patch which already contains all their data.
+    for (const entityId of addedIds) {
+      flushTrackedInstance(this.get(entityId) as Entity);
+    }
+  }
+
+  /** @internal */
   applyOperation<EntityName>(
     op: Operation<EntityName, EntityId, Entity>,
   ): void {

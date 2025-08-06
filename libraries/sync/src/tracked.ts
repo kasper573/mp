@@ -86,7 +86,7 @@ export function flushTrackedInstance<Target>(
 
 export function updateTrackedInstance<Target>(
   target: Target,
-  changes: TrackedInstanceFlush,
+  changes: Readonly<TrackedInstanceFlush>,
 ): void {
   const memory = assert(
     getSyncMemory(target),
