@@ -128,6 +128,9 @@ class TrackedInstance<T extends object> {
             }
           },
         });
+
+        // Consider initial values dirty
+        memory.dirty.add(key);
         return;
       }
 
