@@ -18,7 +18,7 @@ describe("can flush and patch", () => {
     };
   }
 
-  const User = object(1, {
+  const User = object({
     name: value<string>(),
     cash: value<number>(),
   });
@@ -185,13 +185,13 @@ describe("can flush and patch", () => {
 });
 
 describe("deeply nested state", () => {
-  const Movement = object(2, {
+  const Movement = object({
     x: value<number>(),
     y: value<number>(),
     speed: value<number>(),
   });
 
-  const User = object(3, {
+  const User = object({
     name: value<string>(),
     cash: value<number>(),
     movement: Movement,
@@ -294,7 +294,7 @@ describe("deeply nested state", () => {
 });
 
 it("can encode and decode", () => {
-  const Thing = object(4, {
+  const Thing = object({
     value: value<number>(),
   });
   type Thing = typeof Thing.$infer;
@@ -312,7 +312,7 @@ it("can encode and decode", () => {
 });
 
 it("properties are reactive", () => {
-  const Counter = object(5, {
+  const Counter = object({
     count: value<number>(),
   });
 
@@ -332,7 +332,7 @@ it("properties are reactive", () => {
 });
 
 describe("property tracking optimization", () => {
-  const Entity = object(6, {
+  const Entity = object({
     value: value<number>({
       transform: (value) => parseFloat(value.toFixed(3)),
       filter: (a, b) => Math.floor(a) !== Math.floor(b),

@@ -29,13 +29,6 @@ export enum EncoderTag {
   GameServiceArea = 40_515,
 }
 
-// Makes the @tracked decorator use the EncoderTag type
-declare module "@mp/sync" {
-  export interface TrackedRegistry {
-    tag: EncoderTag;
-  }
-}
-
 // ----------------------------------------------------
 // Special encodings
 // ----------------------------------------------------

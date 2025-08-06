@@ -4,10 +4,9 @@ import { signal as createSignal, signal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
 
 export function object<Values extends object>(
-  tag: Tag,
   properties: PropertySchemas<Values>,
 ): ObjectSchema<Values> {
-  return new ObjectSchema(tag, properties);
+  return new ObjectSchema(properties);
 }
 
 export function value<Value>(optimizer?: PatchOptimizer<Value>): Schema<Value> {
@@ -23,57 +22,76 @@ abstract class Schema<T> {
 }
 
 export class ObjectSchema<Entity extends object> extends Schema<Entity> {
-  #instanceClass: new () => Entity;
-
-  constructor(
-    tag: Tag,
-    public readonly properties: PropertySchemas<Entity>,
-  ) {
+  constructor(public readonly properties: PropertySchemas<Entity>) {
     super();
-
-    this.#instanceClass = class {} as never;
-
-    addEncoderExtension<Entity, DeepPOJO<Entity>>({
-      Class: this.#instanceClass,
-      tag,
-      encode: (instance, encode) =>
-        encode(assert(getEntityMemory(instance)).toPOJO(instance)),
-      decode: (pojo) => this.create(pojo),
-    });
   }
 
   create(initialValues: Entity): Entity {
-    const memory = new EntityMemory(this);
-    const instance = new this.#instanceClass();
-    Reflect.set(instance, entityMemorySymbol, memory);
+    return new EntityInstance(this, initialValues) as Entity;
+  }
+}
 
-    Object.keys(this.properties).forEach((p) => {
+type PropertySchemas<Values> = {
+  readonly [K in keyof Values]: Schema<Values[K]>;
+};
+
+class ValueSchema<T> extends Schema<T> {
+  public readonly optimizer: Required<PatchOptimizer<T>>;
+  constructor({
+    filter = refDiff,
+    transform = passThrough,
+  }: PatchOptimizer<T> = {}) {
+    super();
+    this.optimizer = {
+      filter(prev, next) {
+        if (shouldOptimizeTrackedProperties.value) {
+          return filter(prev, next);
+        }
+        return true;
+      },
+      transform(value) {
+        if (shouldOptimizeTrackedProperties.value) {
+          return transform(value);
+        }
+        return value;
+      },
+    };
+  }
+}
+
+class EntityInstance<Entity extends object> {
+  constructor(schema: ObjectSchema<Entity>, initialValues: Entity) {
+    const memory = new EntityMemory(schema);
+
+    Reflect.set(this, entityMemorySymbol, memory);
+
+    Object.keys(schema.properties).forEach((p) => {
       const key = p as keyof Entity;
-      const schema = this.properties[key];
+      const propertySchema = schema.properties[key];
 
-      if (schema instanceof ObjectSchema) {
+      if (propertySchema instanceof ObjectSchema) {
         // If a tracked child instance is assigned to, we mutate the underlying instance instead
         // And a signal isn't required, only leaf values will be reactive.
-        const childInstance = schema.create(initialValues[key]);
-        Object.defineProperty(instance, key, {
+        const childInstance = propertySchema.create(initialValues[key]);
+        Object.defineProperty(this, key, {
           configurable: false,
           enumerable: true,
           get: () => childInstance,
-          set: (newValue) => Object.assign(instance[key] as object, newValue),
+          set: (newValue) => Object.assign(childInstance, newValue),
         });
         return;
       }
 
-      if (schema instanceof ValueSchema) {
+      if (propertySchema instanceof ValueSchema) {
         const signal = createSignal<Entity[typeof key]>(initialValues[key]);
-        Object.defineProperty(instance, key, {
+        Object.defineProperty(this, key, {
           configurable: false,
           enumerable: true,
           get: () => signal.value,
           set: (newValue) => {
             const prevValue = signal.value;
             signal.value = newValue;
-            if (schema.optimizer.filter(prevValue, newValue)) {
+            if (propertySchema.optimizer.filter(prevValue, newValue)) {
               memory.dirty.add(key);
             }
           },
@@ -83,9 +101,36 @@ export class ObjectSchema<Entity extends object> extends Schema<Entity> {
 
       throw new Error("Unexpected schema type");
     });
-    return instance;
   }
 }
+
+// Deriving a schema from a POJO when decoding is a way to allow us
+// to have only a single encoder extension for all entity instances.
+// The only caveat is that we cannot look up the exact schema instance,
+// but we can estimate it from the shape of the POJO.
+// this will give us the same shape, but not the same instance,
+// so things like value optimizers will be lost,
+// but that should be fine since those are only used on the server.
+function deriveSchema<T extends object>(pojo: T): ObjectSchema<T> {
+  const properties: Record<string, Schema<unknown>> = {};
+  for (const key in pojo) {
+    const value = pojo[key];
+    if (typeof value === "object" && value !== null) {
+      properties[key] = deriveSchema(value);
+    } else {
+      properties[key] = new ValueSchema();
+    }
+  }
+  return new ObjectSchema(properties) as ObjectSchema<T>;
+}
+
+addEncoderExtension<object, DeepPOJO<object>>({
+  Class: EntityInstance,
+  tag: 99_999, // Special enough to avoid conflicts with other tags
+  encode: (instance, encode) =>
+    encode(assert(getEntityMemory(instance)).toPOJO(instance)),
+  decode: (pojo) => new EntityInstance(deriveSchema(pojo), pojo),
+});
 
 const entityMemorySymbol = Symbol("EntityMemory");
 
@@ -194,34 +239,6 @@ export function updateEntity<Entity extends object>(
   mem.update(target, changes);
 }
 
-type PropertySchemas<Values> = {
-  readonly [K in keyof Values]: Schema<Values[K]>;
-};
-
-class ValueSchema<T> extends Schema<T> {
-  public readonly optimizer: Required<PatchOptimizer<T>>;
-  constructor({
-    filter = refDiff,
-    transform = passThrough,
-  }: PatchOptimizer<T> = {}) {
-    super();
-    this.optimizer = {
-      filter(prev, next) {
-        if (shouldOptimizeTrackedProperties.value) {
-          return filter(prev, next);
-        }
-        return true;
-      },
-      transform(value) {
-        if (shouldOptimizeTrackedProperties.value) {
-          return transform(value);
-        }
-        return value;
-      },
-    };
-  }
-}
-
 export interface PatchOptimizer<T> {
   /**
    * A predicate (prevValue, newValue) => boolean.
@@ -237,16 +254,6 @@ export interface PatchOptimizer<T> {
    */
   transform?: (value: T) => T;
 }
-
-type Tag = TrackedRegistry extends { tag: infer T } ? T : number;
-
-/**
- * Augment this interface with a `tag` property to specify the type of
- * tag value that must be passed to the `tracked` decorator.
- *
- * Useful if you want ensure it's an enum or a specific type.
- */
-export interface TrackedRegistry {}
 
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
