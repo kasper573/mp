@@ -576,9 +576,6 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std

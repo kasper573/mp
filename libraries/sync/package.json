@@ -15,8 +15,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/state": "workspace:*",
     "@mp/encoding": "workspace:*",
+    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*"
   },
   "devDependencies": {
