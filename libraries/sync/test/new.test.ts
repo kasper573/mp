@@ -16,10 +16,13 @@ describe("can flush and patch", () => {
       public name = "",
       public cash = 0,
     ) {}
+  }
 
-    static from(data: User): User {
-      return new User(data.name, data.cash);
-    }
+  function userFrom(data: User): User {
+    const user = new User();
+    user.name = data.name;
+    user.cash = data.cash;
+    return user;
   }
 
   let systemA: State;
@@ -41,12 +44,12 @@ describe("can flush and patch", () => {
   describe("map", () => {
     it("set", () => {
       // Assert that map set work in local system
-      systemA.users.set("1", User.from({ name: "1", cash: 1 }));
+      systemA.users.set("1", userFrom({ name: "1", cash: 1 }));
       expect(systemA.users.get("1")).toMatchObject({ name: "1", cash: 1 });
 
       // Assert that flush and update works across systems
       const patch = flushState(systemA);
-      systemB.users.set("2", User.from({ name: "2", cash: 2 }));
+      systemB.users.set("2", userFrom({ name: "2", cash: 2 }));
       updateState(systemB, patch);
       expect(systemB.users.size).toBe(2);
       expect(systemB.users.get("1")).toMatchObject({ name: "1", cash: 1 });
@@ -54,15 +57,15 @@ describe("can flush and patch", () => {
     });
 
     it("delete", () => {
-      systemA.users.set("1", User.from({ name: "1", cash: 1 }));
-      systemA.users.set("2", User.from({ name: "2", cash: 2 }));
-      systemA.users.set("3", User.from({ name: "3", cash: 3 }));
+      systemA.users.set("1", userFrom({ name: "1", cash: 1 }));
+      systemA.users.set("2", userFrom({ name: "2", cash: 2 }));
+      systemA.users.set("3", userFrom({ name: "3", cash: 3 }));
 
       // Omit patch and manually update systemB to align with systemA before the deletes
       flushState(systemA);
-      systemB.users.set("1", User.from({ name: "1", cash: 1 }));
-      systemB.users.set("2", User.from({ name: "2", cash: 2 }));
-      systemB.users.set("3", User.from({ name: "3", cash: 3 }));
+      systemB.users.set("1", userFrom({ name: "1", cash: 1 }));
+      systemB.users.set("2", userFrom({ name: "2", cash: 2 }));
+      systemB.users.set("3", userFrom({ name: "3", cash: 3 }));
 
       // Now delete the entity and flush to send a delete patch
       systemA.users.delete("2");
@@ -75,15 +78,15 @@ describe("can flush and patch", () => {
     });
 
     it("clear", () => {
-      systemA.users.set("1", User.from({ name: "1", cash: 1 }));
-      systemA.users.set("2", User.from({ name: "2", cash: 2 }));
-      systemA.users.set("3", User.from({ name: "3", cash: 3 }));
+      systemA.users.set("1", userFrom({ name: "1", cash: 1 }));
+      systemA.users.set("2", userFrom({ name: "2", cash: 2 }));
+      systemA.users.set("3", userFrom({ name: "3", cash: 3 }));
 
       // Omit patch and manually update systemB to align with systemA before the clear
       flushState(systemA);
-      systemB.users.set("1", User.from({ name: "1", cash: 1 }));
-      systemB.users.set("2", User.from({ name: "2", cash: 2 }));
-      systemB.users.set("3", User.from({ name: "3", cash: 3 }));
+      systemB.users.set("1", userFrom({ name: "1", cash: 1 }));
+      systemB.users.set("2", userFrom({ name: "2", cash: 2 }));
+      systemB.users.set("3", userFrom({ name: "3", cash: 3 }));
 
       // Now clear the map and flush to send a clear patch
       systemA.users.clear();
@@ -93,19 +96,19 @@ describe("can flush and patch", () => {
     });
 
     it("flushing one entity produces a smaller patch than flushing two entities", () => {
-      systemA.users.set("1", User.from({ name: "1", cash: 1 }));
-      systemA.users.set("2", User.from({ name: "2", cash: 2 }));
+      systemA.users.set("1", userFrom({ name: "1", cash: 1 }));
+      systemA.users.set("2", userFrom({ name: "2", cash: 2 }));
 
       const patch1 = flushState(systemA);
 
-      systemA.users.set("3", User.from({ name: "3", cash: 3 }));
+      systemA.users.set("3", userFrom({ name: "3", cash: 3 }));
       const patch2 = flushState(systemA);
 
       expect(sizeOf(patch2)).toBeLessThan(sizeOf(patch1));
     });
 
     it("double flush always yields empty patch", () => {
-      systemA.users.set("1", User.from({ name: "1", cash: 1 }));
+      systemA.users.set("1", userFrom({ name: "1", cash: 1 }));
       flushState(systemA);
       const patch = flushState(systemA);
       expect(patch).toHaveLength(0);
@@ -114,7 +117,7 @@ describe("can flush and patch", () => {
 
   describe("component", () => {
     function startInstance() {
-      return User.from({ name: "John", cash: 100 });
+      return userFrom({ name: "John", cash: 100 });
     }
     it("changes before adding to map", () => {
       const instance = startInstance();
@@ -195,16 +198,16 @@ describe("deeply nested state", () => {
     name = "";
     cash = 0;
     movement = new Movement();
+  }
 
-    static from(data: User): User {
-      const user = new User();
-      user.name = data.name;
-      user.cash = data.cash;
-      user.movement.x = data.movement.x;
-      user.movement.y = data.movement.y;
-      user.movement.speed = data.movement.speed;
-      return user;
-    }
+  function userFrom(data: User): User {
+    const user = new User();
+    user.name = data.name;
+    user.cash = data.cash;
+    user.movement.x = data.movement.x;
+    user.movement.y = data.movement.y;
+    user.movement.speed = data.movement.speed;
+    return user;
   }
 
   class State {
@@ -220,7 +223,7 @@ describe("deeply nested state", () => {
   });
 
   function startInstance() {
-    return User.from({
+    return userFrom({
       name: "John",
       cash: 100,
       movement: { x: 10, y: 20, speed: 30 },

@@ -3,51 +3,58 @@ import type { Signal } from "@mp/state";
 import { signal as createSignal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
 
-export function entity<T extends { new (...args: any[]): {} }>(
-  constructor: T,
-): T {
-  return class extends constructor {
+export function entity<T extends { new (...args: any[]): {} }>(Base: T): T {
+  return class Tracked extends Base {
     [syncMemorySymbol]: SyncMemory;
     constructor(...args: any[]) {
       super(...args);
 
       const memory = new SyncMemory();
       this[syncMemorySymbol] = memory;
-      memory.associate(this, "" as JsonPointer);
+      for (const key in this) {
+        const value = this[key];
+        const child = getSyncMemory(value);
+        if (child) {
+          child.hoist(memory, key);
+          break;
+        }
+
+        // We store the pointer on the signal so that we can change it later when hoisting
+
+        const signal = createSignal(value) as SignalWithPointer<unknown>;
+        signal.pointer = key as unknown as JsonPointer;
+        memory.signals[signal.pointer] = signal;
+
+        Object.defineProperty(this, key, {
+          configurable: false,
+          enumerable: true,
+          get: () => signal.value,
+          set: (newValue) => {
+            signal.value = newValue;
+            memory.dirty.add(signal.pointer);
+          },
+        });
+      }
     }
   };
 }
 
+interface SignalWithPointer<T> extends Signal<T> {
+  pointer: JsonPointer;
+}
+
 class SyncMemory {
-  signals: Record<JsonPointer, Signal<unknown>> = {};
+  signals: Record<JsonPointer, SignalWithPointer<unknown>> = {};
   dirty = new Set<JsonPointer>();
-  ptr = "" as JsonPointer;
 
-  associate<T extends object>(instance: T, ptr: JsonPointer): void {
-    this.ptr = ptr;
-    for (const key in instance) {
-      const value = instance[key];
-      const child = getSyncMemory(value);
-      if (child) {
-        child.hoist(this);
-        return;
-      }
-
-      const signal = createSignal(value);
-      this.signals[ptr] = signal;
-      Object.defineProperty(instance, key, {
-        configurable: true,
-        enumerable: true,
-        get: () => signal.value,
-        set: (newValue) => {
-          signal.value = newValue;
-          this.dirty.add(ptr);
-        },
-      });
+  hoist(to: SyncMemory, parentKey: string): void {
+    for (const signal of Object.values(this.signals)) {
+      signal.pointer = joinPointers(parentKey, signal.pointer);
+      to.signals[signal.pointer] = signal;
     }
+    this.signals = {}; // Empty local signals record since they're all now hoisted
+    this.dirty = to.dirty; // Use the parents dirty set
   }
-
-  hoist(to: SyncMemory): void {}
 }
 
 const syncMemorySymbol = Symbol("SyncMemory");
@@ -93,3 +100,16 @@ export function updateEntity<Entity>(
 type JsonPointer = Branded<string, "JsonPointer">;
 
 export type SyncInstanceFlush = Array<[JsonPointer, unknown]>;
+
+function joinPointers(a: string, b: string): JsonPointer {
+  if (!a && !b) {
+    return "" as JsonPointer;
+  }
+  if (!a) {
+    return b as JsonPointer;
+  }
+  if (!b) {
+    return a as JsonPointer;
+  }
+  return (a + "/" + b) as JsonPointer;
+}
