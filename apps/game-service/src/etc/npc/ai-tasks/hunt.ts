@@ -65,7 +65,7 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
   const target = gameState.actors
     .values()
     .find(function isDefensiveHuntTarget(candidate) {
-      if (candidate.type !== "character" || !candidate.alive) {
+      if (candidate.type !== "character" || !candidate.combat.alive) {
         return false;
       }
       return (
@@ -89,7 +89,7 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
   const target = gameState.actors
     .values()
     .find(function isAggressiveHuntTarget(candidate) {
-      if (candidate.type !== "character" || !candidate.alive) {
+      if (candidate.type !== "character" || !candidate.combat.alive) {
         return false;
       }
       return candidate.movement.coords.isWithinDistance(

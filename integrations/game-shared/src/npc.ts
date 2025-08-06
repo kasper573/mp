@@ -7,7 +7,7 @@ import type {
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
-import { tracked } from "@mp/sync";
+import { object, value } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
@@ -54,43 +54,27 @@ export interface NpcSpawn {
   npcType?: NpcType;
 }
 
-export interface NpcInstanceInit {
-  identity: NpcInstanceIdentity;
-  appearance: AppearanceTrait;
-  movement: MovementTrait;
-  combat: CombatTrait;
-  etc: NpcEtc;
-}
-
-export interface NpcInstanceIdentity {
-  readonly id: NpcInstanceId;
-  readonly npcId: NpcId;
-  readonly spawnId: NpcSpawnId;
-  readonly npcType: NpcType;
-}
-
-@tracked()
-export class NpcEtc {
-  aggroRange = 0 as Tile;
-  patrol?: Path<Tile>;
-}
-
 /**
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-@tracked()
-export class NpcInstance {
-  readonly type = "npc" as const;
-  readonly identity!: NpcInstanceIdentity;
-  readonly appearance = new AppearanceTrait();
-  readonly movement = new MovementTrait();
-  readonly combat = new CombatTrait();
-  readonly etc = new NpcEtc();
+export const NpcInstance = object({
+  type: value<"npc">(),
+  identity: object({
+    id: value<NpcInstanceId>(),
+    npcId: value<NpcId>(),
+    spawnId: value<NpcSpawnId>(),
+    npcType: value<NpcType>(),
+  }),
+  appearance: AppearanceTrait,
+  movement: MovementTrait,
+  combat: CombatTrait,
+  etc: object({
+    aggroRange: value<Tile>(),
+    patrol: value<Path<Tile> | undefined>(),
+  }),
+});
 
-  get alive() {
-    return this.combat.health > 0;
-  }
-}
+export type NpcInstance = typeof NpcInstance.$infer;
 
 export type NpcInstanceId = Branded<string, "NPCInstanceId">;

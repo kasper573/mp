@@ -35,12 +35,19 @@ export function combatBehavior(
     for (const actor of state.actors.values()) {
       attemptAttack(actor, totalTimeElapsed);
 
-      // Dying should stop all actions
+      // You die when your health reaches 0
       if (!actor.combat.health) {
+        actor.combat.alive = false;
+        // Dying should stop all actions
         actor.combat.health = 0;
         actor.movement.path = undefined;
         actor.movement.moveTarget = undefined;
         actor.combat.attackTargetId = undefined;
+      }
+
+      // You live when your health is above 0
+      else {
+        actor.combat.alive = true;
       }
     }
   };

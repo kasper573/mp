@@ -1,11 +1,11 @@
 import type { AreaId } from "@mp/db/types";
-import { tracked, type SyncMap } from "@mp/sync";
+import { object, value, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
 
-@tracked()
-export class GameServiceArea {
-  id!: AreaId;
-}
+export const GameServiceArea = object({
+  id: value<AreaId>(),
+});
+export type GameServiceArea = typeof GameServiceArea.$infer;
 
 // oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameState = {

@@ -5,14 +5,7 @@
 import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
-import { addTrackedClassToEncoder } from "@mp/sync";
-import { AppearanceTrait } from "./appearance";
-import { Character, CharacterProgression } from "./character";
-import { CombatTrait } from "./combat";
 import { EncoderTag } from "./encoding";
-import { GameServiceArea } from "./game-state";
-import { MovementTrait } from "./movement";
-import { NpcEtc, NpcInstance } from "./npc";
 
 let hasRegistered = false;
 
@@ -22,18 +15,6 @@ export function registerEncoderExtensions(): void {
   }
 
   hasRegistered = true;
-
-  addTrackedClassToEncoder(EncoderTag.NpcInstance, NpcInstance);
-  addTrackedClassToEncoder(EncoderTag.NpcEtc, NpcEtc);
-  addTrackedClassToEncoder(EncoderTag.AppearanceTrait, AppearanceTrait);
-  addTrackedClassToEncoder(EncoderTag.MovementTrait, MovementTrait);
-  addTrackedClassToEncoder(EncoderTag.CombatTrait, CombatTrait);
-  addTrackedClassToEncoder(EncoderTag.Character, Character);
-  addTrackedClassToEncoder(
-    EncoderTag.CharacterProgression,
-    CharacterProgression,
-  );
-  addTrackedClassToEncoder(EncoderTag.GameServiceArea, GameServiceArea);
 
   addEncoderExtension<Vector<number>, [number, number]>({
     Class: Vector<number>,

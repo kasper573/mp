@@ -11,7 +11,7 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId, typedAssign } from "@mp/std";
+import { assert, createShortId } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 
@@ -30,7 +30,7 @@ export class NpcSpawner {
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
       for (const actor of state.actors.values()) {
-        if (actor.type !== "npc" || actor.alive) {
+        if (actor.type !== "npc" || actor.combat.alive) {
           continue;
         }
         let cleanupTime = corpseCleanupTimers.get(actor.identity.id);
@@ -65,7 +65,8 @@ export class NpcSpawner {
     const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
 
-    return typedAssign(new NpcInstance(), {
+    return NpcInstance.create({
+      type: "npc",
       identity: {
         id,
         npcId: npc.id,
@@ -84,6 +85,7 @@ export class NpcSpawner {
         attackRange: npc.attackRange,
         attackSpeed: npc.attackSpeed,
         health: npc.maxHealth,
+        alive: true,
         maxHealth: npc.maxHealth,
         attackTargetId: undefined,
         lastAttack: undefined,

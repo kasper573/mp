@@ -231,7 +231,7 @@ class TrackedMemory<T extends object> {
 }
 
 type DeepPOJO<T> = Branded<T, "DeepPOJO">;
-type DeepPartial<T> = Branded<T, "DeepPartial">;
+export type DeepPartial<T> = Branded<T, "DeepPartial">;
 
 function getTrackedMemory<T extends object>(
   target: T,

@@ -22,7 +22,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, typedAssign, withBackoffRetries } from "@mp/std";
+import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -198,9 +198,7 @@ const syncMessageSizeHistogram = new MetricsHistogram({
 });
 
 const gameState: GameState = {
-  area: new SyncMap([
-    ["current", typedAssign(new GameServiceArea(), { id: opt.areaId })],
-  ]),
+  area: new SyncMap([["current", GameServiceArea.create({ id: opt.areaId })]]),
   actors: new SyncMap([]),
 };
 

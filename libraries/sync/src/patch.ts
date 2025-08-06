@@ -1,4 +1,4 @@
-import type { FlatTrackedValues } from "./tracked";
+import type { DeepPartial } from "./tracked";
 
 export type AnyEntityId = string | number;
 export type AnyPatch = Patch<string, AnyEntityId, unknown>;
@@ -13,7 +13,7 @@ export type Patch<EntityName, EntityId, Entity> = Operation<
 export type Operation<EntityName, EntityId, Entity> =
   | MapUpsertOperation<EntityName, EntityId, Entity>
   | MapDeleteOperation<EntityName, EntityId>
-  | EntityUpdateOperation<EntityName, EntityId>;
+  | EntityUpdateOperation<EntityName, EntityId, Entity>;
 
 export interface MapUpsertOperation<EntityName, EntityId, Entity> {
   readonly type: PatchOperationType.MapAdd;
@@ -27,10 +27,10 @@ export interface MapDeleteOperation<EntityName, EntityId> {
   readonly removedIds: ReadonlySet<EntityId>;
 }
 
-export interface EntityUpdateOperation<EntityName, EntityId> {
+export interface EntityUpdateOperation<EntityName, EntityId, Entity> {
   readonly type: PatchOperationType.EntityUpdate;
   readonly entityName: EntityName;
-  readonly changes: readonly [EntityId, FlatTrackedValues][];
+  readonly changes: readonly [EntityId, DeepPartial<Entity>][];
 }
 
 export enum PatchOperationType {

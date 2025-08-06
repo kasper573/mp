@@ -1,20 +1,19 @@
 import type { Rect } from "@mp/math";
 import type { Tile, TimesPerSecond } from "@mp/std";
-import { tracked } from "@mp/sync";
+import { object, value } from "@mp/sync";
 import type { TimeSpan } from "@mp/time";
 import type { ActorId } from "./actor";
 
-@tracked()
-export class CombatTrait {
-  /**
-   * Relative to the actor's position.
-   */
-  hitBox!: Rect<Tile>;
-  health!: number;
-  maxHealth!: number;
-  attackDamage!: number;
-  attackSpeed!: TimesPerSecond;
-  attackRange!: Tile;
-  attackTargetId?: ActorId;
-  lastAttack?: TimeSpan;
-}
+export const CombatTrait = object({
+  hitBox: value<Rect<Tile>>(),
+  health: value<number>(),
+  alive: value<boolean>(),
+  maxHealth: value<number>(),
+  attackDamage: value<number>(),
+  attackSpeed: value<TimesPerSecond>(),
+  attackRange: value<Tile>(),
+  attackTargetId: value<ActorId | undefined>(),
+  lastAttack: value<TimeSpan | undefined>(),
+});
+
+export type CombatTrait = typeof CombatTrait.$infer;

@@ -1,15 +1,15 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { tracked } from "@mp/sync";
+import { object, value } from "@mp/sync";
 
-@tracked()
-export class AppearanceTrait {
-  color?: number;
-  opacity?: number;
-  modelId!: ActorModelId;
-  name!: string;
-}
+export const AppearanceTrait = object({
+  color: value<number | undefined>(),
+  opacity: value<number | undefined>(),
+  modelId: value<ActorModelId>(),
+  name: value<string>(),
+});
+export type AppearanceTrait = typeof AppearanceTrait.$infer;
 
 export interface ActorModel {
   id: ActorModelId;

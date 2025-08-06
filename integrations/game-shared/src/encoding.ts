@@ -17,16 +17,6 @@ export enum EncoderTag {
   SyncMessageWithRecipient = 40_505,
   EventMessage = 40_506,
   EventWithSession = 40_507,
-
-  // Game data
-  NpcInstance = 40_508,
-  NpcEtc = 40_509,
-  AppearanceTrait = 40_510,
-  MovementTrait = 40_511,
-  CombatTrait = 40_512,
-  Character = 40_513,
-  CharacterProgression = 40_514,
-  GameServiceArea = 40_515,
 }
 
 // ----------------------------------------------------

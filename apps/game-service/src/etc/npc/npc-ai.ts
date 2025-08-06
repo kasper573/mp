@@ -45,7 +45,7 @@ export class NpcAi {
       };
 
       for (const subject of this.gameState.actors.values()) {
-        if (subject.type !== "npc" || !subject.alive) {
+        if (subject.type !== "npc" || !subject.combat.alive) {
           continue;
         }
         this.observeAttacksDoneThisTick(subject);
