@@ -45,6 +45,14 @@ describe("can flush and patch", () => {
     });
   });
 
+  it("initial state becomes a patch when flushed", () => {
+    const user = User.create({ name: "John", cash: 100 });
+
+    const patch = flushTrackedInstance(user);
+
+    expect(patch).toBeDefined();
+  });
+
   describe("map", () => {
     it("set", () => {
       // Assert that map set work in local system
