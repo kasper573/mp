@@ -752,9 +752,6 @@ importers:
 
   libraries/event-router:
     dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../encoding
       '@mp/invocation-proxy':
         specifier: workspace:*
         version: link:../invocation-proxy

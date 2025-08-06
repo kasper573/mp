@@ -3,12 +3,12 @@ import { createDbClient } from "@mp/db";
 import {
   createEventInvoker,
   createProxyEventInvoker,
-  eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
 import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
+  eventMessageEncoding,
   eventWithSessionEncoding,
   GameServiceArea,
   GameServiceConfig,

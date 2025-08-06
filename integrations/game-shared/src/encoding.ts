@@ -22,7 +22,8 @@ export enum EncoderTag {
   GameServiceArea = 40_511,
   SyncMessage = 40_512,
   SyncMessageWithRecipient = 40_513,
-  EventWithSession = 40_514,
+  EventMessage = 40_514,
+  EventWithSession = 40_515,
 }
 
 // Makes the @tracked decorator use the EncoderTag type
@@ -55,6 +56,9 @@ export interface EventWithSession {
 }
 export const eventWithSessionEncoding = createEncoding<EventWithSession>(
   EncoderTag.EventWithSession,
+);
+export const eventMessageEncoding = createEncoding<EventRouterMessage<unknown>>(
+  EncoderTag.EventMessage,
 );
 
 // ----------------------------------------------------

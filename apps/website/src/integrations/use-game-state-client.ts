@@ -1,11 +1,11 @@
 import {
   createProxyEventInvoker,
-  eventMessageEncoding,
   type MergeEventRouterNodes,
   type ProxyEventInvoker,
 } from "@mp/event-router";
 import { GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
+import { eventMessageEncoding } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/oauth/client";

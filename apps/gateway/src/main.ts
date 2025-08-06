@@ -4,13 +4,13 @@ import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
   createProxyEventInvoker,
-  eventMessageEncoding,
   QueuedEventInvoker,
   willRouterAcceptMessage,
 } from "@mp/event-router";
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
+  eventMessageEncoding,
   eventWithSessionEncoding,
   registerEncoderExtensions,
   syncMessageEncoding,
