@@ -18,7 +18,7 @@ export function value<T>(optimizer?: PatchOptimizer<T>): Schema<T> {
 export function flushTrackedInstance<T extends object>(
   target: T,
 ): DeepPartial<T> | undefined {
-  return getTrackedMemory(target)?.flush(target);
+  return getTrackedApi(target)?.flush(target);
 }
 
 export function updateTrackedInstance<T extends object>(
@@ -93,9 +93,8 @@ class ValueSchema<T> extends Schema<T> {
 
 class TrackedInstance<T extends object> {
   constructor(schema: ObjectSchema<T>, initialValues: T) {
-    const memory = new TrackedMemory(schema);
-
-    Reflect.set(this, trackedMemorySymbol, memory);
+    const trackedApi = new TrackedAPI(schema);
+    Reflect.set(this, trackedApiSymbol, trackedApi);
 
     Object.keys(schema.properties).forEach((p) => {
       const key = p as keyof T;
@@ -124,13 +123,13 @@ class TrackedInstance<T extends object> {
             const prevValue = signal.value;
             signal.value = newValue;
             if (propertySchema.optimizer.filter(prevValue, newValue)) {
-              memory.dirty.add(key);
+              trackedApi.dirty.add(key);
             }
           },
         });
 
         // Consider initial values dirty
-        memory.dirty.add(key);
+        trackedApi.dirty.add(key);
         return;
       }
 
@@ -163,27 +162,34 @@ addEncoderExtension<object, DeepPOJO<object>>({
   Class: TrackedInstance,
   tag: 99_999, // Special enough to avoid conflicts with other tags
   encode: (instance, encode) =>
-    encode(assert(getTrackedMemory(instance)).toPOJO(instance)),
+    encode(assert(getTrackedApi(instance)).toPOJO(instance)),
   decode: (pojo) => new TrackedInstance(deriveSchema(pojo), pojo),
 });
 
-const trackedMemorySymbol = Symbol("TrackedMemory");
+const trackedApiSymbol = Symbol("TrackedApi");
 
-class TrackedMemory<T extends object> {
+/**
+ * The tracked API is essentially methods that conceptually ought to exist on the tracked instance,
+ * but we cannot add them there since they may conflict with user-defined properties.
+ * So the tracked api lives on a symbol on the instance,
+ * but in all other aspects behaves like normal instance methods,
+ * except that they receive the instance as function argument instead of using  `this`.
+ */
+class TrackedAPI<T extends object> {
   constructor(private schema: ObjectSchema<T>) {}
   dirty = new Set<keyof T>();
 
   /**
    * Gets ALL values, regardless of whether they are dirty or not.
    */
-  toPOJO(target: T): DeepPOJO<T> {
+  toPOJO(instance: T): DeepPOJO<T> {
     const pojo = {} as DeepPOJO<T>;
 
     for (const key in this.schema.properties) {
-      const value = target[key];
+      const value = instance[key];
       const propertySchema = this.schema.properties[key];
       if (propertySchema instanceof ObjectSchema) {
-        pojo[key] = getTrackedMemory(value as object)?.toPOJO(
+        pojo[key] = getTrackedApi(value as object)?.toPOJO(
           value as object,
         ) as never;
       } else if (propertySchema instanceof ValueSchema) {
@@ -200,14 +206,14 @@ class TrackedMemory<T extends object> {
    * Flushes the dirty properties of the target object.
    * Returns a deep partial of the target object with only the dirty properties.
    */
-  flush(target: T): DeepPartial<T> | undefined {
+  flush(instance: T): DeepPartial<T> | undefined {
     const partial = {} as DeepPartial<T>;
 
     for (const key in this.schema.properties) {
       const propertySchema = this.schema.properties[key];
-      const value = target[key];
+      const value = instance[key];
       if (propertySchema instanceof ObjectSchema) {
-        const childPartial = getTrackedMemory(value as object)?.flush(
+        const childPartial = getTrackedApi(value as object)?.flush(
           value as object,
         );
         if (childPartial) {
@@ -233,10 +239,8 @@ class TrackedMemory<T extends object> {
 type DeepPOJO<T> = Branded<T, "DeepPOJO">;
 export type DeepPartial<T> = Branded<T, "DeepPartial">;
 
-function getTrackedMemory<T extends object>(
-  target: T,
-): TrackedMemory<T> | undefined {
-  return Reflect.get(target, trackedMemorySymbol) as TrackedMemory<T>;
+function getTrackedApi<T extends object>(target: T): TrackedAPI<T> | undefined {
+  return Reflect.get(target, trackedApiSymbol) as TrackedAPI<T>;
 }
 
 const passThrough = <T>(v: T): T => v;
