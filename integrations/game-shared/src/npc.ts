@@ -15,7 +15,6 @@ import {
 import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
-import { EncoderTag } from "./encoding";
 import { MovementTrait } from "./movement";
 
 export interface Npc {
@@ -75,7 +74,7 @@ export interface NpcInstanceIdentity {
   readonly npcType: NpcType;
 }
 
-@tracked(EncoderTag.NpcEtc)
+@tracked()
 export class NpcEtc {
   aggroRange = 0 as Tile;
   patrol?: Path<Tile>;
@@ -85,7 +84,7 @@ export class NpcEtc {
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-@tracked(EncoderTag.NpcInstance)
+@tracked()
 export class NpcInstance {
   readonly type = "npc" as const;
   readonly identity: NpcInstanceIdentity;

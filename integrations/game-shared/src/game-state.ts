@@ -1,9 +1,8 @@
 import type { AreaId } from "@mp/db/types";
 import { tracked, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
-import { EncoderTag } from "./encoding";
 
-@tracked(EncoderTag.GameServiceArea)
+@tracked()
 export class GameServiceArea {
   id!: AreaId;
 }

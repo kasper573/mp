@@ -3,9 +3,8 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { tracked } from "@mp/sync";
 import type { TimeSpan } from "@mp/time";
 import type { ActorId } from "./actor";
-import { EncoderTag } from "./encoding";
 
-@tracked(EncoderTag.CombatTrait)
+@tracked()
 export class CombatTrait {
   /**
    * Relative to the actor's position.

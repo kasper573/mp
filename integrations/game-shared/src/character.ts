@@ -4,11 +4,10 @@ import { typedAssign } from "@mp/std";
 import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
-import { EncoderTag } from "./encoding";
 import { MovementTrait } from "./movement";
 
-@tracked(EncoderTag.CharacterProgression)
-class CharacterProgression {
+@tracked()
+export class CharacterProgression {
   xp!: number;
 }
 
@@ -25,7 +24,7 @@ interface CharacterIdentity {
   readonly userId: UserId;
 }
 
-@tracked(EncoderTag.Character)
+@tracked()
 export class Character {
   readonly type = "character" as const;
   readonly identity: CharacterIdentity;

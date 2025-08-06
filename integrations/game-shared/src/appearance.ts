@@ -2,9 +2,8 @@ import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { tracked } from "@mp/sync";
-import { EncoderTag } from "./encoding";
 
-@tracked(EncoderTag.AppearanceTrait)
+@tracked()
 export class AppearanceTrait {
   color?: number;
   opacity?: number;

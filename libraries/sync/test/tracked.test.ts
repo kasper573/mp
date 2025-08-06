@@ -6,6 +6,7 @@ import { createEncoding } from "@mp/encoding";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
 import {
+  addTrackedClassToEncoder,
   flushTrackedInstance,
   tracked,
   updateTrackedInstance,
@@ -22,7 +23,7 @@ describe("can flush and patch", () => {
     };
   }
 
-  @tracked(0)
+  @tracked()
   class User {
     constructor(
       public name = "",
@@ -198,14 +199,14 @@ describe("can flush and patch", () => {
 });
 
 describe("deeply nested state", () => {
-  @tracked(1)
+  @tracked()
   class Movement {
     x = 0;
     y = 0;
     speed = 0;
   }
 
-  @tracked(2)
+  @tracked()
   class User {
     name = "";
     cash = 0;
@@ -287,7 +288,7 @@ describe("deeply nested state", () => {
 });
 
 it("can encode and decode", () => {
-  @tracked(3)
+  @tracked()
   class Thing {
     get double() {
       return this.value * 2;
@@ -295,6 +296,8 @@ it("can encode and decode", () => {
 
     constructor(public value = 0) {}
   }
+
+  addTrackedClassToEncoder(1, Thing);
 
   const encoding = createEncoding<Thing>(1);
 
@@ -306,7 +309,7 @@ it("can encode and decode", () => {
 });
 
 it("properties are reactive", () => {
-  @tracked(4)
+  @tracked()
   class Counter {
     count = 0;
     label = "Counter";
@@ -334,11 +337,11 @@ it("properties are reactive", () => {
 });
 
 describe("property tracking optimization", () => {
-  @tracked(5, {
+  @tracked({
     optimizers: {
       value: {
-        transform: (value: number) => parseFloat(value.toFixed(3)),
-        filter: (a: number, b: number) => Math.floor(a) !== Math.floor(b),
+        transform: (value) => parseFloat(value.toFixed(3)),
+        filter: (a, b) => Math.floor(a ?? 0) !== Math.floor(b),
       },
     },
   })

@@ -26,10 +26,9 @@ export interface TrackedPropertyOptimizer<T> {
   transform?: (value: T) => T;
 }
 
-export function tracked<T extends { new (...args: any[]): {} }>(
-  tag: Tag,
-  { optimizers }: TrackedClassOptions<InstanceType<T>> = {},
-) {
+export function tracked<T extends { new (...args: any[]): {} }>({
+  optimizers,
+}: TrackedClassOptions<InstanceType<T>> = {}) {
   return function createTrackedClass(Base: T): T {
     class Tracked extends Base {
       [syncMemorySymbol]: TrackMemory;
@@ -69,22 +68,29 @@ export function tracked<T extends { new (...args: any[]): {} }>(
       }
     }
 
-    addEncoderExtension<Tracked, FlatTrackedValues>({
-      Class: Tracked,
-      encode(tracked, encode) {
-        const memory = getSyncMemory(tracked) as TrackMemory;
-        return encode(memory.selectFlatValues());
-      },
-      decode(values) {
-        const instance = new Tracked();
-        updateTrackedInstance(instance, values);
-        return instance;
-      },
-      tag,
-    });
-
     return Tracked;
   };
+}
+
+/**
+ * Convenience function to easily add a tracked class as an encoder extension.
+ */
+export function addTrackedClassToEncoder<
+  T extends { new (...args: any[]): {} },
+>(tag: Tag, Tracked: T) {
+  addEncoderExtension<object, FlatTrackedValues>({
+    Class: Tracked,
+    encode(tracked, encode) {
+      const memory = getSyncMemory(tracked) as TrackMemory;
+      return encode(memory.selectFlatValues());
+    },
+    decode(values) {
+      const instance = new Tracked();
+      updateTrackedInstance(instance, values);
+      return instance;
+    },
+    tag,
+  });
 }
 
 function wrapOptimizers({

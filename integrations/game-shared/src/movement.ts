@@ -2,12 +2,9 @@ import type { CardinalDirection, Path, Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { tracked } from "@mp/sync";
 import type { ObjectId } from "@mp/tiled-loader";
-import { EncoderTag } from "./encoding";
 import * as patchOptimizers from "./patch-optimizers";
 
-@tracked(EncoderTag.MovementTrait, {
-  optimizers: patchOptimizers,
-})
+@tracked({ optimizers: patchOptimizers })
 export class MovementTrait {
   /**
    * Current position of the subject.
