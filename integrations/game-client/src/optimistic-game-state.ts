@@ -112,8 +112,10 @@ function applyPatchOptimized(
       }
     }
 
-    // oxlint-disable-next-line no-explicit-any
-    gameState.actors.applyOperation(op as Operation<any, any, any>);
+    gameState[op.entityName as keyof GameState].applyOperation(
+      // oxlint-disable-next-line no-explicit-any
+      op as Operation<any, any, any>,
+    );
   }
 }
 
