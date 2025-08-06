@@ -150,7 +150,7 @@ function deriveSchema<T extends object>(pojo: T): ObjectSchema<T> {
   const properties: Record<string, Schema<unknown>> = {};
   for (const key in pojo) {
     const value = pojo[key];
-    if (typeof value === "object" && value !== null) {
+    if (isPlainObject(value)) {
       properties[key] = deriveSchema(value);
     } else {
       properties[key] = new ValueSchema();
@@ -241,3 +241,11 @@ function getTrackedMemory<T extends object>(
 
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
+
+function isPlainObject(value: unknown): value is object {
+  if (value === null || typeof value !== "object") {
+    return false;
+  }
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}

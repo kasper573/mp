@@ -2,7 +2,7 @@
 import { effect } from "@mp/state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { createEncoding } from "@mp/encoding";
+import { addEncoderExtension, createEncoding } from "@mp/encoding";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
 import {
@@ -292,6 +292,30 @@ describe("Encoding & reactivity", () => {
     after.value = 20;
     const patch = flushTrackedInstance(after);
     expect(patch).toBeDefined();
+  });
+
+  it("decoder does not interpret class instances as pojos", () => {
+    class NumberHolder {
+      constructor(public value: number) {}
+    }
+
+    addEncoderExtension<NumberHolder, number>({
+      Class: NumberHolder,
+      tag: 99,
+      encode: (instance, encode) => encode(instance.value),
+      decode: (value) => new NumberHolder(value),
+    });
+
+    const Obj = object({ holder: value<NumberHolder>() });
+    type Obj = typeof Obj.$infer;
+
+    const enc = createEncoding<Obj>(100);
+
+    const before = Obj.create({ holder: new NumberHolder(10) });
+    const after = enc.decode(enc.encode(before))._unsafeUnwrap();
+    expect(after.holder).toBeInstanceOf(NumberHolder);
+
+    expect(after.holder.value).toBe(10);
   });
 
   it("should react to property changes", () => {
