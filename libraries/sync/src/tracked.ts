@@ -42,6 +42,14 @@ export function tracked<T extends { new (...args: any[]): {} }>({
           const child = getSyncMemory(value);
           if (child) {
             child.hoist(memory, key);
+
+            // If a tracked child instance is assigned to, we mutate the underlying instance instead
+            Object.defineProperty(this, key, {
+              configurable: false,
+              enumerable: true,
+              get: () => value,
+              set: (newValue) => Object.assign(value as object, newValue),
+            });
             break;
           }
 

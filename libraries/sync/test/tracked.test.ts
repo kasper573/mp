@@ -285,6 +285,37 @@ describe("deeply nested state", () => {
 
     expect(patch).toHaveLength(0);
   });
+
+  describe("assigning to nested tracked instance", () => {
+    it("instance is retained but mutated", () => {
+      const instance = startInstance();
+      const movementInstanceBefore = instance.movement;
+      instance.movement = { x: 20, y: 30, speed: 40 };
+      expect(instance.movement).toBe(movementInstanceBefore);
+    });
+
+    it("mutation becomes a patch", () => {
+      const instance = startInstance();
+      systemA.users.set("1", instance);
+
+      let patch = flushState(systemA);
+      updateState(systemB, patch);
+
+      instance.movement = { x: 20, y: 30, speed: 40 };
+      patch = flushState(systemA);
+
+      // Use a new instance in B to ensure we're not relying on changes
+      // in the original instance and actually applying the patch
+      systemB.users.set("1", startInstance());
+      updateState(systemB, patch);
+
+      expect(systemB.users.get("1")).toMatchObject({
+        name: "John",
+        cash: 100,
+        movement: { x: 20, y: 30, speed: 40 },
+      });
+    });
+  });
 });
 
 it("can encode and decode", () => {
