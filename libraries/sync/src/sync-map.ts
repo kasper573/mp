@@ -1,8 +1,8 @@
 import { NotifiableSignal } from "@mp/state";
 import { assert } from "@mp/std";
+import { PatchOperationType, type Operation, type Patch } from "./patch";
 import type { TrackedInstanceFlush } from "./tracked";
 import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
-import { PatchOperationType, type Operation, type Patch } from "./types";
 
 export class SyncMap<EntityId, Entity> {
   #signal: NotifiableSignal<Map<EntityId, Entity>>;

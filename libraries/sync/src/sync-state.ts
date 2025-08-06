@@ -1,5 +1,5 @@
+import type { AnyPatch } from "./patch";
 import { SyncMap } from "./sync-map";
-import type { AnyPatch } from "./types";
 
 export function flushState<State, P extends AnyPatch>(
   state: State,

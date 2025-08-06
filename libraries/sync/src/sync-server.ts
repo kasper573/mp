@@ -1,5 +1,5 @@
+import type { Operation, Patch } from "./patch";
 import type { EventAccessFn, SyncEvent, SyncEventMap } from "./sync-event";
-import type { Operation, Patch } from "./types";
 
 export class SyncServer<State, EventMap extends SyncEventMap, ClientId> {
   private events: ServerSyncEvent<State>[] = [];
