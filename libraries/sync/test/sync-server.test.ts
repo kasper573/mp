@@ -1,15 +1,20 @@
+// oxlint-disable consistent-type-definitions
 import { expect, it } from "vitest";
 import { SyncMap } from "../src/sync-map";
 import { SyncServer } from "../src/sync-server";
 import { updateState } from "../src/sync-state";
 import { tracked } from "../src/tracked";
 
-class TestState {
+type TestState = {
   items: SyncMap<string, Item>;
+};
 
-  constructor(entries?: Iterable<readonly [string, Item]> | null) {
-    this.items = new SyncMap(entries);
-  }
+function createTestState(
+  entries?: Iterable<readonly [string, Item]>,
+): TestState {
+  return {
+    items: new SyncMap<string, Item>(entries),
+  };
 }
 
 @tracked
@@ -30,15 +35,15 @@ it("sends full state patch on initial flush and respects client visibility confi
     }),
   });
 
-  const serverState = new TestState([
+  const serverState = createTestState([
     ["1", new Item(10)],
     ["2", new Item(20)],
     ["3", new Item(30)],
   ]);
   const { clientPatches } = server.flush(serverState);
 
-  const client1State = new TestState();
-  const client2State = new TestState();
+  const client1State = createTestState();
+  const client2State = createTestState();
 
   updateState(client1State, clientPatches.get("client1") ?? []);
   updateState(client2State, clientPatches.get("client2") ?? []);
@@ -61,7 +66,7 @@ it("returns no patches or events when flushed twice with no changes", () => {
     }),
   });
 
-  const state = new TestState([
+  const state = createTestState([
     ["1", new Item(1)],
     ["2", new Item(2)],
   ]);
@@ -81,8 +86,16 @@ it("can collect patches", () => {
     ) {}
   }
 
-  class TestState {
-    persons = new SyncMap<string, Person>();
+  type TestState = {
+    persons: SyncMap<string, Person>;
+  };
+
+  function createTestState(
+    entries?: Iterable<readonly [string, Person]>,
+  ): TestState {
+    return {
+      persons: new SyncMap(entries),
+    };
   }
 
   const server = new SyncServer<TestState, {}, string>({
@@ -92,13 +105,13 @@ it("can collect patches", () => {
     }),
   });
 
-  const serverState = new TestState();
+  const serverState = createTestState();
   const john = new Person("john", 0);
   const jane = new Person("jane", 50);
   serverState.persons.set("john", john);
   serverState.persons.set("jane", jane);
 
-  const clientState = new TestState();
+  const clientState = createTestState();
 
   // Flush initial state
   const flush1 = server.flush(serverState);
@@ -124,7 +137,7 @@ it("delivers events according to visibility", () => {
     }),
   });
 
-  const state = new TestState([
+  const state = createTestState([
     ["1", new Item(10)],
     ["2", new Item(20)],
     ["3", new Item(30)],
@@ -172,7 +185,7 @@ it("markToResendFullState forces a client to get full patch again", () => {
       items: new Set(id === "client1" ? state.items.keys() : ["2"]),
     }),
   });
-  const serverState = new TestState([
+  const serverState = createTestState([
     ["1", new Item(1)],
     ["2", new Item(2)],
   ]);
@@ -180,8 +193,8 @@ it("markToResendFullState forces a client to get full patch again", () => {
   server.markToResendFullState("client1");
   const { clientPatches } = server.flush(serverState); // Flush again, but only for client1
 
-  const client1State = new TestState();
-  const client2State = new TestState();
+  const client1State = createTestState();
+  const client2State = createTestState();
 
   updateState(client1State, clientPatches.get("client1") ?? []);
   updateState(client2State, clientPatches.get("client2") ?? []);
@@ -204,18 +217,18 @@ it("fabricates 'remove' operations when entities leave visibility", () => {
       ),
     }),
   });
-  const state1 = new TestState([
+  const state1 = createTestState([
     ["1", new Item(20)],
     ["2", new Item(30)],
     ["3", new Item(40)],
   ]);
-  const state2 = new TestState([
+  const state2 = createTestState([
     ["1", new Item(20)],
     ["2", new Item(5)],
     ["3", new Item(40)],
   ]);
 
-  const clientState = new TestState();
+  const clientState = createTestState();
 
   const flush1 = server.flush(state1);
   updateState(clientState, flush1.clientPatches.get("client") ?? []);
@@ -241,18 +254,18 @@ it("fabricates 'set' operations when new entities enter visibility", () => {
       ),
     }),
   });
-  const state1 = new TestState([
+  const state1 = createTestState([
     ["1", new Item(20)],
     ["2", new Item(5)],
     ["3", new Item(40)],
   ]);
-  const state2 = new TestState([
+  const state2 = createTestState([
     ["1", new Item(20)],
     ["2", new Item(30)],
     ["3", new Item(40)],
   ]);
 
-  const clientState = new TestState();
+  const clientState = createTestState();
 
   const flush1 = server.flush(state1);
   updateState(clientState, flush1.clientPatches.get("client") ?? []);
@@ -280,7 +293,7 @@ it("does not expose invisible data on initial state flush", () => {
     }),
   });
 
-  const state = new TestState([
+  const state = createTestState([
     ["1", new Item(20)],
     [secretEntityId, { cash: secretValue }],
     ["3", new Item(40)],
@@ -307,7 +320,7 @@ it("does not expose invisible data on update flush", () => {
     }),
   });
 
-  const state = new TestState([
+  const state = createTestState([
     ["1", new Item(20)],
     ["3", new Item(40)],
   ]);

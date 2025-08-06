@@ -1,3 +1,4 @@
+// oxlint-disable consistent-type-definitions
 import { effect } from "@mp/state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -6,8 +7,14 @@ import { flushState, updateState } from "../src/sync-state";
 import { tracked } from "../src/tracked";
 
 describe("can flush and patch", () => {
-  class State {
-    users = new SyncMap<string, User>();
+  type State = {
+    users: SyncMap<string, User>;
+  };
+
+  function createState(): State {
+    return {
+      users: new SyncMap<string, User>(),
+    };
   }
 
   @tracked
@@ -29,8 +36,8 @@ describe("can flush and patch", () => {
   let systemB: State;
 
   beforeEach(() => {
-    systemA = new State();
-    systemB = new State();
+    systemA = createState();
+    systemB = createState();
   });
 
   it("can create entity instances", () => {
@@ -210,16 +217,22 @@ describe("deeply nested state", () => {
     return user;
   }
 
-  class State {
-    users = new SyncMap<string, User>();
+  type State = {
+    users: SyncMap<string, User>;
+  };
+
+  function createState(): State {
+    return {
+      users: new SyncMap<string, User>(),
+    };
   }
 
   let systemA: State;
   let systemB: State;
 
   beforeEach(() => {
-    systemA = new State();
-    systemB = new State();
+    systemA = createState();
+    systemB = createState();
   });
 
   function startInstance() {
