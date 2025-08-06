@@ -48,7 +48,7 @@ export interface PatchOptimizer<T> {
 abstract class Schema<T> {
   get $infer(): T {
     throw new Error(
-      "This property is for typ inference only. Should not be used at runtime",
+      "This property is for type inference only. Should not be used at runtime",
     );
   }
 }
