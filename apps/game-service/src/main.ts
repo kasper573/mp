@@ -154,7 +154,15 @@ function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
   const event = eventMessageEncoding.decode(data);
   if (event.isOk()) {
     eventInvoker.addEvent(event.value, ioc);
+    return;
   }
+
+  logger.warn(
+    { size: data.byteLength, error: event.error },
+    `Received unknown message from game service. ` +
+      `Message decode error: ${event.error}`,
+    `Event decode error: ${eventWithSession.error}`,
+  );
 }
 
 function flushGameState() {

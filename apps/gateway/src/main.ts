@@ -170,7 +170,8 @@ function setupGameServerSocket(socket: WebSocket, areaId: AreaId) {
 
     logger.warn(
       { size: data.byteLength },
-      "Received unknown message from game service",
+      `Received unknown message from game service. ` +
+        `Message decode error: ${message.error}. Event decode error: ${event.error}`,
     );
   });
 }
