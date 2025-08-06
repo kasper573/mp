@@ -6,7 +6,15 @@ import { checker } from "vite-plugin-checker";
 
 import type { Plugin } from "vite";
 
+const babelPlugins = [
+  // esbuild already supports stage 3 decorators, but preact uses babel and not esbuild, so we need this plugin
+  ["@babel/plugin-proposal-decorators", { version: "2023-11" }],
+];
+
 export default defineConfig({
+  esbuild: {
+    target: "es2022", // Required for decorators
+  },
   build: {
     sourcemap: true,
   },
@@ -20,7 +28,7 @@ export default defineConfig({
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    preact(),
+    preact({ babel: { plugins: babelPlugins } }),
     checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

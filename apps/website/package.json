@@ -39,6 +39,7 @@
     "@preact/preset-vite": "catalog:",
     "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
+    "@babel/plugin-proposal-decorators": "7.28.0",
     "vite": "catalog:",
     "vite-plugin-checker": "0.9.3"
   }
