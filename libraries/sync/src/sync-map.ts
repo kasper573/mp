@@ -1,7 +1,7 @@
 import { NotifiableSignal } from "@mp/state";
 import { assert } from "@mp/std";
 import { PatchOperationType, type Operation, type Patch } from "./patch";
-import type { TrackedInstanceFlush } from "./tracked";
+import type { FlatTrackedValues } from "./tracked";
 import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
 
 export class SyncMap<EntityId, Entity> {
@@ -89,7 +89,7 @@ export class SyncMap<EntityId, Entity> {
       });
     }
 
-    const instanceFlushes: Array<[EntityId, TrackedInstanceFlush]> = [];
+    const instanceFlushes: Array<[EntityId, FlatTrackedValues]> = [];
     for (const entityId of staleIds) {
       const changes = flushTrackedInstance(this.get(entityId) as Entity);
       if (changes) {

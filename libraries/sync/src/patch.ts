@@ -1,4 +1,4 @@
-import type { TrackedInstanceFlush } from "./tracked";
+import type { FlatTrackedValues } from "./tracked";
 
 export type AnyEntityId = string | number;
 export type AnyPatch = Patch<string, AnyEntityId, unknown>;
@@ -30,7 +30,7 @@ export interface MapDeleteOperation<EntityName, EntityId> {
 export interface EntityUpdateOperation<EntityName, EntityId> {
   readonly type: PatchOperationType.EntityUpdate;
   readonly entityName: EntityName;
-  readonly changes: readonly [EntityId, Readonly<TrackedInstanceFlush>][];
+  readonly changes: readonly [EntityId, Readonly<FlatTrackedValues>][];
 }
 
 export enum PatchOperationType {

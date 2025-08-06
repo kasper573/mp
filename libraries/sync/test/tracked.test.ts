@@ -2,6 +2,7 @@
 import { effect } from "@mp/state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { createEncoding } from "@mp/encoding";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
 import { tracked } from "../src/tracked";
@@ -17,7 +18,7 @@ describe("can flush and patch", () => {
     };
   }
 
-  @tracked
+  @tracked(0)
   class User {
     constructor(
       public name = "",
@@ -193,14 +194,14 @@ describe("can flush and patch", () => {
 });
 
 describe("deeply nested state", () => {
-  @tracked
+  @tracked(1)
   class Movement {
     x = 0;
     y = 0;
     speed = 0;
   }
 
-  @tracked
+  @tracked(2)
   class User {
     name = "";
     cash = 0;
@@ -281,12 +282,27 @@ describe("deeply nested state", () => {
   });
 });
 
-function sizeOf(arg: unknown): number {
-  return JSON.stringify(arg).length;
-}
+it("can encode and decode", () => {
+  @tracked(3)
+  class Thing {
+    get double() {
+      return this.value * 2;
+    }
+
+    constructor(public value = 0) {}
+  }
+
+  const encoding = createEncoding<Thing>(1);
+
+  const before = new Thing(10);
+  const after = encoding.decode(encoding.encode(before))._unsafeUnwrap();
+  expect(after).toBeInstanceOf(Thing);
+  expect(after.value).toBe(10);
+  expect(after.double).toBe(20);
+});
 
 it("properties are reactive", () => {
-  @tracked
+  @tracked(4)
   class Counter {
     count = 0;
     label = "Counter";
@@ -312,3 +328,7 @@ it("properties are reactive", () => {
 
   expect(c.double).toBe(2);
 });
+
+function sizeOf(arg: unknown): number {
+  return JSON.stringify(arg).length;
+}

@@ -17,7 +17,7 @@ function createTestState(
   };
 }
 
-@tracked
+@tracked(0)
 class Item {
   constructor(public cash = 0) {}
 }
@@ -78,7 +78,7 @@ it("returns no patches or events when flushed twice with no changes", () => {
 });
 
 it("can collect patches", () => {
-  @tracked
+  @tracked(1)
   class Person {
     constructor(
       public id = "",

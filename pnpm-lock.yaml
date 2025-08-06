@@ -942,6 +942,9 @@ importers:
 
   libraries/sync:
     dependencies:
+      '@mp/encoding':
+        specifier: workspace:*
+        version: link:../encoding
       '@mp/state':
         specifier: workspace:*
         version: link:../state
