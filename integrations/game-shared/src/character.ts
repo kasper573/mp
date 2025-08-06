@@ -1,16 +1,15 @@
 import type { CharacterId } from "@mp/db/types";
 import type { UserId } from "@mp/oauth";
-import type { SyncComponent } from "@mp/sync";
-import { defineSyncComponent } from "@mp/sync";
+import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
+import { EncoderTag } from "./encoding";
 import { MovementTrait } from "./movement";
 
-type CharacterProgression = typeof CharacterProgression.$infer;
-
-const CharacterProgression = defineSyncComponent((builder) =>
-  builder.add<number>()("xp"),
-);
+@tracked(EncoderTag.CharacterProgression)
+class CharacterProgression {
+  xp!: number;
+}
 
 export interface CharacterInit {
   identity: CharacterIdentity;
@@ -20,33 +19,32 @@ export interface CharacterInit {
   progression: CharacterProgression;
 }
 
-const CharacterIdentity = defineSyncComponent((builder) =>
-  builder.add<CharacterId>()("id").add<UserId>()("userId"),
-);
+interface CharacterIdentity {
+  readonly id: CharacterId;
+  readonly userId: UserId;
+}
 
-type CharacterIdentity = typeof CharacterIdentity.$infer;
-
-const CharacterCommons = defineSyncComponent((builder) => builder);
-
-export class Character extends CharacterCommons {
+@tracked(EncoderTag.Character)
+export class Character {
   readonly type = "character" as const;
-  readonly identity: SyncComponent<CharacterIdentity>;
-  readonly appearance: SyncComponent<AppearanceTrait>;
-  readonly movement: SyncComponent<MovementTrait>;
-  readonly combat: SyncComponent<CombatTrait>;
-  readonly progression: SyncComponent<CharacterProgression>;
+  readonly identity: CharacterIdentity;
+  readonly appearance: AppearanceTrait;
+  readonly movement: MovementTrait;
+  readonly combat: CombatTrait;
+  readonly progression: CharacterProgression;
 
   get alive() {
     return this.combat.health > 0;
   }
 
   constructor(init: CharacterInit) {
-    super({});
-    this.type = "character";
-    this.identity = new CharacterIdentity(init.identity);
-    this.appearance = new AppearanceTrait(init.appearance);
-    this.movement = new MovementTrait(init.movement);
-    this.combat = new CombatTrait(init.combat);
-    this.progression = new CharacterProgression(init.progression);
+    this.identity = init.identity;
+    this.appearance = Object.assign(new AppearanceTrait(), init.appearance);
+    this.movement = Object.assign(new MovementTrait(), init.movement);
+    this.combat = Object.assign(new CombatTrait(), init.combat);
+    this.progression = Object.assign(
+      new CharacterProgression(),
+      init.progression,
+    );
   }
 }

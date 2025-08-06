@@ -1,17 +1,16 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { defineSyncComponent } from "@mp/sync";
+import { tracked } from "@mp/sync";
+import { EncoderTag } from "./encoding";
 
-export type AppearanceTrait = typeof AppearanceTrait.$infer;
-
-export const AppearanceTrait = defineSyncComponent((builder) =>
-  builder
-    .add<number | undefined>()("color")
-    .add<number | undefined>()("opacity")
-    .add<ActorModelId>()("modelId")
-    .add<string>()("name"),
-);
+@tracked(EncoderTag.AppearanceTrait)
+export class AppearanceTrait {
+  color?: number;
+  opacity?: number;
+  modelId!: ActorModelId;
+  name!: string;
+}
 
 export interface ActorModel {
   id: ActorModelId;

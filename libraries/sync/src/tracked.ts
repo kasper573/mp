@@ -27,7 +27,7 @@ export interface TrackedPropertyOptimizer<T> {
 }
 
 export function tracked<T extends { new (...args: any[]): {} }>(
-  tag: number,
+  tag: Tag,
   { optimizers }: TrackedClassOptions<InstanceType<T>> = {},
 ) {
   return function createTrackedClass(Base: T): T {
@@ -185,3 +185,13 @@ function joinPointers(a: string, b: string): JsonPointer {
 
 const passThrough = <T>(v: T): T => v;
 const refDiff = <T>(a: T, b: T) => a !== b;
+
+type Tag = TrackedRegistry extends { tag: infer T } ? T : number;
+
+/**
+ * Augment this interface with a `tag` property to specify the type of
+ * tag value that must be passed to the `tracked` decorator.
+ *
+ * Useful if you want ensure it's an enum or a specific type.
+ */
+export interface TrackedRegistry {}

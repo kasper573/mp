@@ -7,10 +7,10 @@ import type {
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
-import type { SyncComponent } from "@mp/sync";
-import { defineSyncComponent } from "@mp/sync";
+import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
+import { EncoderTag } from "./encoding";
 import { MovementTrait } from "./movement";
 
 export interface Npc {
@@ -63,47 +63,42 @@ export interface NpcInstanceInit {
   etc: NpcEtc;
 }
 
-export type NpcInstanceIdentity = typeof NpcInstanceIdentity.$infer;
+export interface NpcInstanceIdentity {
+  readonly id: NpcInstanceId;
+  readonly npcId: NpcId;
+  readonly spawnId: NpcSpawnId;
+  readonly npcType: NpcType;
+}
 
-const NpcInstanceIdentity = defineSyncComponent((builder) =>
-  builder
-    .add<NpcInstanceId>()("id")
-    .add<NpcId>()("npcId")
-    .add<NpcSpawnId>()("spawnId")
-    .add<NpcType>()("npcType"),
-);
-
-export type NpcEtc = typeof NpcEtc.$infer;
-
-const NpcEtc = defineSyncComponent((builder) =>
-  builder.add<Tile>()("aggroRange").add<Path<Tile> | undefined>()("patrol"),
-);
-
-export const NpcInstanceCommons = defineSyncComponent((builder) => builder);
+@tracked(EncoderTag.NpcEtc)
+export class NpcEtc {
+  aggroRange = 0 as Tile;
+  patrol?: Path<Tile>;
+}
 
 /**
  * One spawned instance of a specific NPC.
  * Does not get persisted in the database.
  */
-export class NpcInstance extends NpcInstanceCommons {
+@tracked(EncoderTag.NpcInstance)
+export class NpcInstance {
   readonly type = "npc" as const;
-  readonly identity: SyncComponent<NpcInstanceIdentity>;
-  readonly appearance: SyncComponent<AppearanceTrait>;
-  readonly movement: SyncComponent<MovementTrait>;
-  readonly combat: SyncComponent<CombatTrait>;
-  readonly etc: SyncComponent<NpcEtc>;
+  readonly identity: NpcInstanceIdentity;
+  readonly appearance: AppearanceTrait;
+  readonly movement: MovementTrait;
+  readonly combat: CombatTrait;
+  readonly etc: NpcEtc;
 
   get alive() {
     return this.combat.health > 0;
   }
 
   constructor(init: NpcInstanceInit) {
-    super({});
-    this.identity = new NpcInstanceIdentity(init.identity);
-    this.appearance = new AppearanceTrait(init.appearance);
-    this.movement = new MovementTrait(init.movement);
-    this.combat = new CombatTrait(init.combat);
-    this.etc = new NpcEtc(init.etc);
+    this.identity = init.identity;
+    this.appearance = Object.assign(new AppearanceTrait(), init.appearance);
+    this.movement = Object.assign(new MovementTrait(), init.movement);
+    this.combat = Object.assign(new CombatTrait(), init.combat);
+    this.etc = Object.assign(new NpcEtc(), init.etc);
   }
 }
 

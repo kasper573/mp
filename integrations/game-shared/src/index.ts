@@ -4,7 +4,6 @@ export * from "./area-resource";
 export * from "./character";
 export * from "./client-view-distance-settings";
 export * from "./combat";
-export * from "./encoder-extensions";
 export * from "./encoding";
 export * from "./game-service-config";
 export * from "./game-state";
