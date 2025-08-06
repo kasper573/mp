@@ -100,7 +100,7 @@ await db.transaction(async (tx) => {
           yield tx.insert(npcSpawnTable).values({
             npcType,
             areaId,
-            count: 5,
+            count: 10,
             id: createShortId() as NpcSpawnId,
             npcId: soldier.id,
           });
