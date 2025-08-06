@@ -1,16 +1,16 @@
 import { effect } from "@mp/state";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { entity } from "../src/sync-entity";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
+import { tracked } from "../src/tracked";
 
 describe("can flush and patch", () => {
   class State {
     users = new SyncMap<string, User>();
   }
 
-  @entity
+  @tracked
   class User {
     constructor(
       public name = "",
@@ -186,14 +186,14 @@ describe("can flush and patch", () => {
 });
 
 describe("deeply nested state", () => {
-  @entity
+  @tracked
   class Movement {
     x = 0;
     y = 0;
     speed = 0;
   }
 
-  @entity
+  @tracked
   class User {
     name = "";
     cash = 0;
@@ -273,7 +273,7 @@ function sizeOf(arg: unknown): number {
 }
 
 it("properties are reactive", () => {
-  @entity
+  @tracked
   class Counter {
     count = 0;
     label = "Counter";

@@ -1,4 +1,4 @@
-import type { SyncInstanceFlush } from "./sync-entity";
+import type { TrackedInstanceFlush } from "./tracked";
 
 export type AnyPatch = Patch<string, string | number, unknown>;
 
@@ -28,7 +28,7 @@ export interface MapDeleteOperation<EntityName, EntityId> {
 export interface EntityUpdateOperation<EntityName, EntityId> {
   type: PatchOperationType.EntityUpdate;
   entityName: EntityName;
-  changes: readonly [EntityId, SyncInstanceFlush][];
+  changes: readonly [EntityId, TrackedInstanceFlush][];
 }
 
 export enum PatchOperationType {

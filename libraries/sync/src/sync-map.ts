@@ -1,7 +1,7 @@
 import { NotifiableSignal } from "@mp/state";
 import { assert } from "@mp/std";
-import type { SyncInstanceFlush } from "./sync-entity";
-import { flushEntity, updateEntity } from "./sync-entity";
+import type { TrackedInstanceFlush } from "./tracked";
+import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
 import { PatchOperationType, type Operation, type Patch } from "./types";
 
 export class SyncMap<EntityId, Entity> {
@@ -87,7 +87,7 @@ export class SyncMap<EntityId, Entity> {
       // Ensure the added entities have their dirty state flushed and omitted
       // since we're producing an add patch which already contains all their data.
       for (const entityId of addedIds) {
-        flushEntity(this.get(entityId) as Entity);
+        flushTrackedInstance(this.get(entityId) as Entity);
       }
     }
 
@@ -99,9 +99,9 @@ export class SyncMap<EntityId, Entity> {
       });
     }
 
-    const instanceFlushes: Array<[EntityId, SyncInstanceFlush]> = [];
+    const instanceFlushes: Array<[EntityId, TrackedInstanceFlush]> = [];
     for (const entityId of staleIds) {
-      const changes = flushEntity(this.get(entityId) as Entity);
+      const changes = flushTrackedInstance(this.get(entityId) as Entity);
       if (changes) {
         instanceFlushes.push([entityId, changes]);
       }
@@ -138,7 +138,7 @@ export class SyncMap<EntityId, Entity> {
             this.get(entityId),
             `Entity not found for update: ${entityId}`,
           );
-          updateEntity(entity, changes);
+          updateTrackedInstance(entity, changes);
         }
         break;
     }
