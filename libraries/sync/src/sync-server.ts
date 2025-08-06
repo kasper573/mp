@@ -5,6 +5,10 @@ import type { SyncMap } from "./sync-map";
 import type { AnySyncState } from "./sync-state";
 import { flushState } from "./sync-state";
 
+/**
+ * Distributor of sync state patches.
+ * Is aware of which entities clients should be able to see and filters and transforms patches accordingly per client.
+ */
 export class SyncServer<
   State extends AnySyncState,
   EventMap extends SyncEventMap,
@@ -43,12 +47,11 @@ export class SyncServer<
         appendFullStatePatch(state, nextVisibility, clientPatch);
         this.hasBeenGivenFullState.add(clientId);
       } else {
-        // Select operations that are visible to the client
-        clientPatch.push(
-          ...serverPatch.map((op) =>
-            operationVisibilityFilter(op, nextVisibility),
-          ),
-        );
+        // We will temporarily augment the visibility for the client while we emulate adds/removals of entities.
+        // This effectively allows us to dedupe patch operations so ie.
+        // a remove followed by an update of an entity becomes just a remove.
+        // This is safe to do because add/remove completely override any other kind of operation.
+        const filter = { ...nextVisibility };
 
         // Emulate adds and removals of entities due to visibility changes
         for (const entityName in state) {
@@ -62,6 +65,9 @@ export class SyncServer<
               addedIds,
               clientPatch,
             );
+
+            // Remove from visibility to avoid adding more patches for these entities
+            filter[entityName] = filter[entityName].difference(addedIds);
           }
 
           const removedIds = prevIds.difference(nextIds);
@@ -71,8 +77,16 @@ export class SyncServer<
               entityName,
               removedIds,
             });
+
+            // Remove from visibility to avoid adding more patches for these entities
+            filter[entityName] = filter[entityName].difference(removedIds);
           }
         }
+
+        // Add server operations that are still visible to the client
+        clientPatch.push(
+          ...serverPatch.map((op) => operationVisibilityFilter(op, filter)),
+        );
       }
 
       if (clientPatch.length > 0) {
