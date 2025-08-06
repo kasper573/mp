@@ -4,10 +4,33 @@ import type { Signal } from "@mp/state";
 import { signal as createSignal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
 
-export function tracked(tag: number) {
-  return function createTrackedClass<T extends { new (...args: any[]): {} }>(
-    Base: T,
-  ): T {
+export interface TrackedClassOptions<T> {
+  optimizers?: {
+    [K in keyof T]?: TrackedPropertyOptimizer<T[K]>;
+  };
+}
+
+export interface TrackedPropertyOptimizer<T> {
+  /**
+   * A predicate (prevValue, newValue) => boolean.
+   * If provided, the change will only be recorded if this returns true.
+   * Even if the filter returns false, the property is still updated to the new value.
+   */
+  filter?: (prev: T, next: T) => boolean;
+
+  /**
+   * A transform function that takes the "new" value and returns
+   * what actually gets recorded in the internal change list.
+   * The property on the instance is always set to the raw "new" value.
+   */
+  transform?: (value: T) => T;
+}
+
+export function tracked<T extends { new (...args: any[]): {} }>(
+  tag: number,
+  { optimizers }: TrackedClassOptions<InstanceType<T>> = {},
+) {
+  return function createTrackedClass(Base: T): T {
     class Tracked extends Base {
       [syncMemorySymbol]: TrackMemory;
       constructor(...args: any[]) {
@@ -25,8 +48,13 @@ export function tracked(tag: number) {
 
           // We store the pointer on the signal so that we can change it later when hoisting
 
-          const signal = createSignal(value) as SignalWithPointer<unknown>;
+          const signal = createSignal(value) as SignalWithMeta<unknown>;
           signal.pointer = key as unknown as JsonPointer;
+          signal.optimizers = {
+            filter: refDiff,
+            transform: passThrough,
+            ...optimizers?.[key],
+          } as Required<TrackedPropertyOptimizer<unknown>>;
           memory.signals.set(signal.pointer, signal);
 
           Object.defineProperty(this, key, {
@@ -34,8 +62,11 @@ export function tracked(tag: number) {
             enumerable: true,
             get: () => signal.value,
             set: (newValue) => {
+              const prevValue = signal.value;
               signal.value = newValue;
-              memory.dirty.add(signal.pointer);
+              if (signal.optimizers.filter(prevValue, newValue)) {
+                memory.dirty.add(signal.pointer);
+              }
             },
           });
         }
@@ -46,12 +77,7 @@ export function tracked(tag: number) {
       Class: Tracked,
       encode(tracked, encode) {
         const memory = getSyncMemory(tracked) as TrackMemory;
-        return encode(
-          memory.signals
-            .entries()
-            .map(([ptr, signal]) => [ptr, signal.value] as const)
-            .toArray(),
-        );
+        return encode(memory.selectFlatValues());
       },
       decode(values) {
         const instance = new Tracked();
@@ -65,12 +91,13 @@ export function tracked(tag: number) {
   };
 }
 
-interface SignalWithPointer<T> extends Signal<T> {
+interface SignalWithMeta<T> extends Signal<T> {
   pointer: JsonPointer;
+  optimizers: Required<TrackedPropertyOptimizer<T>>;
 }
 
 class TrackMemory {
-  signals = new Map<JsonPointer, SignalWithPointer<unknown>>();
+  signals = new Map<JsonPointer, SignalWithMeta<unknown>>();
   dirty = new Set<JsonPointer>();
 
   hoist(to: TrackMemory, parentKey: string): void {
@@ -80,6 +107,20 @@ class TrackMemory {
     }
     this.signals.clear(); // Empty local signals record since they're all now hoisted
     this.dirty = to.dirty; // Use the parents dirty set
+  }
+
+  selectFlatValues(
+    pointers: Iterable<JsonPointer> = this.signals.keys(),
+  ): FlatTrackedValues {
+    const values: FlatTrackedValues = [];
+    for (const ptr of pointers) {
+      const signal = assert(
+        this.signals.get(ptr),
+        `No signal found for pointer ${ptr}`,
+      );
+      values.push([ptr, signal.optimizers.transform(signal.value)]);
+    }
+    return values;
   }
 }
 
@@ -97,17 +138,11 @@ export function flushTrackedInstance<Target>(
   target: Target,
 ): FlatTrackedValues | undefined {
   const memory = getSyncMemory(target);
-  if (!memory?.dirty.size) {
-    return;
+  if (memory?.dirty.size) {
+    const changes = memory.selectFlatValues(memory.dirty);
+    memory.dirty.clear();
+    return changes;
   }
-
-  const changes: FlatTrackedValues = [];
-  for (const key of memory.dirty) {
-    changes.push([key, memory.signals.get(key)?.value]);
-  }
-
-  memory.dirty.clear();
-  return changes;
 }
 
 export function updateTrackedInstance<Target>(
@@ -147,3 +182,6 @@ function joinPointers(a: string, b: string): JsonPointer {
   }
   return (a + "/" + b) as JsonPointer;
 }
+
+const passThrough = <T>(v: T): T => v;
+const refDiff = <T>(a: T, b: T) => a !== b;

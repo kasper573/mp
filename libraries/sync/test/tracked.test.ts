@@ -5,7 +5,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createEncoding } from "@mp/encoding";
 import { SyncMap } from "../src/sync-map";
 import { flushState, updateState } from "../src/sync-state";
-import { tracked } from "../src/tracked";
+import {
+  flushTrackedInstance,
+  tracked,
+  updateTrackedInstance,
+} from "../src/tracked";
 
 describe("can flush and patch", () => {
   type State = {
@@ -321,12 +325,66 @@ it("properties are reactive", () => {
     spy(c.count);
   });
 
-  c.increment(); // Logs: Count is now: 1
+  c.increment();
 
   expect(spy).toHaveBeenNthCalledWith(1, 0);
   expect(spy).toHaveBeenNthCalledWith(2, 1);
 
   expect(c.double).toBe(2);
+});
+
+describe("property tracking optimization", () => {
+  @tracked(5, {
+    optimizers: {
+      value: {
+        transform: (value: number) => parseFloat(value.toFixed(3)),
+        filter: (a: number, b: number) => Math.floor(a) !== Math.floor(b),
+      },
+    },
+  })
+  class Entity {
+    constructor(public value = 0) {}
+  }
+
+  it("can transform", () => {
+    const e = new Entity();
+
+    e.value = 10.123456789;
+
+    const changes = flushTrackedInstance(e);
+
+    const e2 = new Entity();
+
+    updateTrackedInstance(e2, changes!);
+
+    expect(e2.value).toBe(10.123);
+  });
+
+  it("can filter", () => {
+    const e = new Entity(10);
+
+    flushTrackedInstance(e); // Flush and omit initial state change for test control
+
+    e.value = 10.5; // Not a whole new number, should not trigger a patch
+
+    expect(e.value).toBe(10.5); // But value should still be updated
+
+    const flush1 = flushTrackedInstance(e);
+
+    expect(flush1).toBeUndefined(); // No changes should be recorded
+
+    e.value = 11; // Now a whole new number, should trigger a patch
+
+    const flush2 = flushTrackedInstance(e);
+
+    expect(flush2).toBeDefined();
+
+    const e2 = new Entity();
+
+    updateTrackedInstance(e2, flush2!);
+
+    expect(e2.value).toBe(11);
+  });
 });
 
 function sizeOf(arg: unknown): number {
