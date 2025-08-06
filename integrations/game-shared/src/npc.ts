@@ -6,7 +6,12 @@ import type {
   NpcType,
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
-import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import {
+  typedAssign,
+  type Branded,
+  type Tile,
+  type TimesPerSecond,
+} from "@mp/std";
 import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
@@ -95,10 +100,10 @@ export class NpcInstance {
 
   constructor(init: NpcInstanceInit) {
     this.identity = init.identity;
-    this.appearance = Object.assign(new AppearanceTrait(), init.appearance);
-    this.movement = Object.assign(new MovementTrait(), init.movement);
-    this.combat = Object.assign(new CombatTrait(), init.combat);
-    this.etc = Object.assign(new NpcEtc(), init.etc);
+    this.appearance = typedAssign(new AppearanceTrait(), init.appearance);
+    this.movement = typedAssign(new MovementTrait(), init.movement);
+    this.combat = typedAssign(new CombatTrait(), init.combat);
+    this.etc = typedAssign(new NpcEtc(), init.etc);
   }
 }
 

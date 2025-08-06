@@ -10,9 +10,9 @@ import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
   eventWithSessionEncoding,
+  GameServiceArea,
   GameServiceConfig,
   gameServiceConfigRedisKey,
-  GameStateAreaEntity,
   loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
@@ -22,8 +22,8 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, withBackoffRetries } from "@mp/std";
-import { shouldOptimizeCollects, SyncMap, SyncServer } from "@mp/sync";
+import { Rng, typedAssign, withBackoffRetries } from "@mp/std";
+import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
   MetricsHistogram,
@@ -86,7 +86,7 @@ createRedisSyncEffect(
 );
 
 gameServiceConfig.subscribe((config) => {
-  shouldOptimizeCollects.value = config.isPatchOptimizerEnabled;
+  shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
 });
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
@@ -190,7 +190,9 @@ const syncMessageSizeHistogram = new MetricsHistogram({
 });
 
 const gameState: GameState = {
-  area: new SyncMap([["current", new GameStateAreaEntity({ id: area.id })]]),
+  area: new SyncMap([
+    ["current", typedAssign(new GameServiceArea(), { id: opt.areaId })],
+  ]),
   actors: new SyncMap([]),
 };
 

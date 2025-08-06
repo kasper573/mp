@@ -1,7 +1,7 @@
 // oxlint-disable no-explicit-any
 import { addEncoderExtension } from "@mp/encoding";
 import type { Signal } from "@mp/state";
-import { signal as createSignal } from "@mp/state";
+import { signal as createSignal, signal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
 
 export interface TrackedClassOptions<T> {
@@ -50,11 +50,7 @@ export function tracked<T extends { new (...args: any[]): {} }>(
 
           const signal = createSignal(value) as SignalWithMeta<unknown>;
           signal.pointer = key as unknown as JsonPointer;
-          signal.optimizers = {
-            filter: refDiff,
-            transform: passThrough,
-            ...optimizers?.[key],
-          } as Required<TrackedPropertyOptimizer<unknown>>;
+          signal.optimizers = wrapOptimizers(optimizers?.[key]);
           memory.signals.set(signal.pointer, signal);
 
           Object.defineProperty(this, key, {
@@ -91,6 +87,30 @@ export function tracked<T extends { new (...args: any[]): {} }>(
   };
 }
 
+function wrapOptimizers({
+  filter = refDiff,
+  transform = passThrough,
+}: TrackedPropertyOptimizer<any> = {}): Required<
+  TrackedPropertyOptimizer<unknown>
+> {
+  return {
+    filter(prev, next) {
+      if (shouldOptimizeTrackedProperties.value) {
+        return filter(prev, next);
+      }
+      return true;
+    },
+    transform(value) {
+      if (shouldOptimizeTrackedProperties.value) {
+        return transform(value);
+      }
+      return value;
+    },
+  };
+}
+
+export const shouldOptimizeTrackedProperties = signal(true);
+
 interface SignalWithMeta<T> extends Signal<T> {
   pointer: JsonPointer;
   optimizers: Required<TrackedPropertyOptimizer<T>>;
@@ -112,13 +132,13 @@ class TrackMemory {
   selectFlatValues(
     pointers: Iterable<JsonPointer> = this.signals.keys(),
   ): FlatTrackedValues {
-    const values: FlatTrackedValues = [];
+    const values: FlatTrackedValues = {};
     for (const ptr of pointers) {
       const signal = assert(
         this.signals.get(ptr),
         `No signal found for pointer ${ptr}`,
       );
-      values.push([ptr, signal.optimizers.transform(signal.value)]);
+      values[ptr] = signal.optimizers.transform(signal.value);
     }
     return values;
   }
@@ -153,9 +173,9 @@ export function updateTrackedInstance<Target>(
     getSyncMemory(target),
     "Target is not an instance decorated with @tracked",
   );
-  for (const [ptr, value] of changes) {
+  for (const [ptr, value] of Object.entries(changes)) {
     const signal = assert(
-      memory.signals.get(ptr),
+      memory.signals.get(ptr as JsonPointer),
       `No signal found for pointer ${ptr}`,
     );
     signal.value = value;
@@ -168,7 +188,7 @@ type JsonPointer = Branded<string, "JsonPointer">;
  * The entire hierarchy of values inside the tracked instance,
  * flattened into a single list of [JsonPointer, value] pairs.
  */
-export type FlatTrackedValues = Array<readonly [JsonPointer, unknown]>;
+export type FlatTrackedValues = Record<JsonPointer, unknown>;
 
 function joinPointers(a: string, b: string): JsonPointer {
   if (!a && !b) {

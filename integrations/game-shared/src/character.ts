@@ -1,5 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import type { UserId } from "@mp/oauth";
+import { typedAssign } from "@mp/std";
 import { tracked } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
@@ -39,10 +40,10 @@ export class Character {
 
   constructor(init: CharacterInit) {
     this.identity = init.identity;
-    this.appearance = Object.assign(new AppearanceTrait(), init.appearance);
-    this.movement = Object.assign(new MovementTrait(), init.movement);
-    this.combat = Object.assign(new CombatTrait(), init.combat);
-    this.progression = Object.assign(
+    this.appearance = typedAssign(new AppearanceTrait(), init.appearance);
+    this.movement = typedAssign(new MovementTrait(), init.movement);
+    this.combat = typedAssign(new CombatTrait(), init.combat);
+    this.progression = typedAssign(
       new CharacterProgression(),
       init.progression,
     );

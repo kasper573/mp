@@ -30,7 +30,7 @@ export interface MapDeleteOperation<EntityName, EntityId> {
 export interface EntityUpdateOperation<EntityName, EntityId> {
   readonly type: PatchOperationType.EntityUpdate;
   readonly entityName: EntityName;
-  readonly changes: readonly [EntityId, Readonly<FlatTrackedValues>][];
+  readonly changes: readonly [EntityId, FlatTrackedValues][];
 }
 
 export enum PatchOperationType {
