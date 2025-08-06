@@ -93,23 +93,33 @@ class EntityMemory<T extends object> {
   constructor(private schema: ObjectSchema<T>) {}
   dirty = new Set<keyof T>();
 
+  /**
+   * Gets ALL values, regardless of whether they are dirty or not.
+   */
   toPOJO(target: T): DeepPOJO<T> {
     const pojo = {} as DeepPOJO<T>;
 
     for (const key in this.schema.properties) {
       const value = target[key];
-      if (this.schema.properties[key] instanceof ObjectSchema) {
+      const propertySchema = this.schema.properties[key];
+      if (propertySchema instanceof ObjectSchema) {
         pojo[key] = getEntityMemory(value as object)?.toPOJO(
           value as object,
         ) as never;
+      } else if (propertySchema instanceof ValueSchema) {
+        pojo[key] = propertySchema.optimizer.transform(value) as never;
       } else {
-        pojo[key] = value as never;
+        throw new Error("Unexpected schema type");
       }
     }
 
     return pojo;
   }
 
+  /**
+   * Flushes the dirty properties of the target object.
+   * Returns a deep partial of the target object with only the dirty properties.
+   */
   flush(target: T): DeepPartial<T> | undefined {
     const partial = {} as DeepPartial<T>;
 
