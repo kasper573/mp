@@ -3,6 +3,8 @@ import { addEncoderExtension } from "@mp/encoding";
 import { signal as createSignal, signal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
 
+export const shouldOptimizeTrackedProperties = signal(true);
+
 export function object<Values extends object>(
   properties: PropertySchemas<Values>,
 ): ObjectSchema<Values> {
@@ -13,6 +15,36 @@ export function value<Value>(optimizer?: PatchOptimizer<Value>): Schema<Value> {
   return new ValueSchema(optimizer);
 }
 
+export function flushEntity<Entity extends object>(
+  target: Entity,
+): DeepPartial<Entity> | undefined {
+  return getEntityMemory(target)?.flush(target);
+}
+
+export function updateEntity<Entity extends object>(
+  target: Entity,
+  changes: DeepPartial<Entity>,
+): void {
+  const mem = assert(getEntityMemory(target), "Target not an entity instance");
+  mem.update(target, changes);
+}
+
+export interface PatchOptimizer<T> {
+  /**
+   * A predicate (prevValue, newValue) => boolean.
+   * If provided, the change will only be recorded if this returns true.
+   * Even if the filter returns false, the property is still updated to the new value.
+   */
+  filter?: (prev: T, next: T) => boolean;
+
+  /**
+   * A transform function that takes the "new" value and returns
+   * what actually gets recorded in the internal change list.
+   * The property on the instance is always set to the raw "new" value.
+   */
+  transform?: (value: T) => T;
+}
+
 abstract class Schema<T> {
   get $infer(): T {
     throw new Error(
@@ -21,7 +53,7 @@ abstract class Schema<T> {
   }
 }
 
-export class ObjectSchema<Entity extends object> extends Schema<Entity> {
+class ObjectSchema<Entity extends object> extends Schema<Entity> {
   constructor(public readonly properties: PropertySchemas<Entity>) {
     super();
   }
@@ -214,45 +246,13 @@ class EntityMemory<T extends object> {
   }
 }
 
-export type DeepPOJO<T> = Branded<T, "DeepPOJO">;
-export type DeepPartial<T> = Branded<T, "DeepPartial">;
-
-export const shouldOptimizeTrackedProperties = signal(true);
+type DeepPOJO<T> = Branded<T, "DeepPOJO">;
+type DeepPartial<T> = Branded<T, "DeepPartial">;
 
 function getEntityMemory<T extends object>(
   target: T,
 ): EntityMemory<T> | undefined {
   return Reflect.get(target, entityMemorySymbol) as EntityMemory<T>;
-}
-
-export function flushEntity<Entity extends object>(
-  target: Entity,
-): DeepPartial<Entity> | undefined {
-  return getEntityMemory(target)?.flush(target);
-}
-
-export function updateEntity<Entity extends object>(
-  target: Entity,
-  changes: DeepPartial<Entity>,
-): void {
-  const mem = assert(getEntityMemory(target), "Target not an entity instance");
-  mem.update(target, changes);
-}
-
-export interface PatchOptimizer<T> {
-  /**
-   * A predicate (prevValue, newValue) => boolean.
-   * If provided, the change will only be recorded if this returns true.
-   * Even if the filter returns false, the property is still updated to the new value.
-   */
-  filter?: (prev: T, next: T) => boolean;
-
-  /**
-   * A transform function that takes the "new" value and returns
-   * what actually gets recorded in the internal change list.
-   * The property on the instance is always set to the raw "new" value.
-   */
-  transform?: (value: T) => T;
 }
 
 const passThrough = <T>(v: T): T => v;
