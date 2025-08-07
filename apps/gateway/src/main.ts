@@ -64,8 +64,15 @@ const onlineCharacterIds = computed(() => [
   ...new Set(
     userSessions
       .values()
-      .map((session) => session.value.characterId)
-      .filter((id) => id !== undefined),
+      .map((session) => session.value)
+      .filter(
+        (
+          session,
+        ): session is typeof session & {
+          characterId: NonNullable<typeof session.characterId>;
+        } => session.characterId !== undefined && session.isJoined === true,
+      )
+      .map((session) => session.characterId),
   ),
 ]);
 

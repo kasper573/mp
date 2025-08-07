@@ -17,4 +17,9 @@ export interface UserSession<Id extends string = string> {
    * The character id that the user will be subscribing to game state patches and events for
    */
   readonly characterId?: CharacterId;
+
+  /**
+   * True if the user is actively playing the character (joined), false if just spectating
+   */
+  readonly isJoined?: boolean;
 }
