@@ -10,9 +10,9 @@ import {
   clientViewDistance,
   eventMessageEncoding,
   eventWithSessionEncoding,
-  GameServiceArea,
   GameServiceConfig,
   gameServiceConfigRedisKey,
+  GameStateGlobals,
   loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
@@ -198,7 +198,9 @@ const syncMessageSizeHistogram = new MetricsHistogram({
 });
 
 const gameState: GameState = {
-  area: new SyncMap([["current", GameServiceArea.create({ id: opt.areaId })]]),
+  globals: new SyncMap([
+    ["instance", GameStateGlobals.create({ areaId: opt.areaId })],
+  ]),
   actors: new SyncMap([]),
 };
 

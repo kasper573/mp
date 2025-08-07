@@ -18,10 +18,11 @@ export function deriveClientVisibility(
   clientViewDistance: Tile,
   area: AreaResource,
 ): ClientVisibilityFactory<GameState, CharacterId> {
+  const globals = new Set(["instance" as const]); // Always visible to everyone
   return (characterId, state) => {
     return {
       actors: visibleActors(state, characterId),
-      area: new Set(["current"]),
+      globals,
     };
   };
 

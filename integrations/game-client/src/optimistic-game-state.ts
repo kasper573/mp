@@ -17,7 +17,7 @@ import { PatchOperationType, SyncMap, updateState } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 
 export class OptimisticGameState implements GameState {
-  area: GameState["area"] = new SyncMap();
+  globals: GameState["globals"] = new SyncMap();
   actors: GameState["actors"] = new SyncMap();
 
   constructor(private settings: () => OptimisticGameStateSettings) {}

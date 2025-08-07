@@ -35,7 +35,9 @@ export class GameStateClient {
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
-  readonly areaId = computed(() => this.gameState.area.get("current")?.id);
+  readonly areaId = computed(
+    () => this.gameState.globals.get("instance")?.areaId,
+  );
   readonly readyState: Signal<WebSocket["readyState"]>;
   readonly isConnected: ReadonlySignal<boolean>;
 
