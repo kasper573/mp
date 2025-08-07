@@ -17,6 +17,6 @@ export function trySpawnItem(
   if (!container) {
     return err(`Item container ${targetContainerId} not found`);
   }
-  container.itemInstanceIds.add(item.id);
+  container.itemInstanceIds = new Set([...container.itemInstanceIds, item.id]);
   return ok(void 0);
 }
