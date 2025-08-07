@@ -41,6 +41,7 @@ function createGameStateClient(
   logger: Logger,
   auth: AuthClient,
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
+  logger.debug("Creating new game state client");
   const socket = new WebSocket(() => {
     const url = new URL(env.gameServiceUrl);
     url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
@@ -57,6 +58,7 @@ function createGameStateClient(
     socket.addEventListener("error", logSocketError);
 
     return () => {
+      logger.debug("Destroying game state client");
       socket.removeEventListener("error", logSocketError);
       socket.close();
     };
