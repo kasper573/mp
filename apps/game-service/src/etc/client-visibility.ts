@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId, ItemContainerId } from "@mp/db/types";
 import type {
   ActorId,
   AreaResource,
@@ -23,8 +23,20 @@ export function deriveClientVisibility(
     return {
       actors: visibleActors(state, characterId),
       globals,
+      items: visibleItems(state, characterId),
     };
   };
+
+  function visibleItems(
+    state: GameState,
+    characterId: CharacterId,
+  ): Set<ItemContainerId> {
+    // You can see your own inventory
+    const actor = state.actors.get(characterId);
+    return new Set(
+      actor?.type === "character" ? [actor.inventoryId] : undefined,
+    );
+  }
 
   function visibleActors(state: GameState, observerId: ActorId): Set<ActorId> {
     const ids = new Set<ActorId>();
@@ -38,6 +50,7 @@ export function deriveClientVisibility(
   }
 
   function canSeeSubject(a: MovementTrait, b: MovementTrait) {
+    // You can see actors within view distance
     const box = clientViewDistanceRect(
       a.coords,
       area.tiled.tileCount,

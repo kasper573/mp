@@ -17,6 +17,7 @@ export function characterFromDbFields(
 
   return Character.create({
     type: "character",
+    inventoryId: fields.inventoryId,
     appearance: {
       modelId: fields.modelId,
       name: fields.name,
