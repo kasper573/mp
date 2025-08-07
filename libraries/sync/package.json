@@ -11,8 +11,8 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck"
   },
   "dependencies": {
     "@mp/encoding": "workspace:*",
