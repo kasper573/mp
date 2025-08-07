@@ -120,6 +120,7 @@ logger.info("Inserting npc rewards...");
 await db.insert(npcRewardTable).values({
   npcId: soldier.id,
   itemId: apple.id,
+  xp: 10,
 });
 
 logger.info("Ending database connection...");
