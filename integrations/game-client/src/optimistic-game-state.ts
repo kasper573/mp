@@ -19,7 +19,8 @@ import { TimeSpan } from "@mp/time";
 export class OptimisticGameState implements GameState {
   globals: GameState["globals"] = new SyncMap();
   actors: GameState["actors"] = new SyncMap();
-  items: GameState["items"] = new SyncMap();
+  itemContainers: GameState["itemContainers"] = new SyncMap();
+  itemInstances: GameState["itemInstances"] = new SyncMap();
 
   constructor(private settings: () => OptimisticGameStateSettings) {}
 

@@ -1,4 +1,4 @@
-import type { CharacterId, ItemContainerId } from "@mp/db/types";
+import type { CharacterId, ItemContainerId, ItemId } from "@mp/db/types";
 import type {
   ActorId,
   AreaResource,
@@ -10,9 +10,7 @@ import type { Tile } from "@mp/std";
 import type { ClientVisibilityFactory } from "@mp/sync";
 
 /**
- * Removes any information that the given client should not have access to.
- * Includes client specific information (ie. fog of war),
- * but also common things like signed out players.
+ * Determines what parts of the game state that should be visible to each client
  */
 export function deriveClientVisibility(
   clientViewDistance: Tile,
@@ -20,23 +18,28 @@ export function deriveClientVisibility(
 ): ClientVisibilityFactory<GameState, CharacterId> {
   const globals = new Set(["instance" as const]); // Always visible to everyone
   return (characterId, state) => {
+    // You can see your own inventory
+    const actor = state.actors.get(characterId);
+    const visibleItemContainerIds = new Set<ItemContainerId>(
+      actor?.type === "character" ? [actor.inventoryId] : undefined,
+    );
+
+    // You can see all items in the containers you can see
+    let visibleItemIds = new Set<ItemId>();
+    for (const containerId of visibleItemContainerIds) {
+      const itemsInContainer = state.itemContainers.get(containerId)?.itemIds;
+      if (itemsInContainer) {
+        visibleItemIds = visibleItemIds.intersection(itemsInContainer);
+      }
+    }
+
     return {
       actors: visibleActors(state, characterId),
       globals,
-      items: visibleItems(state, characterId),
+      itemContainers: visibleItemContainerIds,
+      itemInstances: visibleItemIds,
     };
   };
-
-  function visibleItems(
-    state: GameState,
-    characterId: CharacterId,
-  ): Set<ItemContainerId> {
-    // You can see your own inventory
-    const actor = state.actors.get(characterId);
-    return new Set(
-      actor?.type === "character" ? [actor.inventoryId] : undefined,
-    );
-  }
 
   function visibleActors(state: GameState, observerId: ActorId): Set<ActorId> {
     const ids = new Set<ActorId>();
