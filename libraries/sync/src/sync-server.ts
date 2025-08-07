@@ -1,4 +1,4 @@
-import type { AnyOperation, AnyPatch } from "./patch";
+import type { AnyPatch } from "./patch";
 import { PatchOperationType } from "./patch";
 import type { EventAccessFn, SyncEvent, SyncEventMap } from "./sync-event";
 import type { SyncMap } from "./sync-map";
@@ -87,9 +87,7 @@ export class SyncServer<
         }
 
         // Add server operations that are still visible to the client
-        clientPatch.push(
-          ...serverPatch.map((op) => operationVisibilityFilter(op, filter)),
-        );
+        clientPatch.push(...patchVisibilityFilter(serverPatch, filter));
       }
 
       if (clientPatch.length > 0) {
@@ -142,37 +140,54 @@ export class SyncServer<
   };
 }
 
-function operationVisibilityFilter<State extends AnySyncState>(
-  op: AnyOperation,
+function patchVisibilityFilter<State extends AnySyncState>(
+  patch: AnyPatch,
   visibilities: ClientVisibility<State>,
-): AnyOperation {
-  const vis = visibilities[op.entityName];
-  switch (op.type) {
-    case PatchOperationType.MapAdd:
-      return {
-        type: PatchOperationType.MapAdd,
-        entityName: op.entityName,
-        added: op.added.filter(([id]) => vis.has(id as never)),
-      };
-    case PatchOperationType.MapReplace:
-      return {
-        type: PatchOperationType.MapReplace,
-        entityName: op.entityName,
-        replacement: op.replacement.filter(([id]) => vis.has(id as never)),
-      };
-    case PatchOperationType.MapDelete:
-      return {
-        type: PatchOperationType.MapDelete,
-        entityName: op.entityName,
-        removedIds: op.removedIds.intersection(vis),
-      };
-    case PatchOperationType.EntityUpdate:
-      return {
-        type: PatchOperationType.EntityUpdate,
-        entityName: op.entityName,
-        changes: op.changes.filter(([id]) => vis.has(id as never)),
-      };
-  }
+): AnyPatch {
+  return patch.flatMap((op) => {
+    const vis = visibilities[op.entityName];
+    switch (op.type) {
+      case PatchOperationType.MapAdd: {
+        const added = op.added.filter(([id]) => vis.has(id as never));
+        if (!added.length) {
+          return emptyPatch;
+        }
+        return {
+          type: PatchOperationType.MapAdd,
+          entityName: op.entityName,
+          added,
+        };
+      }
+      case PatchOperationType.MapReplace:
+        return {
+          type: PatchOperationType.MapReplace,
+          entityName: op.entityName,
+          replacement: op.replacement.filter(([id]) => vis.has(id as never)),
+        };
+      case PatchOperationType.MapDelete: {
+        const removedIds = op.removedIds.intersection(vis);
+        if (!removedIds.size) {
+          return emptyPatch;
+        }
+        return {
+          type: PatchOperationType.MapDelete,
+          entityName: op.entityName,
+          removedIds,
+        };
+      }
+      case PatchOperationType.EntityUpdate: {
+        const changes = op.changes.filter(([id]) => vis.has(id as never));
+        if (!changes.length) {
+          return emptyPatch;
+        }
+        return {
+          type: PatchOperationType.EntityUpdate,
+          entityName: op.entityName,
+          changes,
+        };
+      }
+    }
+  });
 }
 
 function isVisible<State extends AnySyncState>(
@@ -240,3 +255,5 @@ type inferEntityId<T extends SyncMap<unknown, object>> =
 export type ClientVisibility<State extends AnySyncState> = {
   [EntityName in keyof State]: ReadonlySet<inferEntityId<State[EntityName]>>;
 };
+
+const emptyPatch = Object.freeze([] as AnyPatch);
