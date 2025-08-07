@@ -8,10 +8,7 @@ export function trySpawnItem(
   itemId: ItemId,
   targetContainerId: ItemContainerId,
 ): Result<void, string> {
-  const item = ItemInstance.create({
-    id: createShortId(),
-    itemId,
-  });
+  const item = ItemInstance.create({ id: createShortId(), itemId });
   gameState.itemInstances.set(item.id, item);
   const container = gameState.itemContainers.get(targetContainerId);
   if (!container) {

@@ -21,7 +21,11 @@ function Inventory() {
   return (
     <div className={styles.inventory}>
       <div>Inventory</div>
-      <div>{JSON.stringify(state.inventory.value, null, 2)}</div>
+      {state.inventory.value.map((item) => (
+        <div key={item.id}>
+          instanceId: {item.id}, itemId: {item.itemId}
+        </div>
+      ))}
     </div>
   );
 }
