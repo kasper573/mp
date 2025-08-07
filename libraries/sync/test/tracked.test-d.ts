@@ -6,7 +6,9 @@ it("property schema turns Sets into ReadonlySet", () => {
     prop: prop<Set<string>>(),
   });
 
-  expectTypeOf(Schema.$infer.prop).toEqualTypeOf<ReadonlySet<string>>();
+  expectTypeOf(Schema.$infer.prop).toEqualTypeOf<
+    Readonly<ReadonlySet<string>>
+  >();
 });
 
 it("property schema turns Array into ReadonlyArray", () => {
@@ -22,5 +24,7 @@ it("property schema turns Map into ReadonlyMap", () => {
     prop: prop<Map<number, string>>(),
   });
 
-  expectTypeOf(Schema.$infer.prop).toEqualTypeOf<ReadonlyMap<number, string>>();
+  expectTypeOf(Schema.$infer.prop).toEqualTypeOf<
+    Readonly<ReadonlyMap<number, string>>
+  >();
 });

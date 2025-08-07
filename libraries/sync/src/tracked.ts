@@ -2,6 +2,7 @@
 import { addEncoderExtension } from "@mp/encoding";
 import { signal as createSignal, signal } from "@mp/state";
 import { assert, type Branded } from "@mp/std";
+import type { ReadonlyDeep } from "type-fest";
 
 export const shouldOptimizeTrackedProperties = signal(true);
 
@@ -11,7 +12,9 @@ export function object<T extends object>(
   return new ObjectSchema(properties);
 }
 
-export function prop<T>(optimizer?: PatchOptimizer<T>): Schema<T> {
+export function prop<T>(
+  optimizer?: PatchOptimizer<ReadonlyDeep<T>>,
+): PropertySchema<ReadonlyDeep<T>> {
   return new PropertySchema(optimizer);
 }
 
