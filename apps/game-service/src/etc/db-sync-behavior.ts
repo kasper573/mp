@@ -1,17 +1,15 @@
 import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
-import type {
-  ActorModelLookup,
-  AreaResource,
-  GameState,
+import {
+  ItemContainer,
+  type ActorModelLookup,
+  type AreaResource,
+  type GameState,
 } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import type { Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
-import {
-  characterFromDbFields,
-  dbFieldsFromCharacter,
-} from "./character-transform";
+import { characterFromDbFields, dbFieldsFromCharacter } from "./db-transform";
 import type { GameStateServer } from "./game-state-server";
 
 export function gameStateDbSyncBehavior(
@@ -67,6 +65,16 @@ export function gameStateDbSyncBehavior(
       for (const characterFields of addedCharacters) {
         const char = characterFromDbFields(characterFields, actorModels, rng);
         state.actors.set(char.identity.id, char);
+        if (!state.itemContainers.has(char.inventoryId)) {
+          logger.debug(
+            { characterId: char.identity.id, inventoryId: char.inventoryId },
+            "Creating inventory for character",
+          );
+          state.itemContainers.set(
+            char.inventoryId,
+            ItemContainer.create({ itemInstanceIds: new Set() }),
+          );
+        }
         server.markToResendFullState(char.identity.id);
         logger.debug(
           { characterId: characterFields.id },

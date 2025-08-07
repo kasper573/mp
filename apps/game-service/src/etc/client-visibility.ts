@@ -1,8 +1,9 @@
-import type { CharacterId, ItemContainerId, ItemId } from "@mp/db/types";
+import type { CharacterId, ItemContainerId } from "@mp/db/types";
 import type {
   ActorId,
   AreaResource,
   GameState,
+  ItemInstanceId,
   MovementTrait,
 } from "@mp/game-shared";
 import { clientViewDistanceRect } from "@mp/game-shared";
@@ -25,9 +26,10 @@ export function deriveClientVisibility(
     );
 
     // You can see all items in the containers you can see
-    let visibleItemIds = new Set<ItemId>();
+    let visibleItemIds = new Set<ItemInstanceId>();
     for (const containerId of visibleItemContainerIds) {
-      const itemsInContainer = state.itemContainers.get(containerId)?.itemIds;
+      const itemsInContainer =
+        state.itemContainers.get(containerId)?.itemInstanceIds;
       if (itemsInContainer) {
         visibleItemIds = visibleItemIds.intersection(itemsInContainer);
       }

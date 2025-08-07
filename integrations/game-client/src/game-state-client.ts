@@ -81,13 +81,11 @@ export class GameStateClient {
         return [];
       }
       return this.gameState.itemInstances
-        .slice(container.itemIds)
+        .slice(container.itemInstanceIds)
         .values()
         .toArray();
     });
   }
-
-  private refreshState: () => unknown;
 
   start = () => {
     const { socket } = this.options;

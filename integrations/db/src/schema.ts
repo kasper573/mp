@@ -119,9 +119,8 @@ export const npcRewardTable = pgTable("npc_reward", {
   npcId: npcId()
     .notNull()
     .references(() => npcTable.id),
-  itemId: itemId()
-    .notNull()
-    .references(() => itemTable.id),
+  itemId: itemId().references(() => itemTable.id),
+  xp: real(),
 });
 
 export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
