@@ -1,4 +1,4 @@
-import { TimeSpan } from "timespan-ts";
+import { TimeSpan } from "./timespan";
 
 export class Ticker {
   #subs: TickEventHandler[] = [];
