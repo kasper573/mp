@@ -87,6 +87,8 @@ export class GameStateClient {
     });
   }
 
+  private refreshState: () => unknown;
+
   start = () => {
     const { socket } = this.options;
 
