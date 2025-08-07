@@ -20,8 +20,8 @@
     "@mp/std": "workspace:*"
   },
   "devDependencies": {
-    "type-fest": "4.41.0",
     "@mp/tsconfig": "workspace:*",
+    "type-fest": "4.41.0",
     "vitest": "catalog:"
   }
 }

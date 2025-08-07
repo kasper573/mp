@@ -298,7 +298,7 @@ it("does not expose invisible data on initial state flush", () => {
   ]);
 
   const { clientPatches } = server.flush(state);
-  const serializedPatch = JSON.stringify(clientPatches.get("client"));
+  const serializedPatch = JSON.stringify(clientPatches.get("client")) ?? "";
   expect(serializedPatch).not.toContain(secretValue);
   expect(serializedPatch).not.toContain(secretEntityId);
 });
@@ -331,7 +331,7 @@ it("does not expose invisible data on update flush", () => {
   secret.cash = secretValue;
 
   const { clientPatches } = server.flush(state);
-  const serializedPatch = JSON.stringify(clientPatches.get("client"));
+  const serializedPatch = JSON.stringify(clientPatches.get("client")) ?? "";
   expect(serializedPatch).not.toContain(secretValue);
   expect(serializedPatch).not.toContain(secretEntityId);
 });
