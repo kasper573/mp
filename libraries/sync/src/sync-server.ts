@@ -202,7 +202,7 @@ function appendFullStatePatch<State extends AnySyncState>(
     patch.push({
       type: PatchOperationType.MapReplace,
       entityName,
-      replacement: map.slice(entityIds),
+      replacement: Array.from(map.slice(entityIds).entries()),
     });
   }
 }

@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import type { GameEventClient, GameStateEvents } from "@mp/game-service";
-import type { Actor, Character } from "@mp/game-shared";
+import type { Actor, Character, ItemInstance } from "@mp/game-shared";
 import {
   registerEncoderExtensions,
   syncMessageEncoding,
@@ -42,8 +42,9 @@ export class GameStateClient {
   readonly isConnected: ReadonlySignal<boolean>;
 
   // Derived state
-  readonly actorList: ReadonlySignal<Actor[]>;
+  readonly actorList: ReadonlySignal<readonly Actor[]>;
   readonly character: ReadonlySignal<Character | undefined>;
+  readonly inventory: ReadonlySignal<readonly ItemInstance[]>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
@@ -68,6 +69,21 @@ export class GameStateClient {
         this.characterId.value as CharacterId,
       ) as Character | undefined;
       return char;
+    });
+
+    this.inventory = computed(() => {
+      const char = this.character.value;
+      if (!char) {
+        return [];
+      }
+      const container = this.gameState.itemContainers.get(char.inventoryId);
+      if (!container) {
+        return [];
+      }
+      return this.gameState.itemInstances
+        .slice(container.itemIds)
+        .values()
+        .toArray();
     });
   }
 

@@ -63,7 +63,7 @@ export function GameRenderer({
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
         <GameStateClientContext.Provider value={gameStateClient}>
-          <AreaUi state={gameStateClient} />
+          <AreaUi />
           {showDebugUi.value && (
             <GameDebugUi>
               {additionalDebugUi}

@@ -64,15 +64,15 @@ export class SyncMap<EntityId, Entity extends object> {
     return this.#signal.value[Symbol.toStringTag];
   }
 
-  slice(keys: Iterable<EntityId>): Array<[EntityId, Entity]> {
-    const array: Array<[EntityId, Entity]> = [];
+  slice(keys: Iterable<EntityId>): Map<EntityId, Entity> {
+    const map = new Map<EntityId, Entity>();
     for (const key of keys) {
       const entity = this.get(key);
       if (entity) {
-        array.push([key, entity]);
+        map.set(key, entity);
       }
     }
-    return array;
+    return map;
   }
 
   /** @internal */
@@ -125,7 +125,7 @@ export class SyncMap<EntityId, Entity extends object> {
     patch.push({
       type: PatchOperationType.MapAdd,
       entityName,
-      added: this.slice(addedIds),
+      added: Array.from(this.slice(addedIds).entries()),
     });
 
     // Ensure the added entities have their dirty state flushed and omitted
