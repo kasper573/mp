@@ -20,7 +20,7 @@ export function registerEncoderExtensions(): void {
   addEncoderExtension<TimeSpan, number>({
     Class: TimeSpan as never,
     tag: EncoderTag.TimeSpan,
-    encode: (v) => v.totalMilliseconds,
+    encode: (v, encode) => encode(v.totalMilliseconds),
     decode: (v) => TimeSpan.fromMilliseconds(v),
   });
 
