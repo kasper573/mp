@@ -8,8 +8,8 @@ import { flushState, updateState } from "../src/sync-state";
 import {
   flushTrackedInstance,
   object,
+  prop,
   updateTrackedInstance,
-  value,
 } from "../src/tracked";
 
 function sizeOf(arg: unknown): number {
@@ -18,8 +18,8 @@ function sizeOf(arg: unknown): number {
 
 describe("Basic sync", () => {
   const User = object({
-    name: value<string>(),
-    cash: value<number>(),
+    name: prop<string>(),
+    cash: prop<number>(),
   });
   type User = typeof User.$infer;
 
@@ -186,13 +186,13 @@ describe("Basic sync", () => {
 
 describe("Deeply nested", () => {
   const Movement = object({
-    x: value<number>(),
-    y: value<number>(),
-    speed: value<number>(),
+    x: prop<number>(),
+    y: prop<number>(),
+    speed: prop<number>(),
   });
   const User = object({
-    name: value<string>(),
-    cash: value<number>(),
+    name: prop<string>(),
+    cash: prop<number>(),
     movement: Movement,
   });
   type User = typeof User.$infer;
@@ -280,7 +280,7 @@ describe("Deeply nested", () => {
 
 describe("Encoding & reactivity", () => {
   it("should encode and decode entity preserving flushability", () => {
-    const Thing = object({ value: value<number>() });
+    const Thing = object({ value: prop<number>() });
     type Thing = typeof Thing.$infer;
 
     const enc = createEncoding<Thing>(99);
@@ -306,7 +306,7 @@ describe("Encoding & reactivity", () => {
       decode: (value) => new NumberHolder(value),
     });
 
-    const Obj = object({ holder: value<NumberHolder>() });
+    const Obj = object({ holder: prop<NumberHolder>() });
     type Obj = typeof Obj.$infer;
 
     const enc = createEncoding<Obj>(100);
@@ -319,7 +319,7 @@ describe("Encoding & reactivity", () => {
   });
 
   it("should react to property changes", () => {
-    const Counter = object({ count: value<number>() });
+    const Counter = object({ count: prop<number>() });
     const c = Counter.create({ count: 0 });
 
     const spyFn = vi.fn();
@@ -336,7 +336,7 @@ describe("Encoding & reactivity", () => {
 
 describe("Property tracking optimization", () => {
   const Entity = object({
-    value: value<number>({
+    value: prop<number>({
       transform: (v) => parseFloat(v.toFixed(3)),
       filter: (a, b) => Math.floor(a) !== Math.floor(b),
     }),

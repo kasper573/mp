@@ -1,10 +1,10 @@
 import type { AreaId, ItemContainerId } from "@mp/db/types";
-import { object, value, type SyncMap } from "@mp/sync";
+import { object, prop, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
 import type { ItemContainer, ItemInstance, ItemInstanceId } from "./item";
 
 export const GameStateGlobals = object({
-  areaId: value<AreaId>(),
+  areaId: prop<AreaId>(),
 });
 
 export type GameStateGlobals = typeof GameStateGlobals.$infer;

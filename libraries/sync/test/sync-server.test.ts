@@ -1,6 +1,6 @@
 // oxlint-disable consistent-type-definitions
 import { expect, it } from "vitest";
-import { object, value } from "../src";
+import { object, prop } from "../src";
 import { SyncMap } from "../src/sync-map";
 import { SyncServer } from "../src/sync-server";
 import { updateState } from "../src/sync-state";
@@ -18,7 +18,7 @@ function createTestState(
 }
 
 const Item = object({
-  cash: value<number>(),
+  cash: prop<number>(),
 });
 type Item = typeof Item.$infer;
 
@@ -79,8 +79,8 @@ it("returns no patches or events when flushed twice with no changes", () => {
 
 it("can collect patches", () => {
   const Person = object({
-    id: value<string>(),
-    cash: value<number>(),
+    id: prop<string>(),
+    cash: prop<number>(),
   });
   type Person = typeof Person.$infer;
 

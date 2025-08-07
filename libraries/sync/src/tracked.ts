@@ -6,13 +6,13 @@ import { assert, type Branded } from "@mp/std";
 export const shouldOptimizeTrackedProperties = signal(true);
 
 export function object<T extends object>(
-  properties: PropertySchemas<T>,
+  properties: SchemaShape<T>,
 ): ObjectSchema<T> {
   return new ObjectSchema(properties);
 }
 
-export function value<T>(optimizer?: PatchOptimizer<T>): Schema<T> {
-  return new ValueSchema(optimizer);
+export function prop<T>(optimizer?: PatchOptimizer<T>): Schema<T> {
+  return new PropertySchema(optimizer);
 }
 
 export function flushTrackedInstance<T extends object>(
@@ -54,7 +54,7 @@ abstract class Schema<T> {
 }
 
 class ObjectSchema<T extends object> extends Schema<T> {
-  constructor(public readonly properties: PropertySchemas<T>) {
+  constructor(public readonly properties: SchemaShape<T>) {
     super();
   }
 
@@ -63,11 +63,11 @@ class ObjectSchema<T extends object> extends Schema<T> {
   }
 }
 
-type PropertySchemas<T> = {
+type SchemaShape<T> = {
   readonly [K in keyof T]: Schema<T[K]>;
 };
 
-class ValueSchema<T> extends Schema<T> {
+class PropertySchema<T> extends Schema<T> {
   public readonly optimizer: Required<PatchOptimizer<T>>;
   constructor({
     filter = refDiff,
@@ -113,7 +113,7 @@ class TrackedInstance<T extends object> {
         return;
       }
 
-      if (propertySchema instanceof ValueSchema) {
+      if (propertySchema instanceof PropertySchema) {
         const signal = createSignal<T[typeof key]>(initialValues[key]);
         Object.defineProperty(this, key, {
           configurable: false,
@@ -152,7 +152,7 @@ function deriveSchema<T extends object>(pojo: T): ObjectSchema<T> {
     if (isPlainObject(value)) {
       properties[key] = deriveSchema(value);
     } else {
-      properties[key] = new ValueSchema();
+      properties[key] = new PropertySchema();
     }
   }
   return new ObjectSchema(properties) as ObjectSchema<T>;
@@ -192,7 +192,7 @@ class TrackedAPI<T extends object> {
         pojo[key] = getTrackedApi(value as object)?.toPOJO(
           value as object,
         ) as never;
-      } else if (propertySchema instanceof ValueSchema) {
+      } else if (propertySchema instanceof PropertySchema) {
         pojo[key] = propertySchema.optimizer.transform(value) as never;
       } else {
         throw new Error("Unexpected schema type");
@@ -219,7 +219,7 @@ class TrackedAPI<T extends object> {
         if (childPartial) {
           partial[key] = childPartial as never;
         }
-      } else if (propertySchema instanceof ValueSchema) {
+      } else if (propertySchema instanceof PropertySchema) {
         if (this.dirty.has(key)) {
           partial[key] = propertySchema.optimizer.transform(value);
         }

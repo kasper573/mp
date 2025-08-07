@@ -7,7 +7,7 @@ import type {
 } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
-import { object, value } from "@mp/sync";
+import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
@@ -59,19 +59,19 @@ export interface NpcSpawn {
  * Does not get persisted in the database.
  */
 export const NpcInstance = object({
-  type: value<"npc">(),
+  type: prop<"npc">(),
   identity: object({
-    id: value<NpcInstanceId>(),
-    npcId: value<NpcId>(),
-    spawnId: value<NpcSpawnId>(),
-    npcType: value<NpcType>(),
+    id: prop<NpcInstanceId>(),
+    npcId: prop<NpcId>(),
+    spawnId: prop<NpcSpawnId>(),
+    npcType: prop<NpcType>(),
   }),
   appearance: AppearanceTrait,
   movement: MovementTrait,
   combat: CombatTrait,
   etc: object({
-    aggroRange: value<Tile>(),
-    patrol: value<Path<Tile> | undefined>(),
+    aggroRange: prop<Tile>(),
+    patrol: prop<Path<Tile> | undefined>(),
   }),
 });
 

@@ -1,13 +1,13 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { object, value } from "@mp/sync";
+import { object, prop } from "@mp/sync";
 
 export const AppearanceTrait = object({
-  color: value<number | undefined>(),
-  opacity: value<number | undefined>(),
-  modelId: value<ActorModelId>(),
-  name: value<string>(),
+  color: prop<number | undefined>(),
+  opacity: prop<number | undefined>(),
+  modelId: prop<ActorModelId>(),
+  name: prop<string>(),
 });
 export type AppearanceTrait = typeof AppearanceTrait.$infer;
 

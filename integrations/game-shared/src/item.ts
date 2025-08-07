@@ -1,16 +1,16 @@
 import type { ItemId } from "@mp/db/types";
 import type { Branded } from "@mp/std";
-import { object, value } from "@mp/sync";
+import { object, prop } from "@mp/sync";
 
 export type ItemInstanceId = Branded<string, "ItemInstanceId">;
 
 export const ItemInstance = object({
-  id: value<ItemInstanceId>(),
-  itemId: value<ItemId>(),
+  id: prop<ItemInstanceId>(),
+  itemId: prop<ItemId>(),
 });
 export type ItemInstance = typeof ItemInstance.$infer;
 
 export const ItemContainer = object({
-  itemInstanceIds: value<Set<ItemInstanceId>>(),
+  itemInstanceIds: prop<Set<ItemInstanceId>>(),
 });
 export type ItemContainer = typeof ItemContainer.$infer;
