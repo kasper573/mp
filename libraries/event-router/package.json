@@ -16,7 +16,6 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@mp/encoding": "workspace:*",
     "@mp/invocation-proxy": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/std": "workspace:*"

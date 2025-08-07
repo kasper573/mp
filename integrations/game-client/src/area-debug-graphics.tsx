@@ -32,7 +32,7 @@ export class AreaDebugGraphics extends Container {
   constructor(
     engine: Engine,
     area: AreaResource,
-    actors: ReadonlySignal<Actor[]>,
+    actors: ReadonlySignal<readonly Actor[]>,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
   ) {

@@ -1,9 +1,47 @@
 {
-  "id": "23bf7b08-c9f4-4610-8cbc-d2da7fb542d2",
-  "prevId": "756eaa1d-1aed-48c1-9888-d3ecc098619d",
+  "id": "6b72cc67-0ded-40a6-87c5-1924a50854ec",
+  "prevId": "97487cdb-6f2e-4c1c-b18a-1a71d583287a",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.actor_model": {
+      "name": "actor_model",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(64)",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.area": {
+      "name": "area",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(60)",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.character": {
       "name": "character",
       "schema": "",
@@ -80,15 +118,261 @@
           "primaryKey": false,
           "notNull": true
         },
+        "online": {
+          "name": "online",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
         "xp": {
           "name": "xp",
           "type": "real",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inventoryId": {
+          "name": "inventoryId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "character_areaId_area_id_fk": {
+          "name": "character_areaId_area_id_fk",
+          "tableFrom": "character",
+          "tableTo": "area",
+          "columnsFrom": [
+            "areaId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "character_modelId_actor_model_id_fk": {
+          "name": "character_modelId_actor_model_id_fk",
+          "tableFrom": "character",
+          "tableTo": "actor_model",
+          "columnsFrom": [
+            "modelId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "character_inventoryId_item_container_id_fk": {
+          "name": "character_inventoryId_item_container_id_fk",
+          "tableFrom": "character",
+          "tableTo": "item_container",
+          "columnsFrom": [
+            "inventoryId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item_container": {
+      "name": "item_container",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item_instance": {
+      "name": "item_instance",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "itemId": {
+          "name": "itemId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "item_instance_itemId_item_id_fk": {
+          "name": "item_instance_itemId_item_id_fk",
+          "tableFrom": "item_instance",
+          "tableTo": "item",
+          "columnsFrom": [
+            "itemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item_instance_to_item_container": {
+      "name": "item_instance_to_item_container",
+      "schema": "",
+      "columns": {
+        "instanceId": {
+          "name": "instanceId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "containerId": {
+          "name": "containerId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "item_instance_to_item_container_instanceId_item_instance_id_fk": {
+          "name": "item_instance_to_item_container_instanceId_item_instance_id_fk",
+          "tableFrom": "item_instance_to_item_container",
+          "tableTo": "item_instance",
+          "columnsFrom": [
+            "instanceId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "item_instance_to_item_container_containerId_item_container_id_fk": {
+          "name": "item_instance_to_item_container_containerId_item_container_id_fk",
+          "tableFrom": "item_instance_to_item_container",
+          "tableTo": "item_container",
+          "columnsFrom": [
+            "containerId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item": {
+      "name": "item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc_reward": {
+      "name": "npc_reward",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "npcId": {
+          "name": "npcId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "itemId": {
+          "name": "itemId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "npc_reward_npcId_npc_id_fk": {
+          "name": "npc_reward_npcId_npc_id_fk",
+          "tableFrom": "npc_reward",
+          "tableTo": "npc",
+          "columnsFrom": [
+            "npcId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "npc_reward_itemId_item_id_fk": {
+          "name": "npc_reward_itemId_item_id_fk",
+          "tableFrom": "npc_reward",
+          "tableTo": "item",
+          "columnsFrom": [
+            "itemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
@@ -150,6 +434,19 @@
       },
       "indexes": {},
       "foreignKeys": {
+        "npc_spawn_areaId_area_id_fk": {
+          "name": "npc_spawn_areaId_area_id_fk",
+          "tableFrom": "npc_spawn",
+          "tableTo": "area",
+          "columnsFrom": [
+            "areaId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
         "npc_spawn_npcId_npc_id_fk": {
           "name": "npc_spawn_npcId_npc_id_fk",
           "tableFrom": "npc_spawn",
@@ -242,7 +539,21 @@
         }
       },
       "indexes": {},
-      "foreignKeys": {},
+      "foreignKeys": {
+        "npc_modelId_actor_model_id_fk": {
+          "name": "npc_modelId_actor_model_id_fk",
+          "tableFrom": "npc",
+          "tableTo": "actor_model",
+          "columnsFrom": [
+            "modelId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
       "policies": {},
