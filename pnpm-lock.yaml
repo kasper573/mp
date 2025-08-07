@@ -350,7 +350,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -444,7 +444,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@tanstack/router-plugin':
         specifier: 1.126.2
         version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
