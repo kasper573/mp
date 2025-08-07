@@ -7,7 +7,7 @@ export const requestFullState = evt.event.handler(({ ctx }) => {
   const server = ctx.get(ctxGameStateServer);
   server.markToResendFullState(
     assert(
-      session.characterId,
+      session.character?.id,
       "Cannot resend full game state, user session has no character id",
     ),
   );

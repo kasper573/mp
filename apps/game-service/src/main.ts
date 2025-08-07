@@ -134,8 +134,8 @@ function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
   // Handle game client -> game service messages
   const eventWithSession = eventWithSessionEncoding.decode(data);
   if (eventWithSession.isOk()) {
-    const { characterId } = eventWithSession.value.session;
-    if (characterId && !gameState.actors.has(characterId)) {
+    const { character } = eventWithSession.value.session;
+    if (character && !gameState.actors.has(character.id)) {
       // Messages for unknown characters can be safely ignored.
       // These are just broadcasts from the gateway,
       // and the intent is for the appropriate game service instance to react.

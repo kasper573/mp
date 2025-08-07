@@ -62,10 +62,13 @@ const userSessions = new SyncMap<ClientId, Signal<UserSession<ClientId>>>();
 
 const onlineCharacterIds = computed(() => [
   ...new Set(
-    userSessions
-      .values()
-      .map((session) => session.value.characterId)
-      .filter((id) => id !== undefined),
+    userSessions.values().flatMap((session) => {
+      const { character } = session.value;
+      if (character?.type === "player" && character.id) {
+        return [character.id];
+      }
+      return [];
+    }),
   ),
 ]);
 
@@ -236,7 +239,7 @@ function sendSyncMessageToRecipient(
 ) {
   for (const [clientId, socket] of gameClientSockets.entries()) {
     const socketSession = userSessions.get(clientId)?.value;
-    if (socketSession?.characterId === recipientId) {
+    if (socketSession?.character?.id === recipientId) {
       const encodedPatch = syncMessageEncoding.encode(msg);
       metrics.syncMessageSizeSize.observe(
         { areaId: originatingGameServiceAreaId },
