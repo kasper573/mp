@@ -26,6 +26,14 @@ export class SyncMap<EntityId, Entity extends object> {
     }
     return deleted;
   }
+  replace(entries: Iterable<readonly [EntityId, Entity]>): void {
+    const map = this.#signal.value;
+    map.clear();
+    for (const [key, value] of entries) {
+      map.set(key, value);
+    }
+    this.#signal.notify();
+  }
   get(key: EntityId): Entity | undefined {
     return this.#signal.value.get(key);
   }
@@ -136,6 +144,9 @@ export class SyncMap<EntityId, Entity extends object> {
         for (const [entityId, entity] of op.added) {
           this.set(entityId, entity);
         }
+        break;
+      case PatchOperationType.MapReplace:
+        this.replace(op.replacement);
         break;
       case PatchOperationType.MapDelete:
         for (const entityId of op.removedIds) {

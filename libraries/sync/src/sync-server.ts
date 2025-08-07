@@ -145,13 +145,18 @@ function operationVisibilityFilter<State extends AnySyncState>(
 ): AnyOperation {
   const vis = visibilities[op.entityName];
   switch (op.type) {
-    case PatchOperationType.MapAdd: {
+    case PatchOperationType.MapAdd:
       return {
         type: PatchOperationType.MapAdd,
         entityName: op.entityName,
         added: op.added.filter(([id]) => vis.has(id as never)),
       };
-    }
+    case PatchOperationType.MapReplace:
+      return {
+        type: PatchOperationType.MapReplace,
+        entityName: op.entityName,
+        replacement: op.replacement.filter(([id]) => vis.has(id as never)),
+      };
     case PatchOperationType.MapDelete:
       return {
         type: PatchOperationType.MapDelete,
@@ -192,9 +197,9 @@ function appendFullStatePatch<State extends AnySyncState>(
     const entityIds = visibility[entityName];
     const map = entities[entityName];
     patch.push({
-      type: PatchOperationType.MapAdd,
+      type: PatchOperationType.MapReplace,
       entityName,
-      added: map.slice(entityIds),
+      replacement: map.slice(entityIds),
     });
   }
 }

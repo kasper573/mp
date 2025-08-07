@@ -11,14 +11,21 @@ export type Patch<EntityName, EntityId, Entity> = Operation<
 >[];
 
 export type Operation<EntityName, EntityId, Entity> =
-  | MapUpsertOperation<EntityName, EntityId, Entity>
+  | MapAddOperation<EntityName, EntityId, Entity>
+  | MapReplaceOperation<EntityName, EntityId, Entity>
   | MapDeleteOperation<EntityName, EntityId>
   | EntityUpdateOperation<EntityName, EntityId, Entity>;
 
-export interface MapUpsertOperation<EntityName, EntityId, Entity> {
+export interface MapAddOperation<EntityName, EntityId, Entity> {
   readonly type: PatchOperationType.MapAdd;
   readonly entityName: EntityName;
   readonly added: readonly [EntityId, Entity][];
+}
+
+export interface MapReplaceOperation<EntityName, EntityId, Entity> {
+  readonly type: PatchOperationType.MapReplace;
+  readonly entityName: EntityName;
+  readonly replacement: readonly [EntityId, Entity][];
 }
 
 export interface MapDeleteOperation<EntityName, EntityId> {
@@ -35,6 +42,7 @@ export interface EntityUpdateOperation<EntityName, EntityId, Entity> {
 
 export enum PatchOperationType {
   MapAdd = 1,
-  MapDelete = 2,
-  EntityUpdate = 3,
+  MapReplace = 2,
+  MapDelete = 3,
+  EntityUpdate = 4,
 }
