@@ -8,6 +8,9 @@ import { flushState } from "./sync-state";
 /**
  * Distributor of sync state patches.
  * Is aware of which entities clients should be able to see and filters and transforms patches accordingly per client.
+ * Also collects and distributes events that occur during the same flush cycle.
+ * The events adhere to the same visibility rules and are distributed together with the patches,
+ * so clients can be guaranteed that the events occurred together with the patch they received.
  */
 export class SyncServer<
   State extends AnySyncState,
