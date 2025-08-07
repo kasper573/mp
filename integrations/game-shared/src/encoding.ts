@@ -8,15 +8,16 @@ import type { UserSession } from "./session";
 // (Anything below 40_500 is reserved by cbor)
 export enum EncoderTag {
   // General
-  Vector = 40_501,
-  Rect = 40_502,
-  Error = 40_503,
+  TimeSpan = 40_501,
+  Vector = 40_502,
+  Rect = 40_503,
+  Error = 40_504,
 
   // System
-  SyncMessage = 40_504,
-  SyncMessageWithRecipient = 40_505,
-  EventMessage = 40_506,
-  EventWithSession = 40_507,
+  SyncMessage = 40_505,
+  SyncMessageWithRecipient = 40_506,
+  EventMessage = 40_507,
+  EventWithSession = 40_508,
 }
 
 // ----------------------------------------------------
