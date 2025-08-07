@@ -21,25 +21,26 @@ export function deriveClientVisibility(
   return (characterId, state) => {
     // You can see your own inventory
     const actor = state.actors.get(characterId);
-    const visibleItemContainerIds = new Set<ItemContainerId>(
+    const itemContainers = new Set<ItemContainerId>(
       actor?.type === "character" ? [actor.inventoryId] : undefined,
     );
 
     // You can see all items in the containers you can see
-    let visibleItemIds = new Set<ItemInstanceId>();
-    for (const containerId of visibleItemContainerIds) {
-      const itemsInContainer =
-        state.itemContainers.get(containerId)?.itemInstanceIds;
-      if (itemsInContainer) {
-        visibleItemIds = visibleItemIds.intersection(itemsInContainer);
+    let itemInstances = new Set<ItemInstanceId>();
+    for (const containerId of itemContainers) {
+      const container = state.itemContainers.get(containerId);
+      if (container) {
+        for (const itemId of container.itemInstanceIds) {
+          itemInstances.add(itemId);
+        }
       }
     }
 
     return {
       actors: visibleActors(state, characterId),
       globals,
-      itemContainers: visibleItemContainerIds,
-      itemInstances: visibleItemIds,
+      itemContainers,
+      itemInstances,
     };
   };
 
