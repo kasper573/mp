@@ -22,11 +22,7 @@ export function gameStateDbSyncBehavior(
   logger: Logger,
 ) {
   /**
-   * Even though immediate area leave/join is handled via broadgast events,
-   * we still need to poll the database for changes in online characters.
-   *
-   * (Moving between areas would still work without this polling,
-   * but disconnect and reconnect would not work without it.)
+   * Polls the database for game state changes and updates the game state accordingly.
    */
   async function poll() {
     const desiredIds = new Set(
@@ -87,6 +83,9 @@ export function gameStateDbSyncBehavior(
     }
   }
 
+  /**
+   * Updates the database with the current game state.
+   */
   function save() {
     return db.transaction((tx) =>
       Promise.all(
