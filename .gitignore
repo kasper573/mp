@@ -21,6 +21,7 @@ test-results
 .DS_Store
 *.pem
 .devmode.json
+tsconfig.vitest-temp.json
 
 # Local files for common editors
 .idea
