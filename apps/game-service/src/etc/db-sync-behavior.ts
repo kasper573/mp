@@ -1,15 +1,15 @@
 import type { DbClient } from "@mp/db";
-import { and, characterTable, eq, inArray } from "@mp/db";
+import { and, characterTable, eq, inArray, itemInstanceTable } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
 import type { Character } from "@mp/game-shared";
 import {
-  Inventory,
+  ItemInstance,
   type ActorModelLookup,
   type AreaResource,
   type GameState,
 } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import type { Rng } from "@mp/std";
+import { typedAssign, type Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
 import { characterFromDbFields, dbFieldsFromCharacter } from "./db-transform";
 import type { GameStateServer } from "./game-state-server";
@@ -59,22 +59,73 @@ export function gameStateDbSyncBehavior(
 
       addedCharacters.forEach(addCharacterToGameState);
     }
+
+    const itemInstanceFields = await db
+      .select()
+      .from(itemInstanceTable)
+      .where(
+        inArray(
+          itemInstanceTable.inventoryId,
+          state.actors
+            .values()
+            .flatMap((a) => (a.type === "character" ? [a.inventoryId] : []))
+            .toArray(),
+        ),
+      );
+
+    upsertItemInstancesInGameState(itemInstanceFields);
   }
 
   /**
    * Updates the database with the current game state.
    */
   function save() {
-    return db.transaction((tx) =>
-      Promise.all(
+    return db.transaction(async (tx) => {
+      await Promise.all(
         state.actors
           .values()
           .filter((actor) => actor.type === "character")
           .map((char) =>
             tx.update(characterTable).set(dbFieldsFromCharacter(char)),
           ),
-      ),
-    );
+      );
+
+      await Promise.all(
+        state.items.values().map((item) => {
+          const values = {
+            inventoryId: item.inventoryId,
+            itemId: item.itemId,
+            id: item.id,
+          };
+          return tx
+            .insert(itemInstanceTable)
+            .values(values)
+            .onConflictDoUpdate({
+              target: [itemInstanceTable.id],
+              set: values,
+            });
+        }),
+      );
+    });
+  }
+
+  function upsertItemInstancesInGameState(
+    dbInstances: Array<typeof itemInstanceTable.$inferSelect>,
+  ) {
+    // Upsert item instances
+    for (const itemFields of dbInstances) {
+      // Create item instance if it doesn't exist
+      const instance = state.items.get(itemFields.id);
+      if (!instance) {
+        state.items.set(itemFields.id, ItemInstance.create(itemFields));
+        logger.debug(
+          { itemId: itemFields.id },
+          "Added item instance to game state",
+        );
+      } else {
+        typedAssign(instance, itemFields);
+      }
+    }
   }
 
   function addCharacterToGameState(
@@ -82,19 +133,6 @@ export function gameStateDbSyncBehavior(
   ) {
     const char = characterFromDbFields(characterFields, actorModels, rng);
     state.actors.set(char.identity.id, char);
-    if (!state.inventories.has(char.inventoryId)) {
-      logger.debug(
-        { characterId: char.identity.id, inventoryId: char.inventoryId },
-        "Creating inventory for character",
-      );
-      state.inventories.set(
-        char.inventoryId,
-        Inventory.create({
-          id: char.inventoryId,
-          itemInstanceIds: new Set(),
-        }),
-      );
-    }
     server.markToResendFullState(char.identity.id);
     logger.debug(
       { characterId: characterFields.id },
@@ -104,14 +142,10 @@ export function gameStateDbSyncBehavior(
 
   function removeCharacterFromGameState(characterId: CharacterId) {
     const char = state.actors.get(characterId) as Character | undefined;
-    const inv = char && state.inventories.get(char.inventoryId);
     state.actors.delete(characterId);
-    if (char) {
-      state.inventories.delete(char.inventoryId);
-    }
-    if (inv) {
-      for (const itemId of inv.itemInstanceIds) {
-        state.items.delete(itemId);
+    for (const item of state.items.values()) {
+      if (item.inventoryId === char?.inventoryId) {
+        state.items.delete(item.id);
       }
     }
     logger.debug({ characterId }, "Character left game service via db poll");

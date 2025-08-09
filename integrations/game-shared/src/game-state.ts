@@ -1,7 +1,7 @@
-import type { AreaId, InventoryId } from "@mp/db/types";
+import type { AreaId } from "@mp/db/types";
 import { object, prop, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
-import type { Inventory, ItemInstance, ItemInstanceId } from "./item";
+import type { ItemInstance, ItemInstanceId } from "./item";
 
 export const GameStateGlobals = object({
   areaId: prop<AreaId>(),
@@ -18,6 +18,5 @@ export type GameState = {
    */
   globals: SyncMap<"instance", GameStateGlobals>;
   actors: SyncMap<ActorId, Actor>;
-  inventories: SyncMap<InventoryId, Inventory>;
   items: SyncMap<ItemInstanceId, ItemInstance>;
 };

@@ -1,8 +1,12 @@
 import type { CharacterId, NpcId } from "@mp/db/types";
-import type { Character, GameState, NpcReward } from "@mp/game-shared";
+import {
+  ItemInstance,
+  type Character,
+  type GameState,
+  type NpcReward,
+} from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import { assert } from "@mp/std";
-import { trySpawnItem } from "./spawn-item";
+import { assert, createShortId } from "@mp/std";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcId, NpcReward[]>();
@@ -40,21 +44,16 @@ export class NpcRewardSystem {
       );
       switch (reward.type) {
         case "item": {
-          const res = trySpawnItem(
-            this.gameState,
-            reward.itemId,
-            recipient.inventoryId,
+          const item = ItemInstance.create({
+            id: createShortId(),
+            itemId: reward.itemId,
+            inventoryId: recipient.inventoryId,
+          });
+          this.gameState.items.set(item.id, item);
+
+          this.logger.debug(
+            `Gave item ${reward.itemId} to character ${recipientId} for killing NPC ${npcId}.`,
           );
-          if (res.isErr()) {
-            this.logger.error(
-              res.error,
-              `Failed to give item reward ${reward.itemId} to character ${recipientId} for killing NPC ${npcId}.`,
-            );
-          } else {
-            this.logger.debug(
-              `Gave item ${reward.itemId} to character ${recipientId} for killing NPC ${npcId}.`,
-            );
-          }
           break;
         }
         case "xp": {

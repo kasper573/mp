@@ -65,17 +65,13 @@ export class GameStateClient {
     });
 
     this.inventory = computed(() => {
-      const char = this.character.value;
-      if (!char) {
-        return [];
-      }
-      const container = this.gameState.inventories.get(char.inventoryId);
-      if (!container) {
+      const inventoryId = this.character.value?.inventoryId;
+      if (inventoryId === undefined) {
         return [];
       }
       return this.gameState.items
-        .slice(container.itemInstanceIds)
         .values()
+        .filter((item) => item.inventoryId === inventoryId)
         .toArray();
     });
   }

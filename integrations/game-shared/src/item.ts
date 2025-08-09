@@ -7,11 +7,6 @@ export type ItemInstanceId = Branded<string, "ItemInstanceId">;
 export const ItemInstance = object({
   id: prop<ItemInstanceId>(),
   itemId: prop<ItemId>(),
+  inventoryId: prop<InventoryId>(),
 });
 export type ItemInstance = typeof ItemInstance.$infer;
-
-export const Inventory = object({
-  id: prop<InventoryId>(),
-  itemInstanceIds: prop<Set<ItemInstanceId>>(),
-});
-export type Inventory = typeof Inventory.$infer;
