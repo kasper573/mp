@@ -6,13 +6,13 @@ import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface AreaAssets {
   areaSpritesheets: TiledSpritesheetRecord;
-  actorTextures: ActorTextureLookup;
   area: AreaResource;
 }
 
 export interface GameAssetLoader {
   useAreaAssets: AreaAssetsLookup;
   useItems: ItemLookup;
+  useActorTextures: () => ActorTextureLookup;
 }
 
 export type AreaAssetsLookup = (areaId: AreaId) => AreaAssets;

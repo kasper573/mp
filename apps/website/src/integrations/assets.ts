@@ -18,11 +18,10 @@ export const useAreaAssets: AreaAssetsLookup = (areaId) => {
   return {
     area,
     areaSpritesheets: useAreaSpritesheets(area),
-    actorTextures: useActorTextureLookup(),
   };
 };
 
-export function useActorTextureLookup(): ActorTextureLookup {
+export function useActorTextures(): ActorTextureLookup {
   const api = useApi();
   const [{ data: url }, { data: modelIds }] = useSuspenseQueries({
     queries: [
@@ -31,13 +30,13 @@ export function useActorTextureLookup(): ActorTextureLookup {
     ],
   });
 
-  const query = useSuspenseQuery({
+  const { data: lookup } = useSuspenseQuery({
     queryKey: ["actor-spritesheet-lookup", url],
     staleTime: Infinity,
     queryFn: () => loadActorTextureLookup(modelIds, url),
   });
 
-  return query.data;
+  return lookup;
 }
 
 export function useAreaResource(areaId: AreaId): AreaResource {
@@ -86,4 +85,5 @@ export const useItems: ItemLookup = (itemIds) => {
 export const gameAssetLoader: GameAssetLoader = {
   useAreaAssets,
   useItems,
+  useActorTextures,
 };
