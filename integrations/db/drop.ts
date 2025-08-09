@@ -1,8 +1,10 @@
-import { stdin as input, stdout as output } from "node:process";
 import readline from "node:readline/promises";
 import { createDbClient } from "./src";
 
-const rl = readline.createInterface({ input, output });
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
 
 const answer = await rl.question(
   "⚠️  This will permanently drop all user-defined tables in the database. Continue? (yes/no): ",
