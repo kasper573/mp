@@ -1,5 +1,7 @@
 import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
+import type { CharacterId } from "@mp/db/types";
+import type { Character } from "@mp/game-shared";
 import {
   Inventory,
   type ActorModelLookup,
@@ -47,10 +49,7 @@ export function gameStateDbSyncBehavior(
     const removedIds = activeIds.difference(desiredIds);
     const addedIds = desiredIds.difference(activeIds);
 
-    for (const characterId of removedIds) {
-      state.actors.delete(characterId);
-      logger.debug({ characterId }, "Character left game service via db poll");
-    }
+    removedIds.forEach(removeCharacterFromGameState);
 
     if (addedIds.size) {
       const addedCharacters = await db
@@ -58,28 +57,7 @@ export function gameStateDbSyncBehavior(
         .from(characterTable)
         .where(inArray(characterTable.id, addedIds.values().toArray()));
 
-      for (const characterFields of addedCharacters) {
-        const char = characterFromDbFields(characterFields, actorModels, rng);
-        state.actors.set(char.identity.id, char);
-        if (!state.inventories.has(char.inventoryId)) {
-          logger.debug(
-            { characterId: char.identity.id, inventoryId: char.inventoryId },
-            "Creating inventory for character",
-          );
-          state.inventories.set(
-            char.inventoryId,
-            Inventory.create({
-              id: char.inventoryId,
-              itemInstanceIds: new Set(),
-            }),
-          );
-        }
-        server.markToResendFullState(char.identity.id);
-        logger.debug(
-          { characterId: characterFields.id },
-          "Character joined game service via db poll",
-        );
-      }
+      addedCharacters.forEach(addCharacterToGameState);
     }
   }
 
@@ -97,6 +75,46 @@ export function gameStateDbSyncBehavior(
           ),
       ),
     );
+  }
+
+  function addCharacterToGameState(
+    characterFields: typeof characterTable.$inferSelect,
+  ) {
+    const char = characterFromDbFields(characterFields, actorModels, rng);
+    state.actors.set(char.identity.id, char);
+    if (!state.inventories.has(char.inventoryId)) {
+      logger.debug(
+        { characterId: char.identity.id, inventoryId: char.inventoryId },
+        "Creating inventory for character",
+      );
+      state.inventories.set(
+        char.inventoryId,
+        Inventory.create({
+          id: char.inventoryId,
+          itemInstanceIds: new Set(),
+        }),
+      );
+    }
+    server.markToResendFullState(char.identity.id);
+    logger.debug(
+      { characterId: characterFields.id },
+      "Character joined game service via db poll",
+    );
+  }
+
+  function removeCharacterFromGameState(characterId: CharacterId) {
+    const char = state.actors.get(characterId) as Character | undefined;
+    const inv = char && state.inventories.get(char.inventoryId);
+    state.actors.delete(characterId);
+    if (char) {
+      state.inventories.delete(char.inventoryId);
+    }
+    if (inv) {
+      for (const itemId of inv.itemInstanceIds) {
+        state.items.delete(itemId);
+      }
+    }
+    logger.debug({ characterId }, "Character left game service via db poll");
   }
 
   const stopSaving = startAsyncInterval(
