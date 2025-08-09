@@ -5,8 +5,8 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface AreaAssets {
-  areaSpritesheets: TiledSpritesheetRecord;
-  area: AreaResource;
+  spritesheets: TiledSpritesheetRecord;
+  resource: AreaResource;
 }
 
 export interface GameAssetLoader {

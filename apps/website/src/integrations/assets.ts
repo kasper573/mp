@@ -14,10 +14,10 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
 export const useAreaAssets: AreaAssetsLookup = (areaId) => {
-  const area = useAreaResource(areaId);
+  const resource = useAreaResource(areaId);
   return {
-    area,
-    areaSpritesheets: useAreaSpritesheets(area),
+    resource,
+    spritesheets: useAreaSpritesheets(resource),
   };
 };
 

@@ -106,7 +106,8 @@ function buildStage(
     debugSettings: () => areaDebugSettingsStorage.value,
     state: opt.gameStateClient,
     actorTextures: opt.actorTextures,
-    ...opt.areaAssets,
+    area: opt.areaAssets.resource,
+    areaSpritesheets: opt.areaAssets.spritesheets,
   });
   app.stage.addChild(areaScene);
   return function cleanup() {
