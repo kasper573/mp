@@ -1,4 +1,4 @@
-import type { CharacterId, ItemContainerId } from "@mp/db/types";
+import type { CharacterId, InventoryId } from "@mp/db/types";
 import type {
   ActorId,
   AreaResource,
@@ -21,17 +21,17 @@ export function deriveClientVisibility(
   return (characterId, state) => {
     // You can see your own inventory
     const actor = state.actors.get(characterId);
-    const itemContainers = new Set<ItemContainerId>(
+    const inventories = new Set<InventoryId>(
       actor?.type === "character" ? [actor.inventoryId] : undefined,
     );
 
     // You can see all items in the containers you can see
-    let itemInstances = new Set<ItemInstanceId>();
-    for (const containerId of itemContainers) {
-      const container = state.itemContainers.get(containerId);
+    let items = new Set<ItemInstanceId>();
+    for (const containerId of inventories) {
+      const container = state.inventories.get(containerId);
       if (container) {
         for (const itemId of container.itemInstanceIds) {
-          itemInstances.add(itemId);
+          items.add(itemId);
         }
       }
     }
@@ -39,8 +39,8 @@ export function deriveClientVisibility(
     return {
       actors: visibleActors(state, characterId),
       globals,
-      itemContainers,
-      itemInstances,
+      inventories,
+      items,
     };
   };
 

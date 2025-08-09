@@ -1,7 +1,7 @@
 import type { DbClient } from "@mp/db";
 import { and, characterTable, eq, inArray } from "@mp/db";
 import {
-  ItemContainer,
+  Inventory,
   type ActorModelLookup,
   type AreaResource,
   type GameState,
@@ -65,14 +65,17 @@ export function gameStateDbSyncBehavior(
       for (const characterFields of addedCharacters) {
         const char = characterFromDbFields(characterFields, actorModels, rng);
         state.actors.set(char.identity.id, char);
-        if (!state.itemContainers.has(char.inventoryId)) {
+        if (!state.inventories.has(char.inventoryId)) {
           logger.debug(
             { characterId: char.identity.id, inventoryId: char.inventoryId },
             "Creating inventory for character",
           );
-          state.itemContainers.set(
+          state.inventories.set(
             char.inventoryId,
-            ItemContainer.create({ itemInstanceIds: new Set() }),
+            Inventory.create({
+              id: char.inventoryId,
+              itemInstanceIds: new Set(),
+            }),
           );
         }
         server.markToResendFullState(char.identity.id);

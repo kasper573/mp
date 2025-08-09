@@ -1,4 +1,4 @@
-import type { ItemContainerId, ItemId } from "@mp/db/types";
+import type { InventoryId, ItemId } from "@mp/db/types";
 import { ItemInstance, type GameState } from "@mp/game-shared";
 import type { Result } from "@mp/std";
 import { createShortId, err, ok } from "@mp/std";
@@ -6,14 +6,15 @@ import { createShortId, err, ok } from "@mp/std";
 export function trySpawnItem(
   gameState: GameState,
   itemId: ItemId,
-  targetContainerId: ItemContainerId,
+  inventoryId: InventoryId,
 ): Result<void, string> {
-  const item = ItemInstance.create({ id: createShortId(), itemId });
-  gameState.itemInstances.set(item.id, item);
-  const container = gameState.itemContainers.get(targetContainerId);
-  if (!container) {
-    return err(`Item container ${targetContainerId} not found`);
+  const inventory = gameState.inventories.get(inventoryId);
+  if (!inventory) {
+    return err(`Inventory ${inventoryId} not found`);
   }
-  container.itemInstanceIds = new Set([...container.itemInstanceIds, item.id]);
+
+  const item = ItemInstance.create({ id: createShortId(), itemId });
+  gameState.items.set(item.id, item);
+  inventory.itemInstanceIds = new Set([...inventory.itemInstanceIds, item.id]);
   return ok(void 0);
 }

@@ -12,7 +12,7 @@ import type {
   ActorModelId,
   AreaId,
   CharacterId,
-  ItemContainerId,
+  InventoryId,
   ItemId,
   ItemInstanceId,
   NpcId,
@@ -40,26 +40,21 @@ export const itemTable = pgTable("item", {
   name: varchar({ length: 64 }).notNull(),
 });
 
+export const inventoryId = () => shortId().$type<InventoryId>();
+export const inventoryTable = pgTable("inventory", {
+  id: inventoryId().$defaultFn(createShortId).primaryKey(),
+});
+
 export const itemInstanceId = () => shortId().$type<ItemInstanceId>();
 export const itemInstanceTable = pgTable("item_instance", {
   id: itemInstanceId().$defaultFn(createShortId).primaryKey(),
   itemId: itemId()
     .notNull()
     .references(() => itemTable.id),
+  inventoryId: inventoryId()
+    .notNull()
+    .references(() => inventoryTable.id),
 });
-
-export const itemContainerId = () => shortId().$type<ItemContainerId>();
-export const itemContainerTable = pgTable("item_container", {
-  id: itemContainerId().$defaultFn(createShortId).primaryKey(),
-});
-
-export const itemInstanceToContainerTable = pgTable(
-  "item_instance_to_item_container",
-  {
-    instanceId: itemInstanceId().references(() => itemInstanceTable.id),
-    containerId: itemContainerId().references(() => itemContainerTable.id),
-  },
-);
 
 export const userId = () => uuid().$type<UserId>();
 
@@ -84,9 +79,9 @@ export const characterTable = pgTable("character", {
   name: varchar({ length: 64 }).notNull(),
   online: boolean().notNull().default(false),
   xp: real().notNull(),
-  inventoryId: itemContainerId()
+  inventoryId: inventoryId()
     .notNull()
-    .references(() => itemContainerTable.id),
+    .references(() => inventoryTable.id),
 });
 
 export const npcId = () => shortId().$type<NpcId>();

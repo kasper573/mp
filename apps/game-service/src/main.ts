@@ -202,8 +202,8 @@ const gameState: GameState = {
     ["instance", GameStateGlobals.create({ areaId: opt.areaId })],
   ]),
   actors: new SyncMap(),
-  itemContainers: new SyncMap(),
-  itemInstances: new SyncMap(),
+  inventories: new SyncMap(),
+  items: new SyncMap(),
 };
 
 collectGameStateMetrics(gameState);

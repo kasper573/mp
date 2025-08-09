@@ -1,4 +1,4 @@
-import type { ItemId } from "@mp/db/types";
+import type { InventoryId, ItemId } from "@mp/db/types";
 import type { Branded } from "@mp/std";
 import { object, prop } from "@mp/sync";
 
@@ -10,7 +10,8 @@ export const ItemInstance = object({
 });
 export type ItemInstance = typeof ItemInstance.$infer;
 
-export const ItemContainer = object({
+export const Inventory = object({
+  id: prop<InventoryId>(),
   itemInstanceIds: prop<Set<ItemInstanceId>>(),
 });
-export type ItemContainer = typeof ItemContainer.$infer;
+export type Inventory = typeof Inventory.$infer;

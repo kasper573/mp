@@ -69,11 +69,11 @@ export class GameStateClient {
       if (!char) {
         return [];
       }
-      const container = this.gameState.itemContainers.get(char.inventoryId);
+      const container = this.gameState.inventories.get(char.inventoryId);
       if (!container) {
         return [];
       }
-      return this.gameState.itemInstances
+      return this.gameState.items
         .slice(container.itemInstanceIds)
         .values()
         .toArray();

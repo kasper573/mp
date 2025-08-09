@@ -1,9 +1,4 @@
-import {
-  actorModelTable,
-  characterTable,
-  eq,
-  itemContainerTable,
-} from "@mp/db";
+import { actorModelTable, characterTable, eq, inventoryTable } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
 import type { InjectionContainer } from "@mp/ioc";
 import type { UserIdentity } from "@mp/oauth";
@@ -43,9 +38,9 @@ async function getOrCreateCharacterIdForUser(
   }
 
   const [inventory] = await db
-    .insert(itemContainerTable)
+    .insert(inventoryTable)
     .values({})
-    .returning({ id: itemContainerTable.id });
+    .returning({ id: inventoryTable.id });
 
   const insertResult = await db
     .insert(characterTable)

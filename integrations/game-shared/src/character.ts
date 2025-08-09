@@ -1,4 +1,4 @@
-import type { CharacterId, ItemContainerId } from "@mp/db/types";
+import type { CharacterId, InventoryId } from "@mp/db/types";
 import type { UserId } from "@mp/oauth";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
@@ -17,7 +17,7 @@ export const Character = object({
   progression: object({
     xp: prop<number>(),
   }),
-  inventoryId: prop<ItemContainerId>(),
+  inventoryId: prop<InventoryId>(),
 });
 
 export type Character = typeof Character.$infer;

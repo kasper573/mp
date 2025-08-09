@@ -9,7 +9,6 @@ import {
   areaTable,
   characterTable,
   itemInstanceTable,
-  itemInstanceToContainerTable,
   itemTable,
   npcRewardTable,
   npcSpawnTable,
@@ -43,7 +42,6 @@ const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
 
 const tablesToTruncate = {
   npcRewardTable,
-  itemInstanceToContainerTable,
   itemInstanceTable,
   itemTable,
   npcSpawnTable,

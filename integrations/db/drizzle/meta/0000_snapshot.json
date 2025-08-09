@@ -1,5 +1,5 @@
 {
-  "id": "8915ecfc-9797-4c7f-b04f-95f26f3d3d39",
+  "id": "2bc4d63c-0b0f-46e2-9d97-ecce9e6c951a",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -130,6 +130,12 @@
           "type": "real",
           "primaryKey": false,
           "notNull": true
+        },
+        "inventoryId": {
+          "name": "inventoryId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
@@ -153,6 +159,185 @@
           "tableTo": "actor_model",
           "columnsFrom": [
             "modelId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "character_inventoryId_inventory_id_fk": {
+          "name": "character_inventoryId_inventory_id_fk",
+          "tableFrom": "character",
+          "tableTo": "inventory",
+          "columnsFrom": [
+            "inventoryId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inventory": {
+      "name": "inventory",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item_instance": {
+      "name": "item_instance",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "itemId": {
+          "name": "itemId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inventoryId": {
+          "name": "inventoryId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "item_instance_itemId_item_id_fk": {
+          "name": "item_instance_itemId_item_id_fk",
+          "tableFrom": "item_instance",
+          "tableTo": "item",
+          "columnsFrom": [
+            "itemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "item_instance_inventoryId_inventory_id_fk": {
+          "name": "item_instance_inventoryId_inventory_id_fk",
+          "tableFrom": "item_instance",
+          "tableTo": "inventory",
+          "columnsFrom": [
+            "inventoryId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.item": {
+      "name": "item",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.npc_reward": {
+      "name": "npc_reward",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "npcId": {
+          "name": "npcId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "itemId": {
+          "name": "itemId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "xp": {
+          "name": "xp",
+          "type": "real",
+          "primaryKey": false,
+          "notNull": false
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "npc_reward_npcId_npc_id_fk": {
+          "name": "npc_reward_npcId_npc_id_fk",
+          "tableFrom": "npc_reward",
+          "tableTo": "npc",
+          "columnsFrom": [
+            "npcId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "npc_reward_itemId_item_id_fk": {
+          "name": "npc_reward_itemId_item_id_fk",
+          "tableFrom": "npc_reward",
+          "tableTo": "item",
+          "columnsFrom": [
+            "itemId"
           ],
           "columnsTo": [
             "id"
@@ -245,7 +430,7 @@
           "columnsTo": [
             "id"
           ],
-          "onDelete": "cascade",
+          "onDelete": "no action",
           "onUpdate": "no action"
         }
       },
@@ -315,12 +500,6 @@
         },
         "aggroRange": {
           "name": "aggroRange",
-          "type": "real",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "xpReward": {
-          "name": "xpReward",
           "type": "real",
           "primaryKey": false,
           "notNull": true

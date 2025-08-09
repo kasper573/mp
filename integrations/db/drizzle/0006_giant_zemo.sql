@@ -1,1 +1,0 @@
-ALTER TABLE "npc_reward" RENAME COLUMN "xpAmount" TO "xp";

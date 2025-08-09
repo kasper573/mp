@@ -40,7 +40,7 @@ export type ItemId = Branded<string, "ItemId">;
 
 export type ItemInstanceId = Branded<string, "ItemInstanceId">;
 
-export type ItemContainerId = Branded<string, "ItemContainerId">;
+export type InventoryId = Branded<string, "InventoryId">;
 
 export type CharacterId = Branded<string, "CharacterId">;
 
