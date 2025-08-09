@@ -14,7 +14,7 @@ import {
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
 import { GameAssetLoaderContext, GameStateClientContext } from "./context";
-import type { GameAssets } from "./game-asset-loader";
+import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
@@ -37,9 +37,9 @@ export function GameRenderer({
   additionalDebugUi,
   enableUi = true,
 }: GameRendererProps) {
-  const useGameAssets = useContext(GameAssetLoaderContext);
+  const { useAreaAssets } = useContext(GameAssetLoaderContext);
 
-  const assets = useGameAssets(areaIdToLoadAssetsFor);
+  const assets = useAreaAssets(areaIdToLoadAssetsFor);
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
   const appSignal = useGraphics(container);
@@ -81,7 +81,7 @@ function buildStage(
   opt: {
     interactive: boolean;
     gameStateClient: GameStateClient;
-    assets: GameAssets;
+    assets: AreaAssets;
     showDebugUi: Signal<boolean>;
   },
 ) {

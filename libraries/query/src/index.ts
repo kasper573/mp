@@ -3,6 +3,7 @@ export {
   QueryClientProvider,
   skipToken,
   useMutation,
+  useQueries,
   useQuery,
   useSuspenseQueries,
   useSuspenseQuery,

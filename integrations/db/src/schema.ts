@@ -34,6 +34,7 @@ export const areaTable = pgTable("area", {
   id: areaId().primaryKey(),
 });
 
+export type Item = typeof itemTable.$inferSelect;
 export const itemId = () => shortId().$type<ItemId>();
 export const itemTable = pgTable("item", {
   id: itemId().$defaultFn(createShortId).primaryKey(),

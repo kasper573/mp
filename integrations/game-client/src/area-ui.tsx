@@ -1,6 +1,6 @@
 import { useContext } from "preact/hooks";
 import * as styles from "./area-ui.css";
-import { GameStateClientContext } from "./context";
+import { GameAssetLoaderContext, GameStateClientContext } from "./context";
 import { RespawnDialog } from "./respawn-dialog";
 
 export function AreaUi() {
@@ -17,14 +17,14 @@ export function AreaUi() {
 
 function Inventory() {
   const state = useContext(GameStateClientContext);
+  const { useItems } = useContext(GameAssetLoaderContext);
+  const items = useItems(state.inventory.value.map((item) => item.itemId));
 
   return (
     <div className={styles.inventory}>
       <div>Inventory</div>
       {state.inventory.value.map((item) => (
-        <div key={item.id}>
-          instanceId: {item.id}, itemId: {item.itemId}
-        </div>
+        <div key={item.id}>{items.get(item.itemId)?.name}</div>
       ))}
     </div>
   );

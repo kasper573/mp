@@ -8,7 +8,7 @@ import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useContext } from "preact/compat";
-import { useGameAssets } from "../../../integrations/assets";
+import { gameAssetLoader } from "../../../integrations/assets";
 import { AuthContext } from "../../../integrations/contexts";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
@@ -59,7 +59,7 @@ function RouteComponent() {
       }}
     >
       <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
-        <GameAssetLoaderContext.Provider value={useGameAssets}>
+        <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <SpectatorClient
             characterOptions={characterOptions.data ?? []}
             stateClient={stateClient}
