@@ -235,6 +235,7 @@ logger.info(`Getting all NPC rewards...`);
 const npcRewardSystem = new NpcRewardSystem(
   logger,
   gameState,
+  rng,
   await gameStateLoader.getAllNpcRewards(),
 );
 

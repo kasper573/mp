@@ -6,6 +6,7 @@ import {
   type NpcReward,
 } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
+import type { Rng } from "@mp/std";
 import { assert, createShortId } from "@mp/std";
 
 export class NpcRewardSystem {
@@ -14,6 +15,7 @@ export class NpcRewardSystem {
   constructor(
     private logger: Logger,
     private gameState: GameState,
+    private rng: Rng,
     npcRewards: NpcReward[],
   ) {
     for (const reward of npcRewards) {
