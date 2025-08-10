@@ -1,35 +1,16 @@
 import { NotifiableSignal } from "@mp/state";
-import {
-  type PatchPathStep,
-  type Patch,
-  PatchType,
-  type PatchPath,
-} from "./patch";
-import { isSyncComponent } from "./sync-component";
+import { assert } from "@mp/std";
+import { PatchOperationType, type Operation, type Patch } from "./patch";
+import type { DeepPartial } from "./tracked";
+import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
 
-import type { IndexDefinition, IndexResolvers } from "@mp/index";
-import { Index } from "@mp/index";
+export class SyncMap<EntityId, Entity extends object> {
+  #signal: NotifiableSignal<Map<EntityId, Entity>>;
+  #keysLastFlush = new Set<EntityId>();
 
-export class SyncMap<K, V, Def extends IndexDefinition = {}>
-  implements Map<K, V>
-{
-  #keysLastFlush = new Set<K>();
-  #signal: NotifiableSignal<Map<K, V>>;
-  readonly index: Index<V, Def>;
-
-  constructor(
-    entries?: Iterable<readonly [K, V]> | null,
-    indexResolvers?: IndexResolvers<V, Def>,
-  ) {
-    this.#signal = new NotifiableSignal(new Map<K, V>(entries));
-
-    this.index = new Index(
-      () => this.#signal.value.values(),
-      indexResolvers ?? ({} as IndexResolvers<V, Def>),
-    );
+  constructor(entries?: Iterable<readonly [EntityId, Entity]> | null) {
+    this.#signal = new NotifiableSignal(new Map(entries));
   }
-
-  // Reactive Map implementation
 
   clear(): void {
     const map = this.#signal.value;
@@ -38,26 +19,28 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
       this.#signal.notify();
     }
   }
-  delete(key: K): boolean {
+  delete(key: EntityId): boolean {
     const deleted = this.#signal.value.delete(key);
     if (deleted) {
       this.#signal.notify();
     }
     return deleted;
   }
-  forEach<ThisArg>(
-    callbackfn: (value: V, key: K, map: Map<K, V>) => void,
-    thisArg?: ThisArg,
-  ): void {
-    this.#signal.value.forEach(callbackfn, thisArg);
+  replace(entries: Iterable<readonly [EntityId, Entity]>): void {
+    const map = this.#signal.value;
+    map.clear();
+    for (const [key, value] of entries) {
+      map.set(key, value);
+    }
+    this.#signal.notify();
   }
-  get(key: K): V | undefined {
+  get(key: EntityId): Entity | undefined {
     return this.#signal.value.get(key);
   }
-  has(key: K): boolean {
+  has(key: EntityId): boolean {
     return this.#signal.value.has(key);
   }
-  set(key: K, value: V): this {
+  set(key: EntityId, value: Entity): this {
     this.#signal.value.set(key, value);
     this.#signal.notify();
     return this;
@@ -65,50 +48,120 @@ export class SyncMap<K, V, Def extends IndexDefinition = {}>
   get size(): number {
     return this.#signal.value.size;
   }
-  entries(): MapIterator<[K, V]> {
+  entries(): MapIterator<[EntityId, Entity]> {
     return this.#signal.value.entries();
   }
-  keys(): MapIterator<K> {
+  keys(): MapIterator<EntityId> {
     return this.#signal.value.keys();
   }
-  values(): MapIterator<V> {
+  values(): MapIterator<Entity> {
     return this.#signal.value.values();
   }
-  [Symbol.iterator](): MapIterator<[K, V]> {
+  [Symbol.iterator](): MapIterator<[EntityId, Entity]> {
     return this.#signal.value[Symbol.iterator]();
   }
   get [Symbol.toStringTag](): string {
     return this.#signal.value[Symbol.toStringTag];
   }
 
-  /**
-   * Produces a patch that represents all changes since the last flush.
-   */
-  flush(...path: PatchPathStep[]): Patch {
-    const patch: Patch = [];
-    const currentKeys = new Set(this.keys());
+  slice(keys: Iterable<EntityId>): Map<EntityId, Entity> {
+    const map = new Map<EntityId, Entity>();
+    for (const key of keys) {
+      const entity = this.get(key);
+      if (entity) {
+        map.set(key, entity);
+      }
+    }
+    return map;
+  }
 
-    const addedKeys = currentKeys.difference(this.#keysLastFlush);
-    for (const key of addedKeys) {
-      const value = this.get(key) as V;
-      patch.push([PatchType.Set, [...path, String(key)] as PatchPath, value]);
+  /** @internal */
+  flush<EntityName>(
+    entityName: EntityName,
+    patch: Patch<EntityName, EntityId, Entity>,
+  ) {
+    const currentIds = new Set(this.keys());
+    const addedIds = currentIds.difference(this.#keysLastFlush);
+    const removedIds = this.#keysLastFlush.difference(currentIds);
+    const staleIds = currentIds.intersection(this.#keysLastFlush);
+
+    if (addedIds.size) {
+      this.appendAddOperationToPatch(entityName, addedIds, patch);
     }
 
-    const removedKeys = this.#keysLastFlush.difference(currentKeys);
-    for (const key of removedKeys) {
-      patch.push([PatchType.Remove, [...path, String(key)] as PatchPath]);
+    if (removedIds.size) {
+      patch.push({
+        type: PatchOperationType.MapDelete,
+        entityName,
+        removedIds,
+      });
     }
 
-    const staleKeys = this.#keysLastFlush.intersection(currentKeys);
-    for (const key of staleKeys) {
-      const v = this.get(key);
-      if (isSyncComponent(v)) {
-        v.flush([...path, String(key)], patch);
+    const instanceFlushes: Array<[EntityId, DeepPartial<Entity>]> = [];
+    for (const entityId of staleIds) {
+      const changes = flushTrackedInstance(this.get(entityId) as Entity);
+      if (changes) {
+        instanceFlushes.push([entityId, changes]);
       }
     }
 
-    this.#keysLastFlush = currentKeys;
+    if (instanceFlushes.length) {
+      patch.push({
+        type: PatchOperationType.EntityUpdate,
+        entityName,
+        changes: instanceFlushes,
+      });
+    }
 
-    return patch;
+    this.#keysLastFlush = currentIds;
+  }
+
+  /** @internal */
+  appendAddOperationToPatch<EntityName>(
+    entityName: EntityName,
+    addedIds: Iterable<EntityId>,
+    patch: Patch<EntityName, EntityId, Entity>,
+  ) {
+    patch.push({
+      type: PatchOperationType.MapAdd,
+      entityName,
+      added: Array.from(this.slice(addedIds).entries()),
+    });
+
+    // Ensure the added entities have their dirty state flushed and omitted
+    // since we're producing an add patch which already contains all their data.
+    for (const entityId of addedIds) {
+      flushTrackedInstance(this.get(entityId) as Entity);
+    }
+  }
+
+  /** @internal */
+  applyOperation<EntityName>(
+    op: Operation<EntityName, EntityId, Entity>,
+  ): void {
+    switch (op.type) {
+      case PatchOperationType.MapAdd:
+        for (const [entityId, entity] of op.added) {
+          this.set(entityId, entity);
+        }
+        break;
+      case PatchOperationType.MapReplace:
+        this.replace(op.replacement);
+        break;
+      case PatchOperationType.MapDelete:
+        for (const entityId of op.removedIds) {
+          this.delete(entityId);
+        }
+        break;
+      case PatchOperationType.EntityUpdate:
+        for (const [entityId, changes] of op.changes) {
+          const entity = assert(
+            this.get(entityId),
+            `Entity not found for update: ${entityId}`,
+          );
+          updateTrackedInstance(entity, changes);
+        }
+        break;
+    }
   }
 }

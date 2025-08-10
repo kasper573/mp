@@ -1,21 +1,22 @@
-import type { AreaId, NpcSpawnId } from "@mp/db/types";
-import { defineSyncComponent, type SyncMap } from "@mp/sync";
+import type { AreaId } from "@mp/db/types";
+import { object, prop, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
+import type { ItemInstance, ItemInstanceId } from "./item";
 
-const Commons = defineSyncComponent((b) => b.add<AreaId>()("id"));
+export const GameStateGlobals = object({
+  areaId: prop<AreaId>(),
+});
 
-export class GameStateAreaEntity extends Commons {}
+export type GameStateGlobals = typeof GameStateGlobals.$infer;
 
 // oxlint-disable-next-line consistent-type-definitions This needs to be a record type, so can't use interface
 export type GameState = {
-  area: SyncMap<"current", GameStateAreaEntity>;
-  actors: SyncMap<
-    ActorId,
-    Actor,
-    {
-      alive: boolean;
-      type: Actor["type"];
-      spawnId: NpcSpawnId | undefined;
-    }
-  >;
+  /**
+   * There is only one globals instance,
+   * but since all game state must be sync maps,
+   * we simply use a sync map with a single key.
+   */
+  globals: SyncMap<"instance", GameStateGlobals>;
+  actors: SyncMap<ActorId, Actor>;
+  items: SyncMap<ItemInstanceId, ItemInstance>;
 };

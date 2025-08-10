@@ -18,7 +18,6 @@
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/path-finding": "workspace:*",
-    "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/tiled-loader": "workspace:*",

@@ -11,9 +11,6 @@
       "require": "./src/index.ts"
     }
   },
-  "dependencies": {
-    "timespan-ts": "1.0.3"
-  },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"
   }

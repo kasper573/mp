@@ -20,7 +20,7 @@ export default defineConfig({
     }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    preact(),
+    preact({ devToolsEnabled: false }),
     checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

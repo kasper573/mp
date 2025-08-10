@@ -6,6 +6,7 @@ import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import type { GameStateServer } from "./game-state-server";
 import { findPathForSubject } from "./movement-behavior";
+import type { NpcRewardSystem } from "./npc-reward-system";
 
 const hpRegenInterval = TimeSpan.fromSeconds(10);
 
@@ -13,6 +14,7 @@ export function combatBehavior(
   state: GameState,
   server: GameStateServer,
   area: AreaResource,
+  rewardSystem: NpcRewardSystem,
 ): TickEventHandler {
   let nextHpRegenTime = TimeSpan.fromSeconds(0);
   return ({ totalTimeElapsed }) => {
@@ -33,12 +35,19 @@ export function combatBehavior(
     for (const actor of state.actors.values()) {
       attemptAttack(actor, totalTimeElapsed);
 
-      // Dying should stop all actions
+      // You die when your health reaches 0
       if (!actor.combat.health) {
+        actor.combat.alive = false;
+        // Dying should stop all actions
         actor.combat.health = 0;
         actor.movement.path = undefined;
         actor.movement.moveTarget = undefined;
         actor.combat.attackTargetId = undefined;
+      }
+
+      // You live when your health is above 0
+      else {
+        actor.combat.alive = true;
       }
     }
   };
@@ -84,7 +93,10 @@ export function combatBehavior(
     if (target.combat.health <= 0) {
       server.addEvent("actor.death", target.identity.id);
       if (actor.type === "character" && target.type === "npc") {
-        actor.progression.xp += target.etc.xpReward;
+        rewardSystem.giveRewardForKillingNpc(
+          actor.identity.id,
+          target.identity.npcId,
+        );
       }
     }
 

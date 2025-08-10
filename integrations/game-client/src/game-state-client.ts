@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import type { GameEventClient, GameStateEvents } from "@mp/game-service";
-import type { Actor, Character } from "@mp/game-shared";
+import type { Actor, Character, ItemInstance } from "@mp/game-shared";
 import {
   registerEncoderExtensions,
   syncMessageEncoding,
@@ -35,13 +35,16 @@ export class GameStateClient {
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
-  readonly areaId = computed(() => this.gameState.area.get("current")?.id);
+  readonly areaId = computed(
+    () => this.gameState.globals.get("instance")?.areaId,
+  );
   readonly readyState: Signal<WebSocket["readyState"]>;
   readonly isConnected: ReadonlySignal<boolean>;
 
   // Derived state
-  readonly actorList: ReadonlySignal<Actor[]>;
+  readonly actorList: ReadonlySignal<readonly Actor[]>;
   readonly character: ReadonlySignal<Character | undefined>;
+  readonly inventory: ReadonlySignal<readonly ItemInstance[]>;
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
@@ -52,13 +55,6 @@ export class GameStateClient {
 
     this.actions = new GameActions(this.options.eventClient, this.characterId);
 
-    // We throttle because when stale patches are detected, they usually come in batches,
-    // and we only want to send one request for full state.
-    this.refreshState = throttle(
-      this.options.eventClient.network.requestFullState,
-      5000,
-    );
-
     this.actorList = computed(() => this.gameState.actors.values().toArray());
 
     this.character = computed(() => {
@@ -67,9 +63,18 @@ export class GameStateClient {
       ) as Character | undefined;
       return char;
     });
-  }
 
-  private refreshState: () => unknown;
+    this.inventory = computed(() => {
+      const inventoryId = this.character.value?.inventoryId;
+      if (inventoryId === undefined) {
+        return [];
+      }
+      return this.gameState.items
+        .values()
+        .filter((item) => item.inventoryId === inventoryId)
+        .toArray();
+    });
+  }
 
   start = () => {
     const { socket } = this.options;
@@ -105,10 +110,7 @@ export class GameStateClient {
 
       const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
       if (lag.compareTo(stalePatchThreshold) > 0) {
-        this.options.logger.warn(
-          `Stale patch detected, requesting full state refresh (lag: ${lag.totalMilliseconds}ms)`,
-        );
-        this.refreshState();
+        this.onPatchLagOrError(lag);
       }
 
       if (patch) {
@@ -123,11 +125,7 @@ export class GameStateClient {
           if (handlePatchFailure) {
             handlePatchFailure(result.error);
           } else {
-            this.options.logger.error(
-              result.error,
-              `Could not apply patch, requesting full state refresh`,
-            );
-            this.refreshState();
+            this.onPatchLagOrError(result.error);
           }
         }
       }
@@ -139,6 +137,23 @@ export class GameStateClient {
       }
     }
   };
+
+  // We throttle because when stale patches or errors are detected as they usually come in batches.
+  private onPatchLagOrError = throttle((lagOrError: TimeSpan | Error) => {
+    const { logger, eventClient } = this.options;
+    if (lagOrError instanceof TimeSpan) {
+      logger.warn(
+        `Stale patch detected (lag: ${lagOrError.totalMilliseconds}ms). Requesting full state refresh.`,
+      );
+    } else {
+      logger.error(
+        lagOrError,
+        "Could not apply patch. Requesting full state refresh.",
+      );
+    }
+
+    eventClient.network.requestFullState();
+  }, 5000);
 }
 
 type WebSocketLike = Pick<

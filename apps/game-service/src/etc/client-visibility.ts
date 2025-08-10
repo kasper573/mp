@@ -3,6 +3,7 @@ import type {
   ActorId,
   AreaResource,
   GameState,
+  ItemInstanceId,
   MovementTrait,
 } from "@mp/game-shared";
 import { clientViewDistanceRect } from "@mp/game-shared";
@@ -10,18 +11,29 @@ import type { Tile } from "@mp/std";
 import type { ClientVisibilityFactory } from "@mp/sync";
 
 /**
- * Removes any information that the given client should not have access to.
- * Includes client specific information (ie. fog of war),
- * but also common things like signed out players.
+ * Determines what parts of the game state that should be visible to each client
  */
 export function deriveClientVisibility(
   clientViewDistance: Tile,
   area: AreaResource,
 ): ClientVisibilityFactory<GameState, CharacterId> {
+  const globals = new Set(["instance" as const]); // Always visible to everyone
   return (characterId, state) => {
+    // You can see your own inventory
+    const actor = state.actors.get(characterId);
+    const characterInventoryId =
+      actor?.type === "character" ? actor.inventoryId : undefined;
+    const items = new Set<ItemInstanceId>(
+      state.items
+        .values()
+        .filter((item) => item.inventoryId === characterInventoryId)
+        .map((item) => item.id),
+    );
+
     return {
       actors: visibleActors(state, characterId),
-      area: new Set(["current"]),
+      globals,
+      items,
     };
   };
 
@@ -37,6 +49,7 @@ export function deriveClientVisibility(
   }
 
   function canSeeSubject(a: MovementTrait, b: MovementTrait) {
+    // You can see actors within view distance
     const box = clientViewDistanceRect(
       a.coords,
       area.tiled.tileCount,

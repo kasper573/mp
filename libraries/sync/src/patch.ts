@@ -1,129 +1,48 @@
-// This is a rfc6902 adjacent patch format, but with a few differences:
-// - Array data structure since this data is encoded using cbor, where property names impact payload size.
-// - Path is an array instead of a json pointer string. This makes patch filtering much faster since no string parsing is needed.
-// - Only the operations the sync server and client needs is supported.
+import type { DeepPartial } from "./tracked";
 
-import type { SyncEvent } from "./sync-event";
+export type AnyEntityId = string | number;
+export type AnyPatch = Patch<string, AnyEntityId, unknown>;
+export type AnyOperation = Operation<string, AnyEntityId, unknown>;
 
-export type SyncMessage = [
-  Patch | undefined,
-  serverTime: Date,
-  events?: SyncEvent[],
-];
+export type Patch<EntityName, EntityId, Entity> = Operation<
+  EntityName,
+  EntityId,
+  Entity
+>[];
 
-export type Patch = Operation[];
+export type Operation<EntityName, EntityId, Entity> =
+  | MapAddOperation<EntityName, EntityId, Entity>
+  | MapReplaceOperation<EntityName, EntityId, Entity>
+  | MapDeleteOperation<EntityName, EntityId>
+  | EntityUpdateOperation<EntityName, EntityId, Entity>;
 
-export type PatchPathStep = string | number;
-export type PatchPath =
-  | [entityName: PatchPathStep]
-  | [entityName: PatchPathStep, entityId: PatchPathStep]
-  | [
-      entityName: PatchPathStep,
-      entityId: PatchPathStep,
-      componentName: PatchPathStep,
-    ];
-
-export type Operation = SetOperation | UpdateOperation | RemoveOperation;
-
-export enum PatchType {
-  Set = 1,
-  Update = 2,
-  Remove = 3,
+export interface MapAddOperation<EntityName, EntityId, Entity> {
+  readonly type: PatchOperationType.MapAdd;
+  readonly entityName: EntityName;
+  readonly added: readonly [EntityId, Entity][];
 }
 
-export type SetOperation = [PatchType.Set, path: PatchPath, value: unknown];
-
-export type UpdateOperation = [
-  PatchType.Update,
-  path: PatchPath,
-  value: object,
-];
-
-export type RemoveOperation = [PatchType.Remove, path: PatchPath];
-
-export function applyPatch(target: object, patch: Patch): void {
-  for (const operation of patch) {
-    applyOperation(target, operation);
-  }
+export interface MapReplaceOperation<EntityName, EntityId, Entity> {
+  readonly type: PatchOperationType.MapReplace;
+  readonly entityName: EntityName;
+  readonly replacement: readonly [EntityId, Entity][];
 }
 
-export function prefixOperation(
-  prefix: PatchPathStep,
-  operation: Operation,
-): Operation {
-  const [type, path, ...rest] = operation;
-  return [type, [prefix, ...path] as PatchPath, ...rest] as Operation;
+export interface MapDeleteOperation<EntityName, EntityId> {
+  readonly type: PatchOperationType.MapDelete;
+  readonly entityName: EntityName;
+  readonly removedIds: ReadonlySet<EntityId>;
 }
 
-export function applyOperation(
-  target: object,
-  [type, path, value]: Operation,
-): void {
-  switch (type) {
-    case PatchType.Set:
-      return setValue(target, path, value);
-    case PatchType.Update:
-      return updateValue(target, path, value);
-    case PatchType.Remove:
-      return removeValue(target, path);
-  }
+export interface EntityUpdateOperation<EntityName, EntityId, Entity> {
+  readonly type: PatchOperationType.EntityUpdate;
+  readonly entityName: EntityName;
+  readonly changes: readonly [EntityId, DeepPartial<Entity>][];
 }
 
-function setValue(root: object, path: PatchPath, value: unknown): void {
-  const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
-  const lastKey = path.at(-1) as string;
-  if (isMapLike(target)) {
-    target.set(lastKey, value);
-  } else if (isMapLike(target[lastKey]) && isMapLike(value)) {
-    target[lastKey].clear();
-    for (const [key, val] of value.entries()) {
-      target[lastKey].set(key, val);
-    }
-  } else {
-    target[lastKey] = value;
-  }
+export enum PatchOperationType {
+  MapAdd = 1,
+  MapReplace = 2,
+  MapDelete = 3,
+  EntityUpdate = 4,
 }
-
-function updateValue(root: object, path: PatchPath, value: unknown): void {
-  const target = getValue(root, path) as object | undefined;
-  if (!target) {
-    throw new Error(
-      `Could not update value at path "${path.join(".")}", no prexisting value found`,
-    );
-  }
-  Object.assign(target, value);
-}
-
-function removeValue(root: object, path: PatchPath): void {
-  const target = getValue(root, path.slice(0, -1)) as Record<string, unknown>;
-  const lastKey = path.at(-1) as string;
-  if (isMapLike(target)) {
-    target.delete(lastKey);
-  } else {
-    delete target[lastKey];
-  }
-}
-
-function getValue(target: object, path: unknown[]): unknown {
-  for (const key of path) {
-    if (isMapLike(target)) {
-      target = target.get(key) as never;
-    } else {
-      target = target[key as keyof typeof target];
-    }
-  }
-  return target;
-}
-
-function isMapLike<K, V>(value: unknown): value is Map<K, V> {
-  return (
-    value instanceof Map ||
-    (typeof value === "object" &&
-      value !== null &&
-      mapLikeProps.every((prop) => prop in value))
-  );
-}
-
-const mapLikeProps = ["get", "set", "delete", "clear"] satisfies Array<
-  keyof Map<unknown, unknown>
->;

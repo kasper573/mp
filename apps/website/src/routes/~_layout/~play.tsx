@@ -4,7 +4,7 @@ import { useSignalEffect } from "@mp/state/react";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
-import { useGameAssets } from "../../integrations/assets";
+import { gameAssetLoader } from "../../integrations/assets";
 import { useGameStateClient } from "../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
@@ -33,7 +33,7 @@ function PlayPage() {
   // which in turn would stop the game client.
   return (
     <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
-      <GameAssetLoaderContext.Provider value={useGameAssets}>
+      <GameAssetLoaderContext.Provider value={gameAssetLoader}>
         <GameClient
           stateClient={stateClient}
           additionalDebugUi={<MiscDebugUi />}

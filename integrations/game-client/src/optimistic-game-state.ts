@@ -1,22 +1,25 @@
+// oxlint-disable max-depth
 import type { FrameCallbackOptions } from "@mp/engine";
 import type { GameStateEvents } from "@mp/game-service";
-import type { MovementTrait } from "@mp/game-shared";
-import {
-  moveAlongPath,
-  type Actor,
-  type ActorId,
-  type GameState,
-} from "@mp/game-shared";
+import type { Actor, MovementTrait } from "@mp/game-shared";
+import { moveAlongPath, type ActorId, type GameState } from "@mp/game-shared";
 import { isPathEqual, nearestCardinalDirection } from "@mp/math";
 import type { Result } from "@mp/std";
 import { err, ok, typedKeys } from "@mp/std";
-import type { EventAccessFn, Patch } from "@mp/sync";
-import { applyOperation, applyPatch, PatchType, SyncMap } from "@mp/sync";
+import type {
+  AnyPatch,
+  AnySyncState,
+  EventAccessFn,
+  Operation,
+  Patch,
+} from "@mp/sync";
+import { PatchOperationType, SyncMap, updateState } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 
 export class OptimisticGameState implements GameState {
-  area: GameState["area"] = new SyncMap();
+  globals: GameState["globals"] = new SyncMap();
   actors: GameState["actors"] = new SyncMap();
+  items: GameState["items"] = new SyncMap();
 
   constructor(private settings: () => OptimisticGameStateSettings) {}
 
@@ -38,19 +41,17 @@ export class OptimisticGameState implements GameState {
         }
       }
     }
-
-    this.actors.flush();
   };
 
   applyPatch = (
-    patch: Patch,
+    patch: AnyPatch,
     events: EventAccessFn<GameStateEvents>,
   ): Result<void, Error> => {
     try {
       if (this.settings().usePatchOptimizer) {
-        applyPatchOptimized(this, patch, events);
+        applyPatchOptimized(this, patch as TypedPatch, events);
       } else {
-        applyPatch(this, patch);
+        updateState(this as unknown as AnySyncState, patch);
       }
     } catch (error) {
       return err(new Error(`Failed to apply patch`, { cause: error }));
@@ -67,7 +68,6 @@ export class OptimisticGameState implements GameState {
       }
     }
 
-    this.actors.flush();
     return ok(void 0);
   };
 }
@@ -80,56 +80,58 @@ export interface OptimisticGameStateSettings {
 const teleportThreshold = TimeSpan.fromSeconds(1.5);
 const tileMargin = Math.sqrt(2); // diagonal distance between two tiles
 
+// Not a full representation of a typesafe GameState Patch,
+// but we're only interested in the actor slice, so this does fine here.
+type TypedPatch = Patch<keyof GameState, ActorId, Actor>;
+
 // We need to ignore some updates to let the interpolator complete its work.
 // If we receive updates that we trust the interpolator to already be working on,
 // we simply ignore those property changes.
 function applyPatchOptimized(
   gameState: GameState,
-  patch: Patch,
+  patch: Patch<keyof GameState, ActorId, Actor>,
   events: EventAccessFn<GameStateEvents>,
 ): void {
   for (const op of patch) {
-    const [type, [entityName, entityId, componentName], update] = op;
-
     if (
-      entityName === ("actors" satisfies keyof GameState) &&
-      componentName === ("movement" satisfies keyof Actor) &&
-      type === PatchType.Update
+      op.type === PatchOperationType.EntityUpdate &&
+      op.entityName === "actors"
     ) {
-      const actor = gameState[entityName].get(entityId as ActorId);
-      for (const key of typedKeys(update)) {
-        if (
-          actor &&
-          !shouldApplyMovementUpdate(
-            actor.identity.id,
-            actor.movement,
-            update,
-            key,
-            events,
-          )
-        ) {
-          delete update[key];
+      for (const [entityId, actorUpdate] of op.changes) {
+        const localActor = gameState[op.entityName].get(entityId as ActorId);
+        if (!localActor) {
+          continue;
+        }
+        for (const key of typedKeys(actorUpdate.movement ?? [])) {
+          if (
+            !shouldApplyMovementUpdate(localActor, actorUpdate, key, events)
+          ) {
+            delete actorUpdate.movement[key];
+          }
         }
       }
     }
 
-    applyOperation(gameState, op);
+    gameState[op.entityName as keyof GameState].applyOperation(
+      // oxlint-disable-next-line no-explicit-any
+      op as Operation<any, any, any>,
+    );
   }
 }
 
-function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
-  actorId: ActorId,
-  target: MovementTrait,
-  update: Partial<MovementTrait>,
-  key: Key,
+function shouldApplyMovementUpdate(
+  local: Actor,
+  update: Partial<Actor>,
+  key: keyof MovementTrait,
   events: EventAccessFn<GameStateEvents>,
 ) {
   switch (key) {
     case "coords": {
-      const threshold = target.speed * teleportThreshold.totalSeconds;
+      const coords = update.movement?.coords as MovementTrait["coords"];
+      const threshold = local.movement.speed * teleportThreshold.totalSeconds;
       if (
-        update.coords &&
-        !update.coords.isWithinDistance(target.coords, threshold)
+        coords &&
+        !coords.isWithinDistance(local.movement.coords, threshold)
       ) {
         return true; // Snap to new coords if the distance is too large
       }
@@ -140,26 +142,30 @@ function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
     case "path": {
       if (
         events("movement.stop").some(
-          (stoppedActorId) => stoppedActorId === actorId,
+          (stoppedActorId) => stoppedActorId === local.identity.id,
         )
       ) {
         return true;
       }
-      if (update.path?.length) {
+      const path = update.movement?.path as MovementTrait["path"];
+      if (path?.length) {
         return true; // Any new path should be trusted
       }
       // If server says to stop moving, we need to check if to let lerp finish
-      const lastRemainingLocalStep = target.path?.[0];
+      const lastRemainingLocalStep = local.movement.path?.[0];
       if (
         lastRemainingLocalStep &&
-        lastRemainingLocalStep.isWithinDistance(target.coords, tileMargin)
+        lastRemainingLocalStep.isWithinDistance(
+          local.movement.coords,
+          tileMargin,
+        )
       ) {
         // The last remaining step is within the tile margin,
         // which means the stop command was likely due to the movement completing,
         // so we want to let the lerp finish its remaining step.
         return false;
       }
-      return !isPathEqual(update.path, target.path);
+      return !isPathEqual(path, local.movement.path);
     }
     case "dir": {
       // Client handles actor facing directions completely manually
@@ -167,5 +173,5 @@ function shouldApplyMovementUpdate<Key extends keyof MovementTrait>(
     }
   }
 
-  return update[key] !== target[key];
+  return true;
 }
