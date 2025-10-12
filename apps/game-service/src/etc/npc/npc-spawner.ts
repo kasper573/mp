@@ -29,10 +29,10 @@ export class NpcSpawner {
 
     return ({ totalTimeElapsed }) => {
       // Clean up dead NPCs
-      for (const actor of state.actors.index.access<NpcInstance>({
-        type: "npc",
-        alive: false,
-      })) {
+      for (const actor of state.actors.values()) {
+        if (actor.type !== "npc" || actor.combat.alive) {
+          continue;
+        }
         let cleanupTime = corpseCleanupTimers.get(actor.identity.id);
         if (!cleanupTime) {
           cleanupTime = totalTimeElapsed.add(corpseDuration);
@@ -45,9 +45,10 @@ export class NpcSpawner {
       }
 
       for (const { spawn, npc } of this.options) {
-        const currentSpawnCount = state.actors.index.access<NpcInstance>({
-          spawnId: spawn.id,
-        }).size;
+        const currentSpawnCount = state.actors
+          .values()
+          .filter((a) => a.type === "npc" && a.identity.spawnId === spawn.id)
+          .toArray().length;
 
         const amountToSpawn = spawn.count - currentSpawnCount;
         for (let i = 0; i < amountToSpawn; i++) {
@@ -64,7 +65,8 @@ export class NpcSpawner {
     const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
 
-    return new NpcInstance({
+    return NpcInstance.create({
+      type: "npc",
       identity: {
         id,
         npcId: npc.id,
@@ -83,12 +85,12 @@ export class NpcSpawner {
         attackRange: npc.attackRange,
         attackSpeed: npc.attackSpeed,
         health: npc.maxHealth,
+        alive: true,
         maxHealth: npc.maxHealth,
         attackTargetId: undefined,
         lastAttack: undefined,
       },
       etc: {
-        xpReward: npc.xpReward,
         patrol: spawn.patrol ?? undefined,
         aggroRange: npc.aggroRange,
       },

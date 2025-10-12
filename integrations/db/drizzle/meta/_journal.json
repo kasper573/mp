@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1748042116052,
-      "tag": "0000_large_the_captain",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1748122026338,
-      "tag": "0001_curvy_cassandra_nova",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1748524627944,
-      "tag": "0002_clever_thor_girl",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1753608471483,
-      "tag": "0003_next_longshot",
+      "when": 1754774193011,
+      "tag": "0000_fresh_adam_destine",
       "breakpoints": true
     }
   ]

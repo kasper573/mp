@@ -1,4 +1,4 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": [".", "../*.ts", "../../state/test/observable.test.ts"]
+  "include": [".", "../src"]
 }

@@ -13,7 +13,7 @@ export function accessCharacter(
   if (!character) {
     throw new Error("Unknown character");
   }
-  if (session.characterId !== characterId) {
+  if (session.character?.id !== characterId) {
     throw new Error("User does not have access to character");
   }
   return character;

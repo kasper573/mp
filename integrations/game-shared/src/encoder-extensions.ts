@@ -1,13 +1,12 @@
-import type { AreaId } from "@mp/db/types";
+// ----------------------------------------------------
+// General purpose encoder extensions
+// ----------------------------------------------------
+
 import { addEncoderExtension } from "@mp/encoding";
 import type { RectComponents } from "@mp/math";
 import { Rect, Vector } from "@mp/math";
-import { SyncMap } from "@mp/sync";
-import type { CharacterInit } from "./character";
-import { Character } from "./character";
-import { GameStateAreaEntity } from "./game-state";
-import type { NpcInstanceInit } from "./npc-instance";
-import { NpcInstance } from "./npc-instance";
+import { TimeSpan } from "@mp/time";
+import { EncoderTag } from "./encoding";
 
 let hasRegistered = false;
 
@@ -18,22 +17,23 @@ export function registerEncoderExtensions(): void {
 
   hasRegistered = true;
 
-  // All tags below this are reserved by @mp/encoding
-  let startTag = 40_501;
-  const nextTag = () => ++startTag;
-
-  // Claiming the range 40_501 - 40_999 for the game protocol
+  addEncoderExtension<TimeSpan, number>({
+    Class: TimeSpan as never,
+    tag: EncoderTag.TimeSpan,
+    encode: (v, encode) => encode(v.totalMilliseconds),
+    decode: (v) => TimeSpan.fromMilliseconds(v),
+  });
 
   addEncoderExtension<Vector<number>, [number, number]>({
     Class: Vector<number>,
-    tag: nextTag(),
+    tag: EncoderTag.Vector,
     encode: (v, encode) => encode([v.x, v.y]),
     decode: (v) => new Vector(v[0], v[1]),
   });
 
   addEncoderExtension<Rect<number>, RectComponents<number>>({
     Class: Rect<number>,
-    tag: nextTag(),
+    tag: EncoderTag.Rect,
     encode: (v, encode) => encode([v.x, v.y, v.width, v.height]),
     decode: (v) => new Rect(...v),
   });
@@ -41,7 +41,7 @@ export function registerEncoderExtensions(): void {
   addEncoderExtension<Error, { name: string; stack?: string; message: string }>(
     {
       Class: Error,
-      tag: nextTag(),
+      tag: EncoderTag.Error,
       encode: (error, encode) =>
         encode({
           message: error.message,
@@ -58,33 +58,4 @@ export function registerEncoderExtensions(): void {
       },
     },
   );
-
-  addEncoderExtension<SyncMap<unknown, unknown>, Array<[unknown, unknown]>>({
-    Class: SyncMap,
-    tag: nextTag(),
-    encode: (map, encode) => encode(map.entries().toArray()),
-    decode: (entries) => new SyncMap(entries),
-  });
-
-  addEncoderExtension<Character, CharacterInit>({
-    Class: Character,
-    tag: nextTag(),
-    encode: (character, encode) =>
-      encode(character.snapshot() as CharacterInit),
-    decode: (init) => new Character(init),
-  });
-
-  addEncoderExtension<NpcInstance, NpcInstanceInit>({
-    Class: NpcInstance,
-    tag: nextTag(),
-    encode: (npc, encode) => encode(npc.snapshot() as NpcInstanceInit),
-    decode: (init) => new NpcInstance(init),
-  });
-
-  addEncoderExtension<GameStateAreaEntity, { id: AreaId }>({
-    Class: GameStateAreaEntity,
-    tag: nextTag(),
-    encode: ({ id }, encode) => encode({ id }),
-    decode: (init) => new GameStateAreaEntity(init),
-  });
 }

@@ -1,5 +1,5 @@
-import type { characterTable } from "@mp/db";
-import type { ActorModelLookup } from "@mp/game-shared";
+import type { characterTable, npcRewardTable } from "@mp/db";
+import type { ActorModelLookup, NpcReward } from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
 import { cardinalDirections } from "@mp/math";
 import type { Rng } from "@mp/std";
@@ -15,7 +15,9 @@ export function characterFromDbFields(
     `Actor model not found: ${fields.modelId}`,
   );
 
-  return new Character({
+  return Character.create({
+    type: "character",
+    inventoryId: fields.inventoryId,
     appearance: {
       modelId: fields.modelId,
       name: fields.name,
@@ -35,6 +37,7 @@ export function characterFromDbFields(
       attackSpeed: fields.attackSpeed,
       health: fields.health,
       maxHealth: fields.maxHealth,
+      alive: true,
       hitBox: model.hitBox,
       attackTargetId: undefined,
       lastAttack: undefined,
@@ -52,8 +55,29 @@ export function characterFromDbFields(
 
 export function dbFieldsFromCharacter(char: Character) {
   return {
-    ...char.combat.snapshot(),
-    ...char.movement.snapshot(),
-    ...char.progression.snapshot(),
+    ...char.combat,
+    ...char.movement,
+    ...char.progression,
   } satisfies Partial<typeof characterTable.$inferInsert>;
+}
+
+export function npcRewardsFromDbFields(
+  fields: typeof npcRewardTable.$inferSelect,
+): NpcReward[] {
+  const rewards: NpcReward[] = [];
+  if (fields.xp !== null) {
+    rewards.push({
+      npcId: fields.npcId,
+      type: "xp",
+      xp: fields.xp,
+    });
+  }
+  if (fields.itemId !== null) {
+    rewards.push({
+      npcId: fields.npcId,
+      type: "item",
+      itemId: fields.itemId,
+    });
+  }
+  return rewards;
 }

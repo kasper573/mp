@@ -7,6 +7,7 @@ import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
 import { useContext, useState } from "preact/hooks";
+import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
@@ -14,7 +15,7 @@ import {
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
 import { GameAssetLoaderContext, GameStateClientContext } from "./context";
-import type { GameAssets } from "./game-asset-loader";
+import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
@@ -37,16 +38,20 @@ export function GameRenderer({
   additionalDebugUi,
   enableUi = true,
 }: GameRendererProps) {
-  const useGameAssets = useContext(GameAssetLoaderContext);
+  const { useAreaAssets, useActorTextures } = useContext(
+    GameAssetLoaderContext,
+  );
 
-  const assets = useGameAssets(areaIdToLoadAssetsFor);
+  const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
+  const actorTextures = useActorTextures();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
   const appSignal = useGraphics(container);
   const optionsSignal = useObjectSignal({
     interactive,
     gameStateClient,
-    assets,
+    areaAssets,
+    actorTextures,
     showDebugUi,
   });
 
@@ -63,7 +68,7 @@ export function GameRenderer({
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
         <GameStateClientContext.Provider value={gameStateClient}>
-          <AreaUi state={gameStateClient} />
+          <AreaUi />
           {showDebugUi.value && (
             <GameDebugUi>
               {additionalDebugUi}
@@ -81,7 +86,8 @@ function buildStage(
   opt: {
     interactive: boolean;
     gameStateClient: GameStateClient;
-    assets: GameAssets;
+    areaAssets: AreaAssets;
+    actorTextures: ActorTextureLookup;
     showDebugUi: Signal<boolean>;
   },
 ) {
@@ -99,7 +105,9 @@ function buildStage(
     engine,
     debugSettings: () => areaDebugSettingsStorage.value,
     state: opt.gameStateClient,
-    ...opt.assets,
+    actorTextures: opt.actorTextures,
+    area: opt.areaAssets.resource,
+    areaSpritesheets: opt.areaAssets.spritesheets,
   });
   app.stage.addChild(areaScene);
   return function cleanup() {

@@ -1,17 +1,15 @@
 import type { ActorModelId } from "@mp/db/types";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { defineSyncComponent } from "@mp/sync";
+import { object, prop } from "@mp/sync";
 
+export const AppearanceTrait = object({
+  color: prop<number | undefined>(),
+  opacity: prop<number | undefined>(),
+  modelId: prop<ActorModelId>(),
+  name: prop<string>(),
+});
 export type AppearanceTrait = typeof AppearanceTrait.$infer;
-
-export const AppearanceTrait = defineSyncComponent((builder) =>
-  builder
-    .add<number | undefined>()("color")
-    .add<number | undefined>()("opacity")
-    .add<ActorModelId>()("modelId")
-    .add<string>()("name"),
-);
 
 export interface ActorModel {
   id: ActorModelId;

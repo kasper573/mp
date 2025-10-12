@@ -1,4 +1,4 @@
-import type { TimeSpan } from "timespan-ts";
+import type { TimeSpan } from "./timespan";
 
 /**
  * Like `setInterval`, but the callback is a Promise.

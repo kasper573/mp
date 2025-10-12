@@ -25,8 +25,8 @@ catalogs:
       specifier: 5.1.0
       version: 5.1.0
     preact:
-      specifier: 10.26.9
-      version: 10.26.9
+      specifier: 10.27.0
+      version: 10.27.0
     tsx:
       specifier: 4.19.2
       version: 4.19.2
@@ -350,7 +350,7 @@ importers:
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.27.4)(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -437,14 +437,14 @@ importers:
         version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(@tanstack/router-core@1.126.2)(csstype@3.1.3)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(solid-js@1.9.5)(tiny-invariant@1.3.3)
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
+        version: 10.27.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
       '@preact/preset-vite':
         specifier: 'catalog:'
-        version: 2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 2.10.2(@babel/core@7.28.0)(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@tanstack/router-plugin':
         specifier: 1.126.2
         version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -547,7 +547,7 @@ importers:
         version: link:../../libraries/ws
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
+        version: 10.27.0
       uniqolor:
         specifier: 1.1.1
         version: 1.1.1
@@ -576,9 +576,6 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
@@ -749,9 +746,6 @@ importers:
 
   libraries/event-router:
     dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../encoding
       '@mp/invocation-proxy':
         specifier: workspace:*
         version: link:../invocation-proxy
@@ -785,17 +779,7 @@ importers:
         version: 8.11.0
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
-  libraries/index:
-    dependencies:
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
+        version: 10.27.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -871,7 +855,7 @@ importers:
         version: 5.82.0(@tanstack/react-query@5.82.0(react@19.1.0))(react@19.1.0)
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
+        version: 10.27.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -894,13 +878,13 @@ importers:
     dependencies:
       '@preact/signals':
         specifier: 2.2.1
-        version: 2.2.1(preact@10.26.9)
+        version: 2.2.1(preact@10.27.0)
       '@preact/signals-core':
         specifier: 1.11.0
         version: 1.11.0
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
+        version: 10.27.0
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -952,16 +936,22 @@ importers:
 
   libraries/sync:
     dependencies:
-      '@mp/index':
+      '@mp/encoding':
         specifier: workspace:*
-        version: link:../index
+        version: link:../encoding
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      type-fest:
+        specifier: 4.41.0
+        version: 4.41.0
       vitest:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@22.13.10)(jiti@2.4.2)(jsdom@23.2.0)(tsx@4.19.2)
@@ -1024,10 +1014,6 @@ importers:
         version: link:../tsconfig
 
   libraries/time:
-    dependencies:
-      timespan-ts:
-        specifier: 1.0.3
-        version: 1.0.3
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -1052,7 +1038,7 @@ importers:
         version: link:../style
       preact:
         specifier: 'catalog:'
-        version: 10.26.9
+        version: 10.27.0
       react-error-boundary:
         specifier: 6.0.0
         version: 6.0.0(react@19.1.0)
@@ -4660,8 +4646,8 @@ packages:
   postgres-range@1.1.4:
     resolution: {integrity: sha512-i/hbxIE9803Alj/6ytL7UHQxRvZkI9O4Sy+J3HGc4F4oo/2eQAjTSNJ0bfxyse3bH0nuVesCk+3IRLaMtG3H6w==}
 
-  preact@10.26.9:
-    resolution: {integrity: sha512-SSjF9vcnF27mJK1XyFMNJzFd5u3pQiATFqoaDy03XuN00u4ziveVVEGt5RKJrDR8MHE/wJo9Nnad56RLzS2RMA==}
+  preact@10.27.0:
+    resolution: {integrity: sha512-/DTYoB6mwwgPytiqQTh/7SFRL98ZdiD8Sk8zIUVOxtwq4oWcwrcd1uno9fE/zZmUaUrFNYzbH14CPebOz9tZQw==}
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -5056,9 +5042,6 @@ packages:
 
   thread-stream@3.1.0:
     resolution: {integrity: sha512-OqyPZ9u96VohAyMfJykzmivOrY2wfMSf3C5TtFJVgN+Hm6aj+voFhlK+kZEIv2FBh1X6Xp3DlnCOfEQ3B2J86A==}
-
-  timespan-ts@1.0.3:
-    resolution: {integrity: sha512-FnrxI8Jd2595wuR9cjMUz1TfncTcbYJTKbuptwCnQZf124KQe0WCEreVJUi5PkzrGUn5s/wntb0tFLTgAbsoyw==}
 
   tiny-invariant@1.3.3:
     resolution: {integrity: sha512-+FbBPE1o9QAYvviau/qC5SE3caw21q3xkvWKBtja5vgqOWIHHJ3ioaq1VPfn/Szqctz2bU/oYeKd9/z5BL+PVg==}
@@ -6696,12 +6679,12 @@ snapshots:
       '@pnpm/network.ca-file': 1.0.2
       config-chain: 1.1.13
 
-  '@preact/preset-vite@2.10.2(@babel/core@7.27.4)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
+  '@preact/preset-vite@2.10.2(@babel/core@7.27.4)(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
     dependencies:
       '@babel/core': 7.27.4
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.27.4)
       '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.27.4)
-      '@prefresh/vite': 2.4.8(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+      '@prefresh/vite': 2.4.8(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@rollup/pluginutils': 4.2.1
       babel-plugin-transform-hook-names: 1.0.2(@babel/core@7.27.4)
       debug: 4.4.1
@@ -6712,12 +6695,12 @@ snapshots:
       - preact
       - supports-color
 
-  '@preact/preset-vite@2.10.2(@babel/core@7.28.0)(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
+  '@preact/preset-vite@2.10.2(@babel/core@7.28.0)(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
     dependencies:
       '@babel/core': 7.28.0
       '@babel/plugin-transform-react-jsx': 7.27.1(@babel/core@7.28.0)
       '@babel/plugin-transform-react-jsx-development': 7.27.1(@babel/core@7.28.0)
-      '@prefresh/vite': 2.4.8(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+      '@prefresh/vite': 2.4.8(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
       '@rollup/pluginutils': 4.2.1
       babel-plugin-transform-hook-names: 1.0.2(@babel/core@7.28.0)
       debug: 4.4.1
@@ -6730,27 +6713,27 @@ snapshots:
 
   '@preact/signals-core@1.11.0': {}
 
-  '@preact/signals@2.2.1(preact@10.26.9)':
+  '@preact/signals@2.2.1(preact@10.27.0)':
     dependencies:
       '@preact/signals-core': 1.11.0
-      preact: 10.26.9
+      preact: 10.27.0
 
   '@prefresh/babel-plugin@0.5.2': {}
 
-  '@prefresh/core@1.5.5(preact@10.26.9)':
+  '@prefresh/core@1.5.5(preact@10.27.0)':
     dependencies:
-      preact: 10.26.9
+      preact: 10.27.0
 
   '@prefresh/utils@1.2.1': {}
 
-  '@prefresh/vite@2.4.8(preact@10.26.9)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
+  '@prefresh/vite@2.4.8(preact@10.27.0)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))':
     dependencies:
       '@babel/core': 7.28.0
       '@prefresh/babel-plugin': 0.5.2
-      '@prefresh/core': 1.5.5(preact@10.26.9)
+      '@prefresh/core': 1.5.5(preact@10.27.0)
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
-      preact: 10.26.9
+      preact: 10.27.0
       vite: 6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)
     transitivePeerDependencies:
       - supports-color
@@ -9019,7 +9002,7 @@ snapshots:
 
   postgres-range@1.1.4: {}
 
-  preact@10.26.9: {}
+  preact@10.27.0: {}
 
   prelude-ls@1.2.1: {}
 
@@ -9439,8 +9422,6 @@ snapshots:
   thread-stream@3.1.0:
     dependencies:
       real-require: 0.2.0
-
-  timespan-ts@1.0.3: {}
 
   tiny-invariant@1.3.3: {}
 

@@ -36,8 +36,16 @@ export type ActorModelId = Branded<string, "ActorModelId">;
 
 export type AreaId = Branded<string, "AreaId">;
 
+export type ItemId = Branded<string, "ItemId">;
+
+export type ItemInstanceId = Branded<string, "ItemInstanceId">;
+
+export type InventoryId = Branded<string, "InventoryId">;
+
 export type CharacterId = Branded<string, "CharacterId">;
 
 export type NpcId = Branded<string, "NPCId">;
 
 export type NpcSpawnId = Branded<string, "NpcSpawnId">;
+
+export type NpcRewardId = Branded<string, "NpcRewardId">;

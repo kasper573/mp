@@ -1,23 +1,27 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { AreaId } from "@mp/db/types";
-import type { ActorTextureLookup } from "@mp/game-client";
+import type { Item } from "@mp/db";
+import type { AreaId, ItemId } from "@mp/db/types";
+import type {
+  ActorTextureLookup,
+  AreaAssetsLookup,
+  ItemLookup,
+} from "@mp/game-client";
 import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
 import type { AreaResource } from "@mp/game-shared";
 import { loadAreaResource } from "@mp/game-shared";
-import { useSuspenseQueries, useSuspenseQuery } from "@mp/query";
+import { useQueries, useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
-export const useGameAssets: GameAssetLoader = (areaId) => {
-  const area = useAreaResource(areaId);
+export const useAreaAssets: AreaAssetsLookup = (areaId) => {
+  const resource = useAreaResource(areaId);
   return {
-    area,
-    areaSpritesheets: useAreaSpritesheets(area),
-    actorTextures: useActorTextureLookup(),
+    resource,
+    spritesheets: useAreaSpritesheets(resource),
   };
 };
 
-export function useActorTextureLookup(): ActorTextureLookup {
+export function useActorTextures(): ActorTextureLookup {
   const api = useApi();
   const [{ data: url }, { data: modelIds }] = useSuspenseQueries({
     queries: [
@@ -26,13 +30,13 @@ export function useActorTextureLookup(): ActorTextureLookup {
     ],
   });
 
-  const query = useSuspenseQuery({
+  const { data: lookup } = useSuspenseQuery({
     queryKey: ["actor-spritesheet-lookup", url],
     staleTime: Infinity,
     queryFn: () => loadActorTextureLookup(modelIds, url),
   });
 
-  return query.data;
+  return lookup;
 }
 
 export function useAreaResource(areaId: AreaId): AreaResource {
@@ -58,3 +62,28 @@ export function useAreaSpritesheets(
   });
   return query.data;
 }
+
+export const useItems: ItemLookup = (itemIds) => {
+  const api = useApi();
+  return useQueries({
+    queries: new Set(itemIds)
+      .values()
+      .map((itemId) => api.item.queryOptions(itemId))
+      .toArray(),
+    combine: (result) => {
+      const map = new Map<ItemId, Item>();
+      for (const item of result) {
+        if (item.data) {
+          map.set(item.data.id, item.data);
+        }
+      }
+      return map;
+    },
+  });
+};
+
+export const gameAssetLoader: GameAssetLoader = {
+  useAreaAssets,
+  useItems,
+  useActorTextures,
+};

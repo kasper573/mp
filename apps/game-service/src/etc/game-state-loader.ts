@@ -1,11 +1,20 @@
 import type { DbClient } from "@mp/db";
-import { characterTable, eq, npcSpawnTable, npcTable } from "@mp/db";
+import {
+  and,
+  characterTable,
+  eq,
+  exists,
+  npcRewardTable,
+  npcSpawnTable,
+  npcTable,
+} from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,
   AreaResource,
   Character,
   Npc,
+  NpcReward,
   NpcSpawn,
 } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
@@ -13,7 +22,8 @@ import type { Rng, Tile } from "@mp/std";
 import {
   characterFromDbFields,
   dbFieldsFromCharacter,
-} from "./character-transform";
+  npcRewardsFromDbFields,
+} from "./db-transform";
 import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
 
 export class GameStateLoader {
@@ -84,5 +94,24 @@ export class GameStateLoader {
     );
 
     return [...allFromDB, ...allFromTiled];
+  }
+
+  async getAllNpcRewards(): Promise<NpcReward[]> {
+    const isRewardForThisAreaQuery = this.db
+      .select()
+      .from(npcSpawnTable)
+      .where(
+        and(
+          eq(npcSpawnTable.areaId, this.area.id),
+          eq(npcRewardTable.npcId, npcSpawnTable.npcId),
+        ),
+      );
+
+    const rows = await this.db
+      .select()
+      .from(npcRewardTable)
+      .where(exists(isRewardForThisAreaQuery));
+
+    return rows.flatMap(npcRewardsFromDbFields);
   }
 }

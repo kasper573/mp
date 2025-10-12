@@ -11,15 +11,17 @@
     }
   },
   "scripts": {
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck"
   },
   "dependencies": {
-    "@mp/index": "workspace:*",
-    "@mp/state": "workspace:*"
+    "@mp/encoding": "workspace:*",
+    "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
+    "type-fest": "4.41.0",
     "vitest": "catalog:"
   }
 }

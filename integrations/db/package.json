@@ -20,6 +20,8 @@
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
     "seed": "tsx seed.ts",
+    "drop": "tsx drop.ts",
+    "reset": "pnpm drop && rm -rf drizzle/* && pnpm generate && pnpm push && pnpm seed",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {

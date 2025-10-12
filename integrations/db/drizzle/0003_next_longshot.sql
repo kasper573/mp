@@ -1,1 +1,0 @@
-ALTER TABLE "character" ADD COLUMN "online" boolean DEFAULT false NOT NULL;

@@ -1,12 +1,9 @@
 // oxlint-disable no-await-in-loop
 import { createApiClient } from "@mp/api-service/sdk";
-import {
-  createProxyEventInvoker,
-  eventMessageEncoding,
-} from "@mp/event-router";
+import { createProxyEventInvoker } from "@mp/event-router";
 import { GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
-import { loadAreaResource } from "@mp/game-shared";
+import { eventMessageEncoding, loadAreaResource } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";

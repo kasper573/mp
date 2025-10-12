@@ -14,7 +14,31 @@ export interface UserSession<Id extends string = string> {
   }>;
 
   /**
-   * The character id that the user will be subscribing to game state patches and events for
+   * The character that the user will be subscribing to game state patches and events for
    */
-  readonly characterId?: CharacterId;
+  readonly character?: UserSessionCharacterClaim;
+}
+
+/**
+ * The user may claim character data in different ways
+ */
+export type UserSessionCharacterClaim =
+  | PlayerCharacterClaim
+  | SpectatorCharacterClaim;
+
+/**
+ * Players receive game state, can control the character, and contribute to character online status.
+ */
+export interface PlayerCharacterClaim {
+  readonly type: "player";
+  readonly id: CharacterId;
+}
+
+/**
+ * Spectators only receive game state and cannot control the character.
+ * They also do not contribute to character online status.
+ */
+export interface SpectatorCharacterClaim {
+  readonly type: "spectator";
+  readonly id: CharacterId;
 }

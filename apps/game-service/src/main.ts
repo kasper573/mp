@@ -3,16 +3,16 @@ import { createDbClient } from "@mp/db";
 import {
   createEventInvoker,
   createProxyEventInvoker,
-  eventMessageEncoding,
   QueuedEventInvoker,
 } from "@mp/event-router";
 import type { GameState } from "@mp/game-shared";
 import {
   clientViewDistance,
+  eventMessageEncoding,
   eventWithSessionEncoding,
   GameServiceConfig,
   gameServiceConfigRedisKey,
-  GameStateAreaEntity,
+  GameStateGlobals,
   loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
@@ -23,7 +23,7 @@ import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
 import { Rng, withBackoffRetries } from "@mp/std";
-import { shouldOptimizeCollects, SyncMap, SyncServer } from "@mp/sync";
+import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
   MetricsHistogram,
@@ -51,6 +51,7 @@ import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-b
 import { GameStateLoader } from "./etc/game-state-loader";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
+import { NpcRewardSystem } from "./etc/npc-reward-system";
 import { NpcAi } from "./etc/npc/npc-ai";
 import { NpcSpawner } from "./etc/npc/npc-spawner";
 import { collectGameStateMetrics } from "./metrics/game-state";
@@ -85,7 +86,7 @@ createRedisSyncEffect(
 );
 
 gameServiceConfig.subscribe((config) => {
-  shouldOptimizeCollects.value = config.isPatchOptimizerEnabled;
+  shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
 });
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
@@ -133,8 +134,8 @@ function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
   // Handle game client -> game service messages
   const eventWithSession = eventWithSessionEncoding.decode(data);
   if (eventWithSession.isOk()) {
-    const { characterId } = eventWithSession.value.session;
-    if (characterId && !gameState.actors.has(characterId)) {
+    const { character } = eventWithSession.value.session;
+    if (character && !gameState.actors.has(character.id)) {
       // Messages for unknown characters can be safely ignored.
       // These are just broadcasts from the gateway,
       // and the intent is for the appropriate game service instance to react.
@@ -153,7 +154,15 @@ function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
   const event = eventMessageEncoding.decode(data);
   if (event.isOk()) {
     eventInvoker.addEvent(event.value, ioc);
+    return;
   }
+
+  logger.warn(
+    { size: data.byteLength, error: event.error },
+    `Received unknown message from game service. ` +
+      `Message decode error: ${event.error}`,
+    `Event decode error: ${eventWithSession.error}`,
+  );
 }
 
 function flushGameState() {
@@ -189,13 +198,11 @@ const syncMessageSizeHistogram = new MetricsHistogram({
 });
 
 const gameState: GameState = {
-  area: new SyncMap([["current", new GameStateAreaEntity({ id: area.id })]]),
-  actors: new SyncMap([], {
-    type: (actor) => actor.type,
-    alive: (actor) => actor.alive.value,
-    spawnId: (actor) =>
-      actor.type === "npc" ? actor.identity.spawnId : undefined,
-  }),
+  globals: new SyncMap([
+    ["instance", GameStateGlobals.create({ areaId: opt.areaId })],
+  ]),
+  actors: new SyncMap(),
+  items: new SyncMap(),
 };
 
 collectGameStateMetrics(gameState);
@@ -217,9 +224,20 @@ const updateTicker = new Ticker({
 });
 
 logger.info(`Getting all NPCs and spawns...`);
-const allNpcsAndSpawns = await gameStateLoader.getAllSpawnsAndTheirNpcs();
+const npcSpawner = new NpcSpawner(
+  area,
+  actorModels,
+  await gameStateLoader.getAllSpawnsAndTheirNpcs(),
+  rng,
+);
 
-const npcSpawner = new NpcSpawner(area, actorModels, allNpcsAndSpawns, rng);
+logger.info(`Getting all NPC rewards...`);
+const npcRewardSystem = new NpcRewardSystem(
+  logger,
+  gameState,
+  rng,
+  await gameStateLoader.getAllNpcRewards(),
+);
 
 const ioc = new InjectionContainer()
   .provide(ctxGameStateLoader, gameStateLoader)
@@ -236,7 +254,9 @@ const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
 updateTicker.subscribe(movementBehavior(ioc));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(combatBehavior(gameState, gameStateServer, area));
+updateTicker.subscribe(
+  combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
+);
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 

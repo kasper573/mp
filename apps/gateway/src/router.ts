@@ -22,7 +22,10 @@ export const gatewayRouter = evt.router({
       .input<CharacterId>()
       .handler(({ ctx, input: characterId }) => {
         const session = ctx.get(ctxUserSessionSignal);
-        session.value = { ...session.value, characterId };
+        session.value = {
+          ...session.value,
+          character: { id: characterId, type: "spectator" },
+        };
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
@@ -36,13 +39,16 @@ export const gatewayRouter = evt.router({
         }
 
         const session = ctx.get(ctxUserSessionSignal);
-        session.value = { ...session.value, characterId };
+        session.value = {
+          ...session.value,
+          character: { id: characterId, type: "player" },
+        };
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
     leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
       const session = ctx.get(ctxUserSessionSignal);
-      session.value = { ...session.value, characterId: undefined };
+      session.value = { ...session.value, character: undefined };
     }),
   }),
 });
