@@ -61,6 +61,9 @@
       { "extensions": [".jsx", ".tsx"] }
     ],
 
+    "always-return": "off",
+    "class-methods-use-this": "off",
+    "no-param-reassign": "off",
     "no-promise-in-callback": "off",
     "namespace": "off",
     "no-bitwise": "off",

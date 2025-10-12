@@ -27,7 +27,7 @@
     "@mp/tsconfig": "workspace:*",
     "@types/node": "catalog:",
     "knip": "5.61.3",
-    "oxlint": "1.9.0",
+    "oxlint": "1.22.0",
     "prettier": "3.6.2",
     "typescript": "catalog:"
   },
