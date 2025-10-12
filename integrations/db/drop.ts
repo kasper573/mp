@@ -34,4 +34,4 @@ await db.$client.query(`
   END $$;
 `);
 
-db.$client.end();
+await db.$client.end();
