@@ -1,13 +1,9 @@
 import type { CharacterId, NpcId } from "@mp/db/types";
-import {
-  ItemInstance,
-  type Character,
-  type GameState,
-  type NpcReward,
-} from "@mp/game-shared";
+import type { Character, GameState, NpcReward } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import type { Rng } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import { assert } from "@mp/std";
+import { spawnItem } from "./item-spawn-system";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcId, NpcReward[]>();
@@ -36,25 +32,18 @@ export class NpcRewardSystem {
       return;
     }
 
-    this.logger.debug(
-      `Giving ${rewards.length} rewards for killing NPC ${npcId} to character ${recipientId}.`,
-    );
-
     for (const reward of rewards) {
       const recipient = assert(
         this.gameState.actors.get(recipientId) as Character,
       );
       switch (reward.type) {
         case "item": {
-          const item = ItemInstance.create({
-            id: createShortId(),
-            itemId: reward.itemId,
-            inventoryId: recipient.inventoryId,
-          });
-          this.gameState.items.set(item.id, item);
-
-          this.logger.debug(
-            `Gave item ${reward.itemId} to character ${recipientId} for killing NPC ${npcId}.`,
+          spawnItem(
+            this.gameState,
+            reward.reference,
+            recipient.inventoryId,
+            this.logger,
+            `for killing NPC ${npcId}`,
           );
           break;
         }

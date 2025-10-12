@@ -1,5 +1,5 @@
 {
-  "id": "ce1cd6e5-d0c5-44c3-8748-3461904e2463",
+  "id": "666c14fe-65d5-4c5f-b472-f98e93104363",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -186,14 +186,26 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.inventory": {
-      "name": "inventory",
+    "public.consumable_definition": {
+      "name": "consumable_definition",
       "schema": "",
       "columns": {
         "id": {
           "name": "id",
           "type": "varchar(10)",
           "primaryKey": true,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "maxStackSize": {
+          "name": "maxStackSize",
+          "type": "integer",
+          "primaryKey": false,
           "notNull": true
         }
       },
@@ -205,8 +217,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.item_instance": {
-      "name": "item_instance",
+    "public.consumable_instance": {
+      "name": "consumable_instance",
       "schema": "",
       "columns": {
         "id": {
@@ -215,8 +227,8 @@
           "primaryKey": true,
           "notNull": true
         },
-        "itemId": {
-          "name": "itemId",
+        "definitionId": {
+          "name": "definitionId",
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
@@ -226,16 +238,22 @@
           "type": "varchar(10)",
           "primaryKey": false,
           "notNull": true
+        },
+        "stackSize": {
+          "name": "stackSize",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
         }
       },
       "indexes": {},
       "foreignKeys": {
-        "item_instance_itemId_item_id_fk": {
-          "name": "item_instance_itemId_item_id_fk",
-          "tableFrom": "item_instance",
-          "tableTo": "item",
+        "consumable_instance_definitionId_consumable_definition_id_fk": {
+          "name": "consumable_instance_definitionId_consumable_definition_id_fk",
+          "tableFrom": "consumable_instance",
+          "tableTo": "consumable_definition",
           "columnsFrom": [
-            "itemId"
+            "definitionId"
           ],
           "columnsTo": [
             "id"
@@ -243,9 +261,9 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "item_instance_inventoryId_inventory_id_fk": {
-          "name": "item_instance_inventoryId_inventory_id_fk",
-          "tableFrom": "item_instance",
+        "consumable_instance_inventoryId_inventory_id_fk": {
+          "name": "consumable_instance_inventoryId_inventory_id_fk",
+          "tableFrom": "consumable_instance",
           "tableTo": "inventory",
           "columnsFrom": [
             "inventoryId"
@@ -263,8 +281,8 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.item": {
-      "name": "item",
+    "public.equipment_definition": {
+      "name": "equipment_definition",
       "schema": "",
       "columns": {
         "id": {
@@ -277,6 +295,95 @@
           "name": "name",
           "type": "varchar(64)",
           "primaryKey": false,
+          "notNull": true
+        },
+        "maxDurability": {
+          "name": "maxDurability",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.equipment_instance": {
+      "name": "equipment_instance",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "definitionId": {
+          "name": "definitionId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "inventoryId": {
+          "name": "inventoryId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "durability": {
+          "name": "durability",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "equipment_instance_definitionId_equipment_definition_id_fk": {
+          "name": "equipment_instance_definitionId_equipment_definition_id_fk",
+          "tableFrom": "equipment_instance",
+          "tableTo": "equipment_definition",
+          "columnsFrom": [
+            "definitionId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "equipment_instance_inventoryId_inventory_id_fk": {
+          "name": "equipment_instance_inventoryId_inventory_id_fk",
+          "tableFrom": "equipment_instance",
+          "tableTo": "inventory",
+          "columnsFrom": [
+            "inventoryId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.inventory": {
+      "name": "inventory",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "varchar(10)",
+          "primaryKey": true,
           "notNull": true
         }
       },
@@ -304,9 +411,21 @@
           "primaryKey": false,
           "notNull": true
         },
-        "itemId": {
-          "name": "itemId",
+        "consumableItemId": {
+          "name": "consumableItemId",
           "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "equipmentItemId": {
+          "name": "equipmentItemId",
+          "type": "varchar(10)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "itemAmount": {
+          "name": "itemAmount",
+          "type": "integer",
           "primaryKey": false,
           "notNull": false
         },
@@ -332,12 +451,25 @@
           "onDelete": "no action",
           "onUpdate": "no action"
         },
-        "npc_reward_itemId_item_id_fk": {
-          "name": "npc_reward_itemId_item_id_fk",
+        "npc_reward_consumableItemId_consumable_definition_id_fk": {
+          "name": "npc_reward_consumableItemId_consumable_definition_id_fk",
           "tableFrom": "npc_reward",
-          "tableTo": "item",
+          "tableTo": "consumable_definition",
           "columnsFrom": [
-            "itemId"
+            "consumableItemId"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        },
+        "npc_reward_equipmentItemId_equipment_definition_id_fk": {
+          "name": "npc_reward_equipmentItemId_equipment_definition_id_fk",
+          "tableFrom": "npc_reward",
+          "tableTo": "equipment_definition",
+          "columnsFrom": [
+            "equipmentItemId"
           ],
           "columnsTo": [
             "id"

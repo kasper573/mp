@@ -12,9 +12,11 @@ import type {
   ActorModelId,
   AreaId,
   CharacterId,
+  ConsumableDefinitionId,
+  ConsumableInstanceId,
+  EquipmentDefinitionId,
+  EquipmentInstanceId,
   InventoryId,
-  ItemId,
-  ItemInstanceId,
   NpcId,
   NpcRewardId,
   NpcSpawnId,
@@ -34,27 +36,56 @@ export const areaTable = pgTable("area", {
   id: areaId().primaryKey(),
 });
 
-export type Item = typeof itemTable.$inferSelect;
-export const itemId = () => shortId().$type<ItemId>();
-export const itemTable = pgTable("item", {
-  id: itemId().$defaultFn(createShortId).primaryKey(),
-  name: varchar({ length: 64 }).notNull(),
-});
-
 export const inventoryId = () => shortId().$type<InventoryId>();
 export const inventoryTable = pgTable("inventory", {
   id: inventoryId().$defaultFn(createShortId).primaryKey(),
 });
 
-export const itemInstanceId = () => shortId().$type<ItemInstanceId>();
-export const itemInstanceTable = pgTable("item_instance", {
-  id: itemInstanceId().$defaultFn(createShortId).primaryKey(),
-  itemId: itemId()
-    .notNull()
-    .references(() => itemTable.id),
+const sharedItemDefinitionColumns = {
+  name: varchar({ length: 64 }).notNull(),
+};
+
+const sharedItemInstanceColumns = {
   inventoryId: inventoryId()
     .notNull()
     .references(() => inventoryTable.id),
+};
+
+export const consumableDefinitionId = () =>
+  shortId().$type<ConsumableDefinitionId>();
+export const consumableDefinitionTable = pgTable("consumable_definition", {
+  id: consumableDefinitionId().$defaultFn(createShortId).primaryKey(),
+  ...sharedItemDefinitionColumns,
+  maxStackSize: integer().notNull(),
+});
+
+export const consumableInstanceId = () =>
+  shortId().$type<ConsumableInstanceId>();
+export const consumableInstanceTable = pgTable("consumable_instance", {
+  id: consumableInstanceId().$defaultFn(createShortId).primaryKey(),
+  definitionId: consumableDefinitionId()
+    .notNull()
+    .references(() => consumableDefinitionTable.id),
+  ...sharedItemInstanceColumns,
+  stackSize: integer().notNull(),
+});
+
+export const equipmentDefinitionId = () =>
+  shortId().$type<EquipmentDefinitionId>();
+export const equipmentDefinitionTable = pgTable("equipment_definition", {
+  id: equipmentDefinitionId().$defaultFn(createShortId).primaryKey(),
+  ...sharedItemDefinitionColumns,
+  maxDurability: integer().notNull(),
+});
+
+export const equipmentInstanceId = () => shortId().$type<EquipmentInstanceId>();
+export const equipmentInstanceTable = pgTable("equipment_instance", {
+  id: equipmentInstanceId().$defaultFn(createShortId).primaryKey(),
+  definitionId: equipmentDefinitionId()
+    .notNull()
+    .references(() => equipmentDefinitionTable.id),
+  ...sharedItemInstanceColumns,
+  durability: integer().notNull(),
 });
 
 export const userId = () => uuid().$type<UserId>();
@@ -115,7 +146,13 @@ export const npcRewardTable = pgTable("npc_reward", {
   npcId: npcId()
     .notNull()
     .references(() => npcTable.id),
-  itemId: itemId().references(() => itemTable.id),
+  consumableItemId: consumableDefinitionId().references(
+    () => consumableDefinitionTable.id,
+  ),
+  equipmentItemId: equipmentDefinitionId().references(
+    () => equipmentDefinitionTable.id,
+  ),
+  itemAmount: integer(),
   xp: real(),
 });
 

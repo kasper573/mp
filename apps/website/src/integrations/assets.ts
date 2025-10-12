@@ -1,15 +1,14 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { Item } from "@mp/db";
-import type { AreaId, ItemId } from "@mp/db/types";
-import type {
-  ActorTextureLookup,
-  AreaAssetsLookup,
-  ItemLookup,
-} from "@mp/game-client";
+import type { AreaId } from "@mp/db/types";
+import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
 import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
-import type { AreaResource } from "@mp/game-shared";
+import type {
+  AreaResource,
+  ItemDefinitionByReference,
+  ItemReference,
+} from "@mp/game-shared";
 import { loadAreaResource } from "@mp/game-shared";
-import { useQueries, useSuspenseQueries, useSuspenseQuery } from "@mp/query";
+import { useQuery, useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
@@ -63,27 +62,35 @@ export function useAreaSpritesheets(
   return query.data;
 }
 
-export const useItems: ItemLookup = (itemIds) => {
+/**
+ * TODO change this to a batched hook instead. it's more efficient to just send something like this:
+ * {
+ *   consumable: [id1, id2, id3],
+ *   equipment: [id4, id5, id6]
+ * }
+ *
+ * it also allows us to use useSuspenseQuery, which seems to work better when queried higher up in the tree on batched input.
+ */
+export function useItemDefinition<Ref extends ItemReference>(
+  ref: Ref,
+): ItemDefinitionByReference<Ref> | undefined {
   const api = useApi();
-  return useQueries({
-    queries: new Set(itemIds)
-      .values()
-      .map((itemId) => api.item.queryOptions(itemId))
-      .toArray(),
-    combine: (result) => {
-      const map = new Map<ItemId, Item>();
-      for (const item of result) {
-        if (item.data) {
-          map.set(item.data.id, item.data);
-        }
-      }
-      return map;
-    },
-  });
-};
+  // Note: useSuspenseQuery seems to make preact just crash for some reason.
+  const { data } = useQuery(api.itemDefinition.queryOptions(ref));
+
+  // would prefer to use useSuspenseQuery, but can't.
+  if (!data) {
+    return;
+  }
+
+  // TRPC does not support generic type parameters in procedures,
+  // so i have to assert to restore the generic type information here.
+  // it's safe to do, just ugly.
+  return data as ItemDefinitionByReference<Ref>;
+}
 
 export const gameAssetLoader: GameAssetLoader = {
   useAreaAssets,
-  useItems,
+  useItemDefinition,
   useActorTextures,
 };

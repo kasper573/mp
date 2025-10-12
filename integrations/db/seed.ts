@@ -8,8 +8,10 @@ import {
   actorModelTable,
   areaTable,
   characterTable,
-  itemInstanceTable,
-  itemTable,
+  consumableDefinitionTable,
+  consumableInstanceTable,
+  equipmentDefinitionTable,
+  equipmentInstanceTable,
   npcRewardTable,
   npcSpawnTable,
   npcTable,
@@ -42,8 +44,10 @@ const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
 
 const tablesToTruncate = {
   npcRewardTable,
-  itemInstanceTable,
-  itemTable,
+  consumableDefinitionTable,
+  consumableInstanceTable,
+  equipmentDefinitionTable,
+  equipmentInstanceTable,
   npcSpawnTable,
   npcTable,
   characterTable,
@@ -108,17 +112,28 @@ await db.transaction(async (tx) => {
   );
 });
 
-logger.info("Inserting items...");
+logger.info("Inserting items definitions...");
 const [apple] = await db
-  .insert(itemTable)
-  .values({ name: "Apple" })
-  .returning({ id: itemTable.id });
+  .insert(consumableDefinitionTable)
+  .values({ name: "Apple", maxStackSize: 10 })
+  .returning({ id: consumableDefinitionTable.id });
+
+const [sword] = await db
+  .insert(equipmentDefinitionTable)
+  .values({ name: "Sword", maxDurability: 100 })
+  .returning({ id: equipmentDefinitionTable.id });
 
 logger.info("Inserting npc rewards...");
+await db.insert(npcRewardTable).values({ npcId: soldier.id, xp: 10 });
 await db.insert(npcRewardTable).values({
   npcId: soldier.id,
-  itemId: apple.id,
-  xp: 10,
+  consumableItemId: apple.id,
+  itemAmount: 1,
+});
+await db.insert(npcRewardTable).values({
+  npcId: soldier.id,
+  equipmentItemId: sword.id,
+  itemAmount: 1,
 });
 
 logger.info("Ending database connection...");

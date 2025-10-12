@@ -72,11 +72,26 @@ export function npcRewardsFromDbFields(
       xp: fields.xp,
     });
   }
-  if (fields.itemId !== null) {
+  if (fields.consumableItemId !== null) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",
-      itemId: fields.itemId,
+      reference: { type: "consumable", definitionId: fields.consumableItemId },
+      amount: assert(
+        fields.itemAmount,
+        "Item amount must be defined alongside an item reference",
+      ),
+    });
+  }
+  if (fields.equipmentItemId !== null) {
+    rewards.push({
+      npcId: fields.npcId,
+      type: "item",
+      reference: { type: "equipment", definitionId: fields.equipmentItemId },
+      amount: assert(
+        fields.itemAmount,
+        "Item amount must be defined alongside an item reference",
+      ),
     });
   }
   return rewards;

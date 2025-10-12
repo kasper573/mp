@@ -2,6 +2,8 @@ import { useContext } from "preact/hooks";
 import * as styles from "./area-ui.css";
 import { GameAssetLoaderContext, GameStateClientContext } from "./context";
 import { RespawnDialog } from "./respawn-dialog";
+import type { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
+import type { ReactElement } from "preact/compat";
 
 export function AreaUi() {
   const state = useContext(GameStateClientContext);
@@ -17,15 +19,44 @@ export function AreaUi() {
 
 function Inventory() {
   const state = useContext(GameStateClientContext);
-  const { useItems } = useContext(GameAssetLoaderContext);
-  const items = useItems(state.inventory.value.map((item) => item.itemId));
 
   return (
     <div className={styles.inventory}>
       <div>Inventory</div>
-      {state.inventory.value.map((item) => (
-        <div key={item.id}>{items.get(item.itemId)?.name}</div>
-      ))}
+      {state.inventory.value.map((item): ReactElement => {
+        switch (item.type) {
+          case "equipment":
+            return <EquipmentRow key={item.id} item={item} />;
+          case "consumable":
+            return <ConsumableRow key={item.id} item={item} />;
+        }
+      })}
+    </div>
+  );
+}
+
+function ConsumableRow({ item }: { item: ConsumableInstance }) {
+  const { useItemDefinition } = useContext(GameAssetLoaderContext);
+  const def = useItemDefinition(item);
+  if (!def) {
+    return null;
+  }
+  return (
+    <div>
+      {def.name} x {item.stackSize}/{def.maxStackSize}
+    </div>
+  );
+}
+
+function EquipmentRow({ item }: { item: EquipmentInstance }) {
+  const { useItemDefinition } = useContext(GameAssetLoaderContext);
+  const def = useItemDefinition(item);
+  if (!def) {
+    return null;
+  }
+  return (
+    <div>
+      {def.name} ({item.durability}/{def.maxDurability})
     </div>
   );
 }

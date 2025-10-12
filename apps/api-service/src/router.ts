@@ -10,7 +10,7 @@ import {
   gameServiceSettings,
   setGameServiceSettings,
 } from "./procedures/game-service-settings";
-import { item } from "./procedures/items";
+import { itemDefinition } from "./procedures/items";
 import { myCharacterId } from "./procedures/my-character-id";
 
 export type ApiRpcRouter = typeof apiRouter;
@@ -23,7 +23,7 @@ export const apiRouter = rpc.router({
     throw new Error("This is a test error that was thrown in the server");
   }),
 
-  item,
+  itemDefinition,
   myCharacterId,
   actorSpritesheetUrl,
   actorModelIds,

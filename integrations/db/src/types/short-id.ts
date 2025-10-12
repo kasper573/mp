@@ -1,4 +1,4 @@
-import { createShortId, shortIdLength } from "@mp/std";
+import { shortIdLength } from "@mp/std";
 import { varchar } from "drizzle-orm/pg-core";
 
 /**
@@ -8,7 +8,7 @@ export function shortId(name?: string): DbShortId {
   const base = name
     ? varchar(name, { length: shortIdLength })
     : varchar({ length: shortIdLength });
-  return base.$defaultFn(createShortId);
+  return base;
 }
 
 type DbShortId = ReturnType<typeof varchar>;

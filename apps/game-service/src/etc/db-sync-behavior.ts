@@ -1,9 +1,17 @@
 import type { DbClient } from "@mp/db";
-import { and, characterTable, eq, inArray, itemInstanceTable } from "@mp/db";
+import {
+  and,
+  characterTable,
+  eq,
+  inArray,
+  consumableInstanceTable,
+  equipmentInstanceTable,
+} from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
 import type { Character } from "@mp/game-shared";
 import {
-  ItemInstance,
+  ConsumableInstance,
+  EquipmentInstance,
   type ActorModelLookup,
   type AreaResource,
   type GameState,
@@ -60,20 +68,38 @@ export function gameStateDbSyncBehavior(
       addedCharacters.forEach(addCharacterToGameState);
     }
 
-    const itemInstanceFields = await db
-      .select()
-      .from(itemInstanceTable)
-      .where(
-        inArray(
-          itemInstanceTable.inventoryId,
-          state.actors
-            .values()
-            .flatMap((a) => (a.type === "character" ? [a.inventoryId] : []))
-            .toArray(),
-        ),
-      );
+    const inventoryIds = new Set(
+      state.actors
+        .values()
+        .flatMap((a) => (a.type === "character" ? [a.inventoryId] : [])),
+    );
 
-    upsertItemInstancesInGameState(itemInstanceFields);
+    const [consumableInstanceFields, equipmentInstanceFields] =
+      await Promise.all([
+        db
+          .select()
+          .from(consumableInstanceTable)
+          .where(
+            inArray(
+              consumableInstanceTable.inventoryId,
+              inventoryIds.values().toArray(),
+            ),
+          ),
+        db
+          .select()
+          .from(equipmentInstanceTable)
+          .where(
+            inArray(
+              equipmentInstanceTable.inventoryId,
+              inventoryIds.values().toArray(),
+            ),
+          ),
+      ]);
+
+    upsertItemInstancesInGameState(
+      consumableInstanceFields,
+      equipmentInstanceFields,
+    );
   }
 
   /**
@@ -92,17 +118,16 @@ export function gameStateDbSyncBehavior(
 
       await Promise.all(
         state.items.values().map((item) => {
-          const values = {
-            inventoryId: item.inventoryId,
-            itemId: item.itemId,
-            id: item.id,
-          };
+          const table = {
+            consumable: consumableInstanceTable,
+            equipment: equipmentInstanceTable,
+          }[item.type];
           return tx
-            .insert(itemInstanceTable)
-            .values(values)
+            .insert(table)
+            .values(item)
             .onConflictDoUpdate({
-              target: [itemInstanceTable.id],
-              set: values,
+              target: [table.id],
+              set: item,
             });
         }),
       );
@@ -110,19 +135,39 @@ export function gameStateDbSyncBehavior(
   }
 
   function upsertItemInstancesInGameState(
-    dbInstances: Array<typeof itemInstanceTable.$inferSelect>,
+    dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
+    dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
   ) {
-    // Upsert item instances
-    for (const itemFields of dbInstances) {
-      // Create item instance if it doesn't exist
-      const instance = state.items.get(itemFields.id);
+    const dbFields = [
+      ...dbConsumables.map((fields) => ({
+        type: "consumable" as const,
+        ...fields,
+      })),
+      ...dbEquipment.map((fields) => ({
+        type: "equipment" as const,
+        ...fields,
+      })),
+    ];
+
+    for (const itemFields of dbFields) {
+      let instance = state.items.get(itemFields.id);
       if (!instance) {
-        state.items.set(itemFields.id, ItemInstance.create(itemFields));
+        switch (itemFields.type) {
+          case "consumable":
+            instance = ConsumableInstance.create(itemFields);
+            break;
+          case "equipment":
+            instance = EquipmentInstance.create(itemFields);
+            break;
+        }
+        state.items.set(itemFields.id, instance);
         logger.debug(
-          { itemId: itemFields.id },
+          { itemId: itemFields.id, type: itemFields.type },
           "Added item instance to game state",
         );
       } else {
+        // TODO fix race condition. this currently races with in memory changes made in the game service.
+        // will need some kind of updatedAt check or something.
         typedAssign(instance, itemFields);
       }
     }
