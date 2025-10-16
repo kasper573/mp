@@ -23,7 +23,7 @@ x-game-service: &game_service
   profiles: ["prod", "test"]
   depends_on:
     mp-migrations:
-      condition: service_started
+      condition: service_completed_successfully
 
 services:
   mp-website:
@@ -67,7 +67,7 @@ services:
       retries: 20
     depends_on:
       mp-migrations:
-        condition: service_started
+        condition: service_completed_successfully
       keycloak-healthcheck:
         condition: service_healthy
 
@@ -89,7 +89,7 @@ services:
       retries: 20
     depends_on:
       mp-migrations:
-        condition: service_started
+        condition: service_completed_successfully
       keycloak-healthcheck:
         condition: service_healthy
 
