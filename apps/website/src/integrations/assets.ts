@@ -9,7 +9,7 @@ import type {
   ItemReference,
 } from "@mp/game-shared";
 import { loadAreaResource } from "@mp/game-shared";
-import { useQuery, useSuspenseQueries, useSuspenseQuery } from "@mp/query";
+import { useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
@@ -78,8 +78,7 @@ export const useItemDefinition: ItemDefinitionLookup = <
   ref: Ref,
 ) => {
   const api = useApi();
-  // Note: useSuspenseQuery seems to make preact just crash for some reason.
-  const { data } = useQuery(api.itemDefinition.queryOptions(ref));
+  const { data } = useSuspenseQuery(api.itemDefinition.queryOptions(ref));
 
   // would prefer to use useSuspenseQuery, but can't.
   if (!data) {
