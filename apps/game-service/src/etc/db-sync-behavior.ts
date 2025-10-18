@@ -7,8 +7,8 @@ import {
   consumableInstanceTable,
   equipmentInstanceTable,
 } from "@mp/db";
-import type { CharacterId } from "@mp/db/types";
-import type { Character } from "@mp/game-shared";
+import type { AreaId, CharacterId } from "@mp/db/types";
+import type { Character, ItemInstance, ItemInstanceId } from "@mp/game-shared";
 import {
   ConsumableInstance,
   EquipmentInstance,
@@ -17,7 +17,7 @@ import {
   type GameState,
 } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import { typedAssign, type Rng } from "@mp/std";
+import { assert, type Rng } from "@mp/std";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
 import { characterFromDbFields, dbFieldsFromCharacter } from "./db-transform";
 import type { GameStateServer } from "./game-state-server";
@@ -31,31 +31,25 @@ export function gameStateDbSyncBehavior(
   rng: Rng,
   logger: Logger,
 ) {
+  async function sync() {
+    await save();
+    await load();
+  }
+
   /**
    * Polls the database for game state changes and updates the game state accordingly.
+   * Only adds and removes are applied. Db updates to entities that already exist in game state will be ignored.
+   *
+   * This means external systems cannot really reliably update game state tables in the db,
+   * since those changes may be overwritten by game services.
+   * This is an intentional limitation to keep the sync system simple.
+   * If we ever need external systems to manipiulate persisted game state we'll have to look into more robust sync mechanisms.
    */
-  async function poll() {
-    const desiredIds = new Set(
-      (
-        await db
-          .select({ id: characterTable.id })
-          .from(characterTable)
-          .where(
-            and(
-              eq(characterTable.areaId, area.id),
-              eq(characterTable.online, true),
-            ),
-          )
-      ).map((row) => row.id),
-    );
-
-    const activeIds = new Set(
-      state.actors
-        .values()
-        .flatMap((a) => (a.type === "character" ? [a.identity.id] : [])),
-    );
-    const removedIds = activeIds.difference(desiredIds);
-    const addedIds = desiredIds.difference(activeIds);
+  async function load() {
+    const dbIds = await getOnlineCharacterIdsForAreaFromDb(db, area.id);
+    const stateIds = characterIdsInState(state);
+    const removedIds = stateIds.difference(dbIds);
+    const addedIds = dbIds.difference(stateIds);
 
     removedIds.forEach(removeCharacterFromGameState);
 
@@ -138,19 +132,27 @@ export function gameStateDbSyncBehavior(
     dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
     dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
   ) {
-    const dbFields = [
-      ...dbConsumables.map((fields) => ({
-        type: "consumable" as const,
-        ...fields,
-      })),
-      ...dbEquipment.map((fields) => ({
-        type: "equipment" as const,
-        ...fields,
-      })),
-    ];
+    const dbFields = new Map<ItemInstanceId, ItemInstance>();
 
-    for (const itemFields of dbFields) {
-      let instance = state.items.get(itemFields.id);
+    for (const fields of dbConsumables) {
+      dbFields.set(fields.id, { type: "consumable", ...fields });
+    }
+    for (const fields of dbEquipment) {
+      dbFields.set(fields.id, { type: "equipment", ...fields });
+    }
+
+    const dbIds = new Set(dbFields.keys());
+    const stateIds = new Set(state.items.keys());
+    const removedIds = stateIds.difference(dbIds);
+    const addedIds = dbIds.difference(stateIds);
+
+    for (const itemId of removedIds) {
+      state.items.delete(itemId);
+    }
+
+    for (const itemId of addedIds) {
+      let instance = state.items.get(itemId);
+      const itemFields = assert(dbFields.get(itemId));
       if (!instance) {
         switch (itemFields.type) {
           case "consumable":
@@ -165,10 +167,6 @@ export function gameStateDbSyncBehavior(
           { itemId: itemFields.id, type: itemFields.type },
           "Added item instance to game state",
         );
-      } else {
-        // TODO fix race condition. this currently races with in memory changes made in the game service.
-        // will need some kind of updatedAt check or something.
-        typedAssign(instance, itemFields);
       }
     }
   }
@@ -196,23 +194,38 @@ export function gameStateDbSyncBehavior(
     logger.debug({ characterId }, "Character left game service via db poll");
   }
 
-  const stopSaving = startAsyncInterval(
+  return startAsyncInterval(
     () =>
-      save().catch((err) => logger.error(err, "game state db sync save error")),
-    saveInterval,
+      sync().catch((err) => logger.error(err, "game state db sync save error")),
+    syncInterval,
   );
-
-  const stopPolling = startAsyncInterval(
-    () =>
-      poll().catch((err) => logger.error(err, "game state db sync poll error")),
-    pollInterval,
-  );
-
-  return function stop() {
-    stopSaving();
-    stopPolling();
-  };
 }
 
-const pollInterval = TimeSpan.fromSeconds(3);
-const saveInterval = TimeSpan.fromSeconds(5);
+const syncInterval = TimeSpan.fromSeconds(5);
+
+async function getOnlineCharacterIdsForAreaFromDb(
+  db: DbClient,
+  areaId: AreaId,
+): Promise<ReadonlySet<CharacterId>> {
+  return new Set(
+    (
+      await db
+        .select({ id: characterTable.id })
+        .from(characterTable)
+        .where(
+          and(
+            eq(characterTable.areaId, areaId),
+            eq(characterTable.online, true),
+          ),
+        )
+    ).map((row) => row.id),
+  );
+}
+
+function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {
+  return new Set(
+    state.actors
+      .values()
+      .flatMap((a) => (a.type === "character" ? [a.identity.id] : [])),
+  );
+}

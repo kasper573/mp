@@ -24,7 +24,6 @@ export function spawnItem(
         logger.info(
           `Increased size of stack ${existingStack.id} to ${existingStack.stackSize}`,
         );
-        // TODO also figure out why stack size count update seems to race
         // TODO assert against max stack size?
       } else {
         const newItem = ConsumableInstance.create({
