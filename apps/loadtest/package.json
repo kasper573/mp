@@ -25,6 +25,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
+    "@prefresh/vite": "catalog:",
     "@types/yargs": "17.0.33",
     "@vanilla-extract/vite-plugin": "catalog:",
     "tsx": "catalog:",
