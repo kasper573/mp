@@ -59,6 +59,10 @@ export type ItemDefinition = ConsumableDefinition | EquipmentDefinition;
 export type ItemInstance = ConsumableInstance | EquipmentInstance;
 export type ItemInstanceId = ItemInstance["id"];
 
+export type ItemDefinitionLookup = <Ref extends ItemReference>(
+  ref: Ref,
+) => ItemDefinitionByReference<Ref>;
+
 // We define the refs as runtime types because they are often serialized
 const ConsumableReference = type({
   type: "'consumable'",

@@ -1,5 +1,15 @@
-import type { characterTable, npcRewardTable } from "@mp/db";
-import type { ActorModelLookup, NpcReward } from "@mp/game-shared";
+import type {
+  characterTable,
+  consumableDefinitionTable,
+  equipmentDefinitionTable,
+  npcRewardTable,
+} from "@mp/db";
+import type {
+  ActorModelLookup,
+  ConsumableDefinition,
+  EquipmentDefinition,
+  NpcReward,
+} from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
 import { cardinalDirections } from "@mp/math";
 import type { Rng } from "@mp/std";
@@ -95,4 +105,16 @@ export function npcRewardsFromDbFields(
     });
   }
   return rewards;
+}
+
+export function equipmentDefinitionFromDbFields(
+  fields: typeof equipmentDefinitionTable.$inferSelect,
+): EquipmentDefinition {
+  return { type: "equipment", ...fields };
+}
+
+export function consumableDefinitionFromDbFields(
+  fields: typeof consumableDefinitionTable.$inferSelect,
+): ConsumableDefinition {
+  return { type: "consumable", ...fields };
 }

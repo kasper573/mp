@@ -1,17 +1,15 @@
 import type { CharacterId, NpcId } from "@mp/db/types";
-import type { Character, GameState, NpcReward } from "@mp/game-shared";
-import type { Logger } from "@mp/logger";
-import type { Rng } from "@mp/std";
+import type { Character, NpcReward } from "@mp/game-shared";
 import { assert } from "@mp/std";
 import { spawnItem } from "./item-spawn-system";
+import type { InjectionContainer } from "@mp/ioc";
+import { ctxGameState, ctxLogger } from "../context";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcId, NpcReward[]>();
 
   constructor(
-    private logger: Logger,
-    private gameState: GameState,
-    private rng: Rng,
+    private ioc: InjectionContainer,
     npcRewards: NpcReward[],
   ) {
     for (const reward of npcRewards) {
@@ -24,8 +22,9 @@ export class NpcRewardSystem {
   }
 
   giveRewardForKillingNpc(recipientId: CharacterId, npcId: NpcId) {
-    const logger = this.logger.child({
-      reason: `killed NPC`,
+    const gameState = this.ioc.get(ctxGameState);
+    const logger = this.ioc.get(ctxLogger).child({
+      reason: `Killed NPC`,
       npcId,
       recipientId,
     });
@@ -37,17 +36,10 @@ export class NpcRewardSystem {
     }
 
     for (const reward of rewards) {
-      const recipient = assert(
-        this.gameState.actors.get(recipientId) as Character,
-      );
+      const recipient = assert(gameState.actors.get(recipientId) as Character);
       switch (reward.type) {
         case "item": {
-          spawnItem(
-            this.gameState,
-            reward.reference,
-            recipient.inventoryId,
-            logger,
-          );
+          spawnItem(this.ioc, reward.reference, recipient.inventoryId, logger);
           break;
         }
         case "xp": {

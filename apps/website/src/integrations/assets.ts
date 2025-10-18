@@ -5,6 +5,7 @@ import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
 import type {
   AreaResource,
   ItemDefinitionByReference,
+  ItemDefinitionLookup,
   ItemReference,
 } from "@mp/game-shared";
 import { loadAreaResource } from "@mp/game-shared";
@@ -71,23 +72,29 @@ export function useAreaSpritesheets(
  *
  * it also allows us to use useSuspenseQuery, which seems to work better when queried higher up in the tree on batched input.
  */
-export function useItemDefinition<Ref extends ItemReference>(
+export const useItemDefinition: ItemDefinitionLookup = <
+  Ref extends ItemReference,
+>(
   ref: Ref,
-): ItemDefinitionByReference<Ref> | undefined {
+) => {
   const api = useApi();
   // Note: useSuspenseQuery seems to make preact just crash for some reason.
   const { data } = useQuery(api.itemDefinition.queryOptions(ref));
 
   // would prefer to use useSuspenseQuery, but can't.
   if (!data) {
-    return;
+    return {
+      id: ref.definitionId,
+      name: "Unknown",
+      type: ref.type,
+    } as ItemDefinitionByReference<Ref>;
   }
 
   // TRPC does not support generic type parameters in procedures,
   // so i have to assert to restore the generic type information here.
   // it's safe to do, just ugly.
   return data as ItemDefinitionByReference<Ref>;
-}
+};
 
 export const gameAssetLoader: GameAssetLoader = {
   useAreaAssets,

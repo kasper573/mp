@@ -38,9 +38,6 @@ function Inventory() {
 function ConsumableRow({ item }: { item: ConsumableInstance }) {
   const { useItemDefinition } = useContext(GameAssetLoaderContext);
   const def = useItemDefinition(item);
-  if (!def) {
-    return null;
-  }
   return (
     <div>
       {def.name} x {item.stackSize}/{def.maxStackSize}
@@ -51,9 +48,6 @@ function ConsumableRow({ item }: { item: ConsumableInstance }) {
 function EquipmentRow({ item }: { item: EquipmentInstance }) {
   const { useItemDefinition } = useContext(GameAssetLoaderContext);
   const def = useItemDefinition(item);
-  if (!def) {
-    return null;
-  }
   return (
     <div>
       {def.name} ({item.durability}/{def.maxDurability})

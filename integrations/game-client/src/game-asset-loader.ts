@@ -1,9 +1,5 @@
 import type { AreaId } from "@mp/db/types";
-import type {
-  AreaResource,
-  ItemDefinitionByReference,
-  ItemReference,
-} from "@mp/game-shared";
+import type { AreaResource, ItemDefinitionLookup } from "@mp/game-shared";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
@@ -19,6 +15,3 @@ export interface GameAssetLoader {
 }
 
 export type AreaAssetsLookup = (areaId: AreaId) => AreaAssets;
-export type ItemDefinitionLookup = <Ref extends ItemReference>(
-  ref: Ref,
-) => ItemDefinitionByReference<Ref> | undefined;

@@ -39,6 +39,7 @@ import {
   ctxGameState,
   ctxGameStateLoader,
   ctxGameStateServer,
+  ctxItemDefinitionLookup,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
@@ -48,7 +49,10 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
-import { GameStateLoader } from "./etc/game-state-loader";
+import {
+  createItemDefinitionLookup,
+  GameDataLoader,
+} from "./etc/game-data-loader";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcRewardSystem } from "./etc/npc-reward-system";
@@ -107,7 +111,7 @@ const [area, actorModels] = await withBackoffRetries(() =>
   process.exit(1);
 });
 
-const gameStateLoader = new GameStateLoader(db, area, actorModels, rng);
+const gameDataLoader = new GameDataLoader(db, area, actorModels, rng);
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
@@ -227,20 +231,12 @@ logger.info(`Getting all NPCs and spawns...`);
 const npcSpawner = new NpcSpawner(
   area,
   actorModels,
-  await gameStateLoader.getAllSpawnsAndTheirNpcs(),
+  await gameDataLoader.getAllSpawnsAndTheirNpcs(),
   rng,
-);
-
-logger.info(`Getting all NPC rewards...`);
-const npcRewardSystem = new NpcRewardSystem(
-  logger,
-  gameState,
-  rng,
-  await gameStateLoader.getAllNpcRewards(),
 );
 
 const ioc = new InjectionContainer()
-  .provide(ctxGameStateLoader, gameStateLoader)
+  .provide(ctxGameStateLoader, gameDataLoader)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxArea, area)
@@ -248,7 +244,17 @@ const ioc = new InjectionContainer()
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner)
-  .provide(ctxGameEventClient, gameEventBroadcastClient);
+  .provide(ctxGameEventClient, gameEventBroadcastClient)
+  .provide(
+    ctxItemDefinitionLookup,
+    createItemDefinitionLookup(await gameDataLoader.getAllItemDefinitions()),
+  );
+
+logger.info(`Getting all NPC rewards...`);
+const npcRewardSystem = new NpcRewardSystem(
+  ioc,
+  await gameDataLoader.getAllNpcRewards(),
+);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 

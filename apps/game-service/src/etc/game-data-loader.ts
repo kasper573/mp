@@ -2,7 +2,9 @@ import type { DbClient } from "@mp/db";
 import {
   and,
   characterTable,
+  consumableDefinitionTable,
   eq,
+  equipmentDefinitionTable,
   exists,
   npcRewardTable,
   npcSpawnTable,
@@ -13,20 +15,25 @@ import type {
   ActorModelLookup,
   AreaResource,
   Character,
+  ItemDefinition,
+  ItemDefinitionByReference,
+  ItemDefinitionLookup,
   Npc,
   NpcReward,
   NpcSpawn,
 } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
-import type { Rng, Tile } from "@mp/std";
+import { assert, type Rng, type Tile } from "@mp/std";
 import {
   characterFromDbFields,
+  consumableDefinitionFromDbFields,
   dbFieldsFromCharacter,
+  equipmentDefinitionFromDbFields,
   npcRewardsFromDbFields,
 } from "./db-transform";
 import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
 
-export class GameStateLoader {
+export class GameDataLoader {
   constructor(
     private db: DbClient,
     private area: AreaResource,
@@ -114,4 +121,40 @@ export class GameStateLoader {
 
     return rows.flatMap(npcRewardsFromDbFields);
   }
+
+  async getAllItemDefinitions(): Promise<ItemDefinition[]> {
+    const [equipmentRows, consumableRows] = await Promise.all([
+      this.db.select().from(equipmentDefinitionTable),
+      this.db.select().from(consumableDefinitionTable),
+    ]);
+
+    return [
+      ...equipmentRows.map(equipmentDefinitionFromDbFields),
+      ...consumableRows.map(consumableDefinitionFromDbFields),
+    ];
+  }
+}
+
+export function createItemDefinitionLookup(
+  itemDefinitions: ItemDefinition[],
+): ItemDefinitionLookup {
+  const maps = new Map<
+    ItemDefinition["type"],
+    Map<ItemDefinition["id"], ItemDefinition>
+  >();
+  for (const def of itemDefinitions) {
+    let defs = maps.get(def.type);
+    if (!defs) {
+      defs = new Map([[def.id, def]]);
+      maps.set(def.type, defs);
+    } else {
+      defs.set(def.id, def);
+    }
+  }
+  return (ref) => {
+    return assert(
+      maps.get(ref.type)?.get(ref.definitionId),
+      // Unfortunate type assertion. I have no idea how to do this better.
+    ) as ItemDefinitionByReference<typeof ref>;
+  };
 }
