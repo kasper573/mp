@@ -6,7 +6,7 @@ import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -14,7 +14,11 @@ import {
 } from "./area-debug-settings-form";
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import { GameAssetLoaderContext, GameStateClientContext } from "./context";
+import {
+  GameStateClientContext,
+  useActorTextures,
+  useAreaAssets,
+} from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
@@ -40,10 +44,6 @@ export function GameRenderer({
   additionalDebugUi,
   enableUi = true,
 }: GameRendererProps) {
-  const { useAreaAssets, useActorTextures } = useContext(
-    GameAssetLoaderContext,
-  );
-
   const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
