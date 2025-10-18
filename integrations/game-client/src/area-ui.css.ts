@@ -24,9 +24,11 @@ export const itemGrid = style([
   atoms({
     display: "grid",
     gap: "l",
+    overflowY: "auto",
   }),
   {
     gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    maxHeight: 190,
   },
 ]);
 
