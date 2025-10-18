@@ -4,6 +4,7 @@ export interface Logger {
   warn: LogFn;
   error: LogFn;
   debug: LogFn;
+  child: (bindings: Record<string, unknown>) => Logger;
 }
 
 interface LogFn {
