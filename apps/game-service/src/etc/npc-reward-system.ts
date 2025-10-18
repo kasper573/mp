@@ -42,8 +42,7 @@ export class NpcRewardSystem {
             this.gameState,
             reward.reference,
             recipient.inventoryId,
-            this.logger,
-            `for killing NPC ${npcId}`,
+            this.logger.child({ reason: `killed NPC ${npcId}` }),
           );
           break;
         }

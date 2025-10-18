@@ -9,7 +9,6 @@ export function spawnItem(
   ref: ItemReference,
   inventoryId: InventoryId,
   logger: Logger,
-  reason: string,
 ): void {
   switch (ref.type) {
     case "consumable": {
@@ -23,7 +22,7 @@ export function spawnItem(
       if (existingStack) {
         existingStack.stackSize += 1;
         logger.info(
-          `Increased size of stack ${existingStack.id} to ${existingStack.stackSize} (${reason})`,
+          `Increased size of stack ${existingStack.id} to ${existingStack.stackSize}`,
         );
         // TODO also figure out why stack size count update seems to race
         // TODO assert against max stack size?
@@ -34,7 +33,7 @@ export function spawnItem(
           inventoryId,
           stackSize: 1,
         });
-        logger.info("Created new stack", newItem.definitionId, `(${reason})`);
+        logger.info("Created new stack", newItem.definitionId);
         gameState.items.set(newItem.id, newItem);
       }
       break;
@@ -48,7 +47,7 @@ export function spawnItem(
         // TODO figure out where these values come from
         durability: 100,
       });
-      logger.info("Created new equipment", newItem.definitionId, `(${reason})`);
+      logger.info("Created new equipment", newItem.definitionId);
       gameState.items.set(newItem.id, newItem);
     }
   }
