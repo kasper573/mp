@@ -88,7 +88,9 @@
     "react/button-has-type": "off",
     "react/no-array-index-key": "off",
     "explicit-module-boundary-types": "off",
-    "no-extraneous-class": "off"
+    "no-extraneous-class": "off",
+    "no-process-env": "off",
+    "only-export-components": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.
