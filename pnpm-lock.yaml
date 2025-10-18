@@ -9,9 +9,9 @@ catalogs:
     '@preact/preset-vite':
       specifier: 2.10.2
       version: 2.10.2
-    '@prefresh/vite':
-      specifier: 2.4.10
-      version: 2.4.10
+    '@prefresh/core':
+      specifier: 1.5.8
+      version: 1.5.8
     '@types/express':
       specifier: 5.0.3
       version: 5.0.3
@@ -354,9 +354,9 @@ importers:
       '@preact/preset-vite':
         specifier: 'catalog:'
         version: 2.10.2(@babel/core@7.27.4)(preact@10.27.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-      '@prefresh/vite':
+      '@prefresh/core':
         specifier: 'catalog:'
-        version: 2.4.10(preact@10.27.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 1.5.8(preact@10.27.2)
       '@types/yargs':
         specifier: 17.0.33
         version: 17.0.33
@@ -451,9 +451,9 @@ importers:
       '@preact/preset-vite':
         specifier: 'catalog:'
         version: 2.10.2(@babel/core@7.28.0)(preact@10.27.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
-      '@prefresh/vite':
+      '@prefresh/core':
         specifier: 'catalog:'
-        version: 2.4.10(preact@10.27.2)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
+        version: 1.5.8(preact@10.27.2)
       '@tanstack/router-plugin':
         specifier: 1.126.2
         version: 1.126.2(@tanstack/react-router@1.126.2(react-dom@19.1.0(react@19.1.0))(react@19.1.0))(vite-plugin-solid@2.11.6(solid-js@1.9.5)(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2)))(vite@6.3.5(@types/node@22.13.10)(jiti@2.4.2)(tsx@4.19.2))
@@ -2582,10 +2582,10 @@ packages:
   '@prefresh/babel-plugin@0.5.2':
     resolution: {integrity: sha512-AOl4HG6dAxWkJ5ndPHBgBa49oo/9bOiJuRDKHLSTyH+Fd9x00shTXpdiTj1W41l6oQIwUOAgJeHMn4QwIDpHkA==}
 
-  '@prefresh/core@1.5.5':
-    resolution: {integrity: sha512-H6GTXUl4V4fe3ijz7yhSa/mZ+pGSOh7XaJb6uP/sQsagBx9yl0D1HKDaeoMQA8Ad2Xm27LqvbitMGSdY9UFSKQ==}
+  '@prefresh/core@1.5.8':
+    resolution: {integrity: sha512-T7HMpakS1iPVCFZvfDLMGyrWAcO3toUN9/RkJUqqoRr/vNhQrZgHjidfhq3awDzAQtw1emDWH8dsOeu0DWqtgA==}
     peerDependencies:
-      preact: ^10.0.0
+      preact: ^10.0.0 || ^11.0.0-0
 
   '@prefresh/utils@1.2.1':
     resolution: {integrity: sha512-vq/sIuN5nYfYzvyayXI4C2QkprfNaHUQ9ZX+3xLD8nL3rWyzpxOm1+K7RtMbhd+66QcaISViK7amjnheQ/4WZw==}
@@ -6887,7 +6887,7 @@ snapshots:
 
   '@prefresh/babel-plugin@0.5.2': {}
 
-  '@prefresh/core@1.5.5(preact@10.27.2)':
+  '@prefresh/core@1.5.8(preact@10.27.2)':
     dependencies:
       preact: 10.27.2
 
@@ -6897,7 +6897,7 @@ snapshots:
     dependencies:
       '@babel/core': 7.28.4
       '@prefresh/babel-plugin': 0.5.2
-      '@prefresh/core': 1.5.5(preact@10.27.2)
+      '@prefresh/core': 1.5.8(preact@10.27.2)
       '@prefresh/utils': 1.2.1
       '@rollup/pluginutils': 4.2.1
       preact: 10.27.2
