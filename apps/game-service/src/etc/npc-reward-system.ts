@@ -24,11 +24,15 @@ export class NpcRewardSystem {
   }
 
   giveRewardForKillingNpc(recipientId: CharacterId, npcId: NpcId) {
+    const logger = this.logger.child({
+      reason: `killed NPC`,
+      npcId,
+      recipientId,
+    });
+
     const rewards = this.rewardsPerNpc.get(npcId);
     if (!rewards) {
-      this.logger.debug(
-        `Gave no reward for killing npc. No rewards defined for NPC ${npcId}.`,
-      );
+      logger.debug(`No rewards defined for NPC`);
       return;
     }
 
@@ -42,22 +46,17 @@ export class NpcRewardSystem {
             this.gameState,
             reward.reference,
             recipient.inventoryId,
-            this.logger.child({ reason: `killed NPC ${npcId}` }),
+            logger,
           );
           break;
         }
         case "xp": {
-          this.logger.debug(
-            `Gave ${reward.xp} XP to character ${recipientId} for killing NPC ${npcId}.`,
-          );
+          logger.debug(`Gave ${reward.xp} XP`);
           recipient.progression.xp += reward.xp;
           break;
         }
         default:
-          this.logger.warn(
-            reward,
-            `Unknown npc reward type. Cannot give reward.`,
-          );
+          logger.warn(reward, `Unknown npc reward type. Cannot give reward.`);
           break;
       }
     }
