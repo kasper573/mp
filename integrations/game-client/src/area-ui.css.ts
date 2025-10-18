@@ -1,10 +1,9 @@
-import { atoms, recipe, style } from "@mp/style";
+import { atoms, cssForAnimation, keyframes, recipe, style } from "@mp/style";
 
 export const inventory = atoms({
   position: "absolute",
   top: "l",
   right: "l",
-  padding: "xl",
   backgroundColor: "tint",
   borderRadius: "m",
 });
@@ -15,7 +14,7 @@ export const label = style([
   }),
   {
     top: 0,
-    right: 0,
+    left: 0,
     transform: "translateY(-50%)",
   },
 ]);
@@ -24,6 +23,7 @@ export const itemGrid = style([
   atoms({
     display: "grid",
     gap: "l",
+    padding: "l",
     overflowY: "auto",
   }),
   {
@@ -32,8 +32,24 @@ export const itemGrid = style([
   },
 ]);
 
+const pulse = keyframes({
+  "0%": { opacity: 0.5 },
+  "50%": { opacity: 1 },
+  "100%": { opacity: 0.5 },
+});
+
 export const itemTile = recipe({
-  base: atoms({ padding: "m" }),
+  base: [
+    atoms({
+      padding: "m",
+      whiteSpace: "nowrap",
+      textOverflow: "ellipsis",
+      overflow: "hidden",
+      boxSizing: "border-box",
+      borderRadius: "s",
+    }),
+    { width: 100, height: 25 },
+  ],
   variants: {
     type: {
       equipment: atoms({
@@ -44,7 +60,15 @@ export const itemTile = recipe({
         backgroundColor: "primary.base",
         color: "primary.face",
       }),
-      loading: atoms({}),
+      loading: [
+        atoms({
+          backgroundColor: "highlight",
+          opacity: 0.5,
+        }),
+        {
+          animation: cssForAnimation([pulse, "extraLong5", "linear"]),
+        },
+      ],
     },
   },
 });

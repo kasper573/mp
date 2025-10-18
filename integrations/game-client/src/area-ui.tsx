@@ -22,7 +22,6 @@ function Inventory() {
 
   return (
     <div className={styles.inventory}>
-      <div className={styles.label}>Inventory</div>
       <div className={styles.itemGrid}>
         {state.inventory.value.map((item): ReactElement => {
           switch (item.type) {
@@ -41,6 +40,7 @@ function Inventory() {
           }
         })}
       </div>
+      <div className={styles.label}>Inventory</div>
     </div>
   );
 }
