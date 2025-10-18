@@ -63,15 +63,6 @@ export function useAreaSpritesheets(
   return query.data;
 }
 
-/**
- * TODO change this to a batched hook instead. it's more efficient to just send something like this:
- * {
- *   consumable: [id1, id2, id3],
- *   equipment: [id4, id5, id6]
- * }
- *
- * it also allows us to use useSuspenseQuery, which seems to work better when queried higher up in the tree on batched input.
- */
 export const useItemDefinition: ItemDefinitionLookup = <
   Ref extends ItemReference,
 >(
@@ -79,15 +70,6 @@ export const useItemDefinition: ItemDefinitionLookup = <
 ) => {
   const api = useApi();
   const { data } = useSuspenseQuery(api.itemDefinition.queryOptions(ref));
-
-  // would prefer to use useSuspenseQuery, but can't.
-  if (!data) {
-    return {
-      id: ref.definitionId,
-      name: "Unknown",
-      type: ref.type,
-    } as ItemDefinitionByReference<Ref>;
-  }
 
   // TRPC does not support generic type parameters in procedures,
   // so i have to assert to restore the generic type information here.
