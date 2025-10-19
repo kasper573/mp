@@ -11,33 +11,32 @@ import _default from "./modules/default";
 import _schema from "./modules/schema";
 import _sys from "./modules/sys";
 
-const ExportDefault: typeof _std & 
-  typeof _default & 
-  $.util.OmitDollarPrefixed<typeof $syntax> & 
+const ExportDefault: typeof _std &
+  typeof _default &
+  $.util.OmitDollarPrefixed<typeof $syntax> &
   typeof $op & {
-  "std": typeof _std;
-  "cfg": typeof _cfg;
-  "default": typeof _default;
-  "schema": typeof _schema;
-  "sys": typeof _sys;
-} = {
+    std: typeof _std;
+    cfg: typeof _cfg;
+    default: typeof _default;
+    schema: typeof _schema;
+    sys: typeof _sys;
+  } = {
   ..._std,
   ..._default,
   ...$.util.omitDollarPrefixed($syntax),
   ...$op,
-  "std": _std,
-  "cfg": _cfg,
-  "default": _default,
-  "schema": _schema,
-  "sys": _sys,
+  std: _std,
+  cfg: _cfg,
+  default: _default,
+  schema: _schema,
+  sys: _sys,
 };
 const Cardinality = $.Cardinality;
 type Cardinality = $.Cardinality;
 export type Set<
   Type extends $.BaseType,
-  Card extends $.Cardinality = $.Cardinality.Many
+  Card extends $.Cardinality = $.Cardinality.Many,
 > = $.TypeSet<Type, Card>;
-
 
 export default ExportDefault;
 export { Cardinality };

@@ -2,15 +2,15 @@
 
 /*
  * ⚠️ THIS FILE NEEDS TO BE MIGRATED TO GEL QUERY BUILDER
- * 
+ *
  * This seed script is currently non-functional because it uses Drizzle ORM
  * syntax which has been replaced with Gel (EdgeDB).
- * 
+ *
  * To complete the migration:
  * 1. Set up Gel database in Docker (see README.md)
  * 2. Run `pnpm generate` to create the query builder
  * 3. Replace all db.insert/delete calls with Gel query builder syntax
- * 
+ *
  * See MIGRATION_GUIDE.md for examples.
  */
 
@@ -37,14 +37,18 @@ const logger = createPinoLogger(true);
 
 const actorModelIds = ["adventurer"] as ActorModelId[];
 
-logger.info("Deriving area ids from file server files on disk...");
+// eslint-disable-next-line no-console
+console.log("Deriving area ids from file server files on disk...");
 const areaIds = await getAreaIds();
 
 if (!areaIds.length) {
   throw new Error("No area ids found");
 }
 
-const client = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const client = createDbClient(
+  process.env.MP_API_DATABASE_CONNECTION_STRING ?? "",
+);
 
 // TODO: Migrate to Gel query builder
 // Example for truncating (deleting all records):

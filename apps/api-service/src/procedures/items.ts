@@ -1,9 +1,5 @@
 import type { DbClient } from "@mp/db";
-import {
-  eq,
-  consumableDefinitionTable,
-  equipmentDefinitionTable,
-} from "@mp/db";
+import { e } from "@mp/db";
 import { gatewayRoles } from "@mp/keycloak";
 import { ctxDbClient } from "../context";
 import { roles } from "../integrations/auth";
@@ -42,27 +38,46 @@ async function findConsumableDefinition(
   db: DbClient,
   id: ConsumableDefinitionId,
 ): Promise<ConsumableDefinition> {
-  const [def] = await db
-    .select()
-    .from(consumableDefinitionTable)
-    .where(eq(consumableDefinitionTable.id, id))
-    .limit(1);
+  const results = await e
+    .select(e.ConsumableDefinition, (def) => ({
+      definitionId: true,
+      name: true,
+      maxStackSize: true,
+      filter: e.op(def.definitionId, "=", e.str(id)),
+      limit: 1,
+    }))
+    .run(db);
 
-  assert(def, `Could not find consumable by id ${id}`);
+  assert(results.length > 0, `Could not find consumable by id ${id}`);
 
-  return { type: "consumable", ...def };
+  return {
+    type: "consumable",
+    definitionId: results[0].definitionId as ConsumableDefinitionId,
+    name: results[0].name,
+    maxStackSize: Number(results[0].maxStackSize),
+  };
 }
 
 async function findEquipmentDefinition(
   db: DbClient,
   id: EquipmentDefinitionId,
 ): Promise<EquipmentDefinition> {
-  const [def] = await db
-    .select()
-    .from(equipmentDefinitionTable)
-    .where(eq(equipmentDefinitionTable.id, id))
-    .limit(1);
+  const results = await e
+    .select(e.EquipmentDefinition, (def) => ({
+      definitionId: true,
+      name: true,
+      maxDurability: true,
+      filter: e.op(def.definitionId, "=", e.str(id)),
+      limit: 1,
+    }))
+    .run(db);
 
-  assert(def, `Could not find equipment by id ${id}`);
-  return { type: "equipment", ...def };
+  assert(results.length > 0, `Could not find equipment by id ${id}`);
+
+  return {
+    type: "equipment",
+    definitionId: results[0].definitionId as EquipmentDefinitionId,
+    name: results[0].name,
+    maxDurability: Number(results[0].maxDurability),
+  };
 }

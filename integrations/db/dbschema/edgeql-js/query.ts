@@ -22,8 +22,8 @@ const wrappedExprCache = new WeakMap();
 export async function $queryFunc(this: any, cxn: gel.Executor, args: any) {
   const expr = runnableExpressionKinds.has(this.__kind__)
     ? this
-    : wrappedExprCache.get(this) ??
-      wrappedExprCache.set(this, select(this)).get(this);
+    : (wrappedExprCache.get(this) ??
+      wrappedExprCache.set(this, select(this)).get(this));
 
   const _args = jsonifyComplexParams(expr, args);
 
@@ -43,8 +43,8 @@ export async function $queryFunc(this: any, cxn: gel.Executor, args: any) {
 export async function $queryFuncJSON(this: any, cxn: gel.Executor, args: any) {
   const expr = runnableExpressionKinds.has(this.__kind__)
     ? this
-    : wrappedExprCache.get(this) ??
-      wrappedExprCache.set(this, select(this)).get(this);
+    : (wrappedExprCache.get(this) ??
+      wrappedExprCache.set(this, select(this)).get(this));
   const _args = jsonifyComplexParams(expr, args);
 
   if (

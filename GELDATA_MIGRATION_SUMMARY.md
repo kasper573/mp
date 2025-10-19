@@ -10,15 +10,15 @@ This repository has been partially migrated from **PostgreSQL + Drizzle ORM** to
 
 ### Key Differences
 
-| Aspect | Before (Drizzle) | After (Gel) |
-|--------|------------------|-------------|
-| Database | PostgreSQL | Gel/EdgeDB |
-| Query Language | SQL | EdgeQL |
-| Schema | TypeScript files | `.esdl` files |
-| Client | drizzle-orm | gel |
-| Docker Image | postgres:latest | edgedb/edgedb:latest |
-| Port | 5432 | 5656 |
-| Connection String | `postgresql://...` | `gel://...` |
+| Aspect            | Before (Drizzle)   | After (Gel)          |
+| ----------------- | ------------------ | -------------------- |
+| Database          | PostgreSQL         | Gel/EdgeDB           |
+| Query Language    | SQL                | EdgeQL               |
+| Schema            | TypeScript files   | `.esdl` files        |
+| Client            | drizzle-orm        | gel                  |
+| Docker Image      | postgres:latest    | edgedb/edgedb:latest |
+| Port              | 5432               | 5656                 |
+| Connection String | `postgresql://...` | `gel://...`          |
 
 ## Migration Status
 
@@ -113,6 +113,7 @@ The following cannot be completed automatically:
 ### Step 1: Set Up Infrastructure (2-4 hours)
 
 1. **Update Docker Compose**
+
    ```bash
    # In docker-compose.dev.yaml, replace postgres with:
    # (See integrations/db/docker-compose.gel.yaml for full config)
@@ -127,6 +128,7 @@ The following cannot be completed automatically:
    ```
 
 2. **Update Environment Variables**
+
    ```bash
    # In .env files, change:
    # From: postgresql://user:pass@localhost:5432/db
@@ -175,12 +177,13 @@ await e
     id: true,
     name: true,
     health: true,
-    filter: e.op(char.id, '=', characterId)
+    filter: e.op(char.id, "=", characterId),
   }))
   .run(client);
 ```
 
 **Files to migrate:**
+
 - `apps/gateway/src/db-operations.ts`
 - `apps/gateway/src/main.ts`
 - `apps/game-service/src/etc/db-transform.ts`
@@ -215,16 +218,19 @@ pnpm build
 ## Key Files Reference
 
 ### Schema and Configuration
+
 - `integrations/db/dbschema/default.esdl` - EdgeQL schema
 - `integrations/db/gel.toml` - Gel configuration
 - `integrations/db/docker-compose.gel.yaml` - Docker setup
 
 ### Documentation
+
 - `integrations/db/README.md` - Package overview
 - `integrations/db/MIGRATION_GUIDE.md` - Migration instructions
 - `integrations/db/FILES_TO_MIGRATE.md` - File checklist
 
 ### Core Code
+
 - `integrations/db/src/client.ts` - Database client
 - `integrations/db/src/schema.ts` - Query builder export
 - `integrations/db/src/types/` - Type helpers
@@ -239,6 +245,7 @@ pnpm build
 ## Support
 
 For issues completing this migration:
+
 - Check the documentation in `integrations/db/`
 - Review `MIGRATION_GUIDE.md` for query patterns
 - Consult [Gel Discord](https://discord.gg/umUueND6ag)
@@ -261,6 +268,7 @@ The migration was done in stages:
 3. **Finally**: Migrate queries (can be done systematically) 🔴
 
 This approach ensures:
+
 - Clear separation of concerns
 - Easy to review and test
 - Can be completed incrementally

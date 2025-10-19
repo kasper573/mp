@@ -1,21 +1,20 @@
 /*
  * ⚠️ THIS FILE NEEDS TO BE MIGRATED TO GEL QUERY BUILDER
- * 
+ *
  * This drop script is currently non-functional because it uses PostgreSQL
  * specific SQL which has been replaced with Gel (EdgeDB).
- * 
+ *
  * To complete the migration:
  * 1. Set up Gel database in Docker (see README.md)
  * 2. Use Gel CLI tools for dropping schema:
  *    - `npx gel database wipe` (drops all data)
  *    - Or delete all objects individually with query builder
- * 
+ *
  * See MIGRATION_GUIDE.md for examples.
  */
 
 import readline from "node:readline/promises";
-import { createDbClient } from "./src";
-// import { e } from "./src/schema";  // Uncomment after generating query builder
+// import { createDbClient, e } from "./src";  // Uncomment after full migration
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -31,8 +30,10 @@ if (answer.trim().toLowerCase() !== "yes") {
   process.exit(0);
 }
 
-console.log("Drop script needs migration to Gel query builder.");
-console.log("Alternative: Use 'npx gel database wipe' command.");
+// eslint-disable-next-line no-console
+console.error("Drop script needs migration to Gel query builder.");
+// eslint-disable-next-line no-console
+console.error("Alternative: Use 'npx gel database wipe' command.");
 process.exit(1);
 
 /* OLD POSTGRESQL CODE - Remove after migration

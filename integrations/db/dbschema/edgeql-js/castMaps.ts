@@ -85,7 +85,7 @@ export interface ScalarAssignableByMap {
 export type scalarAssignableBy<T extends $.ScalarType> =
   T extends $.ScalarType<infer N extends keyof ScalarAssignableByMap>
     ? ScalarAssignableByMap[N]
-    : never
+    : never;
 
 export interface ScalarCastableFromMap {
   "std::number": _std.$number;
@@ -158,485 +158,473 @@ export interface ScalarCastableFromMap {
 export type scalarCastableFrom<T extends $.ScalarType> =
   T extends $.ScalarType<infer N extends keyof ScalarCastableFromMap>
     ? ScalarCastableFromMap[N]
-    : never
+    : never;
 
 type getSharedParentScalar<A, B> =
-  A extends $.ScalarType<infer AName> ?
-  B extends $.ScalarType<infer BName> ?
-    AName extends "std::decimal" ?
-      BName extends "std::decimal" ?
-        B
-      :
-      BName extends "std::bigint" ?
-        A
-      :
-      never
-    :
-    AName extends "std::cal::relative_duration" ?
-      BName extends "std::cal::relative_duration" ?
-        B
-      :
-      BName extends "std::cal::date_duration" ?
-        A
-      :
-      never
-    :
-    AName extends "std::cal::local_datetime" ?
-      BName extends "std::cal::local_datetime" ?
-        B
-      :
-      BName extends "std::cal::local_date" ?
-        A
-      :
-      never
-    :
-    AName extends "std::cal::local_date" ?
-      BName extends "std::cal::local_datetime" ?
-        B
-      :
-      BName extends "std::cal::local_date" ?
-        B
-      :
-      never
-    :
-    AName extends "std::cal::date_duration" ?
-      BName extends "std::cal::relative_duration" ?
-        B
-      :
-      BName extends "std::cal::date_duration" ?
-        B
-      :
-      never
-    :
-    AName extends "std::bigint" ?
-      BName extends "std::decimal" ?
-        B
-      :
-      BName extends "std::bigint" ?
-        B
-      :
-      never
-    :
-    AName extends BName ? A : never
-  : never : never;
+  A extends $.ScalarType<infer AName>
+    ? B extends $.ScalarType<infer BName>
+      ? AName extends "std::decimal"
+        ? BName extends "std::decimal"
+          ? B
+          : BName extends "std::bigint"
+            ? A
+            : never
+        : AName extends "std::cal::relative_duration"
+          ? BName extends "std::cal::relative_duration"
+            ? B
+            : BName extends "std::cal::date_duration"
+              ? A
+              : never
+          : AName extends "std::cal::local_datetime"
+            ? BName extends "std::cal::local_datetime"
+              ? B
+              : BName extends "std::cal::local_date"
+                ? A
+                : never
+            : AName extends "std::cal::local_date"
+              ? BName extends "std::cal::local_datetime"
+                ? B
+                : BName extends "std::cal::local_date"
+                  ? B
+                  : never
+              : AName extends "std::cal::date_duration"
+                ? BName extends "std::cal::relative_duration"
+                  ? B
+                  : BName extends "std::cal::date_duration"
+                    ? B
+                    : never
+                : AName extends "std::bigint"
+                  ? BName extends "std::decimal"
+                    ? B
+                    : BName extends "std::bigint"
+                      ? B
+                      : never
+                  : AName extends BName
+                    ? A
+                    : never
+      : never
+    : never;
 
-function getSharedParentScalar<A extends $.ScalarType, B extends $.ScalarType>(a: A, b: B): A | B {
+function getSharedParentScalar<A extends $.ScalarType, B extends $.ScalarType>(
+  a: A,
+  b: B,
+): A | B {
   a = (a as any).__casttype__ || a;
   b = (b as any).__casttype__ || b;
   if (a.__name__ === "std::number") {
-    if(b.__name__ === "std::number") {
+    if (b.__name__ === "std::number") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::VersionStage") {
-    if(b.__name__ === "sys::VersionStage") {
+    if (b.__name__ === "sys::VersionStage") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::TransactionIsolation") {
-    if(b.__name__ === "sys::TransactionIsolation") {
+    if (b.__name__ === "sys::TransactionIsolation") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::TransactionDeferrability") {
-    if(b.__name__ === "sys::TransactionDeferrability") {
+    if (b.__name__ === "sys::TransactionDeferrability") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::TransactionAccessMode") {
-    if(b.__name__ === "sys::TransactionAccessMode") {
+    if (b.__name__ === "sys::TransactionAccessMode") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::QueryType") {
-    if(b.__name__ === "sys::QueryType") {
+    if (b.__name__ === "sys::QueryType") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "sys::OutputFormat") {
-    if(b.__name__ === "sys::OutputFormat") {
+    if (b.__name__ === "sys::OutputFormat") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::uuid") {
-    if(b.__name__ === "std::uuid") {
+    if (b.__name__ === "std::uuid") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::str") {
-    if(b.__name__ === "std::str") {
+    if (b.__name__ === "std::str") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::pg::timestamptz") {
-    if(b.__name__ === "std::pg::timestamptz") {
+    if (b.__name__ === "std::pg::timestamptz") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::pg::timestamp") {
-    if(b.__name__ === "std::pg::timestamp") {
+    if (b.__name__ === "std::pg::timestamp") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::pg::json") {
-    if(b.__name__ === "std::pg::json") {
+    if (b.__name__ === "std::pg::json") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::pg::interval") {
-    if(b.__name__ === "std::pg::interval") {
+    if (b.__name__ === "std::pg::interval") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::pg::date") {
-    if(b.__name__ === "std::pg::date") {
+    if (b.__name__ === "std::pg::date") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::net::http::Method") {
-    if(b.__name__ === "std::net::http::Method") {
+    if (b.__name__ === "std::net::http::Method") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::net::RequestState") {
-    if(b.__name__ === "std::net::RequestState") {
+    if (b.__name__ === "std::net::RequestState") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::net::RequestFailureKind") {
-    if(b.__name__ === "std::net::RequestFailureKind") {
+    if (b.__name__ === "std::net::RequestFailureKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::json") {
-    if(b.__name__ === "std::json") {
+    if (b.__name__ === "std::json") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::int64") {
-    if(b.__name__ === "std::int64") {
+    if (b.__name__ === "std::int64") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::int32") {
-    if(b.__name__ === "std::int32") {
+    if (b.__name__ === "std::int32") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::int16") {
-    if(b.__name__ === "std::int16") {
+    if (b.__name__ === "std::int16") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::document") {
-    if(b.__name__ === "std::fts::document") {
+    if (b.__name__ === "std::fts::document") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::Weight") {
-    if(b.__name__ === "std::fts::Weight") {
+    if (b.__name__ === "std::fts::Weight") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::PGLanguage") {
-    if(b.__name__ === "std::fts::PGLanguage") {
+    if (b.__name__ === "std::fts::PGLanguage") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::LuceneLanguage") {
-    if(b.__name__ === "std::fts::LuceneLanguage") {
+    if (b.__name__ === "std::fts::LuceneLanguage") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::Language") {
-    if(b.__name__ === "std::fts::Language") {
+    if (b.__name__ === "std::fts::Language") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::fts::ElasticLanguage") {
-    if(b.__name__ === "std::fts::ElasticLanguage") {
+    if (b.__name__ === "std::fts::ElasticLanguage") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::float64") {
-    if(b.__name__ === "std::float64") {
+    if (b.__name__ === "std::float64") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::float32") {
-    if(b.__name__ === "std::float32") {
+    if (b.__name__ === "std::float32") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::enc::Base64Alphabet") {
-    if(b.__name__ === "std::enc::Base64Alphabet") {
+    if (b.__name__ === "std::enc::Base64Alphabet") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::duration") {
-    if(b.__name__ === "std::duration") {
+    if (b.__name__ === "std::duration") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::decimal") {
-    if(b.__name__ === "std::decimal") {
+    if (b.__name__ === "std::decimal") {
       return b;
     }
-    if(b.__name__ === "std::bigint") {
+    if (b.__name__ === "std::bigint") {
       return a;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::datetime") {
-    if(b.__name__ === "std::datetime") {
+    if (b.__name__ === "std::datetime") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::cal::relative_duration") {
-    if(b.__name__ === "std::cal::relative_duration") {
+    if (b.__name__ === "std::cal::relative_duration") {
       return b;
     }
-    if(b.__name__ === "std::cal::date_duration") {
+    if (b.__name__ === "std::cal::date_duration") {
       return a;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::cal::local_time") {
-    if(b.__name__ === "std::cal::local_time") {
+    if (b.__name__ === "std::cal::local_time") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::cal::local_datetime") {
-    if(b.__name__ === "std::cal::local_datetime") {
+    if (b.__name__ === "std::cal::local_datetime") {
       return b;
     }
-    if(b.__name__ === "std::cal::local_date") {
+    if (b.__name__ === "std::cal::local_date") {
       return a;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::cal::local_date") {
-    if(b.__name__ === "std::cal::local_datetime") {
+    if (b.__name__ === "std::cal::local_datetime") {
       return b;
     }
-    if(b.__name__ === "std::cal::local_date") {
+    if (b.__name__ === "std::cal::local_date") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::cal::date_duration") {
-    if(b.__name__ === "std::cal::relative_duration") {
+    if (b.__name__ === "std::cal::relative_duration") {
       return b;
     }
-    if(b.__name__ === "std::cal::date_duration") {
+    if (b.__name__ === "std::cal::date_duration") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::bytes") {
-    if(b.__name__ === "std::bytes") {
+    if (b.__name__ === "std::bytes") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::bool") {
-    if(b.__name__ === "std::bool") {
+    if (b.__name__ === "std::bool") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::bigint") {
-    if(b.__name__ === "std::decimal") {
+    if (b.__name__ === "std::decimal") {
       return b;
     }
-    if(b.__name__ === "std::bigint") {
+    if (b.__name__ === "std::bigint") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::JsonEmpty") {
-    if(b.__name__ === "std::JsonEmpty") {
+    if (b.__name__ === "std::JsonEmpty") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "std::Endian") {
-    if(b.__name__ === "std::Endian") {
+    if (b.__name__ === "std::Endian") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::Volatility") {
-    if(b.__name__ === "schema::Volatility") {
+    if (b.__name__ === "schema::Volatility") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::TypeModifier") {
-    if(b.__name__ === "schema::TypeModifier") {
+    if (b.__name__ === "schema::TypeModifier") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::TriggerTiming") {
-    if(b.__name__ === "schema::TriggerTiming") {
+    if (b.__name__ === "schema::TriggerTiming") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::TriggerScope") {
-    if(b.__name__ === "schema::TriggerScope") {
+    if (b.__name__ === "schema::TriggerScope") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::TriggerKind") {
-    if(b.__name__ === "schema::TriggerKind") {
+    if (b.__name__ === "schema::TriggerKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::TargetDeleteAction") {
-    if(b.__name__ === "schema::TargetDeleteAction") {
+    if (b.__name__ === "schema::TargetDeleteAction") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::SourceDeleteAction") {
-    if(b.__name__ === "schema::SourceDeleteAction") {
+    if (b.__name__ === "schema::SourceDeleteAction") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::RewriteKind") {
-    if(b.__name__ === "schema::RewriteKind") {
+    if (b.__name__ === "schema::RewriteKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::ParameterKind") {
-    if(b.__name__ === "schema::ParameterKind") {
+    if (b.__name__ === "schema::ParameterKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::OperatorKind") {
-    if(b.__name__ === "schema::OperatorKind") {
+    if (b.__name__ === "schema::OperatorKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::MigrationGeneratedBy") {
-    if(b.__name__ === "schema::MigrationGeneratedBy") {
+    if (b.__name__ === "schema::MigrationGeneratedBy") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::IndexDeferrability") {
-    if(b.__name__ === "schema::IndexDeferrability") {
+    if (b.__name__ === "schema::IndexDeferrability") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::Cardinality") {
-    if(b.__name__ === "schema::Cardinality") {
+    if (b.__name__ === "schema::Cardinality") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::AccessPolicyAction") {
-    if(b.__name__ === "schema::AccessPolicyAction") {
+    if (b.__name__ === "schema::AccessPolicyAction") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "schema::AccessKind") {
-    if(b.__name__ === "schema::AccessKind") {
+    if (b.__name__ === "schema::AccessKind") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "default::NpcType") {
-    if(b.__name__ === "default::NpcType") {
+    if (b.__name__ === "default::NpcType") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::memory") {
-    if(b.__name__ === "cfg::memory") {
+    if (b.__name__ === "cfg::memory") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::StoreMigrationSDL") {
-    if(b.__name__ === "cfg::StoreMigrationSDL") {
+    if (b.__name__ === "cfg::StoreMigrationSDL") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::SMTPSecurity") {
-    if(b.__name__ === "cfg::SMTPSecurity") {
+    if (b.__name__ === "cfg::SMTPSecurity") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::QueryStatsOption") {
-    if(b.__name__ === "cfg::QueryStatsOption") {
+    if (b.__name__ === "cfg::QueryStatsOption") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::QueryCacheMode") {
-    if(b.__name__ === "cfg::QueryCacheMode") {
+    if (b.__name__ === "cfg::QueryCacheMode") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::ConnectionTransport") {
-    if(b.__name__ === "cfg::ConnectionTransport") {
+    if (b.__name__ === "cfg::ConnectionTransport") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   if (a.__name__ === "cfg::AllowBareDDL") {
-    if(b.__name__ === "cfg::AllowBareDDL") {
+    if (b.__name__ === "cfg::AllowBareDDL") {
       return b;
     }
     throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
-    }
+  }
   throw new Error(`Types are not castable: ${a.__name__}, ${b.__name__}`);
 }
 
@@ -647,9 +635,9 @@ const implicitCastMap = new Map<string, Set<string>>([
 ]);
 function isImplicitlyCastableTo(from: string, to: string): boolean {
   const _a = implicitCastMap.get(from),
-        _b = _a != null ? _a.has(to) : null;
+    _b = _a != null ? _a.has(to) : null;
   return _b != null ? _b : false;
-};
+}
 
 export type scalarLiterals =
   | number
@@ -666,46 +654,77 @@ export type scalarLiterals =
   | gel.LocalTime
   | gel.RelativeDuration
   | gel.DateDuration
-  | gel.Range<any> | gel.MultiRange<any>;
+  | gel.Range<any>
+  | gel.MultiRange<any>;
 
 type getTsType<T extends $.BaseType> = T extends $.ScalarType
-  ? T extends _std.$decimal | _stdfts.$document | _std.$json | _stdpg.$date | _stdpg.$interval | _stdpg.$json | _stdpg.$timestamp | _stdpg.$timestamptz | _std.$uuid
+  ? T extends
+      | _std.$decimal
+      | _stdfts.$document
+      | _std.$json
+      | _stdpg.$date
+      | _stdpg.$interval
+      | _stdpg.$json
+      | _stdpg.$timestamp
+      | _stdpg.$timestamptz
+      | _std.$uuid
     ? never
     : T["__tstype__"]
   : T extends $.RangeType
-  ? gel.Range<T['__element__']['__tstype__']>
-  : T extends $.MultiRangeType
-  ? gel.MultiRange<T['__element__']['__tstype__']>
-  : never;
+    ? gel.Range<T["__element__"]["__tstype__"]>
+    : T extends $.MultiRangeType
+      ? gel.MultiRange<T["__element__"]["__tstype__"]>
+      : never;
 export type orScalarLiteral<T extends $.TypeSet> =
   | T
-  | ($.BaseTypeSet extends T      ? scalarLiterals      : $.Cardinality extends T["__cardinality__"]        ? getTsType<T["__element__"]>        : $.computeTsTypeCard<            getTsType<T["__element__"]>,            T["__cardinality__"]          >);
+  | ($.BaseTypeSet extends T
+      ? scalarLiterals
+      : $.Cardinality extends T["__cardinality__"]
+        ? getTsType<T["__element__"]>
+        : $.computeTsTypeCard<
+            getTsType<T["__element__"]>,
+            T["__cardinality__"]
+          >);
 export type scalarWithConstType<
   T extends $.ScalarType,
-  TsConstType
+  TsConstType,
 > = $.ScalarType<
   T["__name__"],
   T["__tstype__"],
-  T['__tsargtype__'],
+  T["__tsargtype__"],
   TsConstType
 >;
-export type literalToScalarType<T extends any> =
-  T extends number ? scalarWithConstType<_std.$number, T> :
-  T extends string ? scalarWithConstType<_std.$str, T> :
-  T extends boolean ? scalarWithConstType<_std.$bool, T> :
-  T extends bigint ? scalarWithConstType<_std.$bigint, T> :
-  T extends Uint8Array ? scalarWithConstType<_std.$bytes, T> :
-  T extends Date ? scalarWithConstType<_std.$datetime, T> :
-  T extends gel.Duration ? scalarWithConstType<_std.$duration, T> :
-  T extends gel.ConfigMemory ? scalarWithConstType<_cfg.$memory, T> :
-  T extends gel.LocalDateTime ? scalarWithConstType<_stdcal.$local_datetime, T> :
-  T extends gel.LocalDate ? scalarWithConstType<_stdcal.$local_date, T> :
-  T extends gel.LocalTime ? scalarWithConstType<_stdcal.$local_time, T> :
-  T extends gel.RelativeDuration ? scalarWithConstType<_stdcal.$relative_duration, T> :
-  T extends gel.DateDuration ? scalarWithConstType<_stdcal.$date_duration, T> :
-  T extends gel.Range<infer E> ? $.RangeType<literalToScalarType<E>> :
-  T extends gel.MultiRange<infer E> ? $.MultiRangeType<literalToScalarType<E>> :
-  $.BaseType;
+export type literalToScalarType<T extends any> = T extends number
+  ? scalarWithConstType<_std.$number, T>
+  : T extends string
+    ? scalarWithConstType<_std.$str, T>
+    : T extends boolean
+      ? scalarWithConstType<_std.$bool, T>
+      : T extends bigint
+        ? scalarWithConstType<_std.$bigint, T>
+        : T extends Uint8Array
+          ? scalarWithConstType<_std.$bytes, T>
+          : T extends Date
+            ? scalarWithConstType<_std.$datetime, T>
+            : T extends gel.Duration
+              ? scalarWithConstType<_std.$duration, T>
+              : T extends gel.ConfigMemory
+                ? scalarWithConstType<_cfg.$memory, T>
+                : T extends gel.LocalDateTime
+                  ? scalarWithConstType<_stdcal.$local_datetime, T>
+                  : T extends gel.LocalDate
+                    ? scalarWithConstType<_stdcal.$local_date, T>
+                    : T extends gel.LocalTime
+                      ? scalarWithConstType<_stdcal.$local_time, T>
+                      : T extends gel.RelativeDuration
+                        ? scalarWithConstType<_stdcal.$relative_duration, T>
+                        : T extends gel.DateDuration
+                          ? scalarWithConstType<_stdcal.$date_duration, T>
+                          : T extends gel.Range<infer E>
+                            ? $.RangeType<literalToScalarType<E>>
+                            : T extends gel.MultiRange<infer E>
+                              ? $.MultiRangeType<literalToScalarType<E>>
+                              : $.BaseType;
 
 type literalToTypeSet<T extends any> = T extends $.TypeSet
   ? T
@@ -760,6 +779,5 @@ function literalToTypeSet(type: any): $.TypeSet {
   }
   throw new Error(`Cannot convert literal '${type}' into scalar type`);
 }
-
 
 export { getSharedParentScalar, isImplicitlyCastableTo, literalToTypeSet };

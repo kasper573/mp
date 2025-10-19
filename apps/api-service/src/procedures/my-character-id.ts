@@ -1,4 +1,4 @@
-import { actorModelTable, characterTable, eq, inventoryTable } from "@mp/db";
+import { e } from "@mp/db";
 import type { CharacterId } from "@mp/db/types";
 import type { InjectionContainer } from "@mp/ioc";
 import type { UserIdentity } from "@mp/oauth";
@@ -19,52 +19,65 @@ async function getOrCreateCharacterIdForUser(
   user: UserIdentity,
 ): Promise<CharacterId> {
   const db = ioc.get(ctxDbClient);
-  const findResult = await db
-    .select({ id: characterTable.id })
-    .from(characterTable)
-    .where(eq(characterTable.userId, user.id))
-    .limit(1);
+  const findResult = await e
+    .select(e.Character, (char) => ({
+      characterId: true,
+      filter: e.op(char.userId, "=", e.uuid(user.id)),
+      limit: 1,
+    }))
+    .run(db);
 
   if (findResult.length) {
-    return findResult[0].id;
+    return findResult[0].characterId as CharacterId;
   }
 
-  const [model] = await db
-    .select({ id: actorModelTable.id })
-    .from(actorModelTable)
-    .limit(1);
-  if (!model) {
+  const models = await e
+    .select(e.ActorModel, () => ({
+      modelId: true,
+      limit: 1,
+    }))
+    .run(db);
+
+  if (models.length === 0) {
     throw new Error("No actor models found in the database");
   }
 
-  const [inventory] = await db
-    .insert(inventoryTable)
-    .values({})
-    .returning({ id: inventoryTable.id });
+  const inventory = await e
+    .insert(e.Inventory, {
+      inventoryId: e.str(`inv-${Date.now()}`),
+    })
+    .run(db);
 
-  const insertResult = await db
-    .insert(characterTable)
-    .values({
-      ...(await getDefaultSpawnPoint(ioc)),
-      speed: 3 as Tile,
+  const spawnPoint = await getDefaultSpawnPoint(ioc);
+
+  const insertResult = await e
+    .insert(e.Character, {
+      characterId: e.str(`char-${Date.now()}`),
+      coords: e.json(spawnPoint.coords),
+      areaId: e.select(e.Area, (area) => ({
+        filter: e.op(area.areaId, "=", e.str(spawnPoint.areaId)),
+        limit: 1,
+      })),
+      speed: 3,
       health: 100,
       maxHealth: 100,
       attackDamage: 5,
-      attackSpeed: 1.25 as TimesPerSecond,
-      attackRange: 1 as Tile,
-      userId: user.id,
+      attackSpeed: 1.25,
+      attackRange: 1,
+      userId: e.uuid(user.id),
       xp: 0,
       name: user.name,
       online: false,
-      modelId: model.id,
-      inventoryId: inventory.id,
+      modelId: e.select(e.ActorModel, (model) => ({
+        filter: e.op(model.modelId, "=", e.str(models[0].modelId)),
+        limit: 1,
+      })),
+      inventoryId: e.select(e.Inventory, (inv) => ({
+        filter: e.op(inv.inventoryId, "=", e.str(inventory.inventoryId)),
+        limit: 1,
+      })),
     })
-    .returning({ id: characterTable.id });
+    .run(db);
 
-  const returned = insertResult.length > 0 ? insertResult[0] : undefined;
-  if (!returned) {
-    throw new Error("Failed to insert character");
-  }
-
-  return returned.id;
+  return insertResult.characterId as CharacterId;
 }

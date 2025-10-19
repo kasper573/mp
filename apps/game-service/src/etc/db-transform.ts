@@ -129,9 +129,7 @@ export function dbFieldsFromCharacter(char: Character): DbCharacterUpdate {
   };
 }
 
-export function npcRewardsFromDbFields(
-  fields: DbNpcRewardFields,
-): NpcReward[] {
+export function npcRewardsFromDbFields(fields: DbNpcRewardFields): NpcReward[] {
   const rewards: NpcReward[] = [];
   if (fields.xp !== null) {
     rewards.push({

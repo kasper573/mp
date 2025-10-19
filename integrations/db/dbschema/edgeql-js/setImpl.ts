@@ -3,50 +3,64 @@
 import * as $ from "./reflection";
 import * as castMaps from "./castMaps";
 import { $expressionify } from "./path";
-import type { $expr_Set, mergeObjectTypesVariadic, getTypesFromExprs, getTypesFromObjectExprs, getCardsFromExprs, getSharedParentPrimitiveVariadic, LooseTypeSet } from "./set";
+import type {
+  $expr_Set,
+  mergeObjectTypesVariadic,
+  getTypesFromExprs,
+  getTypesFromObjectExprs,
+  getCardsFromExprs,
+  getSharedParentPrimitiveVariadic,
+  LooseTypeSet,
+} from "./set";
 import { getSharedParent } from "./set";
 import type * as _stdcal from "./modules/std/cal";
 import type * as _std from "./modules/std";
 
-type getSetTypeFromExprs<
-  Exprs extends [$.TypeSet, ...$.TypeSet[]]
-> = LooseTypeSet<
-  getSharedParentPrimitiveVariadic<getTypesFromExprs<Exprs>>,
-  $.cardutil.mergeCardinalitiesVariadic<getCardsFromExprs<Exprs>>
->;
+type getSetTypeFromExprs<Exprs extends [$.TypeSet, ...$.TypeSet[]]> =
+  LooseTypeSet<
+    getSharedParentPrimitiveVariadic<getTypesFromExprs<Exprs>>,
+    $.cardutil.mergeCardinalitiesVariadic<getCardsFromExprs<Exprs>>
+  >;
 
 function set(): null;
+function set<Expr extends castMaps.orScalarLiteral<$.TypeSet>>(
+  expr: Expr,
+): $expr_Set<castMaps.literalToTypeSet<Expr>>;
 function set<
-  Expr extends castMaps.orScalarLiteral<$.TypeSet>
->(expr: Expr): $expr_Set<castMaps.literalToTypeSet<Expr>>;
-function set<
-  Expr extends castMaps.orScalarLiteral<$.TypeSet<_stdcal.$relative_durationλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
->(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
+  Expr extends castMaps.orScalarLiteral<
+    $.TypeSet<_stdcal.$relative_durationλICastableTo>
+  >,
+  Exprs extends [Expr, ...Expr[]],
+>(
+  ...exprs: Exprs
+): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
 function set<
   Expr extends $.TypeSet<$.ArrayType<_stdcal.$relative_durationλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
+  Exprs extends [Expr, ...Expr[]],
 >(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<Exprs>>;
 function set<
-  Expr extends castMaps.orScalarLiteral<$.TypeSet<_stdcal.$local_datetimeλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
->(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
+  Expr extends castMaps.orScalarLiteral<
+    $.TypeSet<_stdcal.$local_datetimeλICastableTo>
+  >,
+  Exprs extends [Expr, ...Expr[]],
+>(
+  ...exprs: Exprs
+): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
 function set<
   Expr extends $.TypeSet<$.ArrayType<_stdcal.$local_datetimeλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
+  Exprs extends [Expr, ...Expr[]],
 >(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<Exprs>>;
 function set<
   Expr extends castMaps.orScalarLiteral<$.TypeSet<_std.$decimalλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
->(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
+  Exprs extends [Expr, ...Expr[]],
+>(
+  ...exprs: Exprs
+): $expr_Set<getSetTypeFromExprs<castMaps.mapLiteralToTypeSet<Exprs>>>;
 function set<
   Expr extends $.TypeSet<$.ArrayType<_std.$decimalλICastableTo>>,
-  Exprs extends [Expr, ...Expr[]]
+  Exprs extends [Expr, ...Expr[]],
 >(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<Exprs>>;
-function set<
-  Expr extends $.ObjectTypeSet,
-  Exprs extends [Expr, ...Expr[]]
->(
+function set<Expr extends $.ObjectTypeSet, Exprs extends [Expr, ...Expr[]]>(
   ...exprs: Exprs
 ): $expr_Set<
   LooseTypeSet<
@@ -56,13 +70,15 @@ function set<
 >;
 function set<
   Expr extends $.TypeSet<$.AnyTupleType>,
-  Exprs extends [Expr, ...Expr[]]
+  Exprs extends [Expr, ...Expr[]],
 >(...exprs: Exprs): $expr_Set<getSetTypeFromExprs<Exprs>>;
 function set<
   Expr extends $.TypeSet<$.BaseType> | castMaps.scalarLiterals,
   Exprs extends castMaps.orScalarLiteral<
-    $.TypeSet<$.getPrimitiveBaseType<castMaps.literalToTypeSet<Expr>["__element__"]>>
-  >[]
+    $.TypeSet<
+      $.getPrimitiveBaseType<castMaps.literalToTypeSet<Expr>["__element__"]>
+    >
+  >[],
 >(
   expr: Expr,
   ...exprs: Exprs
@@ -90,24 +106,24 @@ function set(..._exprs: any[]) {
   //   merged objects
   // if primitive
   //   return shared parent of scalars
-  if(_exprs.length === 0){
+  if (_exprs.length === 0) {
     return null;
   }
 
-  const exprs: $.TypeSet[] = _exprs.map(expr => castMaps.literalToTypeSet(expr));
+  const exprs: $.TypeSet[] = _exprs.map((expr) =>
+    castMaps.literalToTypeSet(expr),
+  );
 
   return $expressionify({
     __kind__: $.ExpressionKind.Set,
     __element__: exprs
-      .map(expr => expr.__element__ as any)
+      .map((expr) => expr.__element__ as any)
       .reduce(getSharedParent),
     __cardinality__: $.cardutil.mergeCardinalitiesVariadic(
-      exprs.map(expr => expr.__cardinality__) as any
+      exprs.map((expr) => expr.__cardinality__) as any,
     ),
     __exprs__: exprs,
   }) as any;
-
 }
-
 
 export { set };

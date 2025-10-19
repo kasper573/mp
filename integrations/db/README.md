@@ -7,12 +7,14 @@ This package is currently being migrated from **Drizzle ORM + PostgreSQL** to **
 ### Current State
 
 ✅ **Completed:**
+
 - Package dependencies updated (gel installed, drizzle removed)
 - EdgeQL schema created (`dbschema/default.esdl`)
 - Database client updated to use Gel
 - Gel configuration file created (`gel.toml`)
 
 ❌ **Blocked - Requires Infrastructure:**
+
 - Gel database server needs to be set up (replace PostgreSQL in Docker)
 - Query builder generation requires running Gel database
 - All database queries need to be migrated from SQL to EdgeQL
@@ -21,15 +23,15 @@ This package is currently being migrated from **Drizzle ORM + PostgreSQL** to **
 
 Gel (formerly EdgeDB) is **not just an ORM replacement**. It's a complete database system:
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Database | PostgreSQL | Gel/EdgeDB |
-| Query Language | SQL | EdgeQL |
+| Aspect            | Before               | After                |
+| ----------------- | -------------------- | -------------------- |
+| Database          | PostgreSQL           | Gel/EdgeDB           |
+| Query Language    | SQL                  | EdgeQL               |
 | Schema Definition | TypeScript (Drizzle) | EdgeQL (.esdl files) |
-| Client Library | drizzle-orm | gel |
-| Docker Image | postgres:latest | edgedb/edgedb:latest |
-| Port | 5432 | 5656 |
-| Connection String | `postgresql://...` | `gel://...` |
+| Client Library    | drizzle-orm          | gel                  |
+| Docker Image      | postgres:latest      | edgedb/edgedb:latest |
+| Port              | 5432                 | 5656                 |
+| Connection String | `postgresql://...`   | `gel://...`          |
 
 ## What You Need to Do
 
@@ -67,6 +69,7 @@ pnpm generate
 ### 3. Update Connection Strings
 
 All connection strings must use Gel DSN format:
+
 ```
 gel://username:password@localhost:5656/database
 ```
@@ -99,33 +102,41 @@ import { createDbClient, e } from "@mp/db";
 const client = createDbClient("gel://...");
 
 // Select query
-const characters = await e.select(e.Character, (char) => ({
-  id: true,
-  name: true,
-  health: true,
-  filter: e.op(char.online, '=', true)
-})).run(client);
+const characters = await e
+  .select(e.Character, (char) => ({
+    id: true,
+    name: true,
+    health: true,
+    filter: e.op(char.online, "=", true),
+  }))
+  .run(client);
 
 // Insert query
-await e.insert(e.Character, {
-  id: characterId,
-  name: "Hero",
-  health: 100,
-  // ... other fields
-}).run(client);
+await e
+  .insert(e.Character, {
+    id: characterId,
+    name: "Hero",
+    health: 100,
+    // ... other fields
+  })
+  .run(client);
 
 // Update query
-await e.update(e.Character, (char) => ({
-  filter: e.op(char.id, '=', characterId),
-  set: {
-    health: 50
-  }
-})).run(client);
+await e
+  .update(e.Character, (char) => ({
+    filter: e.op(char.id, "=", characterId),
+    set: {
+      health: 50,
+    },
+  }))
+  .run(client);
 
 // Delete query
-await e.delete(e.Character, (char) => ({
-  filter: e.op(char.id, '=', characterId)
-})).run(client);
+await e
+  .delete(e.Character, (char) => ({
+    filter: e.op(char.id, "=", characterId),
+  }))
+  .run(client);
 ```
 
 ## Why Gel/EdgeDB?

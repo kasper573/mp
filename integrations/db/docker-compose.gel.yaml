@@ -1,5 +1,5 @@
 # Docker Compose configuration for Gel Database
-# 
+#
 # This file provides the Gel database service configuration that should
 # replace the PostgreSQL service in your docker-compose files.
 #
@@ -9,7 +9,7 @@
 # 3. Update volume references from postgres-data to gel-data
 # 4. Update connection strings to use Gel DSN format
 
-version: '3.8'
+version: "3.8"
 
 services:
   gel:
@@ -30,7 +30,16 @@ services:
       - gel-data:/var/lib/edgedb/data
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "edgedb", "query", "--dsn", "edgedb://edgedb@localhost/edgedb", "--", "SELECT 1"]
+      test:
+        [
+          "CMD",
+          "edgedb",
+          "query",
+          "--dsn",
+          "edgedb://edgedb@localhost/edgedb",
+          "--",
+          "SELECT 1",
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -39,9 +48,8 @@ services:
 volumes:
   gel-data:
     name: mp-gel-data
-
 # Connection String Examples:
-# 
+#
 # Development (insecure mode):
 #   gel://edgedb@localhost:5656/edgedb
 #

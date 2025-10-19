@@ -7,6 +7,7 @@ This migration replaces the PostgreSQL + Drizzle ORM stack with Gel Database (Ed
 ## What Changed
 
 ### Before (Drizzle ORM)
+
 - Database: PostgreSQL
 - ORM: Drizzle ORM
 - Query Language: SQL
@@ -14,6 +15,7 @@ This migration replaces the PostgreSQL + Drizzle ORM stack with Gel Database (Ed
 - Client: `drizzle-orm/node-postgres`
 
 ### After (Gel)
+
 - Database: Gel (EdgeDB)
 - Query Builder: Generated TypeScript Query Builder
 - Query Language: EdgeQL
@@ -47,6 +49,7 @@ gel:
 ```
 
 Add to volumes section:
+
 ```yaml
 volumes:
   gel-data:
@@ -83,16 +86,19 @@ This will create the query builder in `dbschema/edgeql-js/`.
 Replace PostgreSQL connection strings with Gel DSN format:
 
 **Old format:**
+
 ```
 postgresql://user:password@host:5432/database
 ```
 
 **New format:**
+
 ```
 gel://username:password@localhost:5656/database
 ```
 
 Update environment variables:
+
 - `MP_API_DATABASE_CONNECTION_STRING`
 - `MP_GAME_SERVICE_DATABASE_CONNECTION_STRING`
 
@@ -108,84 +114,110 @@ import { createDbClient } from "@mp/db";
 #### Example Migrations
 
 **Drizzle select:**
+
 ```typescript
-await db.select().from(characterTable).where(eq(characterTable.id, characterId));
+await db
+  .select()
+  .from(characterTable)
+  .where(eq(characterTable.id, characterId));
 ```
 
 **Gel query builder:**
+
 ```typescript
-await e.select(e.Character, (char) => ({
-  id: true,
-  name: true,
-  coords: true,
-  // ... other fields
-  filter: e.op(char.id, '=', characterId)
-})).run(client);
+await e
+  .select(e.Character, (char) => ({
+    id: true,
+    name: true,
+    coords: true,
+    // ... other fields
+    filter: e.op(char.id, "=", characterId),
+  }))
+  .run(client);
 ```
 
 **Drizzle insert:**
+
 ```typescript
-await db.insert(npcTable).values({
-  id: npcId,
-  name: "Soldier",
-  // ... other fields
-}).returning({ id: npcTable.id });
+await db
+  .insert(npcTable)
+  .values({
+    id: npcId,
+    name: "Soldier",
+    // ... other fields
+  })
+  .returning({ id: npcTable.id });
 ```
 
 **Gel query builder:**
+
 ```typescript
-await e.insert(e.Npc, {
-  id: npcId,
-  name: "Soldier",
-  // ... other fields
-}).run(client);
+await e
+  .insert(e.Npc, {
+    id: npcId,
+    name: "Soldier",
+    // ... other fields
+  })
+  .run(client);
 ```
 
 **Drizzle update:**
+
 ```typescript
-await db.update(characterTable)
+await db
+  .update(characterTable)
   .set({ online: true })
   .where(eq(characterTable.id, characterId));
 ```
 
 **Gel query builder:**
+
 ```typescript
-await e.update(e.Character, (char) => ({
-  filter: e.op(char.id, '=', characterId),
-  set: {
-    online: true
-  }
-})).run(client);
+await e
+  .update(e.Character, (char) => ({
+    filter: e.op(char.id, "=", characterId),
+    set: {
+      online: true,
+    },
+  }))
+  .run(client);
 ```
 
 **Drizzle delete:**
+
 ```typescript
 await db.delete(table);
 ```
 
 **Gel query builder:**
+
 ```typescript
 await e.delete(e.TableName).run(client);
 ```
 
 **Drizzle join:**
+
 ```typescript
-await db.select()
+await db
+  .select()
   .from(npcSpawnTable)
   .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id));
 ```
 
 **Gel query builder:**
+
 ```typescript
-await e.select(e.NpcSpawn, (spawn) => ({
-  // Fields are automatically joined via links
-  npcId: {
-    id: true,
-    name: true,
-    // ... npc fields
-  },
-  // ... other fields
-})).run(client);
+await e
+  .select(e.NpcSpawn, (spawn) => ({
+    // Fields are automatically joined via links
+    npcId: {
+      id: true,
+      name: true,
+      // ... npc fields
+    },
+    // ... other fields
+  }))
+  .run(client);
 ```
 
 ### 7. Update Seed Script
@@ -203,6 +235,7 @@ Replace all Drizzle drop operations with Gel equivalents.
 ### 9. Files That Need Migration
 
 **Core DB Files:**
+
 - ✅ `integrations/db/src/client.ts` (DONE)
 - ✅ `integrations/db/src/schema.ts` (DONE)
 - ✅ `integrations/db/src/index.ts` (DONE)
@@ -210,6 +243,7 @@ Replace all Drizzle drop operations with Gel equivalents.
 - ❌ `integrations/db/drop.ts` (TODO)
 
 **App Files Using Database:**
+
 - ❌ `apps/gateway/src/db-operations.ts`
 - ❌ `apps/game-service/src/etc/game-data-loader.ts`
 - ❌ All other files importing from `@mp/db`
@@ -228,22 +262,27 @@ pnpm build
 ## Key Differences
 
 ### 1. Schema Definitions
+
 - **Drizzle**: TypeScript functions defining tables
 - **Gel**: EdgeQL schema files (declarative)
 
 ### 2. Relationships
+
 - **Drizzle**: Foreign keys with `.references()`
 - **Gel**: Links (first-class relationships)
 
 ### 3. Queries
+
 - **Drizzle**: SQL-like TypeScript API
 - **Gel**: Graph-like TypeScript API with automatic traversal
 
 ### 4. Types
+
 - **Drizzle**: Inferred from schema
 - **Gel**: Generated from schema
 
 ### 5. Transactions
+
 - **Drizzle**: `db.transaction((tx) => ...)`
 - **Gel**: `client.transaction((tx) => ...)`
 
@@ -272,5 +311,6 @@ pnpm build
 ## Support
 
 For issues during migration:
+
 - Check [Gel Discord](https://discord.gg/umUueND6ag)
 - Review [Gel GitHub](https://github.com/geldata/gel-js)
