@@ -1,5 +1,6 @@
 import type { UserId } from "@mp/oauth";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
+import type { Vector, Path } from "@mp/math";
 import {
   Entity,
   PrimaryColumn,
@@ -154,7 +155,7 @@ export class Character {
   id!: CharacterId;
 
   @Column({ type: "point", transformer: new VectorTransformer<Tile>() })
-  coords!: { x: number; y: number };
+  coords!: Vector<Tile>;
 
   @Column({ type: "varchar", length: 60 })
   areaId!: AreaId;
@@ -329,7 +330,7 @@ export class NpcSpawn {
     nullable: true,
     transformer: new VectorTransformer<Tile>(),
   })
-  coords?: { x: number; y: number };
+  coords?: Vector<Tile>;
 
   @Column({ type: "integer", nullable: true })
   randomRadius?: number;
@@ -339,7 +340,7 @@ export class NpcSpawn {
     nullable: true,
     transformer: new PathTransformer<Tile>(),
   })
-  patrol?: Array<{ x: number; y: number }>;
+  patrol?: Path<Tile>;
 
   @Column({
     type: "varchar",

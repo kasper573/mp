@@ -11,8 +11,8 @@ import type {
   NpcReward,
 } from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
-import { cardinalDirections, Vector } from "@mp/math";
-import type { Rng, Tile } from "@mp/std";
+import { cardinalDirections } from "@mp/math";
+import type { Rng } from "@mp/std";
 import { assert } from "@mp/std";
 
 export function characterFromDbFields(
@@ -53,9 +53,7 @@ export function characterFromDbFields(
       lastAttack: undefined,
     },
     movement: {
-      coords: Vector.from<Tile>(
-        fields.coords as unknown as { x: Tile; y: Tile },
-      ),
+      coords: fields.coords,
       speed: fields.speed,
       dir: rng.oneOf(cardinalDirections),
       desiredPortalId: undefined,
