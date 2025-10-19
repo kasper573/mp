@@ -1,21 +1,25 @@
 // oxlint-disable no-await-in-loop
+
+/*
+ * ⚠️ THIS FILE NEEDS TO BE MIGRATED TO GEL QUERY BUILDER
+ * 
+ * This seed script is currently non-functional because it uses Drizzle ORM
+ * syntax which has been replaced with Gel (EdgeDB).
+ * 
+ * To complete the migration:
+ * 1. Set up Gel database in Docker (see README.md)
+ * 2. Run `pnpm generate` to create the query builder
+ * 3. Replace all db.insert/delete calls with Gel query builder syntax
+ * 
+ * See MIGRATION_GUIDE.md for examples.
+ */
+
 import { createPinoLogger } from "@mp/logger/pino";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
 import { createDbClient } from "./src/client";
-import {
-  actorModelTable,
-  areaTable,
-  characterTable,
-  consumableDefinitionTable,
-  consumableInstanceTable,
-  equipmentDefinitionTable,
-  equipmentInstanceTable,
-  npcRewardTable,
-  npcSpawnTable,
-  npcTable,
-} from "./src/schema";
+// import { e } from "./src/schema";  // Uncomment after generating query builder
 import {
   npcTypes,
   type ActorModelId,
@@ -40,104 +44,61 @@ if (!areaIds.length) {
   throw new Error("No area ids found");
 }
 
-const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+const client = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
 
-const tablesToTruncate = {
-  npcRewardTable,
-  consumableDefinitionTable,
-  consumableInstanceTable,
-  equipmentDefinitionTable,
-  equipmentInstanceTable,
-  npcSpawnTable,
-  npcTable,
-  characterTable,
-  actorModelTable,
-  areaTable,
-};
+// TODO: Migrate to Gel query builder
+// Example for truncating (deleting all records):
+// await e.delete(e.NpcReward).run(client);
+// await e.delete(e.ConsumableDefinition).run(client);
+// ... etc
 
+logger.warn("Seed script needs migration to Gel query builder. Exiting.");
+process.exit(1);
+
+/* OLD DRIZZLE CODE - Remove after migration
 for (const [tableName, table] of Object.entries(tablesToTruncate)) {
   logger.info(`Truncating table ${tableName}...`);
   await db.delete(table);
 }
+*/
+
+/* OLD DRIZZLE CODE - To be migrated to Gel query builder
 
 logger.info("Inserting areas and actor models...");
-await db.transaction((tx) =>
-  Promise.all([
-    ...areaIds.map((id) => tx.insert(areaTable).values({ id })),
-    ...actorModelIds.map((id) => tx.insert(actorModelTable).values({ id })),
-  ]),
-);
+// Example Gel migration:
+// await e.insert(e.Area, { id: areaId }).run(client);
+// await e.insert(e.ActorModel, { id: modelId }).run(client);
 
-const oneTile = 1 as Tile;
+// const oneTile = 1 as Tile;
 
 logger.info("Inserting npcs...");
-const [soldier] = await db
-  .insert(npcTable)
-  .values({
-    id: "1" as NpcId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
-    aggroRange: 7 as Tile,
-    npcType: "protective",
-    attackDamage: 3,
-    attackRange: oneTile,
-    attackSpeed: 1 as TimesPerSecond,
-    speed: oneTile,
-    maxHealth: 25,
-    modelId: actorModelIds[0],
-    name: "Soldier",
-  })
-  .returning({ id: npcTable.id });
-
-await db.transaction(async (tx) => {
-  await Promise.all(
-    (function* () {
-      for (const npcType of npcTypes.values()) {
-        if (npcType === "patrol" || npcType === "static") {
-          continue;
-        }
-
-        for (const areaId of areaIds) {
-          logger.info(
-            `Inserting npc spawns for ${npcType} in area ${areaId}...`,
-          );
-          yield tx.insert(npcSpawnTable).values({
-            npcType,
-            areaId,
-            count: 10,
-            id: createShortId() as NpcSpawnId,
-            npcId: soldier.id,
-          });
-        }
-      }
-    })(),
-  );
-});
+// Example Gel migration:
+// const soldier = await e.insert(e.Npc, {
+//   id: "1" as NpcId,
+//   name: "Soldier",
+//   aggroRange: 7,
+//   npcType: "protective",
+//   attackDamage: 3,
+//   attackRange: oneTile,
+//   attackSpeed: 1 as TimesPerSecond,
+//   speed: oneTile,
+//   maxHealth: 25,
+//   modelId: e.select(e.ActorModel, (m) => ({
+//     filter: e.op(m.id, '=', actorModelIds[0])
+//   }))
+// }).run(client);
 
 logger.info("Inserting items definitions...");
-const [apple] = await db
-  .insert(consumableDefinitionTable)
-  .values({ name: "Apple", maxStackSize: 10 })
-  .returning({ id: consumableDefinitionTable.id });
-
-const [sword] = await db
-  .insert(equipmentDefinitionTable)
-  .values({ name: "Sword", maxDurability: 100 })
-  .returning({ id: equipmentDefinitionTable.id });
-
-logger.info("Inserting npc rewards...");
-await db.insert(npcRewardTable).values({ npcId: soldier.id, xp: 10 });
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  consumableItemId: apple.id,
-  itemAmount: 1,
-});
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  equipmentItemId: sword.id,
-  itemAmount: 1,
-});
+// Example Gel migration:
+// const apple = await e.insert(e.ConsumableDefinition, {
+//   name: "Apple",
+//   maxStackSize: 10
+// }).run(client);
 
 logger.info("Ending database connection...");
-await db.$client.end();
+// Gel clients are typically long-lived, no need to close
+// await client.close();
+*/
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fileServerDir("areas");

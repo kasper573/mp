@@ -1,14 +1,9 @@
-import { shortIdLength } from "@mp/std";
-import { varchar } from "drizzle-orm/pg-core";
-
 /**
- * Creates a drizzle table column definition representing a ShortId
+ * Gel/EdgeDB representation of ShortId
+ * 
+ * In EdgeQL, short IDs are represented as regular string properties
+ * The length constraint is defined in the schema (.esdl file)
  */
-export function shortId(name?: string): DbShortId {
-  const base = name
-    ? varchar(name, { length: shortIdLength })
-    : varchar({ length: shortIdLength });
-  return base;
-}
 
-type DbShortId = ReturnType<typeof varchar>;
+// No special function needed for Gel - short IDs are just strings
+// The type safety comes from the generated query builder

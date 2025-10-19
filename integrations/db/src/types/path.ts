@@ -1,34 +1,19 @@
-import { type PathLike, type Path, Vector } from "@mp/math";
-import type { Table } from "drizzle-orm";
-import type { ColumnBaseConfig } from "drizzle-orm";
-import { PgJsonb, PgJsonbBuilder } from "drizzle-orm/pg-core";
+import { type PathLike, type Path, Vector, type VectorLike } from "@mp/math";
 
 /**
- * A drizzle/postgres representation of the Path type from @mp/math
+ * Gel/EdgeDB representation of the Path type from @mp/math
+ * 
+ * In EdgeQL, this is stored as JSON and needs to be serialized/deserialized
+ * when reading from or writing to the database.
  */
-export function path<T extends number>(name = "") {
-  return new PathBuilder<T>(name);
+
+export function serializePath<T extends number>(path: Path<T>): PathLike<T> {
+  return path.map((v) => ({ x: v.x, y: v.y } as VectorLike<T>)) as PathLike<T>;
 }
 
-class PathObject<T extends number> extends PgJsonb<PathColumnConfig<T>> {
-  override mapFromDriverValue(value: string | PathLike<T>): Path<T> {
-    if (typeof value === "string") {
-      value = JSON.parse(value) as PathLike<T>;
-    }
-    return value.map((v) => Vector.from<T>(v));
+export function deserializePath<T extends number>(data: string | PathLike<T>): Path<T> {
+  if (typeof data === "string") {
+    data = JSON.parse(data) as PathLike<T>;
   }
-}
-
-class PathBuilder<T extends number> extends PgJsonbBuilder<
-  PathColumnConfig<T>
-> {
-  build(table: Table) {
-    return new PathObject<T>(table, this.config);
-  }
-}
-
-interface PathColumnConfig<T extends number>
-  extends ColumnBaseConfig<"json", "PgJsonb"> {
-  data: Path<T>;
-  driverData: PathLike<T>;
+  return data.map((v) => Vector.from<T>(v));
 }

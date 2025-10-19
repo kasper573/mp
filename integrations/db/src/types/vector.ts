@@ -1,34 +1,17 @@
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
-import type { Table } from "drizzle-orm";
-import type { ColumnBaseConfig } from "drizzle-orm";
-import { PgPointObject, PgPointObjectBuilder } from "drizzle-orm/pg-core";
 
 /**
- * A drizzle/postgres representation of the Vector type from @mp/math
+ * Gel/EdgeDB representation of the Vector type from @mp/math
+ * 
+ * In EdgeQL, this is stored as JSON and needs to be serialized/deserialized
+ * when reading from or writing to the database.
  */
-export function vector<T extends number>(name = "") {
-  return new VectorBuilder<T>(name);
+
+export function serializeVector<T extends number>(vector: Vector<T>): VectorLike<T> {
+  return { x: vector.x, y: vector.y } as VectorLike<T>;
 }
 
-class VectorObject<T extends number> extends PgPointObject<
-  VectorColumnConfig<T>
-> {
-  override mapFromDriverValue(value: VectorLike<number>) {
-    return Vector.from(value);
-  }
-}
-
-class VectorBuilder<T extends number> extends PgPointObjectBuilder<
-  VectorColumnConfig<T>
-> {
-  build(table: Table) {
-    return new VectorObject<T>(table, this.config);
-  }
-}
-
-interface VectorColumnConfig<T extends number>
-  extends ColumnBaseConfig<"json", "PgPointObject"> {
-  data: Vector<T>;
-  driverData: VectorLike<T>;
+export function deserializeVector<T extends number>(value: VectorLike<T>): Vector<T> {
+  return Vector.from(value) as Vector<T>;
 }
