@@ -1,7 +1,7 @@
 module default {
   # Actor Models
   type ActorModel {
-    required property id -> str {
+    required property modelId -> str {
       constraint exclusive;
       constraint max_len_value(64);
     };
@@ -9,7 +9,7 @@ module default {
 
   # Areas
   type Area {
-    required property id -> str {
+    required property areaId -> str {
       constraint exclusive;
       constraint max_len_value(60);
     };
@@ -17,7 +17,7 @@ module default {
 
   # Inventory
   type Inventory {
-    required property id -> str {
+    required property inventoryId -> str {
       constraint exclusive;
     };
   }
@@ -30,14 +30,14 @@ module default {
   }
 
   type ConsumableDefinition extending ItemDefinition {
-    required property id -> str {
+    required property definitionId -> str {
       constraint exclusive;
     };
     required property maxStackSize -> int64;
   }
 
   type EquipmentDefinition extending ItemDefinition {
-    required property id -> str {
+    required property definitionId -> str {
       constraint exclusive;
     };
     required property maxDurability -> int64;
@@ -49,7 +49,7 @@ module default {
   }
 
   type ConsumableInstance extending ItemInstance {
-    required property id -> str {
+    required property instanceId -> str {
       constraint exclusive;
     };
     required link definitionId -> ConsumableDefinition;
@@ -57,7 +57,7 @@ module default {
   }
 
   type EquipmentInstance extending ItemInstance {
-    required property id -> str {
+    required property instanceId -> str {
       constraint exclusive;
     };
     required link definitionId -> EquipmentDefinition;
@@ -66,7 +66,7 @@ module default {
 
   # Character
   type Character {
-    required property id -> str {
+    required property characterId -> str {
       constraint exclusive;
     };
     required property coords -> json;
@@ -100,7 +100,7 @@ module default {
   >;
 
   type Npc {
-    required property id -> str {
+    required property npcId -> str {
       constraint exclusive;
     };
     required property speed -> int64;
@@ -118,7 +118,7 @@ module default {
 
   # NPC Reward
   type NpcReward {
-    required property id -> str {
+    required property rewardId -> str {
       constraint exclusive;
     };
     required link npcId -> Npc;
@@ -130,7 +130,7 @@ module default {
 
   # NPC Spawn
   type NpcSpawn {
-    required property id -> str {
+    required property spawnId -> str {
       constraint exclusive;
     };
     required property count -> int64;
