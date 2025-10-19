@@ -1,14 +1,22 @@
-import type { Pool } from "pg";
-import pg from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
-import type { Logger } from "drizzle-orm";
+import { createClient, type Client } from "gel";
+import type { Logger } from "@mp/logger";
 
-export type DbClient = ReturnType<typeof drizzle<Record<string, never>, Pool>>;
+export type DbClient = Client;
 
 export function createDbClient(
   connectionString: string,
   logger?: Logger,
 ): DbClient {
-  const pool = new pg.Pool({ connectionString });
-  return drizzle({ client: pool, logger });
+  const client = createClient({
+    dsn: connectionString,
+  });
+
+  // If a logger is provided, we could add logging middleware here
+  if (logger) {
+    // Note: Gel doesn't have built-in query logging like Drizzle
+    // You might want to implement custom logging if needed
+    logger.info("Gel database client created");
+  }
+
+  return client;
 }

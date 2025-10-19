@@ -1,28 +1,6 @@
 export * from "./client";
 export * from "./schema";
-export {
-  eq,
-  ne,
-  gt,
-  gte,
-  lt,
-  lte,
-  exists,
-  notExists,
-  isNull,
-  isNotNull,
-  inArray,
-  notInArray,
-  between,
-  notBetween,
-  like,
-  ilike,
-  notIlike,
-  notLike,
-  not,
-  and,
-  or,
-  arrayContained,
-  arrayContains,
-  arrayOverlaps,
-} from "drizzle-orm";
+
+// Gel uses its query builder for operations
+// No need to export individual operators like Drizzle
+// All query operations are done through the generated query builder (e)

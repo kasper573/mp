@@ -16,12 +16,10 @@
     }
   },
   "scripts": {
-    "push": "drizzle-kit push",
-    "generate": "drizzle-kit generate",
-    "migrate": "drizzle-kit migrate",
+    "generate": "npx @gel/generate edgeql-js",
     "seed": "tsx seed.ts",
     "drop": "tsx drop.ts",
-    "reset": "pnpm drop && rm -rf drizzle/* && pnpm generate && pnpm push && pnpm seed",
+    "reset": "pnpm drop && pnpm seed",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
@@ -29,12 +27,9 @@
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*",
-    "drizzle-orm": "0.38.3",
-    "pg": "8.13.1"
+    "gel": "^2.1.1"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "@types/pg": "8.11.10",
-    "drizzle-kit": "0.30.1"
+    "@mp/tsconfig": "workspace:*"
   }
 }
