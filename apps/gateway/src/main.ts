@@ -81,7 +81,8 @@ const webServer = express()
 const httpServer = http.createServer(webServer);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+// Note: EdgeDB client doesn't expose connection pool errors the same way
+// Errors will be thrown/rejected during query execution
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,

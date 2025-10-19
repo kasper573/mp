@@ -1,15 +1,5 @@
 import type { DbClient } from "@mp/db";
-import {
-  and,
-  characterTable,
-  consumableDefinitionTable,
-  eq,
-  equipmentDefinitionTable,
-  exists,
-  npcRewardTable,
-  npcSpawnTable,
-  npcTable,
-} from "@mp/db";
+import { e } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,
@@ -23,15 +13,21 @@ import type {
   NpcSpawn,
 } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
-import { assert, type Rng, type Tile } from "@mp/std";
+import { assert, type Rng, type Tile, type TimesPerSecond } from "@mp/std";
+import type { ActorModelId, NpcId } from "@mp/db/types";
 import {
   characterFromDbFields,
   consumableDefinitionFromDbFields,
   dbFieldsFromCharacter,
   equipmentDefinitionFromDbFields,
   npcRewardsFromDbFields,
+  type DbCharacterFields,
+  type DbConsumableDefinitionFields,
+  type DbEquipmentDefinitionFields,
+  type DbNpcRewardFields,
 } from "./db-transform";
 import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
+import { deserializeVector } from "@mp/db/src/types/vector";
 
 export class GameDataLoader {
   constructor(
@@ -49,50 +45,169 @@ export class GameDataLoader {
   }
 
   async saveCharacterToDb(character: Character) {
-    await this.db
-      .update(characterTable)
-      .set(dbFieldsFromCharacter(character))
-      .where(eq(characterTable.id, character.identity.id));
+    const updates = dbFieldsFromCharacter(character);
+    await e
+      .update(e.Character, (char) => ({
+        filter: e.op(char.characterId, "=", e.str(character.identity.id)),
+        set: {
+          health: updates.health,
+          maxHealth: updates.maxHealth,
+          attackDamage: updates.attackDamage,
+          attackRange: updates.attackRange,
+          attackSpeed: updates.attackSpeed,
+          xp: updates.xp,
+          coords: e.json(updates.coords),
+          speed: updates.speed,
+        },
+      }))
+      .run(this.db);
   }
 
   async assignAreaIdToCharacterInDb(
     characterId: CharacterId,
     newAreaId: AreaId,
   ): Promise<Character> {
-    const result = await this.db.transaction(async (tx) => {
-      await tx
-        .update(characterTable)
-        .set({ areaId: newAreaId })
-        .where(eq(characterTable.id, characterId));
+    const result = await e
+      .params(
+        {
+          characterId: e.str,
+          newAreaId: e.str,
+        },
+        (params) => {
+          return e.select(e.Character, (char) => ({
+            characterId: true,
+            userId: true,
+            name: true,
+            inventoryId: true,
+            xp: true,
+            attackDamage: true,
+            attackRange: true,
+            attackSpeed: true,
+            health: true,
+            maxHealth: true,
+            coords: true,
+            speed: true,
+            modelId: {
+              modelId: true,
+            },
+            filter: e.op(char.characterId, "=", params.characterId),
+          }));
+        },
+      )
+      .run(this.db, { characterId, newAreaId });
 
-      return tx
-        .select()
-        .from(characterTable)
-        .where(eq(characterTable.id, characterId))
-        .limit(1);
-    });
+    // First update, then select
+    await e
+      .update(e.Character, (char) => ({
+        filter: e.op(char.characterId, "=", e.str(characterId)),
+        set: {
+          areaId: e.select(e.Area, (area) => ({
+            filter: e.op(area.areaId, "=", e.str(newAreaId)),
+            limit: 1,
+          })),
+        },
+      }))
+      .run(this.db);
 
-    if (result.length === 0) {
+    const updated = await e
+      .select(e.Character, (char) => ({
+        characterId: true,
+        userId: true,
+        name: true,
+        inventoryId: true,
+        xp: true,
+        attackDamage: true,
+        attackRange: true,
+        attackSpeed: true,
+        health: true,
+        maxHealth: true,
+        coords: true,
+        speed: true,
+        modelId: {
+          modelId: true,
+        },
+        filter: e.op(char.characterId, "=", e.str(characterId)),
+        limit: 1,
+      }))
+      .run(this.db);
+
+    if (updated.length === 0) {
       throw new Error(`Character with id ${characterId} not found`);
     }
 
-    return characterFromDbFields(result[0], this.actorModels, this.rng);
+    const dbFields: DbCharacterFields = {
+      characterId: updated[0].characterId as CharacterId,
+      userId: updated[0].userId,
+      modelId: updated[0].modelId.modelId as ActorModelId,
+      name: updated[0].name,
+      inventoryId: updated[0].inventoryId as any,
+      xp: updated[0].xp,
+      attackDamage: updated[0].attackDamage,
+      attackRange: updated[0].attackRange as Tile,
+      attackSpeed: updated[0].attackSpeed as TimesPerSecond,
+      health: updated[0].health,
+      maxHealth: updated[0].maxHealth,
+      coords: deserializeVector(updated[0].coords as any),
+      speed: updated[0].speed as Tile,
+    };
+
+    return characterFromDbFields(dbFields, this.actorModels, this.rng);
   }
 
   async getAllSpawnsAndTheirNpcs(): Promise<
     Array<{ spawn: NpcSpawn; npc: Npc }>
   > {
-    const result = await this.db
-      .select()
-      .from(npcSpawnTable)
-      .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
-      .where(eq(npcSpawnTable.areaId, this.area.id));
+    const result = await e
+      .select(e.NpcSpawn, (spawn) => ({
+        spawnId: true,
+        count: true,
+        coords: true,
+        randomRadius: true,
+        patrol: true,
+        npcType: true,
+        areaId: { areaId: true },
+        npcId: {
+          npcId: true,
+          speed: true,
+          maxHealth: true,
+          attackDamage: true,
+          attackSpeed: true,
+          attackRange: true,
+          name: true,
+          npcType: true,
+          aggroRange: true,
+          modelId: { modelId: true },
+        },
+        filter: e.op(spawn.areaId.areaId, "=", e.str(this.area.id)),
+      }))
+      .run(this.db);
 
-    const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
-      if (!npc) {
-        throw new Error(`NPC spawn ${spawn.id} has no NPC`);
-      }
-      return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
+    const allFromDB = result.map((row) => {
+      const spawn: NpcSpawn = {
+        id: row.spawnId as any,
+        count: Number(row.count),
+        areaId: row.areaId.areaId as AreaId,
+        npcId: row.npcId.npcId as NpcId,
+        coords: row.coords ? deserializeVector(row.coords as any) : undefined,
+        randomRadius: row.randomRadius ? Number(row.randomRadius) : undefined,
+        patrol: undefined, // TODO: deserialize path
+        npcType: row.npcType ?? undefined,
+      };
+
+      const npc: Npc = {
+        id: row.npcId.npcId as NpcId,
+        speed: Number(row.npcId.speed) as Tile,
+        maxHealth: row.npcId.maxHealth,
+        attackDamage: row.npcId.attackDamage,
+        attackSpeed: row.npcId.attackSpeed as TimesPerSecond,
+        attackRange: row.npcId.attackRange as Tile,
+        modelId: row.npcId.modelId.modelId as ActorModelId,
+        name: row.npcId.name,
+        npcType: row.npcId.npcType,
+        aggroRange: row.npcId.aggroRange as Tile,
+      };
+
+      return { spawn, npc };
     });
 
     const allFromTiled = deriveNpcSpawnsFromArea(
@@ -104,33 +219,74 @@ export class GameDataLoader {
   }
 
   async getAllNpcRewards(): Promise<NpcReward[]> {
-    const isRewardForThisAreaQuery = this.db
-      .select()
-      .from(npcSpawnTable)
-      .where(
-        and(
-          eq(npcSpawnTable.areaId, this.area.id),
-          eq(npcRewardTable.npcId, npcSpawnTable.npcId),
+    // Get all rewards for NPCs that spawn in this area
+    const result = await e
+      .select(e.NpcReward, (reward) => ({
+        rewardId: true,
+        xp: true,
+        itemAmount: true,
+        npcId: { npcId: true },
+        consumableItemId: { definitionId: true },
+        equipmentItemId: { definitionId: true },
+        filter: e.op(
+          reward.npcId,
+          "in",
+          e.select(e.NpcSpawn, (spawn) => ({
+            filter: e.op(spawn.areaId.areaId, "=", e.str(this.area.id)),
+          })).npcId,
         ),
-      );
+      }))
+      .run(this.db);
 
-    const rows = await this.db
-      .select()
-      .from(npcRewardTable)
-      .where(exists(isRewardForThisAreaQuery));
+    const dbFields: DbNpcRewardFields[] = result.map((row) => ({
+      rewardId: row.rewardId,
+      npcId: row.npcId.npcId as NpcId,
+      xp: row.xp,
+      consumableItemId: row.consumableItemId?.definitionId as any,
+      equipmentItemId: row.equipmentItemId?.definitionId as any,
+      itemAmount: row.itemAmount ? Number(row.itemAmount) : null,
+    }));
 
-    return rows.flatMap(npcRewardsFromDbFields);
+    return dbFields.flatMap(npcRewardsFromDbFields);
   }
 
   async getAllItemDefinitions(): Promise<ItemDefinition[]> {
     const [equipmentRows, consumableRows] = await Promise.all([
-      this.db.select().from(equipmentDefinitionTable),
-      this.db.select().from(consumableDefinitionTable),
+      e
+        .select(e.EquipmentDefinition, () => ({
+          definitionId: true,
+          name: true,
+          maxDurability: true,
+        }))
+        .run(this.db),
+      e
+        .select(e.ConsumableDefinition, () => ({
+          definitionId: true,
+          name: true,
+          maxStackSize: true,
+        }))
+        .run(this.db),
     ]);
 
+    const equipment: DbEquipmentDefinitionFields[] = equipmentRows.map(
+      (row) => ({
+        definitionId: row.definitionId as any,
+        name: row.name,
+        maxDurability: Number(row.maxDurability),
+      }),
+    );
+
+    const consumables: DbConsumableDefinitionFields[] = consumableRows.map(
+      (row) => ({
+        definitionId: row.definitionId as any,
+        name: row.name,
+        maxStackSize: Number(row.maxStackSize),
+      }),
+    );
+
     return [
-      ...equipmentRows.map(equipmentDefinitionFromDbFields),
-      ...consumableRows.map(consumableDefinitionFromDbFields),
+      ...equipment.map(equipmentDefinitionFromDbFields),
+      ...consumables.map(consumableDefinitionFromDbFields),
     ];
   }
 }

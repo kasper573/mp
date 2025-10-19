@@ -1,9 +1,4 @@
-import type {
-  characterTable,
-  consumableDefinitionTable,
-  equipmentDefinitionTable,
-  npcRewardTable,
-} from "@mp/db";
+import { e } from "@mp/db";
 import type {
   ActorModelLookup,
   ConsumableDefinition,
@@ -12,11 +7,74 @@ import type {
 } from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
 import { cardinalDirections } from "@mp/math";
-import type { Rng } from "@mp/std";
+import type { Rng, Tile, TimesPerSecond } from "@mp/std";
 import { assert } from "@mp/std";
+import type { UserId } from "@mp/oauth";
+import type {
+  ActorModelId,
+  CharacterId,
+  ConsumableDefinitionId,
+  EquipmentDefinitionId,
+  InventoryId,
+  NpcId,
+} from "@mp/db/types";
+import type { Vector } from "@mp/math";
+
+// Type for Character fields from database
+export interface DbCharacterFields {
+  characterId: CharacterId;
+  userId: UserId;
+  modelId: ActorModelId;
+  name: string;
+  inventoryId: InventoryId;
+  xp: number;
+  attackDamage: number;
+  attackRange: Tile;
+  attackSpeed: TimesPerSecond;
+  health: number;
+  maxHealth: number;
+  coords: Vector<Tile>;
+  speed: Tile;
+}
+
+// Type for Character insert/update fields
+export interface DbCharacterUpdate {
+  health: number;
+  maxHealth: number;
+  attackDamage: number;
+  attackRange: Tile;
+  attackSpeed: TimesPerSecond;
+  coords: Vector<Tile>;
+  speed: Tile;
+  xp: number;
+}
+
+// Type for NPC reward fields from database
+export interface DbNpcRewardFields {
+  rewardId: string;
+  npcId: NpcId;
+  xp: number | null;
+  consumableItemId: ConsumableDefinitionId | null;
+  equipmentItemId: EquipmentDefinitionId | null;
+  itemAmount: number | null;
+}
+
+// Type for Equipment Definition fields from database
+export interface DbEquipmentDefinitionFields {
+  definitionId: EquipmentDefinitionId;
+  name: string;
+  maxDurability: number;
+}
+
+// Type for Consumable Definition fields from database
+export interface DbConsumableDefinitionFields {
+  definitionId: ConsumableDefinitionId;
+  name: string;
+  maxStackSize: number;
+}
 
 export function characterFromDbFields(
-  fields: typeof characterTable.$inferSelect,
+  fields: DbCharacterFields,
   modelLookup: ActorModelLookup,
   rng: Rng,
 ): Character {
@@ -35,7 +93,7 @@ export function characterFromDbFields(
       opacity: undefined,
     },
     identity: {
-      id: fields.id,
+      id: fields.characterId,
       userId: fields.userId,
     },
     progression: {
@@ -63,16 +121,16 @@ export function characterFromDbFields(
   });
 }
 
-export function dbFieldsFromCharacter(char: Character) {
+export function dbFieldsFromCharacter(char: Character): DbCharacterUpdate {
   return {
     ...char.combat,
     ...char.movement,
     ...char.progression,
-  } satisfies Partial<typeof characterTable.$inferInsert>;
+  };
 }
 
 export function npcRewardsFromDbFields(
-  fields: typeof npcRewardTable.$inferSelect,
+  fields: DbNpcRewardFields,
 ): NpcReward[] {
   const rewards: NpcReward[] = [];
   if (fields.xp !== null) {
@@ -108,13 +166,13 @@ export function npcRewardsFromDbFields(
 }
 
 export function equipmentDefinitionFromDbFields(
-  fields: typeof equipmentDefinitionTable.$inferSelect,
+  fields: DbEquipmentDefinitionFields,
 ): EquipmentDefinition {
   return { type: "equipment", ...fields };
 }
 
 export function consumableDefinitionFromDbFields(
-  fields: typeof consumableDefinitionTable.$inferSelect,
+  fields: DbConsumableDefinitionFields,
 ): ConsumableDefinition {
   return { type: "consumable", ...fields };
 }

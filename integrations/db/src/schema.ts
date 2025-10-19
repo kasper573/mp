@@ -5,4 +5,5 @@
  * Run `pnpm generate` to regenerate if the schema changes.
  */
 
-export * as e from "../dbschema/edgeql-js";
+import e from "../dbschema/edgeql-js";
+export { e };
