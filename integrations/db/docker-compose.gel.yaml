@@ -1,0 +1,78 @@
+# Docker Compose configuration for Gel Database
+# 
+# This file provides the Gel database service configuration that should
+# replace the PostgreSQL service in your docker-compose files.
+#
+# Usage:
+# 1. Merge this into docker-compose.dev.yaml and docker-compose.yaml
+# 2. Remove the postgres service
+# 3. Update volume references from postgres-data to gel-data
+# 4. Update connection strings to use Gel DSN format
+
+version: '3.8'
+
+services:
+  gel:
+    image: edgedb/edgedb:latest
+    container_name: mp-gel
+    environment:
+      # Development mode - insecure, for local development only
+      EDGEDB_SERVER_SECURITY: insecure_dev_mode
+      # Optional: Set up authentication (comment out for dev mode)
+      # EDGEDB_SERVER_USER: edgedb
+      # EDGEDB_SERVER_PASSWORD: ${GEL_PASSWORD:-changeme}
+      # EDGEDB_SERVER_DATABASE: mp
+    ports:
+      # Default Gel/EdgeDB port
+      - "5656:5656"
+    volumes:
+      # Persistent data storage
+      - gel-data:/var/lib/edgedb/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "edgedb", "query", "--dsn", "edgedb://edgedb@localhost/edgedb", "--", "SELECT 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  gel-data:
+    name: mp-gel-data
+
+# Connection String Examples:
+# 
+# Development (insecure mode):
+#   gel://edgedb@localhost:5656/edgedb
+#
+# Production (with auth):
+#   gel://edgedb:password@hostname:5656/mp
+#
+# Environment Variable Format:
+#   MP_API_DATABASE_CONNECTION_STRING=gel://edgedb@localhost:5656/edgedb
+#   MP_GAME_SERVICE_DATABASE_CONNECTION_STRING=gel://edgedb@localhost:5656/edgedb
+
+# Migration Steps:
+#
+# 1. Stop existing containers:
+#    docker-compose down
+#
+# 2. Start Gel database:
+#    docker-compose -f docker-compose.gel.yaml up -d
+#
+# 3. Initialize Gel project (from integrations/db directory):
+#    npx gel project init
+#
+# 4. Create and apply schema migration:
+#    npx gel migration create
+#    npx gel migrate
+#
+# 5. Generate TypeScript query builder:
+#    pnpm generate
+#
+# 6. Update application connection strings in .env files:
+#    MP_API_DATABASE_CONNECTION_STRING=gel://edgedb@localhost:5656/edgedb
+#    MP_GAME_SERVICE_DATABASE_CONNECTION_STRING=gel://edgedb@localhost:5656/edgedb
+#
+# 7. Seed database:
+#    pnpm seed
