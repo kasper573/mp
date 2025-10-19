@@ -69,7 +69,14 @@ export const useItemDefinition: ItemDefinitionLookup = <
   ref: Ref,
 ) => {
   const api = useApi();
-  const { data } = useSuspenseQuery(api.itemDefinition.queryOptions(ref));
+  const { data } = useSuspenseQuery(
+    // Note that it's important to destructure `ref`,
+    // since it's generic and could contain excess properties that would pollute the query key.
+    api.itemDefinition.queryOptions({
+      type: ref.type,
+      definitionId: ref.definitionId,
+    }),
+  );
 
   // TRPC does not support generic type parameters in procedures,
   // so i have to assert to restore the generic type information here.
