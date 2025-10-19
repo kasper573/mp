@@ -34,7 +34,8 @@ const tokenResolver = createTokenResolver(opt.auth);
 
 const db = createDbClient(opt.databaseConnectionString);
 await db.initialize();
-db.driver.master.on("error", (err: Error) => logger.error(err, "Database error"));
+// TypeORM uses a connection pool internally, error handling is done through query failures
+logger.info("Database connection established");
 
 const redisClient = new Redis(opt.redisPath);
 

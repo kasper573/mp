@@ -1,6 +1,5 @@
 import type { DbClient } from "@mp/db";
 import { Character } from "@mp/db";
-import { In } from "typeorm";
 import type { CharacterId } from "@mp/db/types";
 import type { Logger } from "@mp/logger";
 import type { UserId } from "@mp/oauth";
@@ -11,7 +10,10 @@ export function saveOnlineCharacters(db: DbClient, logger: Logger) {
       .getRepository(Character)
       .createQueryBuilder()
       .update(Character)
-      .set({ online: () => `id = ANY(ARRAY[${onlineCharacterIds.map((id) => `'${id}'`).join(",")}]::varchar[])` })
+      .set({
+        online: () =>
+          `id = ANY(ARRAY[${onlineCharacterIds.map((id) => `'${id}'`).join(",")}]::varchar[])`,
+      })
       .execute()
       .catch((error) =>
         logger.error(
@@ -26,14 +28,12 @@ export async function hasAccessToCharacter(
   userId: UserId,
   characterId: CharacterId,
 ) {
-  const count = await db
-    .getRepository(Character)
-    .count({
-      where: {
-        userId,
-        id: characterId,
-      },
-    });
+  const count = await db.getRepository(Character).count({
+    where: {
+      userId,
+      id: characterId,
+    },
+  });
 
   return count > 0;
 }

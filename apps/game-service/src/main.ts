@@ -97,7 +97,8 @@ const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbClient(opt.databaseConnectionString);
 await db.initialize();
-db.driver.master.on("error", (err: Error) => logger.error(err, "Database error"));
+// TypeORM uses a connection pool internally, error handling is done through query failures
+logger.info("Database connection established");
 
 logger.info(`Loading area and actor models...`);
 const [area, actorModels] = await withBackoffRetries(() =>

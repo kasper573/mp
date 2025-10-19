@@ -12,6 +12,7 @@ export {
   LessThanOrEqual as lte,
   IsNull as isNull,
   Not as not,
+  In,
   In as inArray,
   Between as between,
   Like as like,

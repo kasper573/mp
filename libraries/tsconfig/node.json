@@ -5,6 +5,8 @@
     "skipLibCheck": true,
     "lib": ["ESNext"],
     "types": ["node"],
-    "module": "ESNext"
+    "module": "ESNext",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

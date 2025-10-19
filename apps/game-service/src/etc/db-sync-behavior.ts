@@ -4,7 +4,7 @@ import {
   ConsumableInstance as ConsumableInstanceEntity,
   EquipmentInstance as EquipmentInstanceEntity,
 } from "@mp/db";
-import { In } from "typeorm";
+import { In } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type { Character, ItemInstance, ItemInstanceId } from "@mp/game-shared";
 import {

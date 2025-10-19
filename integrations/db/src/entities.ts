@@ -334,7 +334,11 @@ export class NpcSpawn {
   @Column({ type: "integer", nullable: true })
   randomRadius?: number;
 
-  @Column({ type: "jsonb", nullable: true, transformer: new PathTransformer<Tile>() })
+  @Column({
+    type: "jsonb",
+    nullable: true,
+    transformer: new PathTransformer<Tile>(),
+  })
   patrol?: Array<{ x: number; y: number }>;
 
   @Column({

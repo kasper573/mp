@@ -13,7 +13,6 @@ import type {
   ItemDefinitionByReference,
 } from "@mp/game-shared";
 import { ItemReference } from "@mp/game-shared";
-import { assert } from "@mp/std";
 import type {
   ConsumableDefinitionId,
   EquipmentDefinitionId,
@@ -45,9 +44,16 @@ async function findConsumableDefinition(
     where: { id },
   });
 
-  assert(def, `Could not find consumable by id ${id}`);
+  if (!def) {
+    throw new Error(`Could not find consumable by id ${id}`);
+  }
 
-  return { type: "consumable", ...def };
+  return {
+    type: "consumable",
+    id: def.id,
+    name: def.name,
+    maxStackSize: def.maxStackSize,
+  };
 }
 
 async function findEquipmentDefinition(
@@ -58,6 +64,14 @@ async function findEquipmentDefinition(
     where: { id },
   });
 
-  assert(def, `Could not find equipment by id ${id}`);
-  return { type: "equipment", ...def };
+  if (!def) {
+    throw new Error(`Could not find equipment by id ${id}`);
+  }
+
+  return {
+    type: "equipment",
+    id: def.id,
+    name: def.name,
+    maxDurability: def.maxDurability,
+  };
 }

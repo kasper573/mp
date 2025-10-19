@@ -29,9 +29,9 @@
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*",
-    "typeorm": "0.3.20",
     "pg": "8.13.1",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "^0.2.2",
+    "typeorm": "0.3.20"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

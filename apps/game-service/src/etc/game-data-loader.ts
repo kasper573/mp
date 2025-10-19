@@ -3,11 +3,10 @@ import {
   Character as CharacterEntity,
   ConsumableDefinition as ConsumableDefinitionEntity,
   EquipmentDefinition as EquipmentDefinitionEntity,
-  Npc as NpcEntity,
   NpcReward as NpcRewardEntity,
   NpcSpawn as NpcSpawnEntity,
 } from "@mp/db";
-import { In } from "typeorm";
+import { In } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,

@@ -14,7 +14,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
   [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
 - ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
-  [drizzle](https://orm.drizzle.team/)
+  [TypeORM](https://typeorm.io/)
 - network: [ws](https://www.npmjs.com/package/ws), [trpc](https://trpc.io/), [custom sync lib](libraries/sync)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
@@ -67,9 +67,9 @@ You will have to perform the appropriate docker compose commands to apply your c
 
 ### If you make database related changes
 
-You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
+You will need to use [TypeORM CLI](https://typeorm.io/using-cli).
 
-Run its cli against the development environment using `pnpm -F db devenv <drizzle-kit command>`.
+Run its cli against the development environment using `pnpm -F db devenv typeorm <command>`.
 
 ### If you change user roles
 
@@ -83,7 +83,7 @@ While most of the repo should be fairly conventional, I've made a few choices th
 
 In development, our own apps run on the host machine and outside of the docker network, while 3rd party services run inside the docker network, contrary to production and testing where everything runs inside the docker network.
 
-> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, drizzle-kit cli, pnpm link, etc.
+> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, TypeORM CLI, pnpm link, etc.
 
 We don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
 

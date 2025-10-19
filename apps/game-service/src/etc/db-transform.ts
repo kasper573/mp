@@ -1,8 +1,8 @@
 import type {
-  characterTable,
-  consumableDefinitionTable,
-  equipmentDefinitionTable,
-  npcRewardTable,
+  Character as CharacterEntity,
+  ConsumableDefinition as ConsumableDefinitionEntity,
+  EquipmentDefinition as EquipmentDefinitionEntity,
+  NpcReward as NpcRewardEntity,
 } from "@mp/db";
 import type {
   ActorModelLookup,
@@ -16,7 +16,7 @@ import type { Rng } from "@mp/std";
 import { assert } from "@mp/std";
 
 export function characterFromDbFields(
-  fields: typeof characterTable.$inferSelect,
+  fields: CharacterEntity,
   modelLookup: ActorModelLookup,
   rng: Rng,
 ): Character {
@@ -53,7 +53,7 @@ export function characterFromDbFields(
       lastAttack: undefined,
     },
     movement: {
-      coords: fields.coords,
+      coords: fields.coords as unknown as typeof fields.coords,
       speed: fields.speed,
       dir: rng.oneOf(cardinalDirections),
       desiredPortalId: undefined,
@@ -68,21 +68,22 @@ export function dbFieldsFromCharacter(char: Character) {
     ...char.combat,
     ...char.movement,
     ...char.progression,
-  } satisfies Partial<typeof characterTable.$inferInsert>;
+  } satisfies Partial<CharacterEntity>;
 }
 
-export function npcRewardsFromDbFields(
-  fields: typeof npcRewardTable.$inferSelect,
-): NpcReward[] {
+export function npcRewardsFromDbFields(fields: NpcRewardEntity): NpcReward[] {
   const rewards: NpcReward[] = [];
-  if (fields.xp !== null) {
+  if (fields.xp !== null && fields.xp !== undefined) {
     rewards.push({
       npcId: fields.npcId,
       type: "xp",
       xp: fields.xp,
     });
   }
-  if (fields.consumableItemId !== null) {
+  if (
+    fields.consumableItemId !== null &&
+    fields.consumableItemId !== undefined
+  ) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",
@@ -93,7 +94,7 @@ export function npcRewardsFromDbFields(
       ),
     });
   }
-  if (fields.equipmentItemId !== null) {
+  if (fields.equipmentItemId !== null && fields.equipmentItemId !== undefined) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",
@@ -108,13 +109,13 @@ export function npcRewardsFromDbFields(
 }
 
 export function equipmentDefinitionFromDbFields(
-  fields: typeof equipmentDefinitionTable.$inferSelect,
+  fields: EquipmentDefinitionEntity,
 ): EquipmentDefinition {
   return { type: "equipment", ...fields };
 }
 
 export function consumableDefinitionFromDbFields(
-  fields: typeof consumableDefinitionTable.$inferSelect,
+  fields: ConsumableDefinitionEntity,
 ): ConsumableDefinition {
   return { type: "consumable", ...fields };
 }

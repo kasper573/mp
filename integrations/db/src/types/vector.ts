@@ -5,9 +5,7 @@ import type { ValueTransformer } from "typeorm";
 /**
  * A TypeORM/postgres representation of the Vector type from @mp/math
  */
-export class VectorTransformer<T extends number>
-  implements ValueTransformer
-{
+export class VectorTransformer<T extends number> implements ValueTransformer {
   to(value: VectorLike<T> | undefined): string | undefined {
     if (!value) return undefined;
     // PostgreSQL point format: (x,y)
@@ -20,7 +18,10 @@ export class VectorTransformer<T extends number>
       // Parse PostgreSQL point format: (x,y)
       const match = value.match(/\(([^,]+),([^)]+)\)/);
       if (match) {
-        return Vector.from<T>({ x: parseFloat(match[1]) as T, y: parseFloat(match[2]) as T });
+        return Vector.from<T>({
+          x: parseFloat(match[1]) as T,
+          y: parseFloat(match[2]) as T,
+        });
       }
       return undefined;
     }
