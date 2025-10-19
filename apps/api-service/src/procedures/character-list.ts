@@ -8,11 +8,13 @@ export const characterList = rpc.procedure
   .use(roles([gatewayRoles.spectate]))
   .query(async ({ ctx }) => {
     const db = ctx.ioc.get(ctxDbClient);
-    return await e
+    const results = await e
       .select(e.Character, (char) => ({
-        id: char.characterId,
+        characterId: true,
         name: true,
         filter: e.op(char.online, "=", true),
       }))
       .run(db);
+    
+    return results.map((r) => ({ id: r.characterId, name: r.name }));
   });

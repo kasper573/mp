@@ -52,7 +52,7 @@ async function findConsumableDefinition(
 
   return {
     type: "consumable",
-    definitionId: results[0].definitionId as ConsumableDefinitionId,
+    id: results[0].definitionId as ConsumableDefinitionId,
     name: results[0].name,
     maxStackSize: Number(results[0].maxStackSize),
   };
@@ -76,7 +76,7 @@ async function findEquipmentDefinition(
 
   return {
     type: "equipment",
-    definitionId: results[0].definitionId as EquipmentDefinitionId,
+    id: results[0].definitionId as EquipmentDefinitionId,
     name: results[0].name,
     maxDurability: Number(results[0].maxDurability),
   };
