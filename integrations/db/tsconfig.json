@@ -3,6 +3,8 @@
   "include": ["src", "*.ts"],
   "compilerOptions": {
     "module": "Preserve",
-    "target": "es2017"
+    "target": "es2017",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
   }
 }

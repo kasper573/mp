@@ -5,17 +5,17 @@ import fs from "fs/promises";
 import path from "path";
 import { createDbClient } from "./src/client";
 import {
-  actorModelTable,
-  areaTable,
-  characterTable,
-  consumableDefinitionTable,
-  consumableInstanceTable,
-  equipmentDefinitionTable,
-  equipmentInstanceTable,
-  npcRewardTable,
-  npcSpawnTable,
-  npcTable,
-} from "./src/schema";
+  ActorModel,
+  Area,
+  Character,
+  ConsumableDefinition,
+  ConsumableInstance,
+  EquipmentDefinition,
+  EquipmentInstance,
+  Npc,
+  NpcReward,
+  NpcSpawn,
+} from "./src/entities";
 import {
   npcTypes,
   type ActorModelId,
@@ -41,53 +41,60 @@ if (!areaIds.length) {
 }
 
 const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+await db.initialize();
 
-const tablesToTruncate = {
-  npcRewardTable,
-  consumableDefinitionTable,
-  consumableInstanceTable,
-  equipmentDefinitionTable,
-  equipmentInstanceTable,
-  npcSpawnTable,
-  npcTable,
-  characterTable,
-  actorModelTable,
-  areaTable,
-};
+const entitiesToTruncate = [
+  NpcReward,
+  ConsumableDefinition,
+  ConsumableInstance,
+  EquipmentDefinition,
+  EquipmentInstance,
+  NpcSpawn,
+  Npc,
+  Character,
+  ActorModel,
+  Area,
+];
 
-for (const [tableName, table] of Object.entries(tablesToTruncate)) {
-  logger.info(`Truncating table ${tableName}...`);
-  await db.delete(table);
+for (const entity of entitiesToTruncate) {
+  logger.info(`Truncating table ${entity.name}...`);
+  await db.getRepository(entity).clear();
 }
 
 logger.info("Inserting areas and actor models...");
-await db.transaction((tx) =>
-  Promise.all([
-    ...areaIds.map((id) => tx.insert(areaTable).values({ id })),
-    ...actorModelIds.map((id) => tx.insert(actorModelTable).values({ id })),
-  ]),
-);
+await db.transaction(async (manager) => {
+  await Promise.all([
+    ...areaIds.map((id) => {
+      const area = new Area();
+      area.id = id;
+      return manager.save(area);
+    }),
+    ...actorModelIds.map((id) => {
+      const model = new ActorModel();
+      model.id = id;
+      return manager.save(model);
+    }),
+  ]);
+});
 
 const oneTile = 1 as Tile;
 
 logger.info("Inserting npcs...");
-const [soldier] = await db
-  .insert(npcTable)
-  .values({
-    id: "1" as NpcId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
-    aggroRange: 7 as Tile,
-    npcType: "protective",
-    attackDamage: 3,
-    attackRange: oneTile,
-    attackSpeed: 1 as TimesPerSecond,
-    speed: oneTile,
-    maxHealth: 25,
-    modelId: actorModelIds[0],
-    name: "Soldier",
-  })
-  .returning({ id: npcTable.id });
+const soldier = new Npc();
+soldier.id = "1" as NpcId; // "1" is currently referenced by some hard coded npc definitions in tiled maps.
+soldier.aggroRange = 7 as Tile;
+soldier.npcType = "protective";
+soldier.attackDamage = 3;
+soldier.attackRange = oneTile;
+soldier.attackSpeed = 1 as TimesPerSecond;
+soldier.speed = oneTile;
+soldier.maxHealth = 25;
+soldier.modelId = actorModelIds[0];
+soldier.name = "Soldier";
 
-await db.transaction(async (tx) => {
+const savedSoldier = await db.getRepository(Npc).save(soldier);
+
+await db.transaction(async (manager) => {
   await Promise.all(
     (function* () {
       for (const npcType of npcTypes.values()) {
@@ -99,13 +106,13 @@ await db.transaction(async (tx) => {
           logger.info(
             `Inserting npc spawns for ${npcType} in area ${areaId}...`,
           );
-          yield tx.insert(npcSpawnTable).values({
-            npcType,
-            areaId,
-            count: 10,
-            id: createShortId() as NpcSpawnId,
-            npcId: soldier.id,
-          });
+          const spawn = new NpcSpawn();
+          spawn.npcType = npcType;
+          spawn.areaId = areaId;
+          spawn.count = 10;
+          spawn.id = createShortId() as NpcSpawnId;
+          spawn.npcId = savedSoldier.id;
+          yield manager.save(spawn);
         }
       }
     })(),
@@ -113,31 +120,36 @@ await db.transaction(async (tx) => {
 });
 
 logger.info("Inserting items definitions...");
-const [apple] = await db
-  .insert(consumableDefinitionTable)
-  .values({ name: "Apple", maxStackSize: 10 })
-  .returning({ id: consumableDefinitionTable.id });
+const apple = new ConsumableDefinition();
+apple.name = "Apple";
+apple.maxStackSize = 10;
+const savedApple = await db.getRepository(ConsumableDefinition).save(apple);
 
-const [sword] = await db
-  .insert(equipmentDefinitionTable)
-  .values({ name: "Sword", maxDurability: 100 })
-  .returning({ id: equipmentDefinitionTable.id });
+const sword = new EquipmentDefinition();
+sword.name = "Sword";
+sword.maxDurability = 100;
+const savedSword = await db.getRepository(EquipmentDefinition).save(sword);
 
 logger.info("Inserting npc rewards...");
-await db.insert(npcRewardTable).values({ npcId: soldier.id, xp: 10 });
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  consumableItemId: apple.id,
-  itemAmount: 1,
-});
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  equipmentItemId: sword.id,
-  itemAmount: 1,
-});
+const reward1 = new NpcReward();
+reward1.npcId = savedSoldier.id;
+reward1.xp = 10;
+await db.getRepository(NpcReward).save(reward1);
+
+const reward2 = new NpcReward();
+reward2.npcId = savedSoldier.id;
+reward2.consumableItemId = savedApple.id;
+reward2.itemAmount = 1;
+await db.getRepository(NpcReward).save(reward2);
+
+const reward3 = new NpcReward();
+reward3.npcId = savedSoldier.id;
+reward3.equipmentItemId = savedSword.id;
+reward3.itemAmount = 1;
+await db.getRepository(NpcReward).save(reward3);
 
 logger.info("Ending database connection...");
-await db.$client.end();
+await db.destroy();
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fileServerDir("areas");

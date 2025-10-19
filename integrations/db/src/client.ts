@@ -1,14 +1,44 @@
-import type { Pool } from "pg";
-import pg from "pg";
-import { drizzle } from "drizzle-orm/node-postgres";
-import type { Logger } from "drizzle-orm";
+import "reflect-metadata";
+import { DataSource, type DataSourceOptions } from "typeorm";
+import {
+  ActorModel,
+  Area,
+  Character,
+  ConsumableDefinition,
+  ConsumableInstance,
+  EquipmentDefinition,
+  EquipmentInstance,
+  Inventory,
+  Npc,
+  NpcReward,
+  NpcSpawn,
+} from "./entities";
 
-export type DbClient = ReturnType<typeof drizzle<Record<string, never>, Pool>>;
+export type DbClient = DataSource;
 
 export function createDbClient(
   connectionString: string,
-  logger?: Logger,
+  logger?: boolean,
 ): DbClient {
-  const pool = new pg.Pool({ connectionString });
-  return drizzle({ client: pool, logger });
+  const dataSourceOptions: DataSourceOptions = {
+    type: "postgres",
+    url: connectionString,
+    entities: [
+      ActorModel,
+      Area,
+      Character,
+      ConsumableDefinition,
+      ConsumableInstance,
+      EquipmentDefinition,
+      EquipmentInstance,
+      Inventory,
+      Npc,
+      NpcReward,
+      NpcSpawn,
+    ],
+    synchronize: false,
+    logging: logger,
+  };
+
+  return new DataSource(dataSourceOptions);
 }

@@ -1,15 +1,13 @@
 import type { DbClient } from "@mp/db";
 import {
-  and,
-  characterTable,
-  consumableDefinitionTable,
-  eq,
-  equipmentDefinitionTable,
-  exists,
-  npcRewardTable,
-  npcSpawnTable,
-  npcTable,
+  Character as CharacterEntity,
+  ConsumableDefinition as ConsumableDefinitionEntity,
+  EquipmentDefinition as EquipmentDefinitionEntity,
+  Npc as NpcEntity,
+  NpcReward as NpcRewardEntity,
+  NpcSpawn as NpcSpawnEntity,
 } from "@mp/db";
+import { In } from "typeorm";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type {
   ActorModelLookup,
@@ -50,49 +48,44 @@ export class GameDataLoader {
 
   async saveCharacterToDb(character: Character) {
     await this.db
-      .update(characterTable)
-      .set(dbFieldsFromCharacter(character))
-      .where(eq(characterTable.id, character.identity.id));
+      .getRepository(CharacterEntity)
+      .update(character.identity.id, dbFieldsFromCharacter(character));
   }
 
   async assignAreaIdToCharacterInDb(
     characterId: CharacterId,
     newAreaId: AreaId,
   ): Promise<Character> {
-    const result = await this.db.transaction(async (tx) => {
-      await tx
-        .update(characterTable)
-        .set({ areaId: newAreaId })
-        .where(eq(characterTable.id, characterId));
+    const result = await this.db.transaction(async (manager) => {
+      await manager
+        .getRepository(CharacterEntity)
+        .update(characterId, { areaId: newAreaId });
 
-      return tx
-        .select()
-        .from(characterTable)
-        .where(eq(characterTable.id, characterId))
-        .limit(1);
+      return manager.getRepository(CharacterEntity).findOne({
+        where: { id: characterId },
+      });
     });
 
-    if (result.length === 0) {
+    if (!result) {
       throw new Error(`Character with id ${characterId} not found`);
     }
 
-    return characterFromDbFields(result[0], this.actorModels, this.rng);
+    return characterFromDbFields(result, this.actorModels, this.rng);
   }
 
   async getAllSpawnsAndTheirNpcs(): Promise<
     Array<{ spawn: NpcSpawn; npc: Npc }>
   > {
-    const result = await this.db
-      .select()
-      .from(npcSpawnTable)
-      .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
-      .where(eq(npcSpawnTable.areaId, this.area.id));
+    const spawns = await this.db.getRepository(NpcSpawnEntity).find({
+      where: { areaId: this.area.id },
+      relations: ["npc"],
+    });
 
-    const allFromDB = result.map(({ npc, npc_spawn: spawn }) => {
-      if (!npc) {
+    const allFromDB = spawns.map((spawn) => {
+      if (!spawn.npc) {
         throw new Error(`NPC spawn ${spawn.id} has no NPC`);
       }
-      return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
+      return { spawn, npc: spawn.npc } as { spawn: NpcSpawn; npc: Npc };
     });
 
     const allFromTiled = deriveNpcSpawnsFromArea(
@@ -104,28 +97,27 @@ export class GameDataLoader {
   }
 
   async getAllNpcRewards(): Promise<NpcReward[]> {
-    const isRewardForThisAreaQuery = this.db
-      .select()
-      .from(npcSpawnTable)
-      .where(
-        and(
-          eq(npcSpawnTable.areaId, this.area.id),
-          eq(npcRewardTable.npcId, npcSpawnTable.npcId),
-        ),
-      );
+    const spawns = await this.db.getRepository(NpcSpawnEntity).find({
+      where: { areaId: this.area.id },
+      select: ["npcId"],
+    });
 
-    const rows = await this.db
-      .select()
-      .from(npcRewardTable)
-      .where(exists(isRewardForThisAreaQuery));
+    const npcIds = spawns.map((spawn) => spawn.npcId);
+    if (npcIds.length === 0) {
+      return [];
+    }
+
+    const rows = await this.db.getRepository(NpcRewardEntity).find({
+      where: { npcId: In(npcIds) },
+    });
 
     return rows.flatMap(npcRewardsFromDbFields);
   }
 
   async getAllItemDefinitions(): Promise<ItemDefinition[]> {
     const [equipmentRows, consumableRows] = await Promise.all([
-      this.db.select().from(equipmentDefinitionTable),
-      this.db.select().from(consumableDefinitionTable),
+      this.db.getRepository(EquipmentDefinitionEntity).find(),
+      this.db.getRepository(ConsumableDefinitionEntity).find(),
     ]);
 
     return [

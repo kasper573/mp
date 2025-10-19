@@ -16,8 +16,9 @@ if (answer.trim().toLowerCase() !== "yes") {
 }
 
 const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+await db.initialize();
 
-await db.$client.query(`
+await db.query(`
   DO $$
   DECLARE
     stmt text;
@@ -34,4 +35,4 @@ await db.$client.query(`
   END $$;
 `);
 
-await db.$client.end();
+await db.destroy();

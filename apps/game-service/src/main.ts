@@ -96,7 +96,8 @@ gameServiceConfig.subscribe((config) => {
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+await db.initialize();
+db.driver.master.on("error", (err: Error) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);
 const [area, actorModels] = await withBackoffRetries(() =>

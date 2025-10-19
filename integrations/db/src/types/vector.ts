@@ -1,34 +1,29 @@
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
-import type { Table } from "drizzle-orm";
-import type { ColumnBaseConfig } from "drizzle-orm";
-import { PgPointObject, PgPointObjectBuilder } from "drizzle-orm/pg-core";
+import type { ValueTransformer } from "typeorm";
 
 /**
- * A drizzle/postgres representation of the Vector type from @mp/math
+ * A TypeORM/postgres representation of the Vector type from @mp/math
  */
-export function vector<T extends number>(name = "") {
-  return new VectorBuilder<T>(name);
-}
-
-class VectorObject<T extends number> extends PgPointObject<
-  VectorColumnConfig<T>
-> {
-  override mapFromDriverValue(value: VectorLike<number>) {
-    return Vector.from(value);
+export class VectorTransformer<T extends number>
+  implements ValueTransformer
+{
+  to(value: VectorLike<T> | undefined): string | undefined {
+    if (!value) return undefined;
+    // PostgreSQL point format: (x,y)
+    return `(${value.x},${value.y})`;
   }
-}
 
-class VectorBuilder<T extends number> extends PgPointObjectBuilder<
-  VectorColumnConfig<T>
-> {
-  build(table: Table) {
-    return new VectorObject<T>(table, this.config);
+  from(value: string | VectorLike<T> | undefined): Vector<T> | undefined {
+    if (!value) return undefined;
+    if (typeof value === "string") {
+      // Parse PostgreSQL point format: (x,y)
+      const match = value.match(/\(([^,]+),([^)]+)\)/);
+      if (match) {
+        return Vector.from<T>({ x: parseFloat(match[1]) as T, y: parseFloat(match[2]) as T });
+      }
+      return undefined;
+    }
+    return Vector.from<T>(value);
   }
-}
-
-interface VectorColumnConfig<T extends number>
-  extends ColumnBaseConfig<"json", "PgPointObject"> {
-  data: Vector<T>;
-  driverData: VectorLike<T>;
 }

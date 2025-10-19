@@ -1,12 +1,10 @@
 import type { DbClient } from "@mp/db";
 import {
-  and,
-  characterTable,
-  eq,
-  inArray,
-  consumableInstanceTable,
-  equipmentInstanceTable,
+  Character as CharacterEntity,
+  ConsumableInstance as ConsumableInstanceEntity,
+  EquipmentInstance as EquipmentInstanceEntity,
 } from "@mp/db";
+import { In } from "typeorm";
 import type { AreaId, CharacterId } from "@mp/db/types";
 import type { Character, ItemInstance, ItemInstanceId } from "@mp/game-shared";
 import {
@@ -54,10 +52,11 @@ export function gameStateDbSyncBehavior(
     removedIds.forEach(removeCharacterFromGameState);
 
     if (addedIds.size) {
-      const addedCharacters = await db
-        .select()
-        .from(characterTable)
-        .where(inArray(characterTable.id, addedIds.values().toArray()));
+      const addedCharacters = await db.getRepository(CharacterEntity).find({
+        where: {
+          id: In(addedIds.values().toArray()),
+        },
+      });
 
       addedCharacters.forEach(addCharacterToGameState);
     }
@@ -70,24 +69,16 @@ export function gameStateDbSyncBehavior(
 
     const [consumableInstanceFields, equipmentInstanceFields] =
       await Promise.all([
-        db
-          .select()
-          .from(consumableInstanceTable)
-          .where(
-            inArray(
-              consumableInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
-        db
-          .select()
-          .from(equipmentInstanceTable)
-          .where(
-            inArray(
-              equipmentInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
+        db.getRepository(ConsumableInstanceEntity).find({
+          where: {
+            inventoryId: In(inventoryIds.values().toArray()),
+          },
+        }),
+        db.getRepository(EquipmentInstanceEntity).find({
+          where: {
+            inventoryId: In(inventoryIds.values().toArray()),
+          },
+        }),
       ]);
 
     upsertItemInstancesInGameState(
@@ -100,37 +91,33 @@ export function gameStateDbSyncBehavior(
    * Updates the database with the current game state.
    */
   function save() {
-    return db.transaction(async (tx) => {
+    return db.transaction(async (manager) => {
       await Promise.all(
         state.actors
           .values()
           .filter((actor) => actor.type === "character")
           .map((char) =>
-            tx.update(characterTable).set(dbFieldsFromCharacter(char)),
+            manager
+              .getRepository(CharacterEntity)
+              .update(char.identity.id, dbFieldsFromCharacter(char)),
           ),
       );
 
       await Promise.all(
         state.items.values().map((item) => {
-          const table = {
-            consumable: consumableInstanceTable,
-            equipment: equipmentInstanceTable,
+          const Entity = {
+            consumable: ConsumableInstanceEntity,
+            equipment: EquipmentInstanceEntity,
           }[item.type];
-          return tx
-            .insert(table)
-            .values(item)
-            .onConflictDoUpdate({
-              target: [table.id],
-              set: item,
-            });
+          return manager.getRepository(Entity).save(item);
         }),
       );
     });
   }
 
   function upsertItemInstancesInGameState(
-    dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
-    dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
+    dbConsumables: Array<ConsumableInstanceEntity>,
+    dbEquipment: Array<EquipmentInstanceEntity>,
   ) {
     const dbFields = new Map<ItemInstanceId, ItemInstance>();
 
@@ -171,9 +158,7 @@ export function gameStateDbSyncBehavior(
     }
   }
 
-  function addCharacterToGameState(
-    characterFields: typeof characterTable.$inferSelect,
-  ) {
+  function addCharacterToGameState(characterFields: CharacterEntity) {
     const char = characterFromDbFields(characterFields, actorModels, rng);
     state.actors.set(char.identity.id, char);
     server.markToResendFullState(char.identity.id);
@@ -207,19 +192,14 @@ async function getOnlineCharacterIdsForAreaFromDb(
   db: DbClient,
   areaId: AreaId,
 ): Promise<ReadonlySet<CharacterId>> {
-  return new Set(
-    (
-      await db
-        .select({ id: characterTable.id })
-        .from(characterTable)
-        .where(
-          and(
-            eq(characterTable.areaId, areaId),
-            eq(characterTable.online, true),
-          ),
-        )
-    ).map((row) => row.id),
-  );
+  const characters = await db.getRepository(CharacterEntity).find({
+    select: ["id"],
+    where: {
+      areaId,
+      online: true,
+    },
+  });
+  return new Set(characters.map((char) => char.id));
 }
 
 function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {

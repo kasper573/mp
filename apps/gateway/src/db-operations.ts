@@ -1,5 +1,6 @@
 import type { DbClient } from "@mp/db";
-import { and, characterTable, eq, inArray } from "@mp/db";
+import { Character } from "@mp/db";
+import { In } from "typeorm";
 import type { CharacterId } from "@mp/db/types";
 import type { Logger } from "@mp/logger";
 import type { UserId } from "@mp/oauth";
@@ -7,8 +8,11 @@ import type { UserId } from "@mp/oauth";
 export function saveOnlineCharacters(db: DbClient, logger: Logger) {
   return function save(onlineCharacterIds: CharacterId[]) {
     void db
-      .update(characterTable)
-      .set({ online: inArray(characterTable.id, onlineCharacterIds) })
+      .getRepository(Character)
+      .createQueryBuilder()
+      .update(Character)
+      .set({ online: () => `id = ANY(ARRAY[${onlineCharacterIds.map((id) => `'${id}'`).join(",")}]::varchar[])` })
+      .execute()
       .catch((error) =>
         logger.error(
           new Error("Failed to save online characters", { cause: error }),
@@ -22,17 +26,14 @@ export async function hasAccessToCharacter(
   userId: UserId,
   characterId: CharacterId,
 ) {
-  const matches = await db.$count(
-    db
-      .select()
-      .from(characterTable)
-      .where(
-        and(
-          eq(characterTable.userId, userId),
-          eq(characterTable.id, characterId),
-        ),
-      ),
-  );
+  const count = await db
+    .getRepository(Character)
+    .count({
+      where: {
+        userId,
+        id: characterId,
+      },
+    });
 
-  return matches > 0;
+  return count > 0;
 }

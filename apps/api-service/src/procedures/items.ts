@@ -1,8 +1,7 @@
 import type { DbClient } from "@mp/db";
 import {
-  eq,
-  consumableDefinitionTable,
-  equipmentDefinitionTable,
+  ConsumableDefinition as ConsumableDefinitionEntity,
+  EquipmentDefinition as EquipmentDefinitionEntity,
 } from "@mp/db";
 import { gatewayRoles } from "@mp/keycloak";
 import { ctxDbClient } from "../context";
@@ -42,11 +41,9 @@ async function findConsumableDefinition(
   db: DbClient,
   id: ConsumableDefinitionId,
 ): Promise<ConsumableDefinition> {
-  const [def] = await db
-    .select()
-    .from(consumableDefinitionTable)
-    .where(eq(consumableDefinitionTable.id, id))
-    .limit(1);
+  const def = await db.getRepository(ConsumableDefinitionEntity).findOne({
+    where: { id },
+  });
 
   assert(def, `Could not find consumable by id ${id}`);
 
@@ -57,11 +54,9 @@ async function findEquipmentDefinition(
   db: DbClient,
   id: EquipmentDefinitionId,
 ): Promise<EquipmentDefinition> {
-  const [def] = await db
-    .select()
-    .from(equipmentDefinitionTable)
-    .where(eq(equipmentDefinitionTable.id, id))
-    .limit(1);
+  const def = await db.getRepository(EquipmentDefinitionEntity).findOne({
+    where: { id },
+  });
 
   assert(def, `Could not find equipment by id ${id}`);
   return { type: "equipment", ...def };
