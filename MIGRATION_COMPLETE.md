@@ -28,10 +28,12 @@ Successfully migrated the mp project from **PostgreSQL + Drizzle ORM** to **Gel 
 **Completed Files (12 core files):**
 
 **Gateway App (100% Complete)**
+
 - `apps/gateway/src/db-operations.ts` - Character operations
 - `apps/gateway/src/main.ts` - Error handling
 
 **API Service (100% Complete)**
+
 - `apps/api-service/src/main.ts` - Server initialization
 - `apps/api-service/src/procedures/actor-model-ids.ts` - Model listing
 - `apps/api-service/src/procedures/character-list.ts` - Character queries
@@ -39,6 +41,7 @@ Successfully migrated the mp project from **PostgreSQL + Drizzle ORM** to **Gel 
 - `apps/api-service/src/procedures/my-character-id.ts` - Character creation
 
 **Game Service (85% Complete)**
+
 - `apps/game-service/src/etc/db-transform.ts` - Type transformations
 - `apps/game-service/src/etc/game-data-loader.ts` - Game data queries
 
@@ -53,24 +56,30 @@ Successfully migrated the mp project from **PostgreSQL + Drizzle ORM** to **Gel 
 ### Query Pattern Transformations
 
 **Before (Drizzle):**
+
 ```typescript
-await db.select()
+await db
+  .select()
   .from(npcSpawnTable)
   .leftJoin(npcTable, eq(npcSpawnTable.npcId, npcTable.id))
   .where(eq(npcSpawnTable.areaId, areaId));
 ```
 
 **After (EdgeDB):**
+
 ```typescript
-await e.select(e.NpcSpawn, (spawn) => ({
-  spawnId: true,
-  npcId: {  // Automatic link traversal!
-    npcId: true,
-    name: true,
-    maxHealth: true
-  },
-  filter: e.op(spawn.areaId.areaId, '=', areaId)
-})).run(client);
+await e
+  .select(e.NpcSpawn, (spawn) => ({
+    spawnId: true,
+    npcId: {
+      // Automatic link traversal!
+      npcId: true,
+      name: true,
+      maxHealth: true,
+    },
+    filter: e.op(spawn.areaId.areaId, "=", areaId),
+  }))
+  .run(client);
 ```
 
 ### Key Improvements
@@ -87,29 +96,31 @@ await e.select(e.NpcSpawn, (spawn) => ({
 
 To avoid conflicts with EdgeDB's built-in `id` (UUID) field:
 
-| Entity | Old Field | New Field |
-|--------|-----------|-----------|
-| Character | `id` | `characterId` |
-| Npc | `id` | `npcId` |
-| Area | `id` | `areaId` |
-| ActorModel | `id` | `modelId` |
-| Inventory | `id` | `inventoryId` |
-| ConsumableDefinition | `id` | `definitionId` |
-| EquipmentDefinition | `id` | `definitionId` |
-| ConsumableInstance | `id` | `instanceId` |
-| EquipmentInstance | `id` | `instanceId` |
-| NpcSpawn | `id` | `spawnId` |
-| NpcReward | `id` | `rewardId` |
+| Entity               | Old Field | New Field      |
+| -------------------- | --------- | -------------- |
+| Character            | `id`      | `characterId`  |
+| Npc                  | `id`      | `npcId`        |
+| Area                 | `id`      | `areaId`       |
+| ActorModel           | `id`      | `modelId`      |
+| Inventory            | `id`      | `inventoryId`  |
+| ConsumableDefinition | `id`      | `definitionId` |
+| EquipmentDefinition  | `id`      | `definitionId` |
+| ConsumableInstance   | `id`      | `instanceId`   |
+| EquipmentInstance    | `id`      | `instanceId`   |
+| NpcSpawn             | `id`      | `spawnId`      |
+| NpcReward            | `id`      | `rewardId`     |
 
 ### Relationship Model
 
 **Before (Foreign Keys):**
+
 ```sql
 character.model_id REFERENCES actor_model(id)
 character.area_id REFERENCES area(id)
 ```
 
 **After (EdgeDB Links):**
+
 ```edgeql
 type Character {
   link modelId -> ActorModel

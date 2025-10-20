@@ -15,6 +15,6 @@ export const characterList = rpc.procedure
         filter: e.op(char.online, "=", true),
       }))
       .run(db);
-    
+
     return results.map((r) => ({ id: r.characterId, name: r.name }));
   });

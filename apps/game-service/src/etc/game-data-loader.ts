@@ -15,6 +15,7 @@ import type {
 import type { Vector } from "@mp/math";
 import { assert, type Rng, type Tile, type TimesPerSecond } from "@mp/std";
 import type { ActorModelId, NpcId } from "@mp/db/types";
+import type { UserId } from "@mp/oauth";
 import {
   characterFromDbFields,
   consumableDefinitionFromDbFields,
@@ -27,7 +28,7 @@ import {
   type DbNpcRewardFields,
 } from "./db-transform";
 import { deriveNpcSpawnsFromArea } from "./npc/derive-npc-spawns-from-areas";
-import { deserializeVector } from "@mp/db/src/types/vector";
+import { deserializeVector } from "@mp/db";
 
 export class GameDataLoader {
   constructor(
@@ -101,10 +102,11 @@ export class GameDataLoader {
       .update(e.Character, (char) => ({
         filter: e.op(char.characterId, "=", e.str(characterId)),
         set: {
-          areaId: e.select(e.Area, (area) => ({
-            filter: e.op(area.areaId, "=", e.str(newAreaId)),
-            limit: 1,
-          })),
+          areaId: e.assert_single(
+            e.select(e.Area, (area) => ({
+              filter: e.op(area.areaId, "=", e.str(newAreaId)),
+            })),
+          ),
         },
       }))
       .run(this.db);
@@ -137,7 +139,7 @@ export class GameDataLoader {
 
     const dbFields: DbCharacterFields = {
       characterId: updated[0].characterId as CharacterId,
-      userId: updated[0].userId,
+      userId: updated[0].userId as UserId,
       modelId: updated[0].modelId.modelId as ActorModelId,
       name: updated[0].name,
       inventoryId: updated[0].inventoryId as any,
@@ -186,7 +188,6 @@ export class GameDataLoader {
       const spawn: NpcSpawn = {
         id: row.spawnId as any,
         count: Number(row.count),
-        areaId: row.areaId.areaId as AreaId,
         npcId: row.npcId.npcId as NpcId,
         coords: row.coords ? deserializeVector(row.coords as any) : undefined,
         randomRadius: row.randomRadius ? Number(row.randomRadius) : undefined,

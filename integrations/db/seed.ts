@@ -15,18 +15,12 @@
  */
 
 import { createPinoLogger } from "@mp/logger/pino";
-import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
+import { createShortId } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
 import { createDbClient } from "./src/client";
 // import { e } from "./src/schema";  // Uncomment after generating query builder
-import {
-  npcTypes,
-  type ActorModelId,
-  type AreaId,
-  type NpcId,
-  type NpcSpawnId,
-} from "./src/types";
+import type { ActorModelId, AreaId } from "./src/types";
 
 // This is not a long term plan.
 // The proper solution is to provision game data via an external repository
@@ -35,7 +29,8 @@ import {
 
 const logger = createPinoLogger(true);
 
-const actorModelIds = ["adventurer"] as ActorModelId[];
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const _actorModelIds = ["adventurer"] as ActorModelId[];
 
 // eslint-disable-next-line no-console
 console.log("Deriving area ids from file server files on disk...");

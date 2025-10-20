@@ -166,11 +166,11 @@ export function npcRewardsFromDbFields(fields: DbNpcRewardFields): NpcReward[] {
 export function equipmentDefinitionFromDbFields(
   fields: DbEquipmentDefinitionFields,
 ): EquipmentDefinition {
-  return { type: "equipment", ...fields };
+  return { type: "equipment", id: fields.definitionId, ...fields };
 }
 
 export function consumableDefinitionFromDbFields(
   fields: DbConsumableDefinitionFields,
 ): ConsumableDefinition {
-  return { type: "consumable", ...fields };
+  return { type: "consumable", id: fields.definitionId, ...fields };
 }

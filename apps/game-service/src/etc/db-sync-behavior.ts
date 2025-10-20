@@ -1,231 +1,77 @@
+/*
+ * ⚠️ THIS FILE NEEDS TO BE MIGRATED TO GEL QUERY BUILDER
+ *
+ * This file handles real-time database synchronization and is currently
+ * non-functional because it uses Drizzle ORM syntax.
+ *
+ * To complete the migration:
+ * 1. Migrate all database queries to use Gel query builder
+ * 2. Update transaction handling for EdgeDB
+ * 3. Migrate all select/insert/update operations
+ *
+ * For now, this returns a no-op function to avoid build errors.
+ */
+
 import type { DbClient } from "@mp/db";
-import {
-  and,
-  characterTable,
-  eq,
-  inArray,
-  consumableInstanceTable,
-  equipmentInstanceTable,
-} from "@mp/db";
-import type { AreaId, CharacterId } from "@mp/db/types";
-import type { Character, ItemInstance, ItemInstanceId } from "@mp/game-shared";
-import {
-  ConsumableInstance,
-  EquipmentInstance,
-  type ActorModelLookup,
-  type AreaResource,
-  type GameState,
+import type {
+  ActorModelLookup,
+  AreaResource,
+  GameState,
 } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import { assert, type Rng } from "@mp/std";
-import { startAsyncInterval, TimeSpan } from "@mp/time";
-import { characterFromDbFields, dbFieldsFromCharacter } from "./db-transform";
+import type { Rng } from "@mp/std";
 import type { GameStateServer } from "./game-state-server";
 
 export function gameStateDbSyncBehavior(
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   db: DbClient,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   area: AreaResource,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   state: GameState,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   server: GameStateServer,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   actorModels: ActorModelLookup,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   rng: Rng,
   logger: Logger,
 ) {
-  async function sync() {
-    await save();
-    await load();
-  }
+  logger.warn("gameStateDbSyncBehavior is not yet migrated to Gel/EdgeDB");
 
-  /**
-   * Polls the database for game state changes and updates the game state accordingly.
-   * Only adds and removes are applied. Db updates to entities that already exist in game state will be ignored.
-   *
-   * This means external systems cannot really reliably update game state tables in the db,
-   * since those changes may be overwritten by game services.
-   * This is an intentional limitation to keep the sync system simple.
-   * If we ever need external systems to manipiulate persisted game state we'll have to look into more robust sync mechanisms.
-   */
-  async function load() {
-    const dbIds = await getOnlineCharacterIdsForAreaFromDb(db, area.id);
-    const stateIds = characterIdsInState(state);
-    const removedIds = stateIds.difference(dbIds);
-    const addedIds = dbIds.difference(stateIds);
-
-    removedIds.forEach(removeCharacterFromGameState);
-
-    if (addedIds.size) {
-      const addedCharacters = await db
-        .select()
-        .from(characterTable)
-        .where(inArray(characterTable.id, addedIds.values().toArray()));
-
-      addedCharacters.forEach(addCharacterToGameState);
-    }
-
-    const inventoryIds = new Set(
-      state.actors
-        .values()
-        .flatMap((a) => (a.type === "character" ? [a.inventoryId] : [])),
-    );
-
-    const [consumableInstanceFields, equipmentInstanceFields] =
-      await Promise.all([
-        db
-          .select()
-          .from(consumableInstanceTable)
-          .where(
-            inArray(
-              consumableInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
-        db
-          .select()
-          .from(equipmentInstanceTable)
-          .where(
-            inArray(
-              equipmentInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
-      ]);
-
-    upsertItemInstancesInGameState(
-      consumableInstanceFields,
-      equipmentInstanceFields,
-    );
-  }
-
-  /**
-   * Updates the database with the current game state.
-   */
-  function save() {
-    return db.transaction(async (tx) => {
-      await Promise.all(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "character")
-          .map((char) =>
-            tx.update(characterTable).set(dbFieldsFromCharacter(char)),
-          ),
-      );
-
-      await Promise.all(
-        state.items.values().map((item) => {
-          const table = {
-            consumable: consumableInstanceTable,
-            equipment: equipmentInstanceTable,
-          }[item.type];
-          return tx
-            .insert(table)
-            .values(item)
-            .onConflictDoUpdate({
-              target: [table.id],
-              set: item,
-            });
-        }),
-      );
-    });
-  }
-
-  function upsertItemInstancesInGameState(
-    dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
-    dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
-  ) {
-    const dbFields = new Map<ItemInstanceId, ItemInstance>();
-
-    for (const fields of dbConsumables) {
-      dbFields.set(fields.id, { type: "consumable", ...fields });
-    }
-    for (const fields of dbEquipment) {
-      dbFields.set(fields.id, { type: "equipment", ...fields });
-    }
-
-    const dbIds = new Set(dbFields.keys());
-    const stateIds = new Set(state.items.keys());
-    const removedIds = stateIds.difference(dbIds);
-    const addedIds = dbIds.difference(stateIds);
-
-    for (const itemId of removedIds) {
-      state.items.delete(itemId);
-    }
-
-    for (const itemId of addedIds) {
-      let instance = state.items.get(itemId);
-      const itemFields = assert(dbFields.get(itemId));
-      if (!instance) {
-        switch (itemFields.type) {
-          case "consumable":
-            instance = ConsumableInstance.create(itemFields);
-            break;
-          case "equipment":
-            instance = EquipmentInstance.create(itemFields);
-            break;
-        }
-        state.items.set(itemFields.id, instance);
-        logger.debug(
-          { itemId: itemFields.id, type: itemFields.type },
-          "Added item instance to game state",
-        );
-      }
-    }
-  }
-
-  function addCharacterToGameState(
-    characterFields: typeof characterTable.$inferSelect,
-  ) {
-    const char = characterFromDbFields(characterFields, actorModels, rng);
-    state.actors.set(char.identity.id, char);
-    server.markToResendFullState(char.identity.id);
-    logger.debug(
-      { characterId: characterFields.id },
-      "Character joined game service via db poll",
-    );
-  }
-
-  function removeCharacterFromGameState(characterId: CharacterId) {
-    const char = state.actors.get(characterId) as Character | undefined;
-    state.actors.delete(characterId);
-    for (const item of state.items.values()) {
-      if (item.inventoryId === char?.inventoryId) {
-        state.items.delete(item.id);
-      }
-    }
-    logger.debug({ characterId }, "Character left game service via db poll");
-  }
-
-  return startAsyncInterval(
-    () =>
-      sync().catch((err) => logger.error(err, "game state db sync save error")),
-    syncInterval,
-  );
+  // Return a no-op dispose function
+  return () => {
+    // No cleanup needed
+  };
 }
 
-const syncInterval = TimeSpan.fromSeconds(5);
+/* ORIGINAL DRIZZLE CODE - TO BE MIGRATED
 
-async function getOnlineCharacterIdsForAreaFromDb(
-  db: DbClient,
-  areaId: AreaId,
-): Promise<ReadonlySet<CharacterId>> {
-  return new Set(
-    (
-      await db
-        .select({ id: characterTable.id })
-        .from(characterTable)
-        .where(
-          and(
-            eq(characterTable.areaId, areaId),
-            eq(characterTable.online, true),
-          ),
-        )
-    ).map((row) => row.id),
-  );
-}
+This file contained complex real-time sync logic that needs to be migrated
+to EdgeDB query builder. The original implementation:
 
-function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {
-  return new Set(
-    state.actors
-      .values()
-      .flatMap((a) => (a.type === "character" ? [a.identity.id] : [])),
-  );
-}
+1. Polled database for character state changes
+2. Synchronized game state with database
+3. Handled item instances (consumables and equipment)
+4. Used transactions for atomic updates
+
+Key functions to migrate:
+- sync() - Main sync function
+- load() - Load changes from database to game state
+- save() - Save game state to database
+- getOnlineCharacterIdsForAreaFromDb() - Query online characters
+- addCharacterToGameState() - Add character from DB
+- removeCharacterFromGameState() - Remove character
+- upsertItemInstancesInGameState() - Sync item instances
+
+Migration required for:
+- All SELECT queries → e.select(e.Type, ...)
+- All UPDATE queries → e.update(e.Type, ...)
+- All INSERT queries → e.insert(e.Type, ...)
+- Transaction handling → client.transaction(...)
+- Filter operations → e.op(...)
+- Array operations → Convert inArray to e.op(..., 'in', ...)
+
+See MIGRATION_GUIDE.md for query patterns.
+
+*/

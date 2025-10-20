@@ -96,7 +96,8 @@ gameServiceConfig.subscribe((config) => {
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+// Note: EdgeDB client doesn't expose connection pool errors the same way
+// Errors will be thrown/rejected during query execution
 
 logger.info(`Loading area and actor models...`);
 const [area, actorModels] = await withBackoffRetries(() =>

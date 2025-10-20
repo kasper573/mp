@@ -35,7 +35,7 @@ function RouteComponent() {
           label: "Select character",
         },
         ...characters.map((char) => ({
-          value: char.id,
+          value: char.id as CharacterId,
           label: char.name,
         })),
       ],
