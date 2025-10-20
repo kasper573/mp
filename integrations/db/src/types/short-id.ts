@@ -7,3 +7,6 @@
 
 // No special function needed for Gel - short IDs are just strings
 // The type safety comes from the generated query builder
+
+// Export empty object to make this a module
+export {};

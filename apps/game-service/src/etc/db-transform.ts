@@ -1,4 +1,3 @@
-import { e } from "@mp/db";
 import type {
   ActorModelLookup,
   ConsumableDefinition,
@@ -54,8 +53,8 @@ export interface DbNpcRewardFields {
   rewardId: string;
   npcId: NpcId;
   xp: number | null;
-  consumableItemId: ConsumableDefinitionId | null;
-  equipmentItemId: EquipmentDefinitionId | null;
+  consumableItemId: ConsumableDefinitionId | null | undefined;
+  equipmentItemId: EquipmentDefinitionId | null | undefined;
   itemAmount: number | null;
 }
 
@@ -138,7 +137,10 @@ export function npcRewardsFromDbFields(fields: DbNpcRewardFields): NpcReward[] {
       xp: fields.xp,
     });
   }
-  if (fields.consumableItemId !== null) {
+  if (
+    fields.consumableItemId !== null &&
+    fields.consumableItemId !== undefined
+  ) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",
@@ -149,7 +151,7 @@ export function npcRewardsFromDbFields(fields: DbNpcRewardFields): NpcReward[] {
       ),
     });
   }
-  if (fields.equipmentItemId !== null) {
+  if (fields.equipmentItemId !== null && fields.equipmentItemId !== undefined) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",

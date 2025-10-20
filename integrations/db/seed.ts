@@ -15,12 +15,11 @@
  */
 
 import { createPinoLogger } from "@mp/logger/pino";
-import { createShortId } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
-import { createDbClient } from "./src/client";
+// import { createDbClient } from "./src/client";  // Uncomment after migration
 // import { e } from "./src/schema";  // Uncomment after generating query builder
-import type { ActorModelId, AreaId } from "./src/types";
+import type { AreaId } from "./src/types";
 
 // This is not a long term plan.
 // The proper solution is to provision game data via an external repository
@@ -29,21 +28,12 @@ import type { ActorModelId, AreaId } from "./src/types";
 
 const logger = createPinoLogger(true);
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const _actorModelIds = ["adventurer"] as ActorModelId[];
-
-// eslint-disable-next-line no-console
-console.log("Deriving area ids from file server files on disk...");
+process.stdout.write("Deriving area ids from file server files on disk...\n");
 const areaIds = await getAreaIds();
 
 if (!areaIds.length) {
   throw new Error("No area ids found");
 }
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-const client = createDbClient(
-  process.env.MP_API_DATABASE_CONNECTION_STRING ?? "",
-);
 
 // TODO: Migrate to Gel query builder
 // Example for truncating (deleting all records):

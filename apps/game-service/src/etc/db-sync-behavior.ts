@@ -23,18 +23,12 @@ import type { Rng } from "@mp/std";
 import type { GameStateServer } from "./game-state-server";
 
 export function gameStateDbSyncBehavior(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  db: DbClient,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  area: AreaResource,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  state: GameState,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  server: GameStateServer,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  actorModels: ActorModelLookup,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  rng: Rng,
+  _db: DbClient,
+  _area: AreaResource,
+  _state: GameState,
+  _server: GameStateServer,
+  _actorModels: ActorModelLookup,
+  _rng: Rng,
   logger: Logger,
 ) {
   logger.warn("gameStateDbSyncBehavior is not yet migrated to Gel/EdgeDB");

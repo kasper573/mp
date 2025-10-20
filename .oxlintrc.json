@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "import", "node", "promise", "typescript", "oxc"],
+  "ignorePatterns": ["**/dbschema/edgeql-js/**"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",

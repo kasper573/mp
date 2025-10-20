@@ -55,7 +55,7 @@ async function getOrCreateCharacterIdForUser(
   await e
     .insert(e.Character, {
       characterId: characterId,
-      coords: spawnPoint.coords as any,
+      coords: spawnPoint.coords,
       areaId: e.assert_single(
         e.select(e.Area, (area) => ({
           filter: e.op(area.areaId, "=", spawnPoint.areaId),

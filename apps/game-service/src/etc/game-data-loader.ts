@@ -1,6 +1,13 @@
 import type { DbClient } from "@mp/db";
 import { e } from "@mp/db";
-import type { AreaId, CharacterId } from "@mp/db/types";
+import type {
+  AreaId,
+  CharacterId,
+  ConsumableDefinitionId,
+  EquipmentDefinitionId,
+  InventoryId,
+  NpcSpawnId,
+} from "@mp/db/types";
 import type {
   ActorModelLookup,
   AreaResource,
@@ -68,36 +75,7 @@ export class GameDataLoader {
     characterId: CharacterId,
     newAreaId: AreaId,
   ): Promise<Character> {
-    const result = await e
-      .params(
-        {
-          characterId: e.str,
-          newAreaId: e.str,
-        },
-        (params) => {
-          return e.select(e.Character, (char) => ({
-            characterId: true,
-            userId: true,
-            name: true,
-            inventoryId: true,
-            xp: true,
-            attackDamage: true,
-            attackRange: true,
-            attackSpeed: true,
-            health: true,
-            maxHealth: true,
-            coords: true,
-            speed: true,
-            modelId: {
-              modelId: true,
-            },
-            filter: e.op(char.characterId, "=", params.characterId),
-          }));
-        },
-      )
-      .run(this.db, { characterId, newAreaId });
-
-    // First update, then select
+    // Update area assignment
     await e
       .update(e.Character, (char) => ({
         filter: e.op(char.characterId, "=", e.str(characterId)),
@@ -116,7 +94,6 @@ export class GameDataLoader {
         characterId: true,
         userId: true,
         name: true,
-        inventoryId: true,
         xp: true,
         attackDamage: true,
         attackRange: true,
@@ -127,6 +104,9 @@ export class GameDataLoader {
         speed: true,
         modelId: {
           modelId: true,
+        },
+        inventoryId: {
+          inventoryId: true,
         },
         filter: e.op(char.characterId, "=", e.str(characterId)),
         limit: 1,
@@ -142,14 +122,14 @@ export class GameDataLoader {
       userId: updated[0].userId as UserId,
       modelId: updated[0].modelId.modelId as ActorModelId,
       name: updated[0].name,
-      inventoryId: updated[0].inventoryId as any,
+      inventoryId: updated[0].inventoryId.inventoryId as InventoryId,
       xp: updated[0].xp,
       attackDamage: updated[0].attackDamage,
       attackRange: updated[0].attackRange as Tile,
       attackSpeed: updated[0].attackSpeed as TimesPerSecond,
       health: updated[0].health,
       maxHealth: updated[0].maxHealth,
-      coords: deserializeVector(updated[0].coords as any),
+      coords: deserializeVector(updated[0].coords as Vector<Tile>),
       speed: updated[0].speed as Tile,
     };
 
@@ -186,10 +166,12 @@ export class GameDataLoader {
 
     const allFromDB = result.map((row) => {
       const spawn: NpcSpawn = {
-        id: row.spawnId as any,
+        id: row.spawnId as NpcSpawnId,
         count: Number(row.count),
         npcId: row.npcId.npcId as NpcId,
-        coords: row.coords ? deserializeVector(row.coords as any) : undefined,
+        coords: row.coords
+          ? deserializeVector(row.coords as Vector<Tile>)
+          : undefined,
         randomRadius: row.randomRadius ? Number(row.randomRadius) : undefined,
         patrol: undefined, // TODO: deserialize path
         npcType: row.npcType ?? undefined,
@@ -243,8 +225,14 @@ export class GameDataLoader {
       rewardId: row.rewardId,
       npcId: row.npcId.npcId as NpcId,
       xp: row.xp,
-      consumableItemId: row.consumableItemId?.definitionId as any,
-      equipmentItemId: row.equipmentItemId?.definitionId as any,
+      consumableItemId: row.consumableItemId?.definitionId as
+        | ConsumableDefinitionId
+        | null
+        | undefined,
+      equipmentItemId: row.equipmentItemId?.definitionId as
+        | EquipmentDefinitionId
+        | null
+        | undefined,
       itemAmount: row.itemAmount ? Number(row.itemAmount) : null,
     }));
 
@@ -271,7 +259,7 @@ export class GameDataLoader {
 
     const equipment: DbEquipmentDefinitionFields[] = equipmentRows.map(
       (row) => ({
-        definitionId: row.definitionId as any,
+        definitionId: row.definitionId as EquipmentDefinitionId,
         name: row.name,
         maxDurability: Number(row.maxDurability),
       }),
@@ -279,7 +267,7 @@ export class GameDataLoader {
 
     const consumables: DbConsumableDefinitionFields[] = consumableRows.map(
       (row) => ({
-        definitionId: row.definitionId as any,
+        definitionId: row.definitionId as ConsumableDefinitionId,
         name: row.name,
         maxStackSize: Number(row.maxStackSize),
       }),

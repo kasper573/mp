@@ -25,7 +25,6 @@
   "dependencies": {
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*",
     "gel": "^2.1.1"
   },

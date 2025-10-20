@@ -30,10 +30,8 @@ if (answer.trim().toLowerCase() !== "yes") {
   process.exit(0);
 }
 
-// eslint-disable-next-line no-console
-console.error("Drop script needs migration to Gel query builder.");
-// eslint-disable-next-line no-console
-console.error("Alternative: Use 'npx gel database wipe' command.");
+process.stderr.write("Drop script needs migration to Gel query builder.\n");
+process.stderr.write("Alternative: Use 'npx gel database wipe' command.\n");
 process.exit(1);
 
 /* OLD POSTGRESQL CODE - Remove after migration

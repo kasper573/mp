@@ -8,12 +8,22 @@ ls:
     .dir: regex:.*
   apps/website/src/routes/**:
     .*: regex:~?(__)?[a-z0-9\-]+
+  integrations/db:
+    .md: regex:.*
+  .:
+    .md: regex:.*
 
 ignore:
   - node_modules
   - .git
   - "./*/Dockerfile*"
   - "integrations/db/drizzle/**"
+  - "integrations/db/dbschema/edgeql-js/**"
+  - "GELDATA_MIGRATION_SUMMARY.md"
+  - "MIGRATION_COMPLETE.md"
+  - "integrations/db/FILES_TO_MIGRATE.md"
+  - "integrations/db/MIGRATION_GUIDE.md"
+  - "integrations/db/README.md"
   - "apps/e2e/.playwright"
   - "apps/website/.tanstack"
   - "./{apps,integrations,libraries}/*/.turbo"
