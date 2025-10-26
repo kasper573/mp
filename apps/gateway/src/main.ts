@@ -1,5 +1,5 @@
-import { createDbClient } from "@mp/db";
-import type { AreaId } from "@mp/db/types";
+import { createDbClient, updateOnlineCharacters } from "@mp/db";
+import type { AreaId, CharacterId } from "@mp/db/types";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
@@ -44,7 +44,6 @@ import {
   ctxUserSession,
   ctxUserSessionSignal,
 } from "./context";
-import { saveOnlineCharacters } from "./db-operations";
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
 
@@ -107,7 +106,15 @@ const gatewayEventInvoker = new QueuedEventInvoker({
 const ioc = new InjectionContainer().provide(ctxDbClient, db);
 
 const saveOnlineCharactersDeduped = dedupe(
-  debounce(saveOnlineCharacters(db, logger), 100),
+  debounce(
+    (ids: CharacterId[]) =>
+      void updateOnlineCharacters(db, ids).catch((error) =>
+        logger.error(
+          new Error("Failed to save online characters", { cause: error }),
+        ),
+      ),
+    100,
+  ),
   arrayShallowEquals,
 );
 

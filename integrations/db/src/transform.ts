@@ -1,24 +1,23 @@
 import type {
-  characterTable,
-  consumableDefinitionTable,
-  equipmentDefinitionTable,
-  npcRewardTable,
-} from "@mp/db";
-import type {
   ActorModelLookup,
   ConsumableDefinition,
   EquipmentDefinition,
   NpcReward,
 } from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
-import { cardinalDirections } from "@mp/math";
-import type { Rng } from "@mp/std";
 import { assert } from "@mp/std";
+import type {
+  characterTable,
+  npcRewardTable,
+  equipmentDefinitionTable,
+  consumableDefinitionTable,
+} from "./schema";
+
+// Transformer functions to and from database and game state
 
 export function characterFromDbFields(
   fields: typeof characterTable.$inferSelect,
   modelLookup: ActorModelLookup,
-  rng: Rng,
 ): Character {
   const model = assert(
     modelLookup.get(fields.modelId),
@@ -55,7 +54,7 @@ export function characterFromDbFields(
     movement: {
       coords: fields.coords,
       speed: fields.speed,
-      dir: rng.oneOf(cardinalDirections),
+      dir: "s",
       desiredPortalId: undefined,
       moveTarget: undefined,
       path: undefined,

@@ -1,14 +1,16 @@
 import type { AreaId, CharacterId } from "@mp/db/types";
 import { gatewayRoles } from "@mp/keycloak";
 import {
+  ctxActorModelLookup,
   ctxArea,
+  ctxDbClient,
   ctxGameState,
-  ctxGameStateLoader,
   ctxGameStateServer,
   ctxLogger,
 } from "../context";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
+import { updateCharactersArea } from "@mp/db";
 
 /**
  * Emitted by a game service when a character wants to join another game service.
@@ -22,11 +24,16 @@ export const changeGameService = evt.event
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
       const logger = ctx.get(ctxLogger);
-      const db = ctx.get(ctxGameStateLoader);
+      const db = ctx.get(ctxDbClient);
+      const actorModels = ctx.get(ctxActorModelLookup);
 
       // Void instead of await because we don't want to suspend the event routers queue handler.
-      void db
-        .assignAreaIdToCharacterInDb(input.characterId, currentArea.id)
+      void updateCharactersArea(
+        db,
+        actorModels,
+        input.characterId,
+        currentArea.id,
+      )
         .then((character) => {
           logger.debug(
             { characterId: input.characterId },

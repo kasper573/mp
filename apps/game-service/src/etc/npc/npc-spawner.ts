@@ -14,14 +14,29 @@ import type { Rng, Tile } from "@mp/std";
 import { assert, createShortId } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
+import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
+
+interface NpcSpawnOption {
+  spawn: NpcSpawn;
+  npc: Npc;
+}
 
 export class NpcSpawner {
+  public readonly options: ReadonlyArray<NpcSpawnOption>;
+
   constructor(
     private readonly area: AreaResource,
     private readonly models: ActorModelLookup,
-    public readonly options: Array<{ spawn: NpcSpawn; npc: Npc }>,
+    optionsFromDB: Array<NpcSpawnOption>,
     private readonly rng: Rng,
-  ) {}
+  ) {
+    const optionsFromTiled = deriveNpcSpawnsFromArea(
+      this.area,
+      optionsFromDB.map(({ npc }) => npc),
+    );
+
+    this.options = [...optionsFromDB, ...optionsFromTiled];
+  }
 
   createTickHandler(state: GameState): TickEventHandler {
     const corpseDuration = TimeSpan.fromSeconds(5);

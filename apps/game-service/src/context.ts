@@ -9,10 +9,10 @@ import { InjectionContext } from "@mp/ioc";
 import type { Logger } from "@mp/logger";
 import type { TokenResolver } from "@mp/oauth/server";
 import type { Rng } from "@mp/std";
-import type { GameDataLoader } from "./etc/game-data-loader";
 import type { GameStateServer } from "./etc/game-state-server";
 import type { NpcSpawner } from "./etc/npc/npc-spawner";
 import type { GameEventClient } from "./package";
+import type { DbClient } from "@mp/db";
 
 export const ctxArea = InjectionContext.new<AreaResource>("AreaResource");
 
@@ -26,8 +26,7 @@ export const ctxRng = InjectionContext.new<Rng>("Rng");
 
 export const ctxNpcSpawner = InjectionContext.new<NpcSpawner>("NpcSpawner");
 
-export const ctxGameStateLoader =
-  InjectionContext.new<GameDataLoader>("GameStateLoader");
+export const ctxDbClient = InjectionContext.new<DbClient>("dbClient");
 
 export const ctxGameStateServer =
   InjectionContext.new<GameStateServer>("GameStateServer");

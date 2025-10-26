@@ -10,7 +10,7 @@ import {
   ctxUserSession,
   ctxUserSessionSignal,
 } from "./context";
-import { hasAccessToCharacter } from "./db-operations";
+import { mayAccessCharacter } from "@mp/db";
 
 const evt = new EventRouterBuilder().context<InjectionContainer>().build();
 
@@ -34,7 +34,7 @@ export const gatewayRouter = evt.router({
       .input<CharacterId>()
       .handler(async ({ ctx, input: characterId, mwc }) => {
         const db = ctx.get(ctxDbClient);
-        if (!(await hasAccessToCharacter(db, mwc.user.id, characterId))) {
+        if (!(await mayAccessCharacter(db, mwc.user.id, characterId))) {
           throw new Error("You do not have access to this character");
         }
 

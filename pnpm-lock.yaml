@@ -469,6 +469,9 @@ importers:
 
   integrations/db:
     dependencies:
+      '@mp/game-shared':
+        specifier: workspace:*
+        version: link:../game-shared
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger

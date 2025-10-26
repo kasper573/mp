@@ -1,6 +1,6 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": ["src", "*.ts"],
+  "include": ["src", "*.ts", "../../integrations/db/src/transform.ts"],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017",
