@@ -1,6 +1,6 @@
 import type { ActorModelLookup, Character } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { characterTable } from "../schema";
 import { characterFromDbFields } from "../transform";
 import type { CharacterId, AreaId } from "../types";
@@ -11,7 +11,9 @@ export async function updateCharactersArea(
   characterId: CharacterId,
   newAreaId: AreaId,
 ): Promise<Character> {
-  const result = await db.transaction(async (tx) => {
+  const drizzle = DbClient.unwrap(db);
+
+  const result = await drizzle.transaction(async (tx) => {
     await tx
       .update(characterTable)
       .set({ areaId: newAreaId })

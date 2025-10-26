@@ -10,7 +10,7 @@ import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import { assert } from "@mp/std";
 import { inArray, and, eq } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import {
   characterTable,
   consumableInstanceTable,
@@ -45,6 +45,8 @@ export async function syncGameState({
   logger,
   markToResendFullState,
 }: SyncGameStateOptions) {
+  const drizzle = DbClient.unwrap(db);
+
   await save();
   await load();
 
@@ -57,7 +59,7 @@ export async function syncGameState({
     removedIds.forEach(removeCharacterFromGameState);
 
     if (addedIds.size) {
-      const addedCharacters = await db
+      const addedCharacters = await drizzle
         .select()
         .from(characterTable)
         .where(inArray(characterTable.id, addedIds.values().toArray()));
@@ -73,7 +75,7 @@ export async function syncGameState({
 
     const [consumableInstanceFields, equipmentInstanceFields] =
       await Promise.all([
-        db
+        drizzle
           .select()
           .from(consumableInstanceTable)
           .where(
@@ -82,7 +84,7 @@ export async function syncGameState({
               inventoryIds.values().toArray(),
             ),
           ),
-        db
+        drizzle
           .select()
           .from(equipmentInstanceTable)
           .where(
@@ -103,7 +105,7 @@ export async function syncGameState({
    * Updates the database with the current game state.
    */
   function save() {
-    return db.transaction(async (tx) => {
+    return drizzle.transaction(async (tx) => {
       await Promise.all(
         state.actors
           .values()
@@ -202,9 +204,10 @@ async function getOnlineCharacterIdsForAreaFromDb(
   db: DbClient,
   areaId: AreaId,
 ): Promise<ReadonlySet<CharacterId>> {
+  const drizzle = DbClient.unwrap(db);
   return new Set(
     (
-      await db
+      await drizzle
         .select({ id: characterTable.id })
         .from(characterTable)
         .where(

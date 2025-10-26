@@ -1,6 +1,6 @@
 import assert from "assert";
 import { eq } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { consumableDefinitionTable, equipmentDefinitionTable } from "../schema";
 import type { ConsumableDefinitionId, EquipmentDefinitionId } from "../types";
 
@@ -8,7 +8,8 @@ export async function selectConsumableDefinition(
   db: DbClient,
   id: ConsumableDefinitionId,
 ) {
-  const [def] = await db
+  const drizzle = DbClient.unwrap(db);
+  const [def] = await drizzle
     .select()
     .from(consumableDefinitionTable)
     .where(eq(consumableDefinitionTable.id, id))
@@ -22,7 +23,8 @@ export async function selectEquipmentDefinition(
   db: DbClient,
   id: EquipmentDefinitionId,
 ) {
-  const [def] = await db
+  const drizzle = DbClient.unwrap(db);
+  const [def] = await drizzle
     .select()
     .from(equipmentDefinitionTable)
     .where(eq(equipmentDefinitionTable.id, id))

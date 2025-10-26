@@ -1,6 +1,6 @@
 import type { UserId } from "@mp/oauth";
 import { and, eq } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { characterTable } from "../schema";
 import type { CharacterId } from "../types";
 
@@ -9,8 +9,9 @@ export async function mayAccessCharacter(
   userId: UserId,
   characterId: CharacterId,
 ) {
-  const matches = await db.$count(
-    db
+  const drizzle = DbClient.unwrap(db);
+  const matches = await drizzle.$count(
+    drizzle
       .select()
       .from(characterTable)
       .where(

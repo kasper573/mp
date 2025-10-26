@@ -1,5 +1,5 @@
 import { inArray } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { characterTable } from "../schema";
 import type { CharacterId } from "../types";
 
@@ -7,7 +7,8 @@ export async function updateOnlineCharacters(
   db: DbClient,
   onlineCharacterIds: CharacterId[],
 ) {
-  await db
+  const drizzle = DbClient.unwrap(db);
+  await drizzle
     .update(characterTable)
     .set({ online: inArray(characterTable.id, onlineCharacterIds) });
 }

@@ -1,7 +1,7 @@
 import type { UserIdentity } from "@mp/oauth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
 import type { AreaId, CharacterId } from "../types";
 import type { Vector } from "@mp/math";
@@ -11,7 +11,8 @@ export async function selectOrCreateCharacterIdForUser(
   user: UserIdentity,
   getDefaultSpawnPoint: () => Promise<{ areaId: AreaId; coords: Vector<Tile> }>,
 ): Promise<CharacterId> {
-  const findResult = await db
+  const drizzle = DbClient.unwrap(db);
+  const findResult = await drizzle
     .select({ id: characterTable.id })
     .from(characterTable)
     .where(eq(characterTable.userId, user.id))
@@ -21,7 +22,7 @@ export async function selectOrCreateCharacterIdForUser(
     return findResult[0].id;
   }
 
-  const [model] = await db
+  const [model] = await drizzle
     .select({ id: actorModelTable.id })
     .from(actorModelTable)
     .limit(1);
@@ -29,12 +30,12 @@ export async function selectOrCreateCharacterIdForUser(
     throw new Error("No actor models found in the database");
   }
 
-  const [inventory] = await db
+  const [inventory] = await drizzle
     .insert(inventoryTable)
     .values({})
     .returning({ id: inventoryTable.id });
 
-  const insertResult = await db
+  const insertResult = await drizzle
     .insert(characterTable)
     .values({
       ...(await getDefaultSpawnPoint()),

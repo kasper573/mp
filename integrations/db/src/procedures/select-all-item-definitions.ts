@@ -1,5 +1,5 @@
 import type { ItemDefinition } from "@mp/game-shared";
-import type { DbClient } from "../client";
+import { DbClient } from "../client";
 import { equipmentDefinitionTable, consumableDefinitionTable } from "../schema";
 import {
   equipmentDefinitionFromDbFields,
@@ -9,9 +9,10 @@ import {
 export async function selectAllItemDefinitions(
   db: DbClient,
 ): Promise<ItemDefinition[]> {
+  const drizzle = DbClient.unwrap(db);
   const [equipmentRows, consumableRows] = await Promise.all([
-    db.select().from(equipmentDefinitionTable),
-    db.select().from(consumableDefinitionTable),
+    drizzle.select().from(equipmentDefinitionTable),
+    drizzle.select().from(consumableDefinitionTable),
   ]);
 
   return [

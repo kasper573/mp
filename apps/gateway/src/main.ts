@@ -80,7 +80,7 @@ const webServer = express()
 const httpServer = http.createServer(webServer);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,
