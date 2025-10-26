@@ -3,7 +3,7 @@ import type {
   ActorModelLookup,
   AreaResource,
   GameState,
-  Npc,
+  NpcDefinition,
   NpcInstanceId,
   NpcSpawn,
 } from "@mp/game-shared";
@@ -18,7 +18,7 @@ import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
 
 interface NpcSpawnOption {
   spawn: NpcSpawn;
-  npc: Npc;
+  npc: NpcDefinition;
 }
 
 export class NpcSpawner {
@@ -74,7 +74,7 @@ export class NpcSpawner {
     };
   }
 
-  createInstance(npc: Npc, spawn: NpcSpawn): NpcInstance {
+  createInstance(npc: NpcDefinition, spawn: NpcSpawn): NpcInstance {
     const id = createShortId() as NpcInstanceId;
     const model = assert(this.models.get(npc.modelId));
     const coords = determineSpawnCoords(spawn, this.area, this.rng);

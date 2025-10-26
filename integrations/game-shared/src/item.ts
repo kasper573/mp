@@ -1,8 +1,4 @@
-import type {
-  ConsumableInstanceId,
-  EquipmentInstanceId,
-  InventoryId,
-} from "./ids";
+import type { Branded } from "@mp/std";
 import { object, prop } from "@mp/sync";
 import { type } from "@mp/validate";
 
@@ -83,3 +79,8 @@ export type ItemDefinitionByReference<Ref extends ItemReference> = Extract<
   ItemDefinition,
   ItemDefinitionBase<Ref>
 >;
+export type InventoryId = Branded<string, "InventoryId">;
+export type EquipmentInstanceId = Branded<string, "EquipmentInstanceId">;
+export type EquipmentDefinitionId = Branded<string, "EquipmentDefinitionId">;
+export type ConsumableInstanceId = Branded<string, "ConsumableInstanceId">;
+export type ConsumableDefinitionId = Branded<string, "ConsumableDefinitionId">;

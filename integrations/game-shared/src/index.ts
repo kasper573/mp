@@ -1,6 +1,6 @@
 export * from "./actor";
 export * from "./appearance";
-export * from "./area-resource";
+export * from "./area";
 export * from "./character";
 export * from "./client-view-distance-settings";
 export * from "./combat";
@@ -19,4 +19,3 @@ export * from "./session";
 export * from "./tiled-fixture";
 export * from "./tiled-resource";
 export * from "./tiled-walkable-checker";
-export * from "./ids";

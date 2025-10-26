@@ -1,4 +1,4 @@
-import type { CharacterId } from "./ids";
+import type { CharacterId } from "./character";
 import { createEncoding } from "@mp/encoding";
 import type { EventRouterMessage } from "@mp/event-router";
 import type { AnyPatch, SyncEvent } from "@mp/sync";

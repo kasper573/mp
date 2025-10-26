@@ -16,7 +16,12 @@ import {
   npcSpawnTable,
   npcTable,
 } from "./src/schema";
-import type { ActorModelId, NpcId, NpcSpawnId, AreaId } from "@mp/game-shared";
+import type {
+  ActorModelId,
+  NpcDefinitionId,
+  NpcSpawnId,
+  AreaId,
+} from "@mp/game-shared";
 import { npcTypes } from "@mp/game-shared";
 
 // This is not a long term plan.
@@ -71,7 +76,7 @@ logger.info("Inserting npcs...");
 const [soldier] = await db
   .insert(npcTable)
   .values({
-    id: "1" as NpcId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
+    id: "1" as NpcDefinitionId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
     aggroRange: 7 as Tile,
     npcType: "protective",
     attackDamage: 3,

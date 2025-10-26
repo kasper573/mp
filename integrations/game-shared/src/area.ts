@@ -1,8 +1,7 @@
-import type { AreaId } from "./ids";
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph } from "@mp/path-finding";
-import type { Pixel } from "@mp/std";
+import type { Branded, Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { graphFromTiled } from "./graph-from-tiled";
@@ -58,3 +57,5 @@ export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
 }
 
 export const dynamicLayerName = "Dynamic";
+
+export type AreaId = Branded<string, "AreaId">;

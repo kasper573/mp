@@ -17,7 +17,7 @@ import type {
   EquipmentDefinitionId,
   EquipmentInstanceId,
   InventoryId,
-  NpcId,
+  NpcDefinitionId,
   NpcRewardId,
   NpcSpawnId,
 } from "@mp/game-shared";
@@ -113,7 +113,7 @@ export const npcType = varchar({ enum: npcTypes });
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
-  id: shortId<NpcId>().$defaultFn(createShortId).primaryKey(),
+  id: shortId<NpcDefinitionId>().$defaultFn(createShortId).primaryKey(),
   speed: integer().$type<Tile>().notNull(),
   maxHealth: real().notNull(),
   attackDamage: real().notNull(),
@@ -129,7 +129,7 @@ export const npcTable = pgTable("npc", {
 
 export const npcRewardTable = pgTable("npc_reward", {
   id: shortId<NpcRewardId>().$defaultFn(createShortId).primaryKey(),
-  npcId: shortId<NpcId>()
+  npcId: shortId<NpcDefinitionId>()
     .notNull()
     .references(() => npcTable.id),
   consumableItemId: shortId<ConsumableDefinitionId>().references(
@@ -151,7 +151,7 @@ export const npcSpawnTable = pgTable("npc_spawn", {
   areaId: areaId()
     .notNull()
     .references(() => areaTable.id),
-  npcId: shortId<NpcId>()
+  npcId: shortId<NpcDefinitionId>()
     .notNull()
     .references(() => npcTable.id),
   coords: vector<Tile>(),

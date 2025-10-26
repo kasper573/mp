@@ -1,14 +1,14 @@
 import type { NpcSpawnId } from "@mp/game-shared";
-import type { AreaResource, Npc, NpcSpawn } from "@mp/game-shared";
+import type { AreaResource, NpcDefinition, NpcSpawn } from "@mp/game-shared";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
 import type { TiledClass, TiledObject } from "@mp/tiled-loader";
 
 export function deriveNpcSpawnsFromArea(
   area: AreaResource,
-  availableNpcs: Npc[],
+  availableNpcs: NpcDefinition[],
 ) {
-  const derived: Array<{ npc: Npc; spawn: NpcSpawn }> = [];
+  const derived: Array<{ npc: NpcDefinition; spawn: NpcSpawn }> = [];
 
   const npcObjects = area.tiled.objects.filter(
     (obj) => obj.type === ("npc" as TiledClass),

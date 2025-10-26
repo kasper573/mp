@@ -1,9 +1,10 @@
-import type { CharacterId, InventoryId } from "./ids";
+import type { InventoryId } from "./item";
 import type { UserId } from "@mp/oauth";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
+import type { Branded } from "@mp/std";
 
 export const Character = object({
   type: prop<"character">(),
@@ -21,3 +22,4 @@ export const Character = object({
 });
 
 export type Character = typeof Character.$infer;
+export type CharacterId = Branded<string, "CharacterId">;
