@@ -6,7 +6,7 @@ import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
-import { useContext, useState } from "preact/hooks";
+import { useState } from "preact/hooks";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -14,11 +14,17 @@ import {
 } from "./area-debug-settings-form";
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import { GameAssetLoaderContext, GameStateClientContext } from "./context";
+import {
+  GameStateClientContext,
+  useActorTextures,
+  useAreaAssets,
+} from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
+import { Suspense } from "preact/compat";
+import { Dock, ErrorFallback } from "@mp/ui";
 
 interface GameRendererProps {
   interactive: boolean;
@@ -38,10 +44,6 @@ export function GameRenderer({
   additionalDebugUi,
   enableUi = true,
 }: GameRendererProps) {
-  const { useAreaAssets, useActorTextures } = useContext(
-    GameAssetLoaderContext,
-  );
-
   const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
@@ -68,17 +70,40 @@ export function GameRenderer({
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
         <GameStateClientContext.Provider value={gameStateClient}>
-          <AreaUi />
-          {showDebugUi.value && (
-            <GameDebugUi>
-              {additionalDebugUi}
-              <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
-            </GameDebugUi>
-          )}
+          <Suspense fallback={<UILoadingFallback />}>
+            <AreaUi />
+            {showDebugUi.value && (
+              <GameDebugUi>
+                {additionalDebugUi}
+                <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
+              </GameDebugUi>
+            )}
+          </Suspense>
         </GameStateClientContext.Provider>
       )}
     </>
   );
+}
+
+/**
+ * This suspense fallback is not expected to ever be shown.
+ * It's a fallback to avoid a crash if a part of the game ui has forgotten to add its own suspense boundary.
+ * It's important that every piece of ui in the game ui has its own fine grained suspense boundary,
+ * because ie. we don't want the inventory triggering some async load to cause the HUD to show a loading state.
+ */
+function UILoadingFallback() {
+  if (import.meta.env.DEV) {
+    // In dev cause as much noise as possible to help catch missing suspense boundaries.
+    return (
+      <Dock position="center">
+        <ErrorFallback error="A part of the game UI is missing a suspense boundary, showing fallback." />
+      </Dock>
+    );
+  }
+
+  // In production the most graceful thing we can do is to just show nothing.
+  // Showing a generic loading spinner would just look bad, instead it's best to just show the game as-is.
+  return null;
 }
 
 function buildStage(

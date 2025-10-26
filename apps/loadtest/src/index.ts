@@ -1,9 +1,9 @@
 // oxlint-disable no-await-in-loop
 import { createApiClient } from "@mp/api-service/sdk";
 import { createProxyEventInvoker } from "@mp/event-router";
-import { GameStateClient } from "@mp/game-client";
+import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
-import { eventMessageEncoding, loadAreaResource } from "@mp/game-shared";
+import { eventMessageEncoding } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";
@@ -142,7 +142,7 @@ function testOneGameClient(n: number, rng: Rng) {
         areaId,
         urlType: "public",
       });
-      const area = await loadAreaResource(areaId, areaUrl);
+      const area = await browserLoadAreaResource(areaId, areaUrl);
       const tiles = Array.from(area.graph.nodeIds)
         .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
         .filter((v) => v !== undefined);

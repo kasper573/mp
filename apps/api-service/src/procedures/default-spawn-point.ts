@@ -1,10 +1,10 @@
 import type { AreaId } from "@mp/db/types";
-import { loadAreaResource } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { rpc } from "../integrations/trpc";
 import { getAreaFileUrls } from "./area-file-urls";
+import { loadAreaResource } from "../integrations/load-area-resource";
 
 export const defaultSpawnPoint = rpc.procedure.query(({ ctx }) =>
   getDefaultSpawnPoint(ctx.ioc),

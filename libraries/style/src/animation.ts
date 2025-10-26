@@ -11,10 +11,10 @@ import * as tokens from "./tokens";
  *
  * Usage:
  *
- * import { createTransition, style } from "@yas/style";
+ * import { cssForTransition, style } from "@mp/style";
  *
  * const myStyle = style({
- *   transition: createTransition(["opacity", "standard.enter"])
+ *   transition: cssForTransition(["opacity", "standard.enter"])
  * })
  */
 export function cssForTransition(...transitions: Transition[]) {
@@ -36,10 +36,10 @@ export function cssForTransition(...transitions: Transition[]) {
  *
  * Usage:
  *
- * import { createAnimation, style } from "@yas/style";
+ * import { cssForAnimation, style } from "@mp/style";
  *
  * const myStyle = style({
- *   animation: createAnimation([enter, "long1", "emphasized", { count: 1 }]),
+ *   animation: cssForAnimation([enter, "long1", "emphasized", { count: 1 }]),
  * })
  */
 export function cssForAnimation(...animations: Animation[]) {

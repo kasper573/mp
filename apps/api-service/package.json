@@ -30,6 +30,7 @@
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/telemetry": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
     "@trpc/client": "11.4.3",
     "@trpc/server": "11.4.3",

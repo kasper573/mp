@@ -33,7 +33,7 @@ logger.info(opt, `Starting API...`);
 const tokenResolver = createTokenResolver(opt.auth);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const redisClient = new Redis(opt.redisPath);
 

@@ -36,9 +36,10 @@ export type ActorModelId = Branded<string, "ActorModelId">;
 
 export type AreaId = Branded<string, "AreaId">;
 
-export type ItemId = Branded<string, "ItemId">;
-
-export type ItemInstanceId = Branded<string, "ItemInstanceId">;
+export type ConsumableDefinitionId = Branded<string, "ConsumableDefinitionId">;
+export type ConsumableInstanceId = Branded<string, "ConsumableInstanceId">;
+export type EquipmentDefinitionId = Branded<string, "EquipmentDefinitionId">;
+export type EquipmentInstanceId = Branded<string, "EquipmentInstanceId">;
 
 export type InventoryId = Branded<string, "InventoryId">;
 

@@ -1,16 +1,11 @@
-import type {
-  ActorModelId,
-  ItemId,
-  NpcId,
-  NpcSpawnId,
-  NpcType,
-} from "@mp/db/types";
+import type { ActorModelId, NpcId, NpcSpawnId, NpcType } from "@mp/db/types";
 import type { Path, Vector } from "@mp/math";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
+import type { ItemReference } from "./item";
 
 export interface Npc {
   id: NpcId;
@@ -33,7 +28,8 @@ export interface NpcRewardBase<T extends string> {
 }
 
 export interface NpcItemReward extends NpcRewardBase<"item"> {
-  itemId: ItemId;
+  reference: ItemReference;
+  amount: number;
 }
 
 export interface NpcXpReward extends NpcRewardBase<"xp"> {

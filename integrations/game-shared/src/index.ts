@@ -11,7 +11,6 @@ export * from "./game-state";
 export * from "./graph-from-tiled";
 export * from "./hit-test-tiled-object";
 export * from "./item";
-export * from "./load-area-resource";
 export * from "./move-along-path";
 export * from "./movement";
 export * from "./npc";

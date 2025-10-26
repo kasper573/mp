@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/db/types";
 import { characterRoles } from "@mp/keycloak";
-import { ctxGameStateLoader } from "../context";
+import { ctxArea } from "../context";
 import { accessCharacter } from "../etc/access-character";
 import { sendCharacterToArea } from "../etc/movement-behavior";
 import { roles } from "../integrations/auth";
@@ -16,8 +16,8 @@ export const respawn = evt.event
       throw new Error("Character is not dead");
     }
 
-    const loader = ctx.get(ctxGameStateLoader);
-    const spawnPoint = loader.getDefaultSpawnPoint();
+    const area = ctx.get(ctxArea);
+    const spawnPoint = { areaId: area.id, coords: area.start };
     char.combat.health = char.combat.maxHealth;
 
     sendCharacterToArea(

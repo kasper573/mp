@@ -37,6 +37,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
+    "@prefresh/core": "catalog:",
     "@tanstack/router-plugin": "1.126.2",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",

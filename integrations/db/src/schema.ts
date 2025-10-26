@@ -12,9 +12,11 @@ import type {
   ActorModelId,
   AreaId,
   CharacterId,
+  ConsumableDefinitionId,
+  ConsumableInstanceId,
+  EquipmentDefinitionId,
+  EquipmentInstanceId,
   InventoryId,
-  ItemId,
-  ItemInstanceId,
   NpcId,
   NpcRewardId,
   NpcSpawnId,
@@ -24,45 +26,64 @@ import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
 
-export const actorModelId = () => varchar({ length: 64 }).$type<ActorModelId>();
+const actorModelId = () => varchar({ length: 64 }).$type<ActorModelId>();
 export const actorModelTable = pgTable("actor_model", {
   id: actorModelId().primaryKey(),
 });
 
-export const areaId = () => varchar({ length: 60 }).$type<AreaId>();
+const areaId = () => varchar({ length: 60 }).$type<AreaId>();
 export const areaTable = pgTable("area", {
   id: areaId().primaryKey(),
 });
 
-export type Item = typeof itemTable.$inferSelect;
-export const itemId = () => shortId().$type<ItemId>();
-export const itemTable = pgTable("item", {
-  id: itemId().$defaultFn(createShortId).primaryKey(),
-  name: varchar({ length: 64 }).notNull(),
-});
-
-export const inventoryId = () => shortId().$type<InventoryId>();
 export const inventoryTable = pgTable("inventory", {
-  id: inventoryId().$defaultFn(createShortId).primaryKey(),
+  id: shortId<InventoryId>().$defaultFn(createShortId).primaryKey(),
 });
 
-export const itemInstanceId = () => shortId().$type<ItemInstanceId>();
-export const itemInstanceTable = pgTable("item_instance", {
-  id: itemInstanceId().$defaultFn(createShortId).primaryKey(),
-  itemId: itemId()
-    .notNull()
-    .references(() => itemTable.id),
-  inventoryId: inventoryId()
+const sharedItemDefinitionColumns = {
+  name: varchar({ length: 64 }).notNull(),
+};
+
+const sharedItemInstanceColumns = {
+  inventoryId: shortId<InventoryId>()
     .notNull()
     .references(() => inventoryTable.id),
+};
+
+export const consumableDefinitionTable = pgTable("consumable_definition", {
+  id: shortId<ConsumableDefinitionId>().$defaultFn(createShortId).primaryKey(),
+  ...sharedItemDefinitionColumns,
+  maxStackSize: integer().notNull(),
 });
 
-export const userId = () => uuid().$type<UserId>();
+export const consumableInstanceTable = pgTable("consumable_instance", {
+  id: shortId<ConsumableInstanceId>().$defaultFn(createShortId).primaryKey(),
+  definitionId: shortId<ConsumableDefinitionId>()
+    .notNull()
+    .references(() => consumableDefinitionTable.id),
+  ...sharedItemInstanceColumns,
+  stackSize: integer().notNull(),
+});
 
-export const characterId = () => shortId().$type<CharacterId>();
+export const equipmentDefinitionTable = pgTable("equipment_definition", {
+  id: shortId<EquipmentDefinitionId>().$defaultFn(createShortId).primaryKey(),
+  ...sharedItemDefinitionColumns,
+  maxDurability: integer().notNull(),
+});
+
+export const equipmentInstanceTable = pgTable("equipment_instance", {
+  id: shortId<EquipmentInstanceId>().$defaultFn(createShortId).primaryKey(),
+  definitionId: shortId<EquipmentDefinitionId>()
+    .notNull()
+    .references(() => equipmentDefinitionTable.id),
+  ...sharedItemInstanceColumns,
+  durability: integer().notNull(),
+});
+
+const userId = () => uuid().$type<UserId>();
 
 export const characterTable = pgTable("character", {
-  id: characterId().$defaultFn(createShortId).primaryKey(),
+  id: shortId<CharacterId>().$defaultFn(createShortId).primaryKey(),
   coords: vector<Tile>().notNull(),
   areaId: areaId()
     .notNull()
@@ -80,12 +101,10 @@ export const characterTable = pgTable("character", {
   name: varchar({ length: 64 }).notNull(),
   online: boolean().notNull().default(false),
   xp: real().notNull(),
-  inventoryId: inventoryId()
+  inventoryId: shortId<InventoryId>()
     .notNull()
     .references(() => inventoryTable.id),
 });
-
-export const npcId = () => shortId().$type<NpcId>();
 
 // TODO would like to use pgEnum but it's bugged: https://github.com/drizzle-team/drizzle-orm/issues/3514
 export const npcType = varchar({ enum: npcTypes });
@@ -94,7 +113,7 @@ export const npcType = varchar({ enum: npcTypes });
  * Static information about an NPC.
  */
 export const npcTable = pgTable("npc", {
-  id: npcId().$defaultFn(createShortId).primaryKey(),
+  id: shortId<NpcId>().$defaultFn(createShortId).primaryKey(),
   speed: integer().$type<Tile>().notNull(),
   maxHealth: real().notNull(),
   attackDamage: real().notNull(),
@@ -108,29 +127,31 @@ export const npcTable = pgTable("npc", {
   aggroRange: real().$type<Tile>().notNull(),
 });
 
-export const npcRewardId = () => shortId().$type<NpcRewardId>();
-
 export const npcRewardTable = pgTable("npc_reward", {
-  id: npcRewardId().$defaultFn(createShortId).primaryKey(),
-  npcId: npcId()
+  id: shortId<NpcRewardId>().$defaultFn(createShortId).primaryKey(),
+  npcId: shortId<NpcId>()
     .notNull()
     .references(() => npcTable.id),
-  itemId: itemId().references(() => itemTable.id),
+  consumableItemId: shortId<ConsumableDefinitionId>().references(
+    () => consumableDefinitionTable.id,
+  ),
+  equipmentItemId: shortId<EquipmentDefinitionId>().references(
+    () => equipmentDefinitionTable.id,
+  ),
+  itemAmount: integer(),
   xp: real(),
 });
-
-export const npcSpawnId = () => shortId().$type<NpcSpawnId>();
 
 /**
  * Information about how npc instances should be spawned
  */
 export const npcSpawnTable = pgTable("npc_spawn", {
-  id: npcSpawnId().$defaultFn(createShortId).primaryKey(),
+  id: shortId<NpcSpawnId>().$defaultFn(createShortId).primaryKey(),
   count: integer().notNull(),
   areaId: areaId()
     .notNull()
     .references(() => areaTable.id),
-  npcId: npcId()
+  npcId: shortId<NpcId>()
     .notNull()
     .references(() => npcTable.id),
   coords: vector<Tile>(),

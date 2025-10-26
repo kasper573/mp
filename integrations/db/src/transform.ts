@@ -1,14 +1,23 @@
-import type { characterTable, npcRewardTable } from "@mp/db";
-import type { ActorModelLookup, NpcReward } from "@mp/game-shared";
+import type {
+  ActorModelLookup,
+  ConsumableDefinition,
+  EquipmentDefinition,
+  NpcReward,
+} from "@mp/game-shared";
 import { Character } from "@mp/game-shared";
-import { cardinalDirections } from "@mp/math";
-import type { Rng } from "@mp/std";
 import { assert } from "@mp/std";
+import type {
+  characterTable,
+  npcRewardTable,
+  equipmentDefinitionTable,
+  consumableDefinitionTable,
+} from "./schema";
+
+// Transformer functions to and from database and game state
 
 export function characterFromDbFields(
   fields: typeof characterTable.$inferSelect,
   modelLookup: ActorModelLookup,
-  rng: Rng,
 ): Character {
   const model = assert(
     modelLookup.get(fields.modelId),
@@ -45,7 +54,7 @@ export function characterFromDbFields(
     movement: {
       coords: fields.coords,
       speed: fields.speed,
-      dir: rng.oneOf(cardinalDirections),
+      dir: "s",
       desiredPortalId: undefined,
       moveTarget: undefined,
       path: undefined,
@@ -72,12 +81,39 @@ export function npcRewardsFromDbFields(
       xp: fields.xp,
     });
   }
-  if (fields.itemId !== null) {
+  if (fields.consumableItemId !== null) {
     rewards.push({
       npcId: fields.npcId,
       type: "item",
-      itemId: fields.itemId,
+      reference: { type: "consumable", definitionId: fields.consumableItemId },
+      amount: assert(
+        fields.itemAmount,
+        "Item amount must be defined alongside an item reference",
+      ),
+    });
+  }
+  if (fields.equipmentItemId !== null) {
+    rewards.push({
+      npcId: fields.npcId,
+      type: "item",
+      reference: { type: "equipment", definitionId: fields.equipmentItemId },
+      amount: assert(
+        fields.itemAmount,
+        "Item amount must be defined alongside an item reference",
+      ),
     });
   }
   return rewards;
+}
+
+export function equipmentDefinitionFromDbFields(
+  fields: typeof equipmentDefinitionTable.$inferSelect,
+): EquipmentDefinition {
+  return { type: "equipment", ...fields };
+}
+
+export function consumableDefinitionFromDbFields(
+  fields: typeof consumableDefinitionTable.$inferSelect,
+): ConsumableDefinition {
+  return { type: "consumable", ...fields };
 }

@@ -1,5 +1,10 @@
 import { createApiClient } from "@mp/api-service/sdk";
-import { createDbClient } from "@mp/db";
+import {
+  createDbClient,
+  selectAllItemDefinitions,
+  selectAllNpcRewards,
+  selectAllSpawnAndNpcPairs,
+} from "@mp/db";
 import {
   createEventInvoker,
   createProxyEventInvoker,
@@ -13,7 +18,6 @@ import {
   GameServiceConfig,
   gameServiceConfigRedisKey,
   GameStateGlobals,
-  loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
 } from "@mp/game-shared";
@@ -35,10 +39,11 @@ import "dotenv/config";
 import {
   ctxActorModelLookup,
   ctxArea,
+  ctxDbClient,
   ctxGameEventClient,
   ctxGameState,
-  ctxGameStateLoader,
   ctxGameStateServer,
+  ctxItemDefinitionLookup,
   ctxLogger,
   ctxNpcSpawner,
   ctxRng,
@@ -48,7 +53,7 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
-import { GameStateLoader } from "./etc/game-state-loader";
+import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcRewardSystem } from "./etc/npc-reward-system";
@@ -59,6 +64,7 @@ import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
 import { gameServiceEvents, type GameServiceEvents } from "./router";
+import { loadAreaResource } from "./integrations/load-area-resource";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -92,7 +98,7 @@ gameServiceConfig.subscribe((config) => {
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbClient(opt.databaseConnectionString);
-db.$client.on("error", (err) => logger.error(err, "Database error"));
+db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);
 const [area, actorModels] = await withBackoffRetries(() =>
@@ -107,7 +113,6 @@ const [area, actorModels] = await withBackoffRetries(() =>
   process.exit(1);
 });
 
-const gameStateLoader = new GameStateLoader(db, area, actorModels, rng);
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
 const eventInvoker = new QueuedEventInvoker({
@@ -224,23 +229,16 @@ const updateTicker = new Ticker({
 });
 
 logger.info(`Getting all NPCs and spawns...`);
+
 const npcSpawner = new NpcSpawner(
   area,
   actorModels,
-  await gameStateLoader.getAllSpawnsAndTheirNpcs(),
+  await selectAllSpawnAndNpcPairs(db, area.id),
   rng,
-);
-
-logger.info(`Getting all NPC rewards...`);
-const npcRewardSystem = new NpcRewardSystem(
-  logger,
-  gameState,
-  rng,
-  await gameStateLoader.getAllNpcRewards(),
 );
 
 const ioc = new InjectionContainer()
-  .provide(ctxGameStateLoader, gameStateLoader)
+  .provide(ctxDbClient, db)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxArea, area)
@@ -248,7 +246,17 @@ const ioc = new InjectionContainer()
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
   .provide(ctxNpcSpawner, npcSpawner)
-  .provide(ctxGameEventClient, gameEventBroadcastClient);
+  .provide(ctxGameEventClient, gameEventBroadcastClient)
+  .provide(
+    ctxItemDefinitionLookup,
+    createItemDefinitionLookup(await selectAllItemDefinitions(db)),
+  );
+
+logger.info(`Getting all NPC rewards...`);
+const npcRewardSystem = new NpcRewardSystem(
+  ioc,
+  await selectAllNpcRewards(db, area.id),
+);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
@@ -260,15 +268,14 @@ updateTicker.subscribe(
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 
-startGameStateDbSync(
+startGameStateDbSync({
   db,
   area,
-  gameState,
-  gameStateServer,
+  state: gameState,
+  server: gameStateServer,
   actorModels,
-  rng,
   logger,
-);
+});
 
 updateTicker.start(opt.tickInterval);
 

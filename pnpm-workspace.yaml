@@ -4,12 +4,13 @@ packages:
   - "libraries/*"
 catalog:
   "@types/node": ^22.13.10
-  preact: 10.27.0
+  preact: 10.27.2
   typescript: 5.9.0-beta
   vitest: 3.1.4
   "@vanilla-extract/vite-plugin": 5.0.6
   vite: 6.3.5
   "@preact/preset-vite": 2.10.2
+  "@prefresh/core": 1.5.8
   tsx: 4.19.2
   dotenv: 17.2.0
   express: 5.1.0

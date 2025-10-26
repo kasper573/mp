@@ -16,6 +16,7 @@
     }
   },
   "scripts": {
+    "build": "tsc",
     "push": "drizzle-kit push",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
@@ -25,6 +26,7 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@mp/game-shared": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",

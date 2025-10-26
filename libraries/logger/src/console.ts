@@ -1,11 +1,15 @@
 // oxlint-disable no-console
 import type { Logger } from "./abstract";
 
-export function createConsoleLogger(): Logger {
+export function createConsoleLogger(
+  bindings?: Record<string, unknown>,
+): Logger {
   return {
-    info: console.info.bind(console),
-    warn: console.warn.bind(console),
-    error: console.error.bind(console),
-    debug: console.debug.bind(console),
+    info: (...args: unknown[]) => console.info(...args, bindings),
+    warn: (...args: unknown[]) => console.warn(...args, bindings),
+    error: (...args: unknown[]) => console.error(...args, bindings),
+    debug: (...args: unknown[]) => console.debug(...args, bindings),
+    child: (childBindings) =>
+      createConsoleLogger({ ...bindings, ...childBindings }),
   };
 }

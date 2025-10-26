@@ -1,15 +1,18 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { Item } from "@mp/db";
-import type { AreaId, ItemId } from "@mp/db/types";
-import type {
-  ActorTextureLookup,
-  AreaAssetsLookup,
-  ItemLookup,
+import type { AreaId } from "@mp/db/types";
+import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
+import {
+  browserLoadAreaResource,
+  loadActorTextureLookup,
+  type GameAssetLoader,
 } from "@mp/game-client";
-import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
-import type { AreaResource } from "@mp/game-shared";
-import { loadAreaResource } from "@mp/game-shared";
-import { useQueries, useSuspenseQueries, useSuspenseQuery } from "@mp/query";
+import type {
+  AreaResource,
+  ItemDefinitionByReference,
+  ItemDefinitionLookup,
+  ItemReference,
+} from "@mp/game-shared";
+import { useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
@@ -47,7 +50,7 @@ export function useAreaResource(areaId: AreaId): AreaResource {
   const query = useSuspenseQuery({
     queryKey: ["areaResource", url, areaId],
     staleTime: Infinity,
-    queryFn: () => loadAreaResource(areaId, url),
+    queryFn: () => browserLoadAreaResource(areaId, url),
   });
   return query.data;
 }
@@ -63,27 +66,29 @@ export function useAreaSpritesheets(
   return query.data;
 }
 
-export const useItems: ItemLookup = (itemIds) => {
+export const useItemDefinition: ItemDefinitionLookup = <
+  Ref extends ItemReference,
+>(
+  ref: Ref,
+) => {
   const api = useApi();
-  return useQueries({
-    queries: new Set(itemIds)
-      .values()
-      .map((itemId) => api.item.queryOptions(itemId))
-      .toArray(),
-    combine: (result) => {
-      const map = new Map<ItemId, Item>();
-      for (const item of result) {
-        if (item.data) {
-          map.set(item.data.id, item.data);
-        }
-      }
-      return map;
-    },
-  });
+  const { data } = useSuspenseQuery(
+    // Note that it's important to destructure `ref`,
+    // since it's generic and could contain excess properties that would pollute the query key.
+    api.itemDefinition.queryOptions({
+      type: ref.type,
+      definitionId: ref.definitionId,
+    }),
+  );
+
+  // TRPC does not support generic type parameters in procedures,
+  // so i have to assert to restore the generic type information here.
+  // it's safe to do, just ugly.
+  return data as ItemDefinitionByReference<Ref>;
 };
 
 export const gameAssetLoader: GameAssetLoader = {
   useAreaAssets,
-  useItems,
+  useItemDefinition,
   useActorTextures,
 };
