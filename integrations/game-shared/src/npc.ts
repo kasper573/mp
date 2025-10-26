@@ -1,4 +1,4 @@
-import type { ActorModelId, NpcId, NpcSpawnId, NpcType } from "@mp/db/types";
+import type { ActorModelId, NpcId, NpcSpawnId, NpcType } from "./ids";
 import type { Path, Vector } from "@mp/math";
 import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 import { object, prop } from "@mp/sync";

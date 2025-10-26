@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/db/types";
+import type { AreaId } from "./ids";
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph } from "@mp/path-finding";

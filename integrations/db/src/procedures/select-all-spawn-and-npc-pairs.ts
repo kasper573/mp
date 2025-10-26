@@ -2,7 +2,7 @@ import type { NpcSpawn, Npc } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { npcSpawnTable, npcTable } from "../schema";
-import type { AreaId } from "../types";
+import type { AreaId } from "@mp/game-shared";
 
 export async function selectAllSpawnAndNpcPairs(
   db: DbClient,

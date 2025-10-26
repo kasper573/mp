@@ -2,7 +2,7 @@ import type {
   ConsumableInstanceId,
   EquipmentInstanceId,
   InventoryId,
-} from "@mp/db/types";
+} from "./ids";
 import { object, prop } from "@mp/sync";
 import { type } from "@mp/validate";
 

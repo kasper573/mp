@@ -1,4 +1,4 @@
-import type { NpcSpawnId } from "@mp/db/types";
+import type { NpcSpawnId } from "@mp/game-shared";
 import type { AreaResource, Npc, NpcSpawn } from "@mp/game-shared";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";

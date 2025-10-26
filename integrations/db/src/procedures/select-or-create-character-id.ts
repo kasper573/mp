@@ -3,7 +3,7 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
-import type { AreaId, CharacterId } from "../types";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
 
 export async function selectOrCreateCharacterIdForUser(

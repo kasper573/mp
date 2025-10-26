@@ -1,4 +1,4 @@
-import type { CharacterId, NpcId } from "@mp/db/types";
+import type { CharacterId, NpcId } from "@mp/game-shared";
 import type { Character, NpcReward } from "@mp/game-shared";
 import { assert } from "@mp/std";
 import { spawnItem } from "./item-spawn-system";

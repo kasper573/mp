@@ -3,7 +3,7 @@ import { and, eq, exists } from "drizzle-orm";
 import { DbClient } from "../client";
 import { npcSpawnTable, npcRewardTable } from "../schema";
 import { npcRewardsFromDbFields } from "../transform";
-import type { AreaId } from "../types";
+import type { AreaId } from "@mp/game-shared";
 
 export async function selectAllNpcRewards(
   db: DbClient,

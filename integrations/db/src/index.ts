@@ -1,5 +1,4 @@
 export { type DbClient, createDbClient } from "./client";
-export type * from "./types";
 export * from "./procedures/select-all-actor-model-ids";
 export * from "./procedures/select-all-item-definitions";
 export * from "./procedures/select-all-npc-rewards";

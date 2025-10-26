@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "./ids";
 import type { RoleDefinition, UserId } from "@mp/oauth";
 
 export interface UserSession<Id extends string = string> {

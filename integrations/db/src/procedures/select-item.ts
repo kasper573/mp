@@ -2,7 +2,10 @@ import assert from "assert";
 import { eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { consumableDefinitionTable, equipmentDefinitionTable } from "../schema";
-import type { ConsumableDefinitionId, EquipmentDefinitionId } from "../types";
+import type {
+  ConsumableDefinitionId,
+  EquipmentDefinitionId,
+} from "@mp/game-shared";
 
 export async function selectConsumableDefinition(
   db: DbClient,

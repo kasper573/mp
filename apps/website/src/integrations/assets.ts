@@ -1,5 +1,5 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { AreaId } from "@mp/db/types";
+import type { AreaId } from "@mp/game-shared";
 import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
 import {
   browserLoadAreaResource,

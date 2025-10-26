@@ -20,8 +20,8 @@ import type {
   NpcId,
   NpcRewardId,
   NpcSpawnId,
-} from "./types";
-import { npcTypes } from "./types";
+} from "@mp/game-shared";
+import { npcTypes } from "@mp/game-shared";
 import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";

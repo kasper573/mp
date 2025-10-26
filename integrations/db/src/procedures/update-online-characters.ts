@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { DbClient } from "../client";
 import { characterTable } from "../schema";
-import type { CharacterId } from "../types";
+import type { CharacterId } from "@mp/game-shared";
 
 export async function updateOnlineCharacters(
   db: DbClient,

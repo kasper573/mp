@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { characterTable } from "../schema";
 import { characterFromDbFields } from "../transform";
-import type { CharacterId, AreaId } from "../types";
+import type { CharacterId, AreaId } from "@mp/game-shared";
 
 export async function updateCharactersArea(
   db: DbClient,

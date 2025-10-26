@@ -1,5 +1,5 @@
 import { selectOrCreateCharacterIdForUser } from "@mp/db";
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import { unsafe } from "@mp/validate";
 import { ctxDbClient } from "../context";
 import { auth } from "../integrations/auth";

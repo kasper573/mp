@@ -16,13 +16,8 @@ import {
   npcSpawnTable,
   npcTable,
 } from "./src/schema";
-import {
-  npcTypes,
-  type ActorModelId,
-  type AreaId,
-  type NpcId,
-  type NpcSpawnId,
-} from "./src/types";
+import type { ActorModelId, NpcId, NpcSpawnId, AreaId } from "@mp/game-shared";
+import { npcTypes } from "@mp/game-shared";
 
 // This is not a long term plan.
 // The proper solution is to provision game data via an external repository

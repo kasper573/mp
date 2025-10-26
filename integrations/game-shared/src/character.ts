@@ -1,4 +1,4 @@
-import type { CharacterId, InventoryId } from "@mp/db/types";
+import type { CharacterId, InventoryId } from "./ids";
 import type { UserId } from "@mp/oauth";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";

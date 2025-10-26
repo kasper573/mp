@@ -19,3 +19,4 @@ export * from "./session";
 export * from "./tiled-fixture";
 export * from "./tiled-resource";
 export * from "./tiled-walkable-checker";
+export * from "./ids";

@@ -1,6 +1,6 @@
 import { DbClient } from "../client";
 import { actorModelTable } from "../schema";
-import type { ActorModelId } from "../types";
+import type { ActorModelId } from "@mp/game-shared";
 
 export async function selectAllActorModelIds(
   db: DbClient,

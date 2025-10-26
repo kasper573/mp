@@ -1,4 +1,4 @@
-import type { NpcType } from "@mp/db/types";
+import type { NpcType } from "@mp/game-shared";
 import type {
   ActorModelLookup,
   AreaResource,

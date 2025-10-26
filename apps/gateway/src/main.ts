@@ -1,5 +1,5 @@
 import { createDbClient, updateOnlineCharacters } from "@mp/db";
-import type { AreaId, CharacterId } from "@mp/db/types";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
