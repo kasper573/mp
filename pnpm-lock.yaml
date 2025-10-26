@@ -116,6 +116,9 @@ importers:
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
@@ -314,6 +317,9 @@ importers:
       '@mp/api-service':
         specifier: workspace:*
         version: link:../api-service
+      '@mp/db':
+        specifier: workspace:*
+        version: link:../../integrations/db
       '@mp/event-router':
         specifier: workspace:*
         version: link:../../libraries/event-router
@@ -341,6 +347,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time
@@ -426,6 +435,9 @@ importers:
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
       '@mp/tiled-renderer':
         specifier: workspace:*
         version: link:../../libraries/tiled-renderer

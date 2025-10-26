@@ -1,9 +1,8 @@
 import type { AreaId } from "@mp/db/types";
+import { AreaResource, TiledResource } from "@mp/game-shared";
 import { createTiledLoader } from "@mp/tiled-loader";
-import { AreaResource } from "./area-resource";
-import { TiledResource } from "./tiled-resource";
 
-export async function loadAreaResource(
+export async function browserLoadAreaResource(
   areaId: AreaId,
   areaFileUrl: string,
 ): Promise<AreaResource> {

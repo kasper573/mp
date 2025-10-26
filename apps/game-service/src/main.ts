@@ -18,7 +18,6 @@ import {
   GameServiceConfig,
   gameServiceConfigRedisKey,
   GameStateGlobals,
-  loadAreaResource,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
 } from "@mp/game-shared";
@@ -65,6 +64,7 @@ import { byteBuckets } from "./metrics/shared";
 import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
 import { gameServiceEvents, type GameServiceEvents } from "./router";
+import { loadAreaResource } from "./integrations/load-area-resource";
 
 // Note that this file is an entrypoint and should not have any exports
 

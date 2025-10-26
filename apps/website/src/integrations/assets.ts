@@ -1,14 +1,17 @@
 import { useApi } from "@mp/api-service/sdk";
 import type { AreaId } from "@mp/db/types";
 import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
-import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
+import {
+  browserLoadAreaResource,
+  loadActorTextureLookup,
+  type GameAssetLoader,
+} from "@mp/game-client";
 import type {
   AreaResource,
   ItemDefinitionByReference,
   ItemDefinitionLookup,
   ItemReference,
 } from "@mp/game-shared";
-import { loadAreaResource } from "@mp/game-shared";
 import { useSuspenseQueries, useSuspenseQuery } from "@mp/query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
@@ -47,7 +50,7 @@ export function useAreaResource(areaId: AreaId): AreaResource {
   const query = useSuspenseQuery({
     queryKey: ["areaResource", url, areaId],
     staleTime: Infinity,
-    queryFn: () => loadAreaResource(areaId, url),
+    queryFn: () => browserLoadAreaResource(areaId, url),
   });
   return query.data;
 }
