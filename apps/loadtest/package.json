@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/db": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/game-client": "workspace:*",
     "@mp/game-service": "workspace:*",
@@ -20,7 +19,6 @@
     "@mp/oauth": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/ws": "workspace:*"
   },

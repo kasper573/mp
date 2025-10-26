@@ -27,7 +27,6 @@
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
     "@mp/telemetry": "workspace:*",
-    "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
