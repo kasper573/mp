@@ -6,10 +6,12 @@ export type DrizzleClient = ReturnType<
   typeof drizzle<Record<string, never>, Pool>
 >;
 
-export function createDbClient(connectionString: string): DbClient {
-  const pool = new pg.Pool({ connectionString });
+export function createDrizzleClient(connectionString: string): DrizzleClient {
+  return drizzle(new pg.Pool({ connectionString }));
+}
 
-  return new DbClient(drizzle({ client: pool }));
+export function createDbClient(connectionString: string): DbClient {
+  return new DbClient(createDrizzleClient(connectionString));
 }
 
 /**

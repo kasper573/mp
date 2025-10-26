@@ -3,7 +3,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
-import { createDbClient } from "./src/client";
+import { createDrizzleClient } from "./src/client";
 import {
   actorModelTable,
   areaTable,
@@ -40,7 +40,9 @@ if (!areaIds.length) {
   throw new Error("No area ids found");
 }
 
-const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+const db = createDrizzleClient(
+  process.env.MP_API_DATABASE_CONNECTION_STRING ?? "",
+);
 
 const tablesToTruncate = {
   npcRewardTable,

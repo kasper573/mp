@@ -1,5 +1,5 @@
 import readline from "node:readline/promises";
-import { createDbClient } from "./src";
+import { createDrizzleClient } from "./src/client";
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -15,7 +15,9 @@ if (answer.trim().toLowerCase() !== "yes") {
   process.exit(0);
 }
 
-const db = createDbClient(process.env.MP_API_DATABASE_CONNECTION_STRING ?? "");
+const db = createDrizzleClient(
+  process.env.MP_API_DATABASE_CONNECTION_STRING ?? "",
+);
 
 await db.$client.query(`
   DO $$
