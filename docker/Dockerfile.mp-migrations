@@ -14,6 +14,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm fetch
 COPY . .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
+# We don't need any build artifacts, but we run this to catch errors early
+RUN pnpm -F db build
+
 COPY <<EOF /app/start.sh
 #!/bin/sh
 set -e
