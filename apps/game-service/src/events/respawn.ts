@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { ctxArea } from "../context";
 import { accessCharacter } from "../etc/access-character";

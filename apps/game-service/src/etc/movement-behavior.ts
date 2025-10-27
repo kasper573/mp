@@ -1,4 +1,4 @@
-import type { AreaId, CharacterId } from "@mp/db/types";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { AreaResource, Character, MovementTrait } from "@mp/game-shared";
 import { getAreaIdFromObject, moveAlongPath } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";

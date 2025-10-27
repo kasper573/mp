@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/db/types";
+import type { AreaId } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";

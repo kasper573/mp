@@ -1,4 +1,4 @@
-import type { AreaId, CharacterId } from "@mp/db/types";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
 import {
   ctxActorModelLookup,

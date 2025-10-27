@@ -1,4 +1,4 @@
-import type { ActorModelId } from "@mp/db/types";
+import type { ActorModelId } from "./actor";
 import type { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { object, prop } from "@mp/sync";

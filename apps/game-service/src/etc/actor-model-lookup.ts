@@ -1,4 +1,4 @@
-import type { ActorModelId } from "@mp/db/types";
+import type { ActorModelId } from "@mp/game-shared";
 import type { ActorModel, ActorModelLookup } from "@mp/game-shared";
 import { Rect } from "@mp/math";
 import type { Tile } from "@mp/std";

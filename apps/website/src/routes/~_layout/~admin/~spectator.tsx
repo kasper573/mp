@@ -1,5 +1,5 @@
 import { useApi } from "@mp/api-service/sdk";
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
 import { useQuery } from "@mp/query";

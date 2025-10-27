@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { type VectorLike, Vector } from "@mp/math";
 import type { Tile } from "@mp/std";

@@ -1,13 +1,13 @@
-import type { NpcSpawn, Npc } from "@mp/game-shared";
+import type { NpcSpawn, NpcDefinition } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { npcSpawnTable, npcTable } from "../schema";
-import type { AreaId } from "../types";
+import type { AreaId } from "@mp/game-shared";
 
 export async function selectAllSpawnAndNpcPairs(
   db: DbClient,
   areaId: AreaId,
-): Promise<Array<{ spawn: NpcSpawn; npc: Npc }>> {
+): Promise<Array<{ spawn: NpcSpawn; npc: NpcDefinition }>> {
   const drizzle = DbClient.unwrap(db);
   const result = await drizzle
     .select()
@@ -19,6 +19,6 @@ export async function selectAllSpawnAndNpcPairs(
     if (!npc) {
       throw new Error(`NPC spawn ${spawn.id} has no NPC`);
     }
-    return { spawn, npc } as { spawn: NpcSpawn; npc: Npc };
+    return { spawn, npc } as { spawn: NpcSpawn; npc: NpcDefinition };
   });
 }

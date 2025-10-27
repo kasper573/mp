@@ -2,7 +2,7 @@ import type { UserId } from "@mp/oauth";
 import { and, eq } from "drizzle-orm";
 import { DbClient } from "../client";
 import { characterTable } from "../schema";
-import type { CharacterId } from "../types";
+import type { CharacterId } from "@mp/game-shared";
 
 export async function mayAccessCharacter(
   db: DbClient,

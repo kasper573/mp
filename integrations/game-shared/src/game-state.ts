@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/db/types";
+import type { AreaId } from "./area";
 import { object, prop, type SyncMap } from "@mp/sync";
 import type { Actor, ActorId } from "./actor";
 import type { ItemInstance, ItemInstanceId } from "./item";

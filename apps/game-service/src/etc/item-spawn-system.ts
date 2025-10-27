@@ -1,7 +1,7 @@
 import type { ItemReference } from "@mp/game-shared";
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import { createShortId } from "@mp/std";
-import type { InventoryId } from "@mp/db/types";
+import type { InventoryId } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import type { InjectionContainer } from "@mp/ioc";
 import { ctxGameState, ctxItemDefinitionLookup } from "../context";

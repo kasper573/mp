@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import type { Character } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import { ctxGameState, ctxUserSession } from "../context";

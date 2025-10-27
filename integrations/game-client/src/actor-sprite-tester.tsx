@@ -1,4 +1,4 @@
-import type { ActorModelId } from "@mp/db/types";
+import type { ActorModelId } from "@mp/game-shared";
 import { Engine } from "@mp/engine";
 import { actorModelStates, type ActorModelState } from "@mp/game-shared";
 import { Container, Text } from "@mp/graphics";

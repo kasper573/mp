@@ -17,7 +17,7 @@ import {
   equipmentInstanceTable,
 } from "../schema";
 import { dbFieldsFromCharacter, characterFromDbFields } from "../transform";
-import type { CharacterId, AreaId } from "../types";
+import type { CharacterId, AreaId } from "@mp/game-shared";
 
 export interface SyncGameStateOptions {
   db: DbClient;

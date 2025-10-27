@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "@mp/game-shared";
 import type { GameEventClient, GameStateEvents } from "@mp/game-service";
 import type { Actor, Character, ItemInstance } from "@mp/game-shared";
 import {

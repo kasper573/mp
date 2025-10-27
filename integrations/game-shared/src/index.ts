@@ -1,6 +1,6 @@
 export * from "./actor";
 export * from "./appearance";
-export * from "./area-resource";
+export * from "./area";
 export * from "./character";
 export * from "./client-view-distance-settings";
 export * from "./combat";

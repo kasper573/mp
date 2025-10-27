@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/db/types";
+import type { AreaId } from "@mp/game-shared";
 import { AreaResource, TiledResource } from "@mp/game-shared";
 import { createTiledLoader } from "@mp/tiled-loader";
 

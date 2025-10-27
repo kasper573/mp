@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/db/types";
+import type { CharacterId } from "./character";
 import { createEncoding } from "@mp/encoding";
 import type { EventRouterMessage } from "@mp/event-router";
 import type { AnyPatch, SyncEvent } from "@mp/sync";
