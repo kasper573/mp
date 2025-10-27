@@ -5,6 +5,7 @@ import monorepoCopPlugin from "eslint-plugin-monorepo-cop";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import tseslint from "typescript-eslint";
+import { requireDbResultReturn } from "./db-rules.mjs";
 
 const rootDir = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -45,6 +46,11 @@ export default tseslint.config(
       "@typescript-eslint": tseslint.plugin,
       boundaries: boundariesPlugin,
       "monorepo-cop": monorepoCopPlugin,
+      "mp-db": {
+        rules: {
+          "require-db-result-return": requireDbResultReturn,
+        },
+      },
     },
     settings: {
       "boundaries/elements": [
@@ -66,6 +72,7 @@ export default tseslint.config(
     rules: {
       "@typescript-eslint/await-thenable": "error",
       "@typescript-eslint/no-floating-promises": "error",
+      "mp-db/require-db-result-return": "warn",
       "monorepo-cop/no-relative-import-outside-package": "error",
       "boundaries/element-types": [
         2,
