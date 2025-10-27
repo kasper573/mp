@@ -16,6 +16,7 @@ test-results
 .cache-loader
 *.tsbuildinfo
 .tanstack
+.turbo
 
 # misc
 .DS_Store

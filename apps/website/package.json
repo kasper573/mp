@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "pnpm devenv vite --host 0.0.0.0",
+    "dev": "pnpm devenv vite --host 0.0.0.0 --clearScreen false",
     "build": "vite build",
     "preview": "vite preview --port 5173 --host 0.0.0.0",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- "
