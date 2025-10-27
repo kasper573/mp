@@ -46,10 +46,10 @@ const db = createDrizzleClient(
 
 const tablesToTruncate = {
   npcRewardTable,
-  consumableDefinitionTable,
   consumableInstanceTable,
-  equipmentDefinitionTable,
+  consumableDefinitionTable,
   equipmentInstanceTable,
+  equipmentDefinitionTable,
   npcSpawnTable,
   npcTable,
   characterTable,
