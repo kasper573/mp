@@ -381,9 +381,6 @@ importers:
       '@mp/api-service':
         specifier: workspace:*
         version: link:../api-service
-      '@mp/db':
-        specifier: workspace:*
-        version: link:../../integrations/db
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
@@ -506,9 +503,6 @@ importers:
 
   integrations/game-client:
     dependencies:
-      '@mp/db':
-        specifier: workspace:*
-        version: link:../db
       '@mp/engine':
         specifier: workspace:*
         version: link:../../libraries/engine
@@ -573,9 +567,6 @@ importers:
 
   integrations/game-shared:
     dependencies:
-      '@mp/db':
-        specifier: workspace:*
-        version: link:../db
       '@mp/encoding':
         specifier: workspace:*
         version: link:../../libraries/encoding
