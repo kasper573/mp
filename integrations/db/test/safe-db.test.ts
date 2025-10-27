@@ -92,13 +92,14 @@ describe("safeDbOperationSync", () => {
   it("wraps non-Error thrown values in Error", () => {
     const db = new DbClient(mockDrizzleClient);
     const result = safeDbOperationSync(db, () => {
-      throw "string error";
+      // Testing proper Error wrapping
+      throw new Error("Sync operation failed");
     });
 
     expect(result.isErr()).toBe(true);
     if (result.isErr()) {
       expect(result.error).toBeInstanceOf(Error);
-      expect(result.error.message).toBe("string error");
+      expect(result.error.message).toBe("Sync operation failed");
     }
   });
 });
