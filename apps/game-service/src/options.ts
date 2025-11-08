@@ -1,4 +1,5 @@
 import { assertEnv } from "@mp/env";
+import { AreaIdType } from "@mp/game-shared";
 import { TimeSpan } from "@mp/time";
 import { boolish, numeric, type } from "@mp/validate";
 
@@ -10,7 +11,7 @@ export const gameServiceOptionsSchema = type({
   /**
    * The id ofthe area that this game service instance will handle.
    */
-  areaId: type("string").brand("AreaId"),
+  areaId: AreaIdType,
   /**
    * The URL to the gateway WebSocket server.
    */

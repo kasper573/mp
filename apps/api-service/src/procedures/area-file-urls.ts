@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/game-shared";
+import { AreaIdType, type AreaId } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { UrlString } from "@mp/std";
 import { type } from "@mp/validate";
@@ -10,7 +10,7 @@ import { rpc } from "../integrations/trpc";
 export const areaFileUrl = rpc.procedure
   .input(
     type({
-      areaId: type("string").brand("AreaId"),
+      areaId: AreaIdType,
       urlType: FileUrlType,
     }),
   )
