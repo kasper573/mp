@@ -1,16 +1,19 @@
-import { selectOrCreateCharacterIdForUser } from "@mp/db";
 import type { CharacterId } from "@mp/game-shared";
 import { unsafe } from "@mp/validate";
-import { ctxDbClient } from "../context";
+import { ctxDb } from "../context";
 import { auth } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
 import { getDefaultSpawnPoint } from "./default-spawn-point";
+import { promiseFromResult } from "@mp/std";
 
 export const myCharacterId = rpc.procedure
   .use(auth())
   .output(unsafe<CharacterId>())
   .query(({ ctx }) =>
-    selectOrCreateCharacterIdForUser(ctx.ioc.get(ctxDbClient), ctx.user, () =>
-      getDefaultSpawnPoint(ctx.ioc),
+    promiseFromResult(
+      ctx.ioc.get(ctxDb).selectOrCreateCharacterIdForUser({
+        user: ctx.user,
+        getDefaultSpawnPoint: () => getDefaultSpawnPoint(ctx.ioc),
+      }),
     ),
   );

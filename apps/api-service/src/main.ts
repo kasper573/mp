@@ -1,4 +1,4 @@
-import { createDbClient } from "@mp/db";
+import { createRepository } from "@mp/db";
 import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -13,7 +13,7 @@ import express from "express";
 import type { IncomingHttpHeaders } from "http";
 import {
   ctxAccessToken,
-  ctxDbClient,
+  ctxDb,
   ctxFileResolver,
   ctxGameServiceConfig,
   ctxTokenResolver,
@@ -32,7 +32,7 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const db = createDbClient(opt.databaseConnectionString);
+const db = createRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const redisClient = new Redis(opt.redisPath);
@@ -56,7 +56,7 @@ const fileResolver = createFileResolver(
 const ioc = new InjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
-  .provide(ctxDbClient, db)
+  .provide(ctxDb, db)
   .provide(ctxGameServiceConfig, gameServiceConfig);
 
 const app = express()

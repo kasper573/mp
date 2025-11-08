@@ -1,9 +1,11 @@
-import { selectOnlineCharacterList } from "@mp/db";
 import { gatewayRoles } from "@mp/keycloak";
-import { ctxDbClient } from "../context";
+import { ctxDb } from "../context";
 import { roles } from "../integrations/auth";
 import { rpc } from "../integrations/trpc";
+import { promiseFromResult } from "@mp/std";
 
 export const characterList = rpc.procedure
   .use(roles([gatewayRoles.spectate]))
-  .query(({ ctx }) => selectOnlineCharacterList(ctx.ioc.get(ctxDbClient)));
+  .query(({ ctx }) =>
+    promiseFromResult(ctx.ioc.get(ctxDb).selectOnlineCharacterList()),
+  );

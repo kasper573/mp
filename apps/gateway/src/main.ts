@@ -1,4 +1,4 @@
-import { createDbClient, updateOnlineCharacters } from "@mp/db";
+import { createRepository } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
@@ -39,7 +39,7 @@ import express from "express";
 import type { IncomingMessage } from "http";
 import http from "http";
 import {
-  ctxDbClient,
+  ctxDb,
   ctxGameEventClient,
   ctxUserSession,
   ctxUserSessionSignal,
@@ -79,7 +79,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const db = createDbClient(opt.databaseConnectionString);
+const db = createRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver({
@@ -103,16 +103,20 @@ const gatewayEventInvoker = new QueuedEventInvoker({
   logger,
 });
 
-const ioc = new InjectionContainer().provide(ctxDbClient, db);
+const ioc = new InjectionContainer().provide(ctxDb, db);
 
 const saveOnlineCharactersDeduped = dedupe(
   debounce(
     (ids: CharacterId[]) =>
-      void updateOnlineCharacters(db, ids).catch((error) =>
-        logger.error(
-          new Error("Failed to save online characters", { cause: error }),
-        ),
-      ),
+      void db.updateOnlineCharacters(ids).then((result) => {
+        if (result.isErr()) {
+          logger.error(
+            new Error("Failed to save online characters", {
+              cause: result.error,
+            }),
+          );
+        }
+      }),
     100,
   ),
   arrayShallowEquals,

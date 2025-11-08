@@ -8,19 +8,18 @@ import type {
 } from "@mp/game-shared";
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import { assert } from "@mp/std";
+import { assert, ResultAsync } from "@mp/std";
 import { inArray, and, eq } from "drizzle-orm";
-import { DbClient } from "../client";
 import {
   characterTable,
   consumableInstanceTable,
   equipmentInstanceTable,
-} from "../schema";
-import { dbFieldsFromCharacter, characterFromDbFields } from "../transform";
+} from "./schema";
+import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
+import type { DrizzleClient } from "./client";
 
 export interface SyncGameStateOptions {
-  db: DbClient;
   area: AreaResource;
   state: GameState;
   actorModels: ActorModelLookup;
@@ -37,21 +36,26 @@ export interface SyncGameStateOptions {
  * This is an intentional limitation to keep the sync system simple.
  * If we ever need external systems to manipiulate persisted game state we'll have to look into more robust sync mechanisms.
  */
-export async function syncGameState({
-  db,
-  area,
-  state,
-  actorModels,
-  logger,
-  markToResendFullState,
-}: SyncGameStateOptions) {
-  const drizzle = DbClient.unwrap(db);
-
-  await save();
-  await load();
+export function syncGameState(
+  drizzle: DrizzleClient,
+  {
+    area,
+    state,
+    actorModels,
+    logger,
+    markToResendFullState,
+  }: SyncGameStateOptions,
+) {
+  return ResultAsync.fromPromise(
+    (async () => {
+      await save();
+      await load();
+    })(),
+    (e) => e,
+  );
 
   async function load() {
-    const dbIds = await getOnlineCharacterIdsForAreaFromDb(db, area.id);
+    const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, area.id);
     const stateIds = characterIdsInState(state);
     const removedIds = stateIds.difference(dbIds);
     const addedIds = dbIds.difference(stateIds);
@@ -201,10 +205,9 @@ export async function syncGameState({
 }
 
 async function getOnlineCharacterIdsForAreaFromDb(
-  db: DbClient,
+  drizzle: DrizzleClient,
   areaId: AreaId,
 ): Promise<ReadonlySet<CharacterId>> {
-  const drizzle = DbClient.unwrap(db);
   return new Set(
     (
       await drizzle

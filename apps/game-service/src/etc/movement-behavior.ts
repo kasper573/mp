@@ -7,12 +7,11 @@ import { assert, type Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import {
   ctxArea,
-  ctxDbClient,
+  ctxDb,
   ctxGameEventClient,
   ctxGameState,
   ctxLogger,
 } from "../context";
-import { upsertCharacter } from "@mp/db";
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {
@@ -88,13 +87,15 @@ export function sendCharacterToArea(
   // any mutations that's been done to this character this server tick would be lost unless we save them explicitly right now,
   // since regular persistence is done on interval, an interval which we would miss here.
   const logger = ioc.get(ctxLogger);
-  const db = ioc.get(ctxDbClient);
-  void upsertCharacter(db, char).catch((e) => {
-    logger.error(
-      new Error("Failed to save character changes to db before area change", {
-        cause: e,
-      }),
-    );
+  const db = ioc.get(ctxDb);
+  db.upsertCharacter(char).then((result) => {
+    if (result.isErr()) {
+      logger.error(
+        new Error("Failed to save character changes to db before area change", {
+          cause: result.error,
+        }),
+      );
+    }
   });
 
   // But if we're moving to a different area we must communicate
