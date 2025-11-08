@@ -35,6 +35,9 @@ export interface SyncGameStateOptions {
  * since those changes may be overwritten by game services.
  * This is an intentional limitation to keep the sync system simple.
  * If we ever need external systems to manipiulate persisted game state we'll have to look into more robust sync mechanisms.
+ *
+ * Note: Alternative sync mechanisms like Electric SQL were investigated but found to be unsuitable
+ * for this server-to-server bidirectional sync use case. See electric-investigation.md for details.
  */
 export function syncGameState(
   drizzle: DrizzleClient,
