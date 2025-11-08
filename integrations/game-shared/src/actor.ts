@@ -7,5 +7,5 @@ export const ActorIdType = NpcInstanceIdType.or(CharacterIdType);
 
 export type Actor = Character | NpcInstance;
 
-export const actorModelIdType = type("string").brand("ActorModelId");
-export type ActorModelId = typeof actorModelIdType.infer;
+export const ActorModelIdType = type("string").brand("ActorModelId");
+export type ActorModelId = typeof ActorModelIdType.infer;
