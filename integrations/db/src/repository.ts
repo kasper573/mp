@@ -17,7 +17,7 @@ import type { SyncGameStateOptions } from "./utils/sync-game-state";
 import { syncGameState } from "./utils/sync-game-state";
 
 /**
- * The all database querying must be done through the repository.
+ * All database interactions must be done through the repository.
  * We separate query definitions into procedures internally in the db package,
  * but only the repository will be exposed outside the package.
  */
