@@ -65,10 +65,8 @@ export const NpcInstance = object({
   appearance: AppearanceTrait,
   movement: MovementTrait,
   combat: CombatTrait,
-  etc: object({
-    aggroRange: prop<Tile>(),
-    patrol: prop<Path<Tile> | undefined>(),
-  }),
+  aggroRange: prop<Tile>(),
+  patrol: prop<Path<Tile> | undefined>(),
 });
 
 export type NpcInstance = typeof NpcInstance.$infer;

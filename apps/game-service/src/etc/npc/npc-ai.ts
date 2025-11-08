@@ -69,7 +69,7 @@ export class NpcAi {
           const combatant = assert(this.gameState.actors.get(combatantId));
           return observer.movement.coords.isWithinDistance(
             combatant.movement.coords,
-            observer.etc.aggroRange,
+            observer.aggroRange,
           );
         },
       );
@@ -99,12 +99,12 @@ export class NpcAi {
       case "static":
         return createIdleTask();
       case "patrol":
-        if (!npc.etc.patrol) {
+        if (!npc.patrol) {
           throw new Error(
             `NPC instance "${npc.identity.id}" of type "patrol" does not have a patrol path defined.`,
           );
         }
-        return createPatrolTask(npc.etc.patrol);
+        return createPatrolTask(npc.patrol);
       case "pacifist":
         return this.idleOrWander(tick);
       case "aggressive":
