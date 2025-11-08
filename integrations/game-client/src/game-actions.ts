@@ -16,7 +16,9 @@ export class GameActions {
     return this.events.character.move({
       characterId: assert(this.characterId.value),
       to,
-      desiredPortalId,
+      // Bonkers workaround because arktype can't handle undefined being passed to optional fields
+      // See https://github.com/arktypeio/arktype/issues/1191
+      ...(desiredPortalId ? { desiredPortalId } : {}),
     });
   }
 
