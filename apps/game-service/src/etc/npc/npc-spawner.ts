@@ -105,10 +105,8 @@ export class NpcSpawner {
         attackTargetId: undefined,
         lastAttack: undefined,
       },
-      etc: {
-        patrol: spawn.patrol ?? undefined,
-        aggroRange: npc.aggroRange,
-      },
+      patrol: spawn.patrol ?? undefined,
+      aggroRange: npc.aggroRange,
       movement: {
         coords,
         speed: npc.speed,

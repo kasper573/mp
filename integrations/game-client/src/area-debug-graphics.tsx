@@ -71,7 +71,7 @@ export class AreaDebugGraphics extends Container {
         new DebugCircle(() => ({
           tiled: area.tiled,
           pos: npc.movement.coords,
-          radius: npc.etc.aggroRange,
+          radius: npc.aggroRange,
           color: npc.appearance.color
             ? hexColorFromInt(npc.appearance.color)
             : uniqolor(npc.identity.id).color,

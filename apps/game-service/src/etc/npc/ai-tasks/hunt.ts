@@ -18,7 +18,7 @@ export function createHuntTask(findNewEnemy: HuntFilter): Task {
       if (
         !npc.movement.coords.isWithinDistance(
           target.movement.coords,
-          npc.etc.aggroRange,
+          npc.aggroRange,
         )
       ) {
         // Target out of range, lose aggro
@@ -71,7 +71,7 @@ export const defensiveHuntFilter: HuntFilter = function defensiveHuntFilter(
       return (
         candidate.movement.coords.isWithinDistance(
           npc.movement.coords,
-          npc.etc.aggroRange,
+          npc.aggroRange,
         ) &&
         combatMemory?.hasAttackedEachOther(
           candidate.identity.id,
@@ -94,7 +94,7 @@ export const aggressiveHuntFilter: HuntFilter = function aggressiveHuntFilter(
       }
       return candidate.movement.coords.isWithinDistance(
         npc.movement.coords,
-        npc.etc.aggroRange,
+        npc.aggroRange,
       );
     });
   return target?.identity.id;
@@ -131,7 +131,7 @@ export const protectiveHuntFilter: HuntFilter = function protectiveHuntFilter(
     if (
       !candidate.movement.coords.isWithinDistance(
         npc.movement.coords,
-        npc.etc.aggroRange,
+        npc.aggroRange,
       )
     ) {
       return false;
