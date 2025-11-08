@@ -5,12 +5,12 @@ import { gatewayRoles } from "@mp/keycloak";
 import type { RoleDefinition } from "@mp/oauth";
 import { assertRoles } from "@mp/oauth";
 import {
-  ctxDbClient,
+  ctxDb,
   ctxGameEventClient,
   ctxUserSession,
   ctxUserSessionSignal,
 } from "./context";
-import { mayAccessCharacter } from "@mp/db";
+import { promiseFromResult } from "@mp/std";
 
 const evt = new EventRouterBuilder().context<InjectionContainer>().build();
 
@@ -33,8 +33,11 @@ export const gatewayRouter = evt.router({
       .use(roles([gatewayRoles.join]))
       .input<CharacterId>()
       .handler(async ({ ctx, input: characterId, mwc }) => {
-        const db = ctx.get(ctxDbClient);
-        if (!(await mayAccessCharacter(db, mwc.user.id, characterId))) {
+        const db = ctx.get(ctxDb);
+        const hasAccess = await promiseFromResult(
+          db.mayAccessCharacter({ characterId, userId: mwc.user.id }),
+        );
+        if (!hasAccess) {
           throw new Error("You do not have access to this character");
         }
 

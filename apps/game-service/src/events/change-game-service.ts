@@ -3,14 +3,13 @@ import { gatewayRoles } from "@mp/keycloak";
 import {
   ctxActorModelLookup,
   ctxArea,
-  ctxDbClient,
+  ctxDb,
   ctxGameState,
   ctxGameStateServer,
   ctxLogger,
 } from "../context";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
-import { updateCharactersArea } from "@mp/db";
 
 /**
  * Emitted by a game service when a character wants to join another game service.
@@ -24,31 +23,33 @@ export const changeGameService = evt.event
       const state = ctx.get(ctxGameState);
       const server = ctx.get(ctxGameStateServer);
       const logger = ctx.get(ctxLogger);
-      const db = ctx.get(ctxDbClient);
+      const db = ctx.get(ctxDb);
       const actorModels = ctx.get(ctxActorModelLookup);
 
       // Void instead of await because we don't want to suspend the event routers queue handler.
-      void updateCharactersArea(
-        db,
-        actorModels,
-        input.characterId,
-        currentArea.id,
-      )
-        .then((character) => {
-          logger.debug(
-            { characterId: input.characterId },
-            "Character joined game service via gateway broadcast",
-          );
-          character.movement.coords = currentArea.start;
-          state.actors.set(input.characterId, character);
-          server.markToResendFullState(input.characterId);
+      void db
+        .updateCharactersArea({
+          actorModels,
+          characterId: input.characterId,
+          newAreaId: currentArea.id,
         })
-        .catch((error) =>
-          logger.error(
-            new Error("Failed to assign area id to character in db", {
-              cause: error,
-            }),
-          ),
-        );
+        .then((result) => {
+          if (result.isOk()) {
+            logger.debug(
+              { characterId: input.characterId },
+              "Character joined game service via gateway broadcast",
+            );
+            const character = result.value;
+            character.movement.coords = currentArea.start;
+            state.actors.set(input.characterId, character);
+            server.markToResendFullState(input.characterId);
+          } else {
+            logger.error(
+              new Error("Failed to assign area id to character in db", {
+                cause: result.error,
+              }),
+            );
+          }
+        });
     }
   });

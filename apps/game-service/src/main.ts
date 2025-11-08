@@ -1,11 +1,5 @@
 import { createApiClient } from "@mp/api-service/sdk";
 import {
-  createDbClient,
-  selectAllItemDefinitions,
-  selectAllNpcRewards,
-  selectAllSpawnAndNpcPairs,
-} from "@mp/db";
-import {
   createEventInvoker,
   createProxyEventInvoker,
   QueuedEventInvoker,
@@ -26,7 +20,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, withBackoffRetries } from "@mp/std";
+import { promiseFromResult, Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -39,7 +33,8 @@ import "dotenv/config";
 import {
   ctxActorModelLookup,
   ctxArea,
-  ctxDbClient,
+  ctxDb,
+  ctxDbSyncSession,
   ctxGameEventClient,
   ctxGameState,
   ctxGameStateServer,
@@ -52,7 +47,7 @@ import {
 import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
-import { gameStateDbSyncBehavior as startGameStateDbSync } from "./etc/db-sync-behavior";
+import { startDbSyncSession } from "./etc/db-sync-behavior";
 import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
@@ -65,6 +60,7 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
 import { gameServiceEvents, type GameServiceEvents } from "./router";
 import { loadAreaResource } from "./integrations/load-area-resource";
+import { createDbRepository } from "@mp/db";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -97,7 +93,7 @@ gameServiceConfig.subscribe((config) => {
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
-const db = createDbClient(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);
@@ -233,12 +229,21 @@ logger.info(`Getting all NPCs and spawns...`);
 const npcSpawner = new NpcSpawner(
   area,
   actorModels,
-  await selectAllSpawnAndNpcPairs(db, area.id),
+  await promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
   rng,
 );
 
+const dbSyncSession = startDbSyncSession({
+  db,
+  area,
+  state: gameState,
+  server: gameStateServer,
+  actorModels,
+  logger,
+});
+
 const ioc = new InjectionContainer()
-  .provide(ctxDbClient, db)
+  .provide(ctxDb, db)
   .provide(ctxGameState, gameState)
   .provide(ctxGameStateServer, gameStateServer)
   .provide(ctxArea, area)
@@ -249,13 +254,16 @@ const ioc = new InjectionContainer()
   .provide(ctxGameEventClient, gameEventBroadcastClient)
   .provide(
     ctxItemDefinitionLookup,
-    createItemDefinitionLookup(await selectAllItemDefinitions(db)),
-  );
+    createItemDefinitionLookup(
+      await promiseFromResult(db.selectAllItemDefinitions()),
+    ),
+  )
+  .provide(ctxDbSyncSession, dbSyncSession);
 
 logger.info(`Getting all NPC rewards...`);
 const npcRewardSystem = new NpcRewardSystem(
   ioc,
-  await selectAllNpcRewards(db, area.id),
+  await promiseFromResult(db.selectAllNpcRewards(area.id)),
 );
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
@@ -267,15 +275,6 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
-
-startGameStateDbSync({
-  db,
-  area,
-  state: gameState,
-  server: gameStateServer,
-  actorModels,
-  logger,
-});
 
 updateTicker.start(opt.tickInterval);
 

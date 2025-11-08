@@ -1,29 +1,27 @@
 import type { NpcReward } from "@mp/game-shared";
 import { and, eq, exists } from "drizzle-orm";
-import { DbClient } from "../client";
 import { npcSpawnTable, npcRewardTable } from "../schema";
-import { npcRewardsFromDbFields } from "../transform";
+import { npcRewardsFromDbFields } from "../utils/transform";
 import type { AreaId } from "@mp/game-shared";
+import { procedure } from "../utils/procedure";
 
-export async function selectAllNpcRewards(
-  db: DbClient,
-  areaId: AreaId,
-): Promise<NpcReward[]> {
-  const drizzle = DbClient.unwrap(db);
-  const isRewardForThisAreaQuery = drizzle
-    .select()
-    .from(npcSpawnTable)
-    .where(
-      and(
-        eq(npcSpawnTable.areaId, areaId),
-        eq(npcRewardTable.npcId, npcSpawnTable.npcId),
-      ),
-    );
+export const selectAllNpcRewards = procedure()
+  .input<AreaId>()
+  .query(async (drizzle, areaId): Promise<NpcReward[]> => {
+    const isRewardForThisAreaQuery = drizzle
+      .select()
+      .from(npcSpawnTable)
+      .where(
+        and(
+          eq(npcSpawnTable.areaId, areaId),
+          eq(npcRewardTable.npcId, npcSpawnTable.npcId),
+        ),
+      );
 
-  const rows = await drizzle
-    .select()
-    .from(npcRewardTable)
-    .where(exists(isRewardForThisAreaQuery));
+    const rows = await drizzle
+      .select()
+      .from(npcRewardTable)
+      .where(exists(isRewardForThisAreaQuery));
 
-  return rows.flatMap(npcRewardsFromDbFields);
-}
+    return rows.flatMap(npcRewardsFromDbFields);
+  });
