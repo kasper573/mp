@@ -16,6 +16,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
+    "@mp/validate": "workspace:*",
     "pako": "2.1.0"
   },
   "devDependencies": {

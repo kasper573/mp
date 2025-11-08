@@ -1,4 +1,5 @@
 import type { Branded, Pixel } from "@mp/std";
+import { type } from "@mp/validate";
 
 // Primitives
 export type Rgb = Branded<string, "RGB">;
@@ -59,7 +60,8 @@ export type Encoding = "csv" | "base64";
 /**
  * Incremental ID, unique across all objects
  */
-export type ObjectId = Branded<number, "ObjectId">;
+export const ObjectIdType = type("number").brand("ObjectId");
+export type ObjectId = typeof ObjectIdType.infer;
 
 /**
  * Incremental ID, unique across all layers

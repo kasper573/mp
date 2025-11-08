@@ -15,7 +15,8 @@
     "nanoid": "5.1.5",
     "neverthrow": "8.1.1",
     "random": "^5.4.0",
-    "uuid": "11.0.4"
+    "uuid": "11.0.4",
+    "@mp/validate": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
