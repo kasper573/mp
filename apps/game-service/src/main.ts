@@ -224,24 +224,7 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(),
 });
 
-logger.info(`Getting all NPCs and spawns...`);
-
-const npcSpawner = new NpcSpawner(
-  area,
-  actorModels,
-  await promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
-  rng,
-);
-
-const dbSyncSession = startDbSyncSession({
-  db,
-  area,
-  state: gameState,
-  server: gameStateServer,
-  actorModels,
-  logger,
-});
-
+// Initialize core IoC container without database-dependent data
 const ioc = new InjectionContainer()
   .provide(ctxDb, db)
   .provide(ctxGameState, gameState)
@@ -250,33 +233,61 @@ const ioc = new InjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxNpcSpawner, npcSpawner)
-  .provide(ctxGameEventClient, gameEventBroadcastClient)
-  .provide(
-    ctxItemDefinitionLookup,
-    createItemDefinitionLookup(
-      await promiseFromResult(db.selectAllItemDefinitions()),
-    ),
-  )
-  .provide(ctxDbSyncSession, dbSyncSession);
-
-logger.info(`Getting all NPC rewards...`);
-const npcRewardSystem = new NpcRewardSystem(
-  ioc,
-  await promiseFromResult(db.selectAllNpcRewards(area.id)),
-);
+  .provide(ctxGameEventClient, gameEventBroadcastClient);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
 updateTicker.subscribe(movementBehavior(ioc));
-updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-updateTicker.subscribe(
-  combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
-);
-updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 
 updateTicker.start(opt.tickInterval);
+
+// Load database-dependent data asynchronously after startup
+void (async () => {
+  try {
+    logger.info(`Loading database-dependent game data...`);
+
+    const [spawnsAndNpcs, itemDefinitions, npcRewards] = await Promise.all([
+      promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
+      promiseFromResult(db.selectAllItemDefinitions()),
+      promiseFromResult(db.selectAllNpcRewards(area.id)),
+    ]);
+
+    const npcSpawner = new NpcSpawner(area, actorModels, spawnsAndNpcs, rng);
+    const itemDefinitionLookup = createItemDefinitionLookup(itemDefinitions);
+
+    const dbSyncSession = startDbSyncSession({
+      db,
+      area,
+      state: gameState,
+      server: gameStateServer,
+      actorModels,
+      logger,
+    });
+
+    // Update IoC container with database-dependent data
+    ioc
+      .provide(ctxNpcSpawner, npcSpawner)
+      .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
+      .provide(ctxDbSyncSession, dbSyncSession);
+
+    const npcRewardSystem = new NpcRewardSystem(ioc, npcRewards);
+
+    // Subscribe additional behaviors that depend on database data
+    updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
+    updateTicker.subscribe(
+      combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
+    );
+    updateTicker.subscribe(npcAi.createTickHandler());
+
+    logger.info(`Database-dependent game data loaded successfully`);
+  } catch (error) {
+    logger.error(
+      error,
+      "Failed to load database-dependent game data. Game service will continue with limited functionality.",
+    );
+  }
+})();
 
 setInterval(
   () =>
