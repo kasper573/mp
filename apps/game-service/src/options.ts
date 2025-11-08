@@ -46,6 +46,12 @@ export const gameServiceOptionsSchema = type({
   },
   databaseConnectionString: "string",
   /**
+   * The URL to the Electric sync service (optional).
+   * When provided, enables real-time database sync via Electric.
+   * When not provided, falls back to polling-based sync.
+   */
+  "electricUrl?": "string",
+  /**
    * The version of the game service
    */
   version: "string",

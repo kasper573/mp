@@ -13,7 +13,10 @@ import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
-import type { SyncGameStateOptions } from "./utils/sync-game-state";
+import type {
+  SyncGameStateOptions,
+  SyncGameStateSession,
+} from "./utils/sync-game-state";
 import { syncGameState } from "./utils/sync-game-state";
 
 /**
@@ -21,7 +24,10 @@ import { syncGameState } from "./utils/sync-game-state";
  * We separate query definitions into procedures internally in the db package,
  * but only the repository will be exposed outside the package.
  */
-export function createDbRepository(connectionString: string) {
+export function createDbRepository(
+  connectionString: string,
+  electricUrl?: string,
+) {
   const drizzle = createDrizzleClient(connectionString);
 
   return {
@@ -40,7 +46,7 @@ export function createDbRepository(connectionString: string) {
     upsertCharacter: upsertCharacter.build(drizzle),
 
     syncGameState: (options: SyncGameStateOptions) =>
-      syncGameState(drizzle, options),
+      syncGameState(drizzle, { ...options, electricUrl }),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
@@ -53,6 +59,6 @@ export function createDbRepository(connectionString: string) {
   };
 }
 
-export type { SyncGameStateOptions };
+export type { SyncGameStateOptions, SyncGameStateSession };
 
 export type DbRepository = ReturnType<typeof createDbRepository>;

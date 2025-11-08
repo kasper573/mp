@@ -93,7 +93,7 @@ gameServiceConfig.subscribe((config) => {
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
-const db = createDbRepository(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString, opt.electricUrl);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);
@@ -233,7 +233,7 @@ const npcSpawner = new NpcSpawner(
   rng,
 );
 
-const dbSyncSession = startDbSyncSession({
+const dbSyncSession = await startDbSyncSession({
   db,
   area,
   state: gameState,
