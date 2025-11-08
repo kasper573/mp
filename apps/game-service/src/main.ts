@@ -59,7 +59,7 @@ import { createTickMetricsObserver } from "./metrics/tick";
 import { opt } from "./options";
 import { gameServiceEvents, type GameServiceEvents } from "./router";
 import { loadAreaResource } from "./integrations/load-area-resource";
-import { createRepository } from "@mp/db";
+import { createDbRepository } from "@mp/db";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -92,7 +92,7 @@ gameServiceConfig.subscribe((config) => {
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
-const db = createRepository(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);

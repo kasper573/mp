@@ -21,7 +21,7 @@ import { syncGameState } from "./sync-game-state";
  * We separate query definitions into procedures internally in the db package,
  * but only the repository will be exposed outside the package.
  */
-export function createRepository(connectionString: string) {
+export function createDbRepository(connectionString: string) {
   const drizzle = createDrizzleClient(connectionString);
 
   return {
@@ -55,4 +55,4 @@ export function createRepository(connectionString: string) {
 
 export type { SyncGameStateOptions };
 
-export type DbRepository = ReturnType<typeof createRepository>;
+export type DbRepository = ReturnType<typeof createDbRepository>;

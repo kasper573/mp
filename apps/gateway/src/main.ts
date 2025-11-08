@@ -1,4 +1,4 @@
-import { createRepository } from "@mp/db";
+import { createDbRepository } from "@mp/db";
 import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
@@ -79,7 +79,7 @@ const webServer = express()
 
 const httpServer = http.createServer(webServer);
 
-const db = createRepository(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const resolveAccessToken = createTokenResolver({

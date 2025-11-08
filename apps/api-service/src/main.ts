@@ -1,4 +1,4 @@
-import { createRepository } from "@mp/db";
+import { createDbRepository } from "@mp/db";
 import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
@@ -32,7 +32,7 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const db = createRepository(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 const redisClient = new Redis(opt.redisPath);
