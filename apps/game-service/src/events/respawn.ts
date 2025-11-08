@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/game-shared";
+import { CharacterIdType } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { ctxArea } from "../context";
 import { accessCharacter } from "../etc/access-character";
@@ -7,7 +7,7 @@ import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
 
 export const respawn = evt.event
-  .input<CharacterId>()
+  .input(CharacterIdType)
   .use(roles([characterRoles.respawn]))
   .handler(({ input: characterId, ctx }) => {
     const char = accessCharacter(ctx, characterId);

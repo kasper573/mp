@@ -1,4 +1,4 @@
-import type { AreaId, CharacterId } from "@mp/game-shared";
+import { AreaIdType, CharacterIdType } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
 import {
   ctxActorModelLookup,
@@ -10,13 +10,19 @@ import {
 } from "../context";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
+import { type } from "@mp/validate";
 
 /**
  * Emitted by a game service when a character wants to join another game service.
  */
 export const changeGameService = evt.event
   .use(roles([gatewayRoles.gameServiceBroadcast]))
-  .input<{ characterId: CharacterId; areaId: AreaId }>()
+  .input(
+    type({
+      characterId: CharacterIdType,
+      areaId: AreaIdType,
+    }),
+  )
   .handler(({ ctx, input }) => {
     const currentArea = ctx.get(ctxArea);
     if (input.areaId === currentArea.id) {

@@ -1,12 +1,13 @@
-import type { ActorId } from "@mp/game-shared";
+import { ActorIdType } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
 import { assert } from "@mp/std";
 import { ctxGameState, ctxGameStateServer } from "../context";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
+import { type } from "@mp/validate";
 
 export const kill = evt.event
-  .input<{ targetId: ActorId }>()
+  .input(type({ targetId: ActorIdType }))
   .use(roles([characterRoles.kill]))
   .handler(({ input: { targetId }, ctx }) => {
     const state = ctx.get(ctxGameState);
