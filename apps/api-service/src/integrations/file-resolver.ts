@@ -61,7 +61,8 @@ export function createFileResolver(
         throw new Error(response.statusText);
       }
       const json = await response.json();
-      const entries = DirectoryEntry.array().from(json);
+      // oxlint-disable-next-line no-explicit-any
+      const entries = DirectoryEntry.array().from(json as any);
       return entries.map((entry) => entry.name as FileInDir);
     } catch (error) {
       throw new Error(`Failed to look up directory at ${url}`, {

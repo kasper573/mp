@@ -131,7 +131,7 @@ const gameEventBroadcastClient = createProxyEventInvoker<GameServiceEvents>(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
 );
 
-function handleGatewayMessage({ data }: MessageEvent<ArrayBuffer>) {
+function handleGatewayMessage({ data }: MessageEvent) {
   // Handle game client -> game service messages
   const eventWithSession = eventWithSessionEncoding.decode(data);
   if (eventWithSession.isOk()) {
