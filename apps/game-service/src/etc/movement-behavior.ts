@@ -88,7 +88,7 @@ export function sendCharacterToArea(
   // since regular persistence is done on interval, an interval which we would miss here.
   const logger = ioc.get(ctxLogger);
   const db = ioc.get(ctxDb);
-  db.upsertCharacter(char).then((result) => {
+  void db.upsertCharacter(char).then((result) => {
     if (result.isErr()) {
       logger.error(
         new Error("Failed to save character changes to db before area change", {
