@@ -1,18 +1,21 @@
-import type { CharacterId } from "@mp/game-shared";
+import { CharacterIdType } from "@mp/game-shared";
 import { characterRoles } from "@mp/keycloak";
-import { type VectorLike, Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
-import type { ObjectId } from "@mp/tiled-loader";
+import { Vector } from "@mp/math";
+import { TileType } from "@mp/std";
+import { ObjectIdType } from "@mp/tiled-loader";
 import { accessCharacter } from "../etc/access-character";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
+import { type } from "@mp/validate";
 
 export const move = evt.event
-  .input<{
-    characterId: CharacterId;
-    to: VectorLike<Tile>;
-    desiredPortalId?: ObjectId;
-  }>()
+  .input(
+    type({
+      characterId: CharacterIdType,
+      to: { x: TileType, y: TileType },
+      ["desiredPortalId?"]: ObjectIdType,
+    }),
+  )
   .use(roles([characterRoles.move]))
   .handler(({ input: { characterId, to, desiredPortalId }, ctx }) => {
     const char = accessCharacter(ctx, characterId);

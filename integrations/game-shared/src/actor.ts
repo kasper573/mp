@@ -1,9 +1,11 @@
-import type { Branded } from "@mp/std";
-import type { Character } from "./character";
-import type { CharacterId } from "./character";
-import type { NpcInstance, NpcInstanceId } from "./npc";
+import { CharacterIdType, type Character } from "./character";
+import { NpcInstanceIdType, type NpcInstance } from "./npc";
+import { type } from "@mp/validate";
 
-export type ActorId = NpcInstanceId | CharacterId;
+export type ActorId = typeof ActorIdType.infer;
+export const ActorIdType = NpcInstanceIdType.or(CharacterIdType);
 
 export type Actor = Character | NpcInstance;
-export type ActorModelId = Branded<string, "ActorModelId">;
+
+export const ActorModelIdType = type("string").brand("ActorModelId");
+export type ActorModelId = typeof ActorModelIdType.infer;

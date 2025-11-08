@@ -761,6 +761,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../validate
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -898,6 +901,9 @@ importers:
 
   libraries/std:
     dependencies:
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../validate
       nanoid:
         specifier: 5.1.5
         version: 5.1.5
@@ -986,6 +992,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../validate
       pako:
         specifier: 2.1.0
         version: 2.1.0

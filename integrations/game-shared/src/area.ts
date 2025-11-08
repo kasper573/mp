@@ -1,13 +1,14 @@
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph } from "@mp/path-finding";
-import type { Branded, Pixel } from "@mp/std";
+import type { Pixel } from "@mp/std";
 import { assert, type Tile } from "@mp/std";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { graphFromTiled } from "./graph-from-tiled";
 import { hitTestTiledObject } from "./hit-test-tiled-object";
 import { TiledFixture } from "./tiled-fixture";
 import type { TiledResource } from "./tiled-resource";
+import { type } from "@mp/validate";
 
 export class AreaResource {
   readonly start: Vector<Tile>;
@@ -58,4 +59,5 @@ export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
 
 export const dynamicLayerName = "Dynamic";
 
-export type AreaId = Branded<string, "AreaId">;
+export const AreaIdType = type("string").brand("AreaId");
+export type AreaId = typeof AreaIdType.infer;

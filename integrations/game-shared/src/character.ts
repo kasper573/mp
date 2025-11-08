@@ -4,7 +4,7 @@ import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
-import type { Branded } from "@mp/std";
+import { type } from "@mp/validate";
 
 export const Character = object({
   type: prop<"character">(),
@@ -22,4 +22,6 @@ export const Character = object({
 });
 
 export type Character = typeof Character.$infer;
-export type CharacterId = Branded<string, "CharacterId">;
+
+export const CharacterIdType = type("string").brand("CharacterId");
+export type CharacterId = typeof CharacterIdType.infer;

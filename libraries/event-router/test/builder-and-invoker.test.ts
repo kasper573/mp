@@ -5,13 +5,14 @@ import {
   createEventInvoker,
   EventRouterInvokerError,
 } from "../src";
+import { type } from "@mp/validate";
 
 describe("builder and invoker", () => {
   it("invokes a query event and returns Ok with output", async () => {
     const fn = vi.fn();
     const builder = new EventRouterBuilder().build();
     const node = builder.event
-      .input<number>()
+      .input(type("number"))
       .handler(({ input }) => fn(input * 2));
 
     const invoker = createEventInvoker(node);
@@ -44,7 +45,7 @@ describe("builder and invoker", () => {
 
     const fn = vi.fn();
     const greet = builder.event
-      .input<string>()
+      .input(type("string"))
       .handler(({ input }) => fn(`Hello, ${input}!`));
 
     const root = builder.router({ greet });
@@ -97,15 +98,15 @@ describe("builder and invoker", () => {
 
     const root = builder.router({ broken: brokenProc });
     const invoker = createEventInvoker(root);
-    const call: EventRouterMessage<unknown> = [["broken"], {}];
+    const call: EventRouterMessage<unknown> = [["broken"], undefined];
     const result = await invoker(call, undefined);
 
     expect(result.isErr()).toBe(true);
-    // @ts-expect-error ignore harmless error for lazy property accses
+    // @ts-expect-error ignore harmless error for lazy property access
     expect(result.error).toBeInstanceOf(EventRouterInvokerError);
-    // @ts-expect-error ignore harmless error for lazy property accses
+    // @ts-expect-error ignore harmless error for lazy property access
     expect(result.error.cause).toBeInstanceOf(Error);
-    // @ts-expect-error ignore harmless error for lazy property accses
+    // @ts-expect-error ignore harmless error for lazy property access
     expect((result.error.cause as Error).message).toBe("Unexpected");
   });
 
@@ -180,8 +181,8 @@ describe("builder and invoker", () => {
     const builder = new EventRouterBuilder().build();
     const fn = vi.fn();
     const node = builder.event
-      .input<boolean>()
-      .input<string>()
+      .input(type("boolean"))
+      .input(type("string"))
       .handler(({ input }) => fn(input.length));
 
     const invoker = createEventInvoker(node);
@@ -190,5 +191,31 @@ describe("builder and invoker", () => {
 
     expect(result.isOk()).toBe(true);
     expect(fn).toHaveBeenCalledWith(5);
+  });
+
+  it("validates input according to the provided type", async () => {
+    const builder = new EventRouterBuilder().build();
+    const fn = vi.fn();
+    const node = builder.event
+      .input(type("number"))
+      .handler(({ input }) => fn(input * 3));
+
+    const invoker = createEventInvoker(node);
+    const validCall: EventRouterMessage<number> = [[], 7];
+    const validResult = await invoker(validCall, undefined);
+
+    expect(validResult.isOk()).toBe(true);
+    expect(fn).toHaveBeenCalledWith(21);
+
+    const invalidCall: EventRouterMessage<unknown> = [[], "not a number"];
+    const invalidResult = await invoker(invalidCall, undefined);
+
+    expect(invalidResult.isErr()).toBe(true);
+    // @ts-expect-error ignore harmless error for lazy property access
+    expect(invalidResult.error).toBeInstanceOf(EventRouterInvokerError);
+    // @ts-expect-error ignore harmless error for lazy property access
+    expect(invalidResult.error.cause.message).toBe(
+      "must be a number (was a string)",
+    );
   });
 });

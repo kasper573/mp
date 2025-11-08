@@ -12,6 +12,7 @@
     }
   },
   "dependencies": {
+    "@mp/validate": "workspace:*",
     "nanoid": "5.1.5",
     "neverthrow": "8.1.1",
     "random": "^5.4.0",

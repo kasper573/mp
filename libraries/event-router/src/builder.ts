@@ -1,3 +1,6 @@
+import type { Type } from "@mp/validate";
+import { type } from "@mp/validate";
+
 // oxlint-disable no-explicit-any
 export class EventRouterBuilder<Context = void> {
   context<Context>() {
@@ -85,38 +88,44 @@ export type AnyEventNodeRecord<Context = any> = Record<
 
 export class EventBuilder<Input, Context, MwContext> {
   private constructor(
+    private inputType: Type<Input>,
     private middleware: EventMiddleware<Context, MwContext, unknown>,
   ) {}
 
   use<NewMwContext, PipedMwContext>(
     middleware: EventMiddleware<Context, NewMwContext, PipedMwContext>,
   ): EventBuilder<Input, Context, NewMwContext> {
-    return new EventBuilder(this.middleware.pipe(middleware as never) as never);
+    return new EventBuilder(
+      this.inputType,
+      this.middleware.pipe(middleware as never) as never,
+    );
   }
-  input<NewInput>(): EventBuilder<NewInput, Context, MwContext> {
-    return new EventBuilder(this.middleware);
+  input<NewInputType extends Type>(
+    type: NewInputType,
+  ): EventBuilder<NewInputType["infer"], Context, MwContext> {
+    return new EventBuilder(type, this.middleware);
   }
 
   handler(
     handler: EventHandler<Input, Context, MwContext>,
   ): HandlerNode<Input, Context, MwContext> {
-    return {
-      type: "handler",
-      handler: this.pipeMiddlewareIntoHandler(handler),
-    };
-  }
-
-  private pipeMiddlewareIntoHandler(
-    handler: EventHandler<Input, Context, MwContext>,
-  ): EventHandler<Input, Context, MwContext> {
-    return async (opt) => {
+    const combinedHandler: EventHandler<Input, Context, MwContext> = async (
+      opt,
+    ) => {
+      this.inputType.assert(opt.input);
       const mwc = await this.middleware(opt);
       return handler({ ...opt, mwc });
+    };
+
+    return {
+      type: "handler",
+      handler: combinedHandler,
     };
   }
 
   static create<Context>(): EventBuilder<void, Context, unknown> {
     return new EventBuilder(
+      type("undefined") as Type<void>,
       createMiddleware<Context, unknown, unknown>(() => {}),
     );
   }

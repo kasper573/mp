@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/game-shared";
+import { CharacterIdType } from "@mp/game-shared";
 import { EventRouterBuilder } from "@mp/event-router";
 import type { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
@@ -19,7 +19,7 @@ export const gatewayRouter = evt.router({
   gateway: evt.router({
     spectate: evt.event
       .use(roles([gatewayRoles.spectate]))
-      .input<CharacterId>()
+      .input(CharacterIdType)
       .handler(({ ctx, input: characterId }) => {
         const session = ctx.get(ctxUserSessionSignal);
         session.value = {
@@ -31,7 +31,7 @@ export const gatewayRouter = evt.router({
 
     join: evt.event
       .use(roles([gatewayRoles.join]))
-      .input<CharacterId>()
+      .input(CharacterIdType)
       .handler(async ({ ctx, input: characterId, mwc }) => {
         const db = ctx.get(ctxDb);
         const hasAccess = await promiseFromResult(
@@ -49,7 +49,7 @@ export const gatewayRouter = evt.router({
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
-    leave: evt.event.input<CharacterId>().handler(({ ctx }) => {
+    leave: evt.event.input(CharacterIdType).handler(({ ctx }) => {
       const session = ctx.get(ctxUserSessionSignal);
       session.value = { ...session.value, character: undefined };
     }),
