@@ -12,11 +12,11 @@
     }
   },
   "dependencies": {
+    "@mp/validate": "workspace:*",
     "nanoid": "5.1.5",
     "neverthrow": "8.1.1",
     "random": "^5.4.0",
-    "uuid": "11.0.4",
-    "@mp/validate": "workspace:*"
+    "uuid": "11.0.4"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

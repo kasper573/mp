@@ -17,9 +17,9 @@
   },
   "dependencies": {
     "@mp/invocation-proxy": "workspace:*",
-    "@mp/validate": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/std": "workspace:*"
+    "@mp/std": "workspace:*",
+    "@mp/validate": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
