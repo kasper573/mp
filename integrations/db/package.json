@@ -21,7 +21,6 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@electric-sql/client": "^1.1.3",
     "@mp/game-shared": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",

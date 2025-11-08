@@ -38,6 +38,7 @@ Electric **does support writes** through multiple patterns documented in [their 
 4. **Through-the-database sync**: Local DB writes → API → Postgres → Electric → all clients
 
 The game service scenario is closest to pattern #4, where:
+
 - Game service writes to Postgres via Drizzle
 - Electric syncs changes FROM Postgres TO game service instances
 - Each instance sees changes from other instances in real-time
@@ -63,9 +64,9 @@ const session = startAsyncInterval(async () => {
 const characterShape = new Shape<CharacterRow>({
   url: `${electricUrl}/v1/shape`,
   params: {
-    table: 'character',
-    where: `area_id = '${area.id}' AND online = true`
-  }
+    table: "character",
+    where: `area_id = '${area.id}' AND online = true`,
+  },
 });
 
 // Subscribe to continuous updates
@@ -79,14 +80,14 @@ characterShape.subscribe(({ value }) => {
 
 ### Key Differences
 
-| Aspect                 | Current (Polling)                        | Electric (Real-time)                                |
-| ---------------------- | ---------------------------------------- | --------------------------------------------------- |
-| **Connection Model**   | Periodic DB queries                      | Persistent HTTP/SSE connection                      |
-| **Function Interface** | One-shot operation (called repeatedly)   | Subscription lifecycle (start/stop)                 |
-| **Latency**            | 5 second polling interval                | Real-time (< 1 second)                              |
-| **Complexity**         | Simple (just SQL queries)                | Complex (manage Shape subscriptions + write syncing)|
-| **Infrastructure**     | Just Postgres                            | Postgres + Electric sync service                    |
-| **Resource Usage**     | DB query every 5 sec per game service    | Persistent connection per game service              |
+| Aspect                 | Current (Polling)                      | Electric (Real-time)                                 |
+| ---------------------- | -------------------------------------- | ---------------------------------------------------- |
+| **Connection Model**   | Periodic DB queries                    | Persistent HTTP/SSE connection                       |
+| **Function Interface** | One-shot operation (called repeatedly) | Subscription lifecycle (start/stop)                  |
+| **Latency**            | 5 second polling interval              | Real-time (< 1 second)                               |
+| **Complexity**         | Simple (just SQL queries)              | Complex (manage Shape subscriptions + write syncing) |
+| **Infrastructure**     | Just Postgres                          | Postgres + Electric sync service                     |
+| **Resource Usage**     | DB query every 5 sec per game service  | Persistent connection per game service               |
 
 ## Implementation Options
 
@@ -95,10 +96,12 @@ characterShape.subscribe(({ value }) => {
 Keep the current polling interface but use Electric for reads:
 
 **Pros**:
+
 - Maintains public API compatibility
 - Could get faster updates
 
 **Cons**:
+
 - Creates/destroys Shape subscriptions every 5 seconds (inefficient)
 - Defeats the purpose of Electric's push model
 - Adds infrastructure complexity for no real benefit
@@ -109,18 +112,21 @@ Keep the current polling interface but use Electric for reads:
 Change architecture to use persistent subscriptions:
 
 **Changes required**:
+
 - Modify `startDbSyncSession` to manage Shape lifecycle
 - Remove polling interval
 - Add Electric URL configuration
 - Deploy Electric sync service
 
 **Pros**:
+
 - Lower latency (< 1 second vs 5 seconds)
 - Real-time updates enable responsive gameplay
 - Reduced DB query load
 - Proper use of Electric's capabilities
 
 **Cons**:
+
 - Requires architectural changes
 - Additional infrastructure (Electric service)
 - More complex error handling and reconnection logic
@@ -131,34 +137,34 @@ Change architecture to use persistent subscriptions:
 ```typescript
 export function startDbSyncSession(opt) {
   const shapes = [];
-  
+
   // Create persistent character shape
   const characterShape = new Shape({
     url: `${opt.electricUrl}/v1/shape`,
     params: {
-      table: 'character',
-      where: `area_id = '${opt.area.id}' AND online = true`
-    }
+      table: "character",
+      where: `area_id = '${opt.area.id}' AND online = true`,
+    },
   });
-  
+
   characterShape.subscribe(({ value }) => {
     syncCharacters(value, opt.state);
-    opt.logger.info('Characters synced via Electric');
+    opt.logger.info("Characters synced via Electric");
   });
-  
+
   shapes.push(characterShape);
-  
+
   // Similarly for items...
-  
+
   return {
     stop() {
       // Clean up all shapes
-      shapes.forEach(shape => shape.unsubscribe());
+      shapes.forEach((shape) => shape.unsubscribe());
     },
     async flush() {
       // Save current state to DB
       await saveGameState(opt.db, opt.state);
-    }
+    },
   };
 }
 ```
@@ -166,6 +172,7 @@ export function startDbSyncSession(opt) {
 ### Option 3: Keep current implementation (recommended for now)
 
 **Rationale**:
+
 - Current polling works reliably
 - 5-second latency is acceptable for area transitions
 - Simple architecture is easier to maintain
@@ -173,6 +180,7 @@ export function startDbSyncSession(opt) {
 - Team is familiar with current approach
 
 **When to reconsider**:
+
 - Real-time collaboration features needed (< 1 sec latency)
 - Number of game services scales significantly (>20 instances)
 - Database load from polling becomes problematic
