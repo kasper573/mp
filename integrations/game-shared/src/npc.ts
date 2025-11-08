@@ -1,11 +1,12 @@
 import type { ActorModelId } from "./actor";
 import type { Path, Vector } from "@mp/math";
-import type { Branded, Tile, TimesPerSecond } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";
 import { MovementTrait } from "./movement";
 import type { ItemReference } from "./item";
+import { type } from "@mp/validate";
 
 export interface NpcDefinition {
   id: NpcDefinitionId;
@@ -71,10 +72,17 @@ export const NpcInstance = object({
 
 export type NpcInstance = typeof NpcInstance.$infer;
 
-export type NpcInstanceId = Branded<string, "NPCInstanceId">;
-export type NpcDefinitionId = Branded<string, "NpcDefinitionId">;
-export type NpcSpawnId = Branded<string, "NpcSpawnId">;
-export type NpcRewardId = Branded<string, "NpcRewardId">;
+export const NpcInstanceIdType = type("string").brand("NpcInstanceId");
+export type NpcInstanceId = typeof NpcInstanceIdType.infer;
+
+export const NpcDefinitionIdType = type("string").brand("NpcDefinitionId");
+export type NpcDefinitionId = typeof NpcDefinitionIdType.infer;
+
+export const NpcSpawnIdType = type("string").brand("NpcSpawnId");
+export type NpcSpawnId = typeof NpcSpawnIdType.infer;
+
+export const NpcRewardIdType = type("string").brand("NpcRewardId");
+export type NpcRewardId = typeof NpcRewardIdType.infer;
 
 export type NpcType = (typeof npcTypes)[number];
 export const npcTypes = [

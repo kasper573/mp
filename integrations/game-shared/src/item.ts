@@ -1,4 +1,3 @@
-import type { Branded } from "@mp/std";
 import { object, prop } from "@mp/sync";
 import { type } from "@mp/validate";
 
@@ -79,8 +78,26 @@ export type ItemDefinitionByReference<Ref extends ItemReference> = Extract<
   ItemDefinition,
   ItemDefinitionBase<Ref>
 >;
-export type InventoryId = Branded<string, "InventoryId">;
-export type EquipmentInstanceId = Branded<string, "EquipmentInstanceId">;
-export type EquipmentDefinitionId = Branded<string, "EquipmentDefinitionId">;
-export type ConsumableInstanceId = Branded<string, "ConsumableInstanceId">;
-export type ConsumableDefinitionId = Branded<string, "ConsumableDefinitionId">;
+
+export const InventoryIdType = type("string").brand("InventoryId");
+export type InventoryId = typeof InventoryIdType.infer;
+
+export const EquipmentInstanceIdType = type("string").brand(
+  "EquipmentInstanceId",
+);
+export type EquipmentInstanceId = typeof EquipmentInstanceIdType.infer;
+
+export const EquipmentDefinitionIdType = type("string").brand(
+  "EquipmentDefinitionId",
+);
+export type EquipmentDefinitionId = typeof EquipmentDefinitionIdType.infer;
+
+export const ConsumableInstanceIdType = type("string").brand(
+  "ConsumableInstanceId",
+);
+export type ConsumableInstanceId = typeof ConsumableInstanceIdType.infer;
+
+export const ConsumableDefinitionIdType = type("string").brand(
+  "ConsumableDefinitionId",
+);
+export type ConsumableDefinitionId = typeof ConsumableDefinitionIdType.infer;
