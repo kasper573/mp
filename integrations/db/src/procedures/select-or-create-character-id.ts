@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
 import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { Vector } from "@mp/math";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const selectOrCreateCharacterIdForUser = procedure()
   .input<{

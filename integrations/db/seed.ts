@@ -3,7 +3,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
-import { createDrizzleClient } from "./src/client";
+import { createDrizzleClient } from "./src/utils/client";
 import {
   actorModelTable,
   areaTable,

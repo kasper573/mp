@@ -2,7 +2,7 @@ import type { NpcSpawn, NpcDefinition } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { npcSpawnTable, npcTable } from "../schema";
 import type { AreaId } from "@mp/game-shared";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const selectAllSpawnAndNpcPairs = procedure()
   .input<AreaId>()

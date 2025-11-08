@@ -1,5 +1,5 @@
 import readline from "node:readline/promises";
-import { createDrizzleClient } from "./src/client";
+import { createDrizzleClient } from "./src/utils/client";
 
 const rl = readline.createInterface({
   input: process.stdin,

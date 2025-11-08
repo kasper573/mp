@@ -1,8 +1,8 @@
 import type { Character } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import { dbFieldsFromCharacter } from "../transform";
-import { procedure } from "../procedure";
+import { dbFieldsFromCharacter } from "../utils/transform";
+import { procedure } from "../utils/procedure";
 
 export const upsertCharacter = procedure()
   .input<Character>()

@@ -1,9 +1,9 @@
 import type { NpcReward } from "@mp/game-shared";
 import { and, eq, exists } from "drizzle-orm";
 import { npcSpawnTable, npcRewardTable } from "../schema";
-import { npcRewardsFromDbFields } from "../transform";
+import { npcRewardsFromDbFields } from "../utils/transform";
 import type { AreaId } from "@mp/game-shared";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const selectAllNpcRewards = procedure()
   .input<AreaId>()

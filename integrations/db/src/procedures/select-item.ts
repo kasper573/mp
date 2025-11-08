@@ -5,7 +5,7 @@ import type {
   ConsumableDefinitionId,
   EquipmentDefinitionId,
 } from "@mp/game-shared";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const selectConsumableDefinition = procedure()
   .input<ConsumableDefinitionId>()

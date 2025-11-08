@@ -1,9 +1,9 @@
 import type { ActorModelLookup, Character } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import { characterFromDbFields } from "../transform";
+import { characterFromDbFields } from "../utils/transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const updateCharactersArea = procedure()
   .input<{

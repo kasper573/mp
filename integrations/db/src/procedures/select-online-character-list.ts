@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const selectOnlineCharacterList = procedure().query((drizzle) => {
   return drizzle

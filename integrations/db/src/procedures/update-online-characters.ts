@@ -1,7 +1,7 @@
 import { inArray } from "drizzle-orm";
 import { characterTable } from "../schema";
 import type { CharacterId } from "@mp/game-shared";
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 
 export const updateOnlineCharacters = procedure()
   .input<CharacterId[]>()

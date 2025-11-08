@@ -1,4 +1,4 @@
-import { createDrizzleClient } from "./client";
+import { createDrizzleClient } from "./utils/client";
 import { mayAccessCharacter } from "./procedures/may-access-character";
 import { selectAllActorModelIds } from "./procedures/select-all-actor-model-ids";
 import { selectAllItemDefinitions } from "./procedures/select-all-item-definitions";
@@ -13,8 +13,8 @@ import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
-import type { SyncGameStateOptions } from "./sync-game-state";
-import { syncGameState } from "./sync-game-state";
+import type { SyncGameStateOptions } from "./utils/sync-game-state";
+import { syncGameState } from "./utils/sync-game-state";
 
 /**
  * The all database querying must be done through the repository.

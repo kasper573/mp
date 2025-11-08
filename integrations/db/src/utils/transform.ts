@@ -11,7 +11,7 @@ import type {
   npcRewardTable,
   equipmentDefinitionTable,
   consumableDefinitionTable,
-} from "./schema";
+} from "../schema";
 
 // Transformer functions to and from database and game state
 

@@ -3,8 +3,8 @@ import { equipmentDefinitionTable, consumableDefinitionTable } from "../schema";
 import {
   equipmentDefinitionFromDbFields,
   consumableDefinitionFromDbFields,
-} from "../transform";
-import { procedure } from "../procedure";
+} from "../utils/transform";
+import { procedure } from "../utils/procedure";
 
 export const selectAllItemDefinitions = procedure().query(
   async (drizzle): Promise<ItemDefinition[]> => {

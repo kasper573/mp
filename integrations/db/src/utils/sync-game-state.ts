@@ -14,7 +14,7 @@ import {
   characterTable,
   consumableInstanceTable,
   equipmentInstanceTable,
-} from "./schema";
+} from "../schema";
 import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
@@ -46,13 +46,7 @@ export function syncGameState(
     markToResendFullState,
   }: SyncGameStateOptions,
 ) {
-  return ResultAsync.fromPromise(
-    (async () => {
-      await save();
-      await load();
-    })(),
-    (e) => e,
-  );
+  return ResultAsync.fromPromise(save().then(load), (e) => e);
 
   async function load() {
     const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, area.id);

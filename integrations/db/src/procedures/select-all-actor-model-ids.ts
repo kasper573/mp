@@ -1,4 +1,4 @@
-import { procedure } from "../procedure";
+import { procedure } from "../utils/procedure";
 import { actorModelTable } from "../schema";
 
 export const selectAllActorModelIds = procedure().query(async (drizzle) => {
