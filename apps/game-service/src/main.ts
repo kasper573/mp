@@ -34,6 +34,7 @@ import {
   ctxActorModelLookup,
   ctxArea,
   ctxDb,
+  ctxDbSyncSession,
   ctxGameEventClient,
   ctxGameState,
   ctxGameStateServer,
@@ -46,7 +47,7 @@ import {
 import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
-import { gameStateDbSyncBehavior } from "./etc/db-sync-behavior";
+import { startDbSyncSession } from "./etc/db-sync-behavior";
 import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
@@ -232,6 +233,15 @@ const npcSpawner = new NpcSpawner(
   rng,
 );
 
+const dbSyncSession = startDbSyncSession({
+  db,
+  area,
+  state: gameState,
+  server: gameStateServer,
+  actorModels,
+  logger,
+});
+
 const ioc = new InjectionContainer()
   .provide(ctxDb, db)
   .provide(ctxGameState, gameState)
@@ -247,7 +257,8 @@ const ioc = new InjectionContainer()
     createItemDefinitionLookup(
       await promiseFromResult(db.selectAllItemDefinitions()),
     ),
-  );
+  )
+  .provide(ctxDbSyncSession, dbSyncSession);
 
 logger.info(`Getting all NPC rewards...`);
 const npcRewardSystem = new NpcRewardSystem(
@@ -264,15 +275,6 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
-
-gameStateDbSyncBehavior({
-  db,
-  area,
-  state: gameState,
-  server: gameStateServer,
-  actorModels,
-  logger,
-});
 
 updateTicker.start(opt.tickInterval);
 

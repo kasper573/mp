@@ -13,6 +13,7 @@ import type { GameStateServer } from "./etc/game-state-server";
 import type { NpcSpawner } from "./etc/npc/npc-spawner";
 import type { GameEventClient } from "./package";
 import type { DbRepository } from "@mp/db";
+import type { DbSyncSession } from "./etc/db-sync-behavior";
 
 export const ctxArea = InjectionContext.new<AreaResource>("AreaResource");
 
@@ -27,6 +28,9 @@ export const ctxRng = InjectionContext.new<Rng>("Rng");
 export const ctxNpcSpawner = InjectionContext.new<NpcSpawner>("NpcSpawner");
 
 export const ctxDb = InjectionContext.new<DbRepository>("db");
+
+export const ctxDbSyncSession =
+  InjectionContext.new<DbSyncSession>("DbSyncSession");
 
 export const ctxGameStateServer =
   InjectionContext.new<GameStateServer>("GameStateServer");

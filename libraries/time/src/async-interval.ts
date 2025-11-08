@@ -8,7 +8,7 @@ import type { TimeSpan } from "./timespan";
 export function startAsyncInterval(
   callback: () => Promise<unknown>,
   interval: TimeSpan,
-): () => void {
+): AsyncIntervalSession {
   let stopped = false;
   let timeoutId: ReturnType<typeof setTimeout>;
 
@@ -27,8 +27,23 @@ export function startAsyncInterval(
 
   timeoutId = setTimeout(run, interval.totalMilliseconds);
 
-  return function stopAsyncInterval() {
+  /**
+   * Forcefully runs the callback immediately, regardless of interval timing.
+   */
+  function flush() {
+    clearInterval(timeoutId);
+    return run();
+  }
+
+  function stop() {
     stopped = true;
     clearTimeout(timeoutId);
-  };
+  }
+
+  return { flush, stop };
+}
+
+export interface AsyncIntervalSession {
+  flush: () => Promise<void>;
+  stop: () => void;
 }
