@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@mp/invocation-proxy": "workspace:*",
+    "@mp/validate": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/std": "workspace:*"
   },
