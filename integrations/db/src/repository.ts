@@ -13,15 +13,21 @@ import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
-import type { SyncGameStateOptions } from "./utils/sync-game-state";
-import { syncGameState } from "./utils/sync-game-state";
+import type {
+  SyncGameStateOptions,
+  SyncGameStateSession,
+} from "./utils/sync-game-state";
+import { startSyncSession } from "./utils/sync-game-state";
 
 /**
  * All database interactions must be done through the repository.
  * We separate query definitions into procedures internally in the db package,
  * but only the repository will be exposed outside the package.
  */
-export function createDbRepository(connectionString: string) {
+export function createDbRepository(
+  connectionString: string,
+  electricUrl?: string,
+) {
   const drizzle = createDrizzleClient(connectionString);
 
   return {
@@ -39,8 +45,14 @@ export function createDbRepository(connectionString: string) {
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
-    syncGameState: (options: SyncGameStateOptions) =>
-      syncGameState(drizzle, options),
+    startSyncSession: (options: Omit<SyncGameStateOptions, "electricUrl">) => {
+      if (!electricUrl) {
+        throw new Error(
+          "electricUrl is required when creating repository for game service. Please provide it as the second parameter to createDbRepository().",
+        );
+      }
+      return startSyncSession(drizzle, { ...options, electricUrl });
+    },
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
@@ -53,6 +65,6 @@ export function createDbRepository(connectionString: string) {
   };
 }
 
-export type { SyncGameStateOptions };
+export type { SyncGameStateOptions, SyncGameStateSession };
 
 export type DbRepository = ReturnType<typeof createDbRepository>;

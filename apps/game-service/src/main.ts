@@ -47,7 +47,6 @@ import {
 import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
-import { startDbSyncSession } from "./etc/db-sync-behavior";
 import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
@@ -93,7 +92,7 @@ gameServiceConfig.subscribe((config) => {
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
-const db = createDbRepository(opt.databaseConnectionString);
+const db = createDbRepository(opt.databaseConnectionString, opt.electricUrl);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
 
 logger.info(`Loading area and actor models...`);
@@ -233,13 +232,12 @@ const npcSpawner = new NpcSpawner(
   rng,
 );
 
-const dbSyncSession = startDbSyncSession({
-  db,
+const dbSyncSession = await db.startSyncSession({
   area,
   state: gameState,
-  server: gameStateServer,
   actorModels,
   logger,
+  markToResendFullState: (id) => gameStateServer.markToResendFullState(id),
 });
 
 const ioc = new InjectionContainer()
