@@ -1,39 +1,25 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it } from "vitest";
 import { transformer } from "../src/transformer";
 
 describe("transformer", () => {
-  let consoleWarnSpy: ReturnType<typeof vi.spyOn>;
-  const originalEnv = process.env.NODE_ENV;
-
-  beforeEach(() => {
-    consoleWarnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
-  });
-
-  afterEach(() => {
-    consoleWarnSpy.mockRestore();
-    process.env.NODE_ENV = originalEnv;
-  });
-
   describe("plain objects", () => {
-    it("should serialize and deserialize plain objects without warnings", () => {
+    it("should serialize and deserialize plain objects without errors", () => {
       const data = { name: "test", value: 42, nested: { prop: "value" } };
       const serialized = transformer.serialize(data);
-      const _deserialized = transformer.deserialize(serialized);
+      const deserialized = transformer.deserialize(serialized);
 
-      expect(_deserialized).toEqual(data);
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(deserialized).toEqual(data);
     });
 
-    it("should handle arrays without warnings", () => {
+    it("should handle arrays without errors", () => {
       const data = [1, 2, 3, { name: "test" }];
       const serialized = transformer.serialize(data);
-      const _deserialized = transformer.deserialize(serialized);
+      const deserialized = transformer.deserialize(serialized);
 
-      expect(_deserialized).toEqual(data);
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(deserialized).toEqual(data);
     });
 
-    it("should handle built-in types without warnings", () => {
+    it("should handle built-in types without errors", () => {
       const data = {
         date: new Date("2024-01-01"),
         regex: /test/g,
@@ -43,118 +29,81 @@ describe("transformer", () => {
       const serialized = transformer.serialize(data);
       const _deserialized = transformer.deserialize(serialized);
 
-      // SuperJSON should handle these types
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      // SuperJSON should handle these types without errors
     });
   });
 
   describe("class instances", () => {
-    it("should warn about class instances in development mode", () => {
-      class TestClass1 {
+    it("should throw error when serializing class instances", () => {
+      class TestClass {
         constructor(
           public name: string,
           public value: number,
         ) {}
       }
-      process.env.NODE_ENV = "development";
-      const instance = new TestClass1("test", 42);
+      const instance = new TestClass("test", 42);
 
-      transformer.serialize(instance);
-
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("Detected class instance"),
-      );
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining("TestClass1"),
+      expect(() => transformer.serialize(instance)).toThrow(
+        /Detected class instance "TestClass" at path "root"/,
       );
     });
 
-    it("should warn about nested class instances", () => {
-      class TestClass2 {
+    it("should throw error for nested class instances with correct path", () => {
+      class TestClass {
         constructor(
           public name: string,
           public value: number,
         ) {}
       }
-      process.env.NODE_ENV = "development";
       const data = {
-        user: new TestClass2("test", 42),
-        items: [new TestClass2("item1", 1), new TestClass2("item2", 2)],
+        user: new TestClass("test", 42),
       };
 
-      transformer.serialize(data);
-
-      expect(consoleWarnSpy).toHaveBeenCalled();
-      const calls = consoleWarnSpy.mock.calls;
-      expect(
-        calls.some((call) => String(call[0]).includes("root.user")),
-      ).toBe(true);
-      expect(
-        calls.some((call) => String(call[0]).includes("root.items[0]")),
-      ).toBe(true);
-      expect(
-        calls.some((call) => String(call[0]).includes("root.items[1]")),
-      ).toBe(true);
+      expect(() => transformer.serialize(data)).toThrow(
+        /Detected class instance "TestClass" at path "root\.user"/,
+      );
     });
 
-    it("should not warn in production mode", () => {
-      class TestClass3 {
+    it("should throw error for class instances in arrays with correct path", () => {
+      class TestClass {
         constructor(
           public name: string,
           public value: number,
         ) {}
       }
-      process.env.NODE_ENV = "production";
-      const instance = new TestClass3("test", 42);
+      const data = {
+        items: [new TestClass("item1", 1)],
+      };
 
-      transformer.serialize(instance);
-
-      expect(consoleWarnSpy).not.toHaveBeenCalled();
+      expect(() => transformer.serialize(data)).toThrow(
+        /Detected class instance "TestClass" at path "root\.items\[0\]"/,
+      );
     });
 
-    it("should only warn once per class-path combination", () => {
-      class TestClass4 {
-        constructor(
-          public name: string,
-          public value: number,
-        ) {}
+    it("should include helpful error message", () => {
+      class MyCustomClass {
+        constructor(public value: string) {}
       }
-      process.env.NODE_ENV = "development";
-      const instance = new TestClass4("test", 42);
+      const instance = new MyCustomClass("test");
 
-      // Clear any previous warnings
-      consoleWarnSpy.mockClear();
-
-      transformer.serialize(instance);
-      transformer.serialize(instance);
-      transformer.serialize(instance);
-
-      // Should only warn once despite serializing 3 times
-      expect(consoleWarnSpy).toHaveBeenCalledTimes(1);
+      expect(() => transformer.serialize(instance)).toThrow(
+        /Class instances cannot be reliably serialized through tRPC/,
+      );
+      expect(() => transformer.serialize(instance)).toThrow(
+        /Consider using plain objects or registering the class with SuperJSON/,
+      );
     });
   });
 
   describe("deserialization", () => {
-    it("should warn about class instances during deserialization in development", () => {
-      class TestClass5 {
-        constructor(
-          public name: string,
-          public value: number,
-        ) {}
-      }
-      process.env.NODE_ENV = "development";
-      const instance = new TestClass5("test", 42);
-      const serialized = transformer.serialize(instance);
+    it("should not check deserialized data for class instances", () => {
+      const data = { name: "test", value: 42 };
+      const serialized = transformer.serialize(data);
+      const deserialized = transformer.deserialize(serialized);
 
-      // Clear warnings from serialization
-      consoleWarnSpy.mockClear();
-
-      // Deserialize should also warn
-      transformer.deserialize(serialized);
-
-      // Note: After deserialization, the object is typically a plain object,
-      // not a class instance, unless SuperJSON has the class registered.
-      // This test verifies the deserialization path is also checked.
+      // Deserialization should not throw even if we had a class instance before
+      // (though SuperJSON converts it to plain object anyway)
+      expect(deserialized).toEqual(data);
     });
   });
 });
