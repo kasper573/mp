@@ -16,64 +16,40 @@ export function createLazyItemDefinitionLookup(
     Map<ItemDefinition["id"], ItemDefinition>
   > | null = null;
 
-  // Start lazy loading in background
   void (async () => {
-    let attempt = 0;
+    logger.info(`Loading item definitions...`);
 
-    while (maps === null) {
-      try {
-        attempt++;
-        logger.info({ attempt }, `Loading item definitions...`);
+    const itemDefinitions = await withBackoffRetries(
+      () => promiseFromResult(db.selectAllItemDefinitions()),
+      {
+        maxRetries: "infinite",
+        initialDelay: 1000,
+        factor: 2,
+      },
+    );
 
-        // Use withBackoffRetries with capped delay
-        // oxlint-disable-next-line no-await-in-loop
-        const itemDefinitions = await withBackoffRetries(
-          () => promiseFromResult(db.selectAllItemDefinitions()),
-          {
-            maxRetries: 10, // Try 10 times before letting outer loop retry
-            initialDelay: 1000,
-            factor: 2,
-          },
-        );
-
-        const newMaps = new Map<
-          ItemDefinition["type"],
-          Map<ItemDefinition["id"], ItemDefinition>
-        >();
-        for (const def of itemDefinitions) {
-          let defs = newMaps.get(def.type);
-          if (!defs) {
-            defs = new Map([[def.id, def]]);
-            newMaps.set(def.type, defs);
-          } else {
-            defs.set(def.id, def);
-          }
-        }
-        maps = newMaps;
-        logger.info(
-          { definitionCount: itemDefinitions.length },
-          `Item definitions loaded successfully`,
-        );
-        return;
-      } catch (error) {
-        // Retry with capped delay of 30s
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
-        logger.warn(
-          { error, attempt, nextRetryIn: delay },
-          `Failed to load item definitions after retries, will retry again...`,
-        );
-        // oxlint-disable-next-line no-await-in-loop
-        await new Promise((res) => setTimeout(res, delay));
+    const newMaps = new Map<
+      ItemDefinition["type"],
+      Map<ItemDefinition["id"], ItemDefinition>
+    >();
+    for (const def of itemDefinitions) {
+      let defs = newMaps.get(def.type);
+      if (!defs) {
+        defs = new Map([[def.id, def]]);
+        newMaps.set(def.type, defs);
+      } else {
+        defs.set(def.id, def);
       }
     }
+    maps = newMaps;
+    logger.info(
+      { definitionCount: itemDefinitions.length },
+      `Item definitions loaded successfully`,
+    );
   })();
 
   return (ref) => {
-    // Progressive enhancement: definitions not available yet will cause lookups to fail gracefully
-    // The calling code should handle this by checking if the lookup succeeds
     if (maps === null) {
-      // Return a type assertion - caller must handle the case where definitions aren't loaded
-      // This will throw when assert is called by consumers if they try to use it before loading
       return null as unknown as ItemDefinitionByReference<typeof ref>;
     }
     return assert(

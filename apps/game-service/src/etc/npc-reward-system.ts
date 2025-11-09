@@ -15,55 +15,35 @@ export class NpcRewardSystem {
     private db: DbRepository,
     private areaId: AreaId,
   ) {
-    // Start lazy loading rewards with infinite retry
     void this.lazyLoadRewards();
   }
 
   private async lazyLoadRewards() {
     const logger = this.ioc.get(ctxLogger);
-    let attempt = 0;
+    logger.info(`Loading NPC rewards...`);
 
-    while (!this.isLoaded) {
-      try {
-        attempt++;
-        logger.info({ attempt }, `Loading NPC rewards...`);
+    const npcRewards = await withBackoffRetries(
+      () => promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
+      {
+        maxRetries: "infinite",
+        initialDelay: 1000,
+        factor: 2,
+      },
+    );
 
-        // Use withBackoffRetries with capped delay
-        // oxlint-disable-next-line no-await-in-loop
-        const npcRewards = await withBackoffRetries(
-          () => promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
-          {
-            maxRetries: 10, // Try 10 times before letting outer loop retry
-            initialDelay: 1000,
-            factor: 2,
-          },
-        );
-
-        for (const reward of npcRewards) {
-          if (this.rewardsPerNpc.has(reward.npcId)) {
-            this.rewardsPerNpc.get(reward.npcId)?.push(reward);
-          } else {
-            this.rewardsPerNpc.set(reward.npcId, [reward]);
-          }
-        }
-
-        this.isLoaded = true;
-        logger.info(
-          { rewardCount: npcRewards.length },
-          `NPC rewards loaded successfully`,
-        );
-        return;
-      } catch (error) {
-        // Retry with capped delay of 30s
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
-        logger.warn(
-          { error, attempt, nextRetryIn: delay },
-          `Failed to load NPC rewards after retries, will retry again...`,
-        );
-        // oxlint-disable-next-line no-await-in-loop
-        await new Promise((res) => setTimeout(res, delay));
+    for (const reward of npcRewards) {
+      if (this.rewardsPerNpc.has(reward.npcId)) {
+        this.rewardsPerNpc.get(reward.npcId)?.push(reward);
+      } else {
+        this.rewardsPerNpc.set(reward.npcId, [reward]);
       }
     }
+
+    this.isLoaded = true;
+    logger.info(
+      { rewardCount: npcRewards.length },
+      `NPC rewards loaded successfully`,
+    );
   }
 
   giveRewardForKillingNpc(recipientId: CharacterId, npcId: NpcDefinitionId) {

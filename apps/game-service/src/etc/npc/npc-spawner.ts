@@ -33,51 +33,31 @@ export class NpcSpawner {
     private readonly db: DbRepository,
     private readonly logger: Logger,
   ) {
-    // Start lazy loading spawn options with infinite retry
     void this.lazyLoadSpawnOptions();
   }
 
   private async lazyLoadSpawnOptions() {
-    let attempt = 0;
+    this.logger.info(`Loading NPC spawn options...`);
 
-    while (this.options.length === 0) {
-      try {
-        attempt++;
-        this.logger.info({ attempt }, `Loading NPC spawn options...`);
+    const optionsFromDB = await withBackoffRetries(
+      () => promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
+      {
+        maxRetries: "infinite",
+        initialDelay: 1000,
+        factor: 2,
+      },
+    );
 
-        // Use withBackoffRetries with capped delay
-        // oxlint-disable-next-line no-await-in-loop
-        const optionsFromDB = await withBackoffRetries(
-          () => promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
-          {
-            maxRetries: 10, // Try 10 times before letting outer loop retry
-            initialDelay: 1000,
-            factor: 2,
-          },
-        );
+    const optionsFromTiled = deriveNpcSpawnsFromArea(
+      this.area,
+      optionsFromDB.map(({ npc }) => npc),
+    );
 
-        const optionsFromTiled = deriveNpcSpawnsFromArea(
-          this.area,
-          optionsFromDB.map(({ npc }) => npc),
-        );
-
-        this.options = [...optionsFromDB, ...optionsFromTiled];
-        this.logger.info(
-          { optionCount: this.options.length },
-          `NPC spawn options loaded successfully`,
-        );
-        return;
-      } catch (error) {
-        // Retry with capped delay of 30s
-        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
-        this.logger.warn(
-          { error, attempt, nextRetryIn: delay },
-          `Failed to load NPC spawn options after retries, will retry again...`,
-        );
-        // oxlint-disable-next-line no-await-in-loop
-        await new Promise((res) => setTimeout(res, delay));
-      }
-    }
+    this.options = [...optionsFromDB, ...optionsFromTiled];
+    this.logger.info(
+      { optionCount: this.options.length },
+      `NPC spawn options loaded successfully`,
+    );
   }
 
   createTickHandler(state: GameState): TickEventHandler {

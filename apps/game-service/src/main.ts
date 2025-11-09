@@ -224,11 +224,10 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(),
 });
 
-// Initialize components with lazy-loading database dependencies
 const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
 const itemDefinitionLookup = createLazyItemDefinitionLookup(db, logger);
 const npcRewardSystem = new NpcRewardSystem(
-  new InjectionContainer() // Create a temporary IoC for NpcRewardSystem initialization
+  new InjectionContainer()
     .provide(ctxLogger, logger)
     .provide(ctxGameState, gameState),
   db,
@@ -244,7 +243,6 @@ const dbSyncSession = startDbSyncSession({
   logger,
 });
 
-// Declare IoC container at module level so it can be used by event handlers
 const ioc = new InjectionContainer()
   .provide(ctxDb, db)
   .provide(ctxGameState, gameState)
@@ -260,8 +258,6 @@ const ioc = new InjectionContainer()
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
-// Start all functionality immediately (movement, NPCs, combat, state sync)
-// Components will progressively enhance as database data loads
 updateTicker.subscribe(movementBehavior(ioc));
 updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
 updateTicker.subscribe(
