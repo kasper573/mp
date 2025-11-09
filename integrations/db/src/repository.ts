@@ -48,7 +48,7 @@ export function createDbRepository(
     startSyncSession: (options: Omit<SyncGameStateOptions, "electricUrl">) => {
       if (!electricUrl) {
         throw new Error(
-          "electricUrl is required for startSyncSession. Please provide it when creating the repository.",
+          "electricUrl is required when creating repository for game service. Please provide it as the second parameter to createDbRepository().",
         );
       }
       return startSyncSession(drizzle, { ...options, electricUrl });

@@ -9,7 +9,7 @@ import type {
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import { assert } from "@mp/std";
-import { inArray, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import {
   characterTable,
   consumableInstanceTable,
@@ -19,6 +19,11 @@ import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
 import type { CharacterId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
 import { Shape, ShapeStream } from "@electric-sql/client";
+
+// Type definitions for Electric Shape data
+type CharacterRow = typeof characterTable.$inferSelect;
+type ConsumableRow = typeof consumableInstanceTable.$inferSelect;
+type EquipmentRow = typeof equipmentInstanceTable.$inferSelect;
 
 export interface SyncGameStateOptions {
   area: AreaResource;
@@ -31,13 +36,9 @@ export interface SyncGameStateOptions {
 
 export interface SyncGameStateSession {
   /**
-   * Save current game state to the database
+   * Dispose the sync session and clean up resources
    */
-  save: () => Promise<void>;
-  /**
-   * Stop the sync session and clean up resources
-   */
-  stop: () => void;
+  dispose: () => void;
   /**
    * Forcefully flushes any pending sync operations to the database.
    * @param character Only flush data related to this character. If omitted, flushes all pending data.
@@ -54,14 +55,14 @@ function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {
 }
 
 /**
- * Creates an Electric-based sync session with persistent subscriptions.
- * This returns a session object that manages the Electric Shape subscriptions.
+ * Starts a database synchronization session using Electric SQL for real-time updates.
+ *
+ * This creates persistent Shape subscriptions that receive push notifications from Electric.
+ * Writes are done directly to the database via Drizzle ORM, and Electric syncs them to other instances.
  */
-async function createElectricSyncSession(
+export async function startSyncSession(
   drizzle: DrizzleClient,
-  options: Required<Omit<SyncGameStateOptions, "electricUrl">> & {
-    electricUrl: string;
-  },
+  options: SyncGameStateOptions,
 ): Promise<SyncGameStateSession> {
   const {
     area,
@@ -72,9 +73,9 @@ async function createElectricSyncSession(
     electricUrl,
   } = options;
 
-  let characterShape: Shape<Record<string, unknown>> | null = null;
-  let consumableShape: Shape<Record<string, unknown>> | null = null;
-  let equipmentShape: Shape<Record<string, unknown>> | null = null;
+  let characterShape: Shape<CharacterRow> | null = null;
+  let consumableShape: Shape<ConsumableRow> | null = null;
+  let equipmentShape: Shape<EquipmentRow> | null = null;
 
   // Track current inventory IDs to update item shapes when characters change
   let currentInventoryIds = new Set<string>();
@@ -115,8 +116,8 @@ async function createElectricSyncSession(
   }
 
   function upsertItemInstancesInGameState(
-    dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
-    dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
+    dbConsumables: ConsumableRow[],
+    dbEquipment: EquipmentRow[],
   ) {
     const dbFields = new Map<ItemInstanceId, ItemInstance>();
 
@@ -157,9 +158,7 @@ async function createElectricSyncSession(
     }
   }
 
-  function addCharacterToGameState(
-    characterFields: typeof characterTable.$inferSelect,
-  ) {
+  function addCharacterToGameState(characterFields: CharacterRow) {
     const char = characterFromDbFields(characterFields, actorModels);
     state.actors.set(char.identity.id, char);
     markToResendFullState(char.identity.id);
@@ -186,9 +185,7 @@ async function createElectricSyncSession(
   /**
    * Handle character changes from Electric
    */
-  async function handleCharacterChanges(
-    charactersData: Map<string, Record<string, unknown>>,
-  ) {
+  function handleCharacterChanges(charactersData: Map<string, CharacterRow>) {
     const dbIds = new Set(charactersData.keys());
     const stateIds = characterIdsInState(state);
     const removedIds = stateIds.difference(dbIds);
@@ -197,16 +194,12 @@ async function createElectricSyncSession(
     // Remove characters that are no longer in the DB
     removedIds.forEach(removeCharacterFromGameState);
 
-    // Add new characters from the DB
-    if (addedIds.size > 0) {
-      const addedCharacters = await drizzle
-        .select()
-        .from(characterTable)
-        .where(
-          inArray(characterTable.id, Array.from(addedIds) as CharacterId[]),
-        );
-
-      addedCharacters.forEach(addCharacterToGameState);
+    // Add new characters from Electric data
+    for (const characterId of addedIds) {
+      const characterFields = charactersData.get(characterId);
+      if (characterFields) {
+        addCharacterToGameState(characterFields);
+      }
     }
 
     // Update item shapes when characters change
@@ -238,49 +231,40 @@ async function createElectricSyncSession(
     }
 
     // Create/recreate consumable shape
-    const consumableWhere = `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`;
-
-    const consumableStream = new ShapeStream({
+    const consumableStream = new ShapeStream<ConsumableRow>({
       url: `${electricUrl}/v1/shape`,
       params: {
         table: "consumable_instance",
-        where: consumableWhere,
+        where: `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`,
       },
     });
 
     consumableShape = new Shape(consumableStream);
 
     consumableShape.subscribe(({ value }) => {
-      const items = Array.from(value.values()).map(
-        (item) =>
-          item as unknown as typeof consumableInstanceTable.$inferSelect,
-      );
+      const items = Array.from(value.values());
       upsertItemInstancesInGameState(items, []);
     });
 
     // Create/recreate equipment shape
-    const equipmentWhere = `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`;
-
-    const equipmentStream = new ShapeStream({
+    const equipmentStream = new ShapeStream<EquipmentRow>({
       url: `${electricUrl}/v1/shape`,
       params: {
         table: "equipment_instance",
-        where: equipmentWhere,
+        where: `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`,
       },
     });
 
     equipmentShape = new Shape(equipmentStream);
 
     equipmentShape.subscribe(({ value }) => {
-      const items = Array.from(value.values()).map(
-        (item) => item as unknown as typeof equipmentInstanceTable.$inferSelect,
-      );
+      const items = Array.from(value.values());
       upsertItemInstancesInGameState([], items);
     });
   }
 
   // Initialize character shape
-  const characterStream = new ShapeStream({
+  const characterStream = new ShapeStream<CharacterRow>({
     url: `${electricUrl}/v1/shape`,
     params: {
       table: "character",
@@ -290,23 +274,16 @@ async function createElectricSyncSession(
 
   characterShape = new Shape(characterStream);
 
-  characterShape.subscribe(async ({ value }) => {
-    await handleCharacterChanges(value);
+  characterShape.subscribe(({ value }) => {
+    handleCharacterChanges(value);
   });
-
-  logger.info(
-    { electricUrl, areaId: area.id },
-    "Electric sync session started",
-  );
 
   // Do initial save
   await save();
 
   // Return session controller
   return {
-    save,
-    stop() {
-      logger.info("Stopping Electric sync session");
+    dispose() {
       // Electric shapes clean up automatically when garbage collected
       // but we set to null to help with cleanup
       characterShape = null;
@@ -319,23 +296,4 @@ async function createElectricSyncSession(
       void save();
     },
   };
-}
-
-/**
- * Starts a database synchronization session using Electric SQL for real-time updates.
- *
- * This creates persistent Shape subscriptions that receive push notifications from Electric.
- * Writes are done directly to the database via Drizzle ORM.
- */
-export async function startSyncSession(
-  drizzle: DrizzleClient,
-  options: SyncGameStateOptions,
-): Promise<SyncGameStateSession> {
-  const { electricUrl, logger } = options;
-
-  logger.info({ electricUrl }, "Starting Electric real-time sync session");
-
-  const session = await createElectricSyncSession(drizzle, options);
-
-  return session;
 }
