@@ -20,7 +20,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { promiseFromResult, Rng, withBackoffRetries } from "@mp/std";
+import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -48,7 +48,7 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { startDbSyncSession } from "./etc/db-sync-behavior";
-import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
+import { createLazyItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcRewardSystem } from "./etc/npc-reward-system";
@@ -224,13 +224,14 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(),
 });
 
-logger.info(`Getting all NPCs and spawns...`);
-
-const npcSpawner = new NpcSpawner(
-  area,
-  actorModels,
-  await promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
-  rng,
+const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
+const itemDefinitionLookup = createLazyItemDefinitionLookup(db, logger);
+const npcRewardSystem = new NpcRewardSystem(
+  new InjectionContainer()
+    .provide(ctxLogger, logger)
+    .provide(ctxGameState, gameState),
+  db,
+  opt.areaId,
 );
 
 const dbSyncSession = startDbSyncSession({
@@ -250,21 +251,10 @@ const ioc = new InjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxNpcSpawner, npcSpawner)
   .provide(ctxGameEventClient, gameEventBroadcastClient)
-  .provide(
-    ctxItemDefinitionLookup,
-    createItemDefinitionLookup(
-      await promiseFromResult(db.selectAllItemDefinitions()),
-    ),
-  )
+  .provide(ctxNpcSpawner, npcSpawner)
+  .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
   .provide(ctxDbSyncSession, dbSyncSession);
-
-logger.info(`Getting all NPC rewards...`);
-const npcRewardSystem = new NpcRewardSystem(
-  ioc,
-  await promiseFromResult(db.selectAllNpcRewards(area.id)),
-);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
@@ -275,7 +265,6 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
-
 updateTicker.start(opt.tickInterval);
 
 setInterval(
@@ -286,3 +275,5 @@ setInterval(
     }),
   opt.metricsPushgateway.interval.totalMilliseconds,
 );
+
+logger.info(`Game service started successfully`);
