@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "tsc && tsx esbuild.ts",
+    "test": "vitest run",
     "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
     "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
     "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/main.ts",
