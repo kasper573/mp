@@ -225,79 +225,100 @@ const updateTicker = new Ticker({
 });
 
 // Declare IoC container at module level so it can be used by event handlers
-let ioc: InjectionContainer;
+// Initialize with core dependencies that don't require database
+const ioc = new InjectionContainer()
+  .provide(ctxDb, db)
+  .provide(ctxGameState, gameState)
+  .provide(ctxGameStateServer, gameStateServer)
+  .provide(ctxArea, area)
+  .provide(ctxLogger, logger)
+  .provide(ctxActorModelLookup, actorModels)
+  .provide(ctxRng, rng)
+  .provide(ctxGameEventClient, gameEventBroadcastClient);
 
-// Initialize game service asynchronously to avoid top-level await
-async function initializeGameService() {
-  logger.info(`Loading database-dependent game data...`);
+const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
-  const [spawnsAndNpcs, itemDefinitions, npcRewards] = await withBackoffRetries(
-    () =>
-      Promise.all([
+// Start core functionality immediately (movement, state sync)
+updateTicker.subscribe(movementBehavior(ioc));
+updateTicker.subscribe(flushGameState);
+updateTicker.start(opt.tickInterval);
+
+setInterval(
+  () =>
+    metricsPushgateway.push({
+      jobName: "game-service",
+      groupings: { areaId: opt.areaId },
+    }),
+  opt.metricsPushgateway.interval.totalMilliseconds,
+);
+
+logger.info(`Game service started with core functionality`);
+
+// Initialize database-dependent features asynchronously with infinite retries
+async function initializeDatabaseFeatures() {
+  let attempt = 0;
+  const initialDelay = 1000;
+  const maxDelay = 30000; // Cap at 30 seconds between retries
+  const factor = 2;
+
+  while (true) {
+    try {
+      attempt++;
+      logger.info(
+        { attempt },
+        `Attempting to load database-dependent game data...`,
+      );
+
+      // oxlint-disable-next-line no-await-in-loop
+      const [spawnsAndNpcs, itemDefinitions, npcRewards] = await Promise.all([
         promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
         promiseFromResult(db.selectAllItemDefinitions()),
         promiseFromResult(db.selectAllNpcRewards(area.id)),
-      ]),
-  ).catch((error) => {
-    logger.error(error, "Failed to load database-dependent game data");
-    process.exit(1);
-  });
+      ]);
 
-  const npcSpawner = new NpcSpawner(area, actorModels, spawnsAndNpcs, rng);
+      const npcSpawner = new NpcSpawner(area, actorModels, spawnsAndNpcs, rng);
+      const itemDefinitionLookup = createItemDefinitionLookup(itemDefinitions);
 
-  const dbSyncSession = startDbSyncSession({
-    db,
-    area,
-    state: gameState,
-    server: gameStateServer,
-    actorModels,
-    logger,
-  });
+      const dbSyncSession = startDbSyncSession({
+        db,
+        area,
+        state: gameState,
+        server: gameStateServer,
+        actorModels,
+        logger,
+      });
 
-  ioc = new InjectionContainer()
-    .provide(ctxDb, db)
-    .provide(ctxGameState, gameState)
-    .provide(ctxGameStateServer, gameStateServer)
-    .provide(ctxArea, area)
-    .provide(ctxLogger, logger)
-    .provide(ctxActorModelLookup, actorModels)
-    .provide(ctxRng, rng)
-    .provide(ctxNpcSpawner, npcSpawner)
-    .provide(ctxGameEventClient, gameEventBroadcastClient)
-    .provide(
-      ctxItemDefinitionLookup,
-      createItemDefinitionLookup(itemDefinitions),
-    )
-    .provide(ctxDbSyncSession, dbSyncSession);
+      // Update IoC container with database-dependent data
+      ioc
+        .provide(ctxNpcSpawner, npcSpawner)
+        .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
+        .provide(ctxDbSyncSession, dbSyncSession);
 
-  const npcRewardSystem = new NpcRewardSystem(ioc, npcRewards);
+      const npcRewardSystem = new NpcRewardSystem(ioc, npcRewards);
 
-  const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
+      // Subscribe additional behaviors that depend on database data
+      updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
+      updateTicker.subscribe(
+        combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
+      );
+      updateTicker.subscribe(npcAi.createTickHandler());
 
-  updateTicker.subscribe(movementBehavior(ioc));
-  updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-  updateTicker.subscribe(
-    combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
-  );
-  updateTicker.subscribe(npcAi.createTickHandler());
-  updateTicker.subscribe(flushGameState);
-
-  updateTicker.start(opt.tickInterval);
-
-  setInterval(
-    () =>
-      metricsPushgateway.push({
-        jobName: "game-service",
-        groupings: { areaId: opt.areaId },
-      }),
-    opt.metricsPushgateway.interval.totalMilliseconds,
-  );
-
-  logger.info(`Game service initialized successfully`);
+      logger.info(`Database-dependent game data loaded successfully`);
+      return; // Success - exit the retry loop
+    } catch (error) {
+      const delay = Math.min(
+        initialDelay * Math.pow(factor, attempt - 1),
+        maxDelay,
+      );
+      logger.warn(
+        { error, attempt, nextRetryIn: delay },
+        `Failed to load database-dependent game data, retrying...`,
+      );
+      // oxlint-disable-next-line no-await-in-loop
+      await new Promise((res) => setTimeout(res, delay));
+    }
+  }
 }
 
-// Start initialization (no top-level await)
-initializeGameService().catch((error) => {
-  logger.error(error, "Fatal error during game service initialization");
-  process.exit(1);
-});
+// Start database initialization (non-blocking)
+void initializeDatabaseFeatures();
