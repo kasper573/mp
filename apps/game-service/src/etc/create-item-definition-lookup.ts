@@ -58,7 +58,6 @@ export function createLazyItemDefinitionLookup(
   };
 }
 
-// Legacy function for backwards compatibility if needed
 export function createItemDefinitionLookup(
   itemDefinitions: ItemDefinition[],
 ): ItemDefinitionLookup {
