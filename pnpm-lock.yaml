@@ -487,6 +487,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+      '@mp/time':
+        specifier: workspace:^
+        version: link:../../libraries/time
       drizzle-orm:
         specifier: 0.38.3
         version: 0.38.3(@opentelemetry/api@1.9.0)(@types/pg@8.11.10)(@types/react@19.1.8)(pg@8.13.1)(react@19.1.0)

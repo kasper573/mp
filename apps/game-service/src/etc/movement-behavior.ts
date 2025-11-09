@@ -85,7 +85,7 @@ export function sendCharacterToArea(
   // Since moving to another area means to remove the character from the current game service,
   // any unsynced game state changes related to this character would be lost unless we save them explicitly right now,
   // since regular persistence is done on interval, an interval which we would miss here.
-  ioc.get(ctxDbSyncSession).flush(char);
+  ioc.get(ctxDbSyncSession).flush();
 
   // But if we're moving to a different area we must communicate
   // with other services and tell them to pick up this character.

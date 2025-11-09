@@ -19,6 +19,7 @@ import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
 import { Shape, ShapeStream } from "@electric-sql/client";
+import { startAsyncInterval, TimeSpan } from "@mp/time";
 
 export interface SyncGameStateOptions {
   area: AreaResource;
@@ -38,6 +39,10 @@ export interface SyncGameStateSession {
    * Stop the sync session and clean up resources
    */
   stop: () => void;
+  /**
+   * Forcefully flushes any pending sync operations to the database.
+   */
+  flush: () => void;
 }
 
 /**
@@ -520,6 +525,75 @@ async function createElectricSyncSession(
       characterShape = null;
       consumableShape = null;
       equipmentShape = null;
+    },
+    flush() {
+      // For Electric mode, flush means saving current state
+      void save();
+    },
+  };
+}
+
+/**
+ * Starts a database synchronization session.
+ *
+ * If Electric URL is configured, this creates a persistent sync session with real-time updates.
+ * Otherwise, it uses the traditional polling approach for backwards compatibility.
+ *
+ * This is the recommended way to create a sync session as it handles both Electric and polling modes.
+ */
+export async function startSyncSession(
+  drizzle: DrizzleClient,
+  options: SyncGameStateOptions,
+): Promise<SyncGameStateSession> {
+  const { electricUrl, logger } = options;
+
+  // If Electric URL is provided, use real-time sync
+  if (electricUrl) {
+    try {
+      const session = await createElectricSyncSession(drizzle, {
+        ...options,
+        electricUrl,
+      } as Required<Omit<SyncGameStateOptions, "electricUrl">> & {
+        electricUrl: string;
+      });
+      logger.info("Using Electric real-time sync");
+      return session;
+    } catch (error) {
+      logger.error(
+        error,
+        "Failed to initialize Electric sync, falling back to polling",
+      );
+      // Fall through to polling mode
+    }
+  }
+
+  // Polling mode - create a session that polls periodically
+  logger.info("Using polling-based sync");
+
+  const syncInterval = TimeSpan.fromSeconds(5);
+  const pollingSession = startAsyncInterval(async () => {
+    const result = await syncGameState(drizzle, options);
+    if (result.isErr()) {
+      logger.error(result.error, "game state db sync error");
+    }
+  }, syncInterval);
+
+  return {
+    async save() {
+      // In polling mode, save happens automatically on the next interval
+      // But we can trigger an immediate sync
+      const result = await syncGameState(drizzle, options);
+      if (result.isErr()) {
+        throw result.error;
+      }
+    },
+    stop() {
+      logger.info("Stopping polling sync session");
+      pollingSession.stop();
+    },
+    flush() {
+      // Flush the polling interval to trigger immediate sync
+      void pollingSession.flush();
     },
   };
 }

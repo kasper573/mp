@@ -17,7 +17,7 @@ import type {
   SyncGameStateOptions,
   SyncGameStateSession,
 } from "./utils/sync-game-state";
-import { syncGameState } from "./utils/sync-game-state";
+import { syncGameState, startSyncSession } from "./utils/sync-game-state";
 
 /**
  * All database interactions must be done through the repository.
@@ -47,6 +47,9 @@ export function createDbRepository(
 
     syncGameState: (options: SyncGameStateOptions) =>
       syncGameState(drizzle, { ...options, electricUrl }),
+
+    startSyncSession: (options: SyncGameStateOptions) =>
+      startSyncSession(drizzle, { ...options, electricUrl }),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
