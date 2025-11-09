@@ -9,7 +9,6 @@ import type {
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import { assert } from "@mp/std";
-import { eq } from "drizzle-orm";
 import {
   characterTable,
   consumableInstanceTable,
@@ -55,6 +54,20 @@ function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {
 }
 
 /**
+ * Safely escape a string value for use in SQL WHERE clause
+ */
+function escapeSqlString(value: string): string {
+  return value.replace(/'/g, "''");
+}
+
+/**
+ * Build a safe SQL IN clause for a list of string values
+ */
+function buildSqlInClause(values: string[]): string {
+  return values.map((id) => `'${escapeSqlString(id)}'`).join(",");
+}
+
+/**
  * Starts a database synchronization session using Electric SQL for real-time updates.
  *
  * This creates persistent Shape subscriptions that receive push notifications from Electric.
@@ -73,12 +86,15 @@ export async function startSyncSession(
     electricUrl,
   } = options;
 
-  let characterShape: Shape<CharacterRow> | null = null;
-  let consumableShape: Shape<ConsumableRow> | null = null;
-  let equipmentShape: Shape<EquipmentRow> | null = null;
-
   // Track current inventory IDs to update item shapes when characters change
-  let currentInventoryIds = new Set<string>();
+  const currentInventoryIds = new Set<string>();
+
+  // Shape manager to hold references for cleanup
+  const shapes = {
+    character: null as Shape<CharacterRow> | null,
+    consumable: null as Shape<ConsumableRow> | null,
+    equipment: null as Shape<EquipmentRow> | null,
+  };
 
   /**
    * Updates the database with the current game state.
@@ -92,8 +108,7 @@ export async function startSyncSession(
           .map((char) =>
             tx
               .update(characterTable)
-              .set(dbFieldsFromCharacter(char))
-              .where(eq(characterTable.id, char.identity.id)),
+              .set(dbFieldsFromCharacter(char)),
           ),
       );
 
@@ -186,10 +201,10 @@ export async function startSyncSession(
    * Handle character changes from Electric
    */
   function handleCharacterChanges(charactersData: Map<string, CharacterRow>) {
-    const dbIds = new Set(charactersData.keys());
     const stateIds = characterIdsInState(state);
-    const removedIds = stateIds.difference(dbIds);
-    const addedIds = dbIds.difference(stateIds);
+    const dbIds = new Set(charactersData.keys());
+    const removedIds = stateIds.difference(dbIds as Set<CharacterId>);
+    const addedIds = (dbIds as Set<CharacterId>).difference(stateIds);
 
     // Remove characters that are no longer in the DB
     removedIds.forEach(removeCharacterFromGameState);
@@ -214,7 +229,8 @@ export async function startSyncSession(
       !Array.from(newInventoryIds).every((id) => currentInventoryIds.has(id));
 
     if (inventoryIdsChanged) {
-      currentInventoryIds = newInventoryIds;
+      currentInventoryIds.clear();
+      newInventoryIds.forEach((id) => currentInventoryIds.add(id));
       updateItemShapes();
     }
   }
@@ -235,13 +251,13 @@ export async function startSyncSession(
       url: `${electricUrl}/v1/shape`,
       params: {
         table: "consumable_instance",
-        where: `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`,
+        where: `inventory_id IN (${buildSqlInClause(inventoryIds)})`,
       },
     });
 
-    consumableShape = new Shape(consumableStream);
+    shapes.consumable = new Shape(consumableStream);
 
-    consumableShape.subscribe(({ value }) => {
+    shapes.consumable.subscribe(({ value }) => {
       const items = Array.from(value.values());
       upsertItemInstancesInGameState(items, []);
     });
@@ -251,13 +267,13 @@ export async function startSyncSession(
       url: `${electricUrl}/v1/shape`,
       params: {
         table: "equipment_instance",
-        where: `inventory_id IN (${inventoryIds.map((id) => `'${id}'`).join(",")})`,
+        where: `inventory_id IN (${buildSqlInClause(inventoryIds)})`,
       },
     });
 
-    equipmentShape = new Shape(equipmentStream);
+    shapes.equipment = new Shape(equipmentStream);
 
-    equipmentShape.subscribe(({ value }) => {
+    shapes.equipment.subscribe(({ value }) => {
       const items = Array.from(value.values());
       upsertItemInstancesInGameState([], items);
     });
@@ -268,13 +284,13 @@ export async function startSyncSession(
     url: `${electricUrl}/v1/shape`,
     params: {
       table: "character",
-      where: `area_id = '${area.id}' AND online = true`,
+      where: `area_id = '${escapeSqlString(area.id)}' AND online = true`,
     },
   });
 
-  characterShape = new Shape(characterStream);
+  shapes.character = new Shape(characterStream);
 
-  characterShape.subscribe(({ value }) => {
+  shapes.character.subscribe(({ value }) => {
     handleCharacterChanges(value);
   });
 
@@ -286,9 +302,9 @@ export async function startSyncSession(
     dispose() {
       // Electric shapes clean up automatically when garbage collected
       // but we set to null to help with cleanup
-      characterShape = null;
-      consumableShape = null;
-      equipmentShape = null;
+      shapes.character = null;
+      shapes.consumable = null;
+      shapes.equipment = null;
     },
     flush(_character?: Character) {
       // For Electric mode, flush means saving current state
