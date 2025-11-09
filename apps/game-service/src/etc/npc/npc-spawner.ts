@@ -11,7 +11,7 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId, promiseFromResult } from "@mp/std";
+import { assert, createShortId, promiseFromResult, withBackoffRetries } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
@@ -25,7 +25,6 @@ interface NpcSpawnOption {
 
 export class NpcSpawner {
   private options: ReadonlyArray<NpcSpawnOption> = [];
-  private loadAttempt = 0;
 
   constructor(
     private readonly area: AreaResource,
@@ -39,21 +38,22 @@ export class NpcSpawner {
   }
 
   private async lazyLoadSpawnOptions() {
-    const initialDelay = 1000;
-    const maxDelay = 30000;
-    const factor = 2;
+    let attempt = 0;
 
     while (this.options.length === 0) {
       try {
-        this.loadAttempt++;
-        this.logger.info(
-          { attempt: this.loadAttempt },
-          `Loading NPC spawn options...`,
-        );
+        attempt++;
+        this.logger.info({ attempt }, `Loading NPC spawn options...`);
 
+        // Use withBackoffRetries with capped delay
         // oxlint-disable-next-line no-await-in-loop
-        const optionsFromDB = await promiseFromResult(
-          this.db.selectAllSpawnAndNpcPairs(this.area.id),
+        const optionsFromDB = await withBackoffRetries(
+          () => promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
+          {
+            maxRetries: 10, // Try 10 times before letting outer loop retry
+            initialDelay: 1000,
+            factor: 2,
+          },
         );
 
         const optionsFromTiled = deriveNpcSpawnsFromArea(
@@ -68,13 +68,11 @@ export class NpcSpawner {
         );
         return;
       } catch (error) {
-        const delay = Math.min(
-          initialDelay * Math.pow(factor, this.loadAttempt - 1),
-          maxDelay,
-        );
+        // Retry with capped delay of 30s
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
         this.logger.warn(
-          { error, attempt: this.loadAttempt, nextRetryIn: delay },
-          `Failed to load NPC spawn options, retrying...`,
+          { error, attempt, nextRetryIn: delay },
+          `Failed to load NPC spawn options after retries, will retry again...`,
         );
         // oxlint-disable-next-line no-await-in-loop
         await new Promise((res) => setTimeout(res, delay));

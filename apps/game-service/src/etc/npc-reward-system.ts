@@ -1,6 +1,6 @@
 import type { CharacterId, NpcDefinitionId, AreaId } from "@mp/game-shared";
 import type { Character, NpcReward } from "@mp/game-shared";
-import { assert, promiseFromResult } from "@mp/std";
+import { assert, promiseFromResult, withBackoffRetries } from "@mp/std";
 import { spawnItem } from "./item-spawn-system";
 import type { InjectionContainer } from "@mp/ioc";
 import { ctxGameState, ctxLogger } from "../context";
@@ -8,7 +8,6 @@ import type { DbRepository } from "@mp/db";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcDefinitionId, NpcReward[]>();
-  private loadAttempt = 0;
   private isLoaded = false;
 
   constructor(
@@ -22,18 +21,22 @@ export class NpcRewardSystem {
 
   private async lazyLoadRewards() {
     const logger = this.ioc.get(ctxLogger);
-    const initialDelay = 1000;
-    const maxDelay = 30000;
-    const factor = 2;
+    let attempt = 0;
 
     while (!this.isLoaded) {
       try {
-        this.loadAttempt++;
-        logger.info({ attempt: this.loadAttempt }, `Loading NPC rewards...`);
+        attempt++;
+        logger.info({ attempt }, `Loading NPC rewards...`);
 
+        // Use withBackoffRetries with capped delay
         // oxlint-disable-next-line no-await-in-loop
-        const npcRewards = await promiseFromResult(
-          this.db.selectAllNpcRewards(this.areaId),
+        const npcRewards = await withBackoffRetries(
+          () => promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
+          {
+            maxRetries: 10, // Try 10 times before letting outer loop retry
+            initialDelay: 1000,
+            factor: 2,
+          },
         );
 
         for (const reward of npcRewards) {
@@ -51,13 +54,11 @@ export class NpcRewardSystem {
         );
         return;
       } catch (error) {
-        const delay = Math.min(
-          initialDelay * Math.pow(factor, this.loadAttempt - 1),
-          maxDelay,
-        );
+        // Retry with capped delay of 30s
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
         logger.warn(
-          { error, attempt: this.loadAttempt, nextRetryIn: delay },
-          `Failed to load NPC rewards, retrying...`,
+          { error, attempt, nextRetryIn: delay },
+          `Failed to load NPC rewards after retries, will retry again...`,
         );
         // oxlint-disable-next-line no-await-in-loop
         await new Promise((res) => setTimeout(res, delay));

@@ -3,7 +3,7 @@ import type {
   ItemDefinitionLookup,
   ItemDefinitionByReference,
 } from "@mp/game-shared";
-import { assert, promiseFromResult } from "@mp/std";
+import { assert, promiseFromResult, withBackoffRetries } from "@mp/std";
 import type { DbRepository } from "@mp/db";
 import type { Logger } from "@mp/logger";
 
@@ -15,22 +15,25 @@ export function createLazyItemDefinitionLookup(
     ItemDefinition["type"],
     Map<ItemDefinition["id"], ItemDefinition>
   > | null = null;
-  let loadAttempt = 0;
 
   // Start lazy loading in background
   void (async () => {
-    const initialDelay = 1000;
-    const maxDelay = 30000;
-    const factor = 2;
+    let attempt = 0;
 
     while (maps === null) {
       try {
-        loadAttempt++;
-        logger.info({ attempt: loadAttempt }, `Loading item definitions...`);
+        attempt++;
+        logger.info({ attempt }, `Loading item definitions...`);
 
+        // Use withBackoffRetries with capped delay
         // oxlint-disable-next-line no-await-in-loop
-        const itemDefinitions = await promiseFromResult(
-          db.selectAllItemDefinitions(),
+        const itemDefinitions = await withBackoffRetries(
+          () => promiseFromResult(db.selectAllItemDefinitions()),
+          {
+            maxRetries: 10, // Try 10 times before letting outer loop retry
+            initialDelay: 1000,
+            factor: 2,
+          },
         );
 
         const newMaps = new Map<
@@ -53,13 +56,11 @@ export function createLazyItemDefinitionLookup(
         );
         return;
       } catch (error) {
-        const delay = Math.min(
-          initialDelay * Math.pow(factor, loadAttempt - 1),
-          maxDelay,
-        );
+        // Retry with capped delay of 30s
+        const delay = Math.min(1000 * Math.pow(2, attempt - 1), 30000);
         logger.warn(
-          { error, attempt: loadAttempt, nextRetryIn: delay },
-          `Failed to load item definitions, retrying...`,
+          { error, attempt, nextRetryIn: delay },
+          `Failed to load item definitions after retries, will retry again...`,
         );
         // oxlint-disable-next-line no-await-in-loop
         await new Promise((res) => setTimeout(res, delay));
