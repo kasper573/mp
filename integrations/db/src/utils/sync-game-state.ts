@@ -8,18 +8,17 @@ import type {
 } from "@mp/game-shared";
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
-import { assert, ResultAsync } from "@mp/std";
-import { inArray, and, eq } from "drizzle-orm";
+import { assert } from "@mp/std";
+import { inArray, eq } from "drizzle-orm";
 import {
   characterTable,
   consumableInstanceTable,
   equipmentInstanceTable,
 } from "../schema";
 import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
-import type { CharacterId, AreaId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
 import { Shape, ShapeStream } from "@electric-sql/client";
-import { startAsyncInterval, TimeSpan } from "@mp/time";
 
 export interface SyncGameStateOptions {
   area: AreaResource;
@@ -27,7 +26,7 @@ export interface SyncGameStateOptions {
   actorModels: ActorModelLookup;
   logger: Logger;
   markToResendFullState: (characterId: CharacterId) => void;
-  electricUrl?: string;
+  electricUrl: string;
 }
 
 export interface SyncGameStateSession {
@@ -41,221 +40,9 @@ export interface SyncGameStateSession {
   stop: () => void;
   /**
    * Forcefully flushes any pending sync operations to the database.
+   * @param character Only flush data related to this character. If omitted, flushes all pending data.
    */
-  flush: () => void;
-}
-
-/**
- * Syncs game state with the database using Electric SQL for real-time updates.
- *
- * This implementation uses Electric's Shape API to subscribe to database changes in real-time,
- * eliminating the need for polling. Writes are still done directly to the database via Drizzle ORM.
- *
- * When electricUrl is provided, this creates persistent subscriptions that receive push notifications
- * from Electric. When not provided, falls back to the original polling-based approach for backwards compatibility.
- *
- * Only adds and removes are applied. Db updates to entities that already exist in game state will be ignored.
- * This is an intentional limitation to keep the sync system simple.
- */
-export function syncGameState(
-  drizzle: DrizzleClient,
-  {
-    area,
-    state,
-    actorModels,
-    logger,
-    markToResendFullState,
-    electricUrl,
-  }: SyncGameStateOptions,
-) {
-  // If Electric URL is provided, use real-time sync; otherwise fall back to polling
-  if (electricUrl) {
-    return ResultAsync.fromPromise(
-      createElectricSyncSession(drizzle, {
-        area,
-        state,
-        actorModels,
-        logger,
-        markToResendFullState,
-        electricUrl,
-      }),
-      (e) => e,
-    );
-  }
-
-  // Backwards compatible: single sync operation for polling
-  return ResultAsync.fromPromise(save().then(load), (e) => e);
-
-  async function load() {
-    const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, area.id);
-    const stateIds = characterIdsInState(state);
-    const removedIds = stateIds.difference(dbIds);
-    const addedIds = dbIds.difference(stateIds);
-
-    removedIds.forEach(removeCharacterFromGameState);
-
-    if (addedIds.size) {
-      const addedCharacters = await drizzle
-        .select()
-        .from(characterTable)
-        .where(inArray(characterTable.id, addedIds.values().toArray()));
-
-      addedCharacters.forEach(addCharacterToGameState);
-    }
-
-    const inventoryIds = new Set(
-      state.actors
-        .values()
-        .flatMap((a) => (a.type === "character" ? [a.inventoryId] : [])),
-    );
-
-    const [consumableInstanceFields, equipmentInstanceFields] =
-      await Promise.all([
-        drizzle
-          .select()
-          .from(consumableInstanceTable)
-          .where(
-            inArray(
-              consumableInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
-        drizzle
-          .select()
-          .from(equipmentInstanceTable)
-          .where(
-            inArray(
-              equipmentInstanceTable.inventoryId,
-              inventoryIds.values().toArray(),
-            ),
-          ),
-      ]);
-
-    upsertItemInstancesInGameState(
-      consumableInstanceFields,
-      equipmentInstanceFields,
-    );
-  }
-
-  /**
-   * Updates the database with the current game state.
-   */
-  function save() {
-    return drizzle.transaction(async (tx) => {
-      await Promise.all(
-        state.actors
-          .values()
-          .filter((actor) => actor.type === "character")
-          .map((char) =>
-            tx
-              .update(characterTable)
-              .set(dbFieldsFromCharacter(char))
-              .where(eq(characterTable.id, char.identity.id)),
-          ),
-      );
-
-      await Promise.all(
-        state.items.values().map((item) => {
-          const table = {
-            consumable: consumableInstanceTable,
-            equipment: equipmentInstanceTable,
-          }[item.type];
-          return tx
-            .insert(table)
-            .values(item)
-            .onConflictDoUpdate({
-              target: [table.id],
-              set: item,
-            });
-        }),
-      );
-    });
-  }
-
-  function upsertItemInstancesInGameState(
-    dbConsumables: Array<typeof consumableInstanceTable.$inferSelect>,
-    dbEquipment: Array<typeof equipmentInstanceTable.$inferSelect>,
-  ) {
-    const dbFields = new Map<ItemInstanceId, ItemInstance>();
-
-    for (const fields of dbConsumables) {
-      dbFields.set(fields.id, { type: "consumable", ...fields });
-    }
-    for (const fields of dbEquipment) {
-      dbFields.set(fields.id, { type: "equipment", ...fields });
-    }
-
-    const dbIds = new Set(dbFields.keys());
-    const stateIds = new Set(state.items.keys());
-    const removedIds = stateIds.difference(dbIds);
-    const addedIds = dbIds.difference(stateIds);
-
-    for (const itemId of removedIds) {
-      state.items.delete(itemId);
-    }
-
-    for (const itemId of addedIds) {
-      let instance = state.items.get(itemId);
-      const itemFields = assert(dbFields.get(itemId));
-      if (!instance) {
-        switch (itemFields.type) {
-          case "consumable":
-            instance = ConsumableInstance.create(itemFields);
-            break;
-          case "equipment":
-            instance = EquipmentInstance.create(itemFields);
-            break;
-        }
-        state.items.set(itemFields.id, instance);
-        logger.debug(
-          { itemId: itemFields.id, type: itemFields.type },
-          "Added item instance to game state",
-        );
-      }
-    }
-  }
-
-  function addCharacterToGameState(
-    characterFields: typeof characterTable.$inferSelect,
-  ) {
-    const char = characterFromDbFields(characterFields, actorModels);
-    state.actors.set(char.identity.id, char);
-    markToResendFullState(char.identity.id);
-    logger.debug(
-      { characterId: characterFields.id },
-      "Character joined game service via db poll",
-    );
-  }
-
-  function removeCharacterFromGameState(characterId: CharacterId) {
-    const char = state.actors.get(characterId) as Character | undefined;
-    state.actors.delete(characterId);
-    for (const item of state.items.values()) {
-      if (item.inventoryId === char?.inventoryId) {
-        state.items.delete(item.id);
-      }
-    }
-    logger.debug({ characterId }, "Character left game service via db poll");
-  }
-}
-
-async function getOnlineCharacterIdsForAreaFromDb(
-  drizzle: DrizzleClient,
-  areaId: AreaId,
-): Promise<ReadonlySet<CharacterId>> {
-  return new Set(
-    (
-      await drizzle
-        .select({ id: characterTable.id })
-        .from(characterTable)
-        .where(
-          and(
-            eq(characterTable.areaId, areaId),
-            eq(characterTable.online, true),
-          ),
-        )
-    ).map((row) => row.id),
-  );
+  flush: (character?: Character) => void;
 }
 
 function characterIdsInState(state: GameState): ReadonlySet<CharacterId> {
@@ -526,20 +313,19 @@ async function createElectricSyncSession(
       consumableShape = null;
       equipmentShape = null;
     },
-    flush() {
+    flush(_character?: Character) {
       // For Electric mode, flush means saving current state
+      // Character parameter is for future proofing but not used currently
       void save();
     },
   };
 }
 
 /**
- * Starts a database synchronization session.
+ * Starts a database synchronization session using Electric SQL for real-time updates.
  *
- * If Electric URL is configured, this creates a persistent sync session with real-time updates.
- * Otherwise, it uses the traditional polling approach for backwards compatibility.
- *
- * This is the recommended way to create a sync session as it handles both Electric and polling modes.
+ * This creates persistent Shape subscriptions that receive push notifications from Electric.
+ * Writes are done directly to the database via Drizzle ORM.
  */
 export async function startSyncSession(
   drizzle: DrizzleClient,
@@ -547,53 +333,9 @@ export async function startSyncSession(
 ): Promise<SyncGameStateSession> {
   const { electricUrl, logger } = options;
 
-  // If Electric URL is provided, use real-time sync
-  if (electricUrl) {
-    try {
-      const session = await createElectricSyncSession(drizzle, {
-        ...options,
-        electricUrl,
-      } as Required<Omit<SyncGameStateOptions, "electricUrl">> & {
-        electricUrl: string;
-      });
-      logger.info("Using Electric real-time sync");
-      return session;
-    } catch (error) {
-      logger.error(
-        error,
-        "Failed to initialize Electric sync, falling back to polling",
-      );
-      // Fall through to polling mode
-    }
-  }
+  logger.info({ electricUrl }, "Starting Electric real-time sync session");
 
-  // Polling mode - create a session that polls periodically
-  logger.info("Using polling-based sync");
+  const session = await createElectricSyncSession(drizzle, options);
 
-  const syncInterval = TimeSpan.fromSeconds(5);
-  const pollingSession = startAsyncInterval(async () => {
-    const result = await syncGameState(drizzle, options);
-    if (result.isErr()) {
-      logger.error(result.error, "game state db sync error");
-    }
-  }, syncInterval);
-
-  return {
-    async save() {
-      // In polling mode, save happens automatically on the next interval
-      // But we can trigger an immediate sync
-      const result = await syncGameState(drizzle, options);
-      if (result.isErr()) {
-        throw result.error;
-      }
-    },
-    stop() {
-      logger.info("Stopping polling sync session");
-      pollingSession.stop();
-    },
-    flush() {
-      // Flush the polling interval to trigger immediate sync
-      void pollingSession.flush();
-    },
-  };
+  return session;
 }

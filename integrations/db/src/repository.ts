@@ -17,7 +17,7 @@ import type {
   SyncGameStateOptions,
   SyncGameStateSession,
 } from "./utils/sync-game-state";
-import { syncGameState, startSyncSession } from "./utils/sync-game-state";
+import { startSyncSession } from "./utils/sync-game-state";
 
 /**
  * All database interactions must be done through the repository.
@@ -45,11 +45,14 @@ export function createDbRepository(
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
-    syncGameState: (options: SyncGameStateOptions) =>
-      syncGameState(drizzle, { ...options, electricUrl }),
-
-    startSyncSession: (options: SyncGameStateOptions) =>
-      startSyncSession(drizzle, { ...options, electricUrl }),
+    startSyncSession: (options: Omit<SyncGameStateOptions, "electricUrl">) => {
+      if (!electricUrl) {
+        throw new Error(
+          "electricUrl is required for startSyncSession. Please provide it when creating the repository.",
+        );
+      }
+      return startSyncSession(drizzle, { ...options, electricUrl });
+    },
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);

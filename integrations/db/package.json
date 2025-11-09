@@ -27,7 +27,6 @@
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/time": "workspace:^",
     "drizzle-orm": "0.38.3",
     "pg": "8.13.1"
   },

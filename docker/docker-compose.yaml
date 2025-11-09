@@ -160,6 +160,24 @@ services:
       timeout: 5s
       retries: 5
 
+  electric:
+    env_file: *env_files
+    logging: *logging
+    image: electricsql/electric:latest
+    restart: always
+    environment:
+      DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_INFRA_DB}"
+    ports:
+      - "3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3000/v1/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   redis:
     env_file: *env_files
     logging: *logging
