@@ -11,10 +11,12 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import { assert, createShortId, promiseFromResult } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
+import type { DbRepository } from "@mp/db";
+import type { Logger } from "@mp/logger";
 
 interface NpcSpawnOption {
   spawn: NpcSpawn;
@@ -22,20 +24,62 @@ interface NpcSpawnOption {
 }
 
 export class NpcSpawner {
-  public readonly options: ReadonlyArray<NpcSpawnOption>;
+  private options: ReadonlyArray<NpcSpawnOption> = [];
+  private loadAttempt = 0;
 
   constructor(
     private readonly area: AreaResource,
     private readonly models: ActorModelLookup,
-    optionsFromDB: Array<NpcSpawnOption>,
     private readonly rng: Rng,
+    private readonly db: DbRepository,
+    private readonly logger: Logger,
   ) {
-    const optionsFromTiled = deriveNpcSpawnsFromArea(
-      this.area,
-      optionsFromDB.map(({ npc }) => npc),
-    );
+    // Start lazy loading spawn options with infinite retry
+    void this.lazyLoadSpawnOptions();
+  }
 
-    this.options = [...optionsFromDB, ...optionsFromTiled];
+  private async lazyLoadSpawnOptions() {
+    const initialDelay = 1000;
+    const maxDelay = 30000;
+    const factor = 2;
+
+    while (this.options.length === 0) {
+      try {
+        this.loadAttempt++;
+        this.logger.info(
+          { attempt: this.loadAttempt },
+          `Loading NPC spawn options...`,
+        );
+
+        // oxlint-disable-next-line no-await-in-loop
+        const optionsFromDB = await promiseFromResult(
+          this.db.selectAllSpawnAndNpcPairs(this.area.id),
+        );
+
+        const optionsFromTiled = deriveNpcSpawnsFromArea(
+          this.area,
+          optionsFromDB.map(({ npc }) => npc),
+        );
+
+        this.options = [...optionsFromDB, ...optionsFromTiled];
+        this.logger.info(
+          { optionCount: this.options.length },
+          `NPC spawn options loaded successfully`,
+        );
+        return;
+      } catch (error) {
+        const delay = Math.min(
+          initialDelay * Math.pow(factor, this.loadAttempt - 1),
+          maxDelay,
+        );
+        this.logger.warn(
+          { error, attempt: this.loadAttempt, nextRetryIn: delay },
+          `Failed to load NPC spawn options, retrying...`,
+        );
+        // oxlint-disable-next-line no-await-in-loop
+        await new Promise((res) => setTimeout(res, delay));
+      }
+    }
   }
 
   createTickHandler(state: GameState): TickEventHandler {

@@ -20,7 +20,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { promiseFromResult, Rng, withBackoffRetries } from "@mp/std";
+import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -48,7 +48,7 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { startDbSyncSession } from "./etc/db-sync-behavior";
-import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
+import { createLazyItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcRewardSystem } from "./etc/npc-reward-system";
@@ -224,8 +224,27 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(),
 });
 
+// Initialize components with lazy-loading database dependencies
+const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
+const itemDefinitionLookup = createLazyItemDefinitionLookup(db, logger);
+const npcRewardSystem = new NpcRewardSystem(
+  new InjectionContainer() // Create a temporary IoC for NpcRewardSystem initialization
+    .provide(ctxLogger, logger)
+    .provide(ctxGameState, gameState),
+  db,
+  opt.areaId,
+);
+
+const dbSyncSession = startDbSyncSession({
+  db,
+  area,
+  state: gameState,
+  server: gameStateServer,
+  actorModels,
+  logger,
+});
+
 // Declare IoC container at module level so it can be used by event handlers
-// Initialize with core dependencies that don't require database
 const ioc = new InjectionContainer()
   .provide(ctxDb, db)
   .provide(ctxGameState, gameState)
@@ -234,12 +253,21 @@ const ioc = new InjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxGameEventClient, gameEventBroadcastClient);
+  .provide(ctxGameEventClient, gameEventBroadcastClient)
+  .provide(ctxNpcSpawner, npcSpawner)
+  .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
+  .provide(ctxDbSyncSession, dbSyncSession);
 
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
-// Start core functionality immediately (movement, state sync)
+// Start all functionality immediately (movement, NPCs, combat, state sync)
+// Components will progressively enhance as database data loads
 updateTicker.subscribe(movementBehavior(ioc));
+updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
+updateTicker.subscribe(
+  combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
+);
+updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
 updateTicker.start(opt.tickInterval);
 
@@ -252,73 +280,4 @@ setInterval(
   opt.metricsPushgateway.interval.totalMilliseconds,
 );
 
-logger.info(`Game service started with core functionality`);
-
-// Initialize database-dependent features asynchronously with infinite retries
-async function initializeDatabaseFeatures() {
-  let attempt = 0;
-  const initialDelay = 1000;
-  const maxDelay = 30000; // Cap at 30 seconds between retries
-  const factor = 2;
-
-  while (true) {
-    try {
-      attempt++;
-      logger.info(
-        { attempt },
-        `Attempting to load database-dependent game data...`,
-      );
-
-      // oxlint-disable-next-line no-await-in-loop
-      const [spawnsAndNpcs, itemDefinitions, npcRewards] = await Promise.all([
-        promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
-        promiseFromResult(db.selectAllItemDefinitions()),
-        promiseFromResult(db.selectAllNpcRewards(area.id)),
-      ]);
-
-      const npcSpawner = new NpcSpawner(area, actorModels, spawnsAndNpcs, rng);
-      const itemDefinitionLookup = createItemDefinitionLookup(itemDefinitions);
-
-      const dbSyncSession = startDbSyncSession({
-        db,
-        area,
-        state: gameState,
-        server: gameStateServer,
-        actorModels,
-        logger,
-      });
-
-      // Update IoC container with database-dependent data
-      ioc
-        .provide(ctxNpcSpawner, npcSpawner)
-        .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
-        .provide(ctxDbSyncSession, dbSyncSession);
-
-      const npcRewardSystem = new NpcRewardSystem(ioc, npcRewards);
-
-      // Subscribe additional behaviors that depend on database data
-      updateTicker.subscribe(npcSpawner.createTickHandler(gameState));
-      updateTicker.subscribe(
-        combatBehavior(gameState, gameStateServer, area, npcRewardSystem),
-      );
-      updateTicker.subscribe(npcAi.createTickHandler());
-
-      logger.info(`Database-dependent game data loaded successfully`);
-      return; // Success - exit the retry loop
-    } catch (error) {
-      const delay = Math.min(
-        initialDelay * Math.pow(factor, attempt - 1),
-        maxDelay,
-      );
-      logger.warn(
-        { error, attempt, nextRetryIn: delay },
-        `Failed to load database-dependent game data, retrying...`,
-      );
-      // oxlint-disable-next-line no-await-in-loop
-      await new Promise((res) => setTimeout(res, delay));
-    }
-  }
-}
-
-// Start database initialization (non-blocking)
-void initializeDatabaseFeatures();
+logger.info(`Game service started successfully`);
