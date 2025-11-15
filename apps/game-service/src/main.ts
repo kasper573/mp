@@ -74,6 +74,19 @@ logger.info(opt, `Starting server...`);
 
 const api = createApiClient(opt.apiServiceUrl);
 
+// A game service can't function without these dependencies,
+// so we block startup until they are available.
+// (Any other third party dependencies should be lazy loaded and have graceful degradation when unavailable)
+logger.info(`Loading area and actor models...`);
+const [area, actorModels] = await withBackoffRetries(() =>
+  Promise.all([
+    api.areaFileUrl
+      .query({ areaId: opt.areaId, urlType: "internal" })
+      .then((url) => loadAreaResource(opt.areaId, url)),
+    api.actorModelIds.query().then(createActorModelLookup),
+  ]),
+);
+
 const redisClient = new Redis(opt.redisPath);
 
 const gameServiceConfig = signal<GameServiceConfig>({
@@ -95,19 +108,6 @@ const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
-
-logger.info(`Loading area and actor models...`);
-const [area, actorModels] = await withBackoffRetries(() =>
-  Promise.all([
-    api.areaFileUrl
-      .query({ areaId: opt.areaId, urlType: "internal" })
-      .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorModelIds.query().then(createActorModelLookup),
-  ]),
-).catch((error) => {
-  logger.error(error, "Failed to load area and actor data from API service");
-  process.exit(1);
-});
 
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
