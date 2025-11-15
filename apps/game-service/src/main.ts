@@ -48,7 +48,7 @@ import { createActorModelLookup } from "./etc/actor-model-lookup";
 import { deriveClientVisibility } from "./etc/client-visibility";
 import { combatBehavior } from "./etc/combat-behavior";
 import { startDbSyncSession } from "./etc/db-sync-behavior";
-import { createLazyItemDefinitionLookup } from "./etc/create-item-definition-lookup";
+import { createItemDefinitionLookup } from "./etc/create-item-definition-lookup";
 import type { GameStateServer } from "./etc/game-state-server";
 import { movementBehavior } from "./etc/movement-behavior";
 import { NpcRewardSystem } from "./etc/npc-reward-system";
@@ -225,7 +225,7 @@ const updateTicker = new Ticker({
 });
 
 const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
-const itemDefinitionLookup = createLazyItemDefinitionLookup(db, logger);
+const itemDefinitionLookup = createItemDefinitionLookup(db, logger);
 const npcRewardSystem = new NpcRewardSystem(
   new InjectionContainer()
     .provide(ctxLogger, logger)

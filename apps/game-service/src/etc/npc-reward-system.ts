@@ -8,7 +8,6 @@ import type { DbRepository } from "@mp/db";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcDefinitionId, NpcReward[]>();
-  private isLoaded = false;
 
   constructor(
     private ioc: InjectionContainer,
@@ -22,13 +21,8 @@ export class NpcRewardSystem {
     const logger = this.ioc.get(ctxLogger);
     logger.info(`Loading NPC rewards...`);
 
-    const npcRewards = await withBackoffRetries(
-      () => promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
-      {
-        maxRetries: "infinite",
-        initialDelay: 1000,
-        factor: 2,
-      },
+    const npcRewards = await withBackoffRetries(() =>
+      promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
     );
 
     for (const reward of npcRewards) {
@@ -39,7 +33,6 @@ export class NpcRewardSystem {
       }
     }
 
-    this.isLoaded = true;
     logger.info(
       { rewardCount: npcRewards.length },
       `NPC rewards loaded successfully`,
@@ -47,11 +40,6 @@ export class NpcRewardSystem {
   }
 
   giveRewardForKillingNpc(recipientId: CharacterId, npcId: NpcDefinitionId) {
-    // Progressive enhancement: only give rewards if loaded
-    if (!this.isLoaded) {
-      return;
-    }
-
     const gameState = this.ioc.get(ctxGameState);
     const logger = this.ioc.get(ctxLogger).child({
       reason: `Killed NPC`,

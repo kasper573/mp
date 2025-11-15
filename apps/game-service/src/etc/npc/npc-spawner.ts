@@ -11,7 +11,12 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId, promiseFromResult, withBackoffRetries } from "@mp/std";
+import {
+  assert,
+  createShortId,
+  promiseFromResult,
+  withBackoffRetries,
+} from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
@@ -39,13 +44,8 @@ export class NpcSpawner {
   private async lazyLoadSpawnOptions() {
     this.logger.info(`Loading NPC spawn options...`);
 
-    const optionsFromDB = await withBackoffRetries(
-      () => promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
-      {
-        maxRetries: "infinite",
-        initialDelay: 1000,
-        factor: 2,
-      },
+    const optionsFromDB = await withBackoffRetries(() =>
+      promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
     );
 
     const optionsFromTiled = deriveNpcSpawnsFromArea(
