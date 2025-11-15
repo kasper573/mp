@@ -11,10 +11,17 @@ import { NpcInstance } from "@mp/game-shared";
 import { cardinalDirections, clamp, Vector } from "@mp/math";
 import type { VectorGraphNode } from "@mp/path-finding";
 import type { Rng, Tile } from "@mp/std";
-import { assert, createShortId } from "@mp/std";
+import {
+  assert,
+  createShortId,
+  promiseFromResult,
+  withBackoffRetries,
+} from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import { TimeSpan } from "@mp/time";
 import { deriveNpcSpawnsFromArea } from "./derive-npc-spawns-from-areas";
+import type { DbRepository } from "@mp/db";
+import type { Logger } from "@mp/logger";
 
 interface NpcSpawnOption {
   spawn: NpcSpawn;
@@ -22,20 +29,35 @@ interface NpcSpawnOption {
 }
 
 export class NpcSpawner {
-  public readonly options: ReadonlyArray<NpcSpawnOption>;
+  private options: ReadonlyArray<NpcSpawnOption> = [];
 
   constructor(
     private readonly area: AreaResource,
     private readonly models: ActorModelLookup,
-    optionsFromDB: Array<NpcSpawnOption>,
     private readonly rng: Rng,
+    private readonly db: DbRepository,
+    private readonly logger: Logger,
   ) {
+    void this.lazyLoadSpawnOptions();
+  }
+
+  private async lazyLoadSpawnOptions() {
+    this.logger.info(`Loading NPC spawn options...`);
+
+    const optionsFromDB = await withBackoffRetries(() =>
+      promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
+    );
+
     const optionsFromTiled = deriveNpcSpawnsFromArea(
       this.area,
       optionsFromDB.map(({ npc }) => npc),
     );
 
     this.options = [...optionsFromDB, ...optionsFromTiled];
+    this.logger.info(
+      { optionCount: this.options.length },
+      `NPC spawn options loaded successfully`,
+    );
   }
 
   createTickHandler(state: GameState): TickEventHandler {

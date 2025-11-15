@@ -1,17 +1,27 @@
 import type { CharacterId, NpcDefinitionId } from "@mp/game-shared";
 import type { Character, NpcReward } from "@mp/game-shared";
-import { assert } from "@mp/std";
+import { assert, promiseFromResult, withBackoffRetries } from "@mp/std";
 import { spawnItem } from "./item-spawn-system";
 import type { InjectionContainer } from "@mp/ioc";
-import { ctxGameState, ctxLogger } from "../context";
+import { ctxArea, ctxDb, ctxGameState, ctxLogger } from "../context";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcDefinitionId, NpcReward[]>();
 
-  constructor(
-    private ioc: InjectionContainer,
-    npcRewards: NpcReward[],
-  ) {
+  constructor(private ioc: InjectionContainer) {
+    void this.lazyLoadRewards();
+  }
+
+  private async lazyLoadRewards() {
+    const logger = this.ioc.get(ctxLogger);
+    logger.info(`Loading NPC rewards...`);
+
+    const npcRewards = await withBackoffRetries(() => {
+      const db = this.ioc.get(ctxDb);
+      const areaId = this.ioc.get(ctxArea).id;
+      return promiseFromResult(db.selectAllNpcRewards(areaId));
+    });
+
     for (const reward of npcRewards) {
       if (this.rewardsPerNpc.has(reward.npcId)) {
         this.rewardsPerNpc.get(reward.npcId)?.push(reward);
@@ -19,6 +29,11 @@ export class NpcRewardSystem {
         this.rewardsPerNpc.set(reward.npcId, [reward]);
       }
     }
+
+    logger.info(
+      { rewardCount: npcRewards.length },
+      `NPC rewards loaded successfully`,
+    );
   }
 
   giveRewardForKillingNpc(recipientId: CharacterId, npcId: NpcDefinitionId) {

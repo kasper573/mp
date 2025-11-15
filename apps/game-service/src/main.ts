@@ -20,7 +20,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { promiseFromResult, Rng, withBackoffRetries } from "@mp/std";
+import { Rng, withBackoffRetries } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -74,6 +74,19 @@ logger.info(opt, `Starting server...`);
 
 const api = createApiClient(opt.apiServiceUrl);
 
+// A game service can't function without these dependencies,
+// so we block startup until they are available.
+// (Any other third party dependencies should be lazy loaded and have graceful degradation when unavailable)
+logger.info(`Loading area and actor models...`);
+const [area, actorModels] = await withBackoffRetries(() =>
+  Promise.all([
+    api.areaFileUrl
+      .query({ areaId: opt.areaId, urlType: "internal" })
+      .then((url) => loadAreaResource(opt.areaId, url)),
+    api.actorModelIds.query().then(createActorModelLookup),
+  ]),
+);
+
 const redisClient = new Redis(opt.redisPath);
 
 const gameServiceConfig = signal<GameServiceConfig>({
@@ -95,19 +108,6 @@ const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
-
-logger.info(`Loading area and actor models...`);
-const [area, actorModels] = await withBackoffRetries(() =>
-  Promise.all([
-    api.areaFileUrl
-      .query({ areaId: opt.areaId, urlType: "internal" })
-      .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorModelIds.query().then(createActorModelLookup),
-  ]),
-).catch((error) => {
-  logger.error(error, "Failed to load area and actor data from API service");
-  process.exit(1);
-});
 
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
@@ -224,14 +224,8 @@ const updateTicker = new Ticker({
   middleware: createTickMetricsObserver(),
 });
 
-logger.info(`Getting all NPCs and spawns...`);
-
-const npcSpawner = new NpcSpawner(
-  area,
-  actorModels,
-  await promiseFromResult(db.selectAllSpawnAndNpcPairs(area.id)),
-  rng,
-);
+const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
+const itemDefinitionLookup = createItemDefinitionLookup(db, logger);
 
 const dbSyncSession = startDbSyncSession({
   db,
@@ -250,22 +244,12 @@ const ioc = new InjectionContainer()
   .provide(ctxLogger, logger)
   .provide(ctxActorModelLookup, actorModels)
   .provide(ctxRng, rng)
-  .provide(ctxNpcSpawner, npcSpawner)
   .provide(ctxGameEventClient, gameEventBroadcastClient)
-  .provide(
-    ctxItemDefinitionLookup,
-    createItemDefinitionLookup(
-      await promiseFromResult(db.selectAllItemDefinitions()),
-    ),
-  )
+  .provide(ctxNpcSpawner, npcSpawner)
+  .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
   .provide(ctxDbSyncSession, dbSyncSession);
 
-logger.info(`Getting all NPC rewards...`);
-const npcRewardSystem = new NpcRewardSystem(
-  ioc,
-  await promiseFromResult(db.selectAllNpcRewards(area.id)),
-);
-
+const npcRewardSystem = new NpcRewardSystem(ioc);
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
 updateTicker.subscribe(movementBehavior(ioc));
@@ -275,7 +259,6 @@ updateTicker.subscribe(
 );
 updateTicker.subscribe(npcAi.createTickHandler());
 updateTicker.subscribe(flushGameState);
-
 updateTicker.start(opt.tickInterval);
 
 setInterval(
@@ -286,3 +269,5 @@ setInterval(
     }),
   opt.metricsPushgateway.interval.totalMilliseconds,
 );
+
+logger.info(`Game service started successfully`);
