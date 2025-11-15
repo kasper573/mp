@@ -1,19 +1,14 @@
-import type { CharacterId, NpcDefinitionId, AreaId } from "@mp/game-shared";
+import type { CharacterId, NpcDefinitionId } from "@mp/game-shared";
 import type { Character, NpcReward } from "@mp/game-shared";
 import { assert, promiseFromResult, withBackoffRetries } from "@mp/std";
 import { spawnItem } from "./item-spawn-system";
 import type { InjectionContainer } from "@mp/ioc";
-import { ctxGameState, ctxLogger } from "../context";
-import type { DbRepository } from "@mp/db";
+import { ctxArea, ctxDb, ctxGameState, ctxLogger } from "../context";
 
 export class NpcRewardSystem {
   private rewardsPerNpc = new Map<NpcDefinitionId, NpcReward[]>();
 
-  constructor(
-    private ioc: InjectionContainer,
-    private db: DbRepository,
-    private areaId: AreaId,
-  ) {
+  constructor(private ioc: InjectionContainer) {
     void this.lazyLoadRewards();
   }
 
@@ -21,9 +16,11 @@ export class NpcRewardSystem {
     const logger = this.ioc.get(ctxLogger);
     logger.info(`Loading NPC rewards...`);
 
-    const npcRewards = await withBackoffRetries(() =>
-      promiseFromResult(this.db.selectAllNpcRewards(this.areaId)),
-    );
+    const npcRewards = await withBackoffRetries(() => {
+      const db = this.ioc.get(ctxDb);
+      const areaId = this.ioc.get(ctxArea).id;
+      return promiseFromResult(db.selectAllNpcRewards(areaId));
+    });
 
     for (const reward of npcRewards) {
       if (this.rewardsPerNpc.has(reward.npcId)) {

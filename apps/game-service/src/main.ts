@@ -226,13 +226,6 @@ const updateTicker = new Ticker({
 
 const npcSpawner = new NpcSpawner(area, actorModels, rng, db, logger);
 const itemDefinitionLookup = createItemDefinitionLookup(db, logger);
-const npcRewardSystem = new NpcRewardSystem(
-  new InjectionContainer()
-    .provide(ctxLogger, logger)
-    .provide(ctxGameState, gameState),
-  db,
-  opt.areaId,
-);
 
 const dbSyncSession = startDbSyncSession({
   db,
@@ -256,6 +249,7 @@ const ioc = new InjectionContainer()
   .provide(ctxItemDefinitionLookup, itemDefinitionLookup)
   .provide(ctxDbSyncSession, dbSyncSession);
 
+const npcRewardSystem = new NpcRewardSystem(ioc);
 const npcAi = new NpcAi(gameState, gameStateServer, area, rng);
 
 updateTicker.subscribe(movementBehavior(ioc));
