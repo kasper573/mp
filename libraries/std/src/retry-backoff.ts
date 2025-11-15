@@ -21,7 +21,7 @@ export async function withBackoffRetries<T>(
 }
 
 const defaultOptions: WithBackoffRetriesOptions = {
-  maxRetries: 3,
+  maxRetries: "infinite",
   initialDelay: 1000,
   factor: 2,
 };
