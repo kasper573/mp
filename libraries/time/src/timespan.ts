@@ -143,6 +143,14 @@ export class TimeSpan {
     return TimeSpan.compare(this, value);
   }
 
+  isBefore(value: TimeSpan): boolean {
+    return this.compareTo(value) < 0;
+  }
+
+  isAfter(value: TimeSpan): boolean {
+    return this.compareTo(value) > 0;
+  }
+
   add(ts: TimeSpan): TimeSpan {
     return new TimeSpan(this.ms + ts.ms);
   }
