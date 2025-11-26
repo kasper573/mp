@@ -25,9 +25,6 @@ RUN pnpm -F website build
 FROM alpine:3.21 AS runner
 WORKDIR /srv/mp-website
 
-# Install bash for the env substitution script
-RUN apk add --no-cache bash
-
 # Copy the built website
 COPY --from=builder /workdir/apps/website/dist ./
 

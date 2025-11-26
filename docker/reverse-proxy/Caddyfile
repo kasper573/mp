@@ -79,6 +79,7 @@ faro.{$MP_DOMAIN} {
         @static {
             path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.woff *.woff2 *.wasm *.eot *.ttf *.otf *.svg *.webp
         }
+        # Cache for 180 days (15552000 seconds)
         header @static Cache-Control "public, max-age=15552000"
     }
 }

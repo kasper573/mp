@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 file="/srv/mp-website/index.html"
 prefix="MP_WEBSITE_"
