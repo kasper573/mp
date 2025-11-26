@@ -18,4 +18,4 @@ updated_html=$(echo "$html" | sed "s|$placeholder|$selected_env|g")
 echo "$updated_html" > "$file"
 
 # Keep the container running (it's just a volume for Caddy to serve from)
-tail -f /dev/null
+sleep infinity

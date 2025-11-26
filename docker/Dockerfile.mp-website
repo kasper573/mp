@@ -32,5 +32,5 @@ COPY --from=builder /workdir/apps/website/dist ./
 COPY ./docker/embed-website-env.sh /usr/local/bin/embed-website-env.sh
 RUN chmod +x /usr/local/bin/embed-website-env.sh
 
-# Run the env substitution script at startup and then keep the container alive
+# Run the env substitution script at startup (script keeps container alive after injection)
 CMD ["/usr/local/bin/embed-website-env.sh"]
