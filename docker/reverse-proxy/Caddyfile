@@ -52,7 +52,35 @@ faro.{$MP_DOMAIN} {
 
 {$MP_WEBSITE_DOMAIN} {
     import common_rate_limit
-    reverse_proxy {$MP_WEBSITE_PROXY_HOST}
+    
+    # In dev mode, MP_WEBSITE_PROXY_HOST is set to host.docker.internal:5173
+    # In prod/test mode, MP_WEBSITE_PROXY_HOST is unset and we serve static files
+    @proxy_mode {
+        expression {env.MP_WEBSITE_PROXY_HOST} != ""
+    }
+    
+    # Proxy mode (development)
+    handle @proxy_mode {
+        reverse_proxy {$MP_WEBSITE_PROXY_HOST}
+    }
+    
+    # Static file serving mode (production/test)
+    handle {
+        # Serve static website files from the shared volume
+        root * /srv/mp-website
+        
+        # Try serving the file, fallback to index.html for SPA
+        try_files {path} /index.html
+        
+        # Enable file server
+        file_server
+        
+        # Set cache headers for static assets
+        @static {
+            path *.ico *.css *.js *.gif *.jpg *.jpeg *.png *.woff *.woff2 *.wasm *.eot *.ttf *.otf *.svg *.webp
+        }
+        header @static Cache-Control "public, max-age=15552000"
+    }
 }
 
 {$MP_API_DOMAIN} {

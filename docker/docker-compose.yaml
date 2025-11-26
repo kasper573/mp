@@ -35,6 +35,8 @@ services:
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-website:${DOCKER_IMAGE_VERSION:-latest}
     restart: always
     profiles: ["prod", "test"]
+    volumes:
+      - mp-website-dist:/srv/mp-website
     depends_on:
       - mp-api
       - mp-gateway
@@ -242,6 +244,7 @@ services:
     command: ["caddy", "run", "--config", "/etc/caddy/Caddyfile"]
     image: ${DOCKER_REGISTRY_URL:-mp}/mp-reverse-proxy:${DOCKER_IMAGE_VERSION:-latest}
     restart: unless-stopped
+    profiles: ["prod", "test"]
     ports:
       - "80:80"
       - "443:443"
@@ -250,6 +253,9 @@ services:
       - ./reverse-proxy/Caddyfile:/etc/caddy/Caddyfile
       - reverse-proxy-data:/data
       - reverse-proxy-config:/config
+      - mp-website-dist:/srv/mp-website:ro
+    depends_on:
+      - mp-website
 
   file-server:
     env_file: *env_files
@@ -272,3 +278,4 @@ volumes:
   reverse-proxy-config:
   file-server-data:
   file-server-config:
+  mp-website-dist:

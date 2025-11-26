@@ -21,32 +21,19 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 ENV NODE_ENV=production
 RUN pnpm -F website build
 
-FROM nginx:alpine3.21-slim AS runner
-WORKDIR /workdir
+# Use Alpine as a minimal base for the runtime image
+FROM alpine:3.21 AS runner
+WORKDIR /srv/mp-website
 
-# Copy client build to nginx
-COPY --from=builder /workdir/apps/website/dist /usr/share/nginx/html
+# Install bash for the env substitution script
+RUN apk add --no-cache bash
+
+# Copy the built website
+COPY --from=builder /workdir/apps/website/dist ./
 
 # Install runtime env substitution script
-COPY ./docker/embed-website-env.sh /docker-entrypoint.d/10-embed-website-env.sh
-RUN chmod +x /docker-entrypoint.d/10-embed-website-env.sh
+COPY ./docker/embed-website-env.sh /usr/local/bin/embed-website-env.sh
+RUN chmod +x /usr/local/bin/embed-website-env.sh
 
-# Add SPA configuration
-COPY <<EOF /etc/nginx/conf.d/default.conf
-server {
-    listen 80;
-    server_name localhost;
-    root /usr/share/nginx/html;
-    index index.html;
-
-    location / {
-        try_files \$uri /index.html;
-    }
-
-    location ~* \.(?:ico|css|js|gif|jpe?g|png|woff2?|wasm|eot|ttf|otf|svg|webp)\$ {
-        expires 6M;
-        access_log off;
-        add_header Cache-Control "public";
-    }
-}
-EOF
+# Run the env substitution script at startup and then keep the container alive
+CMD ["/usr/local/bin/embed-website-env.sh"]
