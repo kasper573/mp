@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "builtin-modules": "5.0.0",
-    "esbuild": "0.25.8"
+    "esbuild": "0.27.2"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

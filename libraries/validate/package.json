@@ -16,7 +16,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "arktype": "2.1.20"
+    "arktype": "2.1.29"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

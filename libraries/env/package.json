@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "dot-prop": "9.0.0"
+    "dot-prop": "10.1.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

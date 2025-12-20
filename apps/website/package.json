@@ -29,17 +29,17 @@
     "@mp/tiled-renderer": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
-    "@tanstack/react-router": "1.126.2",
-    "@tanstack/react-router-devtools": "1.126.2",
+    "@tanstack/react-router": "1.141.8",
+    "@tanstack/react-router-devtools": "1.141.8",
     "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@tanstack/router-plugin": "1.126.2",
+    "@tanstack/router-plugin": "1.142.0",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-checker": "0.9.3"
+    "vite-plugin-checker": "0.12.0"
   }
 }

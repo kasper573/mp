@@ -13,8 +13,8 @@
   },
   "dependencies": {
     "@mp/state": "workspace:*",
-    "@tanstack/react-query": "5.82.0",
-    "@tanstack/react-query-devtools": "5.82.0",
+    "@tanstack/react-query": "5.90.12",
+    "@tanstack/react-query-devtools": "5.91.1",
     "preact": "catalog:"
   },
   "devDependencies": {

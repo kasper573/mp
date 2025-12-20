@@ -26,10 +26,10 @@
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@types/yargs": "17.0.33",
+    "@types/yargs": "17.0.35",
     "@vanilla-extract/vite-plugin": "catalog:",
     "tsx": "catalog:",
     "vite": "catalog:",
-    "yargs": "17.7.2"
+    "yargs": "18.0.0"
   }
 }

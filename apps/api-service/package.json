@@ -32,12 +32,12 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
-    "@trpc/client": "11.4.3",
-    "@trpc/server": "11.4.3",
-    "@trpc/tanstack-react-query": "11.4.3",
+    "@trpc/client": "11.8.0",
+    "@trpc/server": "11.8.0",
+    "@trpc/tanstack-react-query": "11.8.0",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "superjson": "2.2.2"
+    "superjson": "2.2.6"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",

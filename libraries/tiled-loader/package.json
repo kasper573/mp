@@ -21,7 +21,7 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@types/pako": "2.0.3",
+    "@types/pako": "2.0.4",
     "vitest": "catalog:"
   }
 }
