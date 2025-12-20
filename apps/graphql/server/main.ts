@@ -4,13 +4,14 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import createExpressApp, { json } from "express";
 import http from "http";
 import cors from "cors";
-import { getSchema } from "./generated/schema";
+import { getSchema } from "./schema.generated";
+import { typesMap } from "../shared/scalars";
 
 const express = createExpressApp();
 const httpServer = http.createServer(express);
 
 const apolloServer = new ApolloServer({
-  schema: getSchema(),
+  schema: getSchema({ scalars: typesMap }),
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
 });
 await apolloServer.start();

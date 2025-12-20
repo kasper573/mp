@@ -4,23 +4,29 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./sdk": {
-      "types": "./src/sdk.ts",
-      "import": "./src/sdk.ts",
-      "require": "./src/sdk.ts"
+    "./client": {
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
     }
   },
   "scripts": {
-    "dev": "pnpm dev:ts & pnpm dev:grats",
-    "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/server.ts",
+    "dev": "concurrently --names ts,grats,tada -c blue,magenta,gray 'pnpm dev:ts' 'pnpm dev:grats' 'pnpm dev:tada'",
+    "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
     "dev:grats": "grats --watch",
+    "dev:tada": "chokidar '../shared/schema.generated.graphql' -c 'pnpm codegen:tada'",
+    "codegen:tada": "gql.tada generate-output -c client/tsconfig.json",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@apollo/client": "^4.0.11",
     "@apollo/server": "^5.2.0",
     "@as-integrations/express5": "^1.1.2",
+    "@mp/query": "workspace:*",
+    "apollo-link-scalars": "^4.0.3",
     "cors": "^2.8.5",
     "express": "catalog:",
+    "gql.tada": "^1.9.0",
     "graphql": "^16.12.0",
     "grats": "^0.0.34"
   },
@@ -29,6 +35,8 @@
     "@mp/tsconfig": "workspace:*",
     "@types/cors": "^2.8.19",
     "@types/express": "catalog:",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1",
     "tsx": "catalog:"
   }
 }

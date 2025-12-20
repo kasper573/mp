@@ -3,9 +3,16 @@
  * Do not manually edit. Regenerate by running `npx grats`.
  */
 
-import { GraphQLSchema, GraphQLObjectType, GraphQLString } from "graphql";
-import { foo as queryFooResolver, whatever as queryWhateverResolver } from "./../foo";
-export function getSchema(): GraphQLSchema {
+import type { GqlScalar } from "grats";
+import type { GqlDate as GqlDateInternal } from "./../shared/scalars";
+import { GraphQLSchema, GraphQLObjectType, GraphQLString, GraphQLScalarType } from "graphql";
+import { foo as queryFooResolver, whatever as queryWhateverResolver } from "./foo";
+export type SchemaConfig = {
+    scalars: {
+        GqlDate: GqlScalar<GqlDateInternal>;
+    };
+};
+export function getSchema(config: SchemaConfig): GraphQLSchema {
     const FooType: GraphQLObjectType = new GraphQLObjectType({
         name: "Foo",
         fields() {
@@ -38,8 +45,12 @@ export function getSchema(): GraphQLSchema {
             };
         }
     });
+    const GqlDateType: GraphQLScalarType = new GraphQLScalarType({
+        name: "GqlDate",
+        ...config.scalars.GqlDate
+    });
     return new GraphQLSchema({
         query: QueryType,
-        types: [FooType, QueryType]
+        types: [GqlDateType, FooType, QueryType]
     });
 }
