@@ -1,0 +1,31 @@
+{
+  "name": "@mp/graphql",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./sdk": {
+      "types": "./src/sdk.ts",
+      "import": "./src/sdk.ts",
+      "require": "./src/sdk.ts"
+    }
+  },
+  "scripts": {
+    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/server.ts",
+    "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@apollo/server": "^5.2.0",
+    "@as-integrations/express5": "^1.1.2",
+    "cors": "^2.8.5",
+    "express": "catalog:",
+    "graphql": "^16.12.0"
+  },
+  "devDependencies": {
+    "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
+    "@types/cors": "^2.8.19",
+    "@types/express": "catalog:",
+    "tsx": "catalog:"
+  }
+}
