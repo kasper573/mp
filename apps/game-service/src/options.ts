@@ -1,4 +1,4 @@
-import { assertEnv } from "@mp/env";
+import { parseEnv } from "@mp/env";
 import { AreaIdType } from "@mp/game-shared";
 import { TimeSpan } from "@mp/time";
 import { boolish, numeric, type } from "@mp/validate";
@@ -67,8 +67,8 @@ export const gameServiceOptionsSchema = type({
   prettyLogs: boolish(),
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(
+export const opt = parseEnv(
   (v) => gameServiceOptionsSchema.assert(v),
   process.env,
   "MP_GAME_SERVICE_",
-);
+)._unsafeUnwrap();

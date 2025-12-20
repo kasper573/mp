@@ -2,23 +2,15 @@ import type { Result } from "@mp/std";
 import { err, ok } from "@mp/std";
 import { setProperty } from "dot-prop";
 
-export function assertEnv<T>(
-  assert: (value: unknown) => T,
-  envInput: FlatObject,
-  prefix = "",
-): T {
-  const selected = selectProperties(envInput, prefix);
-  const nested = flatToNestedObject(selected);
-  return assert(nested);
-}
-
 export function parseEnv<T>(
-  assert: (value: unknown) => T,
+  parse: (value: unknown) => T,
   envInput: FlatObject,
   prefix = "",
 ): Result<T, Error> {
   try {
-    return ok(assertEnv(assert, envInput, prefix));
+    const selected = selectProperties(envInput, prefix);
+    const nested = flatToNestedObject(selected);
+    return ok(parse(nested));
   } catch (error) {
     return err(new Error("Failed to parse env", { cause: error }));
   }

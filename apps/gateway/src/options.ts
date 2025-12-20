@@ -1,4 +1,4 @@
-import { assertEnv } from "@mp/env";
+import { parseEnv } from "@mp/env";
 import { authAlgorithms } from "@mp/oauth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
 
@@ -51,8 +51,8 @@ export const serverOptionsSchema = type({
   },
 }).onDeepUndeclaredKey("delete");
 
-export const opt = assertEnv(
+export const opt = parseEnv(
   (v) => serverOptionsSchema.assert(v),
   process.env,
   "MP_GATEWAY_",
-);
+)._unsafeUnwrap();
