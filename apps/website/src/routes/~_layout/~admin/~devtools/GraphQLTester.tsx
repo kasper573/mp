@@ -1,7 +1,5 @@
 import { useQuery } from "@mp/query";
-import { useQueryBuilder, graphql, GraphQLClient } from "@mp/graphql/client";
-
-const client = new GraphQLClient("http://localhost:4000/graphql");
+import { useQueryBuilder, graphql } from "@mp/graphql/client";
 
 export function GraphQLTester() {
   const qb = useQueryBuilder();

@@ -28,7 +28,8 @@
     "express": "catalog:",
     "gql.tada": "^1.9.0",
     "graphql": "^16.12.0",
-    "grats": "^0.0.34"
+    "grats": "^0.0.34",
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",

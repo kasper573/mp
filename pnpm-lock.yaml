@@ -344,6 +344,9 @@ importers:
       grats:
         specifier: ^0.0.34
         version: 0.0.34
+      preact:
+        specifier: 'catalog:'
+        version: 10.27.2
     devDependencies:
       '@mp/build':
         specifier: workspace:*

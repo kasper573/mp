@@ -14,6 +14,11 @@ import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
+import {
+  GraphQLClient,
+  QueryBuilder,
+  QueryBuilderContext,
+} from "@mp/graphql/client";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -31,19 +36,21 @@ export default function App() {
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
-        <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
-          <LoggerContext.Provider value={systems.logger}>
-            <AuthContext.Provider value={systems.auth}>
-              <RouterProvider router={systems.router} />
-            </AuthContext.Provider>
-          </LoggerContext.Provider>
-          {showDevTools && (
-            <>
-              <TanStackRouterDevtools router={systems.router} />
-              <ReactQueryDevtools client={systems.query} />
-            </>
-          )}
-        </ApiProvider>
+        <QueryBuilderContext.Provider value={systems.queryBuilder}>
+          <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
+            <LoggerContext.Provider value={systems.logger}>
+              <AuthContext.Provider value={systems.auth}>
+                <RouterProvider router={systems.router} />
+              </AuthContext.Provider>
+            </LoggerContext.Provider>
+            {showDevTools && (
+              <>
+                <TanStackRouterDevtools router={systems.router} />
+                <ReactQueryDevtools client={systems.query} />
+              </>
+            )}
+          </ApiProvider>
+        </QueryBuilderContext.Provider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
@@ -64,6 +71,10 @@ function createSystems() {
     },
   });
 
+  const graphqlClient = new GraphQLClient("http://localhost:4000/graphql");
+
+  const queryBuilder = new QueryBuilder(graphqlClient);
+
   function initialize() {
     void auth.refresh();
 
@@ -82,6 +93,8 @@ function createSystems() {
     logger,
     router,
     query,
+    graphqlClient,
+    queryBuilder,
     initialize,
   };
 }
