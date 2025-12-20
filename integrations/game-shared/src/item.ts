@@ -36,13 +36,11 @@ export interface ItemDefinitionBase<Ref extends ItemReference> {
   name: string;
 }
 
-export interface ConsumableDefinition
-  extends ItemDefinitionBase<ConsumableReference> {
+export interface ConsumableDefinition extends ItemDefinitionBase<ConsumableReference> {
   maxStackSize: number;
 }
 
-export interface EquipmentDefinition
-  extends ItemDefinitionBase<EquipmentReference> {
+export interface EquipmentDefinition extends ItemDefinitionBase<EquipmentReference> {
   maxDurability: number;
 }
 

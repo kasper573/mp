@@ -2,7 +2,7 @@ import type { VectorKey, VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import createGraph from "ngraph.graph";
 import type { PathFinder } from "ngraph.path";
-import ngraph from "ngraph.path";
+import * as ngraph from "ngraph.path";
 
 export class VectorGraph<T extends number> {
   #nodeIds = new Set<VectorGraphNodeId>();

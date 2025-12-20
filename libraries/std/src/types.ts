@@ -28,7 +28,9 @@ export type UrlString = string;
 export const TimesPerSecondType = type("number").brand("TimesPerSecond");
 export type TimesPerSecond = typeof TimesPerSecondType.infer;
 
-export type MinimalInput<T extends object> = TreatUndefinedAsOptional<WritableSubset<T>>;
+export type MinimalInput<T extends object> = TreatUndefinedAsOptional<
+  WritableSubset<T>
+>;
 
 export type WritableSubset<T extends object> = {
   [K in WritableKeysOf<T>]: T[K];

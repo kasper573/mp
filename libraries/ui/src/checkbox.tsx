@@ -3,11 +3,10 @@ import type { Signal } from "@mp/state";
 
 export type CheckboxState = true | false | "indeterminate";
 
-export interface CheckboxProps
-  extends Pick<
-    JSX.IntrinsicElements["input"],
-    "className" | "style" | "disabled" | "children"
-  > {
+export interface CheckboxProps extends Pick<
+  JSX.IntrinsicElements["input"],
+  "className" | "style" | "disabled" | "children"
+> {
   signal: Signal<CheckboxState>;
 }
 

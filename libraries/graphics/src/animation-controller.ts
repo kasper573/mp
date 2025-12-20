@@ -143,8 +143,9 @@ export class AnimationController<AnimationName extends string> extends Sprite {
   }
 }
 
-interface AnimationControllerOptions<Name extends string>
-  extends SpriteOptions {
+interface AnimationControllerOptions<
+  Name extends string,
+> extends SpriteOptions {
   frameTime: () => TimeSpan;
   initialAnimation?: Animation<Name>;
 }

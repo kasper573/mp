@@ -35,10 +35,6 @@ export default tseslint.config(
       parserOptions: {
         projectService: true,
         tsconfigRootDir: rootDir,
-        alwaysTryTypes: true,
-        project: ["apps", "integrations", "libraries"].map(
-          (workspace) => `./${workspace}/*/tsconfig.json`,
-        ),
       },
     },
     plugins: {

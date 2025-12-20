@@ -12,8 +12,10 @@ type SelectOptionsInput<Value> =
   | readonly SelectOption<Value>[]
   | readonly Value[];
 
-interface SelectProps<Value>
-  extends Pick<JSX.IntrinsicElements["select"], "className" | "style"> {
+interface SelectProps<Value> extends Pick<
+  JSX.IntrinsicElements["select"],
+  "className" | "style"
+> {
   options: SelectOptionsInput<Value>;
   signal: Signal<Value>;
   isSameValue?: (a: Value, b: Value) => boolean;

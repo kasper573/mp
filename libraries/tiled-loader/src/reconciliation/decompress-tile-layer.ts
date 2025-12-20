@@ -85,8 +85,7 @@ export function decompressTileLayer(
 }
 
 export interface CompressedTileLayer
-  extends SharedLayerProperties,
-    CommonTileLayerProperties {
+  extends SharedLayerProperties, CommonTileLayerProperties {
   chunks?: Chunk[];
   compression: Compression;
   data: TiledData;

@@ -27,8 +27,10 @@ class PathBuilder<T extends number> extends PgJsonbBuilder<
   }
 }
 
-interface PathColumnConfig<T extends number>
-  extends ColumnBaseConfig<"json", "PgJsonb"> {
+interface PathColumnConfig<T extends number> extends ColumnBaseConfig<
+  "json",
+  "PgJsonb"
+> {
   data: Path<T>;
   driverData: PathLike<T>;
 }

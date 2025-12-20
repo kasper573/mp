@@ -5,7 +5,7 @@ packages:
 catalog:
   "@types/node": ^22.13.10
   preact: 10.27.2
-  typescript: 5.9.0-beta
+  typescript: 5.9.3
   vitest: 3.1.4
   "@vanilla-extract/vite-plugin": 5.0.6
   vite: 6.3.5

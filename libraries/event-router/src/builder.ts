@@ -142,8 +142,11 @@ export type EventMiddlewareHandler<Context, MwContext, PipedMwContext> = (opt: {
   mwc: PipedMwContext;
 }) => MwContext | Promise<MwContext>;
 
-export interface EventMiddleware<Context, MwContext, PipedMwContext>
-  extends EventMiddlewareHandler<Context, MwContext, PipedMwContext> {
+export interface EventMiddleware<
+  Context,
+  MwContext,
+  PipedMwContext,
+> extends EventMiddlewareHandler<Context, MwContext, PipedMwContext> {
   pipe: EventMiddlewareBuilder<Context, MwContext>;
 }
 

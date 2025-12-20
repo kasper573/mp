@@ -1,5 +1,4 @@
-import type { Pool } from "pg";
-import pg from "pg";
+import { Pool } from "pg";
 import { drizzle } from "drizzle-orm/node-postgres";
 
 export type DrizzleClient = ReturnType<
@@ -7,5 +6,5 @@ export type DrizzleClient = ReturnType<
 >;
 
 export function createDrizzleClient(connectionString: string): DrizzleClient {
-  return drizzle(new pg.Pool({ connectionString }));
+  return drizzle(new Pool({ connectionString }));
 }

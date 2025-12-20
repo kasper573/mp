@@ -27,8 +27,10 @@ class VectorBuilder<T extends number> extends PgPointObjectBuilder<
   }
 }
 
-interface VectorColumnConfig<T extends number>
-  extends ColumnBaseConfig<"json", "PgPointObject"> {
+interface VectorColumnConfig<T extends number> extends ColumnBaseConfig<
+  "json",
+  "PgPointObject"
+> {
   data: Vector<T>;
   driverData: VectorLike<T>;
 }

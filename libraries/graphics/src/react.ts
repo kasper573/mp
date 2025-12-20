@@ -4,8 +4,10 @@ import { Application } from "@mp/graphics";
 import { useSignal } from "@mp/state/react";
 import type { ReadonlySignal } from "@mp/state";
 
-export interface UseGraphicsOptions
-  extends Omit<Partial<ApplicationOptions>, "canvas" | "resizeTo"> {}
+export interface UseGraphicsOptions extends Omit<
+  Partial<ApplicationOptions>,
+  "canvas" | "resizeTo"
+> {}
 
 /**
  * react and pixi.js integration.

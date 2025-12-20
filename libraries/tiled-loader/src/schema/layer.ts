@@ -62,8 +62,7 @@ export interface CommonTileLayerProperties {
 }
 
 export interface TileLayer
-  extends SharedLayerProperties,
-    CommonTileLayerProperties {
+  extends SharedLayerProperties, CommonTileLayerProperties {
   tiles: TileLayerTile[];
 }
 
