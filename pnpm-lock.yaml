@@ -329,6 +329,9 @@ importers:
       graphql:
         specifier: ^16.12.0
         version: 16.12.0
+      grats:
+        specifier: ^0.0.34
+        version: 0.0.34
     devDependencies:
       '@mp/build':
         specifier: workspace:*
@@ -3291,6 +3294,10 @@ packages:
     resolution: {integrity: sha512-yPVavfyCcRhmorC7rWlkHn15b4wDVgVmBA7kV4QVBsF7kv/9TKJAbAXVTxvTnwP8HHKjRCJDClKbciiYS7p0DQ==}
     engines: {node: '>=16'}
 
+  commander@14.0.2:
+    resolution: {integrity: sha512-TywoWNNRbhoD0BXs1P3ZEScW8W5iKrnbithIl0YH+uCmBd0QpPOA8yc82DS3BIE5Ma6FnBVUsJ7wVUDz4dvOWQ==}
+    engines: {node: '>=20'}
+
   concat-map@0.0.1:
     resolution: {integrity: sha512-/Srv4dswyQNBfohGpz9o6Yb3Gz3SrUDqBH5rTuhGR7ahtlbYKnVxw2bCFMRljaA7EXHaXZ8wsHdodFvbkhKmqg==}
 
@@ -3947,6 +3954,11 @@ packages:
   graphql@16.12.0:
     resolution: {integrity: sha512-DKKrynuQRne0PNpEbzuEdHlYOMksHSUI8Zc9Unei5gTsMNA2/vMpoMz/yKba50pejK56qj98qM0SjYxAKi13gQ==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
+
+  grats@0.0.34:
+    resolution: {integrity: sha512-rvg1bSMLeGyed41EKEe6adIYtZ3WLwQSjV82k/Qz89GoFOeGonk6gPua4L1BsC+ktivuDkAIlGDi5iF5Ai9lBA==}
+    engines: {node: '>=16 <=23'}
+    hasBin: true
 
   handlebars@4.7.8:
     resolution: {integrity: sha512-vafaFqs8MZkRrSX7sFVUdo3ap/eNiLnb4IakshzvP56X5Nr1iGKAIqdX6tMlm6HcNRIkr6AxO5jFEoJzzpT8aQ==}
@@ -5114,6 +5126,11 @@ packages:
     peerDependencies:
       eslint: ^8.57.0 || ^9.0.0
       typescript: '>=4.8.4 <6.0.0'
+
+  typescript@5.9.2:
+    resolution: {integrity: sha512-CWBzXQrc/qOkhidw1OzBTQuYRbfyxDXJMVJ1XNwUHGROVmuaeiEm3OslpZ1RV96d7SKKjZKrSJu3+t/xlw3R9A==}
+    engines: {node: '>=14.17'}
+    hasBin: true
 
   typescript@5.9.3:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
@@ -7596,6 +7613,8 @@ snapshots:
 
   commander@11.1.0: {}
 
+  commander@14.0.2: {}
+
   concat-map@0.0.1: {}
 
   confbox@0.1.8: {}
@@ -8281,6 +8300,13 @@ snapshots:
   graceful-fs@4.2.10: {}
 
   graphql@16.12.0: {}
+
+  grats@0.0.34:
+    dependencies:
+      commander: 14.0.2
+      graphql: 16.12.0
+      semver: 7.7.3
+      typescript: 5.9.2
 
   handlebars@4.7.8:
     dependencies:
@@ -9477,6 +9503,8 @@ snapshots:
       typescript: 5.9.3
     transitivePeerDependencies:
       - supports-color
+
+  typescript@5.9.2: {}
 
   typescript@5.9.3: {}
 

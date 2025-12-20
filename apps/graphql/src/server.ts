@@ -4,25 +4,13 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import createExpressApp, { json } from "express";
 import http from "http";
 import cors from "cors";
-
-const typeDefs = `#graphql
-  type Query {
-    hello: String
-  }
-`;
-
-const resolvers = {
-  Query: {
-    hello: () => "world",
-  },
-};
+import { getSchema } from "./generated/schema";
 
 const express = createExpressApp();
 const httpServer = http.createServer(express);
 
 const apolloServer = new ApolloServer({
-  typeDefs,
-  resolvers,
+  schema: getSchema(),
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
 });
 await apolloServer.start();

@@ -5,6 +5,7 @@ integrations/db/drizzle
 docker/file-server/public
 docker/grafana/dashboards
 docker/keycloak/import
+**/generated/**
 **/*.generated.*
 **/*.gen.*
 .playwright

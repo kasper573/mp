@@ -4,5 +4,9 @@
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017"
+  },
+  "grats": {
+    "graphqlSchema": "./src/generated/schema.graphql",
+    "tsSchema": "./src/generated/schema.ts"
   }
 }

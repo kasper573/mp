@@ -11,7 +11,9 @@
     }
   },
   "scripts": {
-    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/server.ts",
+    "dev": "pnpm dev:ts & pnpm dev:grats",
+    "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/server.ts",
+    "dev:grats": "grats --watch",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
@@ -19,7 +21,8 @@
     "@as-integrations/express5": "^1.1.2",
     "cors": "^2.8.5",
     "express": "catalog:",
-    "graphql": "^16.12.0"
+    "graphql": "^16.12.0",
+    "grats": "^0.0.34"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
