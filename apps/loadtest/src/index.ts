@@ -142,7 +142,7 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
       }
-      const areaId = await waitUntilDefined(gameClient.areaId, 15);
+      const areaId = await waitUntilDefined(gameClient.areaId, 15_000);
 
       if (verbose) {
         logger.info(
