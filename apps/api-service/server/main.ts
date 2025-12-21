@@ -95,10 +95,10 @@ app
   .use(
     json(),
     expressMiddleware(apolloServer, {
-      context({ req }): Promise<ApiContext> {
-        return {
+      context({ req }) {
+        return Promise.resolve<ApiContext>({
           ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
-        };
+        });
       },
     }),
   );
