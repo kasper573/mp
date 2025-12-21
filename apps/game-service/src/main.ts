@@ -75,7 +75,7 @@ logger.info(opt, `Starting server...`);
 
 const api = new GraphQLClient({
   serverUrl: opt.apiServiceUrl,
-  getSchema: () =>
+  schema: () =>
     fs.readFile(
       new URL(import.meta.resolve("@mp/api-service/client/schema.graphql")),
       "utf-8",

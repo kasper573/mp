@@ -70,7 +70,7 @@ function createSystems() {
 
   const graphqlClient = new GraphQLClient({
     serverUrl: env.apiUrl,
-    getSchema: () => fetch(graphqlSchemaUrl).then((res) => res.text()),
+    schema: () => fetch(graphqlSchemaUrl).then((res) => res.text()),
     fetchOptions(init) {
       const token = auth.identity.value?.token;
       const headers = new Headers(init?.headers);

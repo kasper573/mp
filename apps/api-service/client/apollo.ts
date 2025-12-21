@@ -10,7 +10,7 @@ export type { ErrorLike as GraphQLError } from "@apollo/client";
 
 export interface GraphQLCLientOptions {
   serverUrl: string;
-  getSchema: () => Promise<string>;
+  schema: Resolvable<string>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
 }
 
@@ -25,7 +25,7 @@ export class GraphQLClient extends ApolloClient {
 
     super({
       link: ApolloLink.from([
-        deferredApolloLink(() => opt.getSchema().then(scalarLink)),
+        deferredApolloLink(() => resolve(opt.schema).then(scalarLink)),
         httpLink,
       ]),
 
@@ -43,4 +43,15 @@ export class GraphQLClient extends ApolloClient {
 function scalarLink(schemaString: string): ApolloLink {
   const schema = buildSchema(schemaString);
   return withScalars({ schema, typesMap });
+}
+
+type Eventual<T> = T | Promise<T>;
+type Resolvable<T> = Eventual<T> | (() => Eventual<T>);
+
+// oxlint-disable-next-line require-await
+async function resolve<T>(r: Resolvable<T>): Promise<T> {
+  if (typeof r === "function") {
+    return (r as () => Eventual<T>)();
+  }
+  return r;
 }

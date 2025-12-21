@@ -121,7 +121,7 @@ function testOneGameClient(n: number, rng: Rng) {
       }
       const api = new GraphQLClient({
         serverUrl: apiUrl,
-        getSchema: () =>
+        schema: () =>
           fs.readFile(
             require.resolve("@mp/api-service/client/schema.graphql"),
             "utf-8",
