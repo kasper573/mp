@@ -146,7 +146,7 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
       }
-      const areaId = await waitUntilDefined(gameClient.areaId);
+      const areaId = await waitUntilDefined(gameClient.areaId, 15);
 
       if (verbose) {
         logger.info(
@@ -215,14 +215,22 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitUntilDefined<T>(signal: Signal<T | undefined>): Promise<T> {
-  return new Promise((resolve) => {
+function waitUntilDefined<T>(
+  signal: Signal<T | undefined>,
+  timeout: number,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
     if (signal.value !== undefined) {
       resolve(signal.value);
       return;
     }
+    const timeoutId = setTimeout(
+      () => reject(new Error("Timeout waiting for defined signal")),
+      timeout,
+    );
     const unsubscribe = signal.subscribe((value) => {
       if (value !== undefined) {
+        clearTimeout(timeoutId);
         unsubscribe();
         resolve(value);
       }
