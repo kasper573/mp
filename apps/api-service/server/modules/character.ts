@@ -15,10 +15,11 @@ export async function characterList(ctx: ApiContext): Promise<Character[]> {
 /** @gqlQueryField */
 export async function myCharacterId(ctx: ApiContext): Promise<CharacterId> {
   const { user } = await auth(ctx);
+  const spawnPoint = await defaultSpawnPoint(ctx);
   return promiseFromResult(
     ctx.ioc.get(ctxDb).selectOrCreateCharacterIdForUser({
       user: user,
-      getDefaultSpawnPoint: () => defaultSpawnPoint(ctx),
+      spawnPoint,
     }),
   );
 }
