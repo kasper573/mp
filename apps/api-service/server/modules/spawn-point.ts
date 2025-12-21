@@ -1,9 +1,9 @@
 import type { AreaId } from "@mp/game-shared";
-import type { Vector, VectorLike } from "@mp/math";
+import type { VectorLike } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { areaFileUrls } from "./area";
 import { loadAreaResource } from "../integrations/load-area-resource";
-import { ApiContext } from "../context";
+import type { ApiContext } from "../context";
 
 /** @gqlQueryField */
 export async function defaultSpawnPoint(ctx: ApiContext): Promise<SpawnPoint> {

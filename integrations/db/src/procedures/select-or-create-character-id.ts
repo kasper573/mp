@@ -3,7 +3,8 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
 import type { AreaId, CharacterId } from "@mp/game-shared";
-import { Vector, VectorLike } from "@mp/math";
+import type { VectorLike } from "@mp/math";
+import { Vector } from "@mp/math";
 import { procedure } from "../utils/procedure";
 
 export const selectOrCreateCharacterIdForUser = procedure()

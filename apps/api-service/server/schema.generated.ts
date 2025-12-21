@@ -198,8 +198,8 @@ export function getSchema(config: SchemaConfig): GraphQLSchema {
                 serverVersion: {
                     name: "serverVersion",
                     type: new GraphQLNonNull(GraphQLString),
-                    resolve(_source, _args, context) {
-                        return queryServerVersionResolver(context);
+                    resolve() {
+                        return queryServerVersionResolver();
                     }
                 },
                 testError: {

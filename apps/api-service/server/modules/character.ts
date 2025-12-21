@@ -1,9 +1,9 @@
 import { gatewayRoles } from "@mp/keycloak";
-import { ApiContext, ctxDb } from "../context";
+import type { ApiContext } from "../context";
+import { ctxDb } from "../context";
 import { auth, roles } from "../integrations/auth";
 import { promiseFromResult } from "@mp/std";
-import { CharacterId } from "@mp/game-shared";
-import { unsafe } from "@mp/validate";
+import type { CharacterId } from "@mp/game-shared";
 import { defaultSpawnPoint } from "./spawn-point";
 
 /** @gqlQueryField */

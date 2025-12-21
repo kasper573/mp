@@ -1,6 +1,7 @@
 import * as tanstack from "@tanstack/react-query";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
-import { DocumentNode, print } from "graphql";
+import type { DocumentNode } from "graphql";
+import { print } from "graphql";
 
 export class TanstackGraphQLQueryBuilder<Err> {
   #client: GraphQLClientIntegration<Err>;

@@ -31,6 +31,9 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@apollo/client": "^4.0.11",
+    "@apollo/server": "^5.2.0",
+    "@as-integrations/express5": "^1.1.2",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/game-shared": "workspace:*",
@@ -39,34 +42,31 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
+    "@mp/query": "workspace:*",
     "@mp/redis": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
+    "apollo-link-scalars": "^4.0.3",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "superjson": "2.2.6",
-    "@apollo/client": "^4.0.11",
-    "@apollo/server": "^5.2.0",
-    "@as-integrations/express5": "^1.1.2",
-    "@mp/query": "workspace:*",
-    "apollo-link-scalars": "^4.0.3",
-    "tanstack-graphql-query-builder": "workspace:*",
     "gql.tada": "^1.9.0",
     "graphql": "^16.12.0",
     "grats": "^0.0.34",
-    "preact": "catalog:"
+    "preact": "catalog:",
+    "superjson": "2.2.6",
+    "tanstack-graphql-query-builder": "workspace:*"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/express": "catalog:",
-    "tsx": "catalog:",
     "bottleneck": "^2.19.5",
-    "glob": "^13.0.0",
     "chokidar-cli": "^3.0.0",
-    "concurrently": "^9.2.1"
+    "concurrently": "^9.2.1",
+    "glob": "^13.0.0",
+    "tsx": "catalog:"
   }
 }

@@ -10,8 +10,8 @@ import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 import "dotenv/config";
 import express from "express";
 import type { IncomingHttpHeaders } from "http";
+import type { ApiContext } from "./context";
 import {
-  ApiContext,
   ctxAccessToken,
   ctxDb,
   ctxFileResolver,
@@ -95,7 +95,7 @@ app
   .use(
     json(),
     expressMiddleware(apolloServer, {
-      async context({ req }): Promise<ApiContext> {
+      context({ req }): Promise<ApiContext> {
         return {
           ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
         };

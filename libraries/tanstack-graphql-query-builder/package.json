@@ -17,6 +17,8 @@
   },
   "devDependencies": {
     "@graphql-typed-document-node/core": "^3.2.0",
-    "@mp/tsconfig": "workspace:*"
+    "@mp/tsconfig": "workspace:*",
+    "@tanstack/react-query": "5.90.12",
+    "graphql": "^16.12.0"
   }
 }

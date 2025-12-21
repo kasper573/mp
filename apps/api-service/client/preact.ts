@@ -1,11 +1,9 @@
 import { useContext } from "preact/hooks";
 import { createContext } from "preact/compat";
-import { GraphQLClient, GraphQLError } from "./apollo";
-import {
-  GraphQLResult,
-  TanstackGraphQLQueryBuilder,
-} from "tanstack-graphql-query-builder";
-import { ApolloClient } from "@apollo/client";
+import type { GraphQLClient, GraphQLError } from "./apollo";
+import type { GraphQLResult } from "tanstack-graphql-query-builder";
+import { TanstackGraphQLQueryBuilder } from "tanstack-graphql-query-builder";
+import type { ApolloClient } from "@apollo/client";
 
 export function useQueryBuilder() {
   return useContext(QueryBuilderContext);
@@ -41,6 +39,7 @@ function coerceApolloResult<Data>({
   if (error) {
     return { ok: false, error };
   }
+  // oxlint-disable-next-line no-non-null-assertion
   return { ok: true, data: data! };
 }
 

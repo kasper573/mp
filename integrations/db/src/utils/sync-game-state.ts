@@ -166,10 +166,6 @@ export function syncGameState(
             break;
         }
         state.items.set(itemFields.id, instance);
-        logger.debug(
-          { itemId: itemFields.id, type: itemFields.type },
-          "Added item instance to game state",
-        );
       }
     }
   }

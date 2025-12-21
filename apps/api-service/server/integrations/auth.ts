@@ -1,10 +1,7 @@
-import {
-  assertRoles,
-  UserIdentity,
-  type RoleDefinition,
-  type UserId,
-} from "@mp/oauth";
-import { ApiContext, ctxAccessToken, ctxTokenResolver } from "../context";
+import type { UserIdentity } from "@mp/oauth";
+import { assertRoles, type RoleDefinition } from "@mp/oauth";
+import type { ApiContext } from "../context";
+import { ctxAccessToken, ctxTokenResolver } from "../context";
 import { GraphQLError } from "graphql";
 
 export async function auth(ctx: ApiContext): Promise<AuthContext> {

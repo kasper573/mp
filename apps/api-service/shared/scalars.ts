@@ -1,16 +1,21 @@
-import {
+import type {
   ActorId,
   ActorModelId,
   AreaId,
-  Character,
   CharacterId,
   ItemDefinition,
   ItemReference,
 } from "@mp/game-shared";
-import { UrlString, LocalFile, Pixel, Tile, TimesPerSecond } from "@mp/std";
+import type {
+  UrlString,
+  LocalFile,
+  Pixel,
+  Tile,
+  TimesPerSecond,
+} from "@mp/std";
 import type { ParsingFunctionsObject } from "apollo-link-scalars";
 import { GqlDate } from "./date-scalar";
-import { ObjectId } from "@mp/tiled-loader";
+import type { ObjectId } from "@mp/tiled-loader";
 
 export const typesMap: ScalarEncodings = {
   // Primitives

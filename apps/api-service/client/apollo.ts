@@ -41,7 +41,7 @@ export class GraphQLClient extends ApolloClient {
   }
 }
 
-async function scalarLink(schemaString: string): Promise<ApolloLink> {
+function scalarLink(schemaString: string): ApolloLink {
   const schema = buildSchema(schemaString);
   return withScalars({ schema, typesMap });
 }

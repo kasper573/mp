@@ -1,5 +1,6 @@
 import { systemRoles } from "@mp/keycloak";
-import { ApiContext, ctxGameServiceConfig } from "../context";
+import type { ApiContext } from "../context";
+import { ctxGameServiceConfig } from "../context";
 import { roles } from "../integrations/auth";
 import { opt } from "../options";
 
@@ -26,7 +27,7 @@ export async function setPatchOptimizerEnabled(
 }
 
 /** @gqlQueryField */
-export async function serverVersion(ctx: ApiContext): Promise<string> {
+export function serverVersion(): string {
   return opt.version;
 }
 

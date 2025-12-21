@@ -12,12 +12,7 @@ export async function withBackoffRetries<T>(
       if (options.maxRetries !== "infinite" && attempt > options.maxRetries) {
         throw err;
       }
-      if (attempt >= options.warnAfter) {
-        console.warn(
-          `Operation failed ${attempt} times. Last error:`,
-          err instanceof Error ? err : String(err),
-        );
-      }
+
       const delay = Math.min(
         options.maxDelay,
         options.initialDelay * Math.pow(options.factor, attempt - 1),

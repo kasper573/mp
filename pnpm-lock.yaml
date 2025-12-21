@@ -1002,13 +1002,6 @@ importers:
         version: 3.1.4(@types/node@25.0.3)(jiti@2.6.1)(jsdom@23.2.0)(tsx@4.21.0)
 
   libraries/tanstack-graphql-query-builder:
-    dependencies:
-      '@tanstack/react-query':
-        specifier: ^5.90.12
-        version: 5.90.12(react@19.1.0)
-      graphql:
-        specifier: ^16
-        version: 16.12.0
     devDependencies:
       '@graphql-typed-document-node/core':
         specifier: ^3.2.0
@@ -1016,6 +1009,12 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../tsconfig
+      '@tanstack/react-query':
+        specifier: 5.90.12
+        version: 5.90.12(react@19.1.0)
+      graphql:
+        specifier: ^16.12.0
+        version: 16.12.0
 
   libraries/telemetry:
     dependencies:

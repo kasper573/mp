@@ -1,6 +1,6 @@
 import { initGraphQLTada } from "gql.tada";
 import type { introspection } from "./gql-tada.generated";
-import { Scalars } from "../shared/scalars";
+import type { Scalars } from "../shared/scalars";
 
 export const graphql = initGraphQLTada<{
   introspection: introspection;

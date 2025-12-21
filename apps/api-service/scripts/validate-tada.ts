@@ -1,3 +1,4 @@
+// oxlint-disable no-console
 import * as fs from "node:fs";
 import * as path from "node:path";
 import { spawn } from "node:child_process";
@@ -39,7 +40,7 @@ const failures = results.filter(
 
 process.exit(failures.length);
 
-async function findTsConfigs(directory: string): Promise<string[]> {
+function findTsConfigs(directory: string): Promise<string[]> {
   return glob("**/tsconfig.json", {
     cwd: directory,
     absolute: true,

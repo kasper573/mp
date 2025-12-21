@@ -16,8 +16,8 @@ export function deferredApolloLink(
       let subscription: { unsubscribe: () => void } | undefined;
       let cancelled = false;
 
-      linkPromise!
-        .then((link) => {
+      void linkPromise
+        ?.then((link) => {
           if (cancelled) return;
           const result = link.request(operation, forward);
           if (result) {
