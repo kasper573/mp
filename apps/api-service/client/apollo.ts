@@ -18,7 +18,7 @@ export class GraphQLClient extends ApolloClient {
   constructor(opt: GraphQLCLientOptions) {
     const httpLink = new BatchHttpLink({
       uri: opt.serverUrl,
-      batchInterval: 250,
+      batchInterval: 100,
       batchDebounce: true,
       fetch: (input, init) =>
         fetch(input, mergeRequestInit(init, opt.fetchOptions?.())),
