@@ -20,7 +20,9 @@ export class TanstackGraphQLQueryBuilder<Err> {
     return {
       queryKey: this.queryKey(query, vars),
       queryFn:
-        vars === tanstack.skipToken ? undefined : this.queryFn(query, vars),
+        vars === tanstack.skipToken
+          ? tanstack.skipToken
+          : this.queryFn(query, vars),
     };
   }
 
@@ -58,7 +60,9 @@ export class TanstackGraphQLQueryBuilder<Err> {
     return {
       queryKey: this.queryKey(query, vars),
       queryFn:
-        vars === tanstack.skipToken ? undefined : this.queryFn(query, vars),
+        vars === tanstack.skipToken
+          ? tanstack.skipToken
+          : this.queryFn(query, vars),
     };
   }
 
