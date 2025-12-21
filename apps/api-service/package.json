@@ -15,9 +15,9 @@
       "require": "./client/tsconfig.tada.json"
     },
     "./client/schema.graphql": {
-      "types": "./shared/schema.generated.json",
-      "import": "./shared/schema.generated.json",
-      "require": "./shared/schema.generated.json"
+      "types": "./shared/schema.generated.graphql",
+      "import": "./shared/schema.generated.graphql",
+      "require": "./shared/schema.generated.graphql"
     }
   },
   "scripts": {
