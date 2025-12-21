@@ -3,14 +3,15 @@ import { ApolloClient, ApolloLink } from "@apollo/client";
 import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
 import { typesMap } from "../shared/scalars";
-import { buildSchema } from "graphql";
+import type { IntrospectionQuery } from "graphql";
+import { buildClientSchema, buildSchema } from "graphql";
 import { deferredApolloLink } from "./deferred-apollo-link";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
 export interface GraphQLCLientOptions {
   serverUrl: string;
-  schema: Resolvable<string>;
+  schema: Resolvable<string | object>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
 }
 
@@ -40,8 +41,11 @@ export class GraphQLClient extends ApolloClient {
   }
 }
 
-function scalarLink(schemaString: string): ApolloLink {
-  const schema = buildSchema(schemaString);
+function scalarLink(schemaStringOrIntrospection: string | object): ApolloLink {
+  const schema =
+    typeof schemaStringOrIntrospection === "string"
+      ? buildSchema(schemaStringOrIntrospection)
+      : buildClientSchema(schemaStringOrIntrospection as IntrospectionQuery);
   return withScalars({ schema, typesMap });
 }
 
