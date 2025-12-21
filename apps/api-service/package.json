@@ -18,6 +18,11 @@
       "types": "./shared/schema.generated.graphql",
       "import": "./shared/schema.generated.graphql",
       "require": "./shared/schema.generated.graphql"
+    },
+    "./client/schema.json": {
+      "types": "./shared/schema.generated.json",
+      "import": "./shared/schema.generated.json",
+      "require": "./shared/schema.generated.json"
     }
   },
   "scripts": {
@@ -26,7 +31,8 @@
     "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
     "dev:grats": "grats --watch",
     "dev:tada": "chokidar './shared/schema.generated.graphql' --initial -c 'pnpm tada:codegen'",
-    "codegen": "grats && pnpm tada:codegen",
+    "codegen": "grats && pnpm tada:codegen && pnpm codegen:json",
+    "codegen:json": "tsx ./scripts/graphql-to-json.ts ./shared/schema.generated.graphql ./shared/schema.generated.json",
     "tada:codegen": "gql.tada generate-output -c client/tsconfig.json -o client/gql-tada.generated.d.ts",
     "tada:check": "tsx ./scripts/validate-tada.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
