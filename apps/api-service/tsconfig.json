@@ -1,14 +1,6 @@
 {
   "extends": "@mp/tsconfig/node.json",
-  "include": [
-    "./*",
-    "src/**/*",
-    "server/integrations",
-    "server/modules",
-    "server/context.ts",
-    "server/main.ts",
-    "server/options.ts"
-  ],
+  "include": ["*.ts", "shared", "server"],
   "compilerOptions": {
     "module": "Preserve",
     "target": "es2017"

@@ -3,7 +3,7 @@ import { build } from "@mp/build/esbuild";
 
 void build({
   entryPoints: {
-    index: "./src/main.ts",
+    index: "./server/main.ts",
   },
   outdir: path.resolve(import.meta.dirname, "dist"),
 });
