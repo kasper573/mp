@@ -347,6 +347,9 @@ importers:
       preact:
         specifier: 'catalog:'
         version: 10.27.2
+      tanstack-graphql-query-builder:
+        specifier: workspace:*
+        version: link:../../libraries/tanstack-graphql-query-builder
     devDependencies:
       '@mp/build':
         specifier: workspace:*
@@ -1028,6 +1031,22 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.1.4(@types/node@25.0.3)(jiti@2.6.1)(jsdom@23.2.0)(tsx@4.21.0)
+
+  libraries/tanstack-graphql-query-builder:
+    dependencies:
+      '@tanstack/react-query':
+        specifier: ^5.90.12
+        version: 5.90.12(react@19.1.0)
+      graphql:
+        specifier: ^16
+        version: 16.12.0
+    devDependencies:
+      '@graphql-typed-document-node/core':
+        specifier: ^3.2.0
+        version: 3.2.0(graphql@16.12.0)
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
 
   libraries/telemetry:
     dependencies:

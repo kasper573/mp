@@ -3,7 +3,7 @@ import { useQueryBuilder, graphql } from "@mp/graphql/client";
 
 export function GraphQLTester() {
   const qb = useQueryBuilder();
-  const { data, isLoading, error } = useQuery(qb.queryOptions({ query }));
+  const { data, isLoading, error } = useQuery(qb.queryOptions(query));
 
   return (
     <>

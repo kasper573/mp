@@ -4,7 +4,9 @@ import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
 import { typesMap } from "../shared/scalars";
 import { buildSchema } from "graphql";
-import graphqlSchemaStringg from "../generated/schema.graphql?raw";
+import graphqlSchemaStringg from "../shared/schema.generated.graphql?raw";
+
+export type { ErrorLike as GraphQLError } from "@apollo/client";
 
 export class GraphQLClient extends ApolloClient {
   constructor(uri: string, fetchOptions?: () => RequestInit) {

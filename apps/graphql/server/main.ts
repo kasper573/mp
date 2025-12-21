@@ -13,7 +13,9 @@ const httpServer = http.createServer(express);
 const apolloServer = new ApolloServer({
   schema: getSchema({ scalars: typesMap }),
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  allowBatchedHttpRequests: true,
 });
+
 await apolloServer.start();
 
 express.use(cors(), json(), expressMiddleware(apolloServer));
@@ -21,4 +23,5 @@ express.use(cors(), json(), expressMiddleware(apolloServer));
 await new Promise<void>((resolve) =>
   httpServer.listen({ port: 4000 }, resolve),
 );
+
 console.log(`🚀 Server ready at http://localhost:4000`);

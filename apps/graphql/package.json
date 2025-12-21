@@ -24,6 +24,7 @@
     "@as-integrations/express5": "^1.1.2",
     "@mp/query": "workspace:*",
     "apollo-link-scalars": "^4.0.3",
+    "tanstack-graphql-query-builder": "workspace:*",
     "cors": "^2.8.5",
     "express": "catalog:",
     "gql.tada": "^1.9.0",
