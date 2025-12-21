@@ -16,7 +16,8 @@
     "lint": "oxlint . && ls-lint && manypkg check && knip && eslint . --max-warnings 0",
     "lint:fix": "oxlint . --fix --fix-suggestions --fix-dangerously && manypkg fix && eslint . --fix",
     "format": "prettier --check .",
-    "format:fix": "prettier --write ."
+    "format:fix": "prettier --write .",
+    "postinstall": "pnpm -r codegen"
   },
   "devDependencies": {
     "@dotenvx/dotenvx": "1.51.2",
