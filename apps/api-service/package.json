@@ -47,7 +47,6 @@
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/redis": "workspace:*",
     "@mp/state": "workspace:*",

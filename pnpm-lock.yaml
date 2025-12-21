@@ -107,9 +107,6 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
       '@mp/oauth':
         specifier: workspace:*
         version: link:../../libraries/auth
