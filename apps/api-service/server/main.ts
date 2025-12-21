@@ -25,7 +25,6 @@ import { expressMiddleware } from "@as-integrations/express5";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
 import { json } from "express";
 import http from "http";
-import cors from "cors";
 import { getSchema } from "./schema.generated";
 import { typesMap } from "../shared/scalars";
 import { info } from "console";
@@ -89,7 +88,6 @@ app
   .use("/health", (_, res) => res.send("OK"))
   .use(metricsMiddleware())
   .use(
-    cors(),
     json(),
     expressMiddleware(apolloServer, {
       async context({ req }): Promise<ApiContext> {
