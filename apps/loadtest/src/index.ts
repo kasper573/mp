@@ -1,5 +1,6 @@
 // oxlint-disable no-await-in-loop
 import { graphql, GraphQLClient } from "@mp/api-service/client";
+import fs from "fs/promises";
 import { createProxyEventInvoker } from "@mp/event-router";
 import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
@@ -118,7 +119,13 @@ function testOneGameClient(n: number, rng: Rng) {
       }
       const api = new GraphQLClient({
         serverUrl: apiUrl,
-        schemaUrl: import.meta.resolve("@mp/api-service/client/schema.graphql"),
+        getSchema: () =>
+          fs.readFile(
+            new URL(
+              import.meta.resolve("@mp/api-service/client/schema.graphql"),
+            ),
+            "utf-8",
+          ),
         fetchOptions: () => ({
           headers: { Authorization: `Bearer ${accessToken}` },
         }),

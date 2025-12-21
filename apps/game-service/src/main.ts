@@ -61,6 +61,7 @@ import { opt } from "./options";
 import { gameServiceEvents, type GameServiceEvents } from "./router";
 import { loadAreaResource } from "./integrations/load-area-resource";
 import { createDbRepository } from "@mp/db";
+import fs from "fs/promises";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -74,7 +75,11 @@ logger.info(opt, `Starting server...`);
 
 const api = new GraphQLClient({
   serverUrl: opt.apiServiceUrl,
-  schemaUrl: import.meta.resolve("@mp/api-service/client/schema.graphql"),
+  getSchema: () =>
+    fs.readFile(
+      new URL(import.meta.resolve("@mp/api-service/client/schema.graphql")),
+      "utf-8",
+    ),
 });
 
 // A game service can't function without these dependencies,
@@ -96,6 +101,8 @@ const [area, actorModels] = await withBackoffRetries(async () => {
     createActorModelLookup(actorModelIds),
   ];
 });
+
+logger.info(`Area and actor models loaded successfully`);
 
 const redisClient = new Redis(opt.redisPath);
 
