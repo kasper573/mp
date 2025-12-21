@@ -6,5 +6,11 @@
     "@mp/eslint",
     "@prefresh/core",
     "eslint-import-resolver-typescript"
-  ]
+  ],
+  "workspaces": {
+    "apps/api-service": {
+      "entry": ["server/main.ts", "client/index.ts"],
+      "project": ["**/*.ts"]
+    }
+  }
 }
