@@ -85,7 +85,16 @@ export const useItemDefinition: ItemDefinitionLookup = <
   const qb = useQueryBuilder();
   const {
     data: { itemDefinition },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(itemDefinitionQuery, { ref }));
+  } = useSuspenseQuery(
+    qb.suspenseQueryOptions(itemDefinitionQuery, {
+      // Note that it's important to destructure `ref`,
+      // since it's generic and could contain excess properties that would pollute the query key.
+      ref: {
+        definitionId: ref.definitionId,
+        type: ref.type,
+      } as ItemReference,
+    }),
+  );
 
   // GraphQL does not support generics so we must assert to restore the generic type info.
   // it's safe to do, just ugly.
