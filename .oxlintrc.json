@@ -103,6 +103,13 @@
         "no-non-null-assertion": "off"
       }
     },
+    // Definition files can be ambiguous in module format
+    {
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "unambiguous": "off"
+      }
+    },
     // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports
     {
       "files": ["**/libraries/graphics/**"],
