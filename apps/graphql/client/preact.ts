@@ -5,7 +5,7 @@ import {
   GraphQLResult,
   TanstackGraphQLQueryBuilder,
 } from "tanstack-graphql-query-builder";
-import { ApolloClient, MutateResult } from "@apollo/client";
+import { ApolloClient } from "@apollo/client";
 
 export function useQueryBuilder() {
   return useContext(QueryBuilderContext);
