@@ -21,12 +21,13 @@
     }
   },
   "scripts": {
-    "build": "tsc && tsx esbuild.ts",
-    "dev": "concurrently --names ts,grats,tada -c blue,magenta,gray 'pnpm dev:ts' 'pnpm dev:grats' 'pnpm dev:tada'",
+    "build": "pnpm codegen && tsc && tsx esbuild.ts",
+    "dev": "concurrently --names grats,tada,ts -c blue,magenta,gray 'pnpm dev:grats' 'pnpm dev:tada' 'pnpm dev:ts'",
     "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
     "dev:grats": "grats --watch",
-    "dev:tada": "chokidar '../shared/schema.generated.graphql' --initial -c 'pnpm tada:codegen'",
-    "tada:codegen": "gql.tada generate-output -c client/tsconfig.json",
+    "dev:tada": "chokidar './shared/schema.generated.graphql' --initial -c 'pnpm tada:codegen'",
+    "codegen": "grats && pnpm tada:codegen",
+    "tada:codegen": "gql.tada generate-output -c client/tsconfig.json -o client/gql-tada.generated.d.ts",
     "tada:check": "tsx ./scripts/validate-tada.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
