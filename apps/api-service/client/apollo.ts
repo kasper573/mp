@@ -4,26 +4,32 @@ import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
 import { typesMap } from "../shared/scalars";
 import { buildSchema } from "graphql";
-import graphqlSchemaStringg from "../shared/schema.generated.graphql?raw";
+import { deferredApolloLink } from "./deferred-apollo-link";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
+export interface GraphQLCLientOptions {
+  serverUrl: string;
+  schemaUrl: string;
+  fetchOptions?: () => RequestInit;
+}
+
 export class GraphQLClient extends ApolloClient {
-  constructor(uri: string, fetchOptions?: () => RequestInit) {
+  constructor(opt: GraphQLCLientOptions) {
     const httpLink = new BatchHttpLink({
-      uri,
+      uri: opt.serverUrl,
       fetch: (input, init) =>
         fetch(input, {
           ...init,
-          ...fetchOptions?.(),
+          ...opt.fetchOptions?.(),
         }),
     });
 
-    const schema = buildSchema(graphqlSchemaStringg);
-    const scalarLink = withScalars({ schema, typesMap });
-
     super({
-      link: ApolloLink.from([scalarLink, httpLink]),
+      link: ApolloLink.from([
+        deferredApolloLink(() => scalarLink(opt.schemaUrl)),
+        httpLink,
+      ]),
 
       // Disable caching because we're going to let @tanstack/react-query handle caching
       cache: new InMemoryCache(),
@@ -34,4 +40,10 @@ export class GraphQLClient extends ApolloClient {
       },
     });
   }
+}
+
+async function scalarLink(schemaUrl: string): Promise<ApolloLink> {
+  const schemaString = await fetch(schemaUrl).then((res) => res.text());
+  const schema = buildSchema(schemaString);
+  return withScalars({ schema, typesMap });
 }

@@ -18,6 +18,7 @@ import {
   QueryBuilder,
   QueryBuilderContext,
 } from "@mp/api-service/client";
+import graphqlSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -67,13 +68,17 @@ function createSystems() {
     },
   });
 
-  const graphqlClient = new GraphQLClient(env.apiUrl, () => {
-    const token = auth.identity.value?.token;
-    const headers = new Headers();
-    if (token) {
-      headers.append("Authorization", `Bearer ${token}`);
-    }
-    return { headers };
+  const graphqlClient = new GraphQLClient({
+    serverUrl: env.apiUrl,
+    schemaUrl: graphqlSchemaUrl,
+    fetchOptions() {
+      const token = auth.identity.value?.token;
+      const headers = new Headers();
+      if (token) {
+        headers.append("Authorization", `Bearer ${token}`);
+      }
+      return { headers };
+    },
   });
 
   const queryBuilder = new QueryBuilder(graphqlClient);

@@ -3,11 +3,15 @@ import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import { DocumentNode, print } from "graphql";
 
 export class TanstackGraphQLQueryBuilder<Err> {
+  #client: GraphQLClientIntegration<Err>;
+
   constructor(
-    public client: GraphQLClientIntegration<Err>,
+    client: GraphQLClientIntegration<Err>,
     private queryKey = defaultQueryKey,
     private coerceResponse = defaultCoerceResponse,
-  ) {}
+  ) {
+    this.#client = client;
+  }
 
   queryOptions<Data, Vars extends GraphQLVariablesLike, Selection = Data>(
     query: TypedDocumentNode<Data, Vars>,
@@ -87,7 +91,7 @@ export class TanstackGraphQLQueryBuilder<Err> {
     return {
       mutationKey: this.queryKey(node, undefined),
       mutationFn: async (vars, context) => {
-        const res = await this.client.mutation(node, vars, context);
+        const res = await this.#client.mutation(node, vars, context);
         if (!res.ok) {
           throw res.error;
         }
@@ -101,7 +105,7 @@ export class TanstackGraphQLQueryBuilder<Err> {
     vars: Vars | undefined,
   ) {
     return async (context: tanstack.QueryFunctionContext): Promise<Data> => {
-      const res = await this.client.query(query, assertVars(vars), context);
+      const res = await this.#client.query(query, assertVars(vars), context);
 
       if (!res.ok) {
         throw res.error;

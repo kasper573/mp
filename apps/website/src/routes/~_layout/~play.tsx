@@ -1,4 +1,4 @@
-import { useApiClient } from "@mp/api-service/sdk";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
 import { useSignalEffect } from "@mp/state/react";
 import { LoadingSpinner } from "@mp/ui";
@@ -8,6 +8,7 @@ import { gameAssetLoader } from "../../integrations/assets";
 import { useGameStateClient } from "../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
+import { toResult } from "@mp/std";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
@@ -15,15 +16,16 @@ export const Route = createFileRoute("/_layout/play")({
 
 function PlayPage() {
   const [stateClient, events] = useGameStateClient();
-  const api = useApiClient();
+  const { client } = useQueryBuilder();
 
   useSignalEffect(() => {
     // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
     if (stateClient.isConnected.value) {
       // Temporary solution until we have a proper character selection UI
-      void api.myCharacterId.query().then((id) => {
-        stateClient.characterId.value = id;
-        events.gateway.join(id);
+      void client.query({ query }).then((obj) => {
+        const { myCharacterId } = toResult(obj)._unsafeUnwrap();
+        stateClient.characterId.value = myCharacterId;
+        events.gateway.join(myCharacterId);
       });
     }
   });
@@ -43,3 +45,9 @@ function PlayPage() {
     </Suspense>
   );
 }
+
+const query = graphql(`
+  query PlayPage {
+    myCharacterId
+  }
+`);

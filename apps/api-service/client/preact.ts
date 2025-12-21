@@ -20,7 +20,7 @@ export const QueryBuilderContext = createContext(
 );
 
 export class QueryBuilder extends TanstackGraphQLQueryBuilder<GraphQLError> {
-  constructor(client: GraphQLClient) {
+  constructor(public readonly client: GraphQLClient) {
     super({
       async query(query, variables) {
         const res = await client.query({ query, variables });

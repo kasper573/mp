@@ -3,7 +3,7 @@ import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
 import type { AreaId, CharacterId } from "@mp/game-shared";
-import type { Vector } from "@mp/math";
+import { Vector, VectorLike } from "@mp/math";
 import { procedure } from "../utils/procedure";
 
 export const selectOrCreateCharacterIdForUser = procedure()
@@ -11,7 +11,7 @@ export const selectOrCreateCharacterIdForUser = procedure()
     user: UserIdentity;
     getDefaultSpawnPoint: () => Promise<{
       areaId: AreaId;
-      coords: Vector<Tile>;
+      coords: VectorLike<Tile>;
     }>;
   }>()
   .query(
@@ -39,10 +39,12 @@ export const selectOrCreateCharacterIdForUser = procedure()
         .values({})
         .returning({ id: inventoryTable.id });
 
+      const spawnPoint = await getDefaultSpawnPoint();
       const insertResult = await drizzle
         .insert(characterTable)
         .values({
-          ...(await getDefaultSpawnPoint()),
+          areaId: spawnPoint.areaId,
+          coords: Vector.from(spawnPoint.coords),
           speed: 3 as Tile,
           health: 100,
           maxHealth: 100,

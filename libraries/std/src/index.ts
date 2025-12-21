@@ -9,3 +9,4 @@ export * from "neverthrow";
 export * from "./assert";
 export * from "./retry-backoff";
 export * from "./promise-from-result";
+export * from "./to-result";

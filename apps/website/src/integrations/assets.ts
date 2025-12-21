@@ -1,4 +1,4 @@
-import { useApi } from "@mp/api-service/sdk";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import type { AreaId } from "@mp/game-shared";
 import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
 import {
@@ -25,35 +25,46 @@ export const useAreaAssets: AreaAssetsLookup = (areaId) => {
 };
 
 export function useActorTextures(): ActorTextureLookup {
-  const api = useApi();
-  const [{ data: url }, { data: modelIds }] = useSuspenseQueries({
-    queries: [
-      api.actorSpritesheetUrl.queryOptions("public"),
-      api.actorModelIds.queryOptions(),
-    ],
-  });
+  const qb = useQueryBuilder();
+  const { data } = useSuspenseQuery(
+    qb.suspenseQueryOptions(actorTexturesQuery),
+  );
 
   const { data: lookup } = useSuspenseQuery({
-    queryKey: ["actor-spritesheet-lookup", url],
+    queryKey: ["actor-spritesheet-lookup", data],
     staleTime: Infinity,
-    queryFn: () => loadActorTextureLookup(modelIds, url),
+    queryFn: () =>
+      loadActorTextureLookup(data.actorModelIds, data.actorSpritesheetUrl),
   });
 
   return lookup;
 }
 
+const actorTexturesQuery = graphql(`
+  query ActorTextures {
+    actorSpritesheetUrl(urlType: public)
+    actorModelIds
+  }
+`);
+
 export function useAreaResource(areaId: AreaId): AreaResource {
-  const api = useApi();
-  const { data: url } = useSuspenseQuery(
-    api.areaFileUrl.queryOptions({ areaId, urlType: "public" }),
-  );
+  const qb = useQueryBuilder();
+  const {
+    data: { areaFileUrl },
+  } = useSuspenseQuery(qb.suspenseQueryOptions(actorResourceQuery, { areaId }));
   const query = useSuspenseQuery({
-    queryKey: ["areaResource", url, areaId],
+    queryKey: ["areaResource", areaFileUrl, areaId],
     staleTime: Infinity,
-    queryFn: () => browserLoadAreaResource(areaId, url),
+    queryFn: () => browserLoadAreaResource(areaId, areaFileUrl),
   });
   return query.data;
 }
+
+const actorResourceQuery = graphql(`
+  query AreaResource($areaId: AreaId!) {
+    areaFileUrl(areaId: $areaId, urlType: public)
+  }
+`);
 
 export function useAreaSpritesheets(
   area: AreaResource,
@@ -71,21 +82,21 @@ export const useItemDefinition: ItemDefinitionLookup = <
 >(
   ref: Ref,
 ) => {
-  const api = useApi();
-  const { data } = useSuspenseQuery(
-    // Note that it's important to destructure `ref`,
-    // since it's generic and could contain excess properties that would pollute the query key.
-    api.itemDefinition.queryOptions({
-      type: ref.type,
-      definitionId: ref.definitionId,
-    }),
-  );
+  const qb = useQueryBuilder();
+  const {
+    data: { itemDefinition },
+  } = useSuspenseQuery(qb.suspenseQueryOptions(itemDefinitionQuery, { ref }));
 
-  // TRPC does not support generic type parameters in procedures,
-  // so i have to assert to restore the generic type information here.
+  // GraphQL does not support generics so we must assert to restore the generic type info.
   // it's safe to do, just ugly.
-  return data as ItemDefinitionByReference<Ref>;
+  return itemDefinition as ItemDefinitionByReference<Ref>;
 };
+
+const itemDefinitionQuery = graphql(`
+  query ItemDefinition($ref: ItemReference!) {
+    itemDefinition(ref: $ref)
+  }
+`);
 
 export const gameAssetLoader: GameAssetLoader = {
   useAreaAssets,

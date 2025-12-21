@@ -15,7 +15,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws), [trpc](https://trpc.io/), [custom sync lib](libraries/sync)
+- network: [ws](https://www.npmjs.com/package/ws), [graphql](./apps/api-service/), [custom sync lib](libraries/sync)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
 

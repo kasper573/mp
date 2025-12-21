@@ -10,23 +10,28 @@ export type Branded<T, Name extends string> = T & {
 
 /**
  * Unit of measurement in 2D screen space.
+ * @gqlScalar
  */
-export const PixelType = type("number").brand("Pixel");
 export type Pixel = typeof PixelType.infer;
+export const PixelType = type("number").brand("Pixel");
 
 /**
  * Unit of measurement in 2D tile space.
- */
-export const TileType = type("number").brand("Tile");
+ * @gqlScalar
+ * */
 export type Tile = typeof TileType.infer;
+export const TileType = type("number").brand("Tile");
 
-export const LocalFileType = type("string").brand("LocalFile");
+/** @gqlScalar */
 export type LocalFile = typeof LocalFileType.infer;
+export const LocalFileType = type("string").brand("LocalFile");
 
+/** @gqlScalar */
 export type UrlString = string;
 
-export const TimesPerSecondType = type("number").brand("TimesPerSecond");
+/** @gqlScalar */
 export type TimesPerSecond = typeof TimesPerSecondType.infer;
+export const TimesPerSecondType = type("number").brand("TimesPerSecond");
 
 export type MinimalInput<T extends object> = TreatUndefinedAsOptional<
   WritableSubset<T>

@@ -1,4 +1,4 @@
-import { useApi } from "@mp/api-service/sdk";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import type { CharacterId } from "@mp/game-shared";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
@@ -21,26 +21,25 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const api = useApi();
+  const qb = useQueryBuilder();
   const auth = useContext(AuthContext);
   const [stateClient, events] = useGameStateClient();
 
-  const characterOptions = useQuery(
-    api.characterList.queryOptions(void 0, {
-      refetchInterval: 5000,
-      enabled: !!auth.identity.value,
-      select: (characters): SelectOption<CharacterId>[] => [
-        {
-          value: undefined as unknown as CharacterId,
-          label: "Select character",
-        },
-        ...characters.map((char) => ({
-          value: char.id,
-          label: char.name,
-        })),
-      ],
-    }),
-  );
+  const characterOptions = useQuery({
+    ...qb.queryOptions(query),
+    refetchInterval: 5000,
+    enabled: !!auth.identity.value,
+    select: ({ characterList }): SelectOption<CharacterId>[] => [
+      {
+        value: undefined as unknown as CharacterId,
+        label: "Select character",
+      },
+      ...characterList.map((char) => ({
+        value: char.id,
+        label: char.name,
+      })),
+    ],
+  });
 
   useSignalEffect(() => {
     // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
@@ -71,3 +70,12 @@ function RouteComponent() {
     </div>
   );
 }
+
+const query = graphql(`
+  query SpectatorCharacterList {
+    characterList {
+      id
+      name
+    }
+  }
+`);

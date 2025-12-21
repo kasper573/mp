@@ -48,6 +48,7 @@ export interface EquipmentDefinition extends ItemDefinitionBase<EquipmentReferen
 // and for properties that are shared, but it's intended that server behavior and
 // client rendering should be implementing concrete logic per item type.
 
+/** @gqlScalar */
 export type ItemDefinition = ConsumableDefinition | EquipmentDefinition;
 export type ItemInstance = ConsumableInstance | EquipmentInstance;
 export type ItemInstanceId = ItemInstance["id"];
@@ -69,8 +70,10 @@ const EquipmentReference = type({
 });
 type EquipmentReference = typeof EquipmentReference.inferOut;
 
-export const ItemReference = ConsumableReference.or(EquipmentReference);
-export type ItemReference = typeof ItemReference.inferOut;
+export const ItemReferenceType = ConsumableReference.or(EquipmentReference);
+
+/** @gqlScalar */
+export type ItemReference = typeof ItemReferenceType.inferOut;
 
 export type ItemDefinitionByReference<Ref extends ItemReference> = Extract<
   ItemDefinition,

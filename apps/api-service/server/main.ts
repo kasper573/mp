@@ -1,27 +1,116 @@
+import { createDbRepository } from "@mp/db";
+import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
+import { InjectionContainer } from "@mp/ioc";
+import { createPinoLogger } from "@mp/logger/pino";
+import type { AccessToken } from "@mp/oauth";
+import { createTokenResolver } from "@mp/oauth/server";
+import { createRedisSyncEffect, Redis } from "@mp/redis";
+import { signal } from "@mp/state";
+import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
+import "dotenv/config";
+import express from "express";
+import type { IncomingHttpHeaders } from "http";
+import {
+  ApiContext,
+  ctxAccessToken,
+  ctxDb,
+  ctxFileResolver,
+  ctxGameServiceConfig,
+  ctxTokenResolver,
+} from "./context";
+import { createFileResolver } from "./integrations/file-resolver";
+import { opt } from "./options";
 import { ApolloServer } from "@apollo/server";
 import { expressMiddleware } from "@as-integrations/express5";
 import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHttpServer";
-import createExpressApp, { json } from "express";
+import { json } from "express";
 import http from "http";
 import cors from "cors";
 import { getSchema } from "./schema.generated";
 import { typesMap } from "../shared/scalars";
+import { info } from "console";
 
-const express = createExpressApp();
-const httpServer = http.createServer(express);
+// Note that this file is an entrypoint and should not have any exports
+
+collectDefaultMetrics();
+
+const logger = createPinoLogger(opt.prettyLogs);
+logger.info(opt, `Starting API...`);
+
+const tokenResolver = createTokenResolver(opt.auth);
+
+const db = createDbRepository(opt.databaseConnectionString);
+db.subscribeToErrors((err) => logger.error(err, "Database error"));
+
+const redisClient = new Redis(opt.redisPath);
+
+const gameServiceConfig = signal<GameServiceConfig>({
+  isPatchOptimizerEnabled: true,
+});
+
+createRedisSyncEffect(
+  redisClient,
+  gameServiceConfigRedisKey,
+  GameServiceConfig,
+  gameServiceConfig,
+);
+
+const fileResolver = createFileResolver(
+  opt.fileServerInternalUrl,
+  opt.fileServerPublicUrl,
+);
+
+const ioc = new InjectionContainer()
+  .provide(ctxTokenResolver, tokenResolver)
+  .provide(ctxFileResolver, fileResolver)
+  .provide(ctxDb, db)
+  .provide(ctxGameServiceConfig, gameServiceConfig);
+
+const app = express();
+const httpServer = http.createServer(app);
 
 const apolloServer = new ApolloServer({
   schema: getSchema({ scalars: typesMap }),
   plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
   allowBatchedHttpRequests: true,
+  formatError(formattedError) {
+    if (opt.exposeErrorDetails) {
+      return formattedError;
+    }
+
+    // Omit the sensitive error details
+    return { message: "Internal Server Error" };
+  },
 });
 
 await apolloServer.start();
 
-express.use(cors(), json(), expressMiddleware(apolloServer));
+app
+  .use("/health", (_, res) => res.send("OK"))
+  .use(metricsMiddleware())
+  .use(
+    cors(),
+    json(),
+    expressMiddleware(apolloServer, {
+      async context({ req }): Promise<ApiContext> {
+        logger.info(info, "[req]");
+        return {
+          ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
+        };
+      },
+    }),
+  );
 
 await new Promise<void>((resolve) =>
-  httpServer.listen({ port: 4000 }, resolve),
+  httpServer.listen(opt.port, opt.hostname, resolve),
 );
 
-console.log(`🚀 Server ready at http://localhost:4000`);
+logger.info(`API listening on ${opt.hostname}:${opt.port}`);
+
+function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
+  const prefix = "Bearer ";
+  const headerValue = String(headers.authorization ?? "");
+  if (headerValue.startsWith(prefix)) {
+    return headerValue.substring(prefix.length) as AccessToken;
+  }
+}

@@ -4,9 +4,9 @@ import { type } from "@mp/validate";
 /**
  * internal: url that only works within the docker network,
  * public: on the internet
+ * @gqlEnum
  */
-export const FileUrlType = type.enumerated("internal", "public");
-export type FileUrlType = typeof FileUrlType.infer;
+export type FileUrlType = "internal" | "public";
 
 export interface FileResolver {
   /**
@@ -26,14 +26,14 @@ export function createFileResolver(
   internalBaseUrl: string,
   publicBaseUrl: string,
 ): FileResolver {
-  function internalUrl(...relativePath: string[]): string {
+  function internalUrl(...relativePath: string[]): UrlString {
     const url = new URL(relativePath.join("/"), internalBaseUrl);
-    return url.toString();
+    return url.toString() as UrlString;
   }
 
-  function publicUrl(...relativePath: string[]) {
+  function publicUrl(...relativePath: string[]): UrlString {
     const url = new URL(relativePath.join("/"), publicBaseUrl);
-    return url.toString();
+    return url.toString() as UrlString;
   }
 
   function abs(

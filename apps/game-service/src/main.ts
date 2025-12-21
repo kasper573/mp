@@ -1,4 +1,4 @@
-import { createApiClient } from "@mp/api-service/sdk";
+import { GraphQLClient, graphql } from "@mp/api-service/client";
 import {
   createEventInvoker,
   createProxyEventInvoker,
@@ -20,7 +20,7 @@ import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
 import { createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, withBackoffRetries } from "@mp/std";
+import { Rng, withBackoffRetries, toResult } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -72,20 +72,30 @@ const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger(opt.prettyLogs, { areaId: opt.areaId });
 logger.info(opt, `Starting server...`);
 
-const api = createApiClient(opt.apiServiceUrl);
+const api = new GraphQLClient({
+  serverUrl: opt.apiServiceUrl,
+  schemaUrl: import.meta.resolve("@mp/api-service/client/schema.graphql"),
+});
 
 // A game service can't function without these dependencies,
 // so we block startup until they are available.
 // (Any other third party dependencies should be lazy loaded and have graceful degradation when unavailable)
 logger.info(`Loading area and actor models...`);
-const [area, actorModels] = await withBackoffRetries(() =>
-  Promise.all([
-    api.areaFileUrl
-      .query({ areaId: opt.areaId, urlType: "internal" })
-      .then((url) => loadAreaResource(opt.areaId, url)),
-    api.actorModelIds.query().then(createActorModelLookup),
-  ]),
-);
+const [area, actorModels] = await withBackoffRetries(async () => {
+  const res = await api.query({
+    query: graphql(`
+      query GameServiceDependencies {
+        areaFileUrl(areaId: "${opt.areaId}", urlType: internal)
+        actorModelIds
+      }
+    `),
+  });
+  const { areaFileUrl, actorModelIds } = toResult(res)._unsafeUnwrap();
+  return [
+    await loadAreaResource(opt.areaId, areaFileUrl),
+    createActorModelLookup(actorModelIds),
+  ];
+});
 
 const redisClient = new Redis(opt.redisPath);
 

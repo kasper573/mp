@@ -13,6 +13,11 @@
       "types": "./client/tsconfig.tada.json",
       "import": "./client/tsconfig.tada.json",
       "require": "./client/tsconfig.tada.json"
+    },
+    "./client/schema.graphql": {
+      "types": "./shared/schema.generated.json",
+      "import": "./shared/schema.generated.json",
+      "require": "./shared/schema.generated.json"
     }
   },
   "scripts": {
@@ -40,17 +45,30 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
-    "@trpc/client": "11.8.0",
-    "@trpc/server": "11.8.0",
-    "@trpc/tanstack-react-query": "11.8.0",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "superjson": "2.2.6"
+    "superjson": "2.2.6",
+    "@apollo/client": "^4.0.11",
+    "@apollo/server": "^5.2.0",
+    "@as-integrations/express5": "^1.1.2",
+    "@mp/query": "workspace:*",
+    "apollo-link-scalars": "^4.0.3",
+    "tanstack-graphql-query-builder": "workspace:*",
+    "cors": "^2.8.5",
+    "gql.tada": "^1.9.0",
+    "graphql": "^16.12.0",
+    "grats": "^0.0.34",
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/express": "catalog:",
-    "tsx": "catalog:"
+    "tsx": "catalog:",
+    "@types/cors": "^2.8.19",
+    "bottleneck": "^2.19.5",
+    "glob": "^13.0.0",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1"
   }
 }

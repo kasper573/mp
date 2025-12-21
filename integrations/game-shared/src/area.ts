@@ -59,5 +59,6 @@ export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
 
 export const dynamicLayerName = "Dynamic";
 
-export const AreaIdType = type("string").brand("AreaId");
+/** @gqlScalar */
 export type AreaId = typeof AreaIdType.infer;
+export const AreaIdType = type("string").brand("AreaId");
