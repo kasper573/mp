@@ -8,13 +8,18 @@
       "types": "./client/index.ts",
       "import": "./client/index.ts",
       "require": "./client/index.ts"
+    },
+    "./client/tsconfig.json": {
+      "types": "./client/tsconfig.tada.json",
+      "import": "./client/tsconfig.tada.json",
+      "require": "./client/tsconfig.tada.json"
     }
   },
   "scripts": {
     "dev": "concurrently --names ts,grats,tada -c blue,magenta,gray 'pnpm dev:ts' 'pnpm dev:grats' 'pnpm dev:tada'",
     "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
     "dev:grats": "grats --watch",
-    "dev:tada": "chokidar '../shared/schema.generated.graphql' -c 'pnpm codegen:tada'",
+    "dev:tada": "chokidar '../shared/schema.generated.graphql' --initial -c 'pnpm codegen:tada'",
     "codegen:tada": "gql.tada generate-output -c client/tsconfig.json",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },

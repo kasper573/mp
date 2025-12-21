@@ -3,9 +3,9 @@
 
 export type introspection_types = {
     'Boolean': unknown;
-    'Foo': { kind: 'OBJECT'; name: 'Foo'; fields: { 'bar': { name: 'bar'; type: { kind: 'SCALAR'; name: 'String'; ofType: null; } }; }; };
+    'Foo': { kind: 'OBJECT'; name: 'Foo'; fields: { 'bar': { name: 'bar'; type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'String'; ofType: null; }; } }; }; };
     'GqlDate': unknown;
-    'Query': { kind: 'OBJECT'; name: 'Query'; fields: { 'foo': { name: 'foo'; type: { kind: 'OBJECT'; name: 'Foo'; ofType: null; } }; 'whatever': { name: 'whatever'; type: { kind: 'SCALAR'; name: 'String'; ofType: null; } }; }; };
+    'Query': { kind: 'OBJECT'; name: 'Query'; fields: { 'foo': { name: 'foo'; type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'OBJECT'; name: 'Foo'; ofType: null; }; } }; 'whatever': { name: 'whatever'; type: { kind: 'NON_NULL'; name: never; ofType: { kind: 'SCALAR'; name: 'String'; ofType: null; }; } }; }; };
     'String': unknown;
 };
 

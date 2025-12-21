@@ -10,8 +10,8 @@ export function whatever(): string {
 }
 
 /** @gqlQueryField */
-export function foo(): Foo {
+export function foo(input?: string | null): Foo {
   return {
-    bar: "Hello from Foo",
+    bar: `You said: ${input ?? "nothing"}`,
   };
 }

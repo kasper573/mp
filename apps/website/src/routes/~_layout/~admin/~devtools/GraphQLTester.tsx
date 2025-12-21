@@ -14,8 +14,8 @@ export function GraphQLTester() {
 }
 
 const query = graphql(`
-  query Query {
-    foo {
+  query Query($input: String) {
+    foo(input: $input) {
       bar
     }
   }
