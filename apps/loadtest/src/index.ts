@@ -123,9 +123,7 @@ function testOneGameClient(n: number, rng: Rng) {
         serverUrl: apiUrl,
         getSchema: () =>
           fs.readFile(
-            new URL(
-              import.meta.resolve("@mp/api-service/client/schema.graphql"),
-            ),
+            require.resolve("@mp/api-service/client/schema.graphql"),
             "utf-8",
           ),
         fetchOptions: (init) => ({
