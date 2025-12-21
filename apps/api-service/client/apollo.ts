@@ -11,7 +11,7 @@ export type { ErrorLike as GraphQLError } from "@apollo/client";
 export interface GraphQLCLientOptions {
   serverUrl: string;
   getSchema: () => Promise<string>;
-  fetchOptions?: () => RequestInit;
+  fetchOptions?: (init?: RequestInit) => RequestInit;
 }
 
 export class GraphQLClient extends ApolloClient {
@@ -20,8 +20,7 @@ export class GraphQLClient extends ApolloClient {
       uri: opt.serverUrl,
       batchInterval: 100,
       batchDebounce: true,
-      fetch: (input, init) =>
-        fetch(input, mergeRequestInit(init, opt.fetchOptions?.())),
+      fetch: (input, init) => fetch(input, opt.fetchOptions?.(init) ?? init),
     });
 
     super({
@@ -44,13 +43,4 @@ export class GraphQLClient extends ApolloClient {
 function scalarLink(schemaString: string): ApolloLink {
   const schema = buildSchema(schemaString);
   return withScalars({ schema, typesMap });
-}
-
-function mergeRequestInit(a?: RequestInit, b?: RequestInit): RequestInit {
-  const headers = new Headers(a?.headers);
-  const headersB = new Headers(b?.headers);
-  for (const [key, value] of headersB) {
-    headers.set(key, value);
-  }
-  return { ...a, ...b, headers };
 }

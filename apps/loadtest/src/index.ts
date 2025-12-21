@@ -126,8 +126,9 @@ function testOneGameClient(n: number, rng: Rng) {
             ),
             "utf-8",
           ),
-        fetchOptions: () => ({
-          headers: { Authorization: `Bearer ${accessToken}` },
+        fetchOptions: (init) => ({
+          ...init,
+          headers: { ...init?.headers, Authorization: `Bearer ${accessToken}` },
         }),
       });
       const { myCharacterId } = toResult(
