@@ -12,8 +12,10 @@ export async function withBackoffRetries<T>(
       if (options.maxRetries !== "infinite" && attempt > options.maxRetries) {
         throw err;
       }
-      const delay =
-        options.initialDelay * Math.pow(options.factor, attempt - 1);
+      const delay = Math.min(
+        options.maxDelay,
+        options.initialDelay * Math.pow(options.factor, attempt - 1),
+      );
       // oxlint-disable-next-line no-await-in-loop
       await new Promise((res) => setTimeout(res, delay));
     }
@@ -23,11 +25,13 @@ export async function withBackoffRetries<T>(
 const defaultOptions: WithBackoffRetriesOptions = {
   maxRetries: "infinite",
   initialDelay: 1000,
+  maxDelay: 30000,
   factor: 2,
 };
 
 export interface WithBackoffRetriesOptions {
   maxRetries: number | "infinite";
   initialDelay: number;
+  maxDelay: number;
   factor: number;
 }
