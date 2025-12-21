@@ -19,10 +19,7 @@ export class GraphQLClient extends ApolloClient {
     const httpLink = new BatchHttpLink({
       uri: opt.serverUrl,
       fetch: (input, init) =>
-        fetch(input, {
-          ...init,
-          ...opt.fetchOptions?.(),
-        }),
+        fetch(input, mergeRequestInit(init, opt.fetchOptions?.())),
     });
 
     super({
@@ -46,4 +43,13 @@ async function scalarLink(schemaUrl: string): Promise<ApolloLink> {
   const schemaString = await fetch(schemaUrl).then((res) => res.text());
   const schema = buildSchema(schemaString);
   return withScalars({ schema, typesMap });
+}
+
+function mergeRequestInit(a?: RequestInit, b?: RequestInit): RequestInit {
+  const headers = new Headers(a?.headers);
+  const headersB = new Headers(b?.headers);
+  for (const [key, value] of headersB) {
+    headers.set(key, value);
+  }
+  return { ...a, ...b, headers };
 }
