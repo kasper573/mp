@@ -5,6 +5,9 @@ import type { AccessToken } from "@mp/oauth";
 import type { TokenResolver } from "@mp/oauth/server";
 import type { Signal } from "@mp/state";
 import type { FileResolver } from "./integrations/file-resolver";
+import { Logger } from "@mp/logger";
+
+export const ctxLogger = InjectionContext.new<Logger>("logger");
 
 export const ctxGameServiceConfig =
   InjectionContext.new<Signal<GameServiceConfig>>("gameServiceConfig");

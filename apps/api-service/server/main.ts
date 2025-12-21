@@ -16,6 +16,7 @@ import {
   ctxDb,
   ctxFileResolver,
   ctxGameServiceConfig,
+  ctxLogger,
   ctxTokenResolver,
 } from "./context";
 import { createFileResolver } from "./integrations/file-resolver";
@@ -27,7 +28,7 @@ import { json } from "express";
 import http from "http";
 import { getSchema } from "./schema.generated";
 import { typesMap } from "../shared/scalars";
-import { info } from "console";
+import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -63,14 +64,18 @@ const ioc = new InjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
   .provide(ctxDb, db)
-  .provide(ctxGameServiceConfig, gameServiceConfig);
+  .provide(ctxGameServiceConfig, gameServiceConfig)
+  .provide(ctxLogger, logger);
 
 const app = express();
 const httpServer = http.createServer(app);
 
 const apolloServer = new ApolloServer({
   schema: getSchema({ scalars: typesMap }),
-  plugins: [ApolloServerPluginDrainHttpServer({ httpServer })],
+  plugins: [
+    ApolloServerPluginDrainHttpServer({ httpServer }),
+    apolloRequestLoggerPlugin(),
+  ],
   allowBatchedHttpRequests: true,
   formatError(formattedError) {
     if (opt.exposeErrorDetails) {
@@ -91,7 +96,6 @@ app
     json(),
     expressMiddleware(apolloServer, {
       async context({ req }): Promise<ApiContext> {
-        logger.info(info, "[req]");
         return {
           ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
         };
