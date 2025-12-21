@@ -8,7 +8,7 @@ import * as styles from "./app-bar.css";
 import { Link } from "./link";
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { useQuery } from "@mp/query";
-import { env } from "process";
+import { env } from "../env";
 
 export default function AppBar() {
   const qb = useQueryBuilder();
