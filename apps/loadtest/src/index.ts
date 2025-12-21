@@ -18,16 +18,18 @@ const logger = createConsoleLogger();
 const { apiUrl, gameServiceUrl, gameClients, timeout, verbose, exitFast } =
   readCliOptions();
 
-const start = performance.now();
+async function main() {
+  const start = performance.now();
 
-const success = await testAllGameClients();
+  const success = await testAllGameClients();
 
-const end = performance.now();
+  const end = performance.now();
 
-logger.info(`Done in ${(end - start).toFixed(2)}ms`);
+  logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-if (!success) {
-  process.exit(1);
+  if (!success) {
+    process.exit(1);
+  }
 }
 
 async function testAllGameClients() {
@@ -241,3 +243,5 @@ const myCharacterIdQuery = graphql(`
     myCharacterId
   }
 `);
+
+main();
