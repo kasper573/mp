@@ -244,4 +244,4 @@ const myCharacterIdQuery = graphql(`
   }
 `);
 
-main();
+void main();
