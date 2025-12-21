@@ -1,4 +1,3 @@
-import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
 import {
@@ -18,7 +17,7 @@ import {
   GraphQLClient,
   QueryBuilder,
   QueryBuilderContext,
-} from "@mp/graphql/client";
+} from "@mp/api-service/client";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -37,19 +36,17 @@ export default function App() {
         }}
       >
         <QueryBuilderContext.Provider value={systems.queryBuilder}>
-          <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
-            <LoggerContext.Provider value={systems.logger}>
-              <AuthContext.Provider value={systems.auth}>
-                <RouterProvider router={systems.router} />
-              </AuthContext.Provider>
-            </LoggerContext.Provider>
-            {showDevTools && (
-              <>
-                <TanStackRouterDevtools router={systems.router} />
-                <ReactQueryDevtools client={systems.query} />
-              </>
-            )}
-          </ApiProvider>
+          <LoggerContext.Provider value={systems.logger}>
+            <AuthContext.Provider value={systems.auth}>
+              <RouterProvider router={systems.router} />
+            </AuthContext.Provider>
+          </LoggerContext.Provider>
+          {showDevTools && (
+            <>
+              <TanStackRouterDevtools router={systems.router} />
+              <ReactQueryDevtools client={systems.query} />
+            </>
+          )}
         </QueryBuilderContext.Provider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
@@ -60,7 +57,6 @@ function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const query = new QueryClient({
     defaultOptions: {
@@ -71,7 +67,14 @@ function createSystems() {
     },
   });
 
-  const graphqlClient = new GraphQLClient("http://localhost:4000/graphql");
+  const graphqlClient = new GraphQLClient(env.apiUrl, () => {
+    const token = auth.identity.value?.token;
+    const headers = new Headers();
+    if (token) {
+      headers.append("Authorization", `Bearer ${token}`);
+    }
+    return { headers };
+  });
 
   const queryBuilder = new QueryBuilder(graphqlClient);
 
@@ -89,7 +92,6 @@ function createSystems() {
 
   return {
     auth,
-    api,
     logger,
     router,
     query,

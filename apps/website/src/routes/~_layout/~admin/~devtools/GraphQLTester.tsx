@@ -1,5 +1,5 @@
 import { useQuery } from "@mp/query";
-import { useQueryBuilder, graphql } from "@mp/graphql/client";
+import { useQueryBuilder, graphql } from "@mp/api-service/client";
 
 export function GraphQLTester() {
   const qb = useQueryBuilder();

@@ -107,7 +107,7 @@ async function validateGraphQL(configPath: string): Promise<void> {
     return;
   }
 
-  const prefix = path.join(dir, "node_modules/@mp/graphql/client");
+  const prefix = path.join(dir, "node_modules/@mp/api-service/client");
   plugin.schema = path.join(prefix, plugin.schema);
   plugin.tadaOutputLocation = path.join(prefix, plugin.tadaOutputLocation);
   fs.writeFileSync(tmpPath, JSON.stringify(tsConfig));
