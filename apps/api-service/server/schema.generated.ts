@@ -9,7 +9,7 @@ import type { ItemDefinition as ItemDefinitionInternal, ItemReference as ItemRef
 import type { LocalFile as LocalFileInternal, Pixel as PixelInternal, Tile as TileInternal, TimesPerSecond as TimesPerSecondInternal, UrlString as UrlStringInternal } from "./../../../libraries/std/src/types";
 import { GraphQLSchema, GraphQLObjectType, GraphQLNonNull, GraphQLList, GraphQLScalarType, GraphQLEnumType, GraphQLString, GraphQLBoolean } from "graphql";
 import { actorModelIds as queryActorModelIdsResolver, actorSpritesheetUrl as queryActorSpritesheetUrlResolver } from "./modules/actor";
-import { areaFileUrl as queryAreaFileUrlResolver, areaFileUrls as queryAreaFileUrlsResolver } from "./modules/area";
+import { areaFileUrl as queryAreaFileUrlResolver } from "./modules/area";
 import { characterList as queryCharacterListResolver, myCharacterId as queryMyCharacterIdResolver } from "./modules/character";
 import { defaultSpawnPoint as queryDefaultSpawnPointResolver } from "./modules/spawn-point";
 import { isPatchOptimizerEnabled as queryIsPatchOptimizerEnabledResolver, serverVersion as queryServerVersionResolver, testError as queryTestErrorResolver, setPatchOptimizerEnabled as mutationSetPatchOptimizerEnabledResolver } from "./modules/settings";
@@ -54,21 +54,6 @@ export function getSchema(config: SchemaConfig): GraphQLSchema {
     const AreaIdType: GraphQLScalarType = new GraphQLScalarType({
         name: "AreaId",
         ...config.scalars.AreaId
-    });
-    const AreaFileInfoType: GraphQLObjectType = new GraphQLObjectType({
-        name: "AreaFileInfo",
-        fields() {
-            return {
-                areaId: {
-                    name: "areaId",
-                    type: new GraphQLNonNull(AreaIdType)
-                },
-                url: {
-                    name: "url",
-                    type: new GraphQLNonNull(UrlStringType)
-                }
-            };
-        }
     });
     const CharacterIdType: GraphQLScalarType = new GraphQLScalarType({
         name: "CharacterId",
@@ -168,18 +153,6 @@ export function getSchema(config: SchemaConfig): GraphQLSchema {
                     },
                     resolve(_source, args, context) {
                         return queryAreaFileUrlResolver(args.areaId, args.urlType, context);
-                    }
-                },
-                areaFileUrls: {
-                    name: "areaFileUrls",
-                    type: new GraphQLNonNull(new GraphQLList(new GraphQLNonNull(AreaFileInfoType))),
-                    args: {
-                        urlType: {
-                            type: new GraphQLNonNull(FileUrlTypeType)
-                        }
-                    },
-                    resolve(_source, args, context) {
-                        return queryAreaFileUrlsResolver(args.urlType, context);
                     }
                 },
                 characterList: {
@@ -282,6 +255,6 @@ export function getSchema(config: SchemaConfig): GraphQLSchema {
     return new GraphQLSchema({
         query: QueryType,
         mutation: MutationType,
-        types: [ActorIdType, ActorModelIdType, AreaIdType, CharacterIdType, GqlDateType, ItemDefinitionType, ItemReferenceType, LocalFileType, PixelType, TileType, TimesPerSecondType, UrlStringType, FileUrlTypeType, AreaFileInfoType, CharacterType, MutationType, QueryType, SpawnPointType, TileVectorLikeType]
+        types: [ActorIdType, ActorModelIdType, AreaIdType, CharacterIdType, GqlDateType, ItemDefinitionType, ItemReferenceType, LocalFileType, PixelType, TileType, TimesPerSecondType, UrlStringType, FileUrlTypeType, CharacterType, MutationType, QueryType, SpawnPointType, TileVectorLikeType]
     });
 }

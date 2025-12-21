@@ -2,7 +2,6 @@ import path from "path";
 import { ApiContext, ctxFileResolver } from "../context";
 import { FileUrlType } from "../integrations/file-resolver";
 import { AreaId } from "@mp/game-shared";
-import { UrlString } from "@mp/std";
 
 /** @gqlQueryField */
 export function areaFileUrl(
@@ -13,11 +12,7 @@ export function areaFileUrl(
   return ioc.get(ctxFileResolver).abs(["areas", `${areaId}.json`], urlType);
 }
 
-/** @gqlQueryField */
-export async function areaFileUrls(
-  urlType: FileUrlType,
-  { ioc }: ApiContext,
-): Promise<AreaFileInfo[]> {
+export async function areaFileUrls(urlType: FileUrlType, { ioc }: ApiContext) {
   const fs = ioc.get(ctxFileResolver);
   const areaFiles = await fs.dir(["areas"]);
   return areaFiles.map((file) => {
@@ -25,12 +20,4 @@ export async function areaFileUrls(
     const url = fs.abs(["areas", file], urlType);
     return { areaId, url };
   });
-}
-
-/** @gqlType */
-export interface AreaFileInfo {
-  /** @gqlField */
-  areaId: AreaId;
-  /** @gqlField */
-  url: UrlString;
 }

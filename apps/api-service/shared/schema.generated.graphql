@@ -35,11 +35,6 @@ enum FileUrlType {
   public
 }
 
-type AreaFileInfo {
-  areaId: AreaId!
-  url: UrlString!
-}
-
 type Character {
   id: CharacterId!
   name: String!
@@ -53,7 +48,6 @@ type Query {
   actorModelIds: [ActorModelId!]!
   actorSpritesheetUrl(urlType: FileUrlType!): UrlString!
   areaFileUrl(areaId: AreaId!, urlType: FileUrlType!): String!
-  areaFileUrls(urlType: FileUrlType!): [AreaFileInfo!]!
   characterList: [Character!]!
   defaultSpawnPoint: SpawnPoint!
   isPatchOptimizerEnabled: Boolean!
