@@ -17,7 +17,7 @@ export function createItemDefinitionLookup(
   >();
 
   logger.info(`Loading item definitions...`);
-  void withBackoffRetries(async () => {
+  void withBackoffRetries("load-item-definitions", async () => {
     const itemDefinitions = await promiseFromResult(
       db.selectAllItemDefinitions(),
     );

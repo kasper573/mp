@@ -44,7 +44,7 @@ export class NpcSpawner {
   private async lazyLoadSpawnOptions() {
     this.logger.info(`Loading NPC spawn options...`);
 
-    const optionsFromDB = await withBackoffRetries(() =>
+    const optionsFromDB = await withBackoffRetries("load-spawn-options", () =>
       promiseFromResult(this.db.selectAllSpawnAndNpcPairs(this.area.id)),
     );
 

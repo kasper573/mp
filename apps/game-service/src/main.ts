@@ -86,21 +86,24 @@ const api = new GraphQLClient({
 // so we block startup until they are available.
 // (Any other third party dependencies should be lazy loaded and have graceful degradation when unavailable)
 logger.info(`Loading area and actor models...`);
-const [area, actorModels] = await withBackoffRetries(async () => {
-  const res = await api.query({
-    query: graphql(`
+const [area, actorModels] = await withBackoffRetries(
+  "load-game-service-dependencies",
+  async () => {
+    const res = await api.query({
+      query: graphql(`
       query GameServiceDependencies {
         areaFileUrl(areaId: "${opt.areaId}", urlType: internal)
         actorModelIds
       }
     `),
-  });
-  const { areaFileUrl, actorModelIds } = toResult(res)._unsafeUnwrap();
-  return [
-    await loadAreaResource(opt.areaId, areaFileUrl),
-    createActorModelLookup(actorModelIds),
-  ];
-});
+    });
+    const { areaFileUrl, actorModelIds } = toResult(res)._unsafeUnwrap();
+    return [
+      await loadAreaResource(opt.areaId, areaFileUrl),
+      createActorModelLookup(actorModelIds),
+    ];
+  },
+);
 
 logger.info(`Area and actor models loaded successfully`);
 

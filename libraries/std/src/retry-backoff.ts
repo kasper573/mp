@@ -1,4 +1,5 @@
 export async function withBackoffRetries<T>(
+  debugId: string,
   fn: () => Promise<T>,
   options = defaultOptions,
 ): Promise<T> {
@@ -10,22 +11,34 @@ export async function withBackoffRetries<T>(
     } catch (err) {
       attempt++;
       if (options.maxRetries !== "infinite" && attempt > options.maxRetries) {
-        throw err;
+        throw new Error(
+          `Operation "${debugId}" failed after ${attempt - 1} retries`,
+          { cause: err },
+        );
       }
 
       const delay = Math.min(
         options.maxDelay,
         options.initialDelay * Math.pow(options.factor, attempt - 1),
       );
+
+      if (attempt >= options.warnAfter) {
+        // oxlint-disable-next-line no-console
+        console.warn(
+          `Operation "${debugId}" failed on attempt ${attempt}, retrying in ${delay}ms...`,
+          err,
+        );
+      }
+
       // oxlint-disable-next-line no-await-in-loop
-      await new Promise((res) => setTimeout(res, delay));
+      await new Promise((resolve) => setTimeout(resolve, delay));
     }
   }
 }
 
 const defaultOptions: WithBackoffRetriesOptions = {
   maxRetries: "infinite",
-  initialDelay: 1000,
+  initialDelay: 500,
   maxDelay: 30000,
   factor: 2,
   warnAfter: 4,
