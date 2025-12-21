@@ -16,6 +16,7 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store pnpm install --frozen-lockfile
 
 ARG APP_NAME
 ENV NODE_ENV=production
+RUN pnpm -r codegen
 RUN pnpm -F ${APP_NAME} build
 RUN cp -r /builder/apps/${APP_NAME}/dist /builder/dist
 
