@@ -2,7 +2,7 @@ import { InMemoryCache } from "@apollo/client";
 import { ApolloClient, ApolloLink } from "@apollo/client";
 import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
-import { typesMap } from "../shared/scalars";
+import { scalars } from "../shared/scalars";
 import type { IntrospectionQuery } from "graphql";
 import { buildClientSchema, buildSchema } from "graphql";
 import { deferredApolloLink } from "./deferred-apollo-link";
@@ -46,7 +46,7 @@ function scalarLink(schemaStringOrIntrospection: string | object): ApolloLink {
     typeof schemaStringOrIntrospection === "string"
       ? buildSchema(schemaStringOrIntrospection)
       : buildClientSchema(schemaStringOrIntrospection as IntrospectionQuery);
-  return withScalars({ schema, typesMap });
+  return withScalars({ schema, typesMap: scalars });
 }
 
 type Eventual<T> = T | Promise<T>;

@@ -28,7 +28,7 @@ import { GqlDate } from "./date-scalar";
 import { ObjectIdType, type ObjectId } from "@mp/tiled-loader";
 import { type Type, type } from "@mp/validate";
 
-export const typesMap: ScalarEncodings = {
+export const scalars: ScalarEncodings = {
   // Primitives
   GqlDate: GqlDate,
   UrlString: scalarFor(type("string")),

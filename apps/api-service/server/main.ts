@@ -27,7 +27,7 @@ import { ApolloServerPluginDrainHttpServer } from "@apollo/server/plugin/drainHt
 import { json } from "express";
 import http from "http";
 import { getSchema } from "./schema.generated";
-import { typesMap } from "../shared/scalars";
+import { scalars } from "../shared/scalars";
 import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
 
 // Note that this file is an entrypoint and should not have any exports
@@ -71,7 +71,7 @@ const app = express();
 const httpServer = http.createServer(app);
 
 const apolloServer = new ApolloServer({
-  schema: getSchema({ scalars: typesMap }),
+  schema: getSchema({ scalars }),
   plugins: [
     ApolloServerPluginDrainHttpServer({ httpServer }),
     apolloRequestLoggerPlugin(),
