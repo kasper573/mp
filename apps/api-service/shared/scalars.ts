@@ -1,38 +1,49 @@
-import type {
-  ActorId,
-  ActorModelId,
-  AreaId,
-  CharacterId,
-  ItemDefinition,
-  ItemReference,
+import {
+  ActorIdType,
+  ActorModelIdType,
+  AreaIdType,
+  CharacterIdType,
+  ItemDefinitionType,
+  ItemReferenceType,
+  type ActorId,
+  type ActorModelId,
+  type AreaId,
+  type CharacterId,
+  type ItemDefinition,
+  type ItemReference,
 } from "@mp/game-shared";
-import type {
-  UrlString,
-  LocalFile,
-  Pixel,
-  Tile,
-  TimesPerSecond,
+import {
+  type UrlString,
+  type LocalFile,
+  type Pixel,
+  type Tile,
+  type TimesPerSecond,
+  LocalFileType,
+  PixelType,
+  TileType,
+  TimesPerSecondType,
 } from "@mp/std";
 import type { ParsingFunctionsObject } from "apollo-link-scalars";
 import { GqlDate } from "./date-scalar";
-import type { ObjectId } from "@mp/tiled-loader";
+import { ObjectIdType, type ObjectId } from "@mp/tiled-loader";
+import { type Type, type } from "@mp/validate";
 
 export const typesMap: ScalarEncodings = {
   // Primitives
   GqlDate: GqlDate,
-  UrlString: primitive(),
-  LocalFile: primitive(),
-  Pixel: primitive(),
-  Tile: primitive(),
-  TimesPerSecond: primitive(),
+  UrlString: scalarFor<UrlString>(type("string")),
+  LocalFile: scalarFor<LocalFile>(LocalFileType),
+  Pixel: scalarFor<Pixel>(PixelType),
+  Tile: scalarFor<Tile>(TileType),
+  TimesPerSecond: scalarFor<TimesPerSecond>(TimesPerSecondType),
   // Game data
-  ActorId: primitive(),
-  AreaId: primitive(),
-  ActorModelId: primitive(),
-  CharacterId: primitive(),
-  ObjectId: primitive(),
-  ItemReference: passthrough(),
-  ItemDefinition: passthrough(),
+  ActorId: scalarFor<ActorId>(ActorIdType),
+  AreaId: scalarFor<AreaId>(AreaIdType),
+  ActorModelId: scalarFor<ActorModelId>(ActorModelIdType),
+  CharacterId: scalarFor<CharacterId>(CharacterIdType),
+  ObjectId: scalarFor<ObjectId>(ObjectIdType),
+  ItemReference: scalarFor<ItemReference>(ItemReferenceType),
+  ItemDefinition: scalarFor<ItemDefinition>(ItemDefinitionType),
 };
 
 type ScalarEncodings = {
@@ -57,27 +68,9 @@ export interface Scalars {
   ItemDefinition: ItemDefinition;
 }
 
-function primitive<T>(): ParsingFunctionsObject<T, unknown> {
-  return {
-    serialize: assertPrimitive,
-    parseValue: assertPrimitive,
-  };
-}
-
-function assertPrimitive<T>(value: unknown): T {
-  switch (typeof value) {
-    case "string":
-    case "number":
-    case "boolean":
-      return value as T;
-    default:
-      throw new Error(`Expected primitive value, got ${typeof value}`);
-  }
-}
-
-function passthrough<T>(): ParsingFunctionsObject<T, unknown> {
+function scalarFor<T>(schema: Type<T>): ParsingFunctionsObject<T, unknown> {
   return {
     serialize: (value) => value,
-    parseValue: (value) => value as T,
+    parseValue: (value) => schema.assert(value) as T,
   };
 }
