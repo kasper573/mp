@@ -1,5 +1,4 @@
 import { ApolloLink, Observable } from "@apollo/client";
-import type { ApolloLink as ApolloLinkNS } from "@apollo/client";
 
 export function deferredApolloLink(
   factory: () => Promise<ApolloLink>,
@@ -7,18 +6,20 @@ export function deferredApolloLink(
   let linkPromise: Promise<ApolloLink> | null = null;
 
   return new ApolloLink((operation, forward) => {
-    // Initialize once on first request
     if (!linkPromise) {
       linkPromise = factory();
     }
 
-    return new Observable<ApolloLinkNS.Result>((observer) => {
+    return new Observable<ApolloLink.Result>((observer) => {
       let subscription: { unsubscribe: () => void } | undefined;
       let cancelled = false;
 
       void linkPromise
         ?.then((link) => {
-          if (cancelled) return;
+          if (cancelled) {
+            return;
+          }
+
           const result = link.request(operation, forward);
           if (result) {
             subscription = result.subscribe(observer);
@@ -27,7 +28,9 @@ export function deferredApolloLink(
           }
         })
         .catch((err) => {
-          if (!cancelled) observer.error(err);
+          if (!cancelled) {
+            observer.error(err);
+          }
         });
 
       return () => {
