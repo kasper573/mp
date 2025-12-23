@@ -31,19 +31,19 @@ import { type Type, type } from "@mp/validate";
 export const typesMap: ScalarEncodings = {
   // Primitives
   GqlDate: GqlDate,
-  UrlString: scalarFor<UrlString>(type("string")),
-  LocalFile: scalarFor<LocalFile>(LocalFileType),
-  Pixel: scalarFor<Pixel>(PixelType),
-  Tile: scalarFor<Tile>(TileType),
-  TimesPerSecond: scalarFor<TimesPerSecond>(TimesPerSecondType),
+  UrlString: scalarFor(type("string")),
+  LocalFile: scalarFor(LocalFileType),
+  Pixel: scalarFor(PixelType),
+  Tile: scalarFor(TileType),
+  TimesPerSecond: scalarFor(TimesPerSecondType),
   // Game data
-  ActorId: scalarFor<ActorId>(ActorIdType),
-  AreaId: scalarFor<AreaId>(AreaIdType),
-  ActorModelId: scalarFor<ActorModelId>(ActorModelIdType),
-  CharacterId: scalarFor<CharacterId>(CharacterIdType),
-  ObjectId: scalarFor<ObjectId>(ObjectIdType),
-  ItemReference: scalarFor<ItemReference>(ItemReferenceType),
-  ItemDefinition: scalarFor<ItemDefinition>(ItemDefinitionType),
+  ActorId: scalarFor(ActorIdType),
+  AreaId: scalarFor(AreaIdType),
+  ActorModelId: scalarFor(ActorModelIdType),
+  CharacterId: scalarFor(CharacterIdType),
+  ObjectId: scalarFor(ObjectIdType),
+  ItemReference: scalarFor(ItemReferenceType),
+  ItemDefinition: scalarFor(ItemDefinitionType),
 };
 
 type ScalarEncodings = {
@@ -68,9 +68,11 @@ export interface Scalars {
   ItemDefinition: ItemDefinition;
 }
 
-function scalarFor<T>(schema: Type<T>): ParsingFunctionsObject<T, unknown> {
+function scalarFor<Schema extends Type>(
+  schema: Schema,
+): ParsingFunctionsObject<Schema["inferOut"], unknown> {
   return {
     serialize: (value) => value,
-    parseValue: (value) => schema.assert(value) as T,
+    parseValue: (value) => schema.assert(value) as Schema["inferOut"],
   };
 }
