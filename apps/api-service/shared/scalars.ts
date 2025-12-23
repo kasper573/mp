@@ -73,6 +73,6 @@ function scalarFor<Schema extends Type>(
 ): ParsingFunctionsObject<Schema["inferOut"], unknown> {
   return {
     serialize: (value) => value,
-    parseValue: (value) => schema.assert(value) as Schema["inferOut"],
+    parseValue: (value) => schema.assert(value),
   };
 }
