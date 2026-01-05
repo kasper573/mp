@@ -21,8 +21,6 @@
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/oauth": "workspace:*",
-    "@tanstack/react-query": "catalog:",
-    "@tanstack/react-query-devtools": "catalog:",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
@@ -30,6 +28,8 @@
     "@mp/tiled-renderer": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-query-devtools": "catalog:",
     "@tanstack/react-router": "1.141.8",
     "@tanstack/react-router-devtools": "1.141.8",
     "preact": "catalog:"

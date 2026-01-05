@@ -54,20 +54,20 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "apollo-link-scalars": "^4.0.3",
     "dotenv": "catalog:",
     "express": "catalog:",
     "gql.tada": "^1.9.0",
     "graphql": "^16.12.0",
     "grats": "^0.0.34",
-    "preact": "catalog:",
-    "@tanstack/react-query": "catalog:"
+    "preact": "catalog:"
   },
   "devDependencies": {
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/express": "catalog:",
-    "@graphql-typed-document-node/core": "^3.2.0",
     "bottleneck": "^2.19.5",
     "chokidar-cli": "^3.0.0",
     "concurrently": "^9.2.1",
