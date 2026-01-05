@@ -70,7 +70,10 @@ collectDefaultMetrics();
 RateLimiter.enabled = opt.rateLimit;
 
 const rng = new Rng(opt.rngSeed);
-const logger = createPinoLogger(opt.prettyLogs, { areaId: opt.areaId });
+const logger = createPinoLogger({
+  ...opt.log,
+  bindings: { areaId: opt.areaId },
+});
 logger.info(opt, `Starting server...`);
 
 const api = new GraphQLClient({

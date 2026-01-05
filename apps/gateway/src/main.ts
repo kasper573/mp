@@ -51,7 +51,7 @@ import { gatewayRouter } from "./router";
 
 registerEncoderExtensions();
 
-const logger = createPinoLogger(opt.prettyLogs);
+const logger = createPinoLogger(opt.log);
 logger.info(opt, `Starting gateway...`);
 
 type ClientId = Branded<string, "ClientId">;

@@ -29,7 +29,7 @@ import { npcTypes } from "@mp/game-shared";
 // and have it be a manual administrative task per game server.
 // This seed function only exists for convenience while prototyping the game.
 
-const logger = createPinoLogger(true);
+const logger = createPinoLogger();
 
 const actorModelIds = ["adventurer"] as ActorModelId[];
 

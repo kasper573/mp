@@ -9,7 +9,16 @@ export const apiOptionsSchema = type({
   hostname: "string",
   exposeErrorDetails: boolish(),
   databaseConnectionString: "string",
-  prettyLogs: boolish(),
+  log: {
+    /**
+     * Which level of logs to output (See @mp/logger)
+     */
+    level: "string?",
+    /**
+     * Display logs in a pretty, human-readable format.
+     */
+    pretty: boolish().optional(),
+  },
   fileServerInternalUrl: "string",
   fileServerPublicUrl: "string",
   version: "string",

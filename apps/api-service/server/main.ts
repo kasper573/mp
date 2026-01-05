@@ -34,7 +34,7 @@ import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger"
 
 collectDefaultMetrics();
 
-const logger = createPinoLogger(opt.prettyLogs);
+const logger = createPinoLogger(opt.log);
 logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);

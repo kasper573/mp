@@ -2,12 +2,19 @@
 import pino from "pino";
 import type { Logger } from "./abstract";
 
-export function createPinoLogger(
-  pretty: boolean,
-  bindings?: pino.Bindings,
-): Logger {
+interface Options {
+  level?: pino.LevelWithSilentOrString;
+  pretty?: boolean;
+  bindings?: pino.Bindings;
+}
+
+export function createPinoLogger({
+  level,
+  pretty = true,
+  bindings,
+}: Options = {}): Logger {
   let logger = pino({
-    level: "debug",
+    level,
     ...(pretty && {
       transport: {
         target: "pino-pretty",
