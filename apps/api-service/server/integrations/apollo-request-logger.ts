@@ -7,10 +7,10 @@ export function apolloRequestLoggerPlugin(): ApolloServerPlugin<ApiContext> {
   return {
     async requestDidStart({
       contextValue: { ioc },
-      request: { http: _, ...request },
+      request: { http: _, query, variables },
     }) {
       const logger = ioc.get(ctxLogger);
-      logger.info(request, "GraphQL request received");
+      logger.debug({ query, variables }, "GraphQL request received");
       return {
         async didEncounterErrors({ errors }) {
           for (const error of errors) {
