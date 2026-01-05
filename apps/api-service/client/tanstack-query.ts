@@ -19,6 +19,17 @@ export const QueryBuilderContext = createContext(
   }),
 );
 
+/**
+ * Integrates GraphQL with TanStack Query.
+ * The methods return options objects that can be directly passed to TanStack Query hooks.
+ *
+ * @example
+ * function MyComponent() {
+ *   const qb = useQueryBuilder();
+ *   const { data, error } = useQuery(qb.queryOptions(MyQueryDocument, { var1: "value" }));
+ *   // ...
+ * }
+ */
 export class QueryBuilder {
   constructor(public readonly client: GraphQLClient) {}
 
