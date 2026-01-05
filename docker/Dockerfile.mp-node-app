@@ -55,7 +55,7 @@ COPY --from=builder /builder/dist /app
 
 ENV OTEL_SERVICE_NAME="mp-${APP_NAME}"
 ENV OTEL_SERVICE_VERSION="${MP_BUILD_VERSION}"
-ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="http,pg,net,fs,express,dns"
+ENV OTEL_NODE_ENABLED_INSTRUMENTATIONS="fs,http,net,dns,express,graphql,pg,pino"
 ENV NODE_OPTIONS="\
 --enable-source-maps \
 --experimental-loader @opentelemetry/instrumentation/hook.mjs \
