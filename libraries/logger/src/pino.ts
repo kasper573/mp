@@ -9,7 +9,7 @@ interface Options {
 }
 
 export function createPinoLogger({
-  level,
+  level = "debug",
   pretty = true,
   bindings,
 }: Options = {}): Logger {
