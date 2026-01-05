@@ -86,12 +86,13 @@ const [area, actorModels] = await withBackoffRetries(
   "load-game-service-dependencies",
   async () => {
     const res = await api.query({
+      variables: { areaId: opt.areaId },
       query: graphql(`
-      query GameServiceDependencies {
-        areaFileUrl(areaId: "${opt.areaId}", urlType: internal)
-        actorModelIds
-      }
-    `),
+        query GameServiceDependencies($areaId: AreaId!) {
+          areaFileUrl(areaId: $areaId, urlType: internal)
+          actorModelIds
+        }
+      `),
     });
     const { areaFileUrl, actorModelIds } = toResult(res)._unsafeUnwrap();
     return [
