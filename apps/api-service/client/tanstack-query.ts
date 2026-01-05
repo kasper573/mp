@@ -2,8 +2,39 @@ import * as tanstack from "@tanstack/react-query";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import type { DocumentNode } from "graphql";
 import { print } from "graphql";
+import { useContext } from "preact/hooks";
+import { createContext } from "preact/compat";
+import type { GraphQLClient, GraphQLError } from "./apollo";
+import type { ApolloClient } from "@apollo/client";
 
-export class TanstackGraphQLQueryBuilder<Err> {
+export function useQueryBuilder() {
+  return useContext(QueryBuilderContext);
+}
+
+export const QueryBuilderContext = createContext(
+  new Proxy({} as QueryBuilder, {
+    get() {
+      throw new Error("You must provide a QueryBuilderContext");
+    },
+  }),
+);
+
+function coerceApolloResult<Data>({
+  data,
+  error,
+}: ApolloResult<Data>): GraphQLResult<Data, GraphQLError> {
+  if (error) {
+    return { ok: false, error };
+  }
+  // oxlint-disable-next-line no-non-null-assertion
+  return { ok: true, data: data! };
+}
+
+type ApolloResult<Data> =
+  | ApolloClient.MutateResult<Data>
+  | ApolloClient.QueryResult<Data>;
+
+class TanstackGraphQLQueryBuilder<Err> {
   #client: GraphQLClientIntegration<Err>;
 
   constructor(
@@ -121,18 +152,33 @@ export class TanstackGraphQLQueryBuilder<Err> {
   }
 }
 
-export function defaultQueryKey(doc: DocumentNode, vars: unknown): unknown[] {
+export class QueryBuilder extends TanstackGraphQLQueryBuilder<GraphQLError> {
+  constructor(public readonly client: GraphQLClient) {
+    super({
+      async query(query, variables) {
+        const res = await client.query({ query, variables });
+        return coerceApolloResult(res);
+      },
+      async mutation(mutation, variables) {
+        const res = await client.mutate({ mutation, variables });
+        return coerceApolloResult(res);
+      },
+    });
+  }
+}
+
+function defaultQueryKey(doc: DocumentNode, vars: unknown): unknown[] {
   return [print(doc), vars];
 }
 
-export function assertVars<Vars>(vars: Vars | undefined): Vars {
+function assertVars<Vars>(vars: Vars | undefined): Vars {
   if (vars === undefined) {
     return {} as Vars;
   }
   return vars;
 }
 
-export function defaultCoerceResponse<Data>(data: Data): Data {
+function defaultCoerceResponse<Data>(data: Data): Data {
   // Tanstack Query does not support undefined as a valid response, so we coerce it to null.
   return (data ?? null) as Data;
 }
@@ -153,13 +199,13 @@ type RequiredKeysOf<BaseType> = Exclude<
   undefined
 >;
 
-export type GraphQLResult<Data, Err> =
+type GraphQLResult<Data, Err> =
   | { ok: true; data: Data }
   | { ok: false; error: Err };
 
-export type GraphQLVariablesLike = Record<string, unknown>;
+type GraphQLVariablesLike = Record<string, unknown>;
 
-export interface GraphQLClientIntegration<Err> {
+interface GraphQLClientIntegration<Err> {
   query<Data, Vars extends GraphQLVariablesLike>(
     doc: TypedDocumentNode<Data, Vars>,
     variables: Vars,

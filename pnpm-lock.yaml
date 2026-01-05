@@ -134,6 +134,9 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
+      '@tanstack/react-query':
+        specifier: 'catalog:'
+        version: 5.90.12(react@19.1.0)
       apollo-link-scalars:
         specifier: ^4.0.3
         version: 4.0.3(@apollo/client@4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2))(graphql@16.12.0)
@@ -155,10 +158,10 @@ importers:
       preact:
         specifier: 'catalog:'
         version: 10.27.2
-      tanstack-graphql-query-builder:
-        specifier: workspace:*
-        version: link:../../libraries/tanstack-graphql-query-builder
     devDependencies:
+      '@graphql-typed-document-node/core':
+        specifier: ^3.2.0
+        version: 3.2.0(graphql@16.12.0)
       '@mp/build':
         specifier: workspace:*
         version: link:../../libraries/build
@@ -879,25 +882,6 @@ importers:
       ngraph.path:
         specifier: 1.6.1
         version: 1.6.1
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
-  libraries/query:
-    dependencies:
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
-      '@tanstack/react-query':
-        specifier: 5.90.12
-        version: 5.90.12(react@19.1.0)
-      '@tanstack/react-query-devtools':
-        specifier: 5.91.1
-        version: 5.91.1(@tanstack/react-query@5.90.12(react@19.1.0))(react@19.1.0)
-      preact:
-        specifier: 'catalog:'
-        version: 10.27.2
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
