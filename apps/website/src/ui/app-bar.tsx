@@ -7,7 +7,7 @@ import { AuthContext } from "../integrations/contexts";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { useQuery } from "@mp/query";
+import { useQuery } from "@tanstack/react-query";
 import { env } from "../env";
 
 export default function AppBar() {

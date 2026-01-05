@@ -1,5 +1,5 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { skipToken, useQuery } from "@mp/query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useSignal } from "@mp/state/react";
 import { Checkbox, ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";

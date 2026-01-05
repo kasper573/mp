@@ -19,7 +19,7 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
-    "@mp/query": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",

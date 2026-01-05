@@ -4,7 +4,7 @@ import type { CheckboxState } from "@mp/ui";
 import { Checkbox } from "@mp/ui";
 
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { useMutation, useQuery } from "@mp/query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";

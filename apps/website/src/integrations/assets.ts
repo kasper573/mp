@@ -12,7 +12,7 @@ import type {
   ItemDefinitionLookup,
   ItemReference,
 } from "@mp/game-shared";
-import { useSuspenseQuery } from "@mp/query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 

@@ -1,10 +1,7 @@
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
-import {
-  QueryClient,
-  QueryClientProvider,
-  ReactQueryDevtools,
-} from "@mp/query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";

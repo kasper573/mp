@@ -2,7 +2,7 @@ import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import type { CharacterId } from "@mp/game-shared";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
-import { useQuery } from "@mp/query";
+import { useQuery } from "@tanstack/react-query";
 import { useSignalEffect } from "@mp/state/react";
 import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";

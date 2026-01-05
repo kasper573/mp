@@ -1,6 +1,6 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { ActorSpriteTester } from "@mp/game-client";
-import { useSuspenseQuery } from "@mp/query";
+import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActorTextures } from "../../../../integrations/assets";
 
