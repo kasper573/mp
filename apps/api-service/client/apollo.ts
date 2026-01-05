@@ -9,14 +9,14 @@ import { deferredApolloLink } from "./deferred-apollo-link";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
-export interface GraphQLCLientOptions {
+export interface GraphQLClientOptions {
   serverUrl: string;
   schema: Resolvable<string | object>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
 }
 
 export class GraphQLClient extends ApolloClient {
-  constructor(opt: GraphQLCLientOptions) {
+  constructor(opt: GraphQLClientOptions) {
     const httpLink = new BatchHttpLink({
       uri: opt.serverUrl,
       batchInterval: 100,
