@@ -27,7 +27,7 @@ export const updateCharacter = procedure()
     const result = await drizzle
       .update(characterTable)
       .set({ name: newName })
-      .where(and(eq(characterTable.id, characterId)));
+      .where(eq(characterTable.id, characterId));
 
     if (!result.rowCount) {
       throw new Error("No character found with the given ID");
