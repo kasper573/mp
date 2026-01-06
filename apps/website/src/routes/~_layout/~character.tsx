@@ -52,7 +52,7 @@ function CharacterPage() {
       </Card>
 
       {save.isSuccess && !save.data.updateMyCharacter.errors && (
-        <Card intent="success">Changes has been saved</Card>
+        <Card intent="success">Changes have been saved</Card>
       )}
 
       {/* Internal server error, just show in case something terrible happens */}
