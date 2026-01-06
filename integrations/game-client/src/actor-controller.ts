@@ -127,6 +127,6 @@ function actorAnimationState(actor: Actor) {
   return {
     isMoving: !!actor.movement.path?.length,
     isFast: actor.movement.speed >= 2,
-    isAlive: actor.combat.health > 0,
+    isAlive: actor.combat.alive,
   };
 }
