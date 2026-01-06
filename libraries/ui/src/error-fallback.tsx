@@ -1,22 +1,36 @@
 import { createContext } from "preact";
 import { useContext, useEffect } from "preact/hooks";
 
-export function ErrorFallback(props: { error: unknown; reset?: () => void }) {
-  const context = useContext(ErrorFallbackContext);
+export interface ErrorFallbackProps {
+  title?: string;
+  error: unknown;
+  reset?: () => void;
+}
 
-  useEffect(() => context.handleError(props.error), [context, props.error]);
+export function ErrorFallback({
+  title = "Oops! Something went wrong.",
+  error,
+  reset,
+}: ErrorFallbackProps) {
+  const { handleError, displayErrorDetails } = useContext(ErrorFallbackContext);
+
+  useEffect(
+    () => handleError(error),
+    // oxlint-disable-next-line exhaustive-deps It's fine, we only want to emit the error to the current available handler.
+    [error],
+  );
 
   return (
     <>
-      <h1>Oops! Something went wrong.</h1>
-      {props.error && (
+      <h2>{title}</h2>
+      {displayErrorDetails && error && (
         <pre>
-          <ErrorToString error={props.error} />
+          <ErrorToString error={error} />
         </pre>
       )}
-      {props.reset && (
+      {reset && (
         <div>
-          <button onClick={props.reset}>Try again</button>
+          <button onClick={reset}>Try again</button>
         </div>
       )}
     </>
@@ -24,27 +38,27 @@ export function ErrorFallback(props: { error: unknown; reset?: () => void }) {
 }
 
 export interface ErrorFallbackContextValue {
+  displayErrorDetails: boolean;
   handleError: (error: unknown) => void;
 }
 
 export const ErrorFallbackContext = createContext<ErrorFallbackContextValue>({
+  displayErrorDetails: true,
   handleError: () => {
     throw new Error("ErrorFallbackContext must be provided");
   },
 });
 
-export function ErrorToString(props: { error: unknown }) {
-  if (props.error instanceof Error) {
+export function ErrorToString({ error }: { error: unknown }) {
+  if (error instanceof Error) {
     return (
       <>
-        {props.error.stack?.includes(props.error.message)
-          ? null
-          : props.error.message + "\n"}
-        {props.error.stack}
-        {props.error.cause ? <ErrorToString error={props.error.cause} /> : null}
+        {error.stack?.includes(error.message) ? null : error.message + "\n"}
+        {error.stack}
+        {error.cause ? <ErrorToString error={error.cause} /> : null}
       </>
     );
   }
 
-  return String(props.error);
+  return String(error);
 }
