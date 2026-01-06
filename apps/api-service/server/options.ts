@@ -1,5 +1,5 @@
 import { parseEnv } from "@mp/env";
-import { authAlgorithms } from "@mp/oauth/server";
+import { authAlgorithms } from "@mp/auth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
 
 export type ApiOptions = typeof apiOptionsSchema.infer;

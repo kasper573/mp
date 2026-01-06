@@ -6,7 +6,7 @@ import type { GameServerEventRouter } from "@mp/game-service";
 import { eventMessageEncoding } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
-import { createBypassUser } from "@mp/oauth";
+import { createBypassUser } from "@mp/auth";
 import type { Signal } from "@mp/state";
 import { Rng, toResult } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";

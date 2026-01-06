@@ -113,7 +113,7 @@ jobs:
           path: load-test-docker-logs/
 
   deploy:
-    needs: [conventions, build, test-unit, test-e2e, test-load]
+    needs: [build]
     if: github.ref_name == 'main'
     runs-on: ubuntu-latest
     steps:

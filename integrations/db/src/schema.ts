@@ -1,4 +1,4 @@
-import type { UserId } from "@mp/oauth";
+import type { UserId } from "@mp/auth";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import {
   boolean,
@@ -98,7 +98,7 @@ export const characterTable = pgTable("character", {
   modelId: actorModelId()
     .notNull()
     .references(() => actorModelTable.id),
-  name: varchar({ length: 64 }).notNull(),
+  name: varchar({ length: 64 }).unique().notNull(),
   online: boolean().notNull().default(false),
   xp: real().notNull(),
   inventoryId: shortId<InventoryId>()

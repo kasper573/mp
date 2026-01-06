@@ -1,4 +1,4 @@
-import type { UserId } from "@mp/oauth";
+import type { UserId } from "@mp/auth";
 import { and, eq } from "drizzle-orm";
 import { characterTable } from "../schema";
 import type { CharacterId } from "@mp/game-shared";

@@ -2,42 +2,76 @@
 // errors are never unhandled and crash in production, so we need to wrap
 // all procedure definitions in a convention. We use a builder pattern.
 
-import { ResultAsync } from "@mp/std";
+import type { Result } from "@mp/std";
+import { err, Err, ok, Ok, ResultAsync } from "@mp/std";
+import { DrizzleError } from "drizzle-orm";
 import type { DrizzleClient } from "./client";
 
-export function procedure(): DrizzleProcedureBuilder<void, never> {
+export function procedure(): DrizzleProcedureBuilder<void, never, never> {
   return new DrizzleProcedureBuilder(() => {
     throw new Error("Procedure query function not defined");
   });
 }
 
-class DrizzleProcedureBuilder<Input, Output> {
+class DrizzleProcedureBuilder<Input, Output, CustomError extends BaseError> {
   constructor(
-    private queryFn: (drizzle: DrizzleClient, input: Input) => Promise<Output>,
+    private queryFn: DbProcedureQueryFn<Input, Output, CustomError>,
   ) {}
 
   input<NewInput>() {
-    return new DrizzleProcedureBuilder<NewInput, Output>(() => {
+    return new DrizzleProcedureBuilder<NewInput, Output, CustomError>(() => {
       throw new Error("Procedure query function not defined");
     });
   }
 
-  query<NewOutput>(
-    query: (client: DrizzleClient, input: Input) => Promise<NewOutput>,
-  ) {
-    return new DrizzleProcedureBuilder<Input, NewOutput>(query);
+  error<NewCustomError extends BaseError>() {
+    return new DrizzleProcedureBuilder<Input, Output, NewCustomError>(() => {
+      throw new Error("Procedure query function not defined");
+    });
   }
 
-  build(client: DrizzleClient): DbProcedure<Input, Output> {
+  query<NewOutput>(queryFn: DbProcedureQueryFn<Input, NewOutput, CustomError>) {
+    return new DrizzleProcedureBuilder<Input, NewOutput, CustomError>(queryFn);
+  }
+
+  build(client: DrizzleClient): DbProcedure<Input, Output, CustomError> {
     return (input) =>
-      ResultAsync.fromPromise(this.queryFn(client, input), (error) =>
-        error instanceof Error
-          ? error
-          : new Error("Unknown database error", { cause: error }),
+      new ResultAsync(
+        (async () => {
+          try {
+            const result = await this.queryFn(client, input);
+            if (result instanceof Err || result instanceof Ok) {
+              return result;
+            }
+
+            return ok(result);
+          } catch (error) {
+            if (error instanceof DrizzleError) {
+              return err({ type: "drizzle", error });
+            }
+            return err({ type: "unknown", error });
+          }
+        })(),
       );
   }
 }
 
-export type DbProcedure<Input, Output> = (
+export type DbProcedureQueryFn<Input, Output, CustomError> = (
+  client: DrizzleClient,
   input: Input,
-) => ResultAsync<Output, Error>;
+) =>
+  | Promise<Result<Output, CustomError> | Output>
+  | Result<Output, CustomError>
+  | Output;
+
+export type DbProcedure<Input, Output, CustomError extends BaseError> = (
+  input: Input,
+) => ResultAsync<Output, CustomError | BuiltinErrors>;
+
+interface BaseError<Type extends string = string> {
+  type: Type;
+}
+
+type BuiltinErrors =
+  | { type: "drizzle"; error: DrizzleError }
+  | { type: "unknown"; error: unknown };

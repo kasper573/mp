@@ -2,8 +2,8 @@ import { CharacterIdType } from "@mp/game-shared";
 import { EventRouterBuilder } from "@mp/event-router";
 import type { InjectionContainer } from "@mp/ioc";
 import { gatewayRoles } from "@mp/keycloak";
-import type { RoleDefinition } from "@mp/oauth";
-import { assertRoles } from "@mp/oauth";
+import type { RoleDefinition } from "@mp/auth";
+import { assertRoles } from "@mp/auth";
 import {
   ctxDb,
   ctxGameEventClient,

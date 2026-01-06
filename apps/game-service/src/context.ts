@@ -7,7 +7,7 @@ import type {
 } from "@mp/game-shared";
 import { InjectionContext } from "@mp/ioc";
 import type { Logger } from "@mp/logger";
-import type { TokenResolver } from "@mp/oauth/server";
+import type { TokenResolver } from "@mp/auth/server";
 import type { Rng } from "@mp/std";
 import type { GameStateServer } from "./etc/game-state-server";
 import type { NpcSpawner } from "./etc/npc/npc-spawner";

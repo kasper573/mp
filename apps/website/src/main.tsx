@@ -10,6 +10,7 @@ import {
 } from "@mp/ui";
 import { assert } from "@mp/std";
 import * as styles from "./main.css";
+import { env } from "./env";
 
 // Note that main.tsx is not the composition root of the application,
 // only the entry point that then lazy loads the real composition root, app.tsx.
@@ -33,6 +34,7 @@ function Root() {
         */}
       <ErrorFallbackContext.Provider
         value={{
+          displayErrorDetails: env.displayErrorDetails,
           // oxlint-disable-next-line no-console
           handleError: console.error,
         }}

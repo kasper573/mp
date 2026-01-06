@@ -4,12 +4,14 @@ import { selectAllActorModelIds } from "./procedures/select-all-actor-model-ids"
 import { selectAllItemDefinitions } from "./procedures/select-all-item-definitions";
 import { selectAllNpcRewards } from "./procedures/select-all-npc-rewards";
 import { selectAllSpawnAndNpcPairs } from "./procedures/select-all-spawn-and-npc-pairs";
+import { selectCharacterByUser } from "./procedures/select-character-by-user";
 import {
   selectConsumableDefinition,
   selectEquipmentDefinition,
 } from "./procedures/select-item";
 import { selectOnlineCharacterList } from "./procedures/select-online-character-list";
 import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-character-id";
+import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
@@ -30,11 +32,13 @@ export function createDbRepository(connectionString: string) {
     selectAllItemDefinitions: selectAllItemDefinitions.build(drizzle),
     selectAllNpcRewards: selectAllNpcRewards.build(drizzle),
     selectAllSpawnAndNpcPairs: selectAllSpawnAndNpcPairs.build(drizzle),
+    selectCharacterByUser: selectCharacterByUser.build(drizzle),
     selectConsumableDefinition: selectConsumableDefinition.build(drizzle),
     selectEquipmentDefinition: selectEquipmentDefinition.build(drizzle),
     selectOnlineCharacterList: selectOnlineCharacterList.build(drizzle),
     selectOrCreateCharacterIdForUser:
       selectOrCreateCharacterIdForUser.build(drizzle),
+    updateCharacter: updateCharacter.build(drizzle),
     updateCharactersArea: updateCharactersArea.build(drizzle),
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),

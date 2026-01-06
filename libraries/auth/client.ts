@@ -22,6 +22,10 @@ export interface AuthClient {
    * Returns a cleanup function to stop listening.
    */
   initialize(): () => void;
+  /**
+   * Returns the URL to the Keycloak Account Console where users can manage their profile.
+   */
+  getAccountConsoleUrl(): string;
 }
 
 export interface AuthClientOptions {
@@ -92,6 +96,7 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
         extractIdentity(user);
         return user?.state as SignInState | undefined;
       }),
+    getAccountConsoleUrl: () => `${settings.authority}/account`,
   };
 }
 

@@ -11,6 +11,7 @@ ls:
 
 ignore:
   - node_modules
+  - .claude
   - .git
   - "./*/Dockerfile*"
   - "integrations/db/drizzle/**"

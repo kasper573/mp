@@ -1,5 +1,5 @@
 import { createConsoleLogger } from "@mp/logger";
-import { createAuthClient } from "@mp/oauth/client";
+import { createAuthClient } from "@mp/auth/client";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ErrorFallbackContext } from "@mp/ui";
@@ -30,6 +30,7 @@ export default function App() {
     <QueryClientProvider client={systems.query}>
       <ErrorFallbackContext.Provider
         value={{
+          displayErrorDetails: env.displayErrorDetails,
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >

@@ -5,6 +5,7 @@ export interface ClientEnv {
   apiUrl: string;
   version: string;
   retryApiQueries: number;
+  displayErrorDetails: boolean;
   auth: {
     authority: string;
     audience: string;

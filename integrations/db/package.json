@@ -21,10 +21,10 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@mp/auth": "workspace:*",
     "@mp/game-shared": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/oauth": "workspace:*",
     "@mp/std": "workspace:*",
     "drizzle-orm": "0.45.1",
     "pg": "8.16.3"

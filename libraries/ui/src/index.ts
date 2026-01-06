@@ -6,5 +6,8 @@ export * from "./error-fallback";
 export * from "./select";
 export * from "./checkbox";
 export * from "./dialog";
+export * from "./card";
+export * from "./link";
+export * from "./popover";
 export * from "./range";
 export * from "react-error-boundary";

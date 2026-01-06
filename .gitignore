@@ -23,6 +23,7 @@ test-results
 .devmode.json
 tsconfig.vitest-temp.json
 tsconfig.tmp.json
+.claude
 
 # Local files for common editors
 .idea

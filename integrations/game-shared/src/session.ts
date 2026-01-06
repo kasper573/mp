@@ -1,5 +1,5 @@
 import type { CharacterId } from "./character";
-import type { RoleDefinition, UserId } from "@mp/oauth";
+import type { RoleDefinition, UserId } from "@mp/auth";
 
 export interface UserSession<Id extends string = string> {
   readonly id: Id;

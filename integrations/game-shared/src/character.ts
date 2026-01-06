@@ -1,5 +1,5 @@
 import type { InventoryId } from "./item";
-import type { UserId } from "@mp/oauth";
+import type { UserId } from "@mp/auth";
 import { object, prop } from "@mp/sync";
 import { AppearanceTrait } from "./appearance";
 import { CombatTrait } from "./combat";

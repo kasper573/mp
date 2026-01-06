@@ -6,9 +6,10 @@ export async function registerAndSignIn(page: Page) {
   await page.getByRole("link", { name: /sign in/i }).click();
   await page.getByRole("link", { name: /register/i }).click();
 
-  const username = page.getByLabel(/username/i);
-  await username.click();
-  await username.fill(faker.internet.username());
+  const username = faker.internet.username();
+  const usernameEl = page.getByLabel(/username/i);
+  await usernameEl.click();
+  await usernameEl.fill(username);
 
   const pwd = faker.internet.password();
   const password = page.getByLabel("Password *", { exact: true });
@@ -33,4 +34,6 @@ export async function registerAndSignIn(page: Page) {
 
   const register = page.getByRole("button", { name: /register/i });
   await register.click();
+
+  return { username };
 }
