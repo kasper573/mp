@@ -30,6 +30,7 @@ export default function App() {
     <QueryClientProvider client={systems.query}>
       <ErrorFallbackContext.Provider
         value={{
+          displayErrorDetails: env.displayErrorDetails,
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
