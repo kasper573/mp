@@ -46,7 +46,7 @@ export function characterFromDbFields(
       attackSpeed: fields.attackSpeed,
       health: fields.health,
       maxHealth: fields.maxHealth,
-      alive: true,
+      alive: fields.health > 0,
       hitBox: model.hitBox,
       attackTargetId: undefined,
       lastAttack: undefined,
