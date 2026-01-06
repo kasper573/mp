@@ -4,17 +4,17 @@ import { clsx } from "clsx";
 export type StyledComponentProps<Recipe> =
   Recipe extends RuntimeFn<infer _> ? Parameters<Recipe>[0] : {};
 
-export function processStyleProps<Props extends { className?: unknown }>(
+export function processStyleProps<Props>(
   props: Props,
   classOrRecipe: string | string[] | AnyRecipe,
 ): Props {
   let spreadProps: AnyProps;
   let additionalClasses: string[];
   if (Array.isArray(classOrRecipe)) {
-    spreadProps = props;
+    spreadProps = props as AnyProps;
     additionalClasses = classOrRecipe;
   } else if (typeof classOrRecipe === "string") {
-    spreadProps = props;
+    spreadProps = props as AnyProps;
     additionalClasses = [classOrRecipe];
   } else {
     const recipeProps: AnyProps = {};
@@ -31,7 +31,10 @@ export function processStyleProps<Props extends { className?: unknown }>(
   }
   return {
     ...spreadProps,
-    className: clsx(props.className as never, ...additionalClasses),
+    className: clsx(
+      Reflect.get(spreadProps, "className") as string | undefined,
+      ...additionalClasses,
+    ),
   } as Props;
 }
 
