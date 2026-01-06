@@ -1,11 +1,7 @@
-import { ApiProvider, createApiClient } from "@mp/api-service/sdk";
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/oauth/client";
-import {
-  QueryClient,
-  QueryClientProvider,
-  ReactQueryDevtools,
-} from "@mp/query";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
@@ -14,6 +10,12 @@ import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
+import {
+  GraphQLClient,
+  QueryBuilder,
+  QueryBuilderContext,
+} from "@mp/api-service/client";
+import apiSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -31,7 +33,7 @@ export default function App() {
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
-        <ApiProvider queryClient={systems.query} trpcClient={systems.api}>
+        <QueryBuilderContext.Provider value={systems.queryBuilder}>
           <LoggerContext.Provider value={systems.logger}>
             <AuthContext.Provider value={systems.auth}>
               <RouterProvider router={systems.router} />
@@ -43,7 +45,7 @@ export default function App() {
               <ReactQueryDevtools client={systems.query} />
             </>
           )}
-        </ApiProvider>
+        </QueryBuilderContext.Provider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
@@ -53,7 +55,6 @@ function createSystems() {
   const logger = createConsoleLogger();
   const auth = createAuthClient(env.auth);
   const router = createClientRouter();
-  const api = createApiClient(env.apiUrl, () => auth.identity.value?.token);
 
   const query = new QueryClient({
     defaultOptions: {
@@ -63,6 +64,21 @@ function createSystems() {
       },
     },
   });
+
+  const graphqlClient = new GraphQLClient({
+    serverUrl: env.apiUrl,
+    schema: () => fetch(apiSchemaUrl).then((res) => res.text()),
+    fetchOptions(init) {
+      const token = auth.identity.value?.token;
+      const headers = new Headers(init?.headers);
+      if (token) {
+        headers.set("Authorization", `Bearer ${token}`);
+      }
+      return { ...init, headers };
+    },
+  });
+
+  const queryBuilder = new QueryBuilder(graphqlClient);
 
   function initialize() {
     void auth.refresh();
@@ -78,10 +94,11 @@ function createSystems() {
 
   return {
     auth,
-    api,
     logger,
     router,
     query,
+    graphqlClient,
+    queryBuilder,
     initialize,
   };
 }

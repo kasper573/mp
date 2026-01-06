@@ -19,7 +19,7 @@
     }
     header {
         Access-Control-Allow-Origin "https://{$MP_WEBSITE_DOMAIN}"
-        Access-Control-Allow-Methods "GET, HEAD, OPTIONS"
+        Access-Control-Allow-Methods "GET, POST, HEAD, OPTIONS"
         Access-Control-Allow-Headers "Content-Type, Authorization"
         Access-Control-Allow-Credentials true
     }

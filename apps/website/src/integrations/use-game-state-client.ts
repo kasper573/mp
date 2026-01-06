@@ -27,7 +27,11 @@ export function useGameStateClient(): [
   const auth = useContext(AuthContext);
 
   const [stateClient, eventClient, initialize] = useMemo(
-    () => createGameStateClient(logger, auth),
+    () =>
+      createGameStateClient(
+        logger.child({}, { msgPrefix: "[GameStateClient]" }),
+        auth,
+      ),
     [logger, auth],
   );
 
@@ -49,7 +53,10 @@ function createGameStateClient(
   socket.binaryType = "arraybuffer";
 
   const eventClient: ComposedGameEventClient = createProxyEventInvoker(
-    (message) => socket.send(eventMessageEncoding.encode(message)),
+    (message) => {
+      logger.debug("send", ...message);
+      return socket.send(eventMessageEncoding.encode(message));
+    },
   );
 
   function initialize() {

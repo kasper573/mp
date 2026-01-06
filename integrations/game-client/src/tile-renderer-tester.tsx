@@ -3,7 +3,7 @@ import type { Container, Size, Texture } from "@mp/graphics";
 import { Assets, FpsIndicator, Spritesheet } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import { Vector } from "@mp/math";
-import { skipToken, useQuery, useQuerySignal } from "@mp/query";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { Pixel, Tile } from "@mp/std";
 import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
@@ -21,6 +21,7 @@ import {
   generateTilesetTile,
 } from "./test-tile-map-generator";
 import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
+import { useQuerySignal } from "./use-query-signal";
 
 export function TileRendererTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);

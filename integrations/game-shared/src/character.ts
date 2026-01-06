@@ -23,5 +23,6 @@ export const Character = object({
 
 export type Character = typeof Character.$infer;
 
-export const CharacterIdType = type("string").brand("CharacterId");
+/** @gqlScalar */
 export type CharacterId = typeof CharacterIdType.infer;
+export const CharacterIdType = type("string").brand("CharacterId");

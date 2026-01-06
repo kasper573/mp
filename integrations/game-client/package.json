@@ -19,7 +19,6 @@
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/path-finding": "workspace:*",
-    "@mp/query": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",
@@ -29,6 +28,7 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "preact": "catalog:",
     "uniqolor": "1.1.1"
   },

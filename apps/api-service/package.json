@@ -4,27 +4,49 @@
   "private": true,
   "type": "module",
   "exports": {
-    "./sdk": {
-      "types": "./src/sdk.ts",
-      "import": "./src/sdk.ts",
-      "require": "./src/sdk.ts"
+    "./client": {
+      "types": "./client/index.ts",
+      "import": "./client/index.ts",
+      "require": "./client/index.ts"
+    },
+    "./client/tsconfig.json": {
+      "types": "./client/tsconfig.tada.json",
+      "import": "./client/tsconfig.tada.json",
+      "require": "./client/tsconfig.tada.json"
+    },
+    "./client/schema.graphql": {
+      "types": "./shared/schema.generated.graphql",
+      "import": "./shared/schema.generated.graphql",
+      "require": "./shared/schema.generated.graphql"
+    },
+    "./client/schema.json": {
+      "types": "./shared/schema.generated.json",
+      "import": "./shared/schema.generated.json",
+      "require": "./shared/schema.generated.json"
     }
   },
   "scripts": {
     "build": "tsc && tsx esbuild.ts",
-    "inspect": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect src/main.ts",
-    "inspect-brk": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx --inspect-brk src/main.ts",
-    "dev": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "dev": "concurrently --names grats,tada,ts -c blue,magenta,gray 'pnpm dev:grats' 'pnpm dev:tada' 'pnpm dev:ts'",
+    "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
+    "dev:grats": "grats --watch",
+    "dev:tada": "chokidar './shared/schema.generated.graphql' --initial -c 'pnpm tada:codegen'",
+    "codegen": "grats && pnpm tada:codegen && pnpm codegen:json",
+    "codegen:json": "tsx ./scripts/graphql-to-json.ts ./shared/schema.generated.graphql ./shared/schema.generated.json",
+    "tada:codegen": "gql.tada generate-output -c client/tsconfig.json -o client/gql-tada.generated.d.ts",
+    "tada:check": "tsx ./scripts/validate-tada.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@apollo/client": "^4.0.11",
+    "@apollo/server": "^5.2.0",
+    "@as-integrations/express5": "^1.1.2",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/game-shared": "workspace:*",
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/math": "workspace:*",
     "@mp/oauth": "workspace:*",
     "@mp/redis": "workspace:*",
     "@mp/state": "workspace:*",
@@ -32,17 +54,24 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
-    "@trpc/client": "11.8.0",
-    "@trpc/server": "11.8.0",
-    "@trpc/tanstack-react-query": "11.8.0",
+    "@tanstack/react-query": "catalog:",
+    "apollo-link-scalars": "^4.0.3",
     "dotenv": "catalog:",
     "express": "catalog:",
-    "superjson": "2.2.6"
+    "gql.tada": "^1.9.0",
+    "graphql": "^16.12.0",
+    "grats": "^0.0.34",
+    "preact": "catalog:"
   },
   "devDependencies": {
+    "@graphql-typed-document-node/core": "^3.2.0",
     "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@types/express": "catalog:",
+    "bottleneck": "^2.19.5",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1",
+    "glob": "^13.0.0",
     "tsx": "catalog:"
   }
 }

@@ -16,7 +16,7 @@ export class NpcRewardSystem {
     const logger = this.ioc.get(ctxLogger);
     logger.info(`Loading NPC rewards...`);
 
-    const npcRewards = await withBackoffRetries(() => {
+    const npcRewards = await withBackoffRetries("load-all-npc-rewards", () => {
       const db = this.ioc.get(ctxDb);
       const areaId = this.ioc.get(ctxArea).id;
       return promiseFromResult(db.selectAllNpcRewards(areaId));

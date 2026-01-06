@@ -3,8 +3,8 @@ import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CheckboxState } from "@mp/ui";
 import { Checkbox } from "@mp/ui";
 
-import { useApi, useApiClient } from "@mp/api-service/sdk";
-import { useMutation, useQuery } from "@mp/query";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
@@ -12,14 +12,13 @@ import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
 export function MiscDebugUi() {
-  const api = useApi();
+  const qb = useQueryBuilder();
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
-
-  const serverVersion = useQuery(api.buildVersion.queryOptions());
+  const { data } = useQuery(qb.queryOptions(serverSettings));
   return (
     <>
       <div>Client version: {env.version}</div>
-      <div>Server version: {serverVersion.data ?? "unknown"}</div>
+      <div>Server version: {data?.serverVersion ?? "unknown"}</div>
       <label>
         Show ping <Checkbox signal={pingEnabledSignal} />{" "}
         {pingEnabledSignal.value ? <PingIndicator /> : null}
@@ -48,15 +47,14 @@ export function MiscDebugUi() {
 }
 
 function PingIndicator() {
-  const api = useApiClient();
   const ping = useQuery({
     queryKey: ["ping"],
     async queryFn() {
       const start = performance.now();
-      await api.ping.query();
+      await fetch(`${env.apiUrl}/health`);
       return performance.now() - start;
     },
-    refetchInterval: 1000,
+    refetchInterval: 5000,
     initialData: 0,
   });
 
@@ -64,22 +62,35 @@ function PingIndicator() {
 }
 
 function useServerPatchOptimizerSignal() {
-  const api = useApi();
-  const enabled = useSignal<CheckboxState>("indeterminate");
-  const settings = useQuery(api.gameServiceSettings.queryOptions());
-  const setSettings = useMutation(api.setGameServiceSettings.mutationOptions());
+  const qb = useQueryBuilder();
+  const local = useSignal<CheckboxState>("indeterminate");
+  const remote = useQuery(qb.queryOptions(serverSettings));
+  const setRemote = useMutation(qb.mutationOptions(setPatchOptimizerEnabled));
 
   useSignalEffect(() => {
-    if (enabled.value !== "indeterminate") {
-      setSettings.mutate({ isPatchOptimizerEnabled: enabled.value });
+    if (local.value !== "indeterminate") {
+      setRemote.mutate({ newValue: local.value });
     }
   });
 
   useEffect(() => {
-    if (settings.data !== undefined) {
-      enabled.value = settings.data.isPatchOptimizerEnabled;
+    if (remote.data !== undefined) {
+      local.value = remote.data.isPatchOptimizerEnabled;
     }
-  }, [settings.data, enabled]);
+  }, [remote.data, local]);
 
-  return enabled;
+  return local;
 }
+
+const serverSettings = graphql(`
+  query MiscDebugUi {
+    serverVersion
+    isPatchOptimizerEnabled
+  }
+`);
+
+const setPatchOptimizerEnabled = graphql(`
+  mutation SetGameServiceSettings($newValue: Boolean!) {
+    setPatchOptimizerEnabled(newValue: $newValue)
+  }
+`);

@@ -118,8 +118,11 @@ export function isPathEqual<P extends Path<number>>(a?: P, b?: P): boolean {
   return a.every((v1, i) => b[i].equals(v1));
 }
 
+/** @gqlType */
 export interface VectorLike<T extends number> {
+  /** @gqlField */
   x: T;
+  /** @gqlField */
   y: T;
 }
 

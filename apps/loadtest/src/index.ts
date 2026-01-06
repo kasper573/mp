@@ -1,5 +1,5 @@
 // oxlint-disable no-await-in-loop
-import { createApiClient } from "@mp/api-service/sdk";
+import { graphql, GraphQLClient } from "@mp/api-service/client";
 import { createProxyEventInvoker } from "@mp/event-router";
 import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
@@ -8,25 +8,28 @@ import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/oauth";
 import type { Signal } from "@mp/state";
-import { Rng } from "@mp/std";
+import { Rng, toResult } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
+import apiSchema from "@mp/api-service/client/schema.json";
 
 const logger = createConsoleLogger();
 
 const { apiUrl, gameServiceUrl, gameClients, timeout, verbose, exitFast } =
   readCliOptions();
 
-const start = performance.now();
+async function main() {
+  const start = performance.now();
 
-const success = await testAllGameClients();
+  const success = await testAllGameClients();
 
-const end = performance.now();
+  const end = performance.now();
 
-logger.info(`Done in ${(end - start).toFixed(2)}ms`);
+  logger.info(`Done in ${(end - start).toFixed(2)}ms`);
 
-if (!success) {
-  process.exit(1);
+  if (!success) {
+    process.exit(1);
+  }
 }
 
 async function testAllGameClients() {
@@ -116,8 +119,18 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Getting character id for socket ${n}`);
       }
-      const api = createApiClient(apiUrl, () => accessToken);
-      gameClient.characterId.value = await api.myCharacterId.query();
+      const api = new GraphQLClient({
+        serverUrl: apiUrl,
+        schema: apiSchema,
+        fetchOptions: (init) => ({
+          ...init,
+          headers: { ...init?.headers, Authorization: `Bearer ${accessToken}` },
+        }),
+      });
+      const { myCharacterId } = toResult(
+        await api.query({ query: myCharacterIdQuery }),
+      )._unsafeUnwrap();
+      gameClient.characterId.value = myCharacterId;
 
       if (verbose) {
         logger.info(
@@ -129,7 +142,7 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
       }
-      const areaId = await waitUntilDefined(gameClient.areaId);
+      const areaId = await waitUntilDefined(gameClient.areaId, 15_000);
 
       if (verbose) {
         logger.info(
@@ -138,11 +151,11 @@ function testOneGameClient(n: number, rng: Rng) {
         );
       }
 
-      const areaUrl = await api.areaFileUrl.query({
-        areaId,
-        urlType: "public",
-      });
-      const area = await browserLoadAreaResource(areaId, areaUrl);
+      const { areaFileUrl } = toResult(
+        await api.query({ query: areaFileQuery, variables: { areaId } }),
+      )._unsafeUnwrap();
+
+      const area = await browserLoadAreaResource(areaId, areaFileUrl);
       const tiles = Array.from(area.graph.nodeIds)
         .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
         .filter((v) => v !== undefined);
@@ -198,17 +211,39 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitUntilDefined<T>(signal: Signal<T | undefined>): Promise<T> {
-  return new Promise((resolve) => {
+function waitUntilDefined<T>(
+  signal: Signal<T | undefined>,
+  timeout: number,
+): Promise<T> {
+  return new Promise((resolve, reject) => {
     if (signal.value !== undefined) {
       resolve(signal.value);
       return;
     }
+    const timeoutId = setTimeout(
+      () => reject(new Error("Timeout waiting for defined signal")),
+      timeout,
+    );
     const unsubscribe = signal.subscribe((value) => {
       if (value !== undefined) {
+        clearTimeout(timeoutId);
         unsubscribe();
         resolve(value);
       }
     });
   });
 }
+
+const areaFileQuery = graphql(`
+  query GetAreaFileUrl($areaId: AreaId!) {
+    areaFileUrl(areaId: $areaId, urlType: public)
+  }
+`);
+
+const myCharacterIdQuery = graphql(`
+  query GetMyCharacterId {
+    myCharacterId
+  }
+`);
+
+void main();

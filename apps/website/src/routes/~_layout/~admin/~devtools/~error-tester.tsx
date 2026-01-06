@@ -1,5 +1,5 @@
-import { useApi } from "@mp/api-service/sdk";
-import { skipToken, useQuery } from "@mp/query";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { skipToken, useQuery } from "@tanstack/react-query";
 import { useSignal } from "@mp/state/react";
 import { Checkbox, ErrorFallback } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
@@ -10,16 +10,15 @@ export const Route = createFileRoute("/_layout/admin/devtools/error-tester")({
 });
 
 function RouteComponent() {
-  const api = useApi();
+  const qb = useQueryBuilder();
   const [uiError, setUiError] = useState(false);
   const [apiError, setApiError] = useState(false);
   const errorBoundary = useSignal(false);
 
-  const query = useQuery(
-    api.testError.queryOptions(apiError ? void 0 : skipToken, {
-      throwOnError: errorBoundary.value,
-    }),
-  );
+  const query = useQuery({
+    ...qb.queryOptions(gql, apiError ? void 0 : skipToken),
+    throwOnError: errorBoundary.value,
+  });
 
   return (
     <div>
@@ -48,3 +47,9 @@ function ForcedError() {
   throw new Error("This is a test error that was thrown in the UI");
   return null;
 }
+
+const gql = graphql(`
+  query ErrorTester {
+    testError
+  }
+`);

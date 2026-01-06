@@ -60,11 +60,16 @@ export const gameServiceOptionsSchema = type({
    * If not provided, a random seed will be used.
    */
   "rngSeed?": numeric(),
-
-  /**
-   * Whether to use pretty logging format.
-   */
-  prettyLogs: boolish(),
+  log: {
+    /**
+     * Which level of logs to output (See @mp/logger)
+     */
+    level: "string?",
+    /**
+     * Display logs in a pretty, human-readable format.
+     */
+    pretty: boolish().optional(),
+  },
 }).onDeepUndeclaredKey("delete");
 
 export const opt = parseEnv(

@@ -30,25 +30,37 @@ export type EquipmentInstance = typeof EquipmentInstance.$infer;
 // but as a mental model it's useful to think of them as static and something
 // that clients and servers look up on demand and cache aggressively.
 
-export interface ItemDefinitionBase<Ref extends ItemReference> {
-  type: Ref["type"];
-  id: Ref["definitionId"];
-  name: string;
-}
+const consumableType = type("'consumable'");
+const consumableDefinitionIdType = type.string.brand("ConsumableDefinitionId");
+const ConsumableDefinitionType = type({
+  type: consumableType,
+  id: consumableDefinitionIdType,
+  name: "string",
+  maxStackSize: "number",
+});
+export type ConsumableDefinition = typeof ConsumableDefinitionType.inferOut;
 
-export interface ConsumableDefinition extends ItemDefinitionBase<ConsumableReference> {
-  maxStackSize: number;
-}
+const equipmentType = type("'equipment'");
+const equipmentDefinitionIdType = type.string.brand("EquipmentDefinitionId");
+const EquipmentDefinitionType = type({
+  type: equipmentType,
+  id: equipmentDefinitionIdType,
+  name: "string",
+  maxDurability: "number",
+});
+export type EquipmentDefinition = typeof EquipmentDefinitionType.inferOut;
 
-export interface EquipmentDefinition extends ItemDefinitionBase<EquipmentReference> {
-  maxDurability: number;
-}
+export const ItemDefinitionType = ConsumableDefinitionType.or(
+  EquipmentDefinitionType,
+);
 
 // Item instance and definition unions to be able to refer to items as a concept,
 // and for properties that are shared, but it's intended that server behavior and
 // client rendering should be implementing concrete logic per item type.
 
-export type ItemDefinition = ConsumableDefinition | EquipmentDefinition;
+/** @gqlScalar */
+export type ItemDefinition = typeof ItemDefinitionType.inferOut;
+
 export type ItemInstance = ConsumableInstance | EquipmentInstance;
 export type ItemInstanceId = ItemInstance["id"];
 
@@ -56,25 +68,28 @@ export type ItemDefinitionLookup = <Ref extends ItemReference>(
   ref: Ref,
 ) => ItemDefinitionByReference<Ref>;
 
-// We define the refs as runtime types because they are often serialized
-const ConsumableReference = type({
+const ConsumableReferenceType = type({
   type: "'consumable'",
   definitionId: type.string.brand("ConsumableDefinitionId"),
 });
-type ConsumableReference = typeof ConsumableReference.inferOut;
+type ConsumableReference = typeof ConsumableReferenceType.inferOut;
 
-const EquipmentReference = type({
+const EquipmentReferenceType = type({
   type: "'equipment'",
   definitionId: type.string.brand("EquipmentDefinitionId"),
 });
-type EquipmentReference = typeof EquipmentReference.inferOut;
+type EquipmentReference = typeof EquipmentReferenceType.inferOut;
 
-export const ItemReference = ConsumableReference.or(EquipmentReference);
-export type ItemReference = typeof ItemReference.inferOut;
+export const ItemReferenceType = ConsumableReferenceType.or(
+  EquipmentReferenceType,
+);
+
+/** @gqlScalar */
+export type ItemReference = typeof ItemReferenceType.inferOut;
 
 export type ItemDefinitionByReference<Ref extends ItemReference> = Extract<
   ItemDefinition,
-  ItemDefinitionBase<Ref>
+  { type: Ref["type"] }
 >;
 
 export const InventoryIdType = type("string").brand("InventoryId");

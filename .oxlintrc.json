@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "plugins": ["react", "import", "node", "promise", "typescript", "oxc"],
+  "ignorePatterns": ["**/generated/**", "*.generated.*"],
   "categories": {
     "correctness": "error",
     "suspicious": "error",
@@ -100,6 +101,13 @@
       "rules": {
         "ban-ts-comment": "off",
         "no-non-null-assertion": "off"
+      }
+    },
+    // Definition files can be ambiguous in module format
+    {
+      "files": ["**/*.d.ts"],
+      "rules": {
+        "unambiguous": "off"
       }
     },
     // Oxlint seems to mistake imports of pixi.js as file imports rather than module imports

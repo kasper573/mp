@@ -4,7 +4,14 @@ export interface Logger {
   warn: LogFn;
   error: LogFn;
   debug: LogFn;
-  child: (bindings: Record<string, unknown>) => Logger;
+  child: (
+    bindings: Record<string, unknown>,
+    opt?: LoggerChildOptions,
+  ) => Logger;
+}
+
+export interface LoggerChildOptions {
+  msgPrefix?: string;
 }
 
 interface LogFn {

@@ -4,16 +4,27 @@ import { Button, LinearProgress } from "@mp/ui";
 import { useRouterState } from "@tanstack/react-router";
 import { useContext } from "preact/hooks";
 import { AuthContext } from "../integrations/contexts";
-import { useVersionCompatibility } from "../state/use-server-version";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { useQuery } from "@tanstack/react-query";
+import { env } from "../env";
 
 export default function AppBar() {
+  const qb = useQueryBuilder();
   const state = useRouterState();
   const isNavigating = state.status === "pending";
 
   const auth = useContext(AuthContext);
-  const versionCompatibility = useVersionCompatibility();
+  const { data: versionCompatibility } = useQuery({
+    ...qb.queryOptions(query),
+    select({ serverVersion }) {
+      if (serverVersion) {
+        return env.version === serverVersion ? "compatible" : "incompatible";
+      }
+      return "indeterminate";
+    },
+  });
 
   return (
     <nav className={styles.nav}>
@@ -58,3 +69,9 @@ function VersionNotice() {
     </>
   );
 }
+
+const query = graphql(`
+  query AppBar {
+    serverVersion
+  }
+`);

@@ -17,10 +17,16 @@ export const serverOptionsSchema = type({
    * The hostname for the server to listen on
    */
   hostname: "string",
-  /**
-   * Whether to show pretty logs (Useful for development)
-   */
-  prettyLogs: boolish(),
+  log: {
+    /**
+     * Which level of logs to output (See @mp/logger)
+     */
+    level: "string?",
+    /**
+     * Display logs in a pretty, human-readable format.
+     */
+    pretty: boolish().optional(),
+  },
   databaseConnectionString: "string",
   /**
    * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.

@@ -52,6 +52,9 @@ export default tseslint.config(
         { type: "app", pattern: "apps/*/src/**" },
         { type: "integration", pattern: "integrations/*/src/**" },
         { type: "library", pattern: "libraries/**" },
+        { type: "graphql/server", pattern: "apps/graphql/server/**" },
+        { type: "graphql/client", pattern: "apps/graphql/client/**" },
+        { type: "graphql/shared", pattern: "apps/graphql/shared/**" },
       ],
       "import/resolver": {
         typescript: {
@@ -80,6 +83,9 @@ export default tseslint.config(
               allow: ["game-service-typedef", "integration", "library"],
             },
             { from: "library", allow: ["library"] },
+            { from: "app", allow: ["graphql/client"] },
+            { from: "graphql/client", allow: ["graphql/shared", "library"] },
+            { from: "graphql/server", allow: ["graphql/shared"] },
           ],
         },
       ],
