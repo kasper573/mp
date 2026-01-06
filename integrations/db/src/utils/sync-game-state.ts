@@ -109,7 +109,10 @@ export function syncGameState(
           .values()
           .filter((actor) => actor.type === "character")
           .map((char) =>
-            tx.update(characterTable).set(dbFieldsFromCharacter(char)),
+            tx
+              .update(characterTable)
+              .set(dbFieldsFromCharacter(char))
+              .where(eq(characterTable.id, char.identity.id)),
           ),
       );
 
