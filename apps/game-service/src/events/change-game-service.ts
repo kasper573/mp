@@ -48,6 +48,8 @@ export const changeGameService = evt.event
             const character = result.value;
             // Only set coords to spawn point if the character is alive.
             // Dead characters should preserve their death position.
+            // Note: We check health > 0 rather than combat.alive because alive
+            // is always set to true when loading from the database (see transform.ts).
             if (character.combat.health > 0) {
               character.movement.coords = currentArea.start;
             }
