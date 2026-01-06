@@ -13,6 +13,7 @@ import { Route as AuthCallbackRouteImport } from './../../routes/~auth-callback'
 import { Route as LayoutRouteRouteImport } from './../../routes/~_layout/~route'
 import { Route as LayoutPlayRouteImport } from './../../routes/~_layout/~play'
 import { Route as LayoutContactRouteImport } from './../../routes/~_layout/~contact'
+import { Route as LayoutCharacterRouteImport } from './../../routes/~_layout/~character'
 import { Route as LayoutIndexRouteImport } from './../../routes/~_layout/~index'
 import { Route as LayoutAdminSpectatorRouteImport } from './../../routes/~_layout/~admin/~spectator'
 import { Route as LayoutAdminDevtoolsRouteRouteImport } from './../../routes/~_layout/~admin/~devtools/~route'
@@ -41,6 +42,11 @@ const LayoutPlayRoute = LayoutPlayRouteImport.update({
 const LayoutContactRoute = LayoutContactRouteImport.update({
   id: '/contact',
   path: '/contact',
+  getParentRoute: () => LayoutRouteRoute,
+} as any)
+const LayoutCharacterRoute = LayoutCharacterRouteImport.update({
+  id: '/character',
+  path: '/character',
   getParentRoute: () => LayoutRouteRoute,
 } as any)
 const LayoutIndexRoute = LayoutIndexRouteImport.update({
@@ -105,6 +111,7 @@ const LayoutAdminDevtoolsIndexRoute =
 export interface FileRoutesByFullPath {
   '/auth-callback': typeof AuthCallbackRoute
   '/': typeof LayoutIndexRoute
+  '/character': typeof LayoutCharacterRoute
   '/contact': typeof LayoutContactRoute
   '/play': typeof LayoutPlayRoute
   '/admin/devtools': typeof LayoutAdminDevtoolsRouteRouteWithChildren
@@ -120,6 +127,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/auth-callback': typeof AuthCallbackRoute
   '/': typeof LayoutIndexRoute
+  '/character': typeof LayoutCharacterRoute
   '/contact': typeof LayoutContactRoute
   '/play': typeof LayoutPlayRoute
   '/admin/spectator': typeof LayoutAdminSpectatorRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteRouteWithChildren
   '/auth-callback': typeof AuthCallbackRoute
   '/_layout/': typeof LayoutIndexRoute
+  '/_layout/character': typeof LayoutCharacterRoute
   '/_layout/contact': typeof LayoutContactRoute
   '/_layout/play': typeof LayoutPlayRoute
   '/_layout/admin/devtools': typeof LayoutAdminDevtoolsRouteRouteWithChildren
@@ -153,6 +162,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/auth-callback'
     | '/'
+    | '/character'
     | '/contact'
     | '/play'
     | '/admin/devtools'
@@ -168,6 +178,7 @@ export interface FileRouteTypes {
   to:
     | '/auth-callback'
     | '/'
+    | '/character'
     | '/contact'
     | '/play'
     | '/admin/spectator'
@@ -183,6 +194,7 @@ export interface FileRouteTypes {
     | '/_layout'
     | '/auth-callback'
     | '/_layout/'
+    | '/_layout/character'
     | '/_layout/contact'
     | '/_layout/play'
     | '/_layout/admin/devtools'
@@ -229,6 +241,13 @@ declare module '@tanstack/react-router' {
       path: '/contact'
       fullPath: '/contact'
       preLoaderRoute: typeof LayoutContactRouteImport
+      parentRoute: typeof LayoutRouteRoute
+    }
+    '/_layout/character': {
+      id: '/_layout/character'
+      path: '/character'
+      fullPath: '/character'
+      preLoaderRoute: typeof LayoutCharacterRouteImport
       parentRoute: typeof LayoutRouteRoute
     }
     '/_layout/': {
@@ -335,6 +354,7 @@ const LayoutAdminDevtoolsRouteRouteWithChildren =
 
 interface LayoutRouteRouteChildren {
   LayoutIndexRoute: typeof LayoutIndexRoute
+  LayoutCharacterRoute: typeof LayoutCharacterRoute
   LayoutContactRoute: typeof LayoutContactRoute
   LayoutPlayRoute: typeof LayoutPlayRoute
   LayoutAdminDevtoolsRouteRoute: typeof LayoutAdminDevtoolsRouteRouteWithChildren
@@ -343,6 +363,7 @@ interface LayoutRouteRouteChildren {
 
 const LayoutRouteRouteChildren: LayoutRouteRouteChildren = {
   LayoutIndexRoute: LayoutIndexRoute,
+  LayoutCharacterRoute: LayoutCharacterRoute,
   LayoutContactRoute: LayoutContactRoute,
   LayoutPlayRoute: LayoutPlayRoute,
   LayoutAdminDevtoolsRouteRoute: LayoutAdminDevtoolsRouteRouteWithChildren,
