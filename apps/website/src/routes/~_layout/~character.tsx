@@ -1,9 +1,83 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { Button, Card, ErrorFallback } from "@mp/ui";
+import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { createFileRoute } from "@tanstack/react-router";
+import { AuthBoundary } from "../../ui/auth-boundary";
+import { atoms } from "@mp/style";
+import { NavLink } from "../../integrations/router/nav-link";
 
-export const Route = createFileRoute('/_layout/character')({
-  component: RouteComponent,
-})
+export const Route = createFileRoute("/_layout/character")({
+  component: AuthBoundary.wrap(CharacterPage),
+});
 
-function RouteComponent() {
-  return <div>Hello "/_layout/character"!</div>
+function CharacterPage() {
+  const qb = useQueryBuilder();
+
+  const query = useSuspenseQuery(qb.suspenseQueryOptions(myCharacterQuery));
+
+  const save = useMutation(qb.mutationOptions(updateCharacterNameMutation));
+
+  if (!query.data.myCharacter) {
+    return (
+      <div>
+        You have no character. <NavLink to="/play">Start playing</NavLink> to
+        create a character.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ maxWidth: 600 }} className={atoms({ mx: "l" })}>
+      <h1>Character</h1>
+
+      <Card className={atoms({ mb: "l" })}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            const newName = new FormData(e.currentTarget).get("name");
+            if (newName) {
+              save.mutate({ newName: newName.toString() });
+            }
+          }}
+        >
+          <div>
+            <label htmlFor="name">Name</label>
+            <input name="name" defaultValue={query.data.myCharacter.name} />
+          </div>
+
+          <Button type="submit" disabled={save.isPending}>
+            {save.isPending ? "Saving..." : "Save"}
+          </Button>
+        </form>
+      </Card>
+
+      {save.isSuccess && (
+        <Card intent="success">Name updated successfully</Card>
+      )}
+
+      {save.isError && (
+        <Card intent="error">
+          <ErrorFallback
+            title="Could not update character"
+            error={save.error}
+          />
+        </Card>
+      )}
+    </div>
+  );
 }
+
+const myCharacterQuery = graphql(`
+  query CharacterPage {
+    myCharacter {
+      id
+      name
+    }
+  }
+`);
+
+const updateCharacterNameMutation = graphql(`
+  mutation UpdateCharacterName($newName: String!) {
+    updateMyCharacterName(newName: $newName)
+  }
+`);
