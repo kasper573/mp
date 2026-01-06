@@ -14,6 +14,7 @@
   "dependencies": {
     "@mp/state": "workspace:*",
     "@mp/style": "workspace:*",
+    "@radix-ui/react-popover": "^1.1.15",
     "preact": "catalog:",
     "react-error-boundary": "6.0.0"
   },

@@ -148,7 +148,7 @@ export const sizes = {
 export const shadows = {
   none: "none",
   s: "0px 2px 4px rgba(0, 0, 0, 0.1)",
-  m: "0px 4px 8px rgba(0, 0, 0, 0.1)",
+  m: "3px 4px 13px 2px rgba(0, 0, 0, 0.3)",
 };
 
 export const fontFaces = {
