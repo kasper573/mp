@@ -264,6 +264,12 @@ services:
       - file-server-data:/data
       - file-server-config:/config
 
+  postfix:
+    env_file: *env_files
+    logging: *logging
+    image: boky/postfix:v4.3.0
+    restart: always
+
 volumes:
   grafana-data:
   loki-data:
