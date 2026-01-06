@@ -5,7 +5,7 @@ export const card = recipe({
     backgroundColor: "info.base",
     color: "info.face",
     borderRadius: "m",
-    padding: "m",
+    padding: "l",
   }),
   variants: {
     floating: {
