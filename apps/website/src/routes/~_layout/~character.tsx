@@ -5,6 +5,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { atoms } from "@mp/style";
 import { NavLink } from "../../integrations/router/nav-link";
+import type { ReactNode } from "preact/compat";
 
 export const Route = createFileRoute("/_layout/character")({
   component: AuthBoundary.wrap(CharacterPage),
@@ -19,17 +20,15 @@ function CharacterPage() {
 
   if (!query.data.myCharacter) {
     return (
-      <div>
+      <Container>
         You have no character. <NavLink to="/play">Start playing</NavLink> to
         create a character.
-      </div>
+      </Container>
     );
   }
 
   return (
-    <div style={{ maxWidth: 600 }} className={atoms({ mx: "l" })}>
-      <h1>Character</h1>
-
+    <Container>
       <Card className={atoms({ mb: "l" })}>
         <form
           onSubmit={(e) => {
@@ -63,6 +62,15 @@ function CharacterPage() {
           />
         </Card>
       )}
+    </Container>
+  );
+}
+
+function Container({ children }: { children?: ReactNode }) {
+  return (
+    <div style={{ maxWidth: 600 }} className={atoms({ mx: "l" })}>
+      <h1>Character</h1>
+      {children}
     </div>
   );
 }
