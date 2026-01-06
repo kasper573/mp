@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
@@ -20,7 +21,6 @@
     "@mp/gateway": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/auth": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/style": "workspace:*",

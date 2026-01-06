@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/event-router": "workspace:*",
@@ -28,7 +29,6 @@
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/auth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
     "@mp/redis": "workspace:*",
