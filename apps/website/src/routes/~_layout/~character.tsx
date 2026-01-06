@@ -35,13 +35,14 @@ function CharacterPage() {
             e.preventDefault();
             const newName = new FormData(e.currentTarget).get("name");
             if (newName) {
-              save.mutate({ newName: newName.toString() });
+              save.mutate({ input: { newName: newName.toString() } });
             }
           }}
         >
           <div>
             <label htmlFor="name">Name</label>
             <input name="name" defaultValue={query.data.myCharacter.name} />
+            {save.data?.updateMyCharacter.errors?.newName.join(", ")}
           </div>
 
           <Button type="submit" disabled={save.isPending}>
@@ -50,10 +51,11 @@ function CharacterPage() {
         </form>
       </Card>
 
-      {save.isSuccess && (
-        <Card intent="success">Name updated successfully</Card>
+      {save.isSuccess && !save.data.updateMyCharacter.errors && (
+        <Card intent="success">Changes has been saved</Card>
       )}
 
+      {/* Internal server error, just show in case something terrible happens */}
       {save.isError && (
         <Card intent="error">
           <ErrorFallback
@@ -85,7 +87,11 @@ const myCharacterQuery = graphql(`
 `);
 
 const updateCharacterNameMutation = graphql(`
-  mutation UpdateCharacterName($newName: String!) {
-    updateMyCharacterName(newName: $newName)
+  mutation UpdateCharacterName($input: UpdateMyCharacterInput!) {
+    updateMyCharacter(input: $input) {
+      errors {
+        newName
+      }
+    }
   }
 `);

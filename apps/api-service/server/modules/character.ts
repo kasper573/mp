@@ -5,6 +5,7 @@ import { auth, roles } from "../integrations/auth";
 import { assert, promiseFromResult } from "@mp/std";
 import type { CharacterId } from "@mp/game-shared";
 import { defaultSpawnPoint } from "./spawn-point";
+import type { FormUpdateResult } from "./form";
 
 /** @gqlQueryField */
 export async function characterList(ctx: ApiContext): Promise<Character[]> {
@@ -34,18 +35,41 @@ export async function myCharacter(ctx: ApiContext): Promise<Character | null> {
 }
 
 /** @gqlMutationField */
-export async function updateMyCharacterName(
-  newName: string,
+export async function updateMyCharacter(
+  input: UpdateMyCharacterInput,
   ctx: ApiContext,
-): Promise<boolean> {
+): Promise<FormUpdateResult<UpdateMyCharacterErrors>> {
   const char = assert(await myCharacter(ctx));
-  await promiseFromResult(
-    ctx.ioc.get(ctxDb).updateCharacterName({
-      characterId: char.id,
-      newName: newName.trim(),
-    }),
-  );
-  return true;
+
+  const res = await ctx.ioc.get(ctxDb).updateCharacter({
+    characterId: char.id,
+    newName: input.newName.trim(),
+  });
+
+  if (res.isErr()) {
+    if (res.error.type === "nameAlreadyTaken") {
+      return {
+        errors: {
+          newName: [`The name "${res.error.name}" is not available.`],
+        },
+      };
+    }
+
+    throw new Error("Could not update character", { cause: res.error.error });
+  }
+
+  return {};
+}
+
+/** @gqlInput */
+export interface UpdateMyCharacterInput {
+  newName: string;
+}
+
+/** @gqlType */
+export interface UpdateMyCharacterErrors {
+  /** @gqlField */
+  newName: string[];
 }
 
 /** @gqlType */

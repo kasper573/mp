@@ -11,7 +11,7 @@ import {
 } from "./procedures/select-item";
 import { selectOnlineCharacterList } from "./procedures/select-online-character-list";
 import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-character-id";
-import { updateCharacterName } from "./procedures/update-character-name";
+import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
@@ -38,7 +38,7 @@ export function createDbRepository(connectionString: string) {
     selectOnlineCharacterList: selectOnlineCharacterList.build(drizzle),
     selectOrCreateCharacterIdForUser:
       selectOrCreateCharacterIdForUser.build(drizzle),
-    updateCharacterName: updateCharacterName.build(drizzle),
+    updateCharacter: updateCharacter.build(drizzle),
     updateCharactersArea: updateCharactersArea.build(drizzle),
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
