@@ -9,6 +9,7 @@ import { Link } from "./link";
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { useQuery } from "@tanstack/react-query";
 import { env } from "../env";
+import { UserMenu } from "./user-menu";
 
 export default function AppBar() {
   const qb = useQueryBuilder();
@@ -47,15 +48,7 @@ export default function AppBar() {
       <div className={styles.right}>
         {versionCompatibility === "incompatible" ? <VersionNotice /> : null}
 
-        {auth.isSignedIn.value ? (
-          <Button role="link" onClick={() => void auth.signOutRedirect()}>
-            Sign out
-          </Button>
-        ) : (
-          <Button role="link" onClick={() => void auth.redirectToSignIn()}>
-            Sign in
-          </Button>
-        )}
+        <UserMenu />
       </div>
     </nav>
   );
