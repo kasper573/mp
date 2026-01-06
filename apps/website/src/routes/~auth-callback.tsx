@@ -1,4 +1,4 @@
-import type { AuthClient } from "@mp/oauth/client";
+import type { AuthClient } from "@mp/auth/client";
 import type { UseNavigateResult } from "@tanstack/react-router";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useContext, useEffect } from "preact/hooks";

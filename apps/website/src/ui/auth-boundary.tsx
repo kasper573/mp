@@ -1,4 +1,4 @@
-import type { RoleDefinition } from "@mp/oauth";
+import type { RoleDefinition } from "@mp/auth";
 import { useComputed } from "@mp/state/react";
 import type { ComponentChildren, ComponentType } from "preact";
 import { useContext } from "preact/hooks";

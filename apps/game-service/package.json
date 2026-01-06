@@ -28,7 +28,7 @@
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/oauth": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/rate-limiter": "workspace:*",
     "@mp/redis": "workspace:*",

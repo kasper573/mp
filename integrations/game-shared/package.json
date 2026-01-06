@@ -15,7 +15,7 @@
     "@mp/encoding": "workspace:*",
     "@mp/event-router": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/oauth": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/path-finding": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",

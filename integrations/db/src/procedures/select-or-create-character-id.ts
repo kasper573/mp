@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/oauth";
+import type { UserIdentity } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";

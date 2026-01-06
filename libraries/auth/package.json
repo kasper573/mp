@@ -1,5 +1,5 @@
 {
-  "name": "@mp/oauth",
+  "name": "@mp/auth",
   "version": "0.0.0",
   "type": "module",
   "private": true,

@@ -1,4 +1,4 @@
-import type { UserId } from "@mp/oauth";
+import type { UserId } from "@mp/auth";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import {
   boolean,

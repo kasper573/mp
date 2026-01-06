@@ -24,7 +24,7 @@
     "@mp/game-shared": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/oauth": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/std": "workspace:*",
     "drizzle-orm": "0.45.1",
     "pg": "8.16.3"

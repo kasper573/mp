@@ -1,5 +1,5 @@
-import type { UserIdentity } from "@mp/oauth";
-import { assertRoles, type RoleDefinition } from "@mp/oauth";
+import type { UserIdentity } from "@mp/auth";
+import { assertRoles, type RoleDefinition } from "@mp/auth";
 import type { ApiContext } from "../context";
 import { ctxAccessToken, ctxTokenResolver } from "../context";
 import { GraphQLError } from "graphql";

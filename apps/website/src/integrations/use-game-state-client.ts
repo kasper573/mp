@@ -8,7 +8,7 @@ import type { GameServerEventRouter } from "@mp/game-service";
 import { eventMessageEncoding } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
-import type { AuthClient } from "@mp/oauth/client";
+import type { AuthClient } from "@mp/auth/client";
 import { WebSocket } from "@mp/ws/client";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { env } from "../env";

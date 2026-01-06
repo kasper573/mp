@@ -1,4 +1,4 @@
-import { type RoleDefinition, assertRoles } from "@mp/oauth";
+import { type RoleDefinition, assertRoles } from "@mp/auth";
 import { ctxUserSession } from "../context";
 import { evt } from "./event-router";
 

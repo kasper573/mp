@@ -26,7 +26,7 @@
     "@mp/ioc": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/oauth": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",

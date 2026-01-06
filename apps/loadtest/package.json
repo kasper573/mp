@@ -16,7 +16,7 @@
     "@mp/game-shared": "workspace:*",
     "@mp/gateway": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/oauth": "workspace:*",
+    "@mp/auth": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/time": "workspace:*",

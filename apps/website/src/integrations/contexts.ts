@@ -1,5 +1,5 @@
 import type { Logger } from "@mp/logger";
-import type { AuthClient } from "@mp/oauth/client";
+import type { AuthClient } from "@mp/auth/client";
 import { createContext } from "preact";
 
 export const LoggerContext = createContext(

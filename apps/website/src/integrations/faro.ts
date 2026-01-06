@@ -1,4 +1,4 @@
-import type { UserIdentity } from "@mp/oauth";
+import type { UserIdentity } from "@mp/auth";
 import type { ReadonlySignal } from "@mp/state";
 import type { Faro, FaroUser } from "@mp/telemetry/faro";
 
