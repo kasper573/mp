@@ -38,6 +38,7 @@ export const changeGameService = evt.event
           actorModels,
           characterId: input.characterId,
           newAreaId: currentArea.id,
+          newCoords: currentArea.start,
         })
         .then((result) => {
           if (result.isOk()) {
@@ -46,7 +47,6 @@ export const changeGameService = evt.event
               "Character joined game service via gateway broadcast",
             );
             const character = result.value;
-            character.movement.coords = currentArea.start;
             state.actors.set(input.characterId, character);
             server.markToResendFullState(input.characterId);
           } else {

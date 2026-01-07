@@ -4,22 +4,25 @@ import { characterTable } from "../schema";
 import { characterFromDbFields } from "../utils/transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
 import { procedure } from "../utils/procedure";
+import type { Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
 
 export const updateCharactersArea = procedure()
   .input<{
     actorModels: ActorModelLookup;
     characterId: CharacterId;
     newAreaId: AreaId;
+    newCoords: Vector<Tile>;
   }>()
   .query(
     async (
       drizzle,
-      { actorModels, characterId, newAreaId },
+      { actorModels, characterId, newAreaId, newCoords },
     ): Promise<Character> => {
       const result = await drizzle.transaction(async (tx) => {
         await tx
           .update(characterTable)
-          .set({ areaId: newAreaId })
+          .set({ areaId: newAreaId, coords: newCoords })
           .where(eq(characterTable.id, characterId));
 
         return tx
