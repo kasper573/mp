@@ -11,10 +11,12 @@ export function accessCharacter(
   const state = ctx.get(ctxGameState);
   const character = state.actors.get(characterId) as Character | undefined;
   if (!character) {
-    throw new Error("Unknown character");
+    throw new Error(`Character "${characterId}" not found in game state`);
   }
   if (session.character?.id !== characterId) {
-    throw new Error("User does not have access to character");
+    throw new Error(
+      `User "${session.user?.id}" does not have access to character "${characterId}"`,
+    );
   }
   return character;
 }
