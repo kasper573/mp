@@ -92,29 +92,48 @@ function applyPatchOptimized(
   events: EventAccessFn<GameStateEvents>,
 ): void {
   for (const op of patch) {
-    if (
-      op.type === PatchOperationType.EntityUpdate &&
-      op.entityName === "actors"
-    ) {
-      for (const [entityId, actorUpdate] of op.changes) {
-        const localActor = gameState[op.entityName].get(entityId as ActorId);
-        if (!localActor) {
-          continue;
-        }
-        for (const key of typedKeys(actorUpdate.movement ?? [])) {
-          if (
-            !shouldApplyMovementUpdate(localActor, actorUpdate, key, events)
-          ) {
-            delete actorUpdate.movement[key];
+    if (op.type === PatchOperationType.EntityUpdate) {
+      if (op.entityName === "actors") {
+        // Apply movement optimization for actors
+        for (const [entityId, actorUpdate] of op.changes) {
+          const localActor = gameState[op.entityName].get(entityId as ActorId);
+          if (!localActor) {
+            continue;
+          }
+          for (const key of typedKeys(actorUpdate.movement ?? [])) {
+            if (
+              !shouldApplyMovementUpdate(localActor, actorUpdate, key, events)
+            ) {
+              delete actorUpdate.movement[key];
+            }
           }
         }
       }
-    }
 
-    gameState[op.entityName as keyof GameState].applyOperation(
-      // oxlint-disable-next-line no-explicit-any
-      op as Operation<any, any, any>,
-    );
+      // Filter out updates for entities that don't exist (all entity types)
+      // This can happen when switching areas rapidly and receiving stale patches
+      const filteredChanges = op.changes.filter(([entityId]) =>
+        gameState[op.entityName as keyof GameState].has(entityId as never),
+      );
+
+      // Skip the operation if all updates were filtered out
+      if (filteredChanges.length === 0) {
+        continue;
+      }
+
+      // Apply the operation with filtered changes
+      gameState[op.entityName as keyof GameState].applyOperation({
+        ...op,
+        changes: filteredChanges,
+        // oxlint-disable-next-line no-explicit-any
+      } as Operation<any, any, any>);
+    } else {
+      // Apply non-update operations as-is
+      gameState[op.entityName as keyof GameState].applyOperation(
+        // oxlint-disable-next-line no-explicit-any
+        op as Operation<any, any, any>,
+      );
+    }
   }
 }
 
