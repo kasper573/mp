@@ -21,7 +21,9 @@ export function SpectatorClient(props: SpectatorClientProps) {
         signal={props.stateClient.characterId}
       />
 
-      <Suspense fallback={<LoadingSpinner debugId="SpectatorClient" />}>
+      <Suspense
+        fallback={<LoadingSpinner debugDescription="SpectatorClient" />}
+      >
         <GameClient enableUi={false} {...props} />
       </Suspense>
     </>

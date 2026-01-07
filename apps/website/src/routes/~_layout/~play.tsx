@@ -40,7 +40,7 @@ function PlayPage() {
   // all the way up to the routers pending component, which would unmount the page,
   // which in turn would stop the game client.
   return (
-    <Suspense fallback={<LoadingSpinner debugId="PlayPage" />}>
+    <Suspense fallback={<LoadingSpinner debugDescription="~play.tsx" />}>
       <GameAssetLoaderContext.Provider value={gameAssetLoader}>
         <GameClient
           stateClient={stateClient}

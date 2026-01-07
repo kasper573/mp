@@ -40,7 +40,7 @@ function Root() {
         }}
       >
         <ErrorBoundary FallbackComponent={ErrorFallback}>
-          <Suspense fallback={<LoadingSpinner debugId="main" />}>
+          <Suspense fallback={<LoadingSpinner debugDescription="main.tsx" />}>
             <App />
           </Suspense>
         </ErrorBoundary>

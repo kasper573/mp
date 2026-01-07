@@ -17,15 +17,28 @@ export interface GameClientProps {
  * can focus on the data fetching and state management.
  */
 export function GameClient(props: GameClientProps) {
-  const areaId = props.stateClient.areaId.value;
-
   if (!props.stateClient.isConnected.value) {
-    return <LoadingSpinner>Connecting to game server</LoadingSpinner>;
+    return (
+      <LoadingSpinner debugDescription="GameStateClient not connected">
+        Connecting to gateway
+      </LoadingSpinner>
+    );
   }
 
+  if (!props.stateClient.isGameReady.value) {
+    return (
+      <LoadingSpinner debugDescription="isGameReady false">
+        Connecting to game service
+      </LoadingSpinner>
+    );
+  }
+
+  const areaId = props.stateClient.areaId.value;
   if (!areaId) {
     return (
-      <LoadingSpinner debugId="areaId-unavailable">Loading area</LoadingSpinner>
+      <LoadingSpinner debugDescription="areaId unavailable">
+        Loading area
+      </LoadingSpinner>
     );
   }
 

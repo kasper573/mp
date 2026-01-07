@@ -10,15 +10,15 @@ export type LoadingSpinnerProps =
   // If no children are provided we must provide a debug id so that
   // it's easy to see where the loading spinner comes from in development
   // Debug id will not be displayed in production
-  | { debugId: string };
+  | { debugDescription: string };
 
 export function LoadingSpinner(props: LoadingSpinnerProps) {
   const children =
     "children" in props ? <div>{props.children ?? <>&nbsp</>}</div> : undefined;
 
-  const debugId =
-    "debugId" in props && showDebugIds ? (
-      <div>LoadingSpinner debugId: {props.debugId}</div>
+  const debugDescription =
+    "debugDescription" in props && showDebugIds ? (
+      <div>LoadingSpinner debugId: {props.debugDescription}</div>
     ) : undefined;
 
   return (
@@ -31,7 +31,7 @@ export function LoadingSpinner(props: LoadingSpinnerProps) {
           <div className={dot4} />
         </div>
         {children}
-        {debugId}
+        {debugDescription}
       </div>
     </Dock>
   );

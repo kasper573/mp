@@ -38,8 +38,18 @@ export class GameStateClient {
   readonly areaId = computed(
     () => this.gameState.globals.get("instance")?.areaId,
   );
-  readonly readyState: Signal<WebSocket["readyState"]>;
+  readonly socketReadyState: Signal<WebSocket["readyState"]>;
+
+  /**
+   * Is true while connected to the gateway.
+   */
   readonly isConnected: ReadonlySignal<boolean>;
+
+  /**
+   * Is true while connected to the gateway and a game service
+   * has claimed the character this client is controlling.
+   */
+  readonly isGameReady = computed(() => !!this.areaId.value);
 
   // Derived state
   readonly actorList: ReadonlySignal<readonly Actor[]>;
@@ -48,10 +58,12 @@ export class GameStateClient {
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
-    this.readyState = signal<WebSocket["readyState"]>(
+    this.socketReadyState = signal<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
-    this.isConnected = computed(() => this.readyState.value === WebSocket.OPEN);
+    this.isConnected = computed(
+      () => this.socketReadyState.value === WebSocket.OPEN,
+    );
 
     this.actions = new GameActions(this.options.eventClient, this.characterId);
 
@@ -81,7 +93,7 @@ export class GameStateClient {
 
     const subscriptions = [
       subscribeToReadyState(socket, (readyState) => {
-        this.readyState.value = readyState;
+        this.socketReadyState.value = readyState;
       }),
     ];
 

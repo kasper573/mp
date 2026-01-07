@@ -57,7 +57,7 @@ function RouteComponent() {
         flex: 1,
       }}
     >
-      <Suspense fallback={<LoadingSpinner debugId="admin.spectator" />}>
+      <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <SpectatorClient
             characterOptions={characterOptions.data ?? []}

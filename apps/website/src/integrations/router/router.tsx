@@ -8,7 +8,7 @@ export function createClientRouter() {
     routeTree,
     defaultPreload: "intent",
     defaultPendingComponent: () => (
-      <LoadingSpinner debugId="router.defaultPendingComponent" />
+      <LoadingSpinner debugDescription="router.defaultPendingComponent" />
     ),
     defaultNotFoundComponent: PageNotFound,
     defaultErrorComponent: ErrorFallback,

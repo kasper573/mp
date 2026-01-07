@@ -17,7 +17,7 @@ export default function Layout(props: { children?: ComponentChildren }) {
         }}
       >
         <ErrorBoundary FallbackComponent={ErrorFallback}>
-          <Suspense fallback={<LoadingSpinner debugId="Layout" />}>
+          <Suspense fallback={<LoadingSpinner debugDescription="Layout" />}>
             {props.children}
           </Suspense>
         </ErrorBoundary>
