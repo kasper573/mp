@@ -1,8 +1,9 @@
+import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
-import { Suspense } from "preact/compat";
-import { GameRenderer } from "./game-renderer";
 import type { GameStateClient } from "./game-state-client";
+import { GameRenderer } from "./game-renderer";
+import { PendingQueriesDescription } from "./pending-queries-description";
 
 export interface GameClientProps {
   stateClient: GameStateClient;
@@ -43,7 +44,13 @@ export function GameClient(props: GameClientProps) {
   }
 
   return (
-    <Suspense fallback={<LoadingSpinner>Loading renderer</LoadingSpinner>}>
+    <Suspense
+      fallback={
+        <LoadingSpinner>
+          Loading assets: <PendingQueriesDescription />
+        </LoadingSpinner>
+      }
+    >
       <GameRenderer
         interactive={props.interactive}
         gameStateClient={props.stateClient}

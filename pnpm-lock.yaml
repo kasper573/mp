@@ -602,6 +602,9 @@ importers:
       uniqolor:
         specifier: 1.1.1
         version: 1.1.1
+      unique-names-generator:
+        specifier: ^4.7.1
+        version: 4.7.1
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -5625,6 +5628,10 @@ packages:
   uniqolor@1.1.1:
     resolution: {integrity: sha512-HUwezlXCwm5bzsEXW7AP7ybezH13uWENRgYT+3dOdhJPvpYucSqvIGckMiLn+Uy2j0NVf3fPp43uZ4aun3t4Ww==}
 
+  unique-names-generator@4.7.1:
+    resolution: {integrity: sha512-lMx9dX+KRmG8sq6gulYYpKWZc9RlGsgBR6aoO8Qsm3qvkSJ+3rAymr+TnV8EDMrIrwuFJ4kruzMWM/OpYzPoow==}
+    engines: {node: '>=8'}
+
   universalify@0.2.0:
     resolution: {integrity: sha512-CJ1QgKmNg3CwvAv/kOFmtnEN05f0D/cn9QntgNOQlQF9dgvVTHj3t+8JPdjqawCHk7V/KA+fbUqzZ9XWhcqPUg==}
     engines: {node: '>= 4.0.0'}
@@ -10412,6 +10419,8 @@ snapshots:
   unicorn-magic@0.3.0: {}
 
   uniqolor@1.1.1: {}
+
+  unique-names-generator@4.7.1: {}
 
   universalify@0.2.0:
     optional: true
