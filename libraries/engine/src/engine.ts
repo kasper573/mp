@@ -3,12 +3,10 @@ import type { Pixel } from "@mp/std";
 import { Camera } from "./camera";
 import { PointerForCamera } from "./pointer";
 import { Keyboard } from "./keyboard";
-import { FrameEmitter } from "./frame-emitter";
 
 export class Engine {
   #isInteractive = false;
   #viewportSizeObserver?: ResizeObserver;
-  frameEmitter = new FrameEmitter();
   pointer: PointerForCamera;
   keyboard: Keyboard;
 
@@ -30,7 +28,6 @@ export class Engine {
       this.pointer.start();
       this.keyboard.start();
     }
-    this.frameEmitter.start();
     this.#viewportSizeObserver = new ResizeObserver(this.onViewportResized);
     this.#viewportSizeObserver.observe(this.viewport);
 
@@ -41,7 +38,6 @@ export class Engine {
   stop = () => {
     this.pointer.stop();
     this.keyboard.stop();
-    this.frameEmitter.stop();
     this.#viewportSizeObserver?.disconnect();
     this.#viewportSizeObserver = undefined;
   };

@@ -37,6 +37,7 @@ export function useGraphics(
         roundPixels: true,
         canvas,
         resizeTo: container,
+        sharedTicker: true,
       })
       .then(() => {
         adjustCanvasSize(app);

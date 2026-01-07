@@ -1,8 +1,10 @@
-import { FrameEmitter, Spring } from "@mp/engine";
+import { Spring } from "@mp/engine";
+import { Ticker } from "@mp/graphics";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import { Range } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo } from "preact/hooks";
+import { TimeSpan } from "@mp/time";
 
 export const Route = createFileRoute("/_layout/admin/devtools/spring-tester")({
   component: RouteComponent,
@@ -16,7 +18,6 @@ function RouteComponent() {
   const precision = useSignal(1);
   const target = useSignal(0);
 
-  const frameEmitter = useMemo(() => new FrameEmitter(), []);
   const spring = useMemo(
     () =>
       new Spring(target, () => ({
@@ -29,15 +30,16 @@ function RouteComponent() {
   );
 
   useEffect(() => {
-    const unsub = frameEmitter.subscribe((opt) =>
-      spring.update(opt.timeSinceLastFrame),
-    );
-    frameEmitter.start();
+    function update() {
+      spring.update(TimeSpan.fromMilliseconds(Ticker.shared.deltaMS));
+    }
+    Ticker.shared.add(update);
+    Ticker.shared.start();
     return () => {
-      unsub();
-      frameEmitter.stop();
+      Ticker.shared.remove(update);
+      Ticker.shared.stop();
     };
-  }, [frameEmitter, spring]);
+  }, [spring]);
 
   function flipSpringTarget() {
     target.value = target.value ? 0 : 100;

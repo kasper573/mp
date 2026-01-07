@@ -25,6 +25,7 @@ import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
 import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
+import { TimeSpan } from "@mp/time";
 
 interface GameRendererProps {
   interactive: boolean;
@@ -117,9 +118,16 @@ function buildStage(
   },
 ) {
   const engine = new Engine(app.canvas);
+
+  function emitTickToGameState() {
+    opt.gameStateClient.gameState.frameCallback(
+      TimeSpan.fromMilliseconds(app.ticker.deltaMS),
+    );
+  }
+
+  app.ticker.add(emitTickToGameState);
   const subscriptions = [
     engine.start(opt.interactive),
-    engine.frameEmitter.subscribe(opt.gameStateClient.gameState.frameCallback),
     engine.keyboard.on(
       "keydown",
       "F2",
@@ -136,6 +144,7 @@ function buildStage(
   });
   app.stage.addChild(areaScene);
   return function cleanup() {
+    app.ticker.remove(emitTickToGameState);
     app.stage.removeChildren();
     areaScene.destroy({ children: true });
     for (const unsubscribe of subscriptions) {

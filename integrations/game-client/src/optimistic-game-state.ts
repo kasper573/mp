@@ -1,5 +1,4 @@
 // oxlint-disable max-depth
-import type { FrameCallbackOptions } from "@mp/engine";
 import type { GameStateEvents } from "@mp/game-service";
 import type { Actor, MovementTrait } from "@mp/game-shared";
 import { moveAlongPath, type ActorId, type GameState } from "@mp/game-shared";
@@ -23,14 +22,14 @@ export class OptimisticGameState implements GameState {
 
   constructor(private settings: () => OptimisticGameStateSettings) {}
 
-  frameCallback = (opt: FrameCallbackOptions) => {
+  frameCallback = (timeSinceLastFrame: TimeSpan) => {
     if (!this.settings().useInterpolator) {
       return;
     }
 
     for (const actor of this.actors.values()) {
       if (actor.movement.path && actor.combat.health > 0) {
-        moveAlongPath(actor.movement, opt.timeSinceLastFrame);
+        moveAlongPath(actor.movement, timeSinceLastFrame);
 
         // Face the direction the actor is moving towards
         const target = actor.movement.path?.[0];
