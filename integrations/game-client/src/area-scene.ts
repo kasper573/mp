@@ -169,7 +169,7 @@ export class AreaScene extends Container {
   );
 
   #onRender = () => {
-    this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.deltaMS));
+    this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.elapsedMS));
     this.options.engine.camera.update(
       this.options.area.tiled.mapSize,
       this.cameraZoom.value,

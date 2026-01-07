@@ -1,6 +1,6 @@
 import { useEffect } from "preact/hooks";
 import type { ApplicationOptions } from "@mp/graphics";
-import { Application } from "@mp/graphics";
+import { Application, Ticker } from "@mp/graphics";
 import { useSignal } from "@mp/state/react";
 import type { ReadonlySignal } from "@mp/state";
 
@@ -39,6 +39,10 @@ export function useGraphics(
         resizeTo: container,
       })
       .then(() => {
+        // Ensure Ticker.shared speed is always 1 to prevent animation speed issues
+        // Some browsers or systems may incorrectly initialize this value
+        Ticker.shared.speed = 1;
+        
         adjustCanvasSize(app);
         appSignal.value = app;
       });
