@@ -19,6 +19,7 @@ export const characterRoles = defineRoles("character", [
   "attack",
   "kill",
   "respawn",
+  "recall",
 ]);
 
 export const npcRoles = defineRoles("npc", ["spawnRandom"]);
@@ -29,6 +30,7 @@ export const playerRoles = [
   characterRoles.move,
   characterRoles.attack,
   characterRoles.respawn,
+  characterRoles.recall,
   gatewayRoles.join,
 ];
 

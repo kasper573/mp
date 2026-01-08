@@ -1,20 +1,22 @@
 import { PropertySignal, StorageSignal } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { CheckboxState } from "@mp/ui";
-import { Checkbox } from "@mp/ui";
+import { Button, Checkbox } from "@mp/ui";
 
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useEffect } from "preact/hooks";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
+import type { GameStateClient } from "@mp/game-client";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
-export function MiscDebugUi() {
+export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
   const qb = useQueryBuilder();
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
   const { data } = useQuery(qb.queryOptions(serverSettings));
+
   return (
     <>
       <div>Client version: {env.version}</div>
@@ -42,6 +44,8 @@ export function MiscDebugUi() {
           signal={new PropertySignal(miscDebugSettings, "useInterpolator")}
         />
       </label>
+      <br />
+      <Button onClick={() => stateClient.actions.recall()}>Recall</Button>
     </>
   );
 }
