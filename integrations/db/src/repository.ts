@@ -15,8 +15,10 @@ import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
-import type { SyncGameStateOptions } from "./utils/sync-game-state";
-import { createGameStateSyncFactory } from "./utils/sync-game-state";
+import {
+  GameStateSync,
+  type GameStateSyncOptions,
+} from "./utils/sync-game-state";
 
 /**
  * All database interactions must be done through the repository.
@@ -43,7 +45,8 @@ export function createDbRepository(connectionString: string) {
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
-    gameState: createGameStateSyncFactory(drizzle),
+    gameStateFor: (opt: GameStateSyncOptions) =>
+      new GameStateSync(drizzle, opt),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
@@ -56,6 +59,6 @@ export function createDbRepository(connectionString: string) {
   };
 }
 
-export type { SyncGameStateOptions };
+export type { GameStateSyncOptions as SyncGameStateOptions };
 
 export type DbRepository = ReturnType<typeof createDbRepository>;

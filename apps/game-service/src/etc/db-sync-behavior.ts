@@ -26,7 +26,7 @@ export function startDbSyncSession({
   };
 
   const session = startAsyncInterval(async () => {
-    const result = await db.gameState.for(opt).sync();
+    const result = await db.gameStateFor(opt).sync();
     if (result.isErr()) {
       opt.logger.error(result.error, "game state db sync save error");
     }
@@ -35,19 +35,21 @@ export function startDbSyncSession({
   return {
     stop: () => session.stop(),
     save(characterId) {
-      db.gameState
-        .for({ ...opt, characterId })
-        .save()
-        .catch((res) => {
-          opt.logger.error(res, "game state db sync save error");
+      db.gameStateFor(opt)
+        .saveOne(characterId)
+        .then((res) => {
+          if (res.isErr()) {
+            opt.logger.error(res.error, "game state db sync save error");
+          }
         });
     },
     load(characterId) {
-      db.gameState
-        .for({ ...opt, characterId })
-        .load()
-        .catch((res) => {
-          opt.logger.error(res, "game state db sync load error");
+      db.gameStateFor(opt)
+        .loadOne(characterId)
+        .then((res) => {
+          if (res.isErr()) {
+            opt.logger.error(res.error, "game state db sync save error");
+          }
         });
     },
   };
