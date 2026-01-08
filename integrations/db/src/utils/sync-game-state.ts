@@ -1,31 +1,32 @@
 import type {
-  AreaResource,
   GameState,
   ActorModelLookup,
   ItemInstanceId,
   ItemInstance,
   Character,
   InventoryId,
+  AreaId,
 } from "@mp/game-shared";
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import { assert, ResultAsync } from "@mp/std";
-import { inArray, and, eq } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import {
   characterTable,
   consumableInstanceTable,
   equipmentInstanceTable,
 } from "../schema";
 import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
-import type { CharacterId, AreaId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
 
 export interface GameStateSyncOptions {
-  area: AreaResource;
+  areaId: AreaId;
   state: GameState;
   actorModels: ActorModelLookup;
   logger: Logger;
   markToResendFullState: (characterId: CharacterId) => void;
+  getOnlineCharacterIds: () => CharacterId[];
 }
 
 /**
@@ -70,7 +71,11 @@ async function loadGameStateForAllCharacters(
   drizzle: DrizzleClient,
   opt: GameStateSyncOptions,
 ) {
-  const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, opt.area.id);
+  const dbIds = await getOnlineCharacterIdsForArea(
+    drizzle,
+    opt.areaId,
+    opt.getOnlineCharacterIds(),
+  );
   const stateIds = characterIdsInState(opt.state);
   const removedIds = stateIds.difference(dbIds);
   const addedIds = dbIds.difference(stateIds);
@@ -96,8 +101,9 @@ async function loadGameStateForOneCharacter(
 ) {
   const dbCharacter = await getCharacterDataIfOnlineInArea(
     drizzle,
-    opt.area.id,
+    opt.areaId,
     forCharacterId,
+    opt.getOnlineCharacterIds(),
   );
 
   if (!dbCharacter) {
@@ -276,9 +282,10 @@ function upsertItemInstancesInGameState(
   }
 }
 
-async function getOnlineCharacterIdsForAreaFromDb(
+async function getOnlineCharacterIdsForArea(
   drizzle: DrizzleClient,
   areaId: AreaId,
+  onlineCharacterIds: CharacterId[],
 ): Promise<ReadonlySet<CharacterId>> {
   return new Set(
     (
@@ -288,7 +295,7 @@ async function getOnlineCharacterIdsForAreaFromDb(
         .where(
           and(
             eq(characterTable.areaId, areaId),
-            eq(characterTable.online, true),
+            inArray(characterTable.id, onlineCharacterIds),
           ),
         )
     ).map((row) => row.id),
@@ -299,7 +306,12 @@ async function getCharacterDataIfOnlineInArea(
   drizzle: DrizzleClient,
   areaId: AreaId,
   characterId: CharacterId,
+  onlineCharacterIds: CharacterId[],
 ) {
+  if (!onlineCharacterIds.includes(characterId)) {
+    return;
+  }
+
   const res = await drizzle
     .select()
     .from(characterTable)
@@ -307,7 +319,6 @@ async function getCharacterDataIfOnlineInArea(
       and(
         eq(characterTable.areaId, areaId),
         eq(characterTable.id, characterId),
-        eq(characterTable.online, true),
       ),
     )
     .limit(1);

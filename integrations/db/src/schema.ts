@@ -1,13 +1,6 @@
 import type { UserId } from "@mp/auth";
 import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
-import {
-  boolean,
-  integer,
-  pgTable,
-  real,
-  uuid,
-  varchar,
-} from "drizzle-orm/pg-core";
+import { integer, pgTable, real, uuid, varchar } from "drizzle-orm/pg-core";
 import type {
   ActorModelId,
   AreaId,
@@ -99,7 +92,6 @@ export const characterTable = pgTable("character", {
     .notNull()
     .references(() => actorModelTable.id),
   name: varchar({ length: 64 }).unique().notNull(),
-  online: boolean().notNull().default(false),
   xp: real().notNull(),
   inventoryId: shortId<InventoryId>()
     .notNull()

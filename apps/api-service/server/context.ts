@@ -1,10 +1,10 @@
 import type { DbRepository } from "@mp/db";
-import type { GameServiceConfig } from "@mp/game-shared";
+import type { CharacterId, GameServiceConfig } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import { InjectionContext } from "@mp/ioc";
 import type { AccessToken } from "@mp/auth";
 import type { TokenResolver } from "@mp/auth/server";
-import type { Signal } from "@mp/state";
+import type { ReadonlySignal, Signal } from "@mp/state";
 import type { FileResolver } from "./integrations/file-resolver";
 import type { Logger } from "@mp/logger";
 
@@ -14,6 +14,11 @@ export const ctxGameServiceConfig =
   InjectionContext.new<Signal<GameServiceConfig>>("gameServiceConfig");
 
 export const ctxDb = InjectionContext.new<DbRepository>("db");
+
+export const ctxOnlineCharacterIds =
+  InjectionContext.new<ReadonlySignal<readonly CharacterId[]>>(
+    "onlineCharacterIds",
+  );
 
 export const ctxFileResolver =
   InjectionContext.new<FileResolver>("fileResolver");

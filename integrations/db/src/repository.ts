@@ -9,11 +9,10 @@ import {
   selectConsumableDefinition,
   selectEquipmentDefinition,
 } from "./procedures/select-item";
-import { selectOnlineCharacterList } from "./procedures/select-online-character-list";
+import { selectCharacterList } from "./procedures/select-character-list";
 import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-character-id";
 import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
-import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
 import {
   GameStateSync,
@@ -37,12 +36,11 @@ export function createDbRepository(connectionString: string) {
     selectCharacterByUser: selectCharacterByUser.build(drizzle),
     selectConsumableDefinition: selectConsumableDefinition.build(drizzle),
     selectEquipmentDefinition: selectEquipmentDefinition.build(drizzle),
-    selectOnlineCharacterList: selectOnlineCharacterList.build(drizzle),
+    selectCharacterList: selectCharacterList.build(drizzle),
     selectOrCreateCharacterIdForUser:
       selectOrCreateCharacterIdForUser.build(drizzle),
     updateCharacter: updateCharacter.build(drizzle),
     updateCharactersArea: updateCharactersArea.build(drizzle),
-    updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
     gameStateFor: (opt: GameStateSyncOptions) =>

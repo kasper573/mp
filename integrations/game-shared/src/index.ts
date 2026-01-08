@@ -6,7 +6,7 @@ export * from "./client-view-distance-settings";
 export * from "./combat";
 export * from "./encoder-extensions";
 export * from "./encoding";
-export * from "./game-service-config";
+export * from "./redis";
 export * from "./game-state";
 export * from "./graph-from-tiled";
 export * from "./hit-test-tiled-object";

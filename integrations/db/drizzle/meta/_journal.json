@@ -15,6 +15,13 @@
       "when": 1767724222485,
       "tag": "0001_keen_zeigeist",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1767910492558,
+      "tag": "0002_fuzzy_pepper_potts",
+      "breakpoints": true
     }
   ]
 }

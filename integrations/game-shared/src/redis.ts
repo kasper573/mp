@@ -7,3 +7,5 @@ export const GameServiceConfig = type({
 });
 
 export type GameServiceConfig = typeof GameServiceConfig.infer;
+
+export const onlineCharacterIdsRedisKey = "online-character-ids";

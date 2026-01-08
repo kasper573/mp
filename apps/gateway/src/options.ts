@@ -28,6 +28,7 @@ export const serverOptionsSchema = type({
     pretty: boolish().optional(),
   },
   databaseConnectionString: "string",
+  redisPath: "string",
   /**
    * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.
    */
