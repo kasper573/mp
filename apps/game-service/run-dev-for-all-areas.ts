@@ -10,7 +10,6 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 const areaIds = await getAreaIds();
 
 await Promise.all(areaIds.map(runDevInstance));
-//runDevInstance("island" as AreaId);
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fs.readdir(
