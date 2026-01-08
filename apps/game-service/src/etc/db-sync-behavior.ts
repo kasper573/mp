@@ -4,33 +4,53 @@ import { startAsyncInterval, TimeSpan } from "@mp/time";
 import type { GameStateServer } from "./game-state-server";
 import type { CharacterId } from "@mp/game-shared";
 
+export type StartDbSyncSession = Omit<
+  SyncGameStateOptions,
+  "markToResendFullState"
+> & {
+  db: DbRepository;
+  server: GameStateServer;
+};
+
 /**
  * Starts a database synchronization session that periodically syncs the game state to and from the database.
  */
-export function startDbSyncSession(
-  opt: Omit<SyncGameStateOptions, "markToResendFullState"> & {
-    db: DbRepository;
-    server: GameStateServer;
-  },
-): DbSyncSession {
+export function startDbSyncSession({
+  db,
+  server,
+  ...baseOpt
+}: StartDbSyncSession): DbSyncSession {
+  const opt: SyncGameStateOptions = {
+    ...baseOpt,
+    markToResendFullState: (id) => server.markToResendFullState(id),
+  };
+
   const session = startAsyncInterval(async () => {
-    const result = await opt.db.syncGameState({
-      ...opt,
-      markToResendFullState: (id) => opt.server.markToResendFullState(id),
-    });
+    const result = await db.gameStateFor(opt).sync();
     if (result.isErr()) {
       opt.logger.error(result.error, "game state db sync save error");
     }
   }, syncInterval);
 
   return {
-    stop() {
-      session.stop();
+    stop: () => session.stop(),
+    save(characterId) {
+      db.gameStateFor(opt)
+        .saveOne(characterId)
+        .then((res) => {
+          if (res.isErr()) {
+            opt.logger.error(res.error, "game state db sync save error");
+          }
+        });
     },
-    flush() {
-      // NOTE the character param is currently unused,
-      // but exists for future proofing where we may want to optimize what to flush.
-      void session.flush();
+    load(characterId) {
+      db.gameStateFor(opt)
+        .loadOne(characterId)
+        .then((res) => {
+          if (res.isErr()) {
+            opt.logger.error(res.error, "game state db sync save error");
+          }
+        });
     },
   };
 }
@@ -38,10 +58,13 @@ export function startDbSyncSession(
 export interface DbSyncSession {
   stop(): void;
   /**
-   * Forcefully flushes any pending sync operations to the database.
-   * @param character Only flush data related to this character. If omitted, flushes all pending data.
+   * Forcefully saves the game state for the given character immediately
    */
-  flush(characterId?: CharacterId): void;
+  save(characterId: CharacterId): void;
+  /**
+   * Forcefully loads the game state for the given character immediately
+   */
+  load(characterId: CharacterId): void;
 }
 
 const syncInterval = TimeSpan.fromSeconds(5);

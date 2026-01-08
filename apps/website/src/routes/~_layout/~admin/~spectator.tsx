@@ -62,7 +62,7 @@ function RouteComponent() {
           <SpectatorClient
             characterOptions={characterOptions.data ?? []}
             stateClient={stateClient}
-            additionalDebugUi={<MiscDebugUi />}
+            additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
             interactive={false}
           />
         </GameAssetLoaderContext.Provider>

@@ -32,4 +32,8 @@ export class GameActions {
   respawn() {
     return this.events.character.respawn(assert(this.characterId.value));
   }
+
+  recall() {
+    return this.events.character.recall(assert(this.characterId.value));
+  }
 }

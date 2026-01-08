@@ -44,7 +44,7 @@ function PlayPage() {
       <GameAssetLoaderContext.Provider value={gameAssetLoader}>
         <GameClient
           stateClient={stateClient}
-          additionalDebugUi={<MiscDebugUi />}
+          additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
           interactive
         />
       </GameAssetLoaderContext.Provider>
