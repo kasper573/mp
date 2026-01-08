@@ -222,6 +222,15 @@ services:
     logging: *logging
     image: prom/node-exporter:v1.8.2
 
+  postgres_exporter:
+    env_file: *env_files
+    logging: *logging
+    image: prometheuscommunity/postgres-exporter:v0.18.1
+    environment:
+      DATA_SOURCE_URI: postgres:5432/postgres?sslmode=disable
+    depends_on:
+      - postgres
+
   grafana:
     env_file: *env_files
     logging: *logging
