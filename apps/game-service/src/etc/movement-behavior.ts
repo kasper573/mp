@@ -98,11 +98,14 @@ export function sendCharacterToArea(
     })
     .then((res) => {
       if (res.isErr()) {
-        ioc.get(ctxLogger).error(
-          new Error("Failed to update character area", {
-            cause: res.error.error,
-          }),
-        );
+        ioc
+          .get(ctxLogger)
+          .error(
+            new Error(
+              `Could not send character "${characterId}" to area "${destinationAreaId}:${destinationCoords.x}${destinationCoords.y}"`,
+              { cause: res.error.error },
+            ),
+          );
         return;
       }
 
