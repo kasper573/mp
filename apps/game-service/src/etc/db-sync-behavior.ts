@@ -2,7 +2,7 @@ import type { DbRepository } from "@mp/db";
 import type { SyncGameStateOptions } from "@mp/db";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
 import type { GameStateServer } from "./game-state-server";
-import type { Character } from "@mp/game-shared";
+import type { CharacterId } from "@mp/game-shared";
 
 /**
  * Starts a database synchronization session that periodically syncs the game state to and from the database.
@@ -41,7 +41,7 @@ export interface DbSyncSession {
    * Forcefully flushes any pending sync operations to the database.
    * @param character Only flush data related to this character. If omitted, flushes all pending data.
    */
-  flush(character?: Character): void;
+  flush(characterId?: CharacterId): void;
 }
 
 const syncInterval = TimeSpan.fromSeconds(5);

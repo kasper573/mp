@@ -1,8 +1,8 @@
 import type { VectorLike } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph } from "@mp/path-finding";
-import type { Pixel } from "@mp/std";
-import { assert, type Tile } from "@mp/std";
+import type { Pixel, Result } from "@mp/std";
+import { assert, err, ok, TileType, type Tile } from "@mp/std";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { graphFromTiled } from "./graph-from-tiled";
 import { hitTestTiledObject } from "./hit-test-tiled-object";
@@ -38,6 +38,18 @@ export class AreaResource {
       "Invalid area data: must have a start location",
     );
 
+    for (const obj of tiled.objects) {
+      const res = getDestinationFromObject(obj);
+      if (res?.isErr()) {
+        throw new Error(
+          `Area "${id}" tiled map has an invalid portal object "${obj.id}"`,
+          {
+            cause: res.error,
+          },
+        );
+      }
+    }
+
     this.start = tiled.worldCoordToTile(Vector.from(startObj)).round();
   }
 
@@ -52,9 +64,36 @@ export class AreaResource {
   }
 }
 
-export function getAreaIdFromObject(object: TiledObject): AreaId | undefined {
+/**
+ * Gets the portal destination from a Tiled object, if it has one.
+ * Returnes undefined if the object is not a portal.
+ */
+export function getDestinationFromObject(
+  object: TiledObject,
+): Result<PortalDestination, Error> | undefined {
   const prop = object.properties.get("goto");
-  return prop ? (prop.value as AreaId) : undefined;
+  if (!prop) {
+    return;
+  }
+  if (prop.type !== "string") {
+    return err(new Error(`'goto' property must be a string`));
+  }
+  const res = portalDestinationComponentsType(prop.value.split(","));
+  if (res instanceof type.errors) {
+    return err(
+      new Error(`'goto' property invalid: ${res.summary}`, { cause: res }),
+    );
+  }
+  const [areaId, x, y] = res;
+  return ok({
+    areaId,
+    coords: new Vector(x, y),
+  });
+}
+
+export interface PortalDestination {
+  areaId: AreaId;
+  coords: Vector<Tile>;
 }
 
 export const dynamicLayerName = "Dynamic";
@@ -62,3 +101,10 @@ export const dynamicLayerName = "Dynamic";
 /** @gqlScalar */
 export type AreaId = typeof AreaIdType.infer;
 export const AreaIdType = type("string").brand("AreaId");
+
+const stringTileType = type("string").pipe(Number).pipe(TileType);
+const portalDestinationComponentsType = type([
+  AreaIdType,
+  stringTileType,
+  stringTileType,
+]);

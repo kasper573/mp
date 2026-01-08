@@ -337,7 +337,7 @@
                         {
                          "name":"goto",
                          "type":"string",
-                         "value":"island"
+                         "value":"island,39,28"
                         }],
                  "rotation":0,
                  "type":"warp",

@@ -1,15 +1,17 @@
 import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { AreaResource, Character, MovementTrait } from "@mp/game-shared";
-import { getAreaIdFromObject, moveAlongPath } from "@mp/game-shared";
+import { getDestinationFromObject, moveAlongPath } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Path, Vector, VectorLike } from "@mp/math";
 import { assert, type Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import {
   ctxArea,
+  ctxDb,
   ctxDbSyncSession,
   ctxGameEventClient,
   ctxGameState,
+  ctxLogger,
 } from "../context";
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
@@ -40,15 +42,18 @@ export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
       for (const object of area.hitTestObjects(
         area.tiled.tileCoordToWorld(actor.movement.coords),
       )) {
-        const destinationAreaId = getAreaIdFromObject(object) as
-          | AreaId
-          | undefined;
+        const destination = getDestinationFromObject(object);
         if (
-          destinationAreaId &&
+          destination?.isOk() &&
           actor.type === "character" &&
           actor.movement.desiredPortalId === object.id
         ) {
-          sendCharacterToArea(ioc, actor.identity.id, destinationAreaId);
+          sendCharacterToArea(
+            ioc,
+            actor.identity.id,
+            destination.value.areaId,
+            destination.value.coords,
+          );
         }
       }
     }
@@ -59,7 +64,7 @@ export function sendCharacterToArea(
   ioc: InjectionContainer,
   characterId: CharacterId,
   destinationAreaId: AreaId,
-  coords?: Vector<Tile>,
+  destinationCoords: Vector<Tile>,
 ) {
   const gameState = ioc.get(ctxGameState);
   const currentArea = ioc.get(ctxArea);
@@ -78,30 +83,47 @@ export function sendCharacterToArea(
 
   // If we're portalling within the same area we can just change coords
   if (destinationAreaId === currentArea.id) {
-    char.movement.coords = coords ?? currentArea.start;
+    char.movement.coords = destinationCoords;
     return;
   }
 
-  // Since moving to another area means to remove the character from the current game service,
-  // any unsynced game state changes related to this character would be lost unless we save them explicitly right now,
-  // since regular persistence is done on interval, an interval which we would miss here.
-  ioc.get(ctxDbSyncSession).flush(char);
+  // Persist the area change so that upcoming db sync in the
+  // new game service will be able to pick up this character.
+  void ioc
+    .get(ctxDb)
+    .updateCharactersArea({
+      characterId,
+      newAreaId: destinationAreaId,
+      newCoords: destinationCoords,
+    })
+    .then((res) => {
+      if (res.isErr()) {
+        ioc.get(ctxLogger).error(
+          new Error("Failed to update character area", {
+            cause: res.error.error,
+          }),
+        );
+        return;
+      }
 
-  // But if we're moving to a different area we must communicate
-  // with other services and tell them to pick up this character.
+      // Since moving to another area means to remove the character from the current game service,
+      // any unsynced game state changes related to this character would be lost unless we save them explicitly right now,
+      // since regular persistence is done on interval, an interval which we would miss here.
+      ioc.get(ctxDbSyncSession).flush(char.identity.id);
 
-  // RISK: Removing the character and blindly trusting other services to
-  // reinstate them in their instance may lead to characters being left in the void.
-  // It's a minor risk. At worst, the player will have disconnect and
-  // reconnect to have a game service pick them up again.
-  gameState.actors.delete(characterId);
+      // But if we're moving to a different area we must communicate
+      // with other services and tell them to pick up this character.
 
-  // Inform other services that the character wants to join another area
-  const client = ioc.get(ctxGameEventClient);
-  client.network.changeGameService({
-    characterId,
-    areaId: destinationAreaId,
-  });
+      // Remove from game state so that clients get updated right away.
+      gameState.actors.delete(characterId);
+
+      // Broadcast the area change to other services so that they can
+      // flush db sync for this character proactively rather than on poll.
+      ioc.get(ctxGameEventClient).network.changeGameService({
+        characterId,
+        areaId: destinationAreaId,
+      });
+    });
 }
 
 export function findPathForSubject(
