@@ -1,6 +1,5 @@
 import type { Query, QueryCache } from "@tanstack/react-query";
 import { useQueryClient } from "@tanstack/react-query";
-import { memo } from "preact/compat";
 import { useState, useEffect } from "preact/hooks";
 import {
   uniqueNamesGenerator,
@@ -12,7 +11,7 @@ import {
 /**
  * Emulates deterministic flavorful file names for the current pending queries
  */
-export const PendingQueriesDescription = memo(function PendingQueriesList() {
+export function PendingQueriesDescription() {
   const queryClient = useQueryClient();
   const cache = queryClient.getQueryCache();
   const [pendingQueries, setPendingQueries] = useState(() =>
@@ -25,7 +24,7 @@ export const PendingQueriesDescription = memo(function PendingQueriesList() {
   );
 
   return ellipsis(pendingQueries.map(emulateFileName).join(", "), 200);
-});
+}
 
 function emulateFileName(query: Query): string {
   const baseName = uniqueNamesGenerator({
