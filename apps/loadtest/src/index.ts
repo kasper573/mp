@@ -1,9 +1,11 @@
 // oxlint-disable no-await-in-loop
+import fs from "fs/promises";
 import { graphql, GraphQLClient } from "@mp/api-service/client";
 import { createProxyEventInvoker } from "@mp/event-router";
 import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
-import { eventMessageEncoding } from "@mp/game-shared";
+import type { AreaId, AreaResource } from "@mp/game-shared";
+import { eventMessageEncoding, hitTestTiledObject } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/auth";
@@ -12,13 +14,18 @@ import { Rng, toResult } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
 import apiSchema from "@mp/api-service/client/schema.json";
+import path from "path";
 
 const logger = createConsoleLogger();
 
 const { apiUrl, gameServiceUrl, gameClients, timeout, verbose, exitFast } =
   readCliOptions();
 
+let areas: Map<AreaId, AreaResource>;
+
 async function main() {
+  areas = await getAreas();
+
   const start = performance.now();
 
   const success = await testAllGameClients();
@@ -119,14 +126,7 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Getting character id for socket ${n}`);
       }
-      const api = new GraphQLClient({
-        serverUrl: apiUrl,
-        schema: apiSchema,
-        fetchOptions: (init) => ({
-          ...init,
-          headers: { ...init?.headers, Authorization: `Bearer ${accessToken}` },
-        }),
-      });
+      const api = createApiClient(accessToken);
       const { myCharacterId } = toResult(
         await api.query({ query: myCharacterIdQuery }),
       )._unsafeUnwrap();
@@ -142,7 +142,8 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
       }
-      const areaId = await waitUntilDefined(gameClient.areaId, 15_000);
+
+      await waitUntil(gameClient.isGameReady, (v) => v, 15_000);
 
       if (verbose) {
         logger.info(
@@ -151,14 +152,7 @@ function testOneGameClient(n: number, rng: Rng) {
         );
       }
 
-      const { areaFileUrl } = toResult(
-        await api.query({ query: areaFileQuery, variables: { areaId } }),
-      )._unsafeUnwrap();
-
-      const area = await browserLoadAreaResource(areaId, areaFileUrl);
-      const tiles = Array.from(area.graph.nodeIds)
-        .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
-        .filter((v) => v !== undefined);
+      const behavior = n % 2 === 0 ? "run" : "portal";
 
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
@@ -166,11 +160,41 @@ function testOneGameClient(n: number, rng: Rng) {
           gameClient.character.value &&
           !gameClient.character.value.combat.health
         ) {
+          logger.info(`Character for socket ${n} will respawn`);
           gameClient.actions.respawn();
         }
-        const to = rng.oneOf(tiles);
-        gameClient.actions.move(to);
-        logger.info(`Moving character for socket ${n} to ${to}`);
+
+        const currentArea = gameClient.areaId.value
+          ? areas.get(gameClient.areaId.value)
+          : undefined;
+
+        if (currentArea) {
+          switch (behavior) {
+            case "portal": {
+              const portal = rng.oneOf(currentArea.portals);
+              const portalWalkableTiles = tiles(currentArea).filter((coord) =>
+                hitTestTiledObject(
+                  portal.object,
+                  currentArea.tiled.tileCoordToWorld(coord),
+                ),
+              );
+              const to = rng.oneOf(portalWalkableTiles);
+              gameClient.actions.move(to, portal.object.id);
+              logger.info(
+                `Character for socket ${n} will run to ${to} (portal ${portal.object.id})`,
+              );
+              break;
+            }
+            case "run": {
+              const to = rng.oneOf(tiles(currentArea));
+              gameClient.actions.move(to);
+              logger.info(`Character for socket ${n} will run to ${to}`);
+              break;
+            }
+          }
+        } else {
+          logger.warn(`Socket ${n} has no area loaded, idling..`);
+        }
         await wait(1000 + rng.next() * 6000);
       }
       if (verbose) {
@@ -182,6 +206,12 @@ function testOneGameClient(n: number, rng: Rng) {
     stopClient();
     socket.close();
   });
+}
+
+function tiles(area: AreaResource) {
+  return Array.from(area.graph.nodeIds)
+    .map((nodeId) => area.graph.getNode(nodeId)?.data.vector)
+    .filter((v) => v !== undefined);
 }
 
 async function waitForOpen(socket: WebSocket) {
@@ -211,8 +241,9 @@ function wait(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function waitUntilDefined<T>(
-  signal: Signal<T | undefined>,
+function waitUntil<T>(
+  signal: Signal<T>,
+  isReady: (value: T) => boolean,
   timeout: number,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -225,12 +256,48 @@ function waitUntilDefined<T>(
       timeout,
     );
     const unsubscribe = signal.subscribe((value) => {
-      if (value !== undefined) {
+      if (isReady(value)) {
         clearTimeout(timeoutId);
         unsubscribe();
         resolve(value);
       }
     });
+  });
+}
+
+async function getAreas(): Promise<Map<AreaId, AreaResource>> {
+  const areaFiles = await fs.readdir(
+    path.resolve(__dirname, "../../../docker/file-server/public/areas"),
+    { withFileTypes: true },
+  );
+  const api = createApiClient(createBypassUser("load test script"));
+  return new Map(
+    await Promise.all(
+      areaFiles
+        .filter((entry) => entry.isFile())
+        .map(async (entry): Promise<[AreaId, AreaResource]> => {
+          const areaId = path.basename(
+            entry.name,
+            path.extname(entry.name),
+          ) as AreaId;
+          const { areaFileUrl } = toResult(
+            await api.query({ query: areaFileQuery, variables: { areaId } }),
+          )._unsafeUnwrap();
+
+          return [areaId, await browserLoadAreaResource(areaId, areaFileUrl)];
+        }),
+    ),
+  );
+}
+
+function createApiClient(accessToken: string) {
+  return new GraphQLClient({
+    serverUrl: apiUrl,
+    schema: apiSchema,
+    fetchOptions: (init) => ({
+      ...init,
+      headers: { ...init?.headers, Authorization: `Bearer ${accessToken}` },
+    }),
   });
 }
 
@@ -246,4 +313,4 @@ const myCharacterIdQuery = graphql(`
   }
 `);
 
-void main();
+main();
