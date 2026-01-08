@@ -9,7 +9,10 @@ export function roles(requiredRoles: Iterable<RoleDefinition>) {
     if (!session.user) {
       throw new Error("User is not authenticated");
     }
-    assertRoles(requiredRolesSet, session.user.roles)._unsafeUnwrap();
+    const res = assertRoles(requiredRolesSet, session.user.roles);
+    if (res.isErr()) {
+      throw new Error(res.error);
+    }
     return { user: session.user };
   });
 }
