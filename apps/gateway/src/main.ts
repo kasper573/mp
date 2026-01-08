@@ -112,7 +112,7 @@ const saveOnlineCharactersDeduped = dedupe(
         if (result.isErr()) {
           logger.error(
             new Error("Failed to save online characters", {
-              cause: result.error,
+              cause: result.error.error,
             }),
           );
         }
