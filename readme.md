@@ -73,7 +73,7 @@ Run its cli against the development environment using `pnpm -F db devenv <drizzl
 
 ### If you change user roles
 
-User roles are defined in typescript source code as a single source of truth and provisioned to keycloak via the `provision` script in the `server` package. If you make changes to the user roles you will have to run the provisioning script to update your keycloak instance.
+User roles are defined in typescript source code as a single source of truth and provisioned to keycloak via the `provision` script in the `keycloak` package. If you make changes to the user roles you will have to run the provisioning script to update your keycloak instance.
 
 > Production is provisioned automatically when changes are pushed to master, so you don't have to handle that manually.
 
