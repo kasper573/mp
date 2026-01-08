@@ -25,10 +25,23 @@ export interface SyncGameStateOptions {
   actorModels: ActorModelLookup;
   logger: Logger;
   markToResendFullState: (characterId: CharacterId) => void;
+  /**
+   * If set, only syncs the game state for the given character ID.
+   */
+  characterId?: CharacterId;
+}
+
+export type GameStateSync = ReturnType<typeof createGameStateSync>;
+
+export function createGameStateSyncFactory(drizzle: DrizzleClient) {
+  return {
+    for: (options: SyncGameStateOptions) =>
+      createGameStateSync(drizzle, options),
+  };
 }
 
 /**
- * Polls the database for game state changes and updates the game state accordingly.
+ * Queries the database for game state changes and updates the game state accordingly.
  * Only adds and removes are applied. Db updates to entities that already exist in game state will be ignored.
  *
  * This means external systems cannot really reliably update game state tables in the db,
@@ -36,7 +49,7 @@ export interface SyncGameStateOptions {
  * This is an intentional limitation to keep the sync system simple.
  * If we ever need external systems to manipiulate persisted game state we'll have to look into more robust sync mechanisms.
  */
-export function syncGameState(
+function createGameStateSync(
   drizzle: DrizzleClient,
   {
     area,
@@ -46,7 +59,12 @@ export function syncGameState(
     markToResendFullState,
   }: SyncGameStateOptions,
 ) {
-  return ResultAsync.fromPromise(save().then(load), (e) => e);
+  /**
+   * Calls load and save in sequence.
+   */
+  function sync() {
+    return ResultAsync.fromPromise(save().then(load), (e) => e);
+  }
 
   async function load() {
     const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, area.id);
@@ -181,7 +199,7 @@ export function syncGameState(
     markToResendFullState(char.identity.id);
     logger.debug(
       { characterId: characterFields.id },
-      "Character joined game service via db poll",
+      "Character joined game service via db sync",
     );
   }
 
@@ -193,8 +211,10 @@ export function syncGameState(
         state.items.delete(item.id);
       }
     }
-    logger.debug({ characterId }, "Character left game service via db poll");
+    logger.debug({ characterId }, "Character left game service via db sync");
   }
+
+  return { sync, load, save };
 }
 
 async function getOnlineCharacterIdsForAreaFromDb(

@@ -97,22 +97,21 @@ export function sendCharacterToArea(
       newCoords: destinationCoords,
     })
     .then((res) => {
+      const logger = ioc.get(ctxLogger);
       if (res.isErr()) {
-        ioc
-          .get(ctxLogger)
-          .error(
-            new Error(
-              `Could not send character "${characterId}" to area "${destinationAreaId}:${destinationCoords.x}${destinationCoords.y}"`,
-              { cause: res.error.error },
-            ),
-          );
+        logger.error(
+          new Error(
+            `Could not send character "${characterId}" to area ${describeDestination(destinationAreaId, destinationCoords)}`,
+            { cause: res.error.error },
+          ),
+        );
         return;
       }
 
       // Since moving to another area means to remove the character from the current game service,
       // any unsynced game state changes related to this character would be lost unless we save them explicitly right now,
       // since regular persistence is done on interval, an interval which we would miss here.
-      ioc.get(ctxDbSyncSession).flush(char.identity.id);
+      ioc.get(ctxDbSyncSession).save(char.identity.id);
 
       // But if we're moving to a different area we must communicate
       // with other services and tell them to pick up this character.
@@ -143,4 +142,8 @@ export function findPathForSubject(
     return;
   }
   return area.graph.findPath(fromNode, destNode);
+}
+
+function describeDestination(areaId: AreaId, coords: Vector<Tile>): string {
+  return `${areaId} at (${coords.x}, ${coords.y})`;
 }

@@ -28,6 +28,5 @@ export const changeGameService = evt.event
         "Character joined game service via gateway broadcast. Will eagerly reload character state from db.",
       );
 
-    // Void instead of await because we don't want to suspend the event routers queue handler.
-    void ctx.get(ctxDbSyncSession).flush(input.characterId);
+    ctx.get(ctxDbSyncSession).load(input.characterId);
   });

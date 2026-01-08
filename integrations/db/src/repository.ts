@@ -16,7 +16,7 @@ import { updateCharactersArea } from "./procedures/update-characters-area";
 import { updateOnlineCharacters } from "./procedures/update-online-characters";
 import { upsertCharacter } from "./procedures/upsert-character";
 import type { SyncGameStateOptions } from "./utils/sync-game-state";
-import { syncGameState } from "./utils/sync-game-state";
+import { createGameStateSyncFactory } from "./utils/sync-game-state";
 
 /**
  * All database interactions must be done through the repository.
@@ -43,8 +43,7 @@ export function createDbRepository(connectionString: string) {
     updateOnlineCharacters: updateOnlineCharacters.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
-    syncGameState: (options: SyncGameStateOptions) =>
-      syncGameState(drizzle, options),
+    gameState: createGameStateSyncFactory(drizzle),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
