@@ -1,13 +1,6 @@
 import { AreaIdType, CharacterIdType } from "@mp/game-shared";
 import { gatewayRoles } from "@mp/keycloak";
-import {
-  ctxActorModelLookup,
-  ctxArea,
-  ctxDb,
-  ctxGameState,
-  ctxGameStateServer,
-  ctxLogger,
-} from "../context";
+import { ctxArea, ctxDbSyncSession, ctxLogger } from "../context";
 import { roles } from "../integrations/auth";
 import { evt } from "../integrations/event-router";
 import { type } from "@mp/validate";
@@ -24,38 +17,17 @@ export const changeGameService = evt.event
     }),
   )
   .handler(({ ctx, input }) => {
-    const currentArea = ctx.get(ctxArea);
-    if (input.areaId === currentArea.id) {
-      const state = ctx.get(ctxGameState);
-      const server = ctx.get(ctxGameStateServer);
-      const logger = ctx.get(ctxLogger);
-      const db = ctx.get(ctxDb);
-      const actorModels = ctx.get(ctxActorModelLookup);
-
-      // Void instead of await because we don't want to suspend the event routers queue handler.
-      void db
-        .updateCharactersArea({
-          actorModels,
-          characterId: input.characterId,
-          newAreaId: currentArea.id,
-          newCoords: currentArea.start,
-        })
-        .then((result) => {
-          if (result.isOk()) {
-            logger.debug(
-              { characterId: input.characterId },
-              "Character joined game service via gateway broadcast",
-            );
-            const character = result.value;
-            state.actors.set(input.characterId, character);
-            server.markToResendFullState(input.characterId);
-          } else {
-            logger.error(
-              new Error("Failed to assign area id to character in db", {
-                cause: result.error,
-              }),
-            );
-          }
-        });
+    if (input.areaId !== ctx.get(ctxArea).id) {
+      return;
     }
+
+    ctx
+      .get(ctxLogger)
+      .debug(
+        { characterId: input.characterId },
+        "Character joined game service via gateway broadcast. Will eagerly reload character state from db.",
+      );
+
+    // Void instead of await because we don't want to suspend the event routers queue handler.
+    void ctx.get(ctxDbSyncSession).flush(input.characterId);
   });

@@ -2,7 +2,7 @@ import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
 import {
   clientViewDistance,
-  getAreaIdFromObject,
+  getDestinationFromObject,
   type AreaResource,
 } from "@mp/game-shared";
 import type { DestroyOptions } from "@mp/graphics";
@@ -184,7 +184,7 @@ export class AreaScene extends Container {
       if (target?.type === "move") {
         const portal = this.options.area
           .hitTestObjects(this.options.engine.pointer.worldPosition.value)
-          .find(getAreaIdFromObject);
+          .find(getDestinationFromObject);
 
         this.moveThrottled(Vector.from(target.rect), portal?.id);
       }

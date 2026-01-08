@@ -1,7 +1,5 @@
-import type { ActorModelLookup, Character } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import { characterFromDbFields } from "../utils/transform";
 import type { CharacterId, AreaId } from "@mp/game-shared";
 import { procedure } from "../utils/procedure";
 import type { Vector } from "@mp/math";
@@ -9,33 +7,19 @@ import type { Tile } from "@mp/std";
 
 export const updateCharactersArea = procedure()
   .input<{
-    actorModels: ActorModelLookup;
     characterId: CharacterId;
     newAreaId: AreaId;
     newCoords: Vector<Tile>;
   }>()
   .query(
-    async (
-      drizzle,
-      { actorModels, characterId, newAreaId, newCoords },
-    ): Promise<Character> => {
-      const result = await drizzle.transaction(async (tx) => {
-        await tx
-          .update(characterTable)
-          .set({ areaId: newAreaId, coords: newCoords })
-          .where(eq(characterTable.id, characterId));
+    async (drizzle, { characterId, newAreaId, newCoords }): Promise<void> => {
+      const result = await drizzle
+        .update(characterTable)
+        .set({ areaId: newAreaId, coords: newCoords })
+        .where(eq(characterTable.id, characterId));
 
-        return tx
-          .select()
-          .from(characterTable)
-          .where(eq(characterTable.id, characterId))
-          .limit(1);
-      });
-
-      if (result.length === 0) {
+      if (result.rowCount === 0) {
         throw new Error(`Character with id ${characterId} not found`);
       }
-
-      return characterFromDbFields(result[0], actorModels);
     },
   );

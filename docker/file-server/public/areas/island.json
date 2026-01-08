@@ -53,7 +53,6 @@
         {
          "draworder":"topdown",
          "id":4,
-         "locked":true,
          "name":"Objects",
          "objects":[
                 {
@@ -76,7 +75,7 @@
                         {
                          "name":"goto",
                          "type":"string",
-                         "value":"forest"
+                         "value":"forest,3,18"
                         }],
                  "rotation":0,
                  "type":"warp",
@@ -137,7 +136,7 @@
                         {
                          "name":"goto",
                          "type":"string",
-                         "value":"forest"
+                         "value":"forest,3,18"
                         }],
                  "rotation":0,
                  "type":"warp",
@@ -154,7 +153,7 @@
                         {
                          "name":"goto",
                          "type":"string",
-                         "value":"forest"
+                         "value":"forest,3,18"
                         }],
                  "rotation":0,
                  "type":"warp",
@@ -171,7 +170,7 @@
                         {
                          "name":"goto",
                          "type":"string",
-                         "value":"forest"
+                         "value":"forest,3,18"
                         }],
                  "rotation":0,
                  "type":"warp",
@@ -182,7 +181,7 @@
                 }],
          "opacity":1,
          "type":"objectgroup",
-         "visible":false,
+         "visible":true,
          "x":0,
          "y":0
         }],
