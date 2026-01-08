@@ -40,6 +40,11 @@ export function readCliOptions(argv = process.argv) {
       type: "boolean",
       default: false,
     })
+    .options("behavior", {
+      alias: "b",
+      choices: ["run", "portal", "alternate"] as const,
+      default: "run" as const,
+    })
     .option("timeout", {
       alias: "t",
       type: "number",

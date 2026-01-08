@@ -18,8 +18,15 @@ import path from "path";
 
 const logger = createConsoleLogger();
 
-const { apiUrl, gameServiceUrl, gameClients, timeout, verbose, exitFast } =
-  readCliOptions();
+const {
+  apiUrl,
+  gameServiceUrl,
+  gameClients,
+  timeout,
+  verbose,
+  exitFast,
+  behavior,
+} = readCliOptions();
 
 let areas: Map<AreaId, AreaResource>;
 
@@ -36,6 +43,15 @@ async function main() {
 
   if (!success) {
     process.exit(1);
+  }
+}
+
+function determineBehavior(n: number) {
+  switch (behavior) {
+    case "alternate":
+      return n % 2 === 0 ? "run" : "portal";
+    default:
+      return behavior;
   }
 }
 
@@ -152,8 +168,6 @@ function testOneGameClient(n: number, rng: Rng) {
         );
       }
 
-      const behavior = n % 2 === 0 ? "run" : "portal";
-
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
         if (
@@ -169,7 +183,7 @@ function testOneGameClient(n: number, rng: Rng) {
           : undefined;
 
         if (currentArea) {
-          switch (behavior) {
+          switch (determineBehavior(n)) {
             case "portal": {
               const portal = rng.oneOf(currentArea.portals);
               const portalWalkableTiles = tiles(currentArea).filter((coord) =>
@@ -191,6 +205,11 @@ function testOneGameClient(n: number, rng: Rng) {
               logger.info(`Character for socket ${n} will run to ${to}`);
               break;
             }
+            default:
+              logger.info(
+                `Unknown behavior "${determineBehavior(n)}" for socket ${n}, idling..`,
+              );
+              break;
           }
         } else {
           logger.warn(`Socket ${n} has no area loaded, idling..`);
