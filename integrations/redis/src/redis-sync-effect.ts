@@ -20,7 +20,6 @@ export function createRedisSyncEffect<T>(
   initializeRedisWithValueInSignal = true,
   onParseError?: (error: type.errors) => void,
 ) {
-  const updateChannel = `${key}:update`;
   const sub = redis.duplicate();
   let allowSendingSignalValueToRedis = true;
   let hasIgnoredInitialSignalValue = false;
@@ -42,7 +41,7 @@ export function createRedisSyncEffect<T>(
     await redis
       .multi()
       .set(key, payload)
-      .publish(updateChannel, payload)
+      .publish(updateChannel(key), payload)
       .exec();
   }
 
@@ -70,9 +69,9 @@ export function createRedisSyncEffect<T>(
     }
   });
 
-  void sub.subscribe(updateChannel).then(() => {
+  void sub.subscribe(updateChannel(key)).then(() => {
     sub.on("message", (channel, payload) => {
-      if (channel === updateChannel) {
+      if (channel === updateChannel(key)) {
         tryReceiveFromRedis(payload);
       }
     });
@@ -80,6 +79,66 @@ export function createRedisSyncEffect<T>(
 
   return function cleanup() {
     stopSubscribingToSignal();
-    void sub.unsubscribe(updateChannel);
+    void sub.unsubscribe(updateChannel(key));
   };
+}
+
+export function createRedisWriteEffect<T>(
+  redis: Redis,
+  key: string,
+  signal: Signal<T>,
+) {
+  async function sendValueToRedis(newValue: T) {
+    const payload = JSON.stringify(newValue);
+    await redis
+      .multi() // Not sure why this is necessary, copy paste from createRedisSyncEffect
+      .set(key, payload)
+      .publish(updateChannel(key), payload)
+      .exec();
+  }
+
+  return signal.subscribe(() => void sendValueToRedis(signal.value));
+}
+
+export function createRedisReadEffect<T>(
+  redis: Redis,
+  key: string,
+  schema: Type<T>,
+  signal: Signal<T>,
+  onParseError?: (error: type.errors) => void,
+) {
+  const sub = redis.duplicate();
+
+  function tryReceiveFromRedis(payload: string): boolean {
+    const result = schema(JSON.parse(payload));
+    if (result instanceof type.errors) {
+      onParseError?.(result);
+      return false;
+    }
+
+    signal.value = result as T;
+    return true;
+  }
+
+  void redis.get(key).then((payload) => {
+    if (payload !== null) {
+      tryReceiveFromRedis(payload);
+    }
+  });
+
+  void sub.subscribe(updateChannel(key)).then(() => {
+    sub.on("message", (channel, payload) => {
+      if (channel === updateChannel(key)) {
+        tryReceiveFromRedis(payload);
+      }
+    });
+  });
+
+  return function cleanup() {
+    void sub.unsubscribe(updateChannel(key));
+  };
+}
+
+function updateChannel(key: string) {
+  return `${key}:update`;
 }

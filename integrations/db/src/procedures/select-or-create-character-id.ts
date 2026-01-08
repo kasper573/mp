@@ -52,7 +52,6 @@ export const selectOrCreateCharacterIdForUser = procedure()
         userId: user.id,
         xp: 0,
         name: user.name,
-        online: false,
         modelId: model.id,
         inventoryId: inventory.id,
       })

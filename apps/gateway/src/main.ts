@@ -1,5 +1,5 @@
 import { createDbRepository } from "@mp/db";
-import type { AreaId, CharacterId } from "@mp/game-shared";
+import type { AreaId } from "@mp/game-shared";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
@@ -12,6 +12,7 @@ import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
   eventMessageEncoding,
   eventWithSessionEncoding,
+  onlineCharacterIdsRedisKey,
   registerEncoderExtensions,
   syncMessageEncoding,
   syncMessageWithRecipientEncoding,
@@ -21,9 +22,9 @@ import { gatewayRoles, playerRoles } from "@mp/keycloak";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken, UserId } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import { computed, effect, Signal } from "@mp/state";
+import { computed, Signal } from "@mp/state";
 import type { Branded } from "@mp/std";
-import { arrayShallowEquals, createShortId, debounce, dedupe } from "@mp/std";
+import { createShortId } from "@mp/std";
 import { SyncMap } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -46,6 +47,7 @@ import {
 } from "./context";
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
+import { createRedisWriteEffect, Redis } from "@mp/redis";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -87,6 +89,14 @@ const resolveAccessToken = createTokenResolver({
   bypassUserRoles: playerRoles,
 });
 
+const redisClient = new Redis(opt.redisPath);
+
+createRedisWriteEffect(
+  redisClient,
+  onlineCharacterIdsRedisKey,
+  onlineCharacterIds,
+);
+
 const wss = new WebSocketServer({
   ...wssConfig(),
   path: opt.wsEndpointPath,
@@ -104,25 +114,6 @@ const gatewayEventInvoker = new QueuedEventInvoker({
 });
 
 const ioc = new InjectionContainer().provide(ctxDb, db);
-
-const saveOnlineCharactersDeduped = dedupe(
-  debounce(
-    (ids: CharacterId[]) =>
-      void db.updateOnlineCharacters(ids).then((result) => {
-        if (result.isErr()) {
-          logger.error(
-            new Error("Failed to save online characters", {
-              cause: result.error.error,
-            }),
-          );
-        }
-      }),
-    100,
-  ),
-  arrayShallowEquals,
-);
-
-effect(() => saveOnlineCharactersDeduped(onlineCharacterIds.value));
 
 wss.on("connection", (socket, request) => {
   socket.binaryType = "arraybuffer";

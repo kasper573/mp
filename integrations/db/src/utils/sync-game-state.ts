@@ -1,30 +1,31 @@
 import type {
-  AreaResource,
   GameState,
   ActorModelLookup,
   ItemInstanceId,
   ItemInstance,
   Character,
+  AreaId,
 } from "@mp/game-shared";
 import { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
 import type { Logger } from "@mp/logger";
 import { assert, ResultAsync } from "@mp/std";
-import { inArray, and, eq } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import {
   characterTable,
   consumableInstanceTable,
   equipmentInstanceTable,
 } from "../schema";
 import { dbFieldsFromCharacter, characterFromDbFields } from "./transform";
-import type { CharacterId, AreaId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/game-shared";
 import type { DrizzleClient } from "./client";
 
 export interface SyncGameStateOptions {
-  area: AreaResource;
+  areaId: AreaId;
   state: GameState;
   actorModels: ActorModelLookup;
   logger: Logger;
   markToResendFullState: (characterId: CharacterId) => void;
+  getOnlineCharacterIds: () => CharacterId[];
 }
 
 /**
@@ -39,17 +40,22 @@ export interface SyncGameStateOptions {
 export function syncGameState(
   drizzle: DrizzleClient,
   {
-    area,
+    areaId,
     state,
     actorModels,
     logger,
     markToResendFullState,
+    getOnlineCharacterIds,
   }: SyncGameStateOptions,
 ) {
   return ResultAsync.fromPromise(save().then(load), (e) => e);
 
   async function load() {
-    const dbIds = await getOnlineCharacterIdsForAreaFromDb(drizzle, area.id);
+    const dbIds = await omitCharacterIdsNotInArea(
+      drizzle,
+      areaId,
+      getOnlineCharacterIds(),
+    );
     const stateIds = characterIdsInState(state);
     const removedIds = stateIds.difference(dbIds);
     const addedIds = dbIds.difference(stateIds);
@@ -197,9 +203,10 @@ export function syncGameState(
   }
 }
 
-async function getOnlineCharacterIdsForAreaFromDb(
+async function omitCharacterIdsNotInArea(
   drizzle: DrizzleClient,
   areaId: AreaId,
+  characterIds: CharacterId[],
 ): Promise<ReadonlySet<CharacterId>> {
   return new Set(
     (
@@ -209,7 +216,7 @@ async function getOnlineCharacterIdsForAreaFromDb(
         .where(
           and(
             eq(characterTable.areaId, areaId),
-            eq(characterTable.online, true),
+            inArray(characterTable.id, characterIds),
           ),
         )
     ).map((row) => row.id),

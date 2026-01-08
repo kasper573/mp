@@ -307,6 +307,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/redis':
+        specifier: workspace:*
+        version: link:../../integrations/redis
       '@mp/state':
         specifier: workspace:*
         version: link:../../libraries/state

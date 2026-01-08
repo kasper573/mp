@@ -1,6 +1,6 @@
 import { gatewayRoles } from "@mp/keycloak";
 import type { ApiContext } from "../context";
-import { ctxDb } from "../context";
+import { ctxDb, ctxOnlineCharacterIds } from "../context";
 import { auth, roles } from "../integrations/auth";
 import { assert, promiseFromResult } from "@mp/std";
 import type { CharacterId } from "@mp/game-shared";
@@ -10,7 +10,8 @@ import type { FormUpdateResult } from "./form";
 /** @gqlQueryField */
 export async function characterList(ctx: ApiContext): Promise<Character[]> {
   await roles(ctx, [gatewayRoles.spectate]);
-  return promiseFromResult(ctx.ioc.get(ctxDb).selectOnlineCharacterList());
+  const ids = ctx.ioc.get(ctxOnlineCharacterIds);
+  return promiseFromResult(ctx.ioc.get(ctxDb).selectCharacterList(ids.value));
 }
 
 /** @gqlQueryField */

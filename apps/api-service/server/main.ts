@@ -1,10 +1,16 @@
 import { createDbRepository } from "@mp/db";
-import { GameServiceConfig, gameServiceConfigRedisKey } from "@mp/game-shared";
+import type { CharacterId } from "@mp/game-shared";
+import {
+  CharacterIdType,
+  GameServiceConfig,
+  gameServiceConfigRedisKey,
+  onlineCharacterIdsRedisKey,
+} from "@mp/game-shared";
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import { createRedisSyncEffect, Redis } from "@mp/redis";
+import { createRedisReadEffect, createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 import "dotenv/config";
@@ -17,6 +23,7 @@ import {
   ctxFileResolver,
   ctxGameServiceConfig,
   ctxLogger,
+  ctxOnlineCharacterIds,
   ctxTokenResolver,
 } from "./context";
 import { createFileResolver } from "./integrations/file-resolver";
@@ -55,6 +62,15 @@ createRedisSyncEffect(
   gameServiceConfig,
 );
 
+const onlineCharacterIds = signal<readonly CharacterId[]>([]);
+
+createRedisReadEffect(
+  redisClient,
+  onlineCharacterIdsRedisKey,
+  CharacterIdType.array().readonly(),
+  onlineCharacterIds,
+);
+
 const fileResolver = createFileResolver(
   opt.fileServerInternalUrl,
   opt.fileServerPublicUrl,
@@ -65,7 +81,8 @@ const ioc = new InjectionContainer()
   .provide(ctxFileResolver, fileResolver)
   .provide(ctxDb, db)
   .provide(ctxGameServiceConfig, gameServiceConfig)
-  .provide(ctxLogger, logger);
+  .provide(ctxLogger, logger)
+  .provide(ctxOnlineCharacterIds, onlineCharacterIds);
 
 const app = express();
 const httpServer = http.createServer(app);

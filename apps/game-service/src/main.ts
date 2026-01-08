@@ -4,21 +4,23 @@ import {
   createProxyEventInvoker,
   QueuedEventInvoker,
 } from "@mp/event-router";
-import type { GameState } from "@mp/game-shared";
+import type { CharacterId, GameState } from "@mp/game-shared";
 import {
+  CharacterIdType,
   clientViewDistance,
   eventMessageEncoding,
   eventWithSessionEncoding,
   GameServiceConfig,
   gameServiceConfigRedisKey,
   GameStateGlobals,
+  onlineCharacterIdsRedisKey,
   registerEncoderExtensions,
   syncMessageWithRecipientEncoding,
 } from "@mp/game-shared";
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createRedisSyncEffect, Redis } from "@mp/redis";
+import { createRedisReadEffect, createRedisSyncEffect, Redis } from "@mp/redis";
 import { signal } from "@mp/state";
 import { Rng, withBackoffRetries, toResult } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
@@ -118,6 +120,15 @@ createRedisSyncEffect(
   gameServiceConfigRedisKey,
   GameServiceConfig,
   gameServiceConfig,
+);
+
+const onlineCharacterIds = signal<CharacterId[]>([]);
+
+createRedisReadEffect(
+  redisClient,
+  onlineCharacterIdsRedisKey,
+  CharacterIdType.array(),
+  onlineCharacterIds,
 );
 
 gameServiceConfig.subscribe((config) => {
@@ -249,11 +260,12 @@ const itemDefinitionLookup = createItemDefinitionLookup(db, logger);
 
 const dbSyncSession = startDbSyncSession({
   db,
-  area,
+  areaId: area.id,
   state: gameState,
   server: gameStateServer,
   actorModels,
   logger,
+  getOnlineCharacterIds: () => onlineCharacterIds.value,
 });
 
 const ioc = new InjectionContainer()
