@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/validate": "workspace:*",
     "ioredis": "5.8.2"
   },

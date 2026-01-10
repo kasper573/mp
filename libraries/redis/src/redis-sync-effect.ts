@@ -3,6 +3,7 @@ import type { Signal } from "@mp/state";
 import type { Type } from "@mp/validate";
 import { type } from "@mp/validate";
 import type Redis from "ioredis";
+import { withBackoffRetries } from "@mp/std";
 
 /**
  * Synchronizes a signal with a Redis key.
@@ -38,11 +39,24 @@ export function createRedisSyncEffect<T>(
 
   async function sendValueToRedis(newValue: T) {
     const payload = JSON.stringify(newValue);
-    await redis
-      .multi()
-      .set(key, payload)
-      .publish(updateChannel(key), payload)
-      .exec();
+    await withBackoffRetries(
+      `redis-sync-write:${key}`,
+      async () => {
+        const results = await redis
+          .multi()
+          .set(key, payload)
+          .publish(updateChannel(key), payload)
+          .exec();
+        
+        // Check if any commands in the pipeline failed
+        if (results) {
+          for (const [err] of results) {
+            if (err) throw new Error('Redis command failed', { cause: err });
+          }
+        }
+      },
+      { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+    );
   }
 
   function tryReceiveFromRedis(payload: string): boolean {
@@ -58,7 +72,11 @@ export function createRedisSyncEffect<T>(
     return true;
   }
 
-  void redis.get(key).then((payload) => {
+  void withBackoffRetries(
+    `redis-sync-init:${key}`,
+    () => redis.get(key),
+    { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+  ).then((payload) => {
     if (payload !== null) {
       const failedToReceive = !tryReceiveFromRedis(payload);
       if (failedToReceive && initializeRedisWithValueInSignal) {
@@ -67,14 +85,26 @@ export function createRedisSyncEffect<T>(
     } else if (initializeRedisWithValueInSignal) {
       void sendValueToRedis(signal.value);
     }
+  }).catch((err) => {
+    console.error(`Failed to initialize Redis sync for key "${key}" after retries:`, err);
+    // On initialization failure, write the signal's current value to Redis
+    if (initializeRedisWithValueInSignal) {
+      void sendValueToRedis(signal.value);
+    }
   });
 
-  void sub.subscribe(updateChannel(key)).then(() => {
+  void withBackoffRetries(
+    `redis-sync-subscribe:${key}`,
+    () => sub.subscribe(updateChannel(key)),
+    { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+  ).then(() => {
     sub.on("message", (channel, payload) => {
       if (channel === updateChannel(key)) {
         tryReceiveFromRedis(payload);
       }
     });
+  }).catch((err) => {
+    console.error(`Failed to subscribe to Redis channel for key "${key}" after retries:`, err);
   });
 
   return function cleanup() {
@@ -90,11 +120,24 @@ export function createRedisWriteEffect<T>(
 ) {
   async function sendValueToRedis(newValue: T) {
     const payload = JSON.stringify(newValue);
-    await redis
-      .multi() // Not sure why this is necessary, copy paste from createRedisSyncEffect
-      .set(key, payload)
-      .publish(updateChannel(key), payload)
-      .exec();
+    await withBackoffRetries(
+      `redis-write:${key}`,
+      async () => {
+        const results = await redis
+          .multi()
+          .set(key, payload)
+          .publish(updateChannel(key), payload)
+          .exec();
+        
+        // Check if any commands in the pipeline failed
+        if (results) {
+          for (const [err] of results) {
+            if (err) throw new Error('Redis command failed', { cause: err });
+          }
+        }
+      },
+      { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+    );
   }
 
   return signal.subscribe(() => void sendValueToRedis(signal.value));
@@ -120,18 +163,30 @@ export function createRedisReadEffect<T>(
     return true;
   }
 
-  void redis.get(key).then((payload) => {
+  void withBackoffRetries(
+    `redis-read-init:${key}`,
+    () => redis.get(key),
+    { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+  ).then((payload) => {
     if (payload !== null) {
       tryReceiveFromRedis(payload);
     }
+  }).catch((err) => {
+    console.error(`Failed to initialize Redis read for key "${key}" after retries:`, err);
   });
 
-  void sub.subscribe(updateChannel(key)).then(() => {
+  void withBackoffRetries(
+    `redis-read-subscribe:${key}`,
+    () => sub.subscribe(updateChannel(key)),
+    { maxRetries: 10, initialDelay: 100, maxDelay: 5000, factor: 2, warnAfter: 3 },
+  ).then(() => {
     sub.on("message", (channel, payload) => {
       if (channel === updateChannel(key)) {
         tryReceiveFromRedis(payload);
       }
     });
+  }).catch((err) => {
+    console.error(`Failed to subscribe to Redis channel for key "${key}" after retries:`, err);
   });
 
   return function cleanup() {
