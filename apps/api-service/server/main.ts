@@ -56,6 +56,7 @@ const tokenResolver = createTokenResolver(opt.auth);
 
 const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
+shutdownCleanups.push(() => db.dispose());
 
 const redisClient = new Redis(opt.redisPath);
 
