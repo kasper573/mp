@@ -19,7 +19,7 @@ export function createRedisSyncEffect<T>(
   key: string,
   schema: Type<T>,
   signal: Signal<T>,
-  onParseOrDecodeError: (error: Error) => void,
+  onError: (error: Error) => void,
   initializeRedisWithValueInSignal = true,
 ) {
   const sub = redis.duplicate();
@@ -38,20 +38,27 @@ export function createRedisSyncEffect<T>(
     }
   });
 
-  async function sendValueToRedis(newValue: T) {
+  function sendValueToRedis(newValue: T) {
     const message = encode(newValue);
-    await redis
+    void redis
       .multi()
       .set(key, message)
       .publish(channels.sync(key), message)
-      .exec();
+      .exec()
+      .catch((cause) =>
+        onError(
+          new Error(`Could not send value to redis for key "${key}"`, {
+            cause,
+          }),
+        ),
+      );
   }
 
   function tryReceiveFromRedis(message: Buffer): boolean {
     const result = decodeAndParse(message, schema);
 
     if (result.isErr()) {
-      onParseOrDecodeError(
+      onError(
         new Error(`Could not receive redis sync for key "${key}"`, {
           cause: result.error,
         }),
@@ -65,16 +72,25 @@ export function createRedisSyncEffect<T>(
     return true;
   }
 
-  void redis.getBuffer(key).then((message) => {
-    if (message !== null) {
-      const failedToReceive = !tryReceiveFromRedis(message);
-      if (failedToReceive && initializeRedisWithValueInSignal) {
-        void sendValueToRedis(signal.value);
+  void redis
+    .getBuffer(key)
+    .then((message) => {
+      if (message !== null) {
+        const failedToReceive = !tryReceiveFromRedis(message);
+        if (failedToReceive && initializeRedisWithValueInSignal) {
+          sendValueToRedis(signal.value);
+        }
+      } else if (initializeRedisWithValueInSignal) {
+        sendValueToRedis(signal.value);
       }
-    } else if (initializeRedisWithValueInSignal) {
-      void sendValueToRedis(signal.value);
-    }
-  });
+    })
+    .catch((cause) =>
+      onError(
+        new Error(`Could not get initial value for redis sync key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
 
   const unsubscribeFromChannel = subscribe(
     sub,
@@ -93,7 +109,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
   key: string,
   memberSchema: Type<NoInfer<Member>>,
   signal: Signal<ReadonlySet<Member>>,
-  onParseOrDecodeError: (error: Error) => void,
+  onError: (error: Error) => void,
 ) {
   const sub = redis.duplicate();
 
@@ -103,7 +119,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     const result = decodeAndParse(arrayAsBuffer, arraySchema);
 
     if (result.isErr()) {
-      onParseOrDecodeError(
+      onError(
         new Error(`Could not receive entire redis set in key "${key}"`, {
           cause: result.error,
         }),
@@ -119,7 +135,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     const result = decodeAndParse(arrayAsBuffer, arraySchema);
 
     if (result.isErr()) {
-      onParseOrDecodeError(
+      onError(
         new Error(`Could not receive redis set addition in key "${key}"`, {
           cause: result.error,
         }),
@@ -135,7 +151,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     const result = decodeAndParse(arrayAsBuffer, arraySchema);
 
     if (result.isErr()) {
-      onParseOrDecodeError(
+      onError(
         new Error(`Could not receive redis set removal in key "${key}"`, {
           cause: result.error,
         }),
@@ -147,9 +163,18 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     return true;
   }
 
-  void redis.smembers(key).then((members) => {
-    signal.value = new Set(members as Member[]);
-  });
+  void redis
+    .smembers(key)
+    .then((members) => {
+      signal.value = new Set(members as Member[]);
+    })
+    .catch((cause) =>
+      onError(
+        new Error(`Could not initialize redis set from key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
 
   const subscriptions = [
     subscribe(sub, channels.overwriteSet(key), overwriteSet),
@@ -168,6 +193,7 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
   redis: Redis,
   key: string,
   signal: Signal<ReadonlySet<T>>,
+  onError: (error: Error) => void,
   initializeRedisWithValueInSignal = true,
 ) {
   let previousSet = signal.value;
@@ -180,7 +206,14 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
       multi.sadd(key, initialArray);
     }
 
-    void multi.publish(channels.overwriteSet(key), encode(initialArray)).exec();
+    void multi
+      .publish(channels.overwriteSet(key), encode(initialArray))
+      .exec()
+      .catch((cause) =>
+        onError(
+          new Error(`Failed to update redis with initial set value`, { cause }),
+        ),
+      );
   }
 
   return signal.subscribe(() => {
@@ -204,7 +237,13 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
     }
 
     if (multi) {
-      void multi.exec();
+      void multi
+        .exec()
+        .catch((cause) =>
+          onError(
+            new Error(`Failed to update redis set for key "${key}"`, { cause }),
+          ),
+        );
     }
   });
 }

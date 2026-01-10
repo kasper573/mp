@@ -96,6 +96,7 @@ createRedisSetWriteEffect(
   redisClient,
   onlineCharacterIdsRedisKey,
   onlineCharacterIds,
+  logger.error,
 );
 
 const wss = new WebSocketServer({
