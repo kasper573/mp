@@ -26,7 +26,12 @@ import {
   Redis,
 } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, withBackoffRetries, toResult } from "@mp/std";
+import {
+  Rng,
+  withBackoffRetries,
+  toResult,
+  setupGracefulShutdown,
+} from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -75,6 +80,7 @@ registerEncoderExtensions();
 collectDefaultMetrics();
 RateLimiter.enabled = opt.rateLimit;
 
+const shutdownCleanups: Array<() => unknown> = [];
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger({
   ...opt.log,
@@ -118,28 +124,29 @@ const redisClient = new Redis(opt.redisPath);
 const gameServiceConfig = signal<GameServiceConfig>({
   isPatchOptimizerEnabled: true,
 });
-
-createRedisSyncEffect(
-  redisClient,
-  gameServiceConfigRedisKey,
-  GameServiceConfig,
-  gameServiceConfig,
-  logger.error,
-);
-
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
-createRedisSetReadEffect(
-  redisClient,
-  onlineCharacterIdsRedisKey,
-  CharacterIdType,
-  onlineCharacterIds,
-  logger.error,
+shutdownCleanups.push(
+  createRedisSyncEffect(
+    redisClient,
+    gameServiceConfigRedisKey,
+    GameServiceConfig,
+    gameServiceConfig,
+    logger.error,
+  ),
+  createRedisSetReadEffect(
+    redisClient,
+    onlineCharacterIdsRedisKey,
+    CharacterIdType,
+    onlineCharacterIds,
+    logger.error,
+  ),
+  gameServiceConfig.subscribe((config) => {
+    shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
+  }),
 );
 
-gameServiceConfig.subscribe((config) => {
-  shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
-});
+setupGracefulShutdown(process, shutdownCleanups);
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 

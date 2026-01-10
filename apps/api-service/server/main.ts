@@ -40,10 +40,14 @@ import http from "http";
 import { getSchema } from "./schema.generated";
 import { scalars } from "../shared/scalars";
 import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
+import { setupGracefulShutdown } from "@mp/std";
 
 // Note that this file is an entrypoint and should not have any exports
 
 collectDefaultMetrics();
+
+const shutdownCleanups: Array<() => unknown> = [];
+setupGracefulShutdown(process, shutdownCleanups);
 
 const logger = createPinoLogger(opt.log);
 logger.info(opt, `Starting API...`);
@@ -59,22 +63,23 @@ const gameServiceConfig = signal<GameServiceConfig>({
   isPatchOptimizerEnabled: true,
 });
 
-createRedisSyncEffect(
-  redisClient,
-  gameServiceConfigRedisKey,
-  GameServiceConfig,
-  gameServiceConfig,
-  logger.error,
-);
-
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
-createRedisSetReadEffect(
-  redisClient,
-  onlineCharacterIdsRedisKey,
-  CharacterIdType,
-  onlineCharacterIds,
-  logger.error,
+shutdownCleanups.push(
+  createRedisSyncEffect(
+    redisClient,
+    gameServiceConfigRedisKey,
+    GameServiceConfig,
+    gameServiceConfig,
+    logger.error,
+  ),
+  createRedisSetReadEffect(
+    redisClient,
+    onlineCharacterIdsRedisKey,
+    CharacterIdType,
+    onlineCharacterIds,
+    logger.error,
+  ),
 );
 
 const fileResolver = createFileResolver(
@@ -92,6 +97,7 @@ const ioc = new InjectionContainer()
 
 const app = express();
 const httpServer = http.createServer(app);
+shutdownCleanups.push(() => httpServer.close());
 
 const apolloServer = new ApolloServer({
   schema: getSchema({ scalars }),
@@ -109,6 +115,8 @@ const apolloServer = new ApolloServer({
     return { message: "Internal Server Error" };
   },
 });
+
+shutdownCleanups.push(() => apolloServer.stop());
 
 await apolloServer.start();
 
