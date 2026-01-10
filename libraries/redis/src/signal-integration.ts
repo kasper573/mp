@@ -342,7 +342,8 @@ function subscribeToExpireEvents(
   onError: (error: Error) => void,
 ) {
   const sub = redis.duplicate();
-  const key = "__keyevent@0__:expired";
+  const dbIndex = redis.options.db ?? 0;
+  const key = `__keyevent@${dbIndex}__:expired`;
 
   void sub.subscribe(key).catch((cause) =>
     onError(
