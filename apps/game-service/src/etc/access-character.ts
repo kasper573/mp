@@ -14,9 +14,13 @@ export function accessCharacter(
     throw new Error(`Character "${characterId}" not found in game state`);
   }
   if (session.character?.id !== characterId) {
-    throw new Error(
-      `User "${session.user?.id}" does not have access to character "${characterId}"`,
-    );
+    let errorMessage = `User "${session.user?.id}" does not have access to character "${characterId}"`;
+    if (session.character) {
+      errorMessage += ` (they have claimed character "${session.character.id}")`;
+    } else {
+      errorMessage += " (they have claimed no character)";
+    }
+    throw new Error(errorMessage);
   }
   return character;
 }
