@@ -27,6 +27,12 @@ export function createPinoLogger({
     }),
   });
 
+  // Our abstract Logger typescript signature expects bound methods
+  logger.error = logger.error.bind(logger);
+  logger.info = logger.info.bind(logger);
+  logger.debug = logger.debug.bind(logger);
+  logger.warn = logger.warn.bind(logger);
+
   if (bindings) {
     logger = logger.child(bindings);
   }

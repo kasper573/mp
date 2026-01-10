@@ -16,7 +16,7 @@ export const ctxGameServiceConfig =
 export const ctxDb = InjectionContext.new<DbRepository>("db");
 
 export const ctxOnlineCharacterIds =
-  InjectionContext.new<ReadonlySignal<readonly CharacterId[]>>(
+  InjectionContext.new<ReadonlySignal<ReadonlySet<CharacterId>>>(
     "onlineCharacterIds",
   );
 

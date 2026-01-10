@@ -20,7 +20,11 @@ import {
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
-import { createRedisReadEffect, createRedisSyncEffect, Redis } from "@mp/redis";
+import {
+  createRedisSetReadEffect,
+  createRedisSyncEffect,
+  Redis,
+} from "@mp/redis";
 import { signal } from "@mp/state";
 import { Rng, withBackoffRetries, toResult } from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
@@ -120,15 +124,17 @@ createRedisSyncEffect(
   gameServiceConfigRedisKey,
   GameServiceConfig,
   gameServiceConfig,
+  logger.error,
 );
 
-const onlineCharacterIds = signal<CharacterId[]>([]);
+const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
-createRedisReadEffect(
+createRedisSetReadEffect(
   redisClient,
   onlineCharacterIdsRedisKey,
-  CharacterIdType.array(),
+  CharacterIdType,
   onlineCharacterIds,
+  logger.error,
 );
 
 gameServiceConfig.subscribe((config) => {
@@ -265,7 +271,7 @@ const dbSyncSession = startDbSyncSession({
   server: gameStateServer,
   actorModels,
   logger,
-  getOnlineCharacterIds: () => onlineCharacterIds.value,
+  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.value),
 });
 
 const ioc = new InjectionContainer()

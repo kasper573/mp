@@ -1,5 +1,5 @@
 import { createDbRepository } from "@mp/db";
-import type { AreaId } from "@mp/game-shared";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { EventRouterMessage } from "@mp/event-router";
 import {
   createEventInvoker,
@@ -47,7 +47,7 @@ import {
 } from "./context";
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
-import { createRedisWriteEffect, Redis } from "@mp/redis";
+import { createRedisSetWriteEffect, Redis } from "@mp/redis";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -61,17 +61,18 @@ const gameServiceSockets = new Set<WebSocket>();
 const gameClientSockets = new Map<ClientId, WebSocket>();
 const userSessions = new SyncMap<ClientId, Signal<UserSession<ClientId>>>();
 
-const onlineCharacterIds = computed(() => [
-  ...new Set(
-    userSessions.values().flatMap((session) => {
-      const { character } = session.value;
-      if (character?.type === "player" && character.id) {
-        return [character.id];
-      }
-      return [];
-    }),
-  ),
-]);
+const onlineCharacterIds = computed(
+  (): ReadonlySet<CharacterId> =>
+    new Set(
+      userSessions.values().flatMap((session) => {
+        const { character } = session.value;
+        if (character?.type === "player" && character.id) {
+          return [character.id];
+        }
+        return [];
+      }),
+    ),
+);
 
 collectDefaultMetrics();
 
@@ -91,10 +92,11 @@ const resolveAccessToken = createTokenResolver({
 
 const redisClient = new Redis(opt.redisPath);
 
-createRedisWriteEffect(
+createRedisSetWriteEffect(
   redisClient,
   onlineCharacterIdsRedisKey,
   onlineCharacterIds,
+  logger.error,
 );
 
 const wss = new WebSocketServer({

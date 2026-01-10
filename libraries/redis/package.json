@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@mp/state": "workspace:*",
+    "@mp/std": "workspace:*",
     "@mp/validate": "workspace:*",
+    "cbor-x": "catalog:",
     "ioredis": "5.8.2"
   },
   "devDependencies": {

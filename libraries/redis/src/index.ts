@@ -1,2 +1,2 @@
 export * from "ioredis";
-export * from "./redis-sync-effect";
+export * from "./signal-integration";
