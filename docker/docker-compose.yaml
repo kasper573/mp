@@ -225,7 +225,7 @@ services:
   redis_exporter:
     env_file: *env_files
     logging: *logging
-    image: bitnami/redis-exporter:latest # TODO replace with specific version
+    image: oliver006/redis_exporter:v1.80.1
     environment:
       REDIS_ADDR: redis://redis:6379
     depends_on:
