@@ -22,7 +22,9 @@ export function createRedisSyncEffect<T>(
   onError: (error: Error) => void,
   initializeRedisWithValueInSignal = true,
 ) {
+  // Must duplicate since connections cannot be used for both commands and pub/sub
   const sub = redis.duplicate();
+
   let allowSendingSignalValueToRedis = true;
   let hasIgnoredInitialSignalValue = false;
 
@@ -102,6 +104,13 @@ export function createRedisSyncEffect<T>(
   return function cleanup() {
     stopSubscribingToSignal();
     unsubscribeFromChannel();
+    sub.quit().catch((cause) =>
+      onError(
+        new Error(`Failed to quit redis subscriber for key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
   };
 }
 
@@ -112,6 +121,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
   signal: Signal<ReadonlySet<Member>>,
   onError: (error: Error) => void,
 ) {
+  // Must duplicate since connections cannot be used for both commands and pub/sub
   const sub = redis.duplicate();
 
   const arraySchema = memberSchema.array();
@@ -187,6 +197,13 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     for (const unsubscribe of subscriptions) {
       unsubscribe();
     }
+    sub.quit().catch((cause) =>
+      onError(
+        new Error(`Failed to quit redis subscriber for key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
   };
 }
 
