@@ -1,9 +1,9 @@
 import type { AreaId, CharacterId } from "@mp/game-shared";
-import type { AreaResource, MovementTrait } from "@mp/game-shared";
+import type { AreaResource, Character, MovementTrait } from "@mp/game-shared";
 import { getDestinationFromObject, moveAlongPath } from "@mp/game-shared";
 import type { InjectionContainer } from "@mp/ioc";
 import type { Path, Vector, VectorLike } from "@mp/math";
-import type { Tile } from "@mp/std";
+import { assert, type Tile } from "@mp/std";
 import type { TickEventHandler } from "@mp/time";
 import {
   ctxArea,
@@ -13,7 +13,6 @@ import {
   ctxGameState,
   ctxLogger,
 } from "../context";
-import { accessCharacter } from "./access-character";
 
 export function movementBehavior(ioc: InjectionContainer): TickEventHandler {
   return function movementBehaviorTick({ timeSinceLastTick }) {
@@ -69,7 +68,10 @@ export function sendCharacterToArea(
 ) {
   const gameState = ioc.get(ctxGameState);
   const currentArea = ioc.get(ctxArea);
-  const char = accessCharacter(ioc, characterId);
+  const char = assert(
+    gameState.actors.get(characterId),
+    `Character ${characterId} not found in game state`,
+  ) as Character;
 
   // Actors area ids are only stored in the database.
   // What controls which area an actor is associated with at runtime is simply if it's been added to a game server instance.
