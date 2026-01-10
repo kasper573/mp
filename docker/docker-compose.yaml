@@ -222,6 +222,15 @@ services:
     logging: *logging
     image: prom/node-exporter:v1.8.2
 
+  redis_exporter:
+    env_file: *env_files
+    logging: *logging
+    image: bitnami/redis-exporter:latest # TODO replace with specific version
+    environment:
+      REDIS_ADDR: redis://redis:6379
+    depends_on:
+      - redis
+
   postgres_exporter:
     env_file: *env_files
     logging: *logging
