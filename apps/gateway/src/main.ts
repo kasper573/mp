@@ -48,13 +48,17 @@ import {
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
 import { createRedisSetWriteEffect, Redis } from "@mp/redis";
+import { setupGracefulShutdown } from "@mp/std";
 
 // Note that this file is an entrypoint and should not have any exports
 
 registerEncoderExtensions();
 
+const shutdownCleanups: Array<() => unknown> = [];
+setupGracefulShutdown(process, shutdownCleanups);
+
 const logger = createPinoLogger(opt.log);
-logger.info(opt, `Starting gateway...`);
+logger.info(opt, `Starting gateway (PID: ${process.pid})...`);
 
 type ClientId = Branded<string, "ClientId">;
 const gameServiceSockets = new Set<WebSocket>();
@@ -81,22 +85,29 @@ const webServer = express()
   .use(metricsMiddleware());
 
 const httpServer = http.createServer(webServer);
+shutdownCleanups.push(() => httpServer.close());
 
 const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
+shutdownCleanups.push(() => db.dispose());
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,
   bypassUserRoles: playerRoles,
 });
 
-const redisClient = new Redis(opt.redisPath);
+const redisClient = new Redis(opt.redis.path);
 
-createRedisSetWriteEffect(
-  redisClient,
-  onlineCharacterIdsRedisKey,
-  onlineCharacterIds,
-  logger.error,
+shutdownCleanups.push(
+  createRedisSetWriteEffect({
+    redis: redisClient,
+    key: onlineCharacterIdsRedisKey,
+    signal: onlineCharacterIds,
+    onError: logger.error,
+
+    // This ensures that online state gets cleared if the gateway crashes
+    expire: opt.redis.expireSeconds.characterOnlineStatus,
+  }),
 );
 
 const wss = new WebSocketServer({
@@ -105,6 +116,7 @@ const wss = new WebSocketServer({
   server: httpServer,
   verifyClient: verifySocketConnection,
 });
+shutdownCleanups.push(() => wss.close());
 
 httpServer.listen(opt.port, opt.hostname, () => {
   logger.info(`Gateway listening on ${opt.hostname}:${opt.port}`);

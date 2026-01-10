@@ -7,6 +7,7 @@ export * from "./collections";
 export * from "./assert";
 export * from "neverthrow";
 export * from "./assert";
+export * from "./graceful-shutdown";
 export * from "./retry-backoff";
 export * from "./promise-from-result";
 export * from "./to-result";

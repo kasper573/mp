@@ -69,6 +69,12 @@ export class OptimisticGameState implements GameState {
 
     return ok(void 0);
   };
+
+  reset = () => {
+    this.globals.clear();
+    this.actors.clear();
+    this.items.clear();
+  };
 }
 
 export interface OptimisticGameStateSettings {

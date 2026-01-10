@@ -325,6 +325,9 @@ importers:
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../../libraries/time
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
@@ -904,6 +907,9 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../std
+      '@mp/time':
+        specifier: workspace:*
+        version: link:../time
       '@mp/validate':
         specifier: workspace:*
         version: link:../validate

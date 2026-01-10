@@ -1,6 +1,7 @@
 import { parseEnv } from "@mp/env";
 import { authAlgorithms } from "@mp/auth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
+import { TimeSpan } from "@mp/time";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;
 
@@ -28,7 +29,6 @@ export const serverOptionsSchema = type({
     pretty: boolish().optional(),
   },
   databaseConnectionString: "string",
-  redisPath: "string",
   /**
    * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.
    */
@@ -55,6 +55,12 @@ export const serverOptionsSchema = type({
      * Used by load test to automatically sign in as a new user and character.
      */
     allowBypassUsers: boolish(),
+  },
+  redis: {
+    path: "string",
+    expireSeconds: {
+      characterOnlineStatus: numeric().pipe((v) => TimeSpan.fromSeconds(v)),
+    },
   },
 }).onDeepUndeclaredKey("delete");
 

@@ -26,7 +26,12 @@ import {
   Redis,
 } from "@mp/redis";
 import { signal } from "@mp/state";
-import { Rng, withBackoffRetries, toResult } from "@mp/std";
+import {
+  Rng,
+  withBackoffRetries,
+  toResult,
+  setupGracefulShutdown,
+} from "@mp/std";
 import { shouldOptimizeTrackedProperties, SyncMap, SyncServer } from "@mp/sync";
 import {
   collectDefaultMetrics,
@@ -75,6 +80,9 @@ registerEncoderExtensions();
 collectDefaultMetrics();
 RateLimiter.enabled = opt.rateLimit;
 
+const shutdownCleanups: Array<() => unknown> = [];
+setupGracefulShutdown(process, shutdownCleanups);
+
 const rng = new Rng(opt.rngSeed);
 const logger = createPinoLogger({
   ...opt.log,
@@ -118,33 +126,33 @@ const redisClient = new Redis(opt.redisPath);
 const gameServiceConfig = signal<GameServiceConfig>({
   isPatchOptimizerEnabled: true,
 });
-
-createRedisSyncEffect(
-  redisClient,
-  gameServiceConfigRedisKey,
-  GameServiceConfig,
-  gameServiceConfig,
-  logger.error,
-);
-
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
-createRedisSetReadEffect(
-  redisClient,
-  onlineCharacterIdsRedisKey,
-  CharacterIdType,
-  onlineCharacterIds,
-  logger.error,
+shutdownCleanups.push(
+  createRedisSyncEffect(
+    redisClient,
+    gameServiceConfigRedisKey,
+    GameServiceConfig,
+    gameServiceConfig,
+    logger.error,
+  ),
+  createRedisSetReadEffect(
+    redisClient,
+    onlineCharacterIdsRedisKey,
+    CharacterIdType,
+    onlineCharacterIds,
+    logger.error,
+  ),
+  gameServiceConfig.subscribe((config) => {
+    shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
+  }),
 );
-
-gameServiceConfig.subscribe((config) => {
-  shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
-});
 
 const metricsPushgateway = new Pushgateway(opt.metricsPushgateway.url);
 
 const db = createDbRepository(opt.databaseConnectionString);
 db.subscribeToErrors((err) => logger.error(err, "Database error"));
+shutdownCleanups.push(() => db.dispose());
 
 const perSessionEventLimit = new RateLimiter({ points: 20, duration: 1 });
 
@@ -163,6 +171,7 @@ gatewaySocket.addEventListener("error", (err) =>
   logger.error(parseSocketError(err), "Gateway socket error"),
 );
 gatewaySocket.addEventListener("message", handleGatewayMessage);
+shutdownCleanups.push(() => gatewaySocket.close());
 
 const gameEventBroadcastClient = createProxyEventInvoker<GameServiceEvents>(
   (event) => gatewaySocket.send(eventMessageEncoding.encode(event)),
