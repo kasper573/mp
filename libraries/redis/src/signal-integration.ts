@@ -96,6 +96,7 @@ export function createRedisSyncEffect<T>(
     sub,
     channels.sync(key),
     tryReceiveFromRedis,
+    onError,
   );
 
   return function cleanup() {
@@ -177,9 +178,9 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     );
 
   const subscriptions = [
-    subscribe(sub, channels.overwriteSet(key), overwriteSet),
-    subscribe(sub, channels.addToSet(key), addToSet),
-    subscribe(sub, channels.removeFromSet(key), removeFromSet),
+    subscribe(sub, channels.overwriteSet(key), overwriteSet, onError),
+    subscribe(sub, channels.addToSet(key), addToSet, onError),
+    subscribe(sub, channels.removeFromSet(key), removeFromSet, onError),
   ];
 
   return function cleanup() {
@@ -277,17 +278,34 @@ function subscribe(
   redis: Redis,
   channel: string,
   listener: (message: Buffer) => void,
+  onError: (error: Error) => void,
 ) {
-  void redis.subscribe(channel).then(() => {
-    redis.on("messageBuffer", (messageChannel, message) => {
-      if (messageChannel.toString("utf8") === channel) {
-        listener(message);
-      }
-    });
-  });
+  function messageHandler(messageChannel: Buffer, message: Buffer) {
+    if (messageChannel.toString("utf8") === channel) {
+      listener(message);
+    }
+  }
+
+  void redis
+    .subscribe(channel)
+    .then(() => redis.on("messageBuffer", messageHandler))
+    .catch((cause) =>
+      onError(
+        new Error(`Failed to subscribe to redis channel "${channel}"`, {
+          cause,
+        }),
+      ),
+    );
 
   return () => {
-    void redis.unsubscribe(channel);
+    redis.off("messageBuffer", messageHandler);
+    void redis.unsubscribe(channel).catch((cause) =>
+      onError(
+        new Error(`Failed to unsubscribe from redis channel "${channel}"`, {
+          cause,
+        }),
+      ),
+    );
   };
 }
 
