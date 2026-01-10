@@ -301,16 +301,15 @@ function subscribe(
     }
   }
 
-  void redis
-    .subscribe(channel)
-    .then(() => redis.on("messageBuffer", messageHandler))
-    .catch((cause) =>
-      onError(
-        new Error(`Failed to subscribe to redis channel "${channel}"`, {
-          cause,
-        }),
-      ),
-    );
+  redis.on("messageBuffer", messageHandler);
+
+  void redis.subscribe(channel).catch((cause) =>
+    onError(
+      new Error(`Failed to subscribe to redis channel "${channel}"`, {
+        cause,
+      }),
+    ),
+  );
 
   return () => {
     redis.off("messageBuffer", messageHandler);
