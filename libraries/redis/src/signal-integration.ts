@@ -180,7 +180,7 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
       multi.sadd(key, initialArray);
     }
 
-    multi.publish(channels.overwriteSet(key), encode(initialArray)).exec();
+    void multi.publish(channels.overwriteSet(key), encode(initialArray)).exec();
   }
 
   return signal.subscribe(() => {
@@ -204,7 +204,7 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
     }
 
     if (multi) {
-      multi.exec();
+      void multi.exec();
     }
   });
 }
