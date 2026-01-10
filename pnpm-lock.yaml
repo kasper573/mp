@@ -27,6 +27,9 @@ catalogs:
     '@vanilla-extract/vite-plugin':
       specifier: 5.0.6
       version: 5.0.6
+    cbor-x:
+      specifier: 1.6.0
+      version: 1.6.0
     dotenv:
       specifier: 17.2.0
       version: 17.2.0
@@ -719,7 +722,7 @@ importers:
         specifier: workspace:*
         version: link:../std
       cbor-x:
-        specifier: 1.6.0
+        specifier: 'catalog:'
         version: 1.6.0
     devDependencies:
       '@mp/tsconfig':
@@ -898,9 +901,15 @@ importers:
       '@mp/state':
         specifier: workspace:*
         version: link:../state
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../std
       '@mp/validate':
         specifier: workspace:*
         version: link:../validate
+      cbor-x:
+        specifier: 'catalog:'
+        version: 1.6.0
       ioredis:
         specifier: 5.8.2
         version: 5.8.2

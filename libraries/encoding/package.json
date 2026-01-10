@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "cbor-x": "1.6.0"
+    "cbor-x": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

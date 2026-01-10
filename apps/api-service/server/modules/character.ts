@@ -11,7 +11,9 @@ import type { FormUpdateResult } from "./form";
 export async function characterList(ctx: ApiContext): Promise<Character[]> {
   await roles(ctx, [gatewayRoles.spectate]);
   const ids = ctx.ioc.get(ctxOnlineCharacterIds);
-  return promiseFromResult(ctx.ioc.get(ctxDb).selectCharacterList(ids.value));
+  return promiseFromResult(
+    ctx.ioc.get(ctxDb).selectCharacterList(Array.from(ids.value)),
+  );
 }
 
 /** @gqlQueryField */

@@ -10,7 +10,11 @@ import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import { createRedisReadEffect, createRedisSyncEffect, Redis } from "@mp/redis";
+import {
+  createRedisSetReadEffect,
+  createRedisSyncEffect,
+  Redis,
+} from "@mp/redis";
 import { signal } from "@mp/state";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 import "dotenv/config";
@@ -60,15 +64,17 @@ createRedisSyncEffect(
   gameServiceConfigRedisKey,
   GameServiceConfig,
   gameServiceConfig,
+  logger.error,
 );
 
-const onlineCharacterIds = signal<readonly CharacterId[]>([]);
+const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
-createRedisReadEffect(
+createRedisSetReadEffect(
   redisClient,
   onlineCharacterIdsRedisKey,
-  CharacterIdType.array().readonly(),
+  CharacterIdType,
   onlineCharacterIds,
+  logger.error,
 );
 
 const fileResolver = createFileResolver(
