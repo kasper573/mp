@@ -18,8 +18,6 @@ function PlayPage() {
   const qb = useQueryBuilder();
   const { data: myCharacterId } = useQuery({
     ...qb.queryOptions(query),
-    // Important to use connected state to requery when reconnecting
-    enabled: stateClient.isConnected.value,
     select: (res) => res.myCharacterId,
   });
 
@@ -34,7 +32,13 @@ function PlayPage() {
       stateClient.characterId.value = myCharacterId;
       events.gateway.join(myCharacterId);
     }
-  }, [myCharacterId, stateClient, events]);
+  }, [
+    myCharacterId,
+    stateClient,
+    events,
+    // Important to retrigger join when connection is re-established
+    stateClient.isConnected.value,
+  ]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,

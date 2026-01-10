@@ -95,6 +95,14 @@ export class GameStateClient {
       subscribeToReadyState(socket, (readyState) => {
         this.socketReadyState.value = readyState;
       }),
+      this.isConnected.subscribe((isConnected) => {
+        if (!isConnected) {
+          this.options.logger.debug(
+            `Disconnected from gateway, resetting game state.`,
+          );
+          this.gameState.reset();
+        }
+      }),
     ];
 
     socket.addEventListener("message", this.handleMessage);
