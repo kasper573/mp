@@ -1,4 +1,3 @@
-// oxlint-disable no-console
 import { ok, err, type Result } from "@mp/std";
 import type { Signal } from "@mp/state";
 import type { Type } from "@mp/validate";
@@ -224,6 +223,11 @@ export interface RedisSetWriteEffectOptions<T> {
    */
   initialize?: boolean;
   /**
+   * If true, the redis set will be deleted when the effect is cleaned up.
+   * Defaults to true.
+   */
+  deleteOnCleanup?: boolean;
+  /**
    * If provided, the redis key will have this expire time set on it.
    * A heartbeat interval will be automatically set up to keep the key alive as long as the effect is active.
    */
@@ -232,24 +236,27 @@ export interface RedisSetWriteEffectOptions<T> {
 
 export function createRedisSetWriteEffect<T extends RedisSetMember>({
   initialize = true,
+  deleteOnCleanup = true,
   expire,
   redis,
   key,
   signal,
   onError,
 }: RedisSetWriteEffectOptions<T>) {
-  let previousSet = signal.value;
-
   if (initialize) {
-    const initialArray = Array.from(previousSet);
+    void setValueInRedis(signal.value);
+  }
+
+  async function setValueInRedis(newValue: ReadonlySet<T>) {
+    const newArray = Array.from(newValue);
     const multi = redis.multi().del(key);
 
-    if (initialArray.length) {
-      multi.sadd(key, initialArray);
+    if (newArray.length) {
+      multi.sadd(key, newArray);
     }
 
-    void multi
-      .publish(channels.overwriteSet(key), encode(initialArray))
+    await multi
+      .publish(channels.overwriteSet(key), encode(newArray))
       .exec()
       .catch((cause) =>
         onError(
@@ -262,6 +269,7 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>({
     ? redisKeepAliveEffect(redis, key, expire, onError)
     : undefined;
 
+  let previousSet = signal.value;
   const unsubscribeFromSignal = signal.subscribe(() => {
     const newSet = signal.value;
     const addedSet = newSet.difference(previousSet);
@@ -293,7 +301,10 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>({
     }
   });
 
-  return function cleanup() {
+  return async function cleanup() {
+    if (deleteOnCleanup) {
+      await setValueInRedis(new Set());
+    }
     unsubscribeFromSignal();
     cleanupHeartbeat?.();
   };
