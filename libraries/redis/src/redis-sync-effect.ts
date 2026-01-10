@@ -147,11 +147,8 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     return true;
   }
 
-  void redis.getBuffer(key).then((message) => {
-    if (message !== null) {
-      console.log(key, "Received", decode(message));
-      overwriteSet(message);
-    }
+  void redis.smembers(key).then((members) => {
+    signal.value = new Set(members as Member[]);
   });
 
   const subscriptions = [
