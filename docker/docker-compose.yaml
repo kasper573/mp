@@ -165,6 +165,7 @@ services:
     logging: *logging
     image: redis:7.4.1
     restart: always
+    command: redis-server --notify-keyspace-events Ex
 
   mimir:
     env_file: *env_files

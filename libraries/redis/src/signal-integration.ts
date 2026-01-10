@@ -5,6 +5,7 @@ import type { Type } from "@mp/validate";
 import { type } from "@mp/validate";
 import type Redis from "ioredis";
 import { encode, decode } from "cbor-x";
+import type { TimeSpan } from "@mp/time";
 
 /**
  * Synchronizes a signal with a Redis key.
@@ -174,6 +175,12 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     return true;
   }
 
+  function onExpire(expiredKey: string) {
+    if (expiredKey === key) {
+      signal.value = new Set();
+    }
+  }
+
   void redis
     .smembers(key)
     .then((members) => overwriteSet(encode(members)))
@@ -189,6 +196,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
     subscribe(sub, channels.overwriteSet(key), overwriteSet, onError),
     subscribe(sub, channels.addToSet(key), addToSet, onError),
     subscribe(sub, channels.removeFromSet(key), removeFromSet, onError),
+    subscribeToExpireEvents(redis, onExpire, onError),
   ];
 
   return function cleanup() {
@@ -205,16 +213,34 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
   };
 }
 
-export function createRedisSetWriteEffect<T extends RedisSetMember>(
-  redis: Redis,
-  key: string,
-  signal: Signal<ReadonlySet<T>>,
-  onError: (error: Error) => void,
-  initializeRedisWithValueInSignal = true,
-) {
+export interface RedisSetWriteEffectOptions<T> {
+  redis: Redis;
+  key: string;
+  signal: Signal<ReadonlySet<T>>;
+  onError: (error: Error) => void;
+  /**
+   * Initialize redis with the current value in the signal on the start of the effect.
+   * Defaults to true.
+   */
+  initialize?: boolean;
+  /**
+   * If provided, the redis key will have this expire time set on it.
+   * A heartbeat interval will be automatically set up to keep the key alive as long as the effect is active.
+   */
+  expire?: TimeSpan;
+}
+
+export function createRedisSetWriteEffect<T extends RedisSetMember>({
+  initialize = true,
+  expire,
+  redis,
+  key,
+  signal,
+  onError,
+}: RedisSetWriteEffectOptions<T>) {
   let previousSet = signal.value;
 
-  if (initializeRedisWithValueInSignal) {
+  if (initialize) {
     const initialArray = Array.from(previousSet);
     const multi = redis.multi().del(key);
 
@@ -232,7 +258,11 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
       );
   }
 
-  return signal.subscribe(() => {
+  let cleanupHeartbeat = expire
+    ? redisKeepAliveEffect(redis, key, expire, onError)
+    : undefined;
+
+  const unsubscribeFromSignal = signal.subscribe(() => {
     const newSet = signal.value;
     const addedSet = newSet.difference(previousSet);
     const removedSet = previousSet.difference(newSet);
@@ -262,6 +292,71 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>(
         );
     }
   });
+
+  return function cleanup() {
+    unsubscribeFromSignal();
+    cleanupHeartbeat?.();
+  };
+}
+
+function redisKeepAliveEffect(
+  redis: Redis,
+  key: string,
+  expire: TimeSpan,
+  onError: (error: Error) => void,
+) {
+  function heartbeat() {
+    void redis.expire(key, expire.totalSeconds).catch((cause) =>
+      onError(
+        new Error(`Failed to set TTL for redis set key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
+  }
+
+  heartbeat();
+
+  const heartbeatInterval = Math.ceil(expire.totalMilliseconds / 2);
+  const intervalId = setInterval(heartbeat, heartbeatInterval);
+
+  return function cleanup() {
+    clearInterval(intervalId);
+  };
+}
+
+function subscribeToExpireEvents(
+  redis: Redis,
+  handleExpiredKey: (expiredKey: string) => void,
+  onError: (error: Error) => void,
+) {
+  const sub = redis.duplicate();
+  const key = "__keyevent@0__:expired";
+
+  void sub.subscribe(key).catch((cause) =>
+    onError(
+      new Error(`Could not subscribe to 'expired' keyspace notification`, {
+        cause,
+      }),
+    ),
+  );
+
+  function onExpire(_channel: string, expiredKey: string) {
+    return handleExpiredKey(expiredKey);
+  }
+
+  sub.on("message", onExpire);
+
+  return function cleanup() {
+    sub.off("message", onExpire);
+    void sub.quit().catch((cause) =>
+      onError(
+        new Error(`Failed to quit redis subscriber for key "${key}"`, {
+          cause,
+        }),
+      ),
+    );
+  };
 }
 
 function decodeAndParse<T>(

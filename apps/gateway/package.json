@@ -32,6 +32,7 @@
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/telemetry": "workspace:*",
+    "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
     "dotenv": "catalog:",

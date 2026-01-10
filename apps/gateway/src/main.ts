@@ -48,6 +48,7 @@ import {
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
 import { createRedisSetWriteEffect, Redis } from "@mp/redis";
+import { TimeSpan } from "@mp/time";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -92,12 +93,13 @@ const resolveAccessToken = createTokenResolver({
 
 const redisClient = new Redis(opt.redisPath);
 
-createRedisSetWriteEffect(
-  redisClient,
-  onlineCharacterIdsRedisKey,
-  onlineCharacterIds,
-  logger.error,
-);
+createRedisSetWriteEffect({
+  redis: redisClient,
+  key: onlineCharacterIdsRedisKey,
+  signal: onlineCharacterIds,
+  onError: logger.error,
+  expire: TimeSpan.fromSeconds(10), // This ensures that online state gets cleared if the gateway crashes
+});
 
 const wss = new WebSocketServer({
   ...wssConfig(),
