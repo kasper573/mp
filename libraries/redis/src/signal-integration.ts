@@ -317,7 +317,7 @@ function redisKeepAliveEffect(
   onError: (error: Error) => void,
 ) {
   function heartbeat() {
-    void redis.expire(key, expire.totalSeconds).catch((cause) =>
+    void redis.expire(key, Math.round(expire.totalSeconds)).catch((cause) =>
       onError(
         new Error(`Failed to set TTL for redis set key "${key}"`, {
           cause,
