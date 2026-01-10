@@ -176,9 +176,7 @@ export function createRedisSetReadEffect<Member extends RedisSetMember>(
 
   void redis
     .smembers(key)
-    .then((members) => {
-      signal.value = new Set(members as Member[]);
-    })
+    .then((members) => overwriteSet(encode(members)))
     .catch((cause) =>
       onError(
         new Error(`Could not initialize redis set from key "${key}"`, {
