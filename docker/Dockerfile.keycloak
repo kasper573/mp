@@ -8,6 +8,9 @@ ENV KC_DB=postgres
 
 WORKDIR /opt/keycloak
 
+# Copy custom theme to prevent username enumeration
+COPY keycloak/themes /opt/keycloak/themes
+
 RUN /opt/keycloak/bin/kc.sh build
 
 FROM base AS runner

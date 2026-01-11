@@ -1603,7 +1603,7 @@
     "ssl": "false",
     "user": "${KC_SMTP_USER}"
   },
-  "loginTheme": "keycloak.v2",
+  "loginTheme": "mp",
   "accountTheme": "keycloak.v3",
   "adminTheme": "keycloak.v2",
   "emailTheme": "keycloak",

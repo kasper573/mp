@@ -1,0 +1,35 @@
+/* 
+ * Security fix: Prevent username enumeration
+ * Always highlight both username and password fields on login errors
+ * to prevent leaking information about which usernames exist
+ */
+
+/* When there's an error, highlight both username and password fields */
+.login-pf-page .alert-error ~ form .pf-c-form__group-control input[name="username"],
+.login-pf-page .alert-error ~ form .pf-c-form__group-control input[name="password"],
+.login-pf-page .kc-login-error ~ form .pf-c-form__group-control input[name="username"],
+.login-pf-page .kc-login-error ~ form .pf-c-form__group-control input[name="password"] {
+    border-color: var(--pf-global--danger-color--100, #c9190b) !important;
+}
+
+/* For Keycloak v2 theme styling */
+.login-pf-page .alert-error ~ form input[name="username"],
+.login-pf-page .alert-error ~ form input[name="password"] {
+    border-color: #cc0000 !important;
+    border-width: 2px !important;
+}
+
+/* Remove individual field error indicators */
+.login-pf-page form .pf-c-form__group.error input,
+.login-pf-page form .form-group.error input {
+    border-color: inherit !important;
+}
+
+/* When error alert is present, apply error styling to both fields */
+.login-pf-page:has(.alert-error) form input[name="username"],
+.login-pf-page:has(.alert-error) form input[name="password"],
+.login-pf-page:has(.kc-login-error) form input[name="username"],
+.login-pf-page:has(.kc-login-error) form input[name="password"] {
+    border-color: #cc0000 !important;
+    border-width: 2px !important;
+}
