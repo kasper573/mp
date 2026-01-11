@@ -20,7 +20,11 @@ RUN pnpm -F db build
 COPY <<EOF /app/start.sh
 #!/bin/sh
 set -e
+# Prepare database for migrations (handles both fresh and existing databases)
+pnpm -F db migrate-safe
+# Run migrations using drizzle-kit
 pnpm -F db migrate
+# Seed the database
 pnpm -F db seed
 EOF
 

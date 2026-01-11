@@ -551,6 +551,9 @@ importers:
       drizzle-kit:
         specifier: 0.31.8
         version: 0.31.8
+      tsx:
+        specifier: 'catalog:'
+        version: 4.19.2
 
   integrations/game-client:
     dependencies:

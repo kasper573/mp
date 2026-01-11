@@ -15,6 +15,7 @@
     "push": "drizzle-kit push",
     "generate": "drizzle-kit generate",
     "migrate": "drizzle-kit migrate",
+    "migrate-safe": "tsx migrate-safe.ts",
     "seed": "tsx seed.ts",
     "drop": "tsx drop.ts",
     "reset": "pnpm drop && rm -rf drizzle/* && pnpm generate && pnpm push && pnpm seed",
@@ -32,6 +33,7 @@
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@types/pg": "8.16.0",
-    "drizzle-kit": "0.31.8"
+    "drizzle-kit": "0.31.8",
+    "tsx": "catalog:"
   }
 }
