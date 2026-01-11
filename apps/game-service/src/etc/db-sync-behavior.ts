@@ -45,7 +45,7 @@ export function startDbSyncSession({
     async load(characterId) {
       const res = await db.gameStateFor(opt).loadOne(characterId);
       if (res.isErr()) {
-        opt.logger.error(res.error, "game state db sync save error");
+        opt.logger.error(res.error, "game state db sync load error");
       }
       return res;
     },

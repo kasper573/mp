@@ -116,7 +116,7 @@ export function sendCharacterToArea(
       // since regular persistence is done on interval, an interval which we would miss here.
       // Wait for the save to complete to ensure the new game service loads the correct state.
       const saveResult = await ioc.get(ctxDbSyncSession).save(char.identity.id);
-      if (saveResult?.isErr()) {
+      if (saveResult.isErr()) {
         logger.error(saveResult.error, "Failed to save character state before area change");
         return;
       }
