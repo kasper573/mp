@@ -16,7 +16,7 @@
                             <#if !realm.loginWithEmailAllowed>${msg("username")}<#elseif !realm.registrationEmailAsUsername>${msg("usernameOrEmail")}<#else>${msg("email")}</#if>
                         </label>
 
-                        <input tabindex="1" id="username" class="<#if showError>pf-c-form-control error<#else>pf-c-form-control</#if>" name="username" value="${(login.username!'')}"  type="text" autofocus autocomplete="off"
+                        <input tabindex="1" id="username" class="<#if showError>pf-c-form-control error<#else>pf-c-form-control</#if>" name="username" value="${(login.username!'')}" type="text" autofocus autocomplete="off"
                                aria-invalid="<#if showError>true<#else>false</#if>"
                         />
                     </div>

@@ -19,17 +19,8 @@
     border-width: 2px !important;
 }
 
-/* Remove individual field error indicators */
+/* Remove individual field error indicators to enforce consistent error styling */
 .login-pf-page form .pf-c-form__group.error input,
 .login-pf-page form .form-group.error input {
     border-color: inherit !important;
-}
-
-/* When error alert is present, apply error styling to both fields */
-.login-pf-page:has(.alert-error) form input[name="username"],
-.login-pf-page:has(.alert-error) form input[name="password"],
-.login-pf-page:has(.kc-login-error) form input[name="username"],
-.login-pf-page:has(.kc-login-error) form input[name="password"] {
-    border-color: #cc0000 !important;
-    border-width: 2px !important;
 }
