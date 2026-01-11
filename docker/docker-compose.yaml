@@ -211,6 +211,8 @@ services:
       - grafana
       - loki
       - tempo
+      - postgres
+      - redis
 
   loki:
     logging: *logging
@@ -219,29 +221,6 @@ services:
     volumes:
       - ./grafana/loki.yaml:/etc/loki/local-config.yaml
       - loki-data:/loki
-
-  node_exporter:
-    env_file: *env_files
-    logging: *logging
-    image: prom/node-exporter:v1.8.2
-
-  redis_exporter:
-    env_file: *env_files
-    logging: *logging
-    image: oliver006/redis_exporter:v1.80.1
-    environment:
-      REDIS_ADDR: redis://redis:6379
-    depends_on:
-      - redis
-
-  postgres_exporter:
-    env_file: *env_files
-    logging: *logging
-    image: prometheuscommunity/postgres-exporter:v0.18.1
-    environment:
-      DATA_SOURCE_URI: postgres:5432/postgres?sslmode=disable
-    depends_on:
-      - postgres
 
   grafana:
     env_file: *env_files

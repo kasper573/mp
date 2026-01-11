@@ -28,30 +28,35 @@ prometheus.scrape "pushgateway" {
 	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
+prometheus.exporter.unix "default" {
+}
+
 prometheus.scrape "node_exporter" {
-	targets = [{
-		__address__ = "node_exporter:9100",
-	}]
+	targets         = prometheus.exporter.unix.default.targets
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "node_exporter"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
+prometheus.exporter.postgres "default" {
+	data_source_names = ["postgresql://" + env("DATA_SOURCE_USER") + ":" + env("DATA_SOURCE_PASS") + "@postgres:5432/postgres?sslmode=disable"]
+}
+
 prometheus.scrape "postgres_exporter" {
-	targets = [{
-		__address__ = "postgres_exporter:9187",
-	}]
+	targets         = prometheus.exporter.postgres.default.targets
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "postgres_exporter"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
+prometheus.exporter.redis "default" {
+	redis_addr = "redis://redis:6379"
+}
+
 prometheus.scrape "redis_exporter" {
-	targets = [{
-		__address__ = "redis_exporter:9121",
-	}]
+	targets         = prometheus.exporter.redis.default.targets
 	forward_to      = [prometheus.remote_write.default.receiver]
 	job_name        = "redis_exporter"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
