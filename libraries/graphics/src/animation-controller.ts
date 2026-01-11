@@ -136,6 +136,15 @@ export class AnimationController<AnimationName extends string> extends Sprite {
     });
   }
 
+  fixAtEnd(name: AnimationName): void {
+    delete this.playToEnd;
+    delete this.smooth;
+    this.fixed = {
+      type: "fixed-at-end",
+      name,
+    };
+  }
+
   private emitAnimationEvent(event: AnimationEvent<AnimationName>) {
     for (const handler of this.eventSubscriptions) {
       handler(event);

@@ -66,7 +66,9 @@ export class ActorController extends Container {
       }),
       options.eventBus.subscribe("actor.death", (deadActorId) => {
         if (deadActorId === actor.identity.id) {
-          void this.sprite.playToEndAndStop("death-spear");
+          void this.sprite.playToEndAndStop("death-spear").then(() => {
+            this.sprite.fixAtEnd("death-spear");
+          });
         }
       }),
     ];
