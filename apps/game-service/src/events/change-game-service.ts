@@ -28,5 +28,5 @@ export const changeGameService = evt.event
         "Character joined game service via gateway broadcast. Will eagerly reload character state from db.",
       );
 
-    ctx.get(ctxDbSyncSession).load(input.characterId);
+    void ctx.get(ctxDbSyncSession).load(input.characterId);
   });

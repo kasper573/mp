@@ -89,14 +89,17 @@ export function sendCharacterToArea(
 
   // Persist the area change so that upcoming db sync in the
   // new game service will be able to pick up this character.
+  // Include health to prevent race condition where old (potentially dead) state is loaded
+  // before the periodic sync can save the current state.
   void ioc
     .get(ctxDb)
     .updateCharactersArea({
       characterId,
       newAreaId: destinationAreaId,
       newCoords: destinationCoords,
+      health: char.combat.health,
     })
-    .then((res) => {
+    .then(async (res) => {
       const logger = ioc.get(ctxLogger);
       if (res.isErr()) {
         logger.error(
@@ -111,7 +114,12 @@ export function sendCharacterToArea(
       // Since moving to another area means to remove the character from the current game service,
       // any unsynced game state changes related to this character would be lost unless we save them explicitly right now,
       // since regular persistence is done on interval, an interval which we would miss here.
-      ioc.get(ctxDbSyncSession).save(char.identity.id);
+      // Wait for the save to complete to ensure the new game service loads the correct state.
+      const saveResult = await ioc.get(ctxDbSyncSession).save(char.identity.id);
+      if (saveResult?.isErr()) {
+        logger.error(saveResult.error, "Failed to save character state before area change");
+        return;
+      }
 
       // But if we're moving to a different area we must communicate
       // with other services and tell them to pick up this character.

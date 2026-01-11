@@ -3,6 +3,7 @@ import type { SyncGameStateOptions } from "@mp/db";
 import { startAsyncInterval, TimeSpan } from "@mp/time";
 import type { GameStateServer } from "./game-state-server";
 import type { CharacterId } from "@mp/game-shared";
+import type { Result } from "@mp/std";
 
 export type StartDbSyncSession = Omit<
   SyncGameStateOptions,
@@ -34,23 +35,19 @@ export function startDbSyncSession({
 
   return {
     stop: () => session.stop(),
-    save(characterId) {
-      db.gameStateFor(opt)
-        .saveOne(characterId)
-        .then((res) => {
-          if (res.isErr()) {
-            opt.logger.error(res.error, "game state db sync save error");
-          }
-        });
+    async save(characterId) {
+      const res = await db.gameStateFor(opt).saveOne(characterId);
+      if (res.isErr()) {
+        opt.logger.error(res.error, "game state db sync save error");
+      }
+      return res;
     },
-    load(characterId) {
-      db.gameStateFor(opt)
-        .loadOne(characterId)
-        .then((res) => {
-          if (res.isErr()) {
-            opt.logger.error(res.error, "game state db sync save error");
-          }
-        });
+    async load(characterId) {
+      const res = await db.gameStateFor(opt).loadOne(characterId);
+      if (res.isErr()) {
+        opt.logger.error(res.error, "game state db sync save error");
+      }
+      return res;
     },
   };
 }
@@ -58,13 +55,15 @@ export function startDbSyncSession({
 export interface DbSyncSession {
   stop(): void;
   /**
-   * Forcefully saves the game state for the given character immediately
+   * Forcefully saves the game state for the given character immediately.
+   * Returns a promise that resolves with the result of the save operation.
    */
-  save(characterId: CharacterId): void;
+  save(characterId: CharacterId): Promise<Result<void, unknown>>;
   /**
-   * Forcefully loads the game state for the given character immediately
+   * Forcefully loads the game state for the given character immediately.
+   * Returns a promise that resolves with the result of the load operation.
    */
-  load(characterId: CharacterId): void;
+  load(characterId: CharacterId): Promise<Result<void, unknown>>;
 }
 
 const syncInterval = TimeSpan.fromSeconds(5);

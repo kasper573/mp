@@ -10,12 +10,22 @@ export const updateCharactersArea = procedure()
     characterId: CharacterId;
     newAreaId: AreaId;
     newCoords: Vector<Tile>;
+    health?: number;
   }>()
   .query(
-    async (drizzle, { characterId, newAreaId, newCoords }): Promise<void> => {
+    async (drizzle, { characterId, newAreaId, newCoords, health }): Promise<void> => {
+      const updateData: { areaId: AreaId; coords: Vector<Tile>; health?: number } = {
+        areaId: newAreaId,
+        coords: newCoords,
+      };
+      
+      if (health !== undefined) {
+        updateData.health = health;
+      }
+
       const result = await drizzle
         .update(characterTable)
-        .set({ areaId: newAreaId, coords: newCoords })
+        .set(updateData)
         .where(eq(characterTable.id, characterId));
 
       if (result.rowCount === 0) {
