@@ -6,248 +6,247 @@ import type Redis from "ioredis";
 import { encode, decode } from "cbor-x";
 import type { TimeSpan } from "@mp/time";
 
+export interface RedisSyncOptions<T> {
+  redis: Redis;
+  key: string;
+  schema: Type<T>;
+  signal: Signal<T>;
+  onError: (error: Error) => void;
+}
+
 /**
- * Synchronizes a signal with a Redis key.
- * If redis updates, the signal value will be changed to the new value from redis.
- * Likewise, if the signal value changes, redis will be updated with the new value.
- *
- * Will use the given arktype to validate the value received from Redis.
- * The signal value will be serialized using cbor.
+ * Synchronizes an arbitrary Redis key and Signal.
  */
-export function createRedisSyncEffect<T>(
-  redis: Redis,
-  key: string,
-  schema: Type<T>,
-  signal: Signal<T>,
-  onError: (error: Error) => void,
-  initializeRedisWithValueInSignal = true,
-) {
-  // Must duplicate since connections cannot be used for both commands and pub/sub
-  const sub = redis.duplicate();
+export class RedisSync<T> {
+  #cleanupFns: CleanupFn[] = [];
 
-  let allowSendingSignalValueToRedis = true;
-  let hasIgnoredInitialSignalValue = false;
+  private constructor(private opt: RedisSyncOptions<T>) {}
 
-  const stopSubscribingToSignal = signal.subscribe(() => {
-    // We only want future updates to the signal
-    if (!hasIgnoredInitialSignalValue) {
-      hasIgnoredInitialSignalValue = true;
-      return;
-    }
+  /**
+   * Immediately load the current value from redis into the signal.
+   */
+  load = (): this => {
+    const { redis, key } = this.opt;
+    void redis
+      .getBuffer(key)
+      .then(this.tryReceiveFromRedis)
+      .catch(this.onError);
+    return this;
+  };
 
-    if (allowSendingSignalValueToRedis) {
-      void sendValueToRedis(signal.value);
-    }
-  });
-
-  function sendValueToRedis(newValue: T) {
-    const message = encode(newValue);
+  /**
+   * Immediately save the current value from the signal into redis.
+   */
+  save = (): this => {
+    const { redis, signal, key } = this.opt;
+    const message = encode(signal.value);
     void redis
       .multi()
       .set(key, message)
       .publish(channels.sync(key), message)
       .exec()
-      .catch((cause) =>
-        onError(
-          new Error(`Could not send value to redis for key "${key}"`, {
-            cause,
-          }),
-        ),
-      );
-  }
+      .catch(this.onError);
 
-  function tryReceiveFromRedis(message: Buffer): boolean {
+    return this;
+  };
+
+  /**
+   * Set to automatically update the signal when redis updates.
+   */
+  subscribe = (): this => {
+    const { redis, key } = this.opt;
+
+    // Must duplicate since connections cannot be used for both commands and pub/sub
+    const sub = redis.duplicate();
+
+    this.#cleanupFns.push(
+      subscribe(
+        sub,
+        channels.sync(key),
+        this.tryReceiveFromRedis,
+        this.onError,
+      ),
+      () => sub.quit().catch(this.onError),
+    );
+
+    return this;
+  };
+
+  /**
+   * Set to automatically update redis when the signal value changes.
+   */
+  synchronize = (): this => {
+    const { signal } = this.opt;
+    this.#cleanupFns.push(signal.subscribe(this.save));
+    return this;
+  };
+
+  private cleanup: CleanupFn = () =>
+    silentInvoke(this.#cleanupFns, this.onError);
+
+  private tryReceiveFromRedis = (message?: Buffer | null): void => {
+    if (!message) {
+      return;
+    }
+
+    const { signal, schema } = this.opt;
     const result = decodeAndParse(message, schema);
 
     if (result.isErr()) {
-      onError(
-        new Error(`Could not receive redis sync for key "${key}"`, {
-          cause: result.error,
-        }),
-      );
-      return false;
+      this.onError(result.error);
+      return;
     }
 
-    allowSendingSignalValueToRedis = false;
     signal.value = result.value;
-    allowSendingSignalValueToRedis = true;
-    return true;
-  }
-
-  void redis
-    .getBuffer(key)
-    .then((message) => {
-      if (message !== null) {
-        const failedToReceive = !tryReceiveFromRedis(message);
-        if (failedToReceive && initializeRedisWithValueInSignal) {
-          sendValueToRedis(signal.value);
-        }
-      } else if (initializeRedisWithValueInSignal) {
-        sendValueToRedis(signal.value);
-      }
-    })
-    .catch((cause) =>
-      onError(
-        new Error(`Could not get initial value for redis sync key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
-
-  const unsubscribeFromChannel = subscribe(
-    sub,
-    channels.sync(key),
-    tryReceiveFromRedis,
-    onError,
-  );
-
-  return function cleanup() {
-    stopSubscribingToSignal();
-    unsubscribeFromChannel();
-    sub.quit().catch((cause) =>
-      onError(
-        new Error(`Failed to quit redis subscriber for key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
   };
+
+  private onError = (cause: unknown) =>
+    this.opt.onError(new RedisSyncError(this.opt.key, cause));
+
+  static createEffect<T>(
+    options: RedisSyncOptions<T>,
+    configure: (instance: RedisSync<T>) => RedisSync<T>,
+  ): CleanupFn {
+    const sync = configure(new RedisSync(options)) as RedisSync<T>;
+    return () => sync.cleanup();
+  }
 }
 
-export function createRedisSetReadEffect<Member extends RedisSetMember>(
-  redis: Redis,
-  key: string,
-  memberSchema: Type<NoInfer<Member>>,
-  signal: Signal<ReadonlySet<Member>>,
-  onError: (error: Error) => void,
-) {
-  // Must duplicate since connections cannot be used for both commands and pub/sub
-  const sub = redis.duplicate();
-
-  const arraySchema = memberSchema.array();
-
-  function overwriteSet(arrayAsBuffer: Buffer): boolean {
-    const result = decodeAndParse(arrayAsBuffer, arraySchema);
-
-    if (result.isErr()) {
-      onError(
-        new Error(`Could not receive entire redis set in key "${key}"`, {
-          cause: result.error,
-        }),
-      );
-      return false;
-    }
-
-    signal.value = new Set(result.value);
-    return true;
+export class RedisSyncError extends Error {
+  constructor(key: string, cause: unknown) {
+    super(`RedisSync error for key "${key}"`, { cause });
   }
-
-  function addToSet(arrayAsBuffer: Buffer) {
-    const result = decodeAndParse(arrayAsBuffer, arraySchema);
-
-    if (result.isErr()) {
-      onError(
-        new Error(`Could not receive redis set addition in key "${key}"`, {
-          cause: result.error,
-        }),
-      );
-      return false;
-    }
-
-    signal.value = signal.value.union(new Set(result.value));
-    return true;
-  }
-
-  function removeFromSet(arrayAsBuffer: Buffer) {
-    const result = decodeAndParse(arrayAsBuffer, arraySchema);
-
-    if (result.isErr()) {
-      onError(
-        new Error(`Could not receive redis set removal in key "${key}"`, {
-          cause: result.error,
-        }),
-      );
-      return false;
-    }
-
-    signal.value = signal.value.difference(new Set(result.value));
-    return true;
-  }
-
-  function onExpire(expiredKey: string) {
-    if (expiredKey === key) {
-      signal.value = new Set();
-    }
-  }
-
-  void redis
-    .smembers(key)
-    .then((members) => overwriteSet(encode(members)))
-    .catch((cause) =>
-      onError(
-        new Error(`Could not initialize redis set from key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
-
-  const subscriptions = [
-    subscribe(sub, channels.overwriteSet(key), overwriteSet, onError),
-    subscribe(sub, channels.addToSet(key), addToSet, onError),
-    subscribe(sub, channels.removeFromSet(key), removeFromSet, onError),
-    subscribeToExpireEvents(redis, onExpire, onError),
-  ];
-
-  return function cleanup() {
-    for (const unsubscribe of subscriptions) {
-      unsubscribe();
-    }
-    sub.quit().catch((cause) =>
-      onError(
-        new Error(`Failed to quit redis subscriber for key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
-  };
 }
 
-export interface RedisSetWriteEffectOptions<T> {
+export interface RedisSetSyncOptions<T> {
   redis: Redis;
   key: string;
   signal: Signal<ReadonlySet<T>>;
   onError: (error: Error) => void;
-  /**
-   * Initialize redis with the current value in the signal on the start of the effect.
-   * Defaults to true.
-   */
-  initialize?: boolean;
-  /**
-   * If true, the redis set will be deleted when the effect is cleaned up.
-   * Defaults to true.
-   */
-  deleteOnCleanup?: boolean;
-  /**
-   * If provided, the redis key will have this expire time set on it.
-   * A heartbeat interval will be automatically set up to keep the key alive as long as the effect is active.
-   */
-  expire?: TimeSpan;
 }
 
-export function createRedisSetWriteEffect<T extends RedisSetMember>({
-  initialize = true,
-  deleteOnCleanup = true,
-  expire,
-  redis,
-  key,
-  signal,
-  onError,
-}: RedisSetWriteEffectOptions<T>) {
-  if (initialize) {
-    void setValueInRedis(signal.value);
-  }
+/**
+ * Synchronizes a set based redis key and signal.
+ * Will use optimal redis commands for set operations.
+ */
+export class RedisSetSync<T extends RedisSetMember> {
+  #cleanupFns: CleanupFn[] = [];
 
-  async function setValueInRedis(newValue: ReadonlySet<T>) {
+  private constructor(private opt: RedisSetSyncOptions<T>) {}
+
+  /**
+   * Immediately load the current value from redis into the signal.
+   */
+  load = (): this => {
+    const { redis, key } = this.opt;
+
+    void redis
+      .smembers(key)
+      .then((members) => (this.opt.signal.value = new Set(members as T[])))
+      .catch(this.onError);
+
+    return this;
+  };
+
+  /**
+   * Immediately save the current value from the signal into redis.
+   */
+  save = (): this => {
+    void this.overwriteRedis(this.opt.signal.value);
+    return this;
+  };
+
+  /**
+   * Set to automatically update the signal when redis updates.
+   */
+  subscribe = (): this => {
+    const { redis, key } = this.opt;
+
+    // Must duplicate since connections cannot be used for both commands and pub/sub
+    const sub = redis.duplicate();
+
+    this.#cleanupFns.push(
+      subscribe(
+        sub,
+        channels.overwriteSet(key),
+        this.overwriteSignal,
+        this.onError,
+      ),
+      subscribe(sub, channels.addToSet(key), this.addToSignal, this.onError),
+      subscribe(
+        sub,
+        channels.removeFromSet(key),
+        this.removeFromSignal,
+        this.onError,
+      ),
+      subscribeToExpireEvents(redis, this.onExpire, this.onError),
+      () => sub.quit().catch(this.onError),
+    );
+
+    return this;
+  };
+
+  /**
+   * Set to automatically update redis when the signal value changes.
+   */
+  synchronize = (): this => {
+    const { signal, redis, key } = this.opt;
+    let previousSet = signal.value;
+    this.#cleanupFns.push(
+      signal.subscribe(() => {
+        const newSet = signal.value;
+        const addedSet = newSet.difference(previousSet);
+        const removedSet = previousSet.difference(newSet);
+        previousSet = newSet;
+
+        let multi;
+        if (addedSet.size) {
+          const addedArray = Array.from(addedSet);
+          multi ??= redis.multi();
+          multi.sadd(key, addedArray);
+          multi.publish(channels.addToSet(key), encode(addedArray));
+        }
+        if (removedSet.size) {
+          const removedArray = Array.from(removedSet);
+          multi ??= redis.multi();
+          multi.srem(key, removedArray);
+          multi.publish(channels.removeFromSet(key), encode(removedArray));
+        }
+
+        if (multi) {
+          void multi.exec().catch(this.onError);
+        }
+      }),
+    );
+    return this;
+  };
+
+  /**
+   * Initialize a heartbeat behavior to automatically expire the redis
+   * key after the given time span unless the heartbeat is kept alive.
+   */
+  heartbeat = (expire: TimeSpan): this => {
+    const { redis, key } = this.opt;
+
+    const heartbeat = () =>
+      void redis
+        .expire(key, Math.round(expire.totalSeconds))
+        .catch(this.onError);
+
+    heartbeat();
+
+    const heartbeatInterval = Math.ceil(expire.totalMilliseconds / 2);
+    const intervalId = setInterval(heartbeat, heartbeatInterval);
+    this.#cleanupFns.push(() => clearInterval(intervalId));
+    this.#cleanupFns.push(() => this.overwriteRedis(new Set()));
+    return this;
+  };
+
+  private cleanup: CleanupFn = () =>
+    silentInvoke(this.#cleanupFns, this.onError);
+
+  private overwriteRedis = async (newValue: ReadonlySet<T>) => {
+    const { redis, key } = this.opt;
     const newArray = Array.from(newValue);
     const multi = redis.multi().del(key);
 
@@ -258,82 +257,60 @@ export function createRedisSetWriteEffect<T extends RedisSetMember>({
     await multi
       .publish(channels.overwriteSet(key), encode(newArray))
       .exec()
-      .catch((cause) =>
-        onError(
-          new Error(`Failed to update redis with initial set value`, { cause }),
-        ),
-      );
-  }
-
-  let cleanupHeartbeat = expire
-    ? redisKeepAliveEffect(redis, key, expire, onError)
-    : undefined;
-
-  let previousSet = signal.value;
-  const unsubscribeFromSignal = signal.subscribe(() => {
-    const newSet = signal.value;
-    const addedSet = newSet.difference(previousSet);
-    const removedSet = previousSet.difference(newSet);
-    previousSet = newSet;
-
-    let multi;
-    if (addedSet.size) {
-      const addedArray = Array.from(addedSet);
-      multi ??= redis.multi();
-      multi.sadd(key, addedArray);
-      multi.publish(channels.addToSet(key), encode(addedArray));
-    }
-    if (removedSet.size) {
-      const removedArray = Array.from(removedSet);
-      multi ??= redis.multi();
-      multi.srem(key, removedArray);
-      multi.publish(channels.removeFromSet(key), encode(removedArray));
-    }
-
-    if (multi) {
-      void multi
-        .exec()
-        .catch((cause) =>
-          onError(
-            new Error(`Failed to update redis set for key "${key}"`, { cause }),
-          ),
-        );
-    }
-  });
-
-  return async function cleanup() {
-    if (deleteOnCleanup) {
-      await setValueInRedis(new Set());
-    }
-    unsubscribeFromSignal();
-    cleanupHeartbeat?.();
+      .catch(this.onError);
   };
-}
 
-function redisKeepAliveEffect(
-  redis: Redis,
-  key: string,
-  expire: TimeSpan,
-  onError: (error: Error) => void,
-) {
-  function heartbeat() {
-    void redis.expire(key, Math.round(expire.totalSeconds)).catch((cause) =>
-      onError(
-        new Error(`Failed to set TTL for redis set key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
-  }
+  private overwriteSignal = (arrayAsBuffer: Buffer): void => {
+    const result = decodeSafe<T[]>(arrayAsBuffer);
 
-  heartbeat();
+    if (result.isErr()) {
+      this.onError(result.error);
+      return;
+    }
 
-  const heartbeatInterval = Math.ceil(expire.totalMilliseconds / 2);
-  const intervalId = setInterval(heartbeat, heartbeatInterval);
-
-  return function cleanup() {
-    clearInterval(intervalId);
+    this.opt.signal.value = new Set(result.value);
   };
+
+  private addToSignal = (arrayAsBuffer: Buffer): void => {
+    const result = decodeSafe<T[]>(arrayAsBuffer);
+
+    if (result.isErr()) {
+      this.onError(result.error);
+      return;
+    }
+
+    const { signal } = this.opt;
+    signal.value = signal.value.union(new Set(result.value));
+  };
+
+  private removeFromSignal = (arrayAsBuffer: Buffer): void => {
+    const result = decodeSafe<T[]>(arrayAsBuffer);
+
+    if (result.isErr()) {
+      this.onError(result.error);
+      return;
+    }
+
+    const { signal } = this.opt;
+    signal.value = signal.value.difference(new Set(result.value));
+  };
+
+  private onExpire = (expiredKey: string) => {
+    if (expiredKey === this.opt.key) {
+      this.opt.signal.value = new Set();
+    }
+  };
+
+  private onError = (cause: unknown) =>
+    this.opt.onError(new RedisSyncError(this.opt.key, cause));
+
+  static createEffect<T extends RedisSetMember>(
+    options: RedisSetSyncOptions<T>,
+    configure: (instance: RedisSetSync<T>) => RedisSetSync<T>,
+  ): CleanupFn {
+    const sync = configure(new RedisSetSync(options)) as RedisSetSync<T>;
+    return () => sync.cleanup();
+  }
 }
 
 function subscribeToExpireEvents(
@@ -345,13 +322,7 @@ function subscribeToExpireEvents(
   const dbIndex = redis.options.db ?? 0;
   const key = `__keyevent@${dbIndex}__:expired`;
 
-  void sub.subscribe(key).catch((cause) =>
-    onError(
-      new Error(`Could not subscribe to 'expired' keyspace notification`, {
-        cause,
-      }),
-    ),
-  );
+  void sub.subscribe(key).catch(onError);
 
   function onExpire(_channel: string, expiredKey: string) {
     return handleExpiredKey(expiredKey);
@@ -361,36 +332,30 @@ function subscribeToExpireEvents(
 
   return function cleanup() {
     sub.off("message", onExpire);
-    void sub.quit().catch((cause) =>
-      onError(
-        new Error(`Failed to quit redis subscriber for key "${key}"`, {
-          cause,
-        }),
-      ),
-    );
+    void sub.quit().catch(onError);
   };
+}
+
+function decodeSafe<T>(messageBuffer: Buffer): Result<T, unknown> {
+  try {
+    return ok(decode(messageBuffer));
+  } catch (decodeError) {
+    return err(decodeError);
+  }
 }
 
 function decodeAndParse<T>(
   messageBuffer: Buffer,
   schema: Type<T>,
-): Result<T, Error> {
-  let message;
-  try {
-    message = decode(messageBuffer);
-  } catch (decodeError) {
-    return err(
-      new Error(`Failed to decode redis message`, { cause: decodeError }),
-    );
+): Result<T, unknown> {
+  const message = decodeSafe<T>(messageBuffer);
+  if (message.isErr()) {
+    return err(message.error);
   }
 
-  const parsed = schema(message);
+  const parsed = schema(message.value);
   if (parsed instanceof type.errors) {
-    return err(
-      new Error(`Failed to parse redis message: ${parsed.summary}`, {
-        cause: parsed,
-      }),
-    );
+    return err(parsed);
   }
 
   return ok(parsed as T);
@@ -410,27 +375,25 @@ function subscribe(
 
   redis.on("messageBuffer", messageHandler);
 
-  void redis.subscribe(channel).catch((cause) =>
-    onError(
-      new Error(`Failed to subscribe to redis channel "${channel}"`, {
-        cause,
-      }),
-    ),
-  );
+  void redis.subscribe(channel).catch(onError);
 
   return () => {
     redis.off("messageBuffer", messageHandler);
-    void redis.unsubscribe(channel).catch((cause) =>
-      onError(
-        new Error(`Failed to unsubscribe from redis channel "${channel}"`, {
-          cause,
-        }),
-      ),
-    );
+    void redis.unsubscribe(channel).catch(onError);
   };
 }
 
-type RedisSetMember = string | number;
+async function silentInvoke(
+  fns: Array<() => unknown>,
+  onError: (error: unknown) => unknown,
+) {
+  const results = await Promise.allSettled(fns.map((fn) => fn()));
+  for (const res of results) {
+    if (res.status === "rejected") {
+      onError(res.reason);
+    }
+  }
+}
 
 const channels = {
   sync: (key: string) => `${key}:sync`,
@@ -438,3 +401,7 @@ const channels = {
   removeFromSet: (key: string) => `${key}:removeFromSet`,
   overwriteSet: (key: string) => `${key}:overwriteSet`,
 };
+
+type CleanupFn = () => void;
+
+type RedisSetMember = string;
