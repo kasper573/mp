@@ -156,7 +156,7 @@ export class RedisSetSync<T extends RedisSetMember> {
    * Immediately save the current value from the signal into redis.
    */
   save = (): this => {
-    this.overwriteRedis(this.opt.signal.value);
+    void this.overwriteRedis(this.opt.signal.value);
     return this;
   };
 
