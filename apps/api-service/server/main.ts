@@ -1,7 +1,6 @@
 import { createDbRepository } from "@mp/db";
 import type { CharacterId } from "@mp/game-shared";
 import {
-  CharacterIdType,
   GameServiceConfig,
   gameServiceConfigRedisKey,
   onlineCharacterIdsRedisKey,
@@ -77,7 +76,6 @@ shutdownCleanups.push(
     {
       redis: redisClient,
       key: onlineCharacterIdsRedisKey,
-      schema: CharacterIdType,
       signal: onlineCharacterIds,
       onError: logger.error,
     },
