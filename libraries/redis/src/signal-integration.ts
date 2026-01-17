@@ -142,7 +142,7 @@ export class RedisSetSync<T extends RedisSetMember> {
 
     void redis
       .smembers(key)
-      .then((members) => this.overwriteSignal(encode(members)))
+      .then((members) => (this.opt.signal.value = new Set(members as T[])))
       .catch(this.onError);
 
     return this;
