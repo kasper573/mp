@@ -338,7 +338,7 @@ function subscribeToExpireEvents(
 
 function decodeSafe<T>(messageBuffer: Buffer): Result<T, unknown> {
   try {
-    return decode(messageBuffer);
+    return ok(decode(messageBuffer));
   } catch (decodeError) {
     return err(decodeError);
   }
