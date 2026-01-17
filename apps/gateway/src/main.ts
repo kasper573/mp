@@ -10,6 +10,7 @@ import {
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
+  CharacterIdType,
   eventMessageEncoding,
   eventWithSessionEncoding,
   onlineCharacterIdsRedisKey,
@@ -47,7 +48,7 @@ import {
 } from "./context";
 import { opt } from "./options";
 import { gatewayRouter } from "./router";
-import { createRedisSetWriteEffect, Redis } from "@mp/redis";
+import { Redis, RedisSetSync } from "@mp/redis";
 import { setupGracefulShutdown } from "@mp/std";
 
 // Note that this file is an entrypoint and should not have any exports
@@ -99,15 +100,22 @@ const resolveAccessToken = createTokenResolver({
 const redisClient = new Redis(opt.redis.path);
 
 shutdownCleanups.push(
-  createRedisSetWriteEffect({
-    redis: redisClient,
-    key: onlineCharacterIdsRedisKey,
-    signal: onlineCharacterIds,
-    onError: logger.error,
-
-    // This ensures that online state gets cleared if the gateway crashes
-    expire: opt.redis.expireSeconds.characterOnlineStatus,
-  }),
+  RedisSetSync.createEffect(
+    {
+      redis: redisClient,
+      key: onlineCharacterIdsRedisKey,
+      schema: CharacterIdType,
+      signal: onlineCharacterIds,
+      onError: logger.error,
+    },
+    (sync) =>
+      sync
+        .save() // Always reset redis value on gateway start, since the gateway is authoritative for online characters
+        // This ensures that online state gets cleared if the gateway crashes
+        .heartbeat(opt.redis.expireSeconds.characterOnlineStatus)
+        // Continuously sync changes to redis
+        .synchronize(),
+  ),
 );
 
 const wss = new WebSocketServer({

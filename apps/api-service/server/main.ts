@@ -10,11 +10,7 @@ import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
-import {
-  createRedisSetReadEffect,
-  createRedisSyncEffect,
-  Redis,
-} from "@mp/redis";
+import { Redis, RedisSetSync, RedisSync } from "@mp/redis";
 import { signal } from "@mp/state";
 import { collectDefaultMetrics, metricsMiddleware } from "@mp/telemetry/prom";
 import "dotenv/config";
@@ -67,19 +63,25 @@ const gameServiceConfig = signal<GameServiceConfig>({
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
 shutdownCleanups.push(
-  createRedisSyncEffect(
-    redisClient,
-    gameServiceConfigRedisKey,
-    GameServiceConfig,
-    gameServiceConfig,
-    logger.error,
+  RedisSync.createEffect(
+    {
+      redis: redisClient,
+      key: gameServiceConfigRedisKey,
+      schema: GameServiceConfig,
+      signal: gameServiceConfig,
+      onError: logger.error,
+    },
+    (b) => b.load().synchronize(),
   ),
-  createRedisSetReadEffect(
-    redisClient,
-    onlineCharacterIdsRedisKey,
-    CharacterIdType,
-    onlineCharacterIds,
-    logger.error,
+  RedisSetSync.createEffect(
+    {
+      redis: redisClient,
+      key: onlineCharacterIdsRedisKey,
+      schema: CharacterIdType,
+      signal: onlineCharacterIds,
+      onError: logger.error,
+    },
+    (b) => b.load().subscribe(),
   ),
 );
 

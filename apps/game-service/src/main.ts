@@ -20,11 +20,7 @@ import {
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import { RateLimiter } from "@mp/rate-limiter";
-import {
-  createRedisSetReadEffect,
-  createRedisSyncEffect,
-  Redis,
-} from "@mp/redis";
+import { Redis, RedisSetSync, RedisSync } from "@mp/redis";
 import { signal } from "@mp/state";
 import {
   Rng,
@@ -129,20 +125,27 @@ const gameServiceConfig = signal<GameServiceConfig>({
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
 
 shutdownCleanups.push(
-  createRedisSyncEffect(
-    redisClient,
-    gameServiceConfigRedisKey,
-    GameServiceConfig,
-    gameServiceConfig,
-    logger.error,
+  RedisSync.createEffect(
+    {
+      redis: redisClient,
+      key: gameServiceConfigRedisKey,
+      schema: GameServiceConfig,
+      signal: gameServiceConfig,
+      onError: logger.error,
+    },
+    (b) => b.load().subscribe(),
   ),
-  createRedisSetReadEffect(
-    redisClient,
-    onlineCharacterIdsRedisKey,
-    CharacterIdType,
-    onlineCharacterIds,
-    logger.error,
+  RedisSetSync.createEffect(
+    {
+      redis: redisClient,
+      key: onlineCharacterIdsRedisKey,
+      schema: CharacterIdType,
+      signal: onlineCharacterIds,
+      onError: logger.error,
+    },
+    (b) => b.load().subscribe(),
   ),
+
   gameServiceConfig.subscribe((config) => {
     shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
   }),
