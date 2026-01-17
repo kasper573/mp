@@ -6,7 +6,6 @@ import {
 } from "@mp/event-router";
 import type { CharacterId, GameState } from "@mp/game-shared";
 import {
-  CharacterIdType,
   clientViewDistance,
   eventMessageEncoding,
   eventWithSessionEncoding,
@@ -139,7 +138,6 @@ shutdownCleanups.push(
     {
       redis: redisClient,
       key: onlineCharacterIdsRedisKey,
-      schema: CharacterIdType,
       signal: onlineCharacterIds,
       onError: logger.error,
     },

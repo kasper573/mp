@@ -121,7 +121,6 @@ export class RedisSyncError extends Error {
 export interface RedisSetSyncOptions<T> {
   redis: Redis;
   key: string;
-  schema: Type<NoInfer<T>>;
   signal: Signal<ReadonlySet<T>>;
   onError: (error: Error) => void;
 }
@@ -132,11 +131,8 @@ export interface RedisSetSyncOptions<T> {
  */
 export class RedisSetSync<T extends RedisSetMember> {
   #cleanupFns: CleanupFn[] = [];
-  #arraySchema: Type<T[]>;
 
-  private constructor(private opt: RedisSetSyncOptions<T>) {
-    this.#arraySchema = this.opt.schema.array();
-  }
+  private constructor(private opt: RedisSetSyncOptions<T>) {}
 
   /**
    * Immediately load the current value from redis into the signal.
@@ -265,7 +261,7 @@ export class RedisSetSync<T extends RedisSetMember> {
   };
 
   private overwriteSignal = (arrayAsBuffer: Buffer): void => {
-    const result = decodeAndParse(arrayAsBuffer, this.#arraySchema);
+    const result = decodeSafe<T[]>(arrayAsBuffer);
 
     if (result.isErr()) {
       this.onError(result.error);
@@ -276,7 +272,7 @@ export class RedisSetSync<T extends RedisSetMember> {
   };
 
   private addToSignal = (arrayAsBuffer: Buffer): void => {
-    const result = decodeAndParse(arrayAsBuffer, this.#arraySchema);
+    const result = decodeSafe<T[]>(arrayAsBuffer);
 
     if (result.isErr()) {
       this.onError(result.error);
@@ -288,7 +284,7 @@ export class RedisSetSync<T extends RedisSetMember> {
   };
 
   private removeFromSignal = (arrayAsBuffer: Buffer): void => {
-    const result = decodeAndParse(arrayAsBuffer, this.#arraySchema);
+    const result = decodeSafe<T[]>(arrayAsBuffer);
 
     if (result.isErr()) {
       this.onError(result.error);
@@ -340,18 +336,24 @@ function subscribeToExpireEvents(
   };
 }
 
+function decodeSafe<T>(messageBuffer: Buffer): Result<T, unknown> {
+  try {
+    return decode(messageBuffer);
+  } catch (decodeError) {
+    return err(decodeError);
+  }
+}
+
 function decodeAndParse<T>(
   messageBuffer: Buffer,
   schema: Type<T>,
 ): Result<T, unknown> {
-  let message;
-  try {
-    message = decode(messageBuffer);
-  } catch (decodeError) {
-    return err(decodeError);
+  const message = decodeSafe<T>(messageBuffer);
+  if (message.isErr()) {
+    return err(message.error);
   }
 
-  const parsed = schema(message);
+  const parsed = schema(message.value);
   if (parsed instanceof type.errors) {
     return err(parsed);
   }
@@ -402,4 +404,4 @@ const channels = {
 
 type CleanupFn = () => void;
 
-type RedisSetMember = string | number;
+type RedisSetMember = string;

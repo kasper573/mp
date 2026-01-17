@@ -10,7 +10,6 @@ import {
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { SyncMessageWithRecipient, UserSession } from "@mp/game-shared";
 import {
-  CharacterIdType,
   eventMessageEncoding,
   eventWithSessionEncoding,
   onlineCharacterIdsRedisKey,
@@ -104,7 +103,6 @@ shutdownCleanups.push(
     {
       redis: redisClient,
       key: onlineCharacterIdsRedisKey,
-      schema: CharacterIdType,
       signal: onlineCharacterIds,
       onError: logger.error,
     },
