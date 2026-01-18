@@ -15,3 +15,4 @@ export * from "./traversal";
 export * from "./schema/common";
 export * from "./loader";
 export * from "./gid";
+export * from "./object-transform";

@@ -9,9 +9,9 @@ import {
   type GlobalTileId,
   type TilesetTile,
   localToGlobalId,
+  tiledObjectTransform,
 } from "@mp/tiled-loader";
 import type { TiledResource } from "./tiled-resource";
-import { tiledObjectMeshInput } from "@mp/tiled-renderer";
 
 /**
  * Checks for the "Walkable" property in the tiled data and determines a score
@@ -85,7 +85,7 @@ export class WalkableChecker {
       // We need to figure out which walkable coords to remove.
 
       // Use same transform as the renderer to ensure it's correct
-      const objTransform = tiledObjectMeshInput(obj).transform;
+      const objTransform = tiledObjectTransform(obj);
       const rect = new Rect(0 as Pixel, 0 as Pixel, obj.width, obj.height)
         .apply(objTransform)
         .divide(this.tiled.tileSize) as unknown as Rect<Tile>;

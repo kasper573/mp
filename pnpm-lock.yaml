@@ -645,9 +645,6 @@ importers:
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../../libraries/tiled-loader
-      '@mp/tiled-renderer':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-renderer
       '@mp/time':
         specifier: workspace:*
         version: link:../../libraries/time

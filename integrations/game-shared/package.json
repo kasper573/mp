@@ -20,7 +20,6 @@
     "@mp/std": "workspace:*",
     "@mp/sync": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
-    "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*"
   },
