@@ -24,13 +24,22 @@ export class RedisSync<T> {
 
   /**
    * Immediately load the current value from redis into the signal.
+   *
+   * Will also reload the the entire set from redis on reconnect.
    */
   load = (): this => {
     const { redis, key } = this.opt;
-    void redis
-      .getBuffer(key)
-      .then(this.tryReceiveFromRedis)
-      .catch(this.onError);
+    const load = () => {
+      void redis
+        .getBuffer(key)
+        .then(this.tryReceiveFromRedis)
+        .catch(this.onError);
+    };
+
+    // Losing connection may mean missing updates, so reload entire set on reconnect
+    redis.on("reconnecting", load);
+    this.#cleanupFns.push(() => redis.off("reconnecting", load));
+
     return this;
   };
 
@@ -136,14 +145,24 @@ export class RedisSetSync<T extends RedisSetMember> {
 
   /**
    * Immediately load the current value from redis into the signal.
+   *
+   * Will also reload the the entire set from redis on reconnect.
    */
   load = (): this => {
     const { redis, key } = this.opt;
 
-    void redis
-      .smembers(key)
-      .then((members) => (this.opt.signal.value = new Set(members as T[])))
-      .catch(this.onError);
+    const load = () => {
+      void redis
+        .smembers(key)
+        .then((members) => (this.opt.signal.value = new Set(members as T[])))
+        .catch(this.onError);
+    };
+
+    load();
+
+    // Losing connection may mean missing updates, so reload entire set on reconnect
+    redis.on("reconnecting", load);
+    this.#cleanupFns.push(() => redis.off("reconnecting", load));
 
     return this;
   };
