@@ -1,78 +1,46 @@
-import {
-  ActorIdType,
-  ActorModelIdType,
-  AreaIdType,
-  CharacterIdType,
-  ItemDefinitionType,
-  ItemReferenceType,
-  type ActorId,
-  type ActorModelId,
-  type AreaId,
-  type CharacterId,
-  type ItemDefinition,
-  type ItemReference,
+import type {
+  AreaId,
+  ActorId,
+  ActorModelId,
+  CharacterId,
+  ItemReference,
+  ItemDefinition,
 } from "@mp/game-shared";
-import {
-  type UrlString,
-  type LocalFile,
-  type Pixel,
-  type Tile,
-  type TimesPerSecond,
-  LocalFileType,
-  PixelType,
-  TileType,
-  TimesPerSecondType,
-} from "@mp/std";
+import type { LocalFile, Pixel, Tile, TimesPerSecond } from "@mp/std";
+import type { ObjectId } from "@mp/tiled-loader";
 import type { ParsingFunctionsObject } from "apollo-link-scalars";
 import { GqlDate } from "./date-scalar";
-import { ObjectIdType, type ObjectId } from "@mp/tiled-loader";
-import { type Type, type } from "@mp/validate";
 
-export const scalars: ScalarEncodings = {
+export const scalars = {
   // Primitives
   GqlDate: GqlDate,
-  UrlString: scalarFor(type("string")),
-  LocalFile: scalarFor(LocalFileType),
-  Pixel: scalarFor(PixelType),
-  Tile: scalarFor(TileType),
-  TimesPerSecond: scalarFor(TimesPerSecondType),
+  UrlString: scalarFor<string>(),
+  LocalFile: scalarFor<LocalFile>(),
+  Pixel: scalarFor<Pixel>(),
+  Tile: scalarFor<Tile>(),
+  TimesPerSecond: scalarFor<TimesPerSecond>(),
   // Game data
-  ActorId: scalarFor(ActorIdType),
-  AreaId: scalarFor(AreaIdType),
-  ActorModelId: scalarFor(ActorModelIdType),
-  CharacterId: scalarFor(CharacterIdType),
-  ObjectId: scalarFor(ObjectIdType),
-  ItemReference: scalarFor(ItemReferenceType),
-  ItemDefinition: scalarFor(ItemDefinitionType),
+  ActorId: scalarFor<ActorId>(),
+  AreaId: scalarFor<AreaId>(),
+  ActorModelId: scalarFor<ActorModelId>(),
+  CharacterId: scalarFor<CharacterId>(),
+  ObjectId: scalarFor<ObjectId>(),
+  ItemReference: scalarFor<ItemReference>(),
+  ItemDefinition: scalarFor<ItemDefinition>(),
+} satisfies Record<string, ParsingFunctionsObject<unknown, unknown>>;
+
+export type Scalars = {
+  [K in keyof typeof scalars]: ReturnType<(typeof scalars)[K]["parseValue"]>;
 };
 
-type ScalarEncodings = {
-  [K in keyof Scalars]: ParsingFunctionsObject<Scalars[K], unknown>;
-};
-
-export interface Scalars {
-  // Primitives
-  GqlDate: GqlDate;
-  UrlString: UrlString;
-  LocalFile: LocalFile;
-  Pixel: Pixel;
-  Tile: Tile;
-  TimesPerSecond: TimesPerSecond;
-  // Game data
-  AreaId: AreaId;
-  ActorId: ActorId;
-  ActorModelId: ActorModelId;
-  CharacterId: CharacterId;
-  ObjectId: ObjectId;
-  ItemReference: ItemReference;
-  ItemDefinition: ItemDefinition;
-}
-
-function scalarFor<Schema extends Type>(
-  schema: Schema,
-): ParsingFunctionsObject<Schema["inferOut"], unknown> {
+// We blind trust the scalar types instead of using @mp/validate schemas at runtime,
+// since @mp/validate adds ~100kb to the client bundle size.
+// Malicious scalar input is a calculated risk we're willing to take.
+// Code paths using the scalars shouldn't be using the scalars in a way that would compromise security,
+// and request size limits will be bounded by the http server already before graphql comes into the picture.
+function scalarFor<Type>(): ParsingFunctionsObject<Type, unknown> {
   return {
     serialize: (value) => value,
-    parseValue: (value) => schema.assert(value),
+    parseValue: (value) => value as Type,
   };
 }
