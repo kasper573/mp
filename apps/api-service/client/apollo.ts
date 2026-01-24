@@ -4,13 +4,19 @@ import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
 import { scalars } from "../shared/scalars";
 import type { IntrospectionQuery } from "graphql";
-import { buildClientSchema, buildSchema } from "graphql";
+import { buildClientSchema, buildSchema, OperationTypeNode } from "graphql";
 import { deferredApolloLink } from "./deferred-apollo-link";
+import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
+import { createClient } from "graphql-ws";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
+// We use this hook from apollo client because tanstack query has no concept of subscriptions.
+export { useSubscription } from "@apollo/client/react";
+
 export interface GraphQLClientOptions {
   serverUrl: string;
+  serverSubscriptionUrl?: string;
   schema: Resolvable<string | object>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
 }
@@ -24,14 +30,27 @@ export class GraphQLClient extends ApolloClient {
       fetch: (input, init) => fetch(input, opt.fetchOptions?.(init) ?? init),
     });
 
-    super({
-      link: ApolloLink.from([
-        deferredApolloLink(() => resolve(opt.schema).then(scalarLink)),
-        httpLink,
-      ]),
+    const scalarLink = deferredApolloLink(() =>
+      resolve(opt.schema).then(createScalarLink),
+    );
 
-      // Disable caching because we're going to let @tanstack/react-query handle caching
-      cache: new InMemoryCache(),
+    let link: ApolloLink;
+    if (opt.serverSubscriptionUrl) {
+      const wsLink = new GraphQLWsLink(
+        createClient({ url: opt.serverSubscriptionUrl }),
+      );
+      link = ApolloLink.split(
+        ({ operationType }) => operationType === OperationTypeNode.SUBSCRIPTION,
+        ApolloLink.from([scalarLink, httpLink]),
+        ApolloLink.from([scalarLink, wsLink]),
+      );
+    } else {
+      link = ApolloLink.from([scalarLink, httpLink]);
+    }
+
+    super({
+      link,
+      cache: new InMemoryCache(), // Disable caching because we're going to let @tanstack/react-query handle caching
       defaultOptions: {
         watchQuery: { fetchPolicy: "no-cache" },
         query: { fetchPolicy: "no-cache" },
@@ -41,7 +60,9 @@ export class GraphQLClient extends ApolloClient {
   }
 }
 
-function scalarLink(schemaStringOrIntrospection: string | object): ApolloLink {
+function createScalarLink(
+  schemaStringOrIntrospection: string | object,
+): ApolloLink {
   const schema =
     typeof schemaStringOrIntrospection === "string"
       ? buildSchema(schemaStringOrIntrospection)

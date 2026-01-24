@@ -60,6 +60,7 @@
     "express": "catalog:",
     "gql.tada": "^1.9.0",
     "graphql": "^16.12.0",
+    "graphql-ws": "6.0.6",
     "grats": "^0.0.34",
     "preact": "catalog:"
   },

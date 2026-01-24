@@ -10,11 +10,7 @@ import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
-import {
-  GraphQLClient,
-  QueryBuilder,
-  QueryBuilderContext,
-} from "@mp/api-service/client";
+import { GraphQLClient, GraphQLClientProvider } from "@mp/api-service/client";
 import apiSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 
 // This is effectively the composition root of the application.
@@ -34,7 +30,7 @@ export default function App() {
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
-        <QueryBuilderContext.Provider value={systems.queryBuilder}>
+        <GraphQLClientProvider client={systems.graphqlClient}>
           <LoggerContext.Provider value={systems.logger}>
             <AuthContext.Provider value={systems.auth}>
               <RouterProvider router={systems.router} />
@@ -46,7 +42,7 @@ export default function App() {
               <ReactQueryDevtools client={systems.query} />
             </>
           )}
-        </QueryBuilderContext.Provider>
+        </GraphQLClientProvider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
@@ -79,8 +75,6 @@ function createSystems() {
     },
   });
 
-  const queryBuilder = new QueryBuilder(graphqlClient);
-
   function initialize() {
     void auth.refresh();
 
@@ -99,7 +93,6 @@ function createSystems() {
     router,
     query,
     graphqlClient,
-    queryBuilder,
     initialize,
   };
 }
