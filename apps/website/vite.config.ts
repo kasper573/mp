@@ -11,13 +11,7 @@ export default defineConfig({
     sourcemap: true,
   },
   plugins: [
-    tanstackRouterPlugin({
-      target: "react",
-      routeFilePrefix: "~",
-      routesDirectory: "src/routes",
-      generatedRouteTree: "src/integrations/router/routeTree.gen.ts",
-      autoCodeSplitting: true,
-    }),
+    tanstackRouterPlugin(),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     preact({ devToolsEnabled: false }),

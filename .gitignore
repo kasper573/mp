@@ -24,6 +24,7 @@ test-results
 tsconfig.vitest-temp.json
 tsconfig.tmp.json
 .claude
+*.gen.*
 
 # Local files for common editors
 .idea
