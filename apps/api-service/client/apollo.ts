@@ -37,7 +37,7 @@ export class GraphQLClient extends ApolloClient {
     let link: ApolloLink;
     if (opt.serverSubscriptionUrl) {
       const wsLink = new GraphQLWsLink(
-        createClient({ url: opt.serverSubscriptionUrl }),
+        createClient({ url: opt.serverSubscriptionUrl, lazy: true }),
       );
       link = ApolloLink.split(
         ({ operationType }) => operationType === OperationTypeNode.SUBSCRIPTION,
