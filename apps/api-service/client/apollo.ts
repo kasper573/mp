@@ -20,7 +20,6 @@ export interface GraphQLClientOptions {
   url: string;
   subscriptionsUrl?: string;
   schema: Resolvable<string | object>;
-  fetchOptions?: (init?: RequestInit) => RequestInit;
   getAccessToken?: () => AccessToken | undefined;
 }
 
@@ -36,7 +35,7 @@ export class GraphQLClient extends ApolloClient {
         if (token) {
           headers.set("Authorization", `Bearer ${token}`);
         }
-        return fetch(input, opt.fetchOptions?.(init) ?? init);
+        return fetch(input, { ...init, headers });
       },
     });
 
