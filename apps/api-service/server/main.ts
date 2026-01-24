@@ -124,7 +124,7 @@ const graphqlWss = createGraphQLWSServer({
   httpServer,
   schema: graphqlSchema,
   logger,
-  context: (req) => contextForRequest(req.headers),
+  context: (params) => contextForRequest(params?.accessToken),
 });
 shutdownCleanups.push(() => graphqlWss.close());
 
@@ -137,7 +137,10 @@ app
   .use(
     json(),
     expressMiddleware(apolloServer, {
-      context: ({ req }) => Promise.resolve(contextForRequest(req.headers)),
+      context: ({ req }) =>
+        Promise.resolve(
+          contextForRequest(getAccessTokenFromHeaders(req.headers)),
+        ),
     }),
   );
 
@@ -147,7 +150,9 @@ await new Promise<void>((resolve) =>
 
 logger.info(`API listening on ${opt.hostname}:${opt.port}`);
 
-function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
+function getAccessTokenFromHeaders(
+  headers: IncomingHttpHeaders,
+): AccessToken | undefined {
   const prefix = "Bearer ";
   const headerValue = String(headers.authorization ?? "");
   if (headerValue.startsWith(prefix)) {
@@ -155,8 +160,8 @@ function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
   }
 }
 
-function contextForRequest(headers: IncomingHttpHeaders): ApiContext {
+function contextForRequest(accessToken: AccessToken | undefined): ApiContext {
   return {
-    ioc: ioc.provide(ctxAccessToken, getAccessToken(headers)),
+    ioc: ioc.provide(ctxAccessToken, accessToken),
   };
 }

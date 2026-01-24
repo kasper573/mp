@@ -3,11 +3,13 @@ import { ApolloClient, ApolloLink } from "@apollo/client";
 import { BatchHttpLink } from "@apollo/client/link/batch-http";
 import { withScalars } from "apollo-link-scalars";
 import { scalars } from "../shared/scalars";
+import type { GraphQLWSConnectionParams } from "../shared/ws";
 import type { IntrospectionQuery } from "graphql";
 import { buildClientSchema, buildSchema, OperationTypeNode } from "graphql";
 import { deferredApolloLink } from "./deferred-apollo-link";
 import { GraphQLWsLink } from "@apollo/client/link/subscriptions";
 import { createClient } from "graphql-ws";
+import type { AccessToken } from "@mp/auth";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
@@ -19,6 +21,7 @@ export interface GraphQLClientOptions {
   subscriptionsUrl?: string;
   schema: Resolvable<string | object>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
+  getAccessToken?: () => AccessToken | undefined;
 }
 
 export class GraphQLClient extends ApolloClient {
@@ -27,7 +30,14 @@ export class GraphQLClient extends ApolloClient {
       uri: opt.url,
       batchInterval: 100,
       batchDebounce: true,
-      fetch: (input, init) => fetch(input, opt.fetchOptions?.(init) ?? init),
+      fetch: (input, init) => {
+        const token = opt.getAccessToken?.();
+        const headers = new Headers(init?.headers);
+        if (token) {
+          headers.set("Authorization", `Bearer ${token}`);
+        }
+        return fetch(input, opt.fetchOptions?.(init) ?? init);
+      },
     });
 
     const scalarLink = deferredApolloLink(() =>
@@ -37,7 +47,14 @@ export class GraphQLClient extends ApolloClient {
     let link: ApolloLink;
     if (opt.subscriptionsUrl) {
       const wsLink = new GraphQLWsLink(
-        createClient({ url: opt.subscriptionsUrl, lazy: true }),
+        createClient({
+          url: opt.subscriptionsUrl,
+          lazy: true,
+          connectionParams(): GraphQLWSConnectionParams | undefined {
+            const accessToken = opt.getAccessToken?.();
+            return accessToken ? { accessToken } : undefined;
+          },
+        }),
       );
       link = ApolloLink.split(
         ({ operationType }) => operationType === OperationTypeNode.SUBSCRIPTION,

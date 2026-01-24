@@ -66,14 +66,7 @@ function createSystems() {
     url: env.api.url,
     subscriptionsUrl: env.api.subscriptionsUrl,
     schema: () => fetch(apiSchemaUrl).then((res) => res.text()),
-    fetchOptions(init) {
-      const token = auth.identity.value?.token;
-      const headers = new Headers(init?.headers);
-      if (token) {
-        headers.set("Authorization", `Bearer ${token}`);
-      }
-      return { ...init, headers };
-    },
+    getAccessToken: () => auth.identity.value?.token,
   });
 
   function initialize() {

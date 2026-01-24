@@ -6,12 +6,13 @@ import type { GraphQLSchema } from "graphql";
 import type { Logger } from "@mp/logger";
 import { opt as serverOptions } from "../options";
 import type { ApiContext } from "../context";
+import type { GraphQLWSConnectionParams } from "../../shared/ws";
 
 export interface InitGraphQLWSServerOptions {
   schema: GraphQLSchema;
   logger: Logger;
   httpServer: http.Server;
-  context: (request: http.IncomingMessage) => ApiContext;
+  context: (connectionParams?: GraphQLWSConnectionParams) => ApiContext;
 }
 
 export function createGraphQLWSServer(
@@ -23,9 +24,12 @@ export function createGraphQLWSServer(
     server: opt.httpServer,
   });
 
-  const gqlServer = makeServer<{}, { request: http.IncomingMessage }>({
+  const gqlServer = makeServer<
+    GraphQLWSConnectionParams,
+    { request: http.IncomingMessage }
+  >({
     schema: opt.schema,
-    context: ({ extra }) => opt.context(extra.request),
+    context: ({ connectionParams }) => opt.context(connectionParams),
   });
 
   wss.on("connection", (socket, request) => {
