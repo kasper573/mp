@@ -15,8 +15,8 @@ export type { ErrorLike as GraphQLError } from "@apollo/client";
 export { useSubscription } from "@apollo/client/react";
 
 export interface GraphQLClientOptions {
-  serverUrl: string;
-  serverSubscriptionUrl?: string;
+  url: string;
+  subscriptionsUrl?: string;
   schema: Resolvable<string | object>;
   fetchOptions?: (init?: RequestInit) => RequestInit;
 }
@@ -24,7 +24,7 @@ export interface GraphQLClientOptions {
 export class GraphQLClient extends ApolloClient {
   constructor(opt: GraphQLClientOptions) {
     const httpLink = new BatchHttpLink({
-      uri: opt.serverUrl,
+      uri: opt.url,
       batchInterval: 100,
       batchDebounce: true,
       fetch: (input, init) => fetch(input, opt.fetchOptions?.(init) ?? init),
@@ -35,9 +35,9 @@ export class GraphQLClient extends ApolloClient {
     );
 
     let link: ApolloLink;
-    if (opt.serverSubscriptionUrl) {
+    if (opt.subscriptionsUrl) {
       const wsLink = new GraphQLWsLink(
-        createClient({ url: opt.serverSubscriptionUrl, lazy: true }),
+        createClient({ url: opt.subscriptionsUrl, lazy: true }),
       );
       link = ApolloLink.split(
         ({ operationType }) => operationType === OperationTypeNode.SUBSCRIPTION,

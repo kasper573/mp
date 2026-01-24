@@ -311,7 +311,7 @@ async function getAreas(): Promise<Map<AreaId, AreaResource>> {
 
 function createApiClient(accessToken: string) {
   return new GraphQLClient({
-    serverUrl: apiUrl,
+    url: apiUrl,
     schema: apiSchema,
     fetchOptions: (init) => ({
       ...init,

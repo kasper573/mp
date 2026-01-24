@@ -86,7 +86,7 @@ const logger = createPinoLogger({
 logger.info(opt, `Starting server...`);
 
 const api = new GraphQLClient({
-  serverUrl: opt.apiServiceUrl,
+  url: opt.apiServiceUrl,
   schema: apiSchema,
 });
 
