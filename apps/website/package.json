@@ -41,8 +41,8 @@
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@tanstack/router-plugin": "1.157.3",
     "@tanstack/router-cli": "1.157.3",
+    "@tanstack/router-plugin": "1.157.3",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.12.0"
