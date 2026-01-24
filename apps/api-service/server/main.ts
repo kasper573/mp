@@ -36,6 +36,7 @@ import { getSchema } from "./schema.generated";
 import { scalars } from "../shared/scalars";
 import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
 import { setupGracefulShutdown } from "@mp/std";
+import { createGraphQLWSServer } from "./integrations/graphql-ws";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -100,8 +101,9 @@ const app = express();
 const httpServer = http.createServer(app);
 shutdownCleanups.push(() => httpServer.close());
 
+const graphqlSchema = getSchema({ scalars });
 const apolloServer = new ApolloServer({
-  schema: getSchema({ scalars }),
+  schema: graphqlSchema,
   plugins: [
     ApolloServerPluginDrainHttpServer({ httpServer }),
     apolloRequestLoggerPlugin(),
@@ -116,9 +118,17 @@ const apolloServer = new ApolloServer({
     return { message: "Internal Server Error" };
   },
 });
-
 shutdownCleanups.push(() => apolloServer.stop());
 
+const graphqlWss = createGraphQLWSServer({
+  httpServer,
+  schema: graphqlSchema,
+  logger,
+  context: (req) => contextForRequest(req.headers),
+});
+shutdownCleanups.push(() => graphqlWss.close());
+
+// Apollo server must be started before using the expressMiddleware
 await apolloServer.start();
 
 app
@@ -127,11 +137,7 @@ app
   .use(
     json(),
     expressMiddleware(apolloServer, {
-      context({ req }) {
-        return Promise.resolve<ApiContext>({
-          ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
-        });
-      },
+      context: ({ req }) => Promise.resolve(contextForRequest(req.headers)),
     }),
   );
 
@@ -147,4 +153,10 @@ function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
   if (headerValue.startsWith(prefix)) {
     return headerValue.substring(prefix.length) as AccessToken;
   }
+}
+
+function contextForRequest(headers: IncomingHttpHeaders): ApiContext {
+  return {
+    ioc: ioc.provide(ctxAccessToken, getAccessToken(headers)),
+  };
 }

@@ -137,6 +137,9 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.90.12(react@19.1.0)

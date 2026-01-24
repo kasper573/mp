@@ -54,6 +54,7 @@
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
+    "@mp/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "apollo-link-scalars": "^4.0.3",
     "dotenv": "catalog:",
