@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "codegen": "tsr generate",
     "dev": "pnpm devenv vite --host 0.0.0.0",
     "build": "vite build",
     "preview": "vite preview --port 5173 --host 0.0.0.0",
@@ -32,15 +33,16 @@
     "@mp/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
-    "@tanstack/react-router": "1.141.8",
-    "@tanstack/react-router-devtools": "1.141.8",
+    "@tanstack/react-router": "1.157.3",
+    "@tanstack/react-router-devtools": "1.157.3",
     "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@tanstack/router-plugin": "1.142.0",
+    "@tanstack/router-plugin": "1.157.3",
+    "@tanstack/router-cli": "1.157.3",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.12.0"
