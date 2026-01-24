@@ -63,7 +63,8 @@ function createSystems() {
   });
 
   const graphqlClient = new GraphQLClient({
-    serverUrl: env.apiUrl,
+    serverUrl: env.api.url,
+    serverSubscriptionUrl: env.api.subscriptionsUrl,
     schema: () => fetch(apiSchemaUrl).then((res) => res.text()),
     fetchOptions(init) {
       const token = auth.identity.value?.token;

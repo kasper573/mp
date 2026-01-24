@@ -2,7 +2,10 @@ import { parseEnv, type FlatObject } from "@mp/env";
 
 export interface ClientEnv {
   gameServiceUrl: string;
-  apiUrl: string;
+  api: {
+    url: string;
+    subscriptionsUrl: string;
+  };
   version: string;
   retryApiQueries: number;
   displayErrorDetails: boolean;
