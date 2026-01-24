@@ -41,8 +41,8 @@ export class GraphQLClient extends ApolloClient {
       );
       link = ApolloLink.split(
         ({ operationType }) => operationType === OperationTypeNode.SUBSCRIPTION,
-        ApolloLink.from([scalarLink, httpLink]),
         ApolloLink.from([scalarLink, wsLink]),
+        ApolloLink.from([scalarLink, httpLink]),
       );
     } else {
       link = ApolloLink.from([scalarLink, httpLink]);
