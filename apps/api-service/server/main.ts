@@ -36,7 +36,7 @@ import { getSchema } from "./schema.generated";
 import { scalars } from "../shared/scalars";
 import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
 import { setupGracefulShutdown } from "@mp/std";
-import { createGraphQLWSServer } from "./integrations/graphql-ws";
+import { setupGraphQLWSServer } from "./integrations/graphql-ws";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -102,11 +102,21 @@ const httpServer = http.createServer(app);
 shutdownCleanups.push(() => httpServer.close());
 
 const graphqlSchema = getSchema({ scalars });
+
+const [graphqlWss, apolloPlugins] = setupGraphQLWSServer({
+  httpServer,
+  schema: graphqlSchema,
+  logger,
+  context: (params) => contextForRequest(params?.accessToken),
+});
+shutdownCleanups.push(() => graphqlWss.close());
+
 const apolloServer = new ApolloServer({
   schema: graphqlSchema,
   plugins: [
     ApolloServerPluginDrainHttpServer({ httpServer }),
     apolloRequestLoggerPlugin(),
+    ...apolloPlugins,
   ],
   allowBatchedHttpRequests: true,
   formatError(formattedError) {
@@ -119,14 +129,6 @@ const apolloServer = new ApolloServer({
   },
 });
 shutdownCleanups.push(() => apolloServer.stop());
-
-const graphqlWss = createGraphQLWSServer({
-  httpServer,
-  schema: graphqlSchema,
-  logger,
-  context: (params) => contextForRequest(params?.accessToken),
-});
-shutdownCleanups.push(() => graphqlWss.close());
 
 // Apollo server must be started before using the expressMiddleware
 await apolloServer.start();

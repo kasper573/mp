@@ -1,5 +1,5 @@
 import type http from "http";
-import { CloseCode, makeServer } from "graphql-ws";
+import { useServer } from "graphql-ws/use/ws";
 import type { WebSocketServerOptions } from "@mp/ws/server";
 import { WebSocketServer } from "@mp/ws/server";
 import type { GraphQLSchema } from "graphql";
@@ -7,6 +7,7 @@ import type { Logger } from "@mp/logger";
 import { opt as serverOptions } from "../options";
 import type { ApiContext } from "../context";
 import type { GraphQLWSConnectionParams } from "../../shared/ws";
+import type { ApolloServerPlugin } from "@apollo/server";
 
 export interface InitGraphQLWSServerOptions {
   schema: GraphQLSchema;
@@ -15,86 +16,36 @@ export interface InitGraphQLWSServerOptions {
   context: (connectionParams?: GraphQLWSConnectionParams) => ApiContext;
 }
 
-export function createGraphQLWSServer(
+export function setupGraphQLWSServer(
   opt: InitGraphQLWSServerOptions,
-): WebSocketServer {
+): [WebSocketServer, ApolloServerPlugin[]] {
   const wss = new WebSocketServer({
     ...wssConfig(),
     path: serverOptions.graphqlWssPath,
     server: opt.httpServer,
   });
 
-  const gqlServer = makeServer<
-    GraphQLWSConnectionParams,
-    { request: http.IncomingMessage }
-  >({
-    schema: opt.schema,
-    context: ({ connectionParams }) => opt.context(connectionParams),
-  });
+  // oxlint-disable-next-line rules-of-hooks
+  const serverCleanup = useServer(
+    {
+      schema: opt.schema,
+      context: ({ connectionParams }) => opt.context(connectionParams),
+    },
+    wss,
+  );
 
-  wss.on("connection", (socket, request) => {
-    const closed = gqlServer.opened(
-      {
-        protocol: socket.protocol,
-        send: (data) =>
-          new Promise((resolve, reject) => {
-            socket.send(data, (err) => {
-              if (err) {
-                reject(err);
-              } else {
-                resolve();
-              }
-            });
-          }),
-        close: (code, reason) => socket.close(code, reason),
-        onMessage: (cb) => {
-          socket.on("message", async (event) => {
-            try {
-              await cb(event.toString());
-            } catch (cause) {
-              if (shouldSendErrorToLogger(cause)) {
-                opt.logger.error(
-                  new Error("GraphQL WS socket error", { cause }),
-                );
-              }
-
-              const exposedError = serverOptions.exposeErrorDetails
-                ? errorToString(cause)
-                : "Internal Server Error";
-
-              socket.close(CloseCode.InternalServerError, exposedError);
-            }
-          });
+  const disposePlugin: ApolloServerPlugin = {
+    // oxlint-disable-next-line require-await
+    async serverWillStart() {
+      return {
+        async drainServer() {
+          await serverCleanup.dispose();
         },
-      },
-      { request },
-    );
+      };
+    },
+  };
 
-    socket.once("close", (code, reason) =>
-      closed(code, reason.toString("utf-8")),
-    );
-  });
-
-  return wss;
-}
-
-function errorToString(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-  return String(error);
-}
-
-function shouldSendErrorToLogger(error: unknown): boolean {
-  if (error instanceof Error) {
-    // Ignore WS send failures due to socket being closed, since that is a common scenario
-    // with subscriptions, and would just be uninteresting to log.
-
-    // Unfortunately ws has no graceful error classes or codes
-    // and we have to identify the error by inspecting the message.
-    return !error.message.includes("WebSocket is not open: readyState");
-  }
-  return true;
+  return [wss, [disposePlugin]];
 }
 
 function wssConfig(): WebSocketServerOptions {
