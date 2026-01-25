@@ -1,5 +1,5 @@
 import type { PropsWithChildren } from "preact/compat";
-import { useEffect, useMemo, useState } from "preact/compat";
+import { createElement, useEffect, useMemo, useState } from "preact/compat";
 import type { GraphQLClient } from "./apollo";
 import { applyMapChanges, type MapChanges } from "../shared/map-changes";
 import { QueryBuilder, QueryBuilderContext } from "./tanstack-query";
@@ -11,11 +11,10 @@ export function GraphQLClientProvider({
   client,
 }: PropsWithChildren<{ client: GraphQLClient }>) {
   const qb = useMemo(() => new QueryBuilder(client), [client]);
-  return (
-    <QueryBuilderContext.Provider value={qb}>
-      <ApolloProvider client={client}>{children}</ApolloProvider>
-    </QueryBuilderContext.Provider>
-  );
+  return createElement(QueryBuilderContext.Provider, { value: qb }, [
+    // oxlint-disable-next-line no-children-prop
+    createElement(ApolloProvider, { client, children }),
+  ]);
 }
 
 /**
@@ -26,15 +25,26 @@ export function useMapSubscription<Data, Key, Value>(
   sub: useSubscription.Result<Data>,
   selectChanges: (data: Data) => MapChanges<Key, Value>,
 ): ReadonlyMap<Key, Value> {
-  const [map, setMap] = useState<ReadonlyMap<Key, Value>>(emptyMap);
+  const changes = useMemo(
+    () => (sub.data ? selectChanges(sub.data) : null),
+    // oxlint-disable-next-line exhaustive-deps
+    [sub.data],
+  );
+
+  return useMapChanges(changes);
+}
+
+export function useMapChanges<Key, Value>(
+  mapChanges: MapChanges<Key, Value> | null,
+  initialMap = emptyMap<Key, Value>,
+): ReadonlyMap<Key, Value> {
+  const [map, setMap] = useState<ReadonlyMap<Key, Value>>(initialMap);
 
   useEffect(() => {
-    const changes = sub.data ? selectChanges(sub.data) : null;
-    if (changes) {
-      setMap((prev) => applyMapChanges(prev, changes));
+    if (mapChanges) {
+      setMap((prev) => applyMapChanges(prev, mapChanges));
     }
-    // oxlint-disable-next-line exhaustive-deps
-  }, [sub.data]);
+  }, [mapChanges]);
 
   return map;
 }
