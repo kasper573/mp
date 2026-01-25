@@ -64,7 +64,13 @@ function RouteComponent() {
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <SpectatorClient
-            characterOptions={onlineCharacters}
+            characterOptions={[
+              {
+                value: undefined as unknown as CharacterId,
+                label: "Select character to spectate",
+              },
+              ...onlineCharacters,
+            ]}
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
             interactive={false}
