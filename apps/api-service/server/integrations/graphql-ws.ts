@@ -52,10 +52,16 @@ export function createGraphQLWSServer(
             try {
               await cb(event.toString());
             } catch (cause) {
-              opt.logger.error(new Error("GraphQL WS socket error", { cause }));
+              if (shouldSendErrorToLogger(cause)) {
+                opt.logger.error(
+                  new Error("GraphQL WS socket error", { cause }),
+                );
+              }
+
               const exposedError = serverOptions.exposeErrorDetails
                 ? errorToString(cause)
                 : "Internal Server Error";
+
               socket.close(CloseCode.InternalServerError, exposedError);
             }
           });
@@ -77,6 +83,18 @@ function errorToString(error: unknown): string {
     return error.message;
   }
   return String(error);
+}
+
+function shouldSendErrorToLogger(error: unknown): boolean {
+  if (error instanceof Error) {
+    // Ignore WS send failures due to socket being closed, since that is a common scenario
+    // with subscriptions, and would just be uninteresting to log.
+
+    // Unfortunately ws has no graceful error classes or codes
+    // and we have to identify the error by inspecting the message.
+    return !error.message.includes("WebSocket is not open: readyState");
+  }
+  return true;
 }
 
 function wssConfig(): WebSocketServerOptions {
