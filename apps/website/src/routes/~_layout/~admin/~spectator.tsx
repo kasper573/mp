@@ -13,6 +13,8 @@ import { gameAssetLoader } from "../../../integrations/assets";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
+import type { CharacterId } from "@mp/game-shared";
+import { atoms } from "@mp/style";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
@@ -63,6 +65,9 @@ function RouteComponent() {
     >
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
+          <div className={atoms({ mb: "xl" })}>
+            Characters online: {online.size}
+          </div>
           <SpectatorClient
             characterOptions={[
               {
