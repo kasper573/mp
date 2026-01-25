@@ -1,15 +1,15 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import type { CharacterId } from "@mp/game-shared";
+import {
+  graphql,
+  useMapSubscription,
+  useSubscription,
+} from "@mp/api-service/client";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
-import { useQuery } from "@tanstack/react-query";
 import { useSignalEffect } from "@mp/state/react";
-import type { SelectOption } from "@mp/ui";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useContext } from "preact/compat";
+import { Suspense, useEffect } from "preact/compat";
 import { gameAssetLoader } from "../../../integrations/assets";
-import { AuthContext } from "../../../integrations/contexts";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
@@ -21,32 +21,36 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const qb = useQueryBuilder();
-  const auth = useContext(AuthContext);
   const [stateClient, events] = useGameStateClient();
 
-  const characterOptions = useQuery({
-    ...qb.queryOptions(query),
-    refetchInterval: 5000,
-    enabled: !!auth.identity.value,
-    select: ({ characterList }): SelectOption<CharacterId>[] => [
-      {
-        value: undefined as unknown as CharacterId,
-        label: "Select character",
-      },
-      ...characterList.map((char) => ({
-        value: char.id,
-        label: char.name,
-      })),
-    ],
-  });
+  const online = useMapSubscription(
+    useSubscription(sub),
+    (data) => data.onlineCharacters,
+  );
+
+  const spectatedId = stateClient.characterId;
+  const onlineCharacters = online
+    .entries()
+    .map(([id, { name }]) => ({ value: id, label: name }))
+    .toArray();
 
   useSignalEffect(() => {
     // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
-    if (stateClient.isConnected.value && stateClient.characterId.value) {
-      events.gateway.spectate(stateClient.characterId.value);
+    if (stateClient.isConnected.value && spectatedId.value) {
+      events.gateway.spectate(spectatedId.value);
+    } else {
+      events.gateway.leave();
     }
   });
+
+  const isSelectedOnline = onlineCharacters.find(
+    ({ value }) => value === spectatedId.value,
+  );
+  useEffect(() => {
+    if (!isSelectedOnline) {
+      spectatedId.value = undefined;
+    }
+  }, [isSelectedOnline, spectatedId]);
 
   return (
     <div
@@ -60,7 +64,7 @@ function RouteComponent() {
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <SpectatorClient
-            characterOptions={characterOptions.data ?? []}
+            characterOptions={onlineCharacters}
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
             interactive={false}
@@ -71,11 +75,16 @@ function RouteComponent() {
   );
 }
 
-const query = graphql(`
-  query SpectatorCharacterList {
-    characterList {
-      id
-      name
+const sub = graphql(`
+  subscription SpectatorCharacterSub {
+    onlineCharacters {
+      added {
+        key
+        value {
+          name
+        }
+      }
+      removed
     }
   }
 `);

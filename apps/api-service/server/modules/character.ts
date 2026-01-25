@@ -6,14 +6,27 @@ import { assert, promiseFromResult } from "@mp/std";
 import type { CharacterId } from "@mp/game-shared";
 import { defaultSpawnPoint } from "./spawn-point";
 import type { FormUpdateResult } from "./form";
+import { computeSetChanges, toAsyncIterable } from "@mp/state";
+import type { MapChanges } from "../../shared/map-changes";
 
-/** @gqlQueryField */
-export async function characterList(ctx: ApiContext): Promise<Character[]> {
+/** @gqlSubscriptionField */
+export async function* onlineCharacters(
+  ctx: ApiContext,
+): AsyncIterable<MapChanges<CharacterId, Character>> {
   await roles(ctx, [gatewayRoles.spectate]);
+
   const ids = ctx.ioc.get(ctxOnlineCharacterIds);
-  return promiseFromResult(
-    ctx.ioc.get(ctxDb).selectCharacterList(Array.from(ids.value)),
-  );
+  const db = ctx.ioc.get(ctxDb);
+
+  for await (const changes of toAsyncIterable(computeSetChanges(ids))) {
+    yield { removed: Array.from(changes.removed) };
+
+    const added = await promiseFromResult(
+      db.selectCharacterList(Array.from(changes.added)),
+    );
+
+    yield { added: added.map((value) => ({ value, key: value.id })) };
+  }
 }
 
 /** @gqlQueryField */
