@@ -36,6 +36,7 @@ import { getSchema } from "./schema.generated";
 import { scalars } from "../shared/scalars";
 import { apolloRequestLoggerPlugin } from "./integrations/apollo-request-logger";
 import { setupGracefulShutdown } from "@mp/std";
+import { setupGraphQLWSServer } from "./integrations/graphql-ws";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -100,11 +101,22 @@ const app = express();
 const httpServer = http.createServer(app);
 shutdownCleanups.push(() => httpServer.close());
 
+const graphqlSchema = getSchema({ scalars });
+
+const [graphqlWss, apolloPlugins] = setupGraphQLWSServer({
+  httpServer,
+  schema: graphqlSchema,
+  logger,
+  context: (params) => contextForRequest(params?.accessToken),
+});
+shutdownCleanups.push(() => graphqlWss.close());
+
 const apolloServer = new ApolloServer({
-  schema: getSchema({ scalars }),
+  schema: graphqlSchema,
   plugins: [
     ApolloServerPluginDrainHttpServer({ httpServer }),
     apolloRequestLoggerPlugin(),
+    ...apolloPlugins,
   ],
   allowBatchedHttpRequests: true,
   formatError(formattedError) {
@@ -116,9 +128,9 @@ const apolloServer = new ApolloServer({
     return { message: "Internal Server Error" };
   },
 });
-
 shutdownCleanups.push(() => apolloServer.stop());
 
+// Apollo server must be started before using the expressMiddleware
 await apolloServer.start();
 
 app
@@ -127,11 +139,10 @@ app
   .use(
     json(),
     expressMiddleware(apolloServer, {
-      context({ req }) {
-        return Promise.resolve<ApiContext>({
-          ioc: ioc.provide(ctxAccessToken, getAccessToken(req.headers)),
-        });
-      },
+      context: ({ req }) =>
+        Promise.resolve(
+          contextForRequest(getAccessTokenFromHeaders(req.headers)),
+        ),
     }),
   );
 
@@ -141,10 +152,18 @@ await new Promise<void>((resolve) =>
 
 logger.info(`API listening on ${opt.hostname}:${opt.port}`);
 
-function getAccessToken(headers: IncomingHttpHeaders): AccessToken | undefined {
+function getAccessTokenFromHeaders(
+  headers: IncomingHttpHeaders,
+): AccessToken | undefined {
   const prefix = "Bearer ";
   const headerValue = String(headers.authorization ?? "");
   if (headerValue.startsWith(prefix)) {
     return headerValue.substring(prefix.length) as AccessToken;
   }
+}
+
+function contextForRequest(accessToken: AccessToken | undefined): ApiContext {
+  return {
+    ioc: ioc.provide(ctxAccessToken, accessToken),
+  };
 }

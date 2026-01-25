@@ -19,6 +19,7 @@ export const apiOptionsSchema = type({
      */
     pretty: boolish().optional(),
   },
+  graphqlWssPath: "string",
   fileServerInternalUrl: "string",
   fileServerPublicUrl: "string",
   version: "string",

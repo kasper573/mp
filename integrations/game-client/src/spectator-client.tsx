@@ -1,6 +1,6 @@
 import type { CharacterId } from "@mp/game-shared";
 import type { SelectOption } from "@mp/ui";
-import { LoadingSpinner, Select } from "@mp/ui";
+import { Dock, LoadingSpinner, Select } from "@mp/ui";
 import { Suspense } from "preact/compat";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
@@ -24,7 +24,11 @@ export function SpectatorClient(props: SpectatorClientProps) {
       <Suspense
         fallback={<LoadingSpinner debugDescription="SpectatorClient" />}
       >
-        <GameClient enableUi={false} {...props} />
+        {props.stateClient.characterId.value ? (
+          <GameClient enableUi={false} {...props} />
+        ) : (
+          <Dock position="center">No character selected</Dock>
+        )}
       </Suspense>
     </>
   );

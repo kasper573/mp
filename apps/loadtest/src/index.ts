@@ -8,6 +8,7 @@ import type { AreaId, AreaResource } from "@mp/game-shared";
 import { eventMessageEncoding, hitTestTiledObject } from "@mp/game-shared";
 import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
+import type { AccessToken } from "@mp/auth";
 import { createBypassUser } from "@mp/auth";
 import type { Signal } from "@mp/state";
 import { Rng, toResult } from "@mp/std";
@@ -309,14 +310,11 @@ async function getAreas(): Promise<Map<AreaId, AreaResource>> {
   );
 }
 
-function createApiClient(accessToken: string) {
+function createApiClient(accessToken: AccessToken) {
   return new GraphQLClient({
-    serverUrl: apiUrl,
+    url: apiUrl,
     schema: apiSchema,
-    fetchOptions: (init) => ({
-      ...init,
-      headers: { ...init?.headers, Authorization: `Bearer ${accessToken}` },
-    }),
+    getAccessToken: () => accessToken,
   });
 }
 

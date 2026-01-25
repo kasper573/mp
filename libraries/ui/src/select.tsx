@@ -1,5 +1,4 @@
 import type { Signal } from "@mp/state";
-import { useComputed } from "@mp/state/react";
 import type { JSX, ComponentChildren } from "preact";
 import { useMemo } from "preact/hooks";
 
@@ -32,8 +31,8 @@ export function Select<const Value>({
     [inputOptions],
   );
 
-  const selectedIndex = useComputed(() =>
-    options.findIndex((option) => isSameValue(option.value, signal.value)),
+  const selectedIndex = options.findIndex((option) =>
+    isSameValue(option.value, signal.value),
   );
 
   return (

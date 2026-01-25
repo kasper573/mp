@@ -55,7 +55,7 @@ function PingIndicator() {
     queryKey: ["ping"],
     async queryFn() {
       const start = performance.now();
-      await fetch(`${env.apiUrl}/health`);
+      await fetch(`${env.api.url}/health`);
       return performance.now() - start;
     },
     refetchInterval: 5000,

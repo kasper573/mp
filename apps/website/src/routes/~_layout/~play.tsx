@@ -25,7 +25,7 @@ function PlayPage() {
   useEffect(() => {
     if (!myCharacterId) {
       if (stateClient.characterId.value) {
-        events.gateway.leave(stateClient.characterId.value);
+        events.gateway.leave();
       }
       stateClient.characterId.value = undefined;
     } else {

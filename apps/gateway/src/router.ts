@@ -49,7 +49,7 @@ export const gatewayRouter = evt.router({
         ctx.get(ctxGameEventClient).network.requestFullState();
       }),
 
-    leave: evt.event.input(CharacterIdType).handler(({ ctx }) => {
+    leave: evt.event.handler(({ ctx }) => {
       const session = ctx.get(ctxUserSessionSignal);
       session.value = { ...session.value, character: undefined };
     }),

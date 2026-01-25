@@ -91,7 +91,7 @@ importers:
     dependencies:
       '@apollo/client':
         specifier: ^4.0.11
-        version: 4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)
+        version: 4.0.11(graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3))(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)
       '@apollo/server':
         specifier: ^5.2.0
         version: 5.2.0(graphql@16.12.0)
@@ -137,12 +137,15 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
+      '@mp/ws':
+        specifier: workspace:*
+        version: link:../../libraries/ws
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.90.12(react@19.1.0)
       apollo-link-scalars:
         specifier: ^4.0.3
-        version: 4.0.3(@apollo/client@4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2))(graphql@16.12.0)
+        version: 4.0.3(@apollo/client@4.0.11(graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3))(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2))(graphql@16.12.0)
       dotenv:
         specifier: 'catalog:'
         version: 17.2.0
@@ -155,6 +158,9 @@ importers:
       graphql:
         specifier: ^16.12.0
         version: 16.12.0
+      graphql-ws:
+        specifier: 6.0.6
+        version: 6.0.6(graphql@16.12.0)(ws@8.18.3)
       grats:
         specifier: ^0.0.34
         version: 0.0.34
@@ -4297,6 +4303,25 @@ packages:
     peerDependencies:
       graphql: ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0
 
+  graphql-ws@6.0.6:
+    resolution: {integrity: sha512-zgfER9s+ftkGKUZgc0xbx8T7/HMO4AV5/YuYiFc+AtgcO5T0v8AxYYNQ+ltzuzDZgNkYJaFspm5MMYLjQzrkmw==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@fastify/websocket': ^10 || ^11
+      crossws: ~0.3
+      graphql: ^15.10.1 || ^16
+      uWebSockets.js: ^20
+      ws: ^8
+    peerDependenciesMeta:
+      '@fastify/websocket':
+        optional: true
+      crossws:
+        optional: true
+      uWebSockets.js:
+        optional: true
+      ws:
+        optional: true
+
   graphql@16.12.0:
     resolution: {integrity: sha512-DKKrynuQRne0PNpEbzuEdHlYOMksHSUI8Zc9Unei5gTsMNA2/vMpoMz/yKba50pejK56qj98qM0SjYxAKi13gQ==}
     engines: {node: ^12.22.0 || ^14.16.0 || ^16.0.0 || >=17.0.0}
@@ -6017,7 +6042,7 @@ snapshots:
     dependencies:
       graphql: 16.12.0
 
-  '@apollo/client@4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)':
+  '@apollo/client@4.0.11(graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3))(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)':
     dependencies:
       '@graphql-typed-document-node/core': 3.2.0(graphql@16.12.0)
       '@wry/caches': 1.0.1
@@ -6029,6 +6054,7 @@ snapshots:
       rxjs: 7.8.2
       tslib: 2.8.1
     optionalDependencies:
+      graphql-ws: 6.0.6(graphql@16.12.0)(ws@8.18.3)
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
 
@@ -8048,9 +8074,9 @@ snapshots:
       normalize-path: 3.0.0
       picomatch: 2.3.1
 
-  apollo-link-scalars@4.0.3(@apollo/client@4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2))(graphql@16.12.0):
+  apollo-link-scalars@4.0.3(@apollo/client@4.0.11(graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3))(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2))(graphql@16.12.0):
     dependencies:
-      '@apollo/client': 4.0.11(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)
+      '@apollo/client': 4.0.11(graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3))(graphql@16.12.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)(rxjs@7.8.2)
       graphql: 16.12.0
       zen-observable-ts: 1.1.0
 
@@ -9020,6 +9046,12 @@ snapshots:
     dependencies:
       graphql: 16.12.0
       tslib: 2.8.1
+
+  graphql-ws@6.0.6(graphql@16.12.0)(ws@8.18.3):
+    dependencies:
+      graphql: 16.12.0
+    optionalDependencies:
+      ws: 8.18.3
 
   graphql@16.12.0: {}
 
