@@ -27,7 +27,7 @@ export function SpectatorClient(props: SpectatorClientProps) {
         {props.stateClient.characterId.value ? (
           <GameClient enableUi={false} {...props} />
         ) : (
-          <Dock position="center">Please select character to spectate</Dock>
+          <Dock position="center">No character selected</Dock>
         )}
       </Suspense>
     </>
