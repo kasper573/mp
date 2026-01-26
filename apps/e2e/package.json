@@ -4,7 +4,8 @@
   "description": "",
   "scripts": {
     "start": "dotenvx run -f ../../docker/.env.test ../../docker/.env.shared -- playwright test",
-    "start:dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- playwright test"
+    "start:dev": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- playwright test",
+    "start:dev:with-services": "START_WITH_SERVICES=1 pnpm start:dev"
   },
   "license": "MIT",
   "devDependencies": {

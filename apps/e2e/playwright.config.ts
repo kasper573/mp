@@ -29,6 +29,21 @@ export default defineConfig({
     ignoreHTTPSErrors: true,
   },
 
+  webServer: process.env.START_WITH_SERVICES
+    ? {
+        command: "pnpm dev",
+        cwd: path.join(__dirname, "../.."),
+        url: `https://${process.env.MP_WEBSITE_DOMAIN}`,
+        reuseExistingServer: true,
+        timeout: 10000,
+        stdout: "pipe",
+        stderr: "pipe",
+        wait: {
+          stdout: /game service connected/i,
+        },
+      }
+    : undefined,
+
   projects: [
     {
       name: "chromium",
