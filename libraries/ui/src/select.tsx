@@ -1,9 +1,9 @@
-import type { Signal } from "@mp/state";
-import type { JSX, ComponentChildren } from "preact";
-import { useMemo } from "preact/hooks";
+import type { WritableSignal } from "@mp/state";
+import type { JSX } from "solid-js";
+import { createMemo, For } from "solid-js";
 
 export interface SelectOption<Value> {
-  label: ComponentChildren;
+  label: JSX.Element;
   value: Value;
 }
 
@@ -13,42 +13,37 @@ type SelectOptionsInput<Value> =
 
 interface SelectProps<Value> extends Pick<
   JSX.IntrinsicElements["select"],
-  "className" | "style"
+  "class" | "style"
 > {
   options: SelectOptionsInput<Value>;
-  signal: Signal<Value>;
+  signal: WritableSignal<Value>;
   isSameValue?: (a: Value, b: Value) => boolean;
 }
 
-export function Select<const Value>({
-  options: inputOptions,
-  signal,
-  isSameValue = refEquals,
-  ...selectProps
-}: SelectProps<Value>) {
-  const options = useMemo(
-    () => normalizeOptionsInput(inputOptions),
-    [inputOptions],
-  );
+export function Select<const Value>(props: SelectProps<Value>) {
+  const isSameValue = props.isSameValue ?? refEquals;
 
-  const selectedIndex = options.findIndex((option) =>
-    isSameValue(option.value, signal.value),
+  const options = createMemo(() => normalizeOptionsInput(props.options));
+
+  const selectedIndex = createMemo(() =>
+    options().findIndex((option) =>
+      isSameValue(option.value, props.signal.get()),
+    ),
   );
 
   return (
     <select
-      value={selectedIndex}
+      value={selectedIndex()}
       onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
-        signal.value = options[optionIndex].value;
+        props.signal.write(options()[optionIndex].value);
       }}
-      {...selectProps}
+      class={props.class}
+      style={props.style}
     >
-      {options.map((option, index) => (
-        <option key={index} value={index}>
-          {option.label}
-        </option>
-      ))}
+      <For each={options()}>
+        {(option, index) => <option value={index()}>{option.label}</option>}
+      </For>
     </select>
   );
 }

@@ -1,26 +1,38 @@
-import type { JSX } from "preact";
-import type { Signal } from "@mp/state";
+import type { JSX } from "solid-js";
+import { createEffect } from "solid-js";
+import type { WritableSignal } from "@mp/state";
 
 export type CheckboxState = true | false | "indeterminate";
 
 export interface CheckboxProps extends Pick<
   JSX.IntrinsicElements["input"],
-  "className" | "style" | "disabled" | "children"
+  "class" | "style" | "disabled"
 > {
-  signal: Signal<CheckboxState>;
+  // Accept any signal that can read CheckboxState-compatible values and write booleans
+  signal: WritableSignal<boolean> | WritableSignal<CheckboxState>;
 }
 
-export function Checkbox({ signal, ...props }: CheckboxProps) {
+export function Checkbox(props: CheckboxProps) {
+  let inputRef!: HTMLInputElement;
+
+  createEffect(() => {
+    inputRef.indeterminate = props.signal.get() === "indeterminate";
+  });
+
   return (
     <input
+      ref={(el) => (inputRef = el)}
       type="checkbox"
-      checked={signal.value === true}
-      // oxlint-disable-next-line no-unknown-property
-      indeterminate={signal.value === "indeterminate"}
+      checked={props.signal.get() === true}
       onChange={(e) => {
-        signal.value = e.currentTarget.checked;
+        // Signal.write is invariant, but we know checkbox always produces boolean
+        (props.signal as WritableSignal<boolean>).write(
+          e.currentTarget.checked,
+        );
       }}
-      {...props}
+      class={props.class}
+      style={props.style}
+      disabled={props.disabled}
     />
   );
 }

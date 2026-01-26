@@ -22,9 +22,9 @@ export default defineConfig({
   reporter: process.env.CI ? [htmlReporter, ["github"]] : [htmlReporter],
   use: {
     baseURL: `https://${process.env.MP_WEBSITE_DOMAIN}`,
-    trace: "retain-on-failure",
-    screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    trace: "on",
+    screenshot: "on",
+    video: "on",
 
     ignoreHTTPSErrors: true,
   },

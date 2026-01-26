@@ -1,4 +1,4 @@
-import { GraphQLClient, graphql } from "@mp/api-service/client";
+import { GraphQLClient, graphql } from "@mp/api-service/client/server";
 import {
   createEventInvoker,
   createProxyEventInvoker,
@@ -145,7 +145,7 @@ shutdownCleanups.push(
   ),
 
   gameServiceConfig.subscribe((config) => {
-    shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
+    shouldOptimizeTrackedProperties.write(config.isPatchOptimizerEnabled);
   }),
 );
 
@@ -281,7 +281,7 @@ const dbSyncSession = startDbSyncSession({
   server: gameStateServer,
   actorModels,
   logger,
-  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.value),
+  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.get()),
 });
 
 const ioc = new InjectionContainer()

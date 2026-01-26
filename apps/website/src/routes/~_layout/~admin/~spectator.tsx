@@ -5,10 +5,10 @@ import {
 } from "@mp/api-service/client";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
 import { gatewayRoles } from "@mp/keycloak";
-import { useSignalEffect } from "@mp/state/react";
+import { useSignalEffect } from "@mp/state/solid";
 import { LoadingSpinner } from "@mp/ui";
-import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useEffect } from "preact/compat";
+import { createFileRoute } from "@tanstack/solid-router";
+import { Suspense, createEffect } from "solid-js";
 import { gameAssetLoader } from "../../../integrations/assets";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
@@ -25,48 +25,51 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 function RouteComponent() {
   const [stateClient, events] = useGameStateClient();
 
+  const subscription = useSubscription(sub);
   const online = useMapSubscription(
-    useSubscription(sub),
+    subscription,
     (data) => data.onlineCharacters,
   );
 
   const spectatedId = stateClient.characterId;
-  const onlineCharacters = online
-    .entries()
-    .map(([id, { name }]) => ({ value: id, label: name }))
-    .toArray();
+  const onlineCharacters = () =>
+    [...online().entries()].map(([id, { name }]) => ({
+      value: id,
+      label: name,
+    }));
 
   useSignalEffect(() => {
     // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
-    if (stateClient.isConnected.value && spectatedId.value) {
-      events.gateway.spectate(spectatedId.value);
+    const id = spectatedId.get();
+    if (stateClient.isConnected.get() && id) {
+      events.gateway.spectate(id);
     } else {
       events.gateway.leave();
     }
   });
 
-  const isSelectedOnline = onlineCharacters.find(
-    ({ value }) => value === spectatedId.value,
-  );
-  useEffect(() => {
+  createEffect(() => {
+    const isSelectedOnline = onlineCharacters().find(
+      ({ value }) => value === spectatedId.get(),
+    );
     if (!isSelectedOnline) {
-      spectatedId.value = undefined;
+      spectatedId.write(undefined);
     }
-  }, [isSelectedOnline, spectatedId]);
+  });
 
   return (
     <div
       style={{
         padding: "32px",
         display: "flex",
-        flexDirection: "column",
+        "flex-direction": "column",
         flex: 1,
       }}
     >
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
-          <div className={atoms({ mb: "xl" })}>
-            Characters online: {online.size}
+          <div class={atoms({ mb: "xl" })}>
+            Characters online: {online().size}
           </div>
           <SpectatorClient
             characterOptions={[
@@ -74,7 +77,7 @@ function RouteComponent() {
                 value: undefined as unknown as CharacterId,
                 label: "Select character to spectate",
               },
-              ...onlineCharacters,
+              ...onlineCharacters(),
             ]}
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}

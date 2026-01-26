@@ -1,5 +1,4 @@
-import { createContext } from "preact";
-import { useContext, useEffect } from "preact/hooks";
+import { createContext, useContext, onMount, type JSX } from "solid-js";
 
 export interface ErrorFallbackProps {
   title?: string;
@@ -7,30 +6,25 @@ export interface ErrorFallbackProps {
   reset?: () => void;
 }
 
-export function ErrorFallback({
-  title = "Oops! Something went wrong.",
-  error,
-  reset,
-}: ErrorFallbackProps) {
-  const { handleError, displayErrorDetails } = useContext(ErrorFallbackContext);
+export function ErrorFallback(props: ErrorFallbackProps) {
+  const title = props.title ?? "Oops! Something went wrong.";
+  const ctx = useContext(ErrorFallbackContext);
 
-  useEffect(
-    () => handleError(error),
-    // oxlint-disable-next-line exhaustive-deps It's fine, we only want to emit the error to the current available handler.
-    [error],
-  );
+  onMount(() => {
+    ctx.handleError(props.error);
+  });
 
   return (
     <>
       <h2>{title}</h2>
-      {displayErrorDetails && error && (
+      {ctx.displayErrorDetails && props.error && (
         <pre>
-          <ErrorToString error={error} />
+          <ErrorToString error={props.error} />
         </pre>
       )}
-      {reset && (
+      {props.reset && (
         <div>
-          <button onClick={reset}>Try again</button>
+          <button onClick={props.reset}>Try again</button>
         </div>
       )}
     </>
@@ -49,16 +43,18 @@ export const ErrorFallbackContext = createContext<ErrorFallbackContextValue>({
   },
 });
 
-export function ErrorToString({ error }: { error: unknown }) {
-  if (error instanceof Error) {
+export function ErrorToString(props: { error: unknown }): JSX.Element {
+  if (props.error instanceof Error) {
     return (
       <>
-        {error.stack?.includes(error.message) ? null : error.message + "\n"}
-        {error.stack}
-        {error.cause ? <ErrorToString error={error.cause} /> : null}
+        {props.error.stack?.includes(props.error.message)
+          ? null
+          : props.error.message + "\n"}
+        {props.error.stack}
+        {props.error.cause ? <ErrorToString error={props.error.cause} /> : null}
       </>
     );
   }
 
-  return String(error);
+  return <>{String(props.error)}</>;
 }

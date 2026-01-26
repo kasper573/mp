@@ -1,12 +1,11 @@
 import type { AreaId } from "@mp/game-shared";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
-import { useGraphics } from "@mp/graphics/react";
+import { useGraphics } from "@mp/graphics/solid";
 import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
-import { useSignal, useSignalEffect } from "@mp/state/react";
-import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useSignal, useSignalEffect } from "@mp/state/solid";
+import { Suspense, Show, type JSX, createSignal } from "solid-js";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -23,7 +22,6 @@ import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
-import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
 import { TimeSpan } from "@mp/time";
 
@@ -38,50 +36,57 @@ interface GameRendererProps {
 /**
  * Composes all game graphics and UI into a single component that renders the actual game.
  */
-export function GameRenderer({
-  interactive,
-  gameStateClient,
-  areaIdToLoadAssetsFor,
-  additionalDebugUi,
-  enableUi = true,
-}: GameRendererProps) {
-  const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
+export function GameRenderer(props: GameRendererProps) {
+  const enableUi = props.enableUi ?? true;
+  const areaAssets = useAreaAssets(props.areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [container, setContainer] = createSignal<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
   const appSignal = useGraphics(container);
-  const optionsSignal = useObjectSignal({
-    interactive,
-    gameStateClient,
+  const optionsSignal = useObjectSignal(() => ({
+    interactive: props.interactive,
+    gameStateClient: props.gameStateClient,
     areaAssets,
     actorTextures,
     showDebugUi,
-  });
+  }));
 
   useSignalEffect(() => {
-    const app = appSignal.value;
-    if (app) {
-      const options = optionsSignal.value;
-      return untracked(() => buildStage(app, options));
+    const app = appSignal.get();
+    const options = optionsSignal.get();
+    const resource = options.areaAssets?.resource;
+    const spritesheets = options.areaAssets?.spritesheets;
+    const textures = options.actorTextures;
+    // Only build stage when all assets are loaded
+    if (app && resource && spritesheets && textures) {
+      return untracked(() =>
+        buildStage(app, {
+          interactive: options.interactive,
+          gameStateClient: options.gameStateClient,
+          areaAssets: { resource, spritesheets },
+          actorTextures: textures,
+          showDebugUi: options.showDebugUi,
+        }),
+      );
     }
   });
 
   return (
     <>
-      <div ref={setContainer} style={{ flex: 1 }} />
-      {enableUi && (
-        <GameStateClientContext.Provider value={gameStateClient}>
+      <div ref={setContainer} style={{ flex: "1" }} />
+      <Show when={enableUi}>
+        <GameStateClientContext.Provider value={props.gameStateClient}>
           <Suspense fallback={<UILoadingFallback />}>
             <AreaUi />
-            {showDebugUi.value && (
+            <Show when={showDebugUi.get()}>
               <GameDebugUi>
-                {additionalDebugUi}
+                {props.additionalDebugUi}
                 <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
               </GameDebugUi>
-            )}
+            </Show>
           </Suspense>
         </GameStateClientContext.Provider>
-      )}
+      </Show>
     </>
   );
 }
@@ -107,16 +112,18 @@ function UILoadingFallback() {
   return null;
 }
 
-function buildStage(
-  app: Application,
-  opt: {
-    interactive: boolean;
-    gameStateClient: GameStateClient;
-    areaAssets: AreaAssets;
-    actorTextures: ActorTextureLookup;
-    showDebugUi: Signal<boolean>;
-  },
-) {
+interface BuildStageOptions {
+  interactive: boolean;
+  gameStateClient: GameStateClient;
+  areaAssets: {
+    resource: NonNullable<AreaAssets["resource"]>;
+    spritesheets: NonNullable<AreaAssets["spritesheets"]>;
+  };
+  actorTextures: ActorTextureLookup;
+  showDebugUi: Signal<boolean>;
+}
+
+function buildStage(app: Application, opt: BuildStageOptions) {
   const engine = new Engine(app.canvas);
 
   function emitTickToGameState() {
@@ -128,15 +135,13 @@ function buildStage(
   app.ticker.add(emitTickToGameState);
   const subscriptions = [
     engine.start(opt.interactive),
-    engine.keyboard.on(
-      "keydown",
-      "F2",
-      () => (opt.showDebugUi.value = !opt.showDebugUi.value),
+    engine.keyboard.on("keydown", "F2", () =>
+      opt.showDebugUi.write(!opt.showDebugUi.get()),
     ),
   ];
   const areaScene = new AreaScene({
     engine,
-    debugSettings: () => areaDebugSettingsStorage.value,
+    debugSettings: () => areaDebugSettingsStorage.get(),
     state: opt.gameStateClient,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,

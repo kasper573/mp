@@ -1,52 +1,53 @@
 import { gatewayRoles, systemRoles } from "@mp/keycloak";
 import { dock } from "@mp/style";
 import { Button, LinearProgress } from "@mp/ui";
-import { useRouterState } from "@tanstack/react-router";
-import { useContext } from "preact/hooks";
+import { useRouterState } from "@tanstack/solid-router";
+import { useContext, Show } from "solid-js";
 import { AuthContext } from "../integrations/contexts";
 import * as styles from "./app-bar.css";
 import { Link } from "./link";
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { useQuery } from "@tanstack/react-query";
+import { createQuery } from "@tanstack/solid-query";
 import { env } from "../env";
 import { UserMenu } from "./user-menu";
 
 export default function AppBar() {
   const qb = useQueryBuilder();
   const state = useRouterState();
-  const isNavigating = state.status === "pending";
+  const isNavigating = () => state().status === "pending";
 
   const auth = useContext(AuthContext);
-  const { data: versionCompatibility } = useQuery({
-    ...qb.queryOptions(query),
-    select({ serverVersion }) {
-      if (serverVersion) {
-        return env.version === serverVersion ? "compatible" : "incompatible";
-      }
-      return "indeterminate";
-    },
-  });
+  const query = createQuery(() => qb.queryOptions(versionQuery));
+  const versionStatus = () => {
+    const serverVersion = query.data?.serverVersion;
+    if (serverVersion) {
+      return env.version === serverVersion ? "compatible" : "incompatible";
+    }
+    return "indeterminate";
+  };
 
   return (
-    <nav className={styles.nav}>
+    <nav class={styles.nav}>
       <Link to="/">Home</Link>
       <Link to="/play">Play</Link>
       <Link to="/contact">Contact</Link>
 
-      {auth.identity.value?.roles.has(systemRoles.useDevTools) && (
+      <Show when={auth.identity.get()?.roles.has(systemRoles.useDevTools)}>
         <Link to="/admin/devtools">Dev Tools</Link>
-      )}
+      </Show>
 
-      {auth.identity.value?.roles.has(gatewayRoles.spectate) && (
+      <Show when={auth.identity.get()?.roles.has(gatewayRoles.spectate)}>
         <Link to="/admin/spectator">Spectate</Link>
-      )}
+      </Show>
 
       <LinearProgress
-        className={dock({ position: "top" })}
-        active={isNavigating}
+        class={dock({ position: "top" })}
+        active={isNavigating()}
       />
-      <div className={styles.right}>
-        {versionCompatibility === "incompatible" ? <VersionNotice /> : null}
+      <div class={styles.right}>
+        <Show when={versionStatus() === "incompatible"}>
+          <VersionNotice />
+        </Show>
 
         <UserMenu />
       </div>
@@ -63,7 +64,7 @@ function VersionNotice() {
   );
 }
 
-const query = graphql(`
+const versionQuery = graphql(`
   query AppBar {
     serverVersion
   }

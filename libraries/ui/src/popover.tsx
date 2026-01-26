@@ -1,35 +1,64 @@
 import { processStyleProps } from "@mp/style";
 import * as styles from "./popover.css";
-import * as Popover from "@radix-ui/react-popover";
-import { forwardRef } from "preact/compat";
+import { Popover as KobaltePopover } from "@kobalte/core/popover";
+import type { JSX } from "solid-js";
+import { splitProps } from "solid-js";
 
-export const PopoverRoot = Popover.Root;
-export const PopoverPortal = Popover.Portal;
-export const PopoverTrigger = Popover.Trigger;
+export const PopoverRoot = KobaltePopover;
+export const PopoverPortal = KobaltePopover.Portal;
+export const PopoverTrigger = KobaltePopover.Trigger;
 
-export const PopoverContent = forwardRef<
-  HTMLDivElement,
-  Popover.PopoverContentProps
->(function PopoverContent(props, ref) {
+export interface PopoverContentProps {
+  ref?: HTMLDivElement | ((el: HTMLDivElement) => void);
+  children?: JSX.Element;
+  class?: string;
+  style?: JSX.CSSProperties;
+}
+
+export function PopoverContent(props: PopoverContentProps) {
+  const [local, rest] = splitProps(props, ["ref"]);
   return (
-    <Popover.Content ref={ref} {...processStyleProps(props, styles.content)} />
+    <KobaltePopover.Content
+      ref={local.ref}
+      {...processStyleProps(rest, styles.content)}
+    />
   );
-});
+}
 
-export const PopoverArrow = forwardRef<
-  SVGSVGElement,
-  Popover.PopoverArrowProps
->(function PopoverArrow(props, ref) {
-  return (
-    <Popover.Arrow ref={ref} {...processStyleProps(props, styles.arrow)} />
-  );
-});
+export interface PopoverArrowProps {
+  ref?: SVGSVGElement | ((el: SVGSVGElement) => void);
+  class?: string;
+  style?: JSX.CSSProperties;
+}
 
-export const PopoverClose = forwardRef<
-  HTMLButtonElement,
-  Popover.PopoverCloseProps
->(function PopoverClose(props, ref) {
+export function PopoverArrow(props: PopoverArrowProps) {
+  const [local, rest] = splitProps(props, ["ref"]);
   return (
-    <Popover.Close ref={ref} {...processStyleProps(props, styles.close)} />
+    <KobaltePopover.Arrow
+      ref={local.ref}
+      {...processStyleProps(rest, styles.arrow)}
+    />
   );
-});
+}
+
+export interface PopoverCloseProps {
+  ref?: HTMLButtonElement | ((el: HTMLButtonElement) => void);
+  children?: JSX.Element;
+  class?: string;
+  style?: JSX.CSSProperties;
+  asChild?: boolean;
+}
+
+export function PopoverClose(props: PopoverCloseProps) {
+  const [local, rest] = splitProps(props, ["ref", "asChild", "children"]);
+  // Kobalte's CloseButton wraps children and triggers close on click
+  // The asChild prop is accepted but children are rendered regardless
+  return (
+    <KobaltePopover.CloseButton
+      ref={local.ref}
+      {...processStyleProps(rest, styles.close)}
+    >
+      {local.children}
+    </KobaltePopover.CloseButton>
+  );
+}

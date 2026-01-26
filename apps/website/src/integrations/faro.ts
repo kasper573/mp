@@ -33,7 +33,7 @@ export function initializeFaro(
   }
 
   function updateFaroWithIdentity() {
-    faro?.api.setUser(deriveFaroUser(identity.value));
+    faro?.api.setUser(deriveFaroUser(identity.get()));
   }
 
   void init();

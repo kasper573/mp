@@ -1,6 +1,6 @@
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
-import { createContext } from "preact";
+import { createContext } from "solid-js";
 
 export const LoggerContext = createContext(
   new Proxy({} as Logger, {

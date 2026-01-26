@@ -1,7 +1,7 @@
 import type { AuthClient } from "@mp/auth/client";
-import type { UseNavigateResult } from "@tanstack/react-router";
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useContext, useEffect } from "preact/hooks";
+import type { UseNavigateResult } from "@tanstack/solid-router";
+import { createFileRoute, useNavigate } from "@tanstack/solid-router";
+import { useContext, onMount } from "solid-js";
 import { AuthContext } from "../integrations/contexts";
 
 /**
@@ -22,9 +22,9 @@ function RouteComponent() {
   const navigate = useNavigate();
   const auth = useContext(AuthContext);
 
-  useEffect(() => {
+  onMount(() => {
     void handleAuthCallback(auth, navigate);
-  }, [auth, navigate]);
+  });
 
   return null;
 }

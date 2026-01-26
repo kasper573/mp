@@ -1,8 +1,8 @@
-import { useEffect } from "preact/hooks";
+import { onMount, onCleanup } from "solid-js";
 import type { ApplicationOptions } from "@mp/graphics";
 import { Application } from "@mp/graphics";
-import { useSignal } from "@mp/state/react";
 import type { ReadonlySignal } from "@mp/state";
+import { signal } from "@mp/state";
 
 export interface UseGraphicsOptions extends Omit<
   Partial<ApplicationOptions>,
@@ -10,19 +10,21 @@ export interface UseGraphicsOptions extends Omit<
 > {}
 
 /**
- * react and pixi.js integration.
+ * SolidJS and pixi.js integration.
  * Will return a signal that will receive the pixi application instance as soon as it's ready.
  */
 export function useGraphics(
   /**
    * Must be provided for the pixi application to be initialized,
-   * but can be null or undefined to allow for integration with react refs.
+   * but can be null or undefined to allow for integration with solid refs.
+   * Note: This should be a getter function that returns the container element.
    */
-  container: HTMLDivElement | null | undefined,
+  getContainer: () => HTMLDivElement | null | undefined,
 ): ReadonlySignal<Application | undefined> {
-  const appSignal = useSignal<Application>();
+  const appSignal = signal<Application | undefined>(undefined);
 
-  useEffect(() => {
+  onMount(() => {
+    const container = getContainer();
     if (!container) {
       return;
     }
@@ -30,7 +32,9 @@ export function useGraphics(
     const canvas = document.createElement("canvas");
     container.prepend(canvas);
     const app = new Application();
-    const initPromise = app
+    let initPromise: Promise<void>;
+
+    initPromise = app
       .init({
         antialias: true,
         eventMode: "none",
@@ -41,7 +45,7 @@ export function useGraphics(
       })
       .then(() => {
         adjustCanvasSize(app);
-        appSignal.value = app;
+        appSignal.write(app);
       });
 
     function adjustCanvasSize(app: Application) {
@@ -57,14 +61,14 @@ export function useGraphics(
       app.resize();
     }
 
-    return () => {
-      appSignal.value = undefined;
+    onCleanup(() => {
+      appSignal.write(undefined);
       canvas.remove();
       void initPromise.then(() => {
         app.destroy({ removeView: false }, { children: true });
       });
-    };
-  }, [container, appSignal]);
+    });
+  });
 
   return appSignal;
 }

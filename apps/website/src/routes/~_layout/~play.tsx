@@ -1,13 +1,13 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
 import { LoadingSpinner } from "@mp/ui";
-import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useEffect } from "preact/compat";
+import { createFileRoute } from "@tanstack/solid-router";
+import { Suspense, createEffect } from "solid-js";
 import { gameAssetLoader } from "../../integrations/assets";
 import { useGameStateClient } from "../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
-import { useQuery } from "@tanstack/react-query";
+import { createQuery } from "@tanstack/solid-query";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
@@ -16,29 +16,24 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const [stateClient, events] = useGameStateClient();
   const qb = useQueryBuilder();
-  const { data: myCharacterId } = useQuery({
-    ...qb.queryOptions(query),
-    select: (res) => res.myCharacterId,
-  });
+  const query = createQuery(() => qb.queryOptions(characterQuery));
 
   // Auto joining as default character is a temporary solution until we have a proper character selection UI
-  useEffect(() => {
+  createEffect(() => {
+    const myCharacterId = query.data?.myCharacterId;
+    // Important to read isConnected to retrigger join when connection is re-established
+    const isConnected = stateClient.isConnected.get();
+
     if (!myCharacterId) {
-      if (stateClient.characterId.value) {
+      if (stateClient.characterId.get()) {
         events.gateway.leave();
       }
-      stateClient.characterId.value = undefined;
-    } else {
-      stateClient.characterId.value = myCharacterId;
+      stateClient.characterId.write(undefined);
+    } else if (isConnected) {
+      stateClient.characterId.write(myCharacterId);
       events.gateway.join(myCharacterId);
     }
-  }, [
-    myCharacterId,
-    stateClient,
-    events,
-    // Important to retrigger join when connection is re-established
-    stateClient.isConnected.value,
-  ]);
+  });
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
@@ -56,7 +51,7 @@ function PlayPage() {
   );
 }
 
-const query = graphql(`
+const characterQuery = graphql(`
   query PlayPage {
     myCharacterId
   }

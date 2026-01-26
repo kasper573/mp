@@ -69,7 +69,7 @@ const onlineCharacterIds = computed(
   (): ReadonlySet<CharacterId> =>
     new Set(
       userSessions.values().flatMap((session) => {
-        const { character } = session.value;
+        const { character } = session.get();
         if (character?.type === "player" && character.id) {
           return [character.id];
         }
@@ -205,14 +205,14 @@ function setupGameClientSocket(
   socket: WebSocket,
   session: Signal<UserSession<ClientId>>,
 ) {
-  logger.info(session.value, `Game client connected`);
-  userSessions.set(session.value.id, session);
-  gameClientSockets.set(session.value.id, socket);
+  logger.info(session.get(), `Game client connected`);
+  userSessions.set(session.get().id, session);
+  gameClientSockets.set(session.get().id, socket);
 
   function broadcastEventToGameServices(event: EventRouterMessage<unknown>) {
     const encoded = eventWithSessionEncoding.encode({
       event,
-      session: session.value,
+      session: session.get(),
     });
     for (const socket of gameServiceSockets) {
       socket.send(encoded);
@@ -224,16 +224,16 @@ function setupGameClientSocket(
   );
 
   socket.on("close", () => {
-    logger.info(`Game client ${session.value.id} disconnected`);
-    gameClientSockets.delete(session.value.id);
-    userSessions.delete(session.value.id);
+    logger.info(`Game client ${session.get().id} disconnected`);
+    gameClientSockets.delete(session.get().id);
+    userSessions.delete(session.get().id);
   });
 
   socket.on("message", (data: ArrayBuffer) => {
     if (data.byteLength > maxMessageSizeFromGameClient) {
       logger.warn(
         { size: data.byteLength },
-        `Received too large message from game client ${session.value.id}. Ignoring message and closing connection.`,
+        `Received too large message from game client ${session.get().id}. Ignoring message and closing connection.`,
       );
       socket.close(1009, "Message too large");
       return;
@@ -244,7 +244,7 @@ function setupGameClientSocket(
         gatewayEventInvoker.addEvent(
           result.value,
           ioc
-            .provide(ctxUserSession, session.value)
+            .provide(ctxUserSession, session.get())
             .provide(ctxUserSessionSignal, session)
             .provide(ctxGameEventClient, broadcastClient),
         );
@@ -260,7 +260,7 @@ function sendSyncMessageToRecipient(
   originatingGameServiceAreaId: AreaId,
 ) {
   for (const [clientId, socket] of gameClientSockets.entries()) {
-    const socketSession = userSessions.get(clientId)?.value;
+    const socketSession = userSessions.get(clientId)?.get();
     if (socketSession?.character?.id === recipientId) {
       const encodedPatch = syncMessageEncoding.encode(msg);
       metrics.syncMessageSizeSize.observe(
@@ -287,10 +287,10 @@ async function verifySocketConnection(
       const result = await resolveAccessToken(info.token);
       if (result.isOk()) {
         const { id, roles, name } = result.value;
-        info.session.value = {
-          ...info.session.value,
+        info.session.write({
+          ...info.session.get(),
           user: { id, roles, name },
-        };
+        });
         return cb(true);
       }
       return cb(false, 401, result.error);
@@ -372,11 +372,10 @@ const metrics = {
     collect() {
       this.set(
         new Set(
-          userSessions
-            .values()
-            .flatMap((session) =>
-              session.value.user ? [session.value.user.id] : [],
-            ),
+          userSessions.values().flatMap((session) => {
+            const user = session.get().user;
+            return user ? [user.id] : [];
+          }),
         ).size,
       );
     },

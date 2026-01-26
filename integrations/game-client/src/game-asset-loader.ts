@@ -4,14 +4,14 @@ import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface AreaAssets {
-  spritesheets: TiledSpritesheetRecord;
-  resource: AreaResource;
+  spritesheets: TiledSpritesheetRecord | undefined;
+  resource: AreaResource | undefined;
 }
 
 export interface GameAssetLoader {
   useAreaAssets: AreaAssetsLookup;
   useItemDefinition: ItemDefinitionLookup;
-  useActorTextures: () => ActorTextureLookup;
+  useActorTextures: () => ActorTextureLookup | undefined;
 }
 
-export type AreaAssetsLookup = (areaId: AreaId) => AreaAssets;
+export type AreaAssetsLookup = (areaId: AreaId) => AreaAssets | undefined;

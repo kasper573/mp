@@ -1,18 +1,17 @@
-import { useContext } from "preact/hooks";
+import { useContext, Suspense, For, Switch, Match, type JSX } from "solid-js";
 import * as styles from "./area-ui.css";
 import { GameStateClientContext, useItemDefinition } from "./context";
 import { RespawnDialog } from "./respawn-dialog";
 import type { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
-import { Suspense, type ReactElement } from "preact/compat";
 
 export function AreaUi() {
   const state = useContext(GameStateClientContext);
-  const health = state.character.value?.combat.health ?? 0;
+  const health = () => state.character.get()?.combat.health ?? 0;
 
   return (
     <>
       <Inventory />
-      <RespawnDialog open={health <= 0} />
+      <RespawnDialog open={health() <= 0} />
     </>
   );
 }
@@ -21,48 +20,54 @@ function Inventory() {
   const state = useContext(GameStateClientContext);
 
   return (
-    <div className={styles.inventory}>
-      <div className={styles.itemGrid}>
-        {state.inventory.value.map((item): ReactElement => {
-          switch (item.type) {
-            case "equipment":
-              return (
-                <Suspense key={item.id} fallback={<LoadingTile />}>
-                  <EquipmentTile item={item} />
-                </Suspense>
-              );
-            case "consumable":
-              return (
-                <Suspense key={item.id} fallback={<LoadingTile />}>
-                  <ConsumableTile item={item} />
-                </Suspense>
-              );
-          }
-        })}
+    <div class={styles.inventory}>
+      <div class={styles.itemGrid}>
+        <For each={state.inventory.get()}>
+          {(item): JSX.Element => (
+            <Switch>
+              <Match when={item.type === "equipment" && item}>
+                {(equipItem) => (
+                  <Suspense fallback={<LoadingTile />}>
+                    <EquipmentTile item={equipItem() as EquipmentInstance} />
+                  </Suspense>
+                )}
+              </Match>
+              <Match when={item.type === "consumable" && item}>
+                {(consumeItem) => (
+                  <Suspense fallback={<LoadingTile />}>
+                    <ConsumableTile
+                      item={consumeItem() as ConsumableInstance}
+                    />
+                  </Suspense>
+                )}
+              </Match>
+            </Switch>
+          )}
+        </For>
       </div>
-      <div className={styles.label}>Inventory</div>
+      <div class={styles.label}>Inventory</div>
     </div>
   );
 }
 
-function ConsumableTile({ item }: { item: ConsumableInstance }) {
-  const def = useItemDefinition(item);
+function ConsumableTile(props: { item: ConsumableInstance }) {
+  const def = useItemDefinition(props.item);
   return (
-    <div className={styles.itemTile({ type: "consumable" })}>
-      {def.name} x {item.stackSize}/{def.maxStackSize}
+    <div class={styles.itemTile({ type: "consumable" })}>
+      {def.name} x {props.item.stackSize}/{def.maxStackSize}
     </div>
   );
 }
 
-function EquipmentTile({ item }: { item: EquipmentInstance }) {
-  const def = useItemDefinition(item);
+function EquipmentTile(props: { item: EquipmentInstance }) {
+  const def = useItemDefinition(props.item);
   return (
-    <div className={styles.itemTile({ type: "equipment" })}>
-      {def.name} ({item.durability}/{def.maxDurability})
+    <div class={styles.itemTile({ type: "equipment" })}>
+      {def.name} ({props.item.durability}/{def.maxDurability})
     </div>
   );
 }
 
 function LoadingTile() {
-  return <div className={styles.itemTile({ type: "loading" })} />;
+  return <div class={styles.itemTile({ type: "loading" })} />;
 }

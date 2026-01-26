@@ -1,6 +1,6 @@
-import { useComputed, useSignal, useSignalEffect } from "@mp/state/react";
-import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "preact/hooks";
+import { useComputed, useSignal, useSignalEffect } from "@mp/state/solid";
+import { createFileRoute } from "@tanstack/solid-router";
+import { createSignal } from "solid-js";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/observable-tester",
@@ -9,17 +9,17 @@ export const Route = createFileRoute(
 });
 
 function RouteComponent() {
-  const [log, setLog] = useState("");
+  const [log, setLog] = createSignal("");
   const base = useSignal(1);
   const multiplier = useSignal(1);
-  const product = useComputed(() => base.value * multiplier.value);
+  const product = useComputed(() => base.get() * multiplier.get());
   const addLog = (message: string) => {
     setLog((prev) => `${message}\n${prev}`);
   };
 
-  useSignalEffect(() => addLog(`Base changed: ${base.value}`));
-  useSignalEffect(() => addLog(`Multiplier changed: ${multiplier.value}`));
-  useSignalEffect(() => addLog(`Product changed: ${product.value}`));
+  useSignalEffect(() => addLog(`Base changed: ${base.get()}`));
+  useSignalEffect(() => addLog(`Multiplier changed: ${multiplier.get()}`));
+  useSignalEffect(() => addLog(`Product changed: ${product.get()}`));
 
   return (
     <>
@@ -27,25 +27,30 @@ function RouteComponent() {
       <div
         style={{
           display: "flex",
-          flexDirection: "row",
+          "flex-direction": "row",
           gap: "10px",
         }}
       >
         <div style={{ flex: 1 }}>
           <div>
-            Base: {base.value} <button onClick={() => base.value--}>-</button>
-            <button onClick={() => base.value++}>+</button>
+            Base: {base.get()}{" "}
+            <button onClick={() => base.write(base.get() - 1)}>-</button>
+            <button onClick={() => base.write(base.get() + 1)}>+</button>
           </div>
 
           <div>
-            Multiplier: {multiplier.value}{" "}
-            <button onClick={() => multiplier.value--}>-</button>
-            <button onClick={() => multiplier.value++}>+</button>
+            Multiplier: {multiplier.get()}{" "}
+            <button onClick={() => multiplier.write(multiplier.get() - 1)}>
+              -
+            </button>
+            <button onClick={() => multiplier.write(multiplier.get() + 1)}>
+              +
+            </button>
           </div>
 
-          <pre>Product: {product.value}</pre>
+          <pre>Product: {product.get()}</pre>
         </div>
-        <pre style={{ flex: 1 }}>{log}</pre>
+        <pre style={{ flex: 1 }}>{log()}</pre>
       </div>
     </>
   );

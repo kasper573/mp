@@ -29,13 +29,13 @@ export class Pointer {
     this.target.removeEventListener("pointerup", this.onPointerUp);
   }
 
-  private onPointerDown = () => (this.#isDown.value = true);
-  private onPointerUp = () => (this.#isDown.value = false);
+  private onPointerDown = () => this.#isDown.write(true);
+  private onPointerUp = () => this.#isDown.write(false);
   private onPointerMove = (e: PointerEvent) => {
     const targetBounds = this.target.getBoundingClientRect();
     const relativeX = (e.clientX - targetBounds.left) as Pixel;
     const relativeY = (e.clientY - targetBounds.top) as Pixel;
-    this.#position.value = new Vector(relativeX, relativeY);
+    this.#position.write(new Vector(relativeX, relativeY));
   };
 
   /**
@@ -45,7 +45,7 @@ export class Pointer {
    */
   onClick = (callback: () => void) => {
     return effect(() => {
-      if (this.isDown.value) {
+      if (this.isDown.get()) {
         untracked(callback);
       }
     });
@@ -58,7 +58,7 @@ export class PointerForCamera extends Pointer {
   constructor(target: HTMLElement, camera: Camera) {
     super(target);
     this.worldPosition = computed(() =>
-      camera.viewportToWorld(this.position.value),
+      camera.viewportToWorld(this.position.get()),
     );
   }
 }

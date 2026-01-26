@@ -52,7 +52,7 @@ export class AreaScene extends Container {
       options.engine,
       options.area,
       options.state.actorList,
-      () => options.state.character.value?.movement.coords,
+      () => options.state.character.get()?.movement.coords,
       options.debugSettings,
     );
 
@@ -62,7 +62,7 @@ export class AreaScene extends Container {
     if (options.engine.isInteractive) {
       const tileHighlight = new TileHighlight(() => ({
         area: options.area,
-        target: this.highlightTarget.value,
+        target: this.highlightTarget.get(),
       }));
       this.addChild(tileHighlight);
     }
@@ -87,7 +87,7 @@ export class AreaScene extends Container {
     this.cameraPos = new VectorSpring(
       computed(() =>
         options.area.tiled.tileCoordToWorld(
-          options.state.character.value?.movement.coords ?? Vector.zero(),
+          options.state.character.get()?.movement.coords ?? Vector.zero(),
         ),
       ),
       () => ({
@@ -111,30 +111,32 @@ export class AreaScene extends Container {
   cameraZoom = computed(() =>
     createZoomLevelForViewDistance(
       this.options.area.tiled.tileSize,
-      this.options.engine.camera.cameraSize.value,
+      this.options.engine.camera.cameraSize.get(),
       clientViewDistance.renderedTileCount,
     ),
   );
 
   pointerTile = computed(() =>
     this.options.area.tiled.worldCoordToTile(
-      this.options.engine.pointer.worldPosition.value,
+      this.options.engine.pointer.worldPosition.get(),
     ),
   );
 
   actorAtPointer = computed(() => {
-    return this.options.state.actorList.value.find(
-      (actor) =>
-        actor.combat.health > 0 &&
-        actor.combat.hitBox
-          .offset(actor.movement.coords)
-          .contains(this.pointerTile.value),
-    );
+    return this.options.state.actorList
+      .get()
+      .find(
+        (actor) =>
+          actor.combat.health > 0 &&
+          actor.combat.hitBox
+            .offset(actor.movement.coords)
+            .contains(this.pointerTile.get()),
+      );
   });
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
-    const actor = this.actorAtPointer.value;
-    if (actor && actor?.identity.id !== this.options.state.characterId.value) {
+    const actor = this.actorAtPointer.get();
+    if (actor && actor?.identity.id !== this.options.state.characterId.get()) {
       return {
         actor,
         type: "attack",
@@ -142,7 +144,7 @@ export class AreaScene extends Container {
       };
     }
 
-    const tileNode = this.options.area.graph.getNodeAt(this.pointerTile.value);
+    const tileNode = this.options.area.graph.getNodeAt(this.pointerTile.get());
     if (tileNode) {
       return {
         rect: Rect.fromDiameter(tileNode.data.vector, 1 as Tile),
@@ -152,7 +154,7 @@ export class AreaScene extends Container {
   });
 
   private onPointerClick = () => {
-    const target = this.highlightTarget.value;
+    const target = this.highlightTarget.get();
     if (target?.type === "attack") {
       void this.options.state.actions.attack(target.actor.identity.id);
     }
@@ -172,18 +174,18 @@ export class AreaScene extends Container {
     this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.deltaMS));
     this.options.engine.camera.update(
       this.options.area.tiled.mapSize,
-      this.cameraZoom.value,
-      this.cameraPos.value.value,
+      this.cameraZoom.get(),
+      this.cameraPos.value.get(),
     );
     this.setFromMatrix(
-      new Matrix(...this.options.engine.camera.transform.value.data),
+      new Matrix(...this.options.engine.camera.transform.get().data),
     );
 
-    if (this.options.engine.pointer.isDown.value) {
-      const target = this.highlightTarget.value;
+    if (this.options.engine.pointer.isDown.get()) {
+      const target = this.highlightTarget.get();
       if (target?.type === "move") {
         const portal = this.options.area
-          .hitTestObjects(this.options.engine.pointer.worldPosition.value)
+          .hitTestObjects(this.options.engine.pointer.worldPosition.get())
           .find(getDestinationFromObject);
 
         this.moveThrottled(Vector.from(target.rect), portal?.id);

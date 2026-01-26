@@ -14,7 +14,7 @@ export class GameActions {
 
   move(to: Vector<Tile>, desiredPortalId?: ObjectId) {
     return this.events.character.move({
-      characterId: assert(this.characterId.value),
+      characterId: assert(this.characterId.get()),
       to,
       // Bonkers workaround because arktype can't handle undefined being passed to optional fields
       // See https://github.com/arktypeio/arktype/issues/1191
@@ -24,16 +24,16 @@ export class GameActions {
 
   attack(targetId: ActorId) {
     return this.events.character.attack({
-      characterId: assert(this.characterId.value),
+      characterId: assert(this.characterId.get()),
       targetId,
     });
   }
 
   respawn() {
-    return this.events.character.respawn(assert(this.characterId.value));
+    return this.events.character.respawn(assert(this.characterId.get()));
   }
 
   recall() {
-    return this.events.character.recall(assert(this.characterId.value));
+    return this.events.character.recall(assert(this.characterId.get()));
   }
 }

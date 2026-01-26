@@ -1,6 +1,8 @@
-import type { Signal } from "@preact/signals-core";
+import type { ReadonlySignal } from "./signal";
 
-export function toAsyncIterable<T>(signal: Signal<T>): AsyncIterable<T> {
+export function toAsyncIterable<T>(
+  signal: ReadonlySignal<T>,
+): AsyncIterable<T> {
   return {
     [Symbol.asyncIterator](): AsyncIterator<T> {
       const queue: T[] = [];

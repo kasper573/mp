@@ -1,34 +1,36 @@
 import type { ReadonlySignal } from "@mp/state";
-import { useSignal } from "@mp/state/react";
+import { useSignal } from "@mp/state/solid";
 import {
-  useQuery,
+  createQuery,
+  type SolidQueryOptions,
   type DefaultError,
   type QueryKey,
-  type UseQueryOptions,
-  type UseQueryResult,
-} from "@tanstack/react-query";
-import { useEffect, useMemo } from "preact/hooks";
+} from "@tanstack/solid-query";
+import { createEffect, createMemo, type Accessor } from "solid-js";
 
 export function useQuerySignal<
   TQueryFnData = unknown,
   TError = DefaultError,
   TData = TQueryFnData,
   TQueryKey extends QueryKey = QueryKey,
->(
-  options: UseQueryOptions<TQueryFnData, TError, TData, TQueryKey>,
-): Omit<UseQueryResult<TData, TError>, "data"> & {
-  signal: ReadonlySignal<TData | undefined>;
-} {
-  const result = useQuery(options);
-  const dataSignal = useSignal(result.data);
-  useEffect(() => {
-    dataSignal.value = result.data;
-  }, [result.data, dataSignal]);
-  return useMemo(
-    () => ({
-      ...result,
-      signal: dataSignal,
-    }),
-    [result, dataSignal],
+>(options: () => SolidQueryOptions<TQueryFnData, TError, TData, TQueryKey>) {
+  const result = createQuery(
+    options as Accessor<
+      SolidQueryOptions<TQueryFnData, TError, TData, TQueryKey> & {
+        initialData?: undefined;
+      }
+    >,
   );
+  const dataSignal = useSignal<TData | undefined>(
+    result.data as TData | undefined,
+  );
+
+  createEffect(() => {
+    dataSignal.write(result.data as TData | undefined);
+  });
+
+  return createMemo(() => ({
+    ...result,
+    signal: dataSignal as ReadonlySignal<TData | undefined>,
+  }))();
 }

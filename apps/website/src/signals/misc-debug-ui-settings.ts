@@ -14,3 +14,5 @@ export const miscDebugSettings = new StorageSignal<MiscDebugSettings>(
 export interface MiscDebugSettings extends OptimisticGameStateSettings {
   visualizeNetworkFogOfWar: boolean;
 }
+
+// Note: Signals from @mp/state use .get()/.write() API

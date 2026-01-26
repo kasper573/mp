@@ -61,6 +61,7 @@
       "error",
       { "extensions": [".jsx", ".tsx"] }
     ],
+    "react/no-unknown-property": "off",
 
     "always-return": "off",
     "class-methods-use-this": "off",

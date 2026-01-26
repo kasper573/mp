@@ -1,11 +1,12 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
 import { Button, Card, ErrorFallback } from "@mp/ui";
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createMutation, createQuery } from "@tanstack/solid-query";
+import { createFileRoute } from "@tanstack/solid-router";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { atoms } from "@mp/style";
 import { NavLink } from "../../integrations/router/nav-link";
-import type { ReactNode } from "preact/compat";
+import type { JSX } from "solid-js";
+import { Show } from "solid-js";
 
 export const Route = createFileRoute("/_layout/character")({
   component: AuthBoundary.wrap(CharacterPage),
@@ -14,65 +15,72 @@ export const Route = createFileRoute("/_layout/character")({
 function CharacterPage() {
   const qb = useQueryBuilder();
 
-  const query = useSuspenseQuery(qb.suspenseQueryOptions(myCharacterQuery));
+  const query = createQuery(() => qb.suspenseQueryOptions(myCharacterQuery));
 
-  const save = useMutation(qb.mutationOptions(updateCharacterNameMutation));
-
-  if (!query.data.myCharacter) {
-    return (
-      <Container>
-        You have no character. <NavLink to="/play">Start playing</NavLink> to
-        create a character.
-      </Container>
-    );
-  }
+  const save = createMutation(() =>
+    qb.mutationOptions(updateCharacterNameMutation),
+  );
 
   return (
-    <Container>
-      <Card className={atoms({ mb: "l" })}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const newName = new FormData(e.currentTarget).get("name");
-            if (newName) {
-              save.mutate({ input: { newName: newName.toString() } });
-            }
-          }}
-        >
-          <div>
-            <label htmlFor="name">Name</label>
-            <input name="name" defaultValue={query.data.myCharacter.name} />
-            {save.data?.updateMyCharacter.errors?.newName.join(", ")}
-          </div>
+    <Show
+      when={query.data?.myCharacter}
+      fallback={
+        <Container>
+          You have no character. <NavLink to="/play">Start playing</NavLink> to
+          create a character.
+        </Container>
+      }
+    >
+      {(character) => (
+        <Container>
+          <Card class={atoms({ mb: "l" })}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const newName = new FormData(e.currentTarget).get("name");
+                if (newName) {
+                  save.mutate({ input: { newName: newName.toString() } });
+                }
+              }}
+            >
+              <div>
+                <label for="name">Name</label>
+                <input name="name" value={character().name} />
+                {save.data?.updateMyCharacter.errors?.newName.join(", ")}
+              </div>
 
-          <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? "Saving..." : "Save"}
-          </Button>
-        </form>
-      </Card>
+              <Button type="submit" disabled={save.isPending}>
+                {save.isPending ? "Saving..." : "Save"}
+              </Button>
+            </form>
+          </Card>
 
-      {save.isSuccess && !save.data.updateMyCharacter.errors && (
-        <Card intent="success">Changes have been saved</Card>
+          <Show when={save.isSuccess && !save.data?.updateMyCharacter.errors}>
+            <Card intent="success">Changes have been saved</Card>
+          </Show>
+
+          {/* Internal server error, just show in case something terrible happens */}
+          <Show when={save.error}>
+            {(error) => (
+              <Card intent="error">
+                <ErrorFallback
+                  title="Could not update character"
+                  error={error()}
+                />
+              </Card>
+            )}
+          </Show>
+        </Container>
       )}
-
-      {/* Internal server error, just show in case something terrible happens */}
-      {save.isError && (
-        <Card intent="error">
-          <ErrorFallback
-            title="Could not update character"
-            error={save.error}
-          />
-        </Card>
-      )}
-    </Container>
+    </Show>
   );
 }
 
-function Container({ children }: { children?: ReactNode }) {
+function Container(props: { children?: JSX.Element }) {
   return (
-    <div style={{ maxWidth: 600 }} className={atoms({ mx: "l" })}>
+    <div style={{ "max-width": "600px" }} class={atoms({ mx: "l" })}>
       <h1>Character</h1>
-      {children}
+      {props.children}
     </div>
   );
 }

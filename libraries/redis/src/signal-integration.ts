@@ -1,5 +1,5 @@
 import { ok, err, type Result } from "@mp/std";
-import type { Signal } from "@mp/state";
+import type { Signal, ReadonlySignal } from "@mp/state";
 import type { Type } from "@mp/validate";
 import { type } from "@mp/validate";
 import type Redis from "ioredis";
@@ -48,7 +48,7 @@ export class RedisSync<T> {
    */
   save = (): this => {
     const { redis, signal, key } = this.opt;
-    const message = encode(signal.value);
+    const message = encode(signal.get());
     void redis
       .multi()
       .set(key, message)
@@ -106,7 +106,7 @@ export class RedisSync<T> {
       return;
     }
 
-    signal.value = result.value;
+    signal.write(result.value);
   };
 
   private onError = (cause: unknown) =>
@@ -130,7 +130,7 @@ export class RedisSyncError extends Error {
 export interface RedisSetSyncOptions<T> {
   redis: Redis;
   key: string;
-  signal: Signal<ReadonlySet<T>>;
+  signal: ReadonlySignal<ReadonlySet<T>>;
   onError: (error: Error) => void;
 }
 
@@ -145,16 +145,21 @@ export class RedisSetSync<T extends RedisSetMember> {
 
   /**
    * Immediately load the current value from redis into the signal.
+   * Requires the signal to be writable (Signal, not ReadonlySignal).
    *
    * Will also reload the the entire set from redis on reconnect.
    */
   load = (): this => {
-    const { redis, key } = this.opt;
+    const { redis, key, signal } = this.opt;
+
+    if (!("write" in signal)) {
+      throw new Error("load() requires a writable Signal, not ReadonlySignal");
+    }
 
     const load = () => {
       void redis
         .smembers(key)
-        .then((members) => (this.opt.signal.value = new Set(members as T[])))
+        .then((members) => this.writableSignal.write(new Set(members as T[])))
         .catch(this.onError);
     };
 
@@ -171,15 +176,22 @@ export class RedisSetSync<T extends RedisSetMember> {
    * Immediately save the current value from the signal into redis.
    */
   save = (): this => {
-    void this.overwriteRedis(this.opt.signal.value);
+    void this.overwriteRedis(this.opt.signal.get());
     return this;
   };
 
   /**
    * Set to automatically update the signal when redis updates.
+   * Requires the signal to be writable (Signal, not ReadonlySignal).
    */
   subscribe = (): this => {
-    const { redis, key } = this.opt;
+    const { redis, key, signal } = this.opt;
+
+    if (!("write" in signal)) {
+      throw new Error(
+        "subscribe() requires a writable Signal, not ReadonlySignal",
+      );
+    }
 
     // Must duplicate since connections cannot be used for both commands and pub/sub
     const sub = redis.duplicate();
@@ -210,10 +222,10 @@ export class RedisSetSync<T extends RedisSetMember> {
    */
   synchronize = (): this => {
     const { signal, redis, key } = this.opt;
-    let previousSet = signal.value;
+    let previousSet = signal.get();
     this.#cleanupFns.push(
       signal.subscribe(() => {
-        const newSet = signal.value;
+        const newSet = signal.get();
         const addedSet = newSet.difference(previousSet);
         const removedSet = previousSet.difference(newSet);
         previousSet = newSet;
@@ -279,6 +291,11 @@ export class RedisSetSync<T extends RedisSetMember> {
       .catch(this.onError);
   };
 
+  // These methods assume subscribe() has verified the signal is writable
+  private get writableSignal(): Signal<ReadonlySet<T>> {
+    return this.opt.signal as Signal<ReadonlySet<T>>;
+  }
+
   private overwriteSignal = (arrayAsBuffer: Buffer): void => {
     const result = decodeSafe<T[]>(arrayAsBuffer);
 
@@ -287,7 +304,7 @@ export class RedisSetSync<T extends RedisSetMember> {
       return;
     }
 
-    this.opt.signal.value = new Set(result.value);
+    this.writableSignal.write(new Set(result.value));
   };
 
   private addToSignal = (arrayAsBuffer: Buffer): void => {
@@ -298,8 +315,8 @@ export class RedisSetSync<T extends RedisSetMember> {
       return;
     }
 
-    const { signal } = this.opt;
-    signal.value = signal.value.union(new Set(result.value));
+    const signal = this.writableSignal;
+    signal.write(signal.get().union(new Set(result.value)));
   };
 
   private removeFromSignal = (arrayAsBuffer: Buffer): void => {
@@ -310,13 +327,13 @@ export class RedisSetSync<T extends RedisSetMember> {
       return;
     }
 
-    const { signal } = this.opt;
-    signal.value = signal.value.difference(new Set(result.value));
+    const signal = this.writableSignal;
+    signal.write(signal.get().difference(new Set(result.value)));
   };
 
   private onExpire = (expiredKey: string) => {
     if (expiredKey === this.opt.key) {
-      this.opt.signal.value = new Set();
+      this.writableSignal.write(new Set());
     }
   };
 

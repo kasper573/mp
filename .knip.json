@@ -4,8 +4,9 @@
     "@mp/tsconfig",
     "pino-pretty",
     "@mp/eslint",
-    "@prefresh/core",
-    "eslint-import-resolver-typescript"
+    "eslint-import-resolver-typescript",
+    "babel-preset-solid",
+    "@babel/plugin-syntax-typescript"
   ],
   "workspaces": {
     "apps/api-service": {

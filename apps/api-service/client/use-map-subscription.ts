@@ -1,36 +1,41 @@
-import type { useSubscription } from "@apollo/client/react";
-import { useMemo, useState, useEffect } from "preact/hooks";
+import {
+  createMemo,
+  createSignal,
+  createEffect,
+  type Accessor,
+} from "solid-js";
 import type { MapChanges } from "../shared/map-changes";
 import { applyMapChanges } from "../shared/map-changes";
+import type { SubscriptionResult } from "./use-subscription";
 
 /**
- * React hook that integrates a GraphQL subscription with our `MapChanges` type convention.
+ * SolidJS hook that integrates a GraphQL subscription with our `MapChanges` type convention.
  * Maintains a local Map instance that is updated based on incoming map changes.
  */
 export function useMapSubscription<Data, Key, Value>(
-  sub: useSubscription.Result<Data>,
+  sub: SubscriptionResult<Data>,
   selectChanges: (data: Data) => MapChanges<Key, Value>,
-): ReadonlyMap<Key, Value> {
-  const changes = useMemo(
-    () => (sub.data ? selectChanges(sub.data) : null),
-    // oxlint-disable-next-line exhaustive-deps
-    [sub.data],
-  );
+): Accessor<ReadonlyMap<Key, Value>> {
+  const changes = createMemo(() => {
+    const data = sub.data();
+    return data ? selectChanges(data) : null;
+  });
 
   return useMapChanges(changes);
 }
 
 function useMapChanges<Key, Value>(
-  mapChanges: MapChanges<Key, Value> | null,
+  mapChanges: () => MapChanges<Key, Value> | null,
   initialMap = emptyMap<Key, Value>,
-): ReadonlyMap<Key, Value> {
-  const [map, setMap] = useState<ReadonlyMap<Key, Value>>(initialMap);
+): () => ReadonlyMap<Key, Value> {
+  const [map, setMap] = createSignal<ReadonlyMap<Key, Value>>(initialMap());
 
-  useEffect(() => {
-    if (mapChanges) {
-      setMap((prev) => applyMapChanges(prev, mapChanges));
+  createEffect(() => {
+    const changes = mapChanges();
+    if (changes) {
+      setMap((prev) => applyMapChanges(prev, changes));
     }
-  }, [mapChanges]);
+  });
 
   return map;
 }

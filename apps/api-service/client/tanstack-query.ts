@@ -1,9 +1,9 @@
-import * as tanstack from "@tanstack/react-query";
+import * as tanstack from "@tanstack/solid-query";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import type { DocumentNode } from "graphql";
 import { print } from "graphql";
-import { useContext } from "preact/hooks";
-import { createContext } from "preact/compat";
+import { useContext } from "solid-js";
+import { createContext } from "solid-js";
 import type { GraphQLClient, GraphQLError } from "./apollo";
 import type { ApolloClient } from "@apollo/client";
 
@@ -26,17 +26,19 @@ export const QueryBuilderContext = createContext(
  * @example
  * function MyComponent() {
  *   const qb = useQueryBuilder();
- *   const { data, error } = useQuery(qb.queryOptions(MyQueryDocument, { var1: "value" }));
+ *   const query = createQuery(() => qb.queryOptions(MyQueryDocument, { var1: "value" }));
  *   // ...
  * }
  */
 export class QueryBuilder {
   constructor(public readonly client: GraphQLClient) {}
 
-  queryOptions<Data, Vars extends GraphQLVariablesLike, Selection = Data>(
+  queryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
-  ): tanstack.UseQueryOptions<Data, GraphQLError, Selection> {
+  ): tanstack.SolidQueryOptions<Data, GraphQLError, Data> & {
+    initialData?: undefined;
+  } {
     return {
       queryKey: queryKey(query, vars),
       queryFn:
@@ -46,14 +48,12 @@ export class QueryBuilder {
     };
   }
 
-  suspenseQueryOptions<
-    Data,
-    Vars extends GraphQLVariablesLike,
-    Selection = Data,
-  >(
+  suspenseQueryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
-  ): tanstack.UseSuspenseQueryOptions<Data, GraphQLError, Selection> {
+  ): tanstack.SolidQueryOptions<Data, GraphQLError, Data> & {
+    initialData?: undefined;
+  } {
     return {
       queryKey: queryKey(query, vars),
       queryFn: this.queryFn(query, vars),
@@ -68,7 +68,7 @@ export class QueryBuilder {
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
   ): Omit<
-    tanstack.UseInfiniteQueryOptions<
+    tanstack.SolidInfiniteQueryOptions<
       Data,
       GraphQLError,
       Selection,
@@ -94,7 +94,7 @@ export class QueryBuilder {
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
   ): Omit<
-    tanstack.UseSuspenseInfiniteQueryOptions<
+    tanstack.SolidInfiniteQueryOptions<
       Data,
       GraphQLError,
       Selection,
@@ -111,10 +111,10 @@ export class QueryBuilder {
 
   mutationOptions<Data, Vars extends GraphQLVariablesLike, TOnMutateResult>(
     mutation: TypedDocumentNode<Data, Vars>,
-  ): tanstack.UseMutationOptions<Data, GraphQLError, Vars, TOnMutateResult> {
+  ): tanstack.SolidMutationOptions<Data, GraphQLError, Vars, TOnMutateResult> {
     return {
       mutationKey: queryKey(mutation, undefined),
-      mutationFn: async (variables) => {
+      mutationFn: async (variables: Vars) => {
         const res = await this.client.mutate({ mutation, variables });
         return assertResponse(res);
       },

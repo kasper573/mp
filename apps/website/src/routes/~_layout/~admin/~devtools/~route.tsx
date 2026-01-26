@@ -1,5 +1,5 @@
 import { systemRoles } from "@mp/keycloak";
-import { createFileRoute, Link, Outlet } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet } from "@tanstack/solid-router";
 import { AuthBoundary } from "../../../../ui/auth-boundary";
 
 export const Route = createFileRoute("/_layout/admin/devtools")({
@@ -14,21 +14,21 @@ function DevtoolsLayout() {
       id="devtools-layout"
       style={{
         display: "flex",
-        flexDirection: "row",
+        "flex-direction": "row",
         width: "100%",
         flex: 1,
         padding: "20px",
         gap: "20px",
-        boxSizing: "border-box",
+        "box-sizing": "border-box",
       }}
     >
       <div
         id="devtools-sidebar"
         style={{
           display: "flex",
-          flexDirection: "column",
+          "flex-direction": "column",
           gap: "10px",
-          whiteSpace: "nowrap",
+          "white-space": "nowrap",
         }}
       >
         <Link to="/admin/devtools/observable-tester">Signal Tester</Link>
@@ -47,7 +47,7 @@ function DevtoolsLayout() {
         id="devtools-content"
         style={{
           display: "flex",
-          flexDirection: "column",
+          "flex-direction": "column",
           flex: 1,
           position: "relative",
         }}
