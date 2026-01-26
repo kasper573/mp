@@ -9,7 +9,7 @@ export async function isPatchOptimizerEnabled(
   ctx: ApiContext,
 ): Promise<boolean> {
   await roles(ctx, [systemRoles.changeSettings]);
-  return ctx.ioc.get(ctxGameServiceConfig).value.isPatchOptimizerEnabled;
+  return ctx.ioc.get(ctxGameServiceConfig).get().isPatchOptimizerEnabled;
 }
 
 /** @gqlMutationField */
@@ -19,10 +19,10 @@ export async function setPatchOptimizerEnabled(
 ): Promise<boolean> {
   await roles(ctx, [systemRoles.changeSettings]);
   const config = ctx.ioc.get(ctxGameServiceConfig);
-  config.value = {
-    ...config.value,
+  config.set({
+    ...config.get(),
     isPatchOptimizerEnabled: newValue,
-  };
+  });
   return true;
 }
 

@@ -1,35 +1,38 @@
 import { processStyleProps } from "@mp/style";
 import * as styles from "./popover.css";
-import * as Popover from "@radix-ui/react-popover";
-import { forwardRef } from "preact/compat";
+import { Popover } from "@kobalte/core/popover";
+import type { JSX, ValidComponent, ParentProps } from "solid-js";
 
-export const PopoverRoot = Popover.Root;
+export const PopoverRoot = Popover;
 export const PopoverPortal = Popover.Portal;
 export const PopoverTrigger = Popover.Trigger;
+export const PopoverCloseButton = Popover.CloseButton;
 
-export const PopoverContent = forwardRef<
-  HTMLDivElement,
-  Popover.PopoverContentProps
->(function PopoverContent(props, ref) {
-  return (
-    <Popover.Content ref={ref} {...processStyleProps(props, styles.content)} />
-  );
-});
+export function PopoverContent(
+  props: JSX.IntrinsicElements["div"] & { style?: JSX.CSSProperties },
+) {
+  return <Popover.Content {...processStyleProps(props, styles.content)} />;
+}
 
-export const PopoverArrow = forwardRef<
-  SVGSVGElement,
-  Popover.PopoverArrowProps
->(function PopoverArrow(props, ref) {
-  return (
-    <Popover.Arrow ref={ref} {...processStyleProps(props, styles.arrow)} />
-  );
-});
+export function PopoverArrow(props: JSX.IntrinsicElements["div"]) {
+  return <Popover.Arrow {...processStyleProps(props, styles.arrow)} />;
+}
 
-export const PopoverClose = forwardRef<
-  HTMLButtonElement,
-  Popover.PopoverCloseProps
->(function PopoverClose(props, ref) {
+export function PopoverClose<T extends ValidComponent = "button">(
+  props: ParentProps<{ as?: T; "aria-label"?: string } & Record<string, unknown>>,
+) {
+  // When used with a custom component (like Link), don't apply close button styling.
+  // Don't override aria-label - let the component's content determine the accessible name.
+  const isCustomComponent = props.as !== undefined && props.as !== "button";
+  const { as, children, ...restProps } = props;
+  const processedProps = isCustomComponent
+    ? restProps
+    : processStyleProps(props, styles.close);
+
   return (
-    <Popover.Close ref={ref} {...processStyleProps(props, styles.close)} />
+    // oxlint-disable-next-line no-explicit-any -- Kobalte polymorphic type workaround
+    <Popover.CloseButton as={as} {...(processedProps as any)}>
+      {children}
+    </Popover.CloseButton>
   );
-});
+}

@@ -88,6 +88,8 @@
     "react/react-in-jsx-scope": "off",
     "react/button-has-type": "off",
     "react/no-array-index-key": "off",
+    "react/no-unknown-property": "off",
+    "rules-of-hooks": "off",
     "explicit-module-boundary-types": "off",
     "no-extraneous-class": "off",
     "no-process-env": "off",
@@ -115,6 +117,14 @@
       "files": ["**/libraries/graphics/**"],
       "rules": {
         "extensions": "off"
+      }
+    },
+    // Node.js specific files in @mp/state need to import from solid-js/dist/solid for reactivity
+    {
+      "files": ["**/libraries/state/src/**/*.node.ts", "**/libraries/state/src/solid-browser.ts"],
+      "rules": {
+        "ban-ts-comment": "off",
+        "triple-slash-reference": "off"
       }
     },
     // Ensure that the game package does not import from its export files

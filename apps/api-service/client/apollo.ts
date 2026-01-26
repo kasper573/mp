@@ -13,8 +13,7 @@ import type { AccessToken } from "@mp/auth";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
-// We use this hook from apollo client because tanstack query has no concept of subscriptions.
-export { useSubscription } from "@apollo/client/react";
+// Note: useSubscription is defined in solid.tsx for SolidJS compatibility
 
 export interface GraphQLClientOptions {
   url: string;
@@ -66,7 +65,7 @@ export class GraphQLClient extends ApolloClient {
 
     super({
       link,
-      cache: new InMemoryCache(), // Disable caching because we're going to let @tanstack/react-query handle caching
+      cache: new InMemoryCache(), // Disable caching because we're going to let @tanstack/solid-query handle caching
       defaultOptions: {
         watchQuery: { fetchPolicy: "no-cache" },
         query: { fetchPolicy: "no-cache" },

@@ -1,16 +1,17 @@
 import { createConsoleLogger } from "@mp/logger";
 import { createAuthClient } from "@mp/auth/client";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
+import { QueryClient, QueryClientProvider } from "@tanstack/solid-query";
+import { SolidQueryDevtools } from "@tanstack/solid-query-devtools";
 import { ErrorFallbackContext } from "@mp/ui";
-import { RouterProvider } from "@tanstack/react-router";
-import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { useEffect, useMemo } from "preact/hooks";
+import { RouterProvider } from "@tanstack/solid-router";
+import { TanStackRouterDevtools } from "@tanstack/solid-router-devtools";
+import { createEffect, onCleanup, Show } from "solid-js";
 import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
-import { GraphQLClient, GraphQLClientProvider } from "@mp/api-service/client";
+import { GraphQLClient } from "@mp/api-service/client";
+import { GraphQLClientProvider } from "@mp/api-service/client/solid";
 import apiSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 
 // This is effectively the composition root of the application.
@@ -19,15 +20,20 @@ import apiSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 // We initialize these here because they have significantly large 3rd party dependencies,
 // and since App.tsx is lazy loaded, this helps with initial load time.
 
+const systems = createSystems();
+
 export default function App() {
-  const systems = useMemo(() => createSystems(), []);
-  useEffect(() => systems.initialize(), [systems]);
+  createEffect(() => {
+    const cleanup = systems.initialize();
+    onCleanup(cleanup);
+  });
+
   return (
     <QueryClientProvider client={systems.query}>
       <ErrorFallbackContext.Provider
         value={{
           displayErrorDetails: env.displayErrorDetails,
-          handleError: (e) => systems.logger.error(e, "Preact error"),
+          handleError: (e) => systems.logger.error(e, "SolidJS error"),
         }}
       >
         <GraphQLClientProvider client={systems.graphqlClient}>
@@ -36,12 +42,10 @@ export default function App() {
               <RouterProvider router={systems.router} />
             </AuthContext.Provider>
           </LoggerContext.Provider>
-          {showDevTools && (
-            <>
-              <TanStackRouterDevtools router={systems.router} />
-              <ReactQueryDevtools client={systems.query} />
-            </>
-          )}
+          <Show when={showDevTools}>
+            <TanStackRouterDevtools router={systems.router} />
+            <SolidQueryDevtools client={systems.query} />
+          </Show>
         </GraphQLClientProvider>
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
@@ -66,7 +70,7 @@ function createSystems() {
     url: env.api.url,
     subscriptionsUrl: env.api.subscriptionsUrl,
     schema: () => fetch(apiSchemaUrl).then((res) => res.text()),
-    getAccessToken: () => auth.identity.value?.token,
+    getAccessToken: () => auth.identity.get()?.token,
   });
 
   function initialize() {

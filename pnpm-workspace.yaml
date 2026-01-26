@@ -4,17 +4,20 @@ packages:
   - "libraries/*"
 catalog:
   "@types/node": ^22.13.10
-  preact: 10.27.2
   typescript: 5.9.3
   vitest: 3.1.4
   "@vanilla-extract/vite-plugin": 5.0.6
-  "@tanstack/react-query": 5.90.12
-  "@tanstack/react-query-devtools": 5.91.1
   vite: 6.3.5
   "cbor-x": 1.6.0
-  "@preact/preset-vite": 2.10.2
-  "@prefresh/core": 1.5.8
   tsx: 4.19.2
   dotenv: 17.2.0
   express: 5.1.0
   "@types/express": 5.0.3
+  # SolidJS ecosystem
+  solid-js: ^1.9.0
+  "@tanstack/solid-query": ^5.90.0
+  "@tanstack/solid-query-devtools": ^5.90.0
+  "@tanstack/solid-router": ^1.115.0
+  "@tanstack/solid-router-devtools": ^1.115.0
+  "@kobalte/core": ^0.13.0
+  vite-plugin-solid: ^2.11.6

@@ -1,12 +1,12 @@
 import type { AreaId } from "@mp/game-shared";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
-import { useGraphics } from "@mp/graphics/react";
+import { useGraphics } from "@mp/graphics/solid";
 import type { Signal } from "@mp/state";
 import { StorageSignal, untracked } from "@mp/state";
-import { useSignal, useSignalEffect } from "@mp/state/react";
-import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { useSignal, useSignalEffect } from "@mp/state/solid";
+import type { JSX } from "solid-js";
+import { createSignal } from "solid-js";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -23,7 +23,7 @@ import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
-import { Suspense } from "preact/compat";
+import { Suspense } from "solid-js";
 import { Dock, ErrorFallback } from "@mp/ui";
 import { TimeSpan } from "@mp/time";
 
@@ -47,21 +47,21 @@ export function GameRenderer({
 }: GameRendererProps) {
   const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
   const actorTextures = useActorTextures();
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [container, setContainer] = createSignal<HTMLDivElement | null>(null);
   const showDebugUi = useSignal(false);
   const appSignal = useGraphics(container);
-  const optionsSignal = useObjectSignal({
+  const optionsSignal = useObjectSignal(() => ({
     interactive,
     gameStateClient,
     areaAssets,
     actorTextures,
     showDebugUi,
-  });
+  }));
 
   useSignalEffect(() => {
-    const app = appSignal.value;
+    const app = appSignal.get();
     if (app) {
-      const options = optionsSignal.value;
+      const options = optionsSignal.get();
       return untracked(() => buildStage(app, options));
     }
   });
@@ -73,7 +73,7 @@ export function GameRenderer({
         <GameStateClientContext.Provider value={gameStateClient}>
           <Suspense fallback={<UILoadingFallback />}>
             <AreaUi />
-            {showDebugUi.value && (
+            {showDebugUi.get() && (
               <GameDebugUi>
                 {additionalDebugUi}
                 <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
@@ -131,12 +131,12 @@ function buildStage(
     engine.keyboard.on(
       "keydown",
       "F2",
-      () => (opt.showDebugUi.value = !opt.showDebugUi.value),
+      () => opt.showDebugUi.set(!opt.showDebugUi.get()),
     ),
   ];
   const areaScene = new AreaScene({
     engine,
-    debugSettings: () => areaDebugSettingsStorage.value,
+    debugSettings: () => areaDebugSettingsStorage.get(),
     state: opt.gameStateClient,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,

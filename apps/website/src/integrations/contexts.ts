@@ -1,19 +1,7 @@
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
-import { createContext } from "preact";
+import { createContext } from "solid-js";
 
-export const LoggerContext = createContext(
-  new Proxy({} as Logger, {
-    get() {
-      throw new Error("LoggerContext not provided");
-    },
-  }),
-);
+export const LoggerContext = createContext<Logger>();
 
-export const AuthContext = createContext(
-  new Proxy({} as AuthClient, {
-    get() {
-      throw new Error("AuthContext not provided");
-    },
-  }),
-);
+export const AuthContext = createContext<AuthClient>();

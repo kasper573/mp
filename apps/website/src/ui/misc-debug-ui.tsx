@@ -1,11 +1,11 @@
 import { PropertySignal, StorageSignal } from "@mp/state";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import { useSignal, effect } from "@mp/state/solid";
 import type { CheckboxState } from "@mp/ui";
 import { Button, Checkbox } from "@mp/ui";
 
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect } from "preact/hooks";
+import { createMutation, createQuery } from "@tanstack/solid-query";
+import { createEffect, Show } from "solid-js";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import type { GameStateClient } from "@mp/game-client";
@@ -15,15 +15,17 @@ const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
   const qb = useQueryBuilder();
   const isServerPatchOptimizerEnabled = useServerPatchOptimizerSignal();
-  const { data } = useQuery(qb.queryOptions(serverSettings));
+  const queryResult = createQuery(() => qb.queryOptions(serverSettings));
 
   return (
     <>
       <div>Client version: {env.version}</div>
-      <div>Server version: {data?.serverVersion ?? "unknown"}</div>
+      <div>Server version: {queryResult.data?.serverVersion ?? "unknown"}</div>
       <label>
         Show ping <Checkbox signal={pingEnabledSignal} />{" "}
-        {pingEnabledSignal.value ? <PingIndicator /> : null}
+        <Show when={pingEnabledSignal.get()}>
+          <PingIndicator />
+        </Show>
       </label>
       <br />
       <label>
@@ -51,7 +53,7 @@ export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
 }
 
 function PingIndicator() {
-  const ping = useQuery({
+  const ping = createQuery(() => ({
     queryKey: ["ping"],
     async queryFn() {
       const start = performance.now();
@@ -60,28 +62,30 @@ function PingIndicator() {
     },
     refetchInterval: 5000,
     initialData: 0,
-  });
+  }));
 
-  return <>{ping.data.toFixed(2)} ms</>;
+  return <>{ping.data?.toFixed(2)} ms</>;
 }
 
 function useServerPatchOptimizerSignal() {
   const qb = useQueryBuilder();
   const local = useSignal<CheckboxState>("indeterminate");
-  const remote = useQuery(qb.queryOptions(serverSettings));
-  const setRemote = useMutation(qb.mutationOptions(setPatchOptimizerEnabled));
+  const remote = createQuery(() => qb.queryOptions(serverSettings));
+  const setRemote = createMutation(() =>
+    qb.mutationOptions(setPatchOptimizerEnabled),
+  );
 
-  useSignalEffect(() => {
-    if (local.value !== "indeterminate") {
-      setRemote.mutate({ newValue: local.value });
+  effect(() => {
+    if (local.get() !== "indeterminate") {
+      setRemote.mutate({ newValue: local.get() as boolean });
     }
   });
 
-  useEffect(() => {
+  createEffect(() => {
     if (remote.data !== undefined) {
-      local.value = remote.data.isPatchOptimizerEnabled;
+      local.set(remote.data.isPatchOptimizerEnabled);
     }
-  }, [remote.data, local]);
+  });
 
   return local;
 }

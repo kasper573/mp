@@ -4,7 +4,6 @@
     "@mp/tsconfig",
     "pino-pretty",
     "@mp/eslint",
-    "@prefresh/core",
     "eslint-import-resolver-typescript"
   ],
   "workspaces": {

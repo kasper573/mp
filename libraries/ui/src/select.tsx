@@ -1,9 +1,8 @@
 import type { Signal } from "@mp/state";
-import type { JSX, ComponentChildren } from "preact";
-import { useMemo } from "preact/hooks";
+import { createMemo, type JSX, type JSXElement, Index, type Accessor } from "solid-js";
 
 export interface SelectOption<Value> {
-  label: ComponentChildren;
+  label: JSXElement;
   value: Value;
 }
 
@@ -13,7 +12,7 @@ type SelectOptionsInput<Value> =
 
 interface SelectProps<Value> extends Pick<
   JSX.IntrinsicElements["select"],
-  "className" | "style"
+  "class" | "style"
 > {
   options: SelectOptionsInput<Value>;
   signal: Signal<Value>;
@@ -26,29 +25,27 @@ export function Select<const Value>({
   isSameValue = refEquals,
   ...selectProps
 }: SelectProps<Value>) {
-  const options = useMemo(
-    () => normalizeOptionsInput(inputOptions),
-    [inputOptions],
-  );
+  const options = createMemo(() => normalizeOptionsInput(inputOptions));
 
-  const selectedIndex = options.findIndex((option) =>
-    isSameValue(option.value, signal.value),
-  );
+  const selectedIndex = () =>
+    options().findIndex((option: SelectOption<Value>) =>
+      isSameValue(option.value, signal.get()),
+    );
 
   return (
     <select
-      value={selectedIndex}
+      value={selectedIndex()}
       onInput={(e) => {
         const optionIndex = Number.parseInt(e.currentTarget.value, 10);
-        signal.value = options[optionIndex].value;
+        signal.set(options()[optionIndex].value);
       }}
       {...selectProps}
     >
-      {options.map((option, index) => (
-        <option key={index} value={index}>
-          {option.label}
-        </option>
-      ))}
+      <Index each={options()}>
+        {(option: Accessor<SelectOption<Value>>, index: number) => (
+          <option value={index}>{option().label}</option>
+        )}
+      </Index>
     </select>
   );
 }

@@ -48,7 +48,7 @@ export class RedisSync<T> {
    */
   save = (): this => {
     const { redis, signal, key } = this.opt;
-    const message = encode(signal.value);
+    const message = encode(signal.get());
     void redis
       .multi()
       .set(key, message)
@@ -106,7 +106,7 @@ export class RedisSync<T> {
       return;
     }
 
-    signal.value = result.value;
+    signal.set(result.value);
   };
 
   private onError = (cause: unknown) =>
@@ -154,7 +154,7 @@ export class RedisSetSync<T extends RedisSetMember> {
     const load = () => {
       void redis
         .smembers(key)
-        .then((members) => (this.opt.signal.value = new Set(members as T[])))
+        .then((members) => this.opt.signal.set(new Set(members as T[])))
         .catch(this.onError);
     };
 
@@ -171,7 +171,7 @@ export class RedisSetSync<T extends RedisSetMember> {
    * Immediately save the current value from the signal into redis.
    */
   save = (): this => {
-    void this.overwriteRedis(this.opt.signal.value);
+    void this.overwriteRedis(this.opt.signal.get());
     return this;
   };
 
@@ -210,10 +210,10 @@ export class RedisSetSync<T extends RedisSetMember> {
    */
   synchronize = (): this => {
     const { signal, redis, key } = this.opt;
-    let previousSet = signal.value;
+    let previousSet = signal.get();
     this.#cleanupFns.push(
       signal.subscribe(() => {
-        const newSet = signal.value;
+        const newSet = signal.get();
         const addedSet = newSet.difference(previousSet);
         const removedSet = previousSet.difference(newSet);
         previousSet = newSet;
@@ -287,7 +287,7 @@ export class RedisSetSync<T extends RedisSetMember> {
       return;
     }
 
-    this.opt.signal.value = new Set(result.value);
+    this.opt.signal.set(new Set(result.value));
   };
 
   private addToSignal = (arrayAsBuffer: Buffer): void => {
@@ -299,7 +299,7 @@ export class RedisSetSync<T extends RedisSetMember> {
     }
 
     const { signal } = this.opt;
-    signal.value = signal.value.union(new Set(result.value));
+    signal.set(signal.get().union(new Set(result.value)));
   };
 
   private removeFromSignal = (arrayAsBuffer: Buffer): void => {
@@ -311,12 +311,12 @@ export class RedisSetSync<T extends RedisSetMember> {
     }
 
     const { signal } = this.opt;
-    signal.value = signal.value.difference(new Set(result.value));
+    signal.set(signal.get().difference(new Set(result.value)));
   };
 
   private onExpire = (expiredKey: string) => {
     if (expiredKey === this.opt.key) {
-      this.opt.signal.value = new Set();
+      this.opt.signal.set(new Set());
     }
   };
 

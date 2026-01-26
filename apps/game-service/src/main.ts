@@ -145,7 +145,7 @@ shutdownCleanups.push(
   ),
 
   gameServiceConfig.subscribe((config) => {
-    shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
+    shouldOptimizeTrackedProperties.set(config.isPatchOptimizerEnabled);
   }),
 );
 
@@ -281,7 +281,7 @@ const dbSyncSession = startDbSyncSession({
   server: gameStateServer,
   actorModels,
   logger,
-  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.value),
+  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.get()),
 });
 
 const ioc = new InjectionContainer()

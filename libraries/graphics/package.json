@@ -10,10 +10,10 @@
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     },
-    "./react": {
-      "types": "./src/react.ts",
-      "import": "./src/react.ts",
-      "require": "./src/react.ts"
+    "./solid": {
+      "types": "./src/solid.ts",
+      "import": "./src/solid.ts",
+      "require": "./src/solid.ts"
     }
   },
   "dependencies": {
@@ -21,7 +21,7 @@
     "@mp/state": "workspace:*",
     "@mp/time": "workspace:*",
     "pixi.js": "8.11.0",
-    "preact": "catalog:"
+    "solid-js": "^1.9.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

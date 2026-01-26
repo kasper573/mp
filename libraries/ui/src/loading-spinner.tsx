@@ -1,15 +1,9 @@
-import type { ComponentChildren } from "preact";
+import type { JSXElement } from "solid-js";
 import { dots, dot1, dot2, dot3, dot4, container } from "./loading-spinner.css";
 import { Dock } from "./dock";
 
 export type LoadingSpinnerProps =
-  // Children is user facing descriptive text or other contentent that communicates to the user what is being loaded.
-  // If provided, this should always be displayed.
-  | { children: ComponentChildren }
-
-  // If no children are provided we must provide a debug id so that
-  // it's easy to see where the loading spinner comes from in development
-  // Debug id will not be displayed in production
+  | { children: JSXElement }
   | { debugDescription: string };
 
 export function LoadingSpinner(props: LoadingSpinnerProps) {
@@ -23,12 +17,12 @@ export function LoadingSpinner(props: LoadingSpinnerProps) {
 
   return (
     <Dock position="center">
-      <div className={container}>
-        <div className={dots}>
-          <div className={dot1} />
-          <div className={dot2} />
-          <div className={dot3} />
-          <div className={dot4} />
+      <div class={container}>
+        <div class={dots}>
+          <div class={dot1} />
+          <div class={dot2} />
+          <div class={dot3} />
+          <div class={dot4} />
         </div>
         {children}
         {debugDescription}

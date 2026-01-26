@@ -1,24 +1,36 @@
-import type { JSX } from "preact";
+import type { JSX } from "solid-js";
+import { createEffect } from "solid-js";
 import type { Signal } from "@mp/state";
 
 export type CheckboxState = true | false | "indeterminate";
 
-export interface CheckboxProps extends Pick<
-  JSX.IntrinsicElements["input"],
-  "className" | "style" | "disabled" | "children"
-> {
-  signal: Signal<CheckboxState>;
+export interface CheckboxProps<T extends CheckboxState = CheckboxState>
+  extends Pick<
+    JSX.IntrinsicElements["input"],
+    "class" | "style" | "disabled" | "children"
+  > {
+  signal: Signal<T>;
 }
 
-export function Checkbox({ signal, ...props }: CheckboxProps) {
+export function Checkbox<T extends CheckboxState = CheckboxState>({
+  signal,
+  ...props
+}: CheckboxProps<T>) {
+  let inputRef: HTMLInputElement | undefined;
+
+  createEffect(() => {
+    if (inputRef) {
+      inputRef.indeterminate = signal.get() === "indeterminate";
+    }
+  });
+
   return (
     <input
+      ref={(el) => (inputRef = el)}
       type="checkbox"
-      checked={signal.value === true}
-      // oxlint-disable-next-line no-unknown-property
-      indeterminate={signal.value === "indeterminate"}
+      checked={signal.get() === true}
       onChange={(e) => {
-        signal.value = e.currentTarget.checked;
+        signal.set(e.currentTarget.checked as T);
       }}
       {...props}
     />

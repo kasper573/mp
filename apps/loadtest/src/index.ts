@@ -10,7 +10,7 @@ import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import type { AccessToken } from "@mp/auth";
 import { createBypassUser } from "@mp/auth";
-import type { Signal } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
 import { Rng, toResult } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
@@ -147,14 +147,14 @@ function testOneGameClient(n: number, rng: Rng) {
       const { myCharacterId } = toResult(
         await api.query({ query: myCharacterIdQuery }),
       )._unsafeUnwrap();
-      gameClient.characterId.value = myCharacterId;
+      gameClient.characterId.set(myCharacterId);
 
       if (verbose) {
         logger.info(
-          `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
+          `Socket ${n} joining gateway with character ${myCharacterId}...`,
         );
       }
-      gatewayEvents.gateway.join(gameClient.characterId.value);
+      gatewayEvents.gateway.join(myCharacterId);
 
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
@@ -164,7 +164,7 @@ function testOneGameClient(n: number, rng: Rng) {
 
       if (verbose) {
         logger.info(
-          { characterId: gameClient.characterId.value },
+          { characterId: gameClient.characterId.get() },
           `Socket ${n} successfully joined gateway`,
         );
       }
@@ -172,16 +172,15 @@ function testOneGameClient(n: number, rng: Rng) {
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
         if (
-          gameClient.character.value &&
-          !gameClient.character.value.combat.health
+          gameClient.character.get() &&
+          !gameClient.character.get()?.combat.health
         ) {
           logger.info(`Character for socket ${n} will respawn`);
           gameClient.actions.respawn();
         }
 
-        const currentArea = gameClient.areaId.value
-          ? areas.get(gameClient.areaId.value)
-          : undefined;
+        const areaId = gameClient.areaId.get();
+        const currentArea = areaId ? areas.get(areaId) : undefined;
 
         if (currentArea) {
           switch (determineBehavior(n)) {
@@ -262,13 +261,13 @@ function wait(ms: number) {
 }
 
 function waitUntil<T>(
-  signal: Signal<T>,
+  signal: ReadonlySignal<T>,
   isReady: (value: T) => boolean,
   timeout: number,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    if (signal.value !== undefined) {
-      resolve(signal.value);
+    if (signal.get() !== undefined) {
+      resolve(signal.get());
       return;
     }
     const timeoutId = setTimeout(

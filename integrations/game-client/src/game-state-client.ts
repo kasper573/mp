@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/game-shared";
+import type { AreaId, CharacterId } from "@mp/game-shared";
 import type { GameEventClient, GameStateEvents } from "@mp/game-service";
 import type { Actor, Character, ItemInstance } from "@mp/game-shared";
 import {
@@ -35,9 +35,7 @@ export class GameStateClient {
   // State
   readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
-  readonly areaId = computed(
-    () => this.gameState.globals.get("instance")?.areaId,
-  );
+  readonly areaId: ReadonlySignal<AreaId | undefined>;
   readonly socketReadyState: Signal<WebSocket["readyState"]>;
 
   /**
@@ -49,7 +47,7 @@ export class GameStateClient {
    * Is true while connected to the gateway and a game service
    * has claimed the character this client is controlling.
    */
-  readonly isGameReady = computed(() => !!this.areaId.value);
+  readonly isGameReady: ReadonlySignal<boolean>;
 
   // Derived state
   readonly actorList: ReadonlySignal<readonly Actor[]>;
@@ -58,11 +56,15 @@ export class GameStateClient {
 
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
+    this.areaId = computed(
+      () => this.gameState.globals.get("instance")?.areaId,
+    );
+    this.isGameReady = computed(() => !!this.areaId.get());
     this.socketReadyState = signal<WebSocket["readyState"]>(
       this.options.socket.readyState,
     );
     this.isConnected = computed(
-      () => this.socketReadyState.value === WebSocket.OPEN,
+      () => this.socketReadyState.get() === WebSocket.OPEN,
     );
 
     this.actions = new GameActions(this.options.eventClient, this.characterId);
@@ -71,13 +73,13 @@ export class GameStateClient {
 
     this.character = computed(() => {
       const char = this.gameState.actors.get(
-        this.characterId.value as CharacterId,
+        this.characterId.get() as CharacterId,
       ) as Character | undefined;
       return char;
     });
 
     this.inventory = computed(() => {
-      const inventoryId = this.character.value?.inventoryId;
+      const inventoryId = this.character.get()?.inventoryId;
       if (inventoryId === undefined) {
         return [];
       }
@@ -93,7 +95,7 @@ export class GameStateClient {
 
     const subscriptions = [
       subscribeToReadyState(socket, (readyState) => {
-        this.socketReadyState.value = readyState;
+        this.socketReadyState.set(readyState);
       }),
       this.isConnected.subscribe((isConnected) => {
         if (!isConnected) {

@@ -1,10 +1,14 @@
-import * as tanstack from "@tanstack/react-query";
+import {
+  skipToken,
+  type SkipToken,
+  type QueryKey,
+  type QueryFunctionContext,
+} from "@tanstack/solid-query";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import type { DocumentNode } from "graphql";
 import { print } from "graphql";
-import { useContext } from "preact/hooks";
-import { createContext } from "preact/compat";
-import type { GraphQLClient, GraphQLError } from "./apollo";
+import { createContext, useContext } from "solid-js";
+import type { GraphQLClient } from "./apollo";
 import type { ApolloClient } from "@apollo/client";
 
 export function useQueryBuilder() {
@@ -19,30 +23,33 @@ export const QueryBuilderContext = createContext(
   }),
 );
 
-/**
- * Integrates GraphQL with TanStack Query.
- * The methods return options objects that can be directly passed to TanStack Query hooks.
- *
- * @example
- * function MyComponent() {
- *   const qb = useQueryBuilder();
- *   const { data, error } = useQuery(qb.queryOptions(MyQueryDocument, { var1: "value" }));
- *   // ...
- * }
- */
+interface QueryOptions<Data, Selection = Data> {
+  queryKey: QueryKey;
+  queryFn: (() => Promise<Data>) | SkipToken;
+  select?: (data: Data) => Selection;
+}
+
+interface MutationOptions<Data, Vars> {
+  mutationKey: QueryKey;
+  mutationFn: (variables: Vars) => Promise<Data>;
+}
+
+interface InfiniteQueryOptions<Data, _Vars, Selection = Data> {
+  queryKey: QueryKey;
+  queryFn: ((ctx: QueryFunctionContext) => Promise<Data>) | SkipToken;
+  select?: (data: Data) => Selection;
+}
+
 export class QueryBuilder {
   constructor(public readonly client: GraphQLClient) {}
 
   queryOptions<Data, Vars extends GraphQLVariablesLike, Selection = Data>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
-  ): tanstack.UseQueryOptions<Data, GraphQLError, Selection> {
+  ): QueryOptions<Data, Selection> {
     return {
       queryKey: queryKey(query, vars),
-      queryFn:
-        vars === tanstack.skipToken
-          ? tanstack.skipToken
-          : this.queryFn(query, vars),
+      queryFn: vars === skipToken ? skipToken : this.queryFn(query, vars),
     };
   }
 
@@ -53,7 +60,7 @@ export class QueryBuilder {
   >(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
-  ): tanstack.UseSuspenseQueryOptions<Data, GraphQLError, Selection> {
+  ): QueryOptions<Data, Selection> {
     return {
       queryKey: queryKey(query, vars),
       queryFn: this.queryFn(query, vars),
@@ -67,22 +74,10 @@ export class QueryBuilder {
   >(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
-  ): Omit<
-    tanstack.UseInfiniteQueryOptions<
-      Data,
-      GraphQLError,
-      Selection,
-      tanstack.QueryKey,
-      Vars
-    >,
-    "getNextPageParam" | "initialPageParam"
-  > {
+  ): Omit<InfiniteQueryOptions<Data, Vars, Selection>, "getNextPageParam" | "initialPageParam"> {
     return {
       queryKey: queryKey(query, vars),
-      queryFn:
-        vars === tanstack.skipToken
-          ? tanstack.skipToken
-          : this.queryFn(query, vars),
+      queryFn: vars === skipToken ? skipToken : this.queryFn(query, vars),
     };
   }
 
@@ -93,28 +88,19 @@ export class QueryBuilder {
   >(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
-  ): Omit<
-    tanstack.UseSuspenseInfiniteQueryOptions<
-      Data,
-      GraphQLError,
-      Selection,
-      tanstack.QueryKey,
-      Vars
-    >,
-    "getNextPageParam" | "initialPageParam"
-  > {
+  ): Omit<InfiniteQueryOptions<Data, Vars, Selection>, "getNextPageParam" | "initialPageParam"> {
     return {
       queryKey: queryKey(query, vars),
       queryFn: this.queryFn(query, vars),
     };
   }
 
-  mutationOptions<Data, Vars extends GraphQLVariablesLike, TOnMutateResult>(
+  mutationOptions<Data, Vars extends GraphQLVariablesLike>(
     mutation: TypedDocumentNode<Data, Vars>,
-  ): tanstack.UseMutationOptions<Data, GraphQLError, Vars, TOnMutateResult> {
+  ): MutationOptions<Data, Vars> {
     return {
       mutationKey: queryKey(mutation, undefined),
-      mutationFn: async (variables) => {
+      mutationFn: async (variables: Vars) => {
         const res = await this.client.mutate({ mutation, variables });
         return assertResponse(res);
       },
@@ -125,7 +111,7 @@ export class QueryBuilder {
     query: TypedDocumentNode<Data, Vars>,
     vars: Vars | undefined,
   ) {
-    return async (_: tanstack.QueryFunctionContext): Promise<Data> => {
+    return async (): Promise<Data> => {
       const res = await this.client.query({
         query,
         variables: assertVars(vars),
@@ -150,7 +136,6 @@ function assertResponse<Data>({ data, error }: ApolloResult<Data>): Data {
   if (error) {
     throw error;
   }
-  // Tanstack Query does not support undefined as a valid response, so we coerce it to null.
   return (data ?? null) as Data;
 }
 
@@ -162,7 +147,7 @@ type UnskippableVariableArgs<Vars> =
   HasRequiredKeys<Vars> extends true ? [Vars] : [Vars?];
 
 type SkippableVariableArgs<Vars> =
-  HasRequiredKeys<Vars> extends true ? [Vars | tanstack.SkipToken] : [Vars?];
+  HasRequiredKeys<Vars> extends true ? [Vars | SkipToken] : [Vars?];
 
 type HasRequiredKeys<T> = RequiredKeysOf<T> extends never ? false : true;
 type RequiredKeysOf<BaseType> = Exclude<

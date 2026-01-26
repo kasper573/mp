@@ -249,8 +249,7 @@ export type ClientPatches<ClientId> = Map<ClientId, AnyPatch>;
 
 export type ClientEvents<ClientId> = Map<ClientId, SyncEvent[]>;
 
-type inferEntityId<T extends SyncMap<unknown, object>> =
-  T extends SyncMap<infer EntityId, object> ? EntityId : never;
+type inferEntityId<T extends SyncMap<unknown, object>> = T["$entityId"];
 
 export type ClientVisibility<State extends AnySyncState> = {
   [EntityName in keyof State]: ReadonlySet<inferEntityId<State[EntityName]>>;

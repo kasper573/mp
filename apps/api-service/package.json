@@ -9,6 +9,11 @@
       "import": "./client/index.ts",
       "require": "./client/index.ts"
     },
+    "./client/solid": {
+      "types": "./client/solid.tsx",
+      "import": "./client/solid.tsx",
+      "require": "./client/solid.tsx"
+    },
     "./client/tsconfig.json": {
       "types": "./client/tsconfig.tada.json",
       "import": "./client/tsconfig.tada.json",
@@ -55,7 +60,6 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/ws": "workspace:*",
-    "@tanstack/react-query": "catalog:",
     "apollo-link-scalars": "^4.0.3",
     "dotenv": "catalog:",
     "express": "catalog:",
@@ -63,7 +67,10 @@
     "graphql": "^16.12.0",
     "graphql-ws": "6.0.6",
     "grats": "^0.0.34",
-    "preact": "catalog:"
+    "solid-js": "^1.9.0"
+  },
+  "peerDependencies": {
+    "@tanstack/solid-query": "^5.90.0"
   },
   "devDependencies": {
     "@graphql-typed-document-node/core": "^3.2.0",

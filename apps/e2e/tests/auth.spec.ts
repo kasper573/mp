@@ -9,6 +9,7 @@ test("can register, sign in, then sign out", async ({ page }) => {
   });
   await userMenuButton.click();
 
-  await page.getByRole("link", { name: /sign out/i }).click();
+  // Use getByText because Kobalte's PopoverClose sets aria-label="Dismiss" on links
+  await page.getByText(/sign out/i).click();
   await expect(page.getByRole("link", { name: /sign in/i })).toBeVisible();
 });

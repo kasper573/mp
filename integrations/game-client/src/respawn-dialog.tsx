@@ -1,6 +1,6 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { useContext } from "preact/hooks";
+import { useContext } from "solid-js";
 import { GameStateClientContext } from "./context";
 
 export function RespawnDialog(props: DialogProps) {

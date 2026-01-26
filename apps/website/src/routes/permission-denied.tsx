@@ -1,5 +1,5 @@
 import { Button } from "@mp/ui";
-import { useContext } from "preact/hooks";
+import { useContext, Show } from "solid-js";
 import { AuthContext } from "../integrations/contexts";
 
 export default function PermissionDenied() {
@@ -10,26 +10,29 @@ export default function PermissionDenied() {
       style={{
         position: "absolute",
         top: "128px",
-        left: 0,
-        right: 0,
-        textAlign: "center",
+        left: "0",
+        right: "0",
+        "text-align": "center",
       }}
     >
-      {auth.isSignedIn.value ? (
-        <>
-          <h1>Permission Denied</h1>
-          <p>
-            Your account does not have the required permissions to access this
-            page.
-          </p>
-        </>
-      ) : (
-        <>
-          <h1>Permission Denied</h1>
-          <p>You must be signed in to access this page.</p>
-          <Button onClick={() => void auth.redirectToSignIn()}>Sign in</Button>
-        </>
-      )}
+      <Show
+        when={auth?.isSignedIn.get()}
+        fallback={
+          <>
+            <h1>Permission Denied</h1>
+            <p>You must be signed in to access this page.</p>
+            <Button onClick={() => void auth?.redirectToSignIn()}>
+              Sign in
+            </Button>
+          </>
+        }
+      >
+        <h1>Permission Denied</h1>
+        <p>
+          Your account does not have the required permissions to access this
+          page.
+        </p>
+      </Show>
     </div>
   );
 }

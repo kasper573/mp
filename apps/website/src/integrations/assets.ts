@@ -12,7 +12,7 @@ import type {
   ItemDefinitionLookup,
   ItemReference,
 } from "@mp/game-shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
+import { createQuery } from "@tanstack/solid-query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
@@ -24,20 +24,28 @@ export const useAreaAssets: AreaAssetsLookup = (areaId) => {
   };
 };
 
+// Helper to assert data is defined (guaranteed within Suspense boundary)
+function defined<T>(value: T | undefined): T {
+  return value as T;
+}
+
 export function useActorTextures(): ActorTextureLookup {
   const qb = useQueryBuilder();
-  const { data } = useSuspenseQuery(
+  const query = createQuery(() =>
     qb.suspenseQueryOptions(actorTexturesQuery),
   );
 
-  const { data: lookup } = useSuspenseQuery({
-    queryKey: ["actor-spritesheet-lookup", data],
+  const lookupQuery = createQuery(() => ({
+    queryKey: ["actor-spritesheet-lookup", query.data],
     staleTime: Infinity,
     queryFn: () =>
-      loadActorTextureLookup(data.actorModelIds, data.actorSpritesheetUrl),
-  });
+      loadActorTextureLookup(
+        defined(query.data).actorModelIds,
+        defined(query.data).actorSpritesheetUrl,
+      ),
+  }));
 
-  return lookup;
+  return defined(lookupQuery.data);
 }
 
 const actorTexturesQuery = graphql(`
@@ -49,15 +57,16 @@ const actorTexturesQuery = graphql(`
 
 export function useAreaResource(areaId: AreaId): AreaResource {
   const qb = useQueryBuilder();
-  const {
-    data: { areaFileUrl },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(actorResourceQuery, { areaId }));
-  const query = useSuspenseQuery({
-    queryKey: ["areaResource", areaFileUrl, areaId],
+  const urlQuery = createQuery(() =>
+    qb.suspenseQueryOptions(actorResourceQuery, { areaId }),
+  );
+  const resourceQuery = createQuery(() => ({
+    queryKey: ["areaResource", defined(urlQuery.data).areaFileUrl, areaId],
     staleTime: Infinity,
-    queryFn: () => browserLoadAreaResource(areaId, areaFileUrl),
-  });
-  return query.data;
+    queryFn: () =>
+      browserLoadAreaResource(areaId, defined(urlQuery.data).areaFileUrl),
+  }));
+  return defined(resourceQuery.data);
 }
 
 const actorResourceQuery = graphql(`
@@ -69,12 +78,12 @@ const actorResourceQuery = graphql(`
 export function useAreaSpritesheets(
   area: AreaResource,
 ): TiledSpritesheetRecord {
-  const query = useSuspenseQuery({
+  const query = createQuery(() => ({
     queryKey: ["areaSpritesheets", area.id],
     staleTime: Infinity,
     queryFn: () => loadTiledMapSpritesheets(area.tiled.map),
-  });
-  return query.data;
+  }));
+  return defined(query.data);
 }
 
 export const useItemDefinition: ItemDefinitionLookup = <
@@ -83,9 +92,7 @@ export const useItemDefinition: ItemDefinitionLookup = <
   ref: Ref,
 ) => {
   const qb = useQueryBuilder();
-  const {
-    data: { itemDefinition },
-  } = useSuspenseQuery(
+  const query = createQuery(() =>
     qb.suspenseQueryOptions(itemDefinitionQuery, {
       // Note that it's important to destructure `ref`,
       // since it's generic and could contain excess properties that would pollute the query key.
@@ -97,8 +104,7 @@ export const useItemDefinition: ItemDefinitionLookup = <
   );
 
   // GraphQL does not support generics so we must assert to restore the generic type info.
-  // it's safe to do, just ugly.
-  return itemDefinition as ItemDefinitionByReference<Ref>;
+  return defined(query.data).itemDefinition as ItemDefinitionByReference<Ref>;
 };
 
 const itemDefinitionQuery = graphql(`

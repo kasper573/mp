@@ -1,6 +1,6 @@
-import type { Query, QueryCache } from "@tanstack/react-query";
-import { useQueryClient } from "@tanstack/react-query";
-import { useState, useEffect } from "preact/hooks";
+import type { Query, QueryCache } from "@tanstack/solid-query";
+import { useQueryClient } from "@tanstack/solid-query";
+import { createSignal, createEffect, onCleanup } from "solid-js";
 import {
   uniqueNamesGenerator,
   adjectives,
@@ -14,16 +14,18 @@ import {
 export function PendingQueriesDescription() {
   const queryClient = useQueryClient();
   const cache = queryClient.getQueryCache();
-  const [pendingQueries, setPendingQueries] = useState(() =>
+  const [pendingQueries, setPendingQueries] = createSignal(
     getPendingQueries(cache),
   );
 
-  useEffect(
-    () => cache.subscribe(() => setPendingQueries(getPendingQueries(cache))),
-    [cache],
-  );
+  createEffect(() => {
+    const unsubscribe = cache.subscribe(() =>
+      setPendingQueries(getPendingQueries(cache)),
+    );
+    onCleanup(unsubscribe);
+  });
 
-  return ellipsis(pendingQueries.map(emulateFileName).join(", "), 200);
+  return ellipsis(pendingQueries().map(emulateFileName).join(", "), 200);
 }
 
 function emulateFileName(query: Query): string {

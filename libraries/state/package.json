@@ -7,19 +7,18 @@
   "exports": {
     ".": {
       "types": "./src/index.ts",
+      "node": "./src/index.node.ts",
       "import": "./src/index.ts",
       "require": "./src/index.ts"
     },
-    "./react": {
-      "types": "./src/react.ts",
-      "import": "./src/react.ts",
-      "require": "./src/react.ts"
+    "./solid": {
+      "types": "./src/solid.ts",
+      "import": "./src/solid.ts",
+      "require": "./src/solid.ts"
     }
   },
   "dependencies": {
-    "@preact/signals": "2.5.1",
-    "@preact/signals-core": "1.12.1",
-    "preact": "catalog:"
+    "solid-js": "^1.9.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

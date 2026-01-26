@@ -1,15 +1,26 @@
-import { Signal, signal } from "../signal";
+import { createSignal, untrack } from "solid-js";
+import { Signal } from "../signal";
 
 export class NotifiableSignal<T> extends Signal<T> {
-  private epoch = signal(0);
+  // Use raw createSignal for the epoch to ensure proper tracking
+  private epochAccessor: () => number;
+  private epochSetter: (n: number) => void;
 
-  override get value(): T {
-    // oxlint-disable-next-line no-unused-expressions
-    this.epoch.value; // Add epoch to dependency to ensure signal updates when notified
-    return super.value;
+  constructor(initialValue: T) {
+    super(initialValue);
+    const [get, set] = createSignal(0);
+    this.epochAccessor = get;
+    this.epochSetter = set;
   }
 
-  notify() {
-    this.epoch.value++;
+  override get(): T {
+    // Track the epoch - this should trigger re-runs when notify() is called
+    this.epochAccessor();
+    return super.get();
+  }
+
+  notify(): void {
+    // Increment epoch without tracking to avoid circular dependencies
+    this.epochSetter(untrack(this.epochAccessor) + 1);
   }
 }

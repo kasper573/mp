@@ -5,6 +5,9 @@ import type { DeepPartial } from "./tracked";
 import { flushTrackedInstance, updateTrackedInstance } from "./tracked";
 
 export class SyncMap<EntityId, Entity extends object> {
+  /** Type-level accessor for EntityId (for use with `inferEntityId` type helper) */
+  declare readonly $entityId: EntityId;
+
   #signal: NotifiableSignal<Map<EntityId, Entity>>;
   #keysLastFlush = new Set<EntityId>();
 
@@ -13,21 +16,21 @@ export class SyncMap<EntityId, Entity extends object> {
   }
 
   clear(): void {
-    const map = this.#signal.value;
+    const map = this.#signal.get();
     if (map.size > 0) {
       map.clear();
       this.#signal.notify();
     }
   }
   delete(key: EntityId): boolean {
-    const deleted = this.#signal.value.delete(key);
+    const deleted = this.#signal.get().delete(key);
     if (deleted) {
       this.#signal.notify();
     }
     return deleted;
   }
   replace(entries: Iterable<readonly [EntityId, Entity]>): void {
-    const map = this.#signal.value;
+    const map = this.#signal.get();
     map.clear();
     for (const [key, value] of entries) {
       map.set(key, value);
@@ -35,33 +38,33 @@ export class SyncMap<EntityId, Entity extends object> {
     this.#signal.notify();
   }
   get(key: EntityId): Entity | undefined {
-    return this.#signal.value.get(key);
+    return this.#signal.get().get(key);
   }
   has(key: EntityId): boolean {
-    return this.#signal.value.has(key);
+    return this.#signal.get().has(key);
   }
   set(key: EntityId, value: Entity): this {
-    this.#signal.value.set(key, value);
+    this.#signal.get().set(key, value);
     this.#signal.notify();
     return this;
   }
   get size(): number {
-    return this.#signal.value.size;
+    return this.#signal.get().size;
   }
   entries(): MapIterator<[EntityId, Entity]> {
-    return this.#signal.value.entries();
+    return this.#signal.get().entries();
   }
   keys(): MapIterator<EntityId> {
-    return this.#signal.value.keys();
+    return this.#signal.get().keys();
   }
   values(): MapIterator<Entity> {
-    return this.#signal.value.values();
+    return this.#signal.get().values();
   }
   [Symbol.iterator](): MapIterator<[EntityId, Entity]> {
-    return this.#signal.value[Symbol.iterator]();
+    return this.#signal.get()[Symbol.iterator]();
   }
   get [Symbol.toStringTag](): string {
-    return this.#signal.value[Symbol.toStringTag];
+    return this.#signal.get()[Symbol.toStringTag];
   }
 
   slice(keys: Iterable<EntityId>): Map<EntityId, Entity> {

@@ -5,21 +5,21 @@ export class PropertySignal<
   Key extends keyof Obj,
 > extends Signal<Obj[Key]> {
   constructor(
-    private signal: Signal<Obj>,
+    private parentSignal: Signal<Obj>,
     private property: Key,
   ) {
-    super(signal.value[property]);
+    super(parentSignal.get()[property]);
   }
 
-  override set value(newValue: Obj[Key]) {
-    super.value = newValue;
-    this.signal.value = {
-      ...this.signal.value,
+  override set(newValue: Obj[Key]): void {
+    super.set(newValue);
+    this.parentSignal.set({
+      ...this.parentSignal.get(),
       [this.property]: newValue,
-    };
+    });
   }
 
-  override get value(): Obj[Key] {
-    return this.signal.value[this.property];
+  override get(): Obj[Key] {
+    return this.parentSignal.get()[this.property];
   }
 }

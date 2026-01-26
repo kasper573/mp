@@ -1,4 +1,4 @@
-import { preact } from "@preact/preset-vite";
+import solidPlugin from "vite-plugin-solid";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { defineConfig } from "vite";
@@ -14,7 +14,11 @@ export default defineConfig({
     tanstackRouterPlugin(),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    preact({ devToolsEnabled: false }),
+    solidPlugin({
+      // Include workspace packages in transformation
+      // Match both regular files and virtual modules with query params (like ?tsr-split=component)
+      include: [/\.tsx(\?.*)?$/, /\.jsx(\?.*)?$/],
+    }),
     checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

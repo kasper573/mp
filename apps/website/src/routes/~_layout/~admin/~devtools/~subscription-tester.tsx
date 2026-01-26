@@ -1,6 +1,8 @@
-import { graphql, useSubscription } from "@mp/api-service/client";
+import { graphql } from "@mp/api-service/client";
+import { useSubscription } from "@mp/api-service/client/solid";
 import { ErrorFallback } from "@mp/ui";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/solid-router";
+import { Show } from "solid-js";
 
 export const Route = createFileRoute(
   "/_layout/admin/devtools/subscription-tester",
@@ -14,7 +16,9 @@ function RouteComponent() {
   return (
     <div>
       <h1>Subscription Tester</h1>
-      {error && <ErrorFallback error={error} />}
+      <Show when={error}>
+        {(err) => <ErrorFallback error={err()} />}
+      </Show>
       <pre>{JSON.stringify(data, null, 2)}</pre>
     </div>
   );

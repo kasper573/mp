@@ -1,1 +1,7 @@
-{ "extends": "@mp/tsconfig/vite.json" }
+{
+  "extends": "@mp/tsconfig/vite.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js"
+  }
+}
