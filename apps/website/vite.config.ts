@@ -3,6 +3,7 @@ import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { defineConfig } from "vite";
 import { checker } from "vite-plugin-checker";
+import tsrConfig from "./tsr.config.json";
 
 import type { Plugin } from "vite";
 
@@ -11,7 +12,9 @@ export default defineConfig({
     sourcemap: true,
   },
   plugins: [
-    tanstackRouterPlugin({ target: "solid", autoCodeSplitting: true }),
+    tanstackRouterPlugin(
+      tsrConfig as Parameters<typeof tanstackRouterPlugin>[0],
+    ),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     solidPlugin(),
