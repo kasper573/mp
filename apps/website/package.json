@@ -31,20 +31,19 @@
     "@mp/time": "workspace:*",
     "@mp/ui": "workspace:*",
     "@mp/ws": "workspace:*",
-    "@tanstack/react-query": "catalog:",
-    "@tanstack/react-query-devtools": "catalog:",
-    "@tanstack/react-router": "1.157.3",
-    "@tanstack/react-router-devtools": "1.157.3",
-    "preact": "catalog:"
+    "@tanstack/solid-query": "catalog:",
+    "@tanstack/solid-query-devtools": "catalog:",
+    "@tanstack/solid-router": "1.157.15",
+    "@tanstack/solid-router-devtools": "1.157.15",
+    "solid-js": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "@preact/preset-vite": "catalog:",
-    "@prefresh/core": "catalog:",
-    "@tanstack/router-cli": "1.157.3",
-    "@tanstack/router-plugin": "1.157.3",
+    "@tanstack/router-cli": "1.157.15",
+    "@tanstack/router-plugin": "1.157.15",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
-    "vite-plugin-checker": "0.12.0"
+    "vite-plugin-checker": "0.12.0",
+    "vite-plugin-solid": "catalog:"
   }
 }

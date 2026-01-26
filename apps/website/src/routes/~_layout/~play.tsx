@@ -1,13 +1,14 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { graphql } from "@mp/api-service/client";
+import { useQueryBuilder } from "@mp/api-service/client/tanstack-query";
 import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
 import { LoadingSpinner } from "@mp/ui";
-import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useEffect } from "preact/compat";
+import { createFileRoute } from "@tanstack/solid-router";
+import { Suspense, createEffect } from "solid-js";
 import { gameAssetLoader } from "../../integrations/assets";
 import { useGameStateClient } from "../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
-import { useQuery } from "@tanstack/react-query";
+import { createQuery } from "@tanstack/solid-query";
 
 export const Route = createFileRoute("/_layout/play")({
   component: AuthBoundary.wrap(PlayPage),
@@ -16,29 +17,34 @@ export const Route = createFileRoute("/_layout/play")({
 function PlayPage() {
   const [stateClient, events] = useGameStateClient();
   const qb = useQueryBuilder();
-  const { data: myCharacterId } = useQuery({
+  const myCharacterQuery = createQuery(() => ({
     ...qb.queryOptions(query),
-    select: (res) => res.myCharacterId,
-  });
+  }));
+
+  const myCharacterId = () => myCharacterQuery.data?.myCharacterId;
 
   // Auto joining as default character is a temporary solution until we have a proper character selection UI
-  useEffect(() => {
-    if (!myCharacterId) {
-      if (stateClient.characterId.value) {
+  createEffect(() => {
+    const characterId = myCharacterId();
+    if (!characterId) {
+      if (stateClient.characterId.get()) {
         events.gateway.leave();
       }
-      stateClient.characterId.value = undefined;
+      stateClient.characterId.set(undefined);
     } else {
-      stateClient.characterId.value = myCharacterId;
-      events.gateway.join(myCharacterId);
+      stateClient.characterId.set(characterId);
+      events.gateway.join(characterId);
     }
-  }, [
-    myCharacterId,
-    stateClient,
-    events,
-    // Important to retrigger join when connection is re-established
-    stateClient.isConnected.value,
-  ]);
+  });
+
+  // Important to retrigger join when connection is re-established
+  createEffect(() => {
+    const characterId = myCharacterId();
+    const isConnected = stateClient.isConnected.get();
+    if (isConnected && characterId) {
+      events.gateway.join(characterId);
+    }
+  });
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,

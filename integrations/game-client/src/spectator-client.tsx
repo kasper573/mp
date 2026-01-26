@@ -1,7 +1,7 @@
 import type { CharacterId } from "@mp/game-shared";
 import type { SelectOption } from "@mp/ui";
 import { Dock, LoadingSpinner, Select } from "@mp/ui";
-import { Suspense } from "preact/compat";
+import { Suspense, Show, splitProps } from "solid-js";
 import type { GameClientProps } from "./game-client";
 import { GameClient } from "./game-client";
 
@@ -14,21 +14,24 @@ export interface SpectatorClientProps extends GameClientProps {
  * Also has additional UI for selecting spectator options.
  */
 export function SpectatorClient(props: SpectatorClientProps) {
+  const [local, others] = splitProps(props, ["characterOptions"]);
+
   return (
     <>
       <Select
-        options={props.characterOptions}
+        options={local.characterOptions}
         signal={props.stateClient.characterId}
       />
 
       <Suspense
         fallback={<LoadingSpinner debugDescription="SpectatorClient" />}
       >
-        {props.stateClient.characterId.value ? (
-          <GameClient enableUi={false} {...props} />
-        ) : (
-          <Dock position="center">No character selected</Dock>
-        )}
+        <Show
+          when={props.stateClient.characterId.get()}
+          fallback={<Dock position="center">No character selected</Dock>}
+        >
+          <GameClient enableUi={false} {...others} />
+        </Show>
       </Suspense>
     </>
   );

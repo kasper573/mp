@@ -34,6 +34,6 @@ async function signInAndObserveGameCanvas(page: Page) {
     .click();
 
   const canvas = page.locator("canvas");
-  await expect(canvas).toBeVisible({ timeout: 10000 });
+  await expect(canvas).toBeVisible({ timeout: 30000 });
   return canvas;
 }

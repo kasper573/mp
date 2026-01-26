@@ -1,26 +1,37 @@
-import type { JSX } from "preact";
+import type { JSX } from "solid-js";
+import { splitProps, createEffect } from "solid-js";
 import type { Signal } from "@mp/state";
 
 export type CheckboxState = true | false | "indeterminate";
 
 export interface CheckboxProps extends Pick<
   JSX.IntrinsicElements["input"],
-  "className" | "style" | "disabled" | "children"
+  "class" | "style" | "disabled" | "children"
 > {
-  signal: Signal<CheckboxState>;
+  // Accept both Signal<boolean> and Signal<CheckboxState> for flexibility
+  signal: Signal<boolean> | Signal<CheckboxState>;
 }
 
-export function Checkbox({ signal, ...props }: CheckboxProps) {
+export function Checkbox(props: CheckboxProps) {
+  const [local, others] = splitProps(props, ["signal"]);
+  let inputRef: HTMLInputElement | undefined;
+
+  // Set indeterminate property via DOM API since it's not an HTML attribute
+  createEffect(() => {
+    if (inputRef) {
+      inputRef.indeterminate = local.signal.get() === "indeterminate";
+    }
+  });
+
   return (
     <input
+      ref={(el) => (inputRef = el)}
       type="checkbox"
-      checked={signal.value === true}
-      // oxlint-disable-next-line no-unknown-property
-      indeterminate={signal.value === "indeterminate"}
+      checked={local.signal.get() === true}
       onChange={(e) => {
-        signal.value = e.currentTarget.checked;
+        local.signal.set(e.currentTarget.checked);
       }}
-      {...props}
+      {...others}
     />
   );
 }

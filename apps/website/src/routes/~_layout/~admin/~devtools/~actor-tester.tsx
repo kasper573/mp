@@ -1,8 +1,11 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { graphql } from "@mp/api-service/client";
+import { useQueryBuilder } from "@mp/api-service/client/tanstack-query";
 import { ActorSpriteTester } from "@mp/game-client";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import { createFileRoute } from "@tanstack/react-router";
+import { createQuery } from "@tanstack/solid-query";
+import { createFileRoute } from "@tanstack/solid-router";
 import { useActorTextures } from "../../../../integrations/assets";
+import { Show, Suspense } from "solid-js";
+import { LoadingSpinner } from "@mp/ui";
 
 export const Route = createFileRoute("/_layout/admin/devtools/actor-tester")({
   component: RouteComponent,
@@ -10,15 +13,20 @@ export const Route = createFileRoute("/_layout/admin/devtools/actor-tester")({
 
 function RouteComponent() {
   const qb = useQueryBuilder();
-  const {
-    data: { actorModelIds },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(query));
+  const actorQuery = createQuery(() => qb.queryOptions(query));
+  const actorTextures = useActorTextures();
 
   return (
-    <ActorSpriteTester
-      modelIds={actorModelIds}
-      actorTextures={useActorTextures()}
-    />
+    <Suspense fallback={<LoadingSpinner debugDescription="actor-tester" />}>
+      <Show when={actorQuery.data?.actorModelIds}>
+        {(modelIds) => (
+          <ActorSpriteTester
+            modelIds={modelIds()}
+            actorTextures={actorTextures.data}
+          />
+        )}
+      </Show>
+    </Suspense>
   );
 }
 

@@ -1,10 +1,9 @@
-import * as tanstack from "@tanstack/react-query";
+import * as tanstack from "@tanstack/solid-query";
 import type { TypedDocumentNode } from "@graphql-typed-document-node/core";
 import type { DocumentNode } from "graphql";
 import { print } from "graphql";
-import { useContext } from "preact/hooks";
-import { createContext } from "preact/compat";
-import type { GraphQLClient, GraphQLError } from "./apollo";
+import { useContext, createContext } from "solid-js";
+import type { GraphQLClient } from "./apollo";
 import type { ApolloClient } from "@apollo/client";
 
 export function useQueryBuilder() {
@@ -26,17 +25,19 @@ export const QueryBuilderContext = createContext(
  * @example
  * function MyComponent() {
  *   const qb = useQueryBuilder();
- *   const { data, error } = useQuery(qb.queryOptions(MyQueryDocument, { var1: "value" }));
+ *   const query = createQuery(() => ({
+ *     ...qb.queryOptions(MyQueryDocument, { var1: "value" })
+ *   }));
  *   // ...
  * }
  */
 export class QueryBuilder {
   constructor(public readonly client: GraphQLClient) {}
 
-  queryOptions<Data, Vars extends GraphQLVariablesLike, Selection = Data>(
+  queryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
-  ): tanstack.UseQueryOptions<Data, GraphQLError, Selection> {
+  ): QueryOptions<Data> {
     return {
       queryKey: queryKey(query, vars),
       queryFn:
@@ -46,37 +47,20 @@ export class QueryBuilder {
     };
   }
 
-  suspenseQueryOptions<
-    Data,
-    Vars extends GraphQLVariablesLike,
-    Selection = Data,
-  >(
+  suspenseQueryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
-  ): tanstack.UseSuspenseQueryOptions<Data, GraphQLError, Selection> {
+  ): QueryOptions<Data> {
     return {
       queryKey: queryKey(query, vars),
       queryFn: this.queryFn(query, vars),
     };
   }
 
-  infiniteQueryOptions<
-    Data,
-    Vars extends GraphQLVariablesLike,
-    Selection = Data,
-  >(
+  infiniteQueryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: SkippableVariableArgs<Vars>
-  ): Omit<
-    tanstack.UseInfiniteQueryOptions<
-      Data,
-      GraphQLError,
-      Selection,
-      tanstack.QueryKey,
-      Vars
-    >,
-    "getNextPageParam" | "initialPageParam"
-  > {
+  ): QueryOptions<Data> {
     return {
       queryKey: queryKey(query, vars),
       queryFn:
@@ -86,32 +70,19 @@ export class QueryBuilder {
     };
   }
 
-  suspenseInfiniteQueryOptions<
-    Data,
-    Vars extends GraphQLVariablesLike,
-    Selection = Data,
-  >(
+  suspenseInfiniteQueryOptions<Data, Vars extends GraphQLVariablesLike>(
     query: TypedDocumentNode<Data, Vars>,
     ...[vars]: UnskippableVariableArgs<Vars>
-  ): Omit<
-    tanstack.UseSuspenseInfiniteQueryOptions<
-      Data,
-      GraphQLError,
-      Selection,
-      tanstack.QueryKey,
-      Vars
-    >,
-    "getNextPageParam" | "initialPageParam"
-  > {
+  ): QueryOptions<Data> {
     return {
       queryKey: queryKey(query, vars),
       queryFn: this.queryFn(query, vars),
     };
   }
 
-  mutationOptions<Data, Vars extends GraphQLVariablesLike, TOnMutateResult>(
+  mutationOptions<Data, Vars extends GraphQLVariablesLike>(
     mutation: TypedDocumentNode<Data, Vars>,
-  ): tanstack.UseMutationOptions<Data, GraphQLError, Vars, TOnMutateResult> {
+  ): MutationOptions<Data, Vars> {
     return {
       mutationKey: queryKey(mutation, undefined),
       mutationFn: async (variables) => {
@@ -175,3 +146,16 @@ type RequiredKeysOf<BaseType> = Exclude<
 >;
 
 type GraphQLVariablesLike = Record<string, unknown>;
+
+// Simplified return types that avoid TanStack Query overload issues
+interface QueryOptions<Data> {
+  queryKey: unknown[];
+  queryFn:
+    | tanstack.SkipToken
+    | ((ctx: tanstack.QueryFunctionContext) => Promise<Data>);
+}
+
+interface MutationOptions<Data, Vars> {
+  mutationKey: unknown[];
+  mutationFn: (variables: Vars) => Promise<Data>;
+}

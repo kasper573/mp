@@ -1,6 +1,6 @@
-import { Suspense } from "preact/compat";
+import { Suspense, Show, createSignal, onCleanup } from "solid-js";
 import { LoadingSpinner } from "@mp/ui";
-import type { JSX } from "preact";
+import type { JSX } from "solid-js";
 import type { GameStateClient } from "./game-state-client";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
@@ -18,46 +18,71 @@ export interface GameClientProps {
  * can focus on the data fetching and state management.
  */
 export function GameClient(props: GameClientProps) {
-  if (!props.stateClient.isConnected.value) {
-    return (
-      <LoadingSpinner debugDescription="GameStateClient not connected">
-        Connecting to gateway
-      </LoadingSpinner>
-    );
-  }
+  // Create SolidJS signals to drive the UI
+  const [isConnected, setIsConnected] = createSignal(
+    props.stateClient.isConnected.get(),
+  );
+  const [isGameReady, setIsGameReady] = createSignal(
+    props.stateClient.isGameReady.get(),
+  );
+  const [areaId, setAreaId] = createSignal(props.stateClient.areaId.get());
 
-  if (!props.stateClient.isGameReady.value) {
-    return (
-      <LoadingSpinner debugDescription="isGameReady false">
-        Connecting to game service
-      </LoadingSpinner>
-    );
-  }
+  // Poll the external signals periodically as a workaround for subscription issues
+  // This ensures we pick up changes even if the reactive subscription chain is broken
+  const pollInterval = setInterval(() => {
+    setIsConnected(props.stateClient.isConnected.get());
+    setIsGameReady(props.stateClient.isGameReady.get());
+    setAreaId(props.stateClient.areaId.get());
+  }, 100);
 
-  const areaId = props.stateClient.areaId.value;
-  if (!areaId) {
-    return (
-      <LoadingSpinner debugDescription="areaId unavailable">
-        Loading area
-      </LoadingSpinner>
-    );
-  }
+  onCleanup(() => {
+    clearInterval(pollInterval);
+  });
 
   return (
-    <Suspense
+    <Show
+      when={isConnected()}
       fallback={
-        <LoadingSpinner>
-          Loading assets: <PendingQueriesDescription />
+        <LoadingSpinner debugDescription="GameStateClient not connected">
+          Connecting to gateway
         </LoadingSpinner>
       }
     >
-      <GameRenderer
-        interactive={props.interactive}
-        gameStateClient={props.stateClient}
-        additionalDebugUi={props.additionalDebugUi}
-        areaIdToLoadAssetsFor={areaId}
-        enableUi={props.enableUi}
-      />
-    </Suspense>
+      <Show
+        when={isGameReady()}
+        fallback={
+          <LoadingSpinner debugDescription="isGameReady false">
+            Connecting to game service
+          </LoadingSpinner>
+        }
+      >
+        <Show
+          when={areaId()}
+          fallback={
+            <LoadingSpinner debugDescription="areaId unavailable">
+              Loading area
+            </LoadingSpinner>
+          }
+        >
+          {(areaId) => (
+            <Suspense
+              fallback={
+                <LoadingSpinner>
+                  Loading assets: <PendingQueriesDescription />
+                </LoadingSpinner>
+              }
+            >
+              <GameRenderer
+                interactive={props.interactive}
+                gameStateClient={props.stateClient}
+                additionalDebugUi={props.additionalDebugUi}
+                areaIdToLoadAssetsFor={areaId()}
+                enableUi={props.enableUi}
+              />
+            </Suspense>
+          )}
+        </Show>
+      </Show>
+    </Show>
   );
 }

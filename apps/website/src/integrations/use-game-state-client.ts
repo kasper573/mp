@@ -10,7 +10,7 @@ import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
 import { WebSocket } from "@mp/ws/client";
-import { useContext, useEffect, useMemo } from "preact/hooks";
+import { useContext, onMount, onCleanup } from "solid-js";
 import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { AuthContext, LoggerContext } from "./contexts";
@@ -26,17 +26,19 @@ export function useGameStateClient(): [
   const logger = useContext(LoggerContext);
   const auth = useContext(AuthContext);
 
-  const [stateClient, eventClient, initialize] = useMemo(
-    () =>
-      createGameStateClient(
-        logger.child({}, { msgPrefix: "[GameStateClient]" }),
-        auth,
-      ),
-    [logger, auth],
+  const [stateClient, eventClient, initialize] = createGameStateClient(
+    logger.child({}, { msgPrefix: "[GameStateClient]" }),
+    auth,
   );
 
-  useEffect(() => initialize(), [initialize]);
-  useEffect(() => stateClient.start(), [stateClient]);
+  onMount(() => {
+    const cleanup = initialize();
+    stateClient.start();
+    onCleanup(() => {
+      cleanup();
+      stateClient.stop();
+    });
+  });
 
   return [stateClient, eventClient];
 }
@@ -47,7 +49,7 @@ function createGameStateClient(
 ): [GameStateClient, ComposedGameEventClient, () => () => void] {
   const socket = new WebSocket(() => {
     const url = new URL(env.gameServiceUrl);
-    url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
+    url.searchParams.set("accessToken", auth.identity.get()?.token ?? "");
     return url.toString();
   });
   socket.binaryType = "arraybuffer";
@@ -73,7 +75,7 @@ function createGameStateClient(
     socket,
     eventClient,
     logger,
-    settings: () => miscDebugSettings.value,
+    settings: () => miscDebugSettings.get(),
   });
 
   return [stateClient, eventClient, initialize];

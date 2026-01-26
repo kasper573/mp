@@ -1,10 +1,9 @@
-import { useContext } from "preact/hooks";
+import { useContext, Show } from "solid-js";
 import { AuthContext } from "../integrations/contexts";
 import {
   Button,
   Card,
   Link,
-  PopoverClose,
   PopoverContent,
   PopoverPortal,
   PopoverRoot,
@@ -15,38 +14,31 @@ import { NavLink } from "../integrations/router/nav-link";
 export function UserMenu() {
   const auth = useContext(AuthContext);
 
-  if (!auth.isSignedIn.value) {
-    return (
-      <Button role="link" onClick={() => void auth.redirectToSignIn()}>
-        Sign in
-      </Button>
-    );
-  }
-
   return (
-    <PopoverRoot>
-      <PopoverTrigger asChild>
-        <Button>{auth.identity.value?.name}</Button>
-      </PopoverTrigger>
-      <PopoverPortal>
-        <PopoverContent>
-          <Card floating>
-            <PopoverClose asChild>
+    <Show
+      when={auth.isSignedIn.get()}
+      fallback={
+        <Button role="link" onClick={() => void auth.redirectToSignIn()}>
+          Sign in
+        </Button>
+      }
+    >
+      <PopoverRoot>
+        <PopoverTrigger as={Button}>{auth.identity.get()?.name}</PopoverTrigger>
+        <PopoverPortal>
+          <PopoverContent>
+            <Card floating>
               <NavLink to="/character">Character</NavLink>
-            </PopoverClose>
-            <br />
-            <PopoverClose asChild>
+              <br />
               <Link href={auth.getAccountConsoleUrl()}>Account</Link>
-            </PopoverClose>
-            <br />
-            <PopoverClose asChild>
+              <br />
               <Link href="#" onClick={() => void auth.signOutRedirect()}>
                 Sign out
               </Link>
-            </PopoverClose>
-          </Card>
-        </PopoverContent>
-      </PopoverPortal>
-    </PopoverRoot>
+            </Card>
+          </PopoverContent>
+        </PopoverPortal>
+      </PopoverRoot>
+    </Show>
   );
 }

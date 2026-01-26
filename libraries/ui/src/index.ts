@@ -10,4 +10,3 @@ export * from "./card";
 export * from "./link";
 export * from "./popover";
 export * from "./range";
-export * from "react-error-boundary";

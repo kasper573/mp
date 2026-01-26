@@ -66,7 +66,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(() => actors.value.filter((actor) => actor.type === "npc")),
+      computed(() => actors.get().filter((actor) => actor.type === "npc")),
       (npc) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
@@ -150,7 +150,7 @@ class DebugTiledGraph extends Container {
         break;
       case "tile": {
         const tileNode = graph.getProximityNode(
-          tiled.worldCoordToTile(worldPosition.value),
+          tiled.worldCoordToTile(worldPosition.get()),
         );
         if (tileNode) {
           drawGraphNode(this.gfx, tiled, graph, tileNode);
@@ -159,10 +159,10 @@ class DebugTiledGraph extends Container {
       }
       case "proximityNode": {
         const nearest = graph.getProximityNode(
-          tiled.worldCoordToTile(worldPosition.value),
+          tiled.worldCoordToTile(worldPosition.get()),
         );
         if (nearest) {
-          drawManyLinesFromSameStart(this.gfx, worldPosition.value, [
+          drawManyLinesFromSameStart(this.gfx, worldPosition.get(), [
             tiled.tileCoordToWorld(nearest.data.vector),
           ]);
         }
@@ -178,11 +178,11 @@ class DebugTiledGraph extends Container {
         }
 
         const obscureAmount = this.walkableChecker.obscureAmount(
-          tiled.worldCoordToTile(worldPosition.value).round(),
+          tiled.worldCoordToTile(worldPosition.get()).round(),
         );
 
         this.text.visible = true;
-        this.text.position.copyFrom(worldPosition.value);
+        this.text.position.copyFrom(worldPosition.get());
         this.text.position.x += 5;
         this.text.text = `${(obscureAmount * 100).toFixed(2)}% obscured`;
       }

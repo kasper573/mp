@@ -13,9 +13,6 @@ import type { AccessToken } from "@mp/auth";
 
 export type { ErrorLike as GraphQLError } from "@apollo/client";
 
-// We use this hook from apollo client because tanstack query has no concept of subscriptions.
-export { useSubscription } from "@apollo/client/react";
-
 export interface GraphQLClientOptions {
   url: string;
   subscriptionsUrl?: string;

@@ -31,7 +31,7 @@
     "symbol-description": "error",
     "checked-requires-onchange-or-readonly": "error",
     "jsx-no-useless-fragment": "error",
-    "rules-of-hooks": "error",
+    "rules-of-hooks": "off",
     "ban-ts-comment": [
       "error",
       {
@@ -88,6 +88,7 @@
     "react/react-in-jsx-scope": "off",
     "react/button-has-type": "off",
     "react/no-array-index-key": "off",
+    "react/no-unknown-property": "off",
     "explicit-module-boundary-types": "off",
     "no-extraneous-class": "off",
     "no-process-env": "off",

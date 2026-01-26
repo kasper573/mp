@@ -15,13 +15,16 @@ export class StorageSignal<T> extends Signal<T> {
     this.storage = storage;
   }
 
-  override set value(newValue: T) {
-    super.value = newValue;
-    save(this.storage, this.key, newValue);
-  }
-
-  override get value(): T {
-    return super.value;
+  override set(newValue: T | ((prev: T) => T)): void {
+    if (typeof newValue === "function") {
+      const fn = newValue as (prev: T) => T;
+      const resolved = fn(this.get());
+      super.set(resolved);
+      save(this.storage, this.key, resolved);
+    } else {
+      super.set(newValue);
+      save(this.storage, this.key, newValue);
+    }
   }
 }
 

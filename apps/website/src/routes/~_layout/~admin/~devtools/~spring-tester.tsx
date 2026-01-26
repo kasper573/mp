@@ -1,9 +1,9 @@
 import { Spring } from "@mp/engine";
 import { Ticker } from "@mp/graphics";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import { useSignal, useSignalEffect } from "@mp/state/solid";
 import { Range } from "@mp/ui";
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo } from "preact/hooks";
+import { createFileRoute } from "@tanstack/solid-router";
+import { onMount, onCleanup } from "solid-js";
 import { TimeSpan } from "@mp/time";
 
 export const Route = createFileRoute("/_layout/admin/devtools/spring-tester")({
@@ -18,37 +18,33 @@ function RouteComponent() {
   const precision = useSignal(1);
   const target = useSignal(0);
 
-  const spring = useMemo(
-    () =>
-      new Spring(target, () => ({
-        stiffness: stiffness.value,
-        damping: damping.value,
-        mass: mass.value,
-        precision: precision.value,
-      })),
-    [target, stiffness, damping, mass, precision],
-  );
+  const spring = new Spring(target, () => ({
+    stiffness: stiffness.get(),
+    damping: damping.get(),
+    mass: mass.get(),
+    precision: precision.get(),
+  }));
 
-  useEffect(() => {
+  onMount(() => {
     function update() {
       spring.update(TimeSpan.fromMilliseconds(Ticker.shared.deltaMS));
     }
     Ticker.shared.add(update);
     Ticker.shared.start();
-    return () => {
+    onCleanup(() => {
       Ticker.shared.remove(update);
       Ticker.shared.stop();
-    };
-  }, [spring]);
+    });
+  });
 
   function flipSpringTarget() {
-    target.value = target.value ? 0 : 100;
+    target.set((v) => (v ? 0 : 100));
   }
 
-  const toggleAutoFlip = () => (autoFlip.value = !autoFlip.value);
+  const toggleAutoFlip = () => autoFlip.set((v) => !v);
 
   useSignalEffect(() => {
-    if (autoFlip.value && spring.state.value === "settled") {
+    if (autoFlip.get() && spring.state.get() === "settled") {
       flipSpringTarget();
     }
   });
@@ -76,14 +72,14 @@ function RouteComponent() {
 
       <button onClick={flipSpringTarget}>Flip Target</button>
       <button onClick={toggleAutoFlip}>
-        {autoFlip.value ? "Disable auto flip" : "Enable auto flip"}
+        {autoFlip.get() ? "Disable auto flip" : "Enable auto flip"}
       </button>
       <pre>
         {JSON.stringify(
           {
-            value: spring.value.value,
-            state: spring.state.value,
-            velocity: spring.velocity.value,
+            value: spring.value.get(),
+            state: spring.state.get(),
+            velocity: spring.velocity.get(),
           },
           null,
           2,
@@ -103,7 +99,7 @@ function RouteComponent() {
             height: cubeSize,
             background: "blue",
             position: "absolute",
-            left: `calc(${spring.value.value / 100} * (100% - ${cubeSize}))`,
+            left: `calc(${spring.value.get() / 100} * (100% - ${cubeSize}))`,
             top: 0,
           }}
         />

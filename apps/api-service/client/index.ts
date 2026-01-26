@@ -1,4 +1,5 @@
 export * from "./apollo";
-export * from "./tanstack-query";
 export * from "./gql-tada";
-export * from "./react";
+// Note: SolidJS-specific exports are available via:
+// - "@mp/api-service/client/solid" - GraphQLClientProvider, useSubscription, useMapSubscription
+// - "@mp/api-service/client/tanstack-query" - QueryBuilder, useQueryBuilder

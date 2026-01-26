@@ -10,7 +10,7 @@ import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import type { AccessToken } from "@mp/auth";
 import { createBypassUser } from "@mp/auth";
-import type { Signal } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
 import { Rng, toResult } from "@mp/std";
 import { parseSocketError, WebSocket } from "@mp/ws/server";
 import { readCliOptions } from "./cli";
@@ -147,14 +147,15 @@ function testOneGameClient(n: number, rng: Rng) {
       const { myCharacterId } = toResult(
         await api.query({ query: myCharacterIdQuery }),
       )._unsafeUnwrap();
-      gameClient.characterId.value = myCharacterId;
+      gameClient.characterId.set(myCharacterId);
 
       if (verbose) {
         logger.info(
-          `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
+          `Socket ${n} joining gateway with character ${gameClient.characterId.get()}...`,
         );
       }
-      gatewayEvents.gateway.join(gameClient.characterId.value);
+      // oxlint-disable-next-line typescript/no-non-null-assertion -- characterId is set above
+      gatewayEvents.gateway.join(gameClient.characterId.get()!);
 
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
@@ -164,24 +165,28 @@ function testOneGameClient(n: number, rng: Rng) {
 
       if (verbose) {
         logger.info(
-          { characterId: gameClient.characterId.value },
+          { characterId: gameClient.characterId.get() },
           `Socket ${n} successfully joined gateway`,
         );
       }
 
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
+        // oxlint-disable typescript/no-non-null-assertion -- checked in condition
         if (
-          gameClient.character.value &&
-          !gameClient.character.value.combat.health
+          gameClient.character.get() &&
+          !gameClient.character.get()!.combat.health
         ) {
+          // oxlint-enable typescript/no-non-null-assertion
           logger.info(`Character for socket ${n} will respawn`);
           gameClient.actions.respawn();
         }
 
-        const currentArea = gameClient.areaId.value
-          ? areas.get(gameClient.areaId.value)
+        // oxlint-disable typescript/no-non-null-assertion -- checked in condition
+        const currentArea = gameClient.areaId.get()
+          ? areas.get(gameClient.areaId.get()!)
           : undefined;
+        // oxlint-enable typescript/no-non-null-assertion
 
         if (currentArea) {
           switch (determineBehavior(n)) {
@@ -262,13 +267,13 @@ function wait(ms: number) {
 }
 
 function waitUntil<T>(
-  signal: Signal<T>,
+  signal: ReadonlySignal<T>,
   isReady: (value: T) => boolean,
   timeout: number,
 ): Promise<T> {
   return new Promise((resolve, reject) => {
-    if (signal.value !== undefined) {
-      resolve(signal.value);
+    if (signal.get() !== undefined) {
+      resolve(signal.get());
       return;
     }
     const timeoutId = setTimeout(

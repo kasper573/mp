@@ -1,12 +1,19 @@
 import type { AreaId } from "@mp/game-shared";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
-import { useGraphics } from "@mp/graphics/react";
+import { useGraphics } from "@mp/graphics/solid";
 import type { Signal } from "@mp/state";
-import { StorageSignal, untracked } from "@mp/state";
-import { useSignal, useSignalEffect } from "@mp/state/react";
-import type { JSX } from "preact";
-import { useState } from "preact/hooks";
+import { StorageSignal, untracked, signal } from "@mp/state";
+import type { JSX } from "solid-js";
+import {
+  createSignal,
+  createEffect,
+  createMemo,
+  onCleanup,
+  Suspense,
+  Show,
+  useContext,
+} from "solid-js";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
@@ -14,16 +21,10 @@ import {
 } from "./area-debug-settings-form";
 import { AreaScene } from "./area-scene";
 import { AreaUi } from "./area-ui";
-import {
-  GameStateClientContext,
-  useActorTextures,
-  useAreaAssets,
-} from "./context";
+import { GameStateClientContext, GameAssetLoaderContext } from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
 import type { GameStateClient } from "./game-state-client";
-import { useObjectSignal } from "./use-object-signal";
-import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
 import { TimeSpan } from "@mp/time";
 
@@ -38,50 +39,75 @@ interface GameRendererProps {
 /**
  * Composes all game graphics and UI into a single component that renders the actual game.
  */
-export function GameRenderer({
-  interactive,
-  gameStateClient,
-  areaIdToLoadAssetsFor,
-  additionalDebugUi,
-  enableUi = true,
-}: GameRendererProps) {
-  const areaAssets = useAreaAssets(areaIdToLoadAssetsFor);
-  const actorTextures = useActorTextures();
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const showDebugUi = useSignal(false);
+export function GameRenderer(props: GameRendererProps) {
+  const assetLoader = useContext(GameAssetLoaderContext);
+  const [container, setContainer] = createSignal<HTMLDivElement | null>(null);
+  const showDebugUi = signal(false);
   const appSignal = useGraphics(container);
-  const optionsSignal = useObjectSignal({
-    interactive,
-    gameStateClient,
-    areaAssets,
-    actorTextures,
-    showDebugUi,
+
+  // Call hooks once in the component body to create the TanStack Query stores
+  // The hooks return objects with getters for reactive data access
+  const areaAssets = assetLoader.useAreaAssets(props.areaIdToLoadAssetsFor);
+  const actorTexturesAccessor = assetLoader.useActorTextures();
+
+  // Create a memo that reads all the async data and produces a ready state
+  // Reading through getters inside createMemo ensures SolidJS tracks the TanStack Query stores
+  const buildOptions = createMemo((): BuildStageOptions | undefined => {
+    const app = appSignal.get();
+    // Access TanStack Query store data through getters for reactive tracking
+    const resource = areaAssets.resource;
+    const spritesheets = areaAssets.spritesheets;
+    const actorTextures = actorTexturesAccessor.data;
+
+    if (!app || !resource || !spritesheets || !actorTextures) {
+      return undefined;
+    }
+
+    return {
+      interactive: props.interactive,
+      gameStateClient: props.gameStateClient,
+      areaAssets: { resource, spritesheets },
+      actorTextures,
+      showDebugUi,
+    };
   });
 
-  useSignalEffect(() => {
-    const app = appSignal.value;
-    if (app) {
-      const options = optionsSignal.value;
-      return untracked(() => buildStage(app, options));
+  // Effect that builds the stage when all data is ready
+  createEffect(() => {
+    const options = buildOptions();
+    if (!options) {
+      return;
+    }
+
+    const app = appSignal.get();
+    if (!app) {
+      return;
+    }
+
+    const cleanup = untracked(() => buildStage(app, options));
+    if (cleanup) {
+      onCleanup(cleanup);
     }
   });
+
+  const enableUi = () => props.enableUi ?? true;
 
   return (
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
-      {enableUi && (
-        <GameStateClientContext.Provider value={gameStateClient}>
+      <Show when={enableUi()}>
+        <GameStateClientContext.Provider value={props.gameStateClient}>
           <Suspense fallback={<UILoadingFallback />}>
             <AreaUi />
-            {showDebugUi.value && (
+            <Show when={showDebugUi.get()}>
               <GameDebugUi>
-                {additionalDebugUi}
+                {props.additionalDebugUi}
                 <AreaDebugSettingsForm signal={areaDebugSettingsStorage} />
               </GameDebugUi>
-            )}
+            </Show>
           </Suspense>
         </GameStateClientContext.Provider>
-      )}
+      </Show>
     </>
   );
 }
@@ -107,16 +133,15 @@ function UILoadingFallback() {
   return null;
 }
 
-function buildStage(
-  app: Application,
-  opt: {
-    interactive: boolean;
-    gameStateClient: GameStateClient;
-    areaAssets: AreaAssets;
-    actorTextures: ActorTextureLookup;
-    showDebugUi: Signal<boolean>;
-  },
-) {
+interface BuildStageOptions {
+  interactive: boolean;
+  gameStateClient: GameStateClient;
+  areaAssets: AreaAssets;
+  actorTextures: ActorTextureLookup;
+  showDebugUi: Signal<boolean>;
+}
+
+function buildStage(app: Application, opt: BuildStageOptions) {
   const engine = new Engine(app.canvas);
 
   function emitTickToGameState() {
@@ -128,15 +153,13 @@ function buildStage(
   app.ticker.add(emitTickToGameState);
   const subscriptions = [
     engine.start(opt.interactive),
-    engine.keyboard.on(
-      "keydown",
-      "F2",
-      () => (opt.showDebugUi.value = !opt.showDebugUi.value),
+    engine.keyboard.on("keydown", "F2", () =>
+      opt.showDebugUi.set(!opt.showDebugUi.get()),
     ),
   ];
   const areaScene = new AreaScene({
     engine,
-    debugSettings: () => areaDebugSettingsStorage.value,
+    debugSettings: () => areaDebugSettingsStorage.get(),
     state: opt.gameStateClient,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,

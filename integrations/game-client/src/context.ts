@@ -1,7 +1,6 @@
-import { createContext } from "preact";
+import { createContext, useContext } from "solid-js";
 import type { GameAssetLoader } from "./game-asset-loader";
 import type { GameStateClient } from "./game-state-client";
-import { useContext } from "preact/hooks";
 
 export const GameStateClientContext = createContext(
   new Proxy({} as GameStateClient, {
@@ -20,9 +19,6 @@ export const GameAssetLoaderContext = createContext(
 );
 
 // Helper hooks for easier access to context values.
-// These are actually necessary due to some preact prefresh issues.
-// if we don't do this and instead destructure the context in the components directly,
-// that causes hot reload in those files specifically to crash which results in a full page reload.
 
 export const useItemDefinition: GameAssetLoader["useItemDefinition"] = (
   ...args

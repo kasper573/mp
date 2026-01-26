@@ -5,34 +5,36 @@ export interface AreaDebugSettingsFormProps {
   signal: Signal<AreaDebugSettings>;
 }
 
-export function AreaDebugSettingsForm({ signal }: AreaDebugSettingsFormProps) {
+export function AreaDebugSettingsForm(props: AreaDebugSettingsFormProps) {
   return (
     <>
       <div>
         Visible Graph lines:{" "}
         <Select
-          options={visibleGraphTypes}
-          signal={new PropertySignal(signal, "visibleGraphType")}
+          options={[...visibleGraphTypes]}
+          signal={new PropertySignal(props.signal, "visibleGraphType")}
         />
       </div>
       <br />
       <label>
-        <Checkbox signal={new PropertySignal(signal, "showFogOfWar")} />
+        <Checkbox signal={new PropertySignal(props.signal, "showFogOfWar")} />
         Visualize network fog of war
       </label>
       <br />
       <label>
-        <Checkbox signal={new PropertySignal(signal, "showAttackRange")} />
+        <Checkbox
+          signal={new PropertySignal(props.signal, "showAttackRange")}
+        />
         Show actor attack range
       </label>
       <br />
       <label>
-        <Checkbox signal={new PropertySignal(signal, "showAggroRange")} />
+        <Checkbox signal={new PropertySignal(props.signal, "showAggroRange")} />
         Show npc aggro range
       </label>
       <br />
       <label>
-        <Checkbox signal={new PropertySignal(signal, "showActorPaths")} />
+        <Checkbox signal={new PropertySignal(props.signal, "showActorPaths")} />
         Show actor paths
       </label>
     </>

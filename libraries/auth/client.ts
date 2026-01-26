@@ -45,13 +45,13 @@ export function createAuthClient(settings: AuthClientOptions): AuthClient {
     loadUserInfo: true,
   });
   const identity = signal<UserIdentity | undefined>(undefined);
-  const isSignedIn = computed(() => identity.value !== undefined);
+  const isSignedIn = computed(() => identity.get() !== undefined);
 
   function handleUpdatedUser(updatedUser?: User | null) {
     const updatedIdentity = extractIdentity(updatedUser);
-    const prevIdentity = identity.value;
+    const prevIdentity = identity.get();
     if (!isEqual(updatedIdentity, prevIdentity)) {
-      identity.value = updatedIdentity;
+      identity.set(updatedIdentity);
     }
   }
 

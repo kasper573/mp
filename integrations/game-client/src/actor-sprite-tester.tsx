@@ -2,58 +2,56 @@ import type { ActorModelId } from "@mp/game-shared";
 import { Engine } from "@mp/engine";
 import { actorModelStates, type ActorModelState } from "@mp/game-shared";
 import { Container, Text } from "@mp/graphics";
-import { useGraphics } from "@mp/graphics/react";
+import { useGraphics } from "@mp/graphics/solid";
 import {
   cardinalDirectionAngles,
   nearestCardinalDirection,
   Vector,
 } from "@mp/math";
-import type { Signal } from "@mp/state";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import type { ReadonlySignal } from "@mp/state";
+import { signal } from "@mp/state";
+import { useSignalEffect } from "@mp/state/solid";
 import type { CSSProperties } from "@mp/style";
 import { Select } from "@mp/ui";
-import { useState } from "preact/hooks";
+import { createSignal, Show } from "solid-js";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 import { useObjectSignal } from "./use-object-signal";
 
-export function ActorSpriteTester({
-  modelIds,
-  actorTextures,
-}: {
+export function ActorSpriteTester(props: {
   modelIds: ActorModelId[];
   actorTextures: ActorTextureLookup;
 }) {
-  const animationName = useSignal<ActorModelState>("walk-normal");
-  const modelId = useSignal<ActorModelId>(modelIds[0]);
+  const animationName = signal<ActorModelState>("walk-normal");
+  const modelId = signal<ActorModelId>(props.modelIds[0]);
 
   const settings = useObjectSignal({
-    animationName: animationName.value,
-    modelId: modelId.value,
-    actorTextures,
+    animationName: animationName.get(),
+    modelId: modelId.get(),
+    actorTextures: props.actorTextures,
   });
 
   return (
     <>
       <div id="form" style={styles.settingsForm}>
-        <Select signal={animationName} options={actorModelStates} />
-        <Select signal={modelId} options={modelIds} />
+        <Select signal={animationName} options={[...actorModelStates]} />
+        <Select signal={modelId} options={props.modelIds} />
       </div>
-      {modelId.value ? <PixiApp settings={settings} /> : null}
+      <Show when={modelId.get()}>
+        <PixiApp settings={settings} />
+      </Show>
     </>
   );
 }
 
-function PixiApp({
-  settings,
-}: {
-  settings: Signal<Omit<ActorTestSettings, "engine">>;
+function PixiApp(props: {
+  settings: ReadonlySignal<Omit<ActorTestSettings, "engine">>;
 }) {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const [container, setContainer] = createSignal<HTMLDivElement | null>(null);
   const appSignal = useGraphics(container);
 
   useSignalEffect(() => {
-    const app = appSignal.value;
+    const app = appSignal.get();
     if (!app) {
       return;
     }
@@ -62,7 +60,7 @@ function PixiApp({
     engine.start(true);
     app.stage.addChild(
       new ActorSpriteList({
-        ...settings.value,
+        ...props.settings.get(),
         engine,
       }),
     );
@@ -165,9 +163,9 @@ class SpecificActorAngle extends Container {
 class LookAtPointerActor extends SpecificActorAngle {
   constructor(options: ActorTestSettings) {
     super(() => {
-      const { x, y } = options.engine.camera.cameraSize.value;
+      const { x, y } = options.engine.camera.cameraSize.get();
       const center = new Vector(x / 2, y / 2);
-      const angle = center.angle(options.engine.pointer.position.value);
+      const angle = center.angle(options.engine.pointer.position.get());
       return {
         ...options,
         angle,

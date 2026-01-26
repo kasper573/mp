@@ -8,10 +8,19 @@ export interface AreaAssets {
   resource: AreaResource;
 }
 
+/**
+ * Provides reactive access to actor textures.
+ * Access the `data` getter inside a reactive context (createEffect, createMemo)
+ * for proper change tracking.
+ */
+export interface ActorTexturesAccessor {
+  readonly data: ActorTextureLookup;
+}
+
 export interface GameAssetLoader {
   useAreaAssets: AreaAssetsLookup;
   useItemDefinition: ItemDefinitionLookup;
-  useActorTextures: () => ActorTextureLookup;
+  useActorTextures: () => ActorTexturesAccessor;
 }
 
 export type AreaAssetsLookup = (areaId: AreaId) => AreaAssets;

@@ -1,10 +1,11 @@
 import { dynamicLayerName } from "@mp/game-shared";
 import type { Container, Size, Texture } from "@mp/graphics";
 import { Assets, FpsIndicator, Spritesheet } from "@mp/graphics";
-import { useGraphics } from "@mp/graphics/react";
+import { useGraphics } from "@mp/graphics/solid";
 import { Vector } from "@mp/math";
-import { skipToken, useQuery } from "@tanstack/react-query";
-import { useSignal, useSignalEffect } from "@mp/state/react";
+import { skipToken, createQuery } from "@tanstack/solid-query";
+import { signal } from "@mp/state";
+import { useSignalEffect } from "@mp/state/solid";
 import type { Pixel, Tile } from "@mp/std";
 import type { GlobalTileId, LocalTileId } from "@mp/tiled-loader";
 import type { TiledSpritesheet } from "@mp/tiled-renderer";
@@ -14,7 +15,7 @@ import {
   TiledRenderer,
 } from "@mp/tiled-renderer";
 import { Checkbox, Select } from "@mp/ui";
-import { useState } from "preact/hooks";
+import { createSignal } from "solid-js";
 import {
   generateRepeatedTileLayer,
   generateTileset,
@@ -24,37 +25,41 @@ import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
 import { useQuerySignal } from "./use-query-signal";
 
 export function TileRendererTester() {
-  const [container, setContainer] = useState<HTMLDivElement | null>(null);
-  const tileSize = useSignal(16 as Pixel);
-  const mapSize = useSignal(1 as Tile);
-  const fitToStage = useSignal(false);
+  const [container, setContainer] = createSignal<HTMLDivElement | null>(null);
+  const tileSize = signal(16 as Pixel);
+  const mapSize = signal<number>(1);
+  const fitToStage = signal(false);
 
-  const texture = useQuery({
+  const texture = createQuery(() => ({
     queryKey: ["text-tileset-texture"],
     async queryFn() {
       const texture = await Assets.load<Texture>(testTilesetTextureUrl);
       texture.source.scaleMode = "nearest";
       return texture;
     },
-  });
+  }));
 
-  const dependencies = useQuerySignal({
-    queryKey: ["text-map-dependencies", mapSize.value, texture.data?.uid],
+  const dependencies = useQuerySignal<
+    Awaited<ReturnType<typeof generateMapDependencies>>
+  >(() => ({
+    queryKey: ["text-map-dependencies", mapSize.get(), texture.data?.uid],
     queryFn: texture.data
       ? () =>
           generateMapDependencies(
-            new Vector(mapSize.value, mapSize.value),
-            new Vector(tileSize.value, tileSize.value),
+            new Vector(mapSize.get() as Tile, mapSize.get() as Tile),
+            new Vector(tileSize.get(), tileSize.get()),
             texture.data,
           )
       : skipToken,
-  });
+  }));
 
   const appSignal = useGraphics(container);
 
   useSignalEffect(() => {
-    const app = appSignal.value;
-    const { layer, spritesheet } = dependencies.signal.value ?? {};
+    const app = appSignal.get();
+    const deps = dependencies.signal.get();
+    const layer = deps?.layer;
+    const spritesheet = deps?.spritesheet;
     if (!app || !layer || !spritesheet) {
       return;
     }
@@ -68,7 +73,7 @@ export function TileRendererTester() {
       createTiledTextureLookup({ spritesheet }),
     );
 
-    if (fitToStage.value) {
+    if (fitToStage.get()) {
       fitObjectInto(renderer, app.canvas);
     }
 
@@ -82,12 +87,12 @@ export function TileRendererTester() {
 
   return (
     <>
-      <div style={{ display: "flex", gap: "10px", marginBottom: "10px" }}>
+      <div style={{ display: "flex", gap: "10px", "margin-bottom": "10px" }}>
         <label>
           Map size
           <Select options={sizeOptions} signal={mapSize} />
         </label>
-        <span>(tile count: {mapSize.value * mapSize.value})</span>
+        <span>(tile count: {mapSize.get() * mapSize.get()})</span>
         <label>
           fit tilemap to stage
           <Checkbox signal={fitToStage} />

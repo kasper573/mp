@@ -43,7 +43,7 @@ export class Engine {
   };
 
   private onViewportResized = () => {
-    this.camera.cameraSize.value = elementSize(this.viewport);
+    this.camera.cameraSize.set(elementSize(this.viewport));
   };
 }
 

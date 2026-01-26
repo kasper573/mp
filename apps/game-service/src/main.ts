@@ -122,6 +122,12 @@ const gameServiceConfig = signal<GameServiceConfig>({
   isPatchOptimizerEnabled: true,
 });
 const onlineCharacterIds = signal<ReadonlySet<CharacterId>>(new Set());
+onlineCharacterIds.subscribe((ids) => {
+  logger.debug(
+    { onlineCharacterIds: Array.from(ids) },
+    "onlineCharacterIds updated",
+  );
+});
 
 shutdownCleanups.push(
   RedisSync.createEffect(
@@ -145,7 +151,7 @@ shutdownCleanups.push(
   ),
 
   gameServiceConfig.subscribe((config) => {
-    shouldOptimizeTrackedProperties.value = config.isPatchOptimizerEnabled;
+    shouldOptimizeTrackedProperties.set(config.isPatchOptimizerEnabled);
   }),
 );
 
@@ -281,7 +287,7 @@ const dbSyncSession = startDbSyncSession({
   server: gameStateServer,
   actorModels,
   logger,
-  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.value),
+  getOnlineCharacterIds: () => Array.from(onlineCharacterIds.get()),
 });
 
 const ioc = new InjectionContainer()

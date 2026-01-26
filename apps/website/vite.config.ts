@@ -1,4 +1,4 @@
-import { preact } from "@preact/preset-vite";
+import solidPlugin from "vite-plugin-solid";
 import tanstackRouterPlugin from "@tanstack/router-plugin/vite";
 import { vanillaExtractPlugin } from "@vanilla-extract/vite-plugin";
 import { defineConfig } from "vite";
@@ -11,10 +11,10 @@ export default defineConfig({
     sourcemap: true,
   },
   plugins: [
-    tanstackRouterPlugin(),
+    tanstackRouterPlugin({ target: "solid", autoCodeSplitting: true }),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
-    preact({ devToolsEnabled: false }),
+    solidPlugin(),
     checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
   ],

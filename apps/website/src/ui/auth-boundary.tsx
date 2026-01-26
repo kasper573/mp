@@ -1,36 +1,40 @@
 import type { RoleDefinition } from "@mp/auth";
-import { useComputed } from "@mp/state/react";
-import type { ComponentChildren, ComponentType } from "preact";
-import { useContext } from "preact/hooks";
+import { useComputed } from "@mp/state/solid";
+import type { JSX, Component } from "solid-js";
+import { useContext, Show } from "solid-js";
 import { AuthContext } from "../integrations/contexts";
 import PermissionDenied from "../routes/permission-denied";
 
 interface AuthBoundaryProps {
   requiredRoles?: Iterable<RoleDefinition>;
-  children?: ComponentChildren;
+  children?: JSX.Element;
 }
 
-export function AuthBoundary(props: AuthBoundaryProps): ComponentChildren {
+export function AuthBoundary(props: AuthBoundaryProps): JSX.Element {
   const auth = useContext(AuthContext);
 
   const isPermitted = useComputed(() => {
-    if (!auth.isSignedIn.value) {
+    if (!auth.isSignedIn.get()) {
       return false;
     }
-    const existingSet = auth.identity.value?.roles ?? new Set();
+    const existingSet = auth.identity.get()?.roles ?? new Set();
     const requiredSet = new Set(props.requiredRoles);
     return requiredSet.isSubsetOf(existingSet);
   });
 
-  if (!isPermitted.value) {
-    return <PermissionDenied />;
-  }
-  return props.children;
+  return (
+    <Show when={isPermitted()} fallback={<PermissionDenied />}>
+      {props.children}
+    </Show>
+  );
 }
 
-AuthBoundary.wrap = (Component: ComponentType, props?: AuthBoundaryProps) => {
+AuthBoundary.wrap = (
+  Component: Component,
+  boundaryProps?: Omit<AuthBoundaryProps, "children">,
+) => {
   return () => (
-    <AuthBoundary {...props}>
+    <AuthBoundary {...boundaryProps}>
       <Component />
     </AuthBoundary>
   );

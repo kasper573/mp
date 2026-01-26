@@ -79,13 +79,13 @@ class PropertySchema<T> extends Schema<T> {
     super();
     this.optimizer = {
       filter(prev, next) {
-        if (shouldOptimizeTrackedProperties.value) {
+        if (shouldOptimizeTrackedProperties.get()) {
           return filter(prev, next);
         }
         return true;
       },
       transform(value) {
-        if (shouldOptimizeTrackedProperties.value) {
+        if (shouldOptimizeTrackedProperties.get()) {
           return transform(value);
         }
         return value;
@@ -121,10 +121,10 @@ class TrackedInstance<T extends object> {
         Object.defineProperty(this, key, {
           configurable: false,
           enumerable: true,
-          get: () => signal.value,
+          get: () => signal.get(),
           set: (newValue) => {
-            const prevValue = signal.value;
-            signal.value = newValue;
+            const prevValue = signal.get();
+            signal.set(newValue);
             if (propertySchema.optimizer.filter(prevValue, newValue)) {
               trackedApi.dirty.add(key);
             }

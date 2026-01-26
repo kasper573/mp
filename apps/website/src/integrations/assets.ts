@@ -1,6 +1,7 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import { graphql } from "@mp/api-service/client";
+import { useQueryBuilder } from "@mp/api-service/client/tanstack-query";
 import type { AreaId } from "@mp/game-shared";
-import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
+import type { ActorTexturesAccessor, AreaAssetsLookup } from "@mp/game-client";
 import {
   browserLoadAreaResource,
   loadActorTextureLookup,
@@ -12,32 +13,54 @@ import type {
   ItemDefinitionLookup,
   ItemReference,
 } from "@mp/game-shared";
-import { useSuspenseQuery } from "@tanstack/react-query";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import { createQuery } from "@tanstack/solid-query";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
 
 export const useAreaAssets: AreaAssetsLookup = (areaId) => {
-  const resource = useAreaResource(areaId);
+  const resourceQuery = useAreaResourceQuery(areaId);
+  const spritesheetsQuery = useAreaSpritesheetsQuery(() => resourceQuery.data);
+
+  // Use getters to make the properties reactive - they'll be read lazily
+  // and any reactive context will track the underlying query stores
   return {
-    resource,
-    spritesheets: useAreaSpritesheets(resource),
+    get resource() {
+      // oxlint-disable-next-line typescript/no-non-null-assertion -- suspense will suspend until data is available
+      return resourceQuery.data!;
+    },
+    get spritesheets() {
+      // oxlint-disable-next-line typescript/no-non-null-assertion -- suspense will suspend until data is available
+      return spritesheetsQuery.data!;
+    },
   };
 };
 
-export function useActorTextures(): ActorTextureLookup {
+export function useActorTextures(): ActorTexturesAccessor {
   const qb = useQueryBuilder();
-  const { data } = useSuspenseQuery(
-    qb.suspenseQueryOptions(actorTexturesQuery),
+  const actorTexturesData = createQuery(() =>
+    qb.queryOptions(actorTexturesQuery),
   );
 
-  const { data: lookup } = useSuspenseQuery({
-    queryKey: ["actor-spritesheet-lookup", data],
+  const lookup = createQuery(() => ({
+    queryKey: ["actor-spritesheet-lookup", actorTexturesData.data],
     staleTime: Infinity,
+    enabled: !!actorTexturesData.data,
     queryFn: () =>
-      loadActorTextureLookup(data.actorModelIds, data.actorSpritesheetUrl),
-  });
+      // oxlint-disable typescript/no-non-null-assertion -- enabled check above ensures data exists
+      loadActorTextureLookup(
+        actorTexturesData.data!.actorModelIds,
+        actorTexturesData.data!.actorSpritesheetUrl,
+      ),
+    // oxlint-enable typescript/no-non-null-assertion
+  }));
 
-  return lookup;
+  // Return an object with a getter so that data access can be tracked
+  // by SolidJS reactive contexts (createEffect, createMemo)
+  return {
+    get data() {
+      // oxlint-disable-next-line typescript/no-non-null-assertion -- suspense will suspend until data is available
+      return lookup.data!;
+    },
+  };
 }
 
 const actorTexturesQuery = graphql(`
@@ -47,17 +70,21 @@ const actorTexturesQuery = graphql(`
   }
 `);
 
-export function useAreaResource(areaId: AreaId): AreaResource {
+function useAreaResourceQuery(areaId: AreaId) {
   const qb = useQueryBuilder();
-  const {
-    data: { areaFileUrl },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(actorResourceQuery, { areaId }));
-  const query = useSuspenseQuery({
-    queryKey: ["areaResource", areaFileUrl, areaId],
+  const areaFileData = createQuery(() =>
+    qb.queryOptions(actorResourceQuery, { areaId }),
+  );
+  const query = createQuery(() => ({
+    queryKey: ["areaResource", areaFileData.data?.areaFileUrl, areaId],
     staleTime: Infinity,
-    queryFn: () => browserLoadAreaResource(areaId, areaFileUrl),
-  });
-  return query.data;
+    enabled: !!areaFileData.data?.areaFileUrl,
+    // oxlint-disable typescript/no-non-null-assertion -- enabled check above ensures data exists
+    queryFn: () =>
+      browserLoadAreaResource(areaId, areaFileData.data!.areaFileUrl),
+    // oxlint-enable typescript/no-non-null-assertion
+  }));
+  return query;
 }
 
 const actorResourceQuery = graphql(`
@@ -66,15 +93,19 @@ const actorResourceQuery = graphql(`
   }
 `);
 
-export function useAreaSpritesheets(
-  area: AreaResource,
-): TiledSpritesheetRecord {
-  const query = useSuspenseQuery({
-    queryKey: ["areaSpritesheets", area.id],
-    staleTime: Infinity,
-    queryFn: () => loadTiledMapSpritesheets(area.tiled.map),
+function useAreaSpritesheetsQuery(getArea: () => AreaResource | undefined) {
+  const query = createQuery(() => {
+    const area = getArea();
+    return {
+      queryKey: ["areaSpritesheets", area?.id],
+      staleTime: Infinity,
+      enabled: !!area,
+      // oxlint-disable typescript/no-non-null-assertion -- enabled check above ensures area exists
+      queryFn: () => loadTiledMapSpritesheets(area!.tiled.map),
+      // oxlint-enable typescript/no-non-null-assertion
+    };
   });
-  return query.data;
+  return query;
 }
 
 export const useItemDefinition: ItemDefinitionLookup = <
@@ -83,10 +114,8 @@ export const useItemDefinition: ItemDefinitionLookup = <
   ref: Ref,
 ) => {
   const qb = useQueryBuilder();
-  const {
-    data: { itemDefinition },
-  } = useSuspenseQuery(
-    qb.suspenseQueryOptions(itemDefinitionQuery, {
+  const query = createQuery(() =>
+    qb.queryOptions(itemDefinitionQuery, {
       // Note that it's important to destructure `ref`,
       // since it's generic and could contain excess properties that would pollute the query key.
       ref: {
@@ -98,7 +127,7 @@ export const useItemDefinition: ItemDefinitionLookup = <
 
   // GraphQL does not support generics so we must assert to restore the generic type info.
   // it's safe to do, just ugly.
-  return itemDefinition as ItemDefinitionByReference<Ref>;
+  return (query.data?.itemDefinition ?? {}) as ItemDefinitionByReference<Ref>;
 };
 
 const itemDefinitionQuery = graphql(`
