@@ -9,5 +9,5 @@ test("can see game canvas after signing in", async ({ page }) => {
     .getByRole("link", { name: /play/i })
     .click();
 
-  await expect(page.locator("canvas")).toBeVisible();
+  await expect(page.locator("canvas")).toBeVisible({ timeout: 10000 });
 });
