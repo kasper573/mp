@@ -46,7 +46,8 @@ async function getColorHistogram(
     const g = Math.floor((data[offset + 1] / 256) * binsPerChannel);
     const b = Math.floor((data[offset + 2] / 256) * binsPerChannel);
 
-    const binIndex = r * binsPerChannel * binsPerChannel + g * binsPerChannel + b;
+    const binIndex =
+      r * binsPerChannel * binsPerChannel + g * binsPerChannel + b;
     histogram[binIndex]++;
   }
 
