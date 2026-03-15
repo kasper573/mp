@@ -28,12 +28,12 @@ export function createFileResolver(
 ): FileResolver {
   function internalUrl(...relativePath: string[]): UrlString {
     const url = new URL(relativePath.join("/"), internalBaseUrl);
-    return url.toString() as UrlString;
+    return url.toString();
   }
 
   function publicUrl(...relativePath: string[]): UrlString {
     const url = new URL(relativePath.join("/"), publicBaseUrl);
-    return url.toString() as UrlString;
+    return url.toString();
   }
 
   function abs(

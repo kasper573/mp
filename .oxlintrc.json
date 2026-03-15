@@ -65,6 +65,7 @@
       { "extensions": [".jsx", ".tsx"] }
     ],
 
+    "no-base-to-string": "off",
     "no-multi-comp": "off",
     "no-use-before-define": "off",
     "no-relative-parent-imports": "off",
@@ -102,7 +103,11 @@
     "only-export-components": "off",
 
     "typescript/no-unsafe-type-assertion": "off",
-    "typescript/promise-function-async": "off"
+    "typescript/promise-function-async": "off",
+    "non-nullable-type-assertion-style": "off",
+    "restrict-template-expressions": "off",
+    "no-meaningless-void-operator": "off",
+    "no-unsafe-unary-minus": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.

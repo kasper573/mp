@@ -116,7 +116,7 @@ export class RedisSync<T> {
     options: RedisSyncOptions<T>,
     configure: (instance: RedisSync<T>) => RedisSync<T>,
   ): CleanupFn {
-    const sync = configure(new RedisSync(options)) as RedisSync<T>;
+    const sync = configure(new RedisSync(options));
     return () => sync.cleanup();
   }
 }
@@ -327,7 +327,7 @@ export class RedisSetSync<T extends RedisSetMember> {
     options: RedisSetSyncOptions<T>,
     configure: (instance: RedisSetSync<T>) => RedisSetSync<T>,
   ): CleanupFn {
-    const sync = configure(new RedisSetSync(options)) as RedisSetSync<T>;
+    const sync = configure(new RedisSetSync(options));
     return () => sync.cleanup();
   }
 }

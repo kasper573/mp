@@ -323,7 +323,7 @@ function getRequestInfo(req: IncomingMessage): RequestInfo {
     | undefined;
 
   if (!session) {
-    session = new Signal({ id: createShortId() as ClientId });
+    session = new Signal({ id: createShortId() });
     Reflect.set(req, "session", session);
   }
 

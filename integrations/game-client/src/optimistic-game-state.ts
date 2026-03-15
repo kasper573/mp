@@ -103,7 +103,7 @@ function applyPatchOptimized(
       op.entityName === "actors"
     ) {
       for (const [entityId, actorUpdate] of op.changes) {
-        const localActor = gameState[op.entityName].get(entityId as ActorId);
+        const localActor = gameState[op.entityName].get(entityId);
         if (!localActor) {
           continue;
         }
@@ -117,7 +117,7 @@ function applyPatchOptimized(
       }
     }
 
-    gameState[op.entityName as keyof GameState].applyOperation(
+    gameState[op.entityName].applyOperation(
       // oxlint-disable-next-line no-explicit-any
       op as Operation<any, any, any>,
     );
@@ -152,7 +152,7 @@ function shouldApplyMovementUpdate(
       ) {
         return true;
       }
-      const path = update.movement?.path as MovementTrait["path"];
+      const path = update.movement?.path;
       if (path?.length) {
         return true; // Any new path should be trusted
       }

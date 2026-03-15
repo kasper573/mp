@@ -1,4 +1,3 @@
-import type { NpcSpawnId } from "@mp/game-shared";
 import type { AreaResource, NpcDefinition, NpcSpawn } from "@mp/game-shared";
 import { Vector } from "@mp/math";
 import { createShortId } from "@mp/std";
@@ -28,7 +27,7 @@ export function deriveNpcSpawnsFromArea(
 
     const spawn: NpcSpawn = {
       npcId: npc.id,
-      id: createShortId() as NpcSpawnId,
+      id: createShortId(),
       ...deriveNpcSpawn(area, npcObject),
     };
 

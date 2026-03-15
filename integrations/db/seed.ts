@@ -19,7 +19,6 @@ import {
 import type {
   ActorModelId,
   NpcDefinitionId,
-  NpcSpawnId,
   AreaId,
 } from "@mp/game-shared";
 import { npcTypes } from "@mp/game-shared";
@@ -105,7 +104,7 @@ await db.transaction(async (tx) => {
             npcType,
             areaId,
             count: 10,
-            id: createShortId() as NpcSpawnId,
+            id: createShortId(),
             npcId: soldier.id,
           });
         }
