@@ -9,7 +9,10 @@ export async function build(opt: {
 }): Promise<void> {
   await rolldownBuild({
     onLog(level, log, defaultHandler) {
-      if (level === "warn" && opt.suppressedWarnings?.includes(log.code ?? "")) {
+      if (
+        level === "warn" &&
+        opt.suppressedWarnings?.includes(log.code ?? "")
+      ) {
         return;
       }
       defaultHandler(level, log);
@@ -23,6 +26,11 @@ export async function build(opt: {
       // to produce something that runs in esm. We'll install these in the docker image instead.
       "pino",
       "pino-pretty",
+      // We externalize graphql because rolldown's lazy CJS init wrapper is incompatible with
+      // the opentelemetry ESM hook (import-in-the-middle), which wraps module exports before
+      // lazy initialization runs, causing GraphQL class extensions to fail with "undefined".
+      // We'll install graphql in the docker image instead.
+      "graphql",
     ],
     resolve: {
       mainFields: ["module", "main"],
