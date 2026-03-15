@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsc && tsx esbuild.ts",
+    "build": "tsgo && tsx esbuild.ts",
     "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/provision.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
