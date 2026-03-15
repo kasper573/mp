@@ -16,11 +16,7 @@ import {
   npcSpawnTable,
   npcTable,
 } from "./src/schema";
-import type {
-  ActorModelId,
-  NpcDefinitionId,
-  AreaId,
-} from "@mp/game-shared";
+import type { ActorModelId, NpcDefinitionId, AreaId } from "@mp/game-shared";
 import { npcTypes } from "@mp/game-shared";
 
 // This is not a long term plan.
