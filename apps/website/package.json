@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "codegen": "tsr generate",
+    "codegen": "tsx tsr.generate.ts",
     "dev": "DEV=true pnpm devenv vite --host 0.0.0.0",
     "build": "tsgo && vite build",
     "preview": "vite preview --port 5173 --host 0.0.0.0",
@@ -41,7 +41,7 @@
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@tanstack/router-cli": "1.166.9",
+    "@tanstack/router-generator": "1.166.9",
     "@tanstack/router-plugin": "1.166.10",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",

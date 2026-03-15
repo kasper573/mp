@@ -520,7 +520,7 @@ importers:
       '@prefresh/core':
         specifier: 'catalog:'
         version: 1.5.8(preact@10.27.2)
-      '@tanstack/router-cli':
+      '@tanstack/router-generator':
         specifier: 1.166.9
         version: 1.166.9
       '@tanstack/router-plugin':
@@ -2338,7 +2338,6 @@ packages:
 
   '@ls-lint/ls-lint@2.3.1':
     resolution: {integrity: sha512-vPe6IDByQnQRTxcAYjTxrmga/tSIui50VBFTB5KIJWY3OOFmxE2VtymjeSEfQfiMbhZV/ZPAqYy2lt8pZFQ0Rw==}
-    cpu: [x64, arm64, s390x, ppc64le]
     os: [darwin, linux, win32]
     hasBin: true
 
@@ -3301,11 +3300,6 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
-
-  '@tanstack/router-cli@1.166.9':
-    resolution: {integrity: sha512-wXy38zDY+eQHJWQne88zavYI/oVb4HSfoFLrG7BSEVsC36if87SUXJlIAlu5BfarFOyx28ZqsL4CMA5RUZbZ1A==}
-    engines: {node: '>=20.19'}
-    hasBin: true
 
   '@tanstack/router-core@1.167.1':
     resolution: {integrity: sha512-8xvS3rWxJ/FZTLxqrh/5KetnDB2B/aFG393C1BjYbinhPXMUhsToW/5fN+l4qbtmQ4BfoNLUmrQUzVRNCN22mw==}
@@ -7860,14 +7854,6 @@ snapshots:
       react: 19.1.0
       react-dom: 19.1.0(react@19.1.0)
       use-sync-external-store: 1.6.0(react@19.1.0)
-
-  '@tanstack/router-cli@1.166.9':
-    dependencies:
-      '@tanstack/router-generator': 1.166.9
-      chokidar: 3.6.0
-      yargs: 17.7.2
-    transitivePeerDependencies:
-      - supports-color
 
   '@tanstack/router-core@1.167.1':
     dependencies:
