@@ -38,8 +38,8 @@
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
-    "@apollo/client": "^4.0.11",
-    "@apollo/server": "^5.2.0",
+    "@apollo/client": "^4.1.6",
+    "@apollo/server": "^5.4.0",
     "@as-integrations/express5": "^1.1.2",
     "@mp/auth": "workspace:*",
     "@mp/db": "workspace:*",
@@ -60,9 +60,9 @@
     "dotenv": "catalog:",
     "express": "catalog:",
     "gql.tada": "^1.9.0",
-    "graphql": "^16.12.0",
-    "graphql-ws": "6.0.6",
-    "grats": "^0.0.34",
+    "graphql": "^16.13.1",
+    "graphql-ws": "6.0.7",
+    "grats": "^0.0.35",
     "preact": "catalog:"
   },
   "devDependencies": {
@@ -73,7 +73,7 @@
     "bottleneck": "^2.19.5",
     "chokidar-cli": "^3.0.0",
     "concurrently": "^9.2.1",
-    "glob": "^13.0.0",
+    "glob": "^13.0.6",
     "tsx": "catalog:"
   }
 }

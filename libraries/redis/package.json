@@ -16,7 +16,7 @@
     "@mp/time": "workspace:*",
     "@mp/validate": "workspace:*",
     "cbor-x": "catalog:",
-    "ioredis": "5.8.2"
+    "ioredis": "5.10.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",

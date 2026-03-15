@@ -20,6 +20,6 @@
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "type-fest": "5.3.1"
+    "type-fest": "5.4.4"
   }
 }

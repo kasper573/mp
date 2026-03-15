@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@mp/math": "workspace:*",
-    "ngraph.graph": "20.1.1",
+    "ngraph.graph": "20.1.2",
     "ngraph.path": "1.6.1"
   },
   "devDependencies": {

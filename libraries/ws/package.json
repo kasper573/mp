@@ -17,9 +17,9 @@
     }
   },
   "dependencies": {
-    "partysocket": "1.1.6",
+    "partysocket": "1.1.16",
     "reconnecting-websocket": "4.4.0",
-    "ws": "8.18.3"
+    "ws": "8.19.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
