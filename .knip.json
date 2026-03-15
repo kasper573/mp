@@ -1,12 +1,6 @@
 {
   "include": ["dependencies"],
-  "ignoreDependencies": [
-    "@mp/tsconfig",
-    "pino-pretty",
-    "@mp/eslint",
-    "@prefresh/core",
-    "eslint-import-resolver-typescript"
-  ],
+  "ignoreDependencies": ["@mp/tsconfig", "pino-pretty", "@prefresh/core"],
   "workspaces": {
     "apps/api-service": {
       "entry": ["server/main.ts", "client/index.ts"],

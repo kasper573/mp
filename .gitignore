@@ -28,7 +28,7 @@ tsconfig.tmp.json
 
 # Local files for common editors
 .idea
-.vscode
+#.vscode
 
 # Disallow non-pnpm lockfiles
 yarn.lock

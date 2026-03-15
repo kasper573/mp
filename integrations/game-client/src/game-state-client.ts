@@ -59,7 +59,7 @@ export class GameStateClient {
   constructor(public options: GameStateClientOptions) {
     this.gameState = new OptimisticGameState(this.options.settings);
     this.socketReadyState = signal<WebSocket["readyState"]>(
-      this.options.socket.readyState,
+      this.options.socket.readyState as WebSocket["readyState"],
     );
     this.isConnected = computed(
       () => this.socketReadyState.value === WebSocket.OPEN,
@@ -93,7 +93,7 @@ export class GameStateClient {
 
     const subscriptions = [
       subscribeToReadyState(socket, (readyState) => {
-        this.socketReadyState.value = readyState;
+        this.socketReadyState.value = readyState as WebSocket["readyState"];
       }),
       this.isConnected.subscribe((isConnected) => {
         if (!isConnected) {
@@ -178,5 +178,7 @@ export class GameStateClient {
 
 type WebSocketLike = Pick<
   WebSocket,
-  "send" | "readyState" | "addEventListener" | "removeEventListener"
->;
+  "send" | "addEventListener" | "removeEventListener"
+> & {
+  readyState: number;
+};

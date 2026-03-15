@@ -1,12 +1,11 @@
 /**
  * Convenience function to subscribe to the WebSocket readyState changes.
  */
-export function subscribeToReadyState(
-  socket: Pick<
-    WebSocket,
-    "readyState" | "addEventListener" | "removeEventListener"
-  >,
-  onReadyStateChanged: (readyState: number) => unknown,
+export function subscribeToReadyState<ReadyState extends number>(
+  socket: Pick<WebSocket, "addEventListener" | "removeEventListener"> & {
+    readyState: ReadyState;
+  },
+  onReadyStateChanged: (readyState: ReadyState) => unknown,
 ) {
   const updateReadyState = () => onReadyStateChanged(socket.readyState);
   socket.addEventListener("open", updateReadyState);

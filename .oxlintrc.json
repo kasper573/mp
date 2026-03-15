@@ -8,6 +8,9 @@
     "perf": "error",
     "restriction": "error"
   },
+  "options": {
+    "typeAware": true
+  },
   "rules": {
     "no-unused-vars": "error",
     "eqeqeq": "error",
@@ -62,6 +65,12 @@
       { "extensions": [".jsx", ".tsx"] }
     ],
 
+    "no-base-to-string": "off",
+    "no-multi-comp": "off",
+    "no-use-before-define": "off",
+    "no-relative-parent-imports": "off",
+    "no-unmodified-loop-condition": "off",
+    "no-shadow": "off",
     "always-return": "off",
     "class-methods-use-this": "off",
     "no-param-reassign": "off",
@@ -91,7 +100,14 @@
     "explicit-module-boundary-types": "off",
     "no-extraneous-class": "off",
     "no-process-env": "off",
-    "only-export-components": "off"
+    "only-export-components": "off",
+
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/promise-function-async": "off",
+    "non-nullable-type-assertion-style": "off",
+    "restrict-template-expressions": "off",
+    "no-meaningless-void-operator": "off",
+    "no-unsafe-unary-minus": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.

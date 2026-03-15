@@ -16,7 +16,7 @@ export interface SpectatorClientProps extends GameClientProps {
 export function SpectatorClient(props: SpectatorClientProps) {
   return (
     <>
-      <Select
+      <Select<CharacterId | undefined>
         options={props.characterOptions}
         signal={props.stateClient.characterId}
       />

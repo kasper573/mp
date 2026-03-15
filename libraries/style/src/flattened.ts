@@ -28,7 +28,7 @@ const separator = ".";
 
 export type Flattened<T> = {
   [K in Path<T> as `${IsLeaf<T, K> extends true
-    ? `${string & K}`
+    ? K & string
     : never}`]: PathValue<T, K>;
 };
 

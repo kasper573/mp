@@ -9,14 +9,30 @@ import type { Plugin } from "vite";
 export default defineConfig({
   build: {
     sourcemap: true,
+    rolldownOptions: {
+      // Apollo Client tries to use React.use (a React 19 API) which doesn't exist in
+      // Preact's compat layer. Apollo handles the missing export gracefully at runtime
+      // by falling back to its own implementation, so this warning is harmless noise.
+      onLog(level, log, defaultHandler) {
+        if (
+          log.code === "IMPORT_IS_UNDEFINED" &&
+          log.message.includes("preact/compat")
+        ) {
+          return;
+        }
+        defaultHandler(level, log);
+      },
+    },
   },
   plugins: [
     tanstackRouterPlugin(),
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     preact({ devToolsEnabled: false }),
-    checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
+    // We only have the checker plugin active in dev since we use tsgo for production builds
+    // This can likely be replaced once tsgo is fully released and the ecosystem has adapted
+    ...(process.env.DEV ? [checker({ typescript: true })] : []),
   ],
 });
 

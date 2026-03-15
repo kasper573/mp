@@ -49,7 +49,10 @@ function findTsConfigs(directory: string): Promise<string[]> {
 }
 
 function resolveConfig(configPath: string): TsConfig {
-  const configFile = ts.readConfigFile(configPath, ts.sys.readFile);
+  const configFile = ts.readConfigFile(
+    configPath,
+    ts.sys.readFile.bind(ts.sys),
+  );
   const basePath = path.dirname(configPath);
   const parsed = ts.parseJsonConfigFileContent(
     configFile.config,

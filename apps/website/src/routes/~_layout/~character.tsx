@@ -35,7 +35,7 @@ function CharacterPage() {
             e.preventDefault();
             const newName = new FormData(e.currentTarget).get("name");
             if (newName) {
-              save.mutate({ input: { newName: newName.toString() } });
+              save.mutate({ input: { newName: String(newName) } });
             }
           }}
         >

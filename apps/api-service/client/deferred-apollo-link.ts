@@ -27,7 +27,7 @@ export function deferredApolloLink(
             observer.complete();
           }
         })
-        .catch((err) => {
+        .catch((err: unknown) => {
           if (!cancelled) {
             observer.error(err);
           }
