@@ -1,7 +1,7 @@
-import { build } from "@mp/build/esbuild";
 import path from "node:path";
+import { build } from "@mp/build/rolldown";
 
-void build({
+await build({
   entryPoints: {
     provision: "./scripts/provision.ts",
   },

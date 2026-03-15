@@ -32,7 +32,7 @@ ARG MP_BUILD_VERSION
 # Add package json
 # We use "no code" otel instrumentation which means we install
 # opentelemetry packages in the image instead of in the application.
-# Also install pino deps since they're externalized by esbuild
+# Also install pino deps since they're externalized by the bundler
 # Keep in mind that pino dependency versions should be in sync with the ones in @mp/logger
 COPY <<EOF /app/package.json
 {

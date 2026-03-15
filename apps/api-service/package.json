@@ -26,7 +26,7 @@
     }
   },
   "scripts": {
-    "build": "tsgo && tsx esbuild.ts",
+    "build": "tsgo && tsx bundle.ts",
     "dev": "concurrently --names grats,tada,ts -c blue,magenta,gray 'pnpm dev:grats' 'pnpm dev:tada' 'pnpm dev:ts'",
     "dev:ts": "NODE_TLS_REJECT_UNAUTHORIZED=0 pnpm devenv tsx watch --clear-screen=false server/main.ts",
     "dev:grats": "grats --watch",
