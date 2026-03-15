@@ -5,8 +5,15 @@ import builtinModules from "builtin-modules";
 export async function build(opt: {
   entryPoints: Record<string, string>;
   outdir: string;
+  suppressedWarnings?: string[];
 }): Promise<void> {
   await rolldownBuild({
+    onLog(level, log, defaultHandler) {
+      if (level === "warn" && opt.suppressedWarnings?.includes(log.code ?? "")) {
+        return;
+      }
+      defaultHandler(level, log);
+    },
     input: opt.entryPoints,
     platform: "node",
     external: [

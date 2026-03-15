@@ -6,4 +6,5 @@ await build({
     index: "./server/main.ts",
   },
   outdir: path.resolve(import.meta.dirname, "dist"),
+  suppressedWarnings: ["EVAL"], // @protobufjs/inquire uses indirect eval intentionally
 });
