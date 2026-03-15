@@ -15,8 +15,10 @@ export default defineConfig({
     disallowExternalizingPlugin(),
     vanillaExtractPlugin(),
     preact({ devToolsEnabled: false }),
-    checker({ typescript: true }),
     ...(process.env.MP_WEBSITE_EMBED_ENV ? [embedEnvPlugin()] : []),
+    // We only have the checker plugin active in dev since we use tsgo for production builds
+    // This can likely be replaced once tsgo is fully released and the ecosystem has adapted
+    ...(process.env.DEV ? [checker({ typescript: true })] : []),
   ],
 });
 
