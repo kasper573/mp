@@ -9,18 +9,18 @@ import type { Plugin } from "vite";
 export default defineConfig({
   build: {
     sourcemap: true,
-    rollupOptions: {
-      onwarn(warning, warn) {
-        // Apollo Client tries to use React.use (a React 19 API) which doesn't exist in
-        // Preact's compat layer. Apollo handles the missing export gracefully at runtime
-        // by falling back to its own implementation, so this warning is harmless noise.
+    rolldownOptions: {
+      // Apollo Client tries to use React.use (a React 19 API) which doesn't exist in
+      // Preact's compat layer. Apollo handles the missing export gracefully at runtime
+      // by falling back to its own implementation, so this warning is harmless noise.
+      onLog(level, log, defaultHandler) {
         if (
-          warning.code === "IMPORT_IS_UNDEFINED" &&
-          warning.message.includes("preact/compat")
+          log.code === "IMPORT_IS_UNDEFINED" &&
+          log.message.includes("preact/compat")
         ) {
           return;
         }
-        warn(warning);
+        defaultHandler(level, log);
       },
     },
   },
