@@ -97,7 +97,7 @@ export class NpcSpawner {
   }
 
   createInstance(npc: NpcDefinition, spawn: NpcSpawn): NpcInstance {
-    const id = createShortId();
+    const id: NpcInstanceId = createShortId();
     const model = assert(this.models.get(npc.modelId));
     const coords = determineSpawnCoords(spawn, this.area, this.rng);
     const npcType = spawn.npcType ?? npc.npcType;
