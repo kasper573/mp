@@ -9,7 +9,7 @@
     "restriction": "error"
   },
   "options": {
-    "typeAware": false
+    "typeAware": true
   },
   "rules": {
     "no-unused-vars": "error",
