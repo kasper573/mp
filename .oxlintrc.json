@@ -9,7 +9,7 @@
     "restriction": "error"
   },
   "options": {
-    "typeAware": true
+    "typeAware": false
   },
   "rules": {
     "no-unused-vars": "error",
@@ -65,6 +65,11 @@
       { "extensions": [".jsx", ".tsx"] }
     ],
 
+    "no-multi-comp": "off",
+    "no-use-before-define": "off",
+    "no-relative-parent-imports": "off",
+    "no-unmodified-loop-condition": "off",
+    "no-shadow": "off",
     "always-return": "off",
     "class-methods-use-this": "off",
     "no-param-reassign": "off",

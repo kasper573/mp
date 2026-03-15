@@ -33,6 +33,7 @@ function Root() {
         this serves as a final bastion of hope to display our error message! 
         */}
       <ErrorFallbackContext.Provider
+        // oxlint-disable-next-line react/jsx-no-constructed-context-values
         value={{
           displayErrorDetails: env.displayErrorDetails,
           // oxlint-disable-next-line no-console

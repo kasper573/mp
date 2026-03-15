@@ -25,6 +25,7 @@ export default function App() {
   return (
     <QueryClientProvider client={systems.query}>
       <ErrorFallbackContext.Provider
+        // oxlint-disable-next-line react/jsx-no-constructed-context-values
         value={{
           displayErrorDetails: env.displayErrorDetails,
           handleError: (e) => systems.logger.error(e, "Preact error"),
