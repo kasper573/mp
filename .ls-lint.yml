@@ -13,6 +13,8 @@ ignore:
   - node_modules
   - .claude
   - .git
+  - AGENTS.md
+  - CLAUDE.md
   - "./*/Dockerfile*"
   - "integrations/db/drizzle/**"
   - "apps/e2e/.playwright"

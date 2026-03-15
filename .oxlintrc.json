@@ -8,6 +8,9 @@
     "perf": "error",
     "restriction": "error"
   },
+  "options": {
+    "typeAware": true
+  },
   "rules": {
     "no-unused-vars": "error",
     "eqeqeq": "error",
@@ -91,7 +94,10 @@
     "explicit-module-boundary-types": "off",
     "no-extraneous-class": "off",
     "no-process-env": "off",
-    "only-export-components": "off"
+    "only-export-components": "off",
+
+    "typescript/no-unsafe-type-assertion": "off",
+    "typescript/promise-function-async": "off"
   },
   "overrides": [
     // Tests don't require the same strictness as production code due to them testing themselves.
