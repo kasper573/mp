@@ -25,7 +25,7 @@ export function ActorSpriteTester({
   actorTextures: ActorTextureLookup;
 }) {
   const animationName = useSignal<ActorModelState>("walk-normal");
-  const modelId = useSignal<ActorModelId>(modelIds[0]);
+  const modelId = useSignal(modelIds[0]);
 
   const settings = useObjectSignal({
     animationName: animationName.value,

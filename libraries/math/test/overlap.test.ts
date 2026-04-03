@@ -1,3 +1,4 @@
+// oxlint-disable typescript/no-unnecessary-type-arguments
 import { Rect } from "../src";
 import { expect, it, describe } from "vitest";
 

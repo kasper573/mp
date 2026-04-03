@@ -5,7 +5,7 @@ export const Route = createFileRoute("/_layout/admin/devtools/storage-tester")({
   component: RouteComponent,
 });
 
-const storage = new StorageSignal<{ text: string }>("local", "test-storage", {
+const storage = new StorageSignal("local", "test-storage", {
   text: "Initial value",
 });
 

@@ -31,15 +31,15 @@ export class Vector<T extends number> implements VectorLike<T> {
   }
 
   add(b: VectorLike<T>): Vector<T> {
-    return new Vector<T>((this.x + b.x) as T, (this.y + b.y) as T);
+    return new Vector((this.x + b.x) as T, (this.y + b.y) as T);
   }
 
   scale<B extends number>(b: VectorLike<B>): Vector<B> {
-    return new Vector<B>((this.x * b.x) as B, (this.y * b.y) as B);
+    return new Vector((this.x * b.x) as B, (this.y * b.y) as B);
   }
 
   divide<B extends number>(b: VectorLike<B>): Vector<B> {
-    return new Vector<B>((this.x / b.x) as B, (this.y / b.y) as B);
+    return new Vector((this.x / b.x) as B, (this.y / b.y) as B);
   }
 
   equals(b: VectorLike<T>): boolean {
@@ -47,7 +47,7 @@ export class Vector<T extends number> implements VectorLike<T> {
   }
 
   round(): Vector<T> {
-    return new Vector<T>(Math.round(this.x) as T, Math.round(this.y) as T);
+    return new Vector(Math.round(this.x) as T, Math.round(this.y) as T);
   }
 
   angle(other: VectorLike<T>): number {
@@ -72,7 +72,7 @@ export class Vector<T extends number> implements VectorLike<T> {
   }
 
   static from<T extends number>(obj: VectorLike<T>): Vector<T> {
-    return new Vector<T>(obj.x, obj.y);
+    return new Vector(obj.x, obj.y);
   }
 
   static key(x: number, y: number): VectorKey {

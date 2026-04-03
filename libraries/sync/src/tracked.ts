@@ -117,7 +117,7 @@ class TrackedInstance<T extends object> {
       }
 
       if (propertySchema instanceof PropertySchema) {
-        const signal = createSignal<T[typeof key]>(initialValues[key]);
+        const signal = createSignal(initialValues[key]);
         Object.defineProperty(this, key, {
           configurable: false,
           enumerable: true,
