@@ -3,8 +3,8 @@ import { computed, signal } from "@mp/state";
 import type { TimeSpan } from "@mp/time";
 
 export class Spring<T extends number> implements SpringLike<T> {
-  readonly velocity = signal<T>(0 as T);
-  readonly #value = signal<T>(0 as T);
+  readonly velocity = signal(0 as T);
+  readonly #value = signal(0 as T);
   readonly state: ReadonlySignal<SpringState>;
 
   get value(): ReadonlySignal<T> {

@@ -68,7 +68,7 @@ export class Rect<T extends number> implements RectLike<T> {
   }
 
   scale<B extends number>(b: VectorLike<B>): Rect<B> {
-    return new Rect<B>(
+    return new Rect(
       (this.x * b.x) as B,
       (this.y * b.y) as B,
       (this.width * b.x) as B,
@@ -77,7 +77,7 @@ export class Rect<T extends number> implements RectLike<T> {
   }
 
   divide<B extends number>(b: VectorLike<B>): Rect<B> {
-    return new Rect<B>(
+    return new Rect(
       (this.x / b.x) as B,
       (this.y / b.y) as B,
       (this.width / b.x) as B,

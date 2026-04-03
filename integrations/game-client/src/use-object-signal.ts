@@ -6,7 +6,7 @@ import { useEffect } from "preact/hooks";
  * This hook will treat all property values of the given object as dependencies and update a signal with the object on change.
  */
 export function useObjectSignal<T extends object>(obj: T): ReadonlySignal<T> {
-  const signal = useSignal<T>(obj);
+  const signal = useSignal(obj);
 
   useEffect(() => {
     // Must shallow copy for signal to accept the new value as different
