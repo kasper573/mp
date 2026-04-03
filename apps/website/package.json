@@ -33,16 +33,16 @@
     "@mp/ws": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
-    "@tanstack/react-router": "1.167.1",
-    "@tanstack/react-router-devtools": "1.166.8",
+    "@tanstack/react-router": "1.168.10",
+    "@tanstack/react-router-devtools": "1.166.11",
     "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
-    "@tanstack/router-generator": "1.166.9",
-    "@tanstack/router-plugin": "1.166.10",
+    "@tanstack/router-generator": "1.166.24",
+    "@tanstack/router-plugin": "1.167.12",
     "@vanilla-extract/vite-plugin": "catalog:",
     "vite": "catalog:",
     "vite-plugin-checker": "0.12.0"

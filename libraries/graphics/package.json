@@ -20,7 +20,7 @@
     "@mp/math": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/time": "workspace:*",
-    "pixi.js": "8.17.0",
+    "pixi.js": "8.17.1",
     "preact": "catalog:"
   },
   "devDependencies": {

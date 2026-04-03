@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@mp/std": "workspace:*",
-    "rate-limiter-flexible": "10.0.1"
+    "rate-limiter-flexible": "11.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*"

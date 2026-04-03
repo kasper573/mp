@@ -13,13 +13,13 @@
   },
   "dependencies": {
     "@mp/validate": "workspace:*",
-    "nanoid": "5.1.6",
+    "nanoid": "5.1.7",
     "neverthrow": "8.2.0",
     "random": "^5.4.1",
     "uuid": "13.0.0"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
-    "type-fest": "5.4.4"
+    "type-fest": "5.5.0"
   }
 }
