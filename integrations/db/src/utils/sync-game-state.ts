@@ -138,37 +138,32 @@ function saveGameStateForCharacters(
   state: GameState,
   characterFilter: (char: Character) => boolean,
 ) {
+  // Intentional sequential operations inside transactions since that's what pg wants.
   return drizzle.transaction(async (tx) => {
-    await Promise.all(
-      state.actors
-        .values()
-        .filter(
-          (actor): actor is Character =>
-            actor.type === "character" && characterFilter(actor),
-        )
-        .map((char) =>
-          tx
-            .update(characterTable)
-            .set(dbFieldsFromCharacter(char))
-            .where(eq(characterTable.id, char.identity.id)),
-        ),
-    );
+    for (const actor of state.actors.values()) {
+      if (actor.type === "character" && characterFilter(actor)) {
+        // oxlint-disable-next-line no-await-in-loop
+        await tx
+          .update(characterTable)
+          .set(dbFieldsFromCharacter(actor))
+          .where(eq(characterTable.id, actor.identity.id));
+      }
+    }
 
-    await Promise.all(
-      state.items.values().map((item) => {
-        const table = {
-          consumable: consumableInstanceTable,
-          equipment: equipmentInstanceTable,
-        }[item.type];
-        return tx
-          .insert(table)
-          .values(item)
-          .onConflictDoUpdate({
-            target: [table.id],
-            set: item,
-          });
-      }),
-    );
+    for (const item of state.items.values()) {
+      const table = {
+        consumable: consumableInstanceTable,
+        equipment: equipmentInstanceTable,
+      }[item.type];
+      // oxlint-disable-next-line no-await-in-loop
+      await tx
+        .insert(table)
+        .values(item)
+        .onConflictDoUpdate({
+          target: [table.id],
+          set: item,
+        });
+    }
   });
 }
 
