@@ -1,12 +1,10 @@
 import {
   createProxyEventInvoker,
-  type MergeEventRouterNodes,
   type ProxyEventInvoker,
 } from "@mp/event-router";
 import { GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
 import { eventMessageEncoding } from "@mp/game-shared";
-import type { GatewayRouter } from "@mp/gateway";
 import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
 import { WebSocket } from "@mp/ws/client";
@@ -15,9 +13,7 @@ import { env } from "../env";
 import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
 import { AuthContext, LoggerContext } from "./contexts";
 
-export type ComposedGameEventClient = ProxyEventInvoker<
-  MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
->;
+export type ComposedGameEventClient = ProxyEventInvoker<GameServerEventRouter>;
 
 export function useGameStateClient(): [
   GameStateClient,

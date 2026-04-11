@@ -9,7 +9,23 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const areaIds = await getAreaIds();
 
+await writeGatewayUrlsEnvFile(areaIds);
+
 await Promise.all(areaIds.map((id, index) => runDevInstance(id, index)));
+
+async function writeGatewayUrlsEnvFile(ids: AreaId[]): Promise<void> {
+  // Gateway needs an explicit areaId=url map to know where to proxy each
+  // authenticated client. Areas are discovered at dev startup, so the mapping
+  // must be regenerated whenever the area set changes.
+  const entries = ids.map(
+    (id, index) => `${id}=ws://localhost:${9701 + index}`,
+  );
+  const file = path.resolve(__dirname, "../../docker/.env.dev.generated");
+  await fs.writeFile(
+    file,
+    `MP_GATEWAY_GAME_SERVICE_URLS=${entries.join(",")}\n`,
+  );
+}
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fs.readdir(

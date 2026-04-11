@@ -1,7 +1,6 @@
 import { parseEnv } from "@mp/env";
 import { authAlgorithms } from "@mp/auth/server";
 import { boolish, csv, numeric, type } from "@mp/validate";
-import { TimeSpan } from "@mp/time";
 
 export type ServerOptions = typeof serverOptionsSchema.infer;
 
@@ -30,37 +29,42 @@ export const serverOptionsSchema = type({
   },
   databaseConnectionString: "string",
   /**
-   * The secret that must be provided in the WebSocket handshake to be allowed to register as a game service.
+   * The secret used by the gateway to authenticate against game-service backends.
    */
   gameServiceSecret: "string",
+  /**
+   * Comma-separated `areaId=ws://host:port` mapping describing which game-service
+   * websocket endpoint serves each area.
+   */
+  gameServiceUrls: csv(type("string")).pipe((entries) => {
+    const map: Record<string, string> = {};
+    for (const entry of entries) {
+      const idx = entry.indexOf("=");
+      if (idx <= 0) {
+        throw new Error(
+          `Invalid gameServiceUrls entry "${entry}", expected "areaId=url"`,
+        );
+      }
+      const id = entry.slice(0, idx).trim();
+      const url = entry.slice(idx + 1).trim();
+      if (!id || !url) {
+        throw new Error(
+          `Invalid gameServiceUrls entry "${entry}", expected "areaId=url"`,
+        );
+      }
+      map[id] = url;
+    }
+    return map;
+  }),
   auth: {
-    /**
-     * OIDC issuer
-     */
     issuer: "string",
-    /**
-     * OIDC audience
-     */
     audience: "string",
-    /**
-     * OIDC JWKS URI
-     */
     jwksUri: "string",
-    /**
-     * OIDC JWT algorithms
-     */
     algorithms: csv(type.enumerated(...authAlgorithms)),
     /**
      * Allow bypassing JWT verification using fake tokens.
-     * Used by load test to automatically sign in as a new user and character.
      */
     allowBypassUsers: boolish(),
-  },
-  redis: {
-    path: "string",
-    expireSeconds: {
-      characterOnlineStatus: numeric().pipe((v) => TimeSpan.fromSeconds(v)),
-    },
   },
 }).onDeepUndeclaredKey("delete");
 

@@ -37,12 +37,11 @@ function RouteComponent() {
     .toArray();
 
   useSignalEffect(() => {
-    // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
-    if (stateClient.isConnected.value && spectatedId.value) {
-      events.gateway.spectate(spectatedId.value);
-    } else {
-      events.gateway.leave();
-    }
+    // Gateway spectate/leave events removed in Phase 4 — re-wire after Phase 5
+    // game-client rewrite plumbs spectate intent through the new transport.
+    void stateClient.isConnected.value;
+    void spectatedId.value;
+    void events;
   });
 
   const isSelectedOnline = onlineCharacters.find(

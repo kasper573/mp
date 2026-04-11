@@ -15,7 +15,6 @@
     "@mp/game-client": "workspace:*",
     "@mp/game-service": "workspace:*",
     "@mp/game-shared": "workspace:*",
-    "@mp/gateway": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/state": "workspace:*",
     "@mp/std": "workspace:*",

@@ -19,7 +19,6 @@
     "@mp/game-client": "workspace:*",
     "@mp/game-service": "workspace:*",
     "@mp/game-shared": "workspace:*",
-    "@mp/gateway": "workspace:*",
     "@mp/graphics": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",

@@ -319,42 +319,18 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
-      '@mp/event-router':
-        specifier: workspace:*
-        version: link:../../libraries/event-router
-      '@mp/game-service':
-        specifier: workspace:*
-        version: link:../game-service
-      '@mp/game-shared':
-        specifier: workspace:*
-        version: link:../../integrations/game-shared
-      '@mp/ioc':
-        specifier: workspace:*
-        version: link:../../libraries/ioc
       '@mp/keycloak':
         specifier: workspace:*
         version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
-      '@mp/redis':
-        specifier: workspace:*
-        version: link:../../libraries/redis
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
-      '@mp/sync':
-        specifier: workspace:*
-        version: link:../../libraries/sync
       '@mp/telemetry':
         specifier: workspace:*
         version: link:../../libraries/telemetry
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../../libraries/time
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
@@ -401,9 +377,6 @@ importers:
       '@mp/game-shared':
         specifier: workspace:*
         version: link:../../integrations/game-shared
-      '@mp/gateway':
-        specifier: workspace:*
-        version: link:../gateway
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -471,9 +444,6 @@ importers:
       '@mp/game-shared':
         specifier: workspace:*
         version: link:../../integrations/game-shared
-      '@mp/gateway':
-        specifier: workspace:*
-        version: link:../gateway
       '@mp/graphics':
         specifier: workspace:*
         version: link:../../libraries/graphics

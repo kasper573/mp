@@ -1,5 +1,6 @@
 import { createDrizzleClient } from "./utils/client";
 import { mayAccessCharacter } from "./procedures/may-access-character";
+import { selectCharacterAreaForUser } from "./procedures/select-character-area-for-user";
 import { selectAllActorModelIds } from "./procedures/select-all-actor-model-ids";
 import { selectAllItemDefinitions } from "./procedures/select-all-item-definitions";
 import { selectAllNpcRewards } from "./procedures/select-all-npc-rewards";
@@ -29,6 +30,7 @@ export function createDbRepository(connectionString: string) {
 
   return {
     mayAccessCharacter: mayAccessCharacter.build(drizzle),
+    selectCharacterAreaForUser: selectCharacterAreaForUser.build(drizzle),
     selectAllActorModelIds: selectAllActorModelIds.build(drizzle),
     selectAllItemDefinitions: selectAllItemDefinitions.build(drizzle),
     selectAllNpcRewards: selectAllNpcRewards.build(drizzle),

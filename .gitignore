@@ -25,6 +25,7 @@ tsconfig.vitest-temp.json
 tsconfig.tmp.json
 .claude
 *.gen.*
+docker/.env.dev.generated
 
 # Local files for common editors
 .idea

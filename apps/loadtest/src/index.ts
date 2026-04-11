@@ -6,7 +6,6 @@ import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
 import type { GameServerEventRouter } from "@mp/game-service";
 import type { AreaId, AreaResource } from "@mp/game-shared";
 import { eventMessageEncoding, hitTestTiledObject } from "@mp/game-shared";
-import type { GatewayRouter } from "@mp/gateway";
 import { createConsoleLogger } from "@mp/logger";
 import type { AccessToken } from "@mp/auth";
 import { createBypassUser } from "@mp/auth";
@@ -117,10 +116,6 @@ function testOneGameClient(n: number, rng: Rng) {
         (message) => socket.send(eventMessageEncoding.encode(message)),
       );
 
-      const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>
-        socket.send(eventMessageEncoding.encode(message)),
-      );
-
       await waitForOpen(socket);
 
       if (verbose) {
@@ -154,8 +149,6 @@ function testOneGameClient(n: number, rng: Rng) {
           `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
         );
       }
-      gatewayEvents.gateway.join(gameClient.characterId.value);
-
       if (verbose) {
         logger.info(`Socket ${n} is waiting on area id...`);
       }

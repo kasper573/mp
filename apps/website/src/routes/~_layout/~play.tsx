@@ -21,24 +21,13 @@ function PlayPage() {
     select: (res) => res.myCharacterId,
   });
 
-  // Auto joining as default character is a temporary solution until we have a proper character selection UI
+  // Auto joining as default character is a temporary solution until we have a proper character selection UI.
+  // Gateway join/leave events removed in Phase 4 — Phase 5 game-client rewrite plumbs character
+  // selection through the new transport (URL query params at connection time).
   useEffect(() => {
-    if (!myCharacterId) {
-      if (stateClient.characterId.value) {
-        events.gateway.leave();
-      }
-      stateClient.characterId.value = undefined;
-    } else {
-      stateClient.characterId.value = myCharacterId;
-      events.gateway.join(myCharacterId);
-    }
-  }, [
-    myCharacterId,
-    stateClient,
-    events,
-    // Important to retrigger join when connection is re-established
-    stateClient.isConnected.value,
-  ]);
+    stateClient.characterId.value = myCharacterId ?? undefined;
+    void events;
+  }, [myCharacterId, stateClient, events, stateClient.isConnected.value]);
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
