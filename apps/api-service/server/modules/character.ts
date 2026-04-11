@@ -39,9 +39,9 @@ export async function myCharacterId(ctx: ApiContext): Promise<CharacterId> {
 /** @gqlQueryField */
 export async function myCharacter(ctx: ApiContext): Promise<Character | null> {
   const { user } = await auth(ctx);
-  const result = await promiseFromResult(
-    ctx.ioc.get(ctxDb).selectCharacterByUser(user.id),
-  );
+  const db = ctx.ioc.get(ctxDb);
+  await promiseFromResult(db.selectOrCreateCharacterIdForUser({ user }));
+  const result = await promiseFromResult(db.selectCharacterByUser(user.id));
   return result ?? null;
 }
 

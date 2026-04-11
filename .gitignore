@@ -26,6 +26,7 @@ tsconfig.tmp.json
 .claude
 *.gen.*
 docker/.env.dev.generated
+apps/game-service/data/
 
 # Local files for common editors
 .idea

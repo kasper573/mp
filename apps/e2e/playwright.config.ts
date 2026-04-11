@@ -33,14 +33,11 @@ export default defineConfig({
     ? {
         command: "pnpm dev",
         cwd: path.join(__dirname, "../.."),
-        url: `https://${process.env.MP_WEBSITE_DOMAIN}`,
+        url: "http://localhost:5173",
         reuseExistingServer: true,
-        timeout: 10000,
+        timeout: 180_000,
         stdout: "pipe",
         stderr: "pipe",
-        wait: {
-          stdout: /game service connected/i,
-        },
       }
     : undefined,
 
