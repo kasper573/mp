@@ -1,5 +1,6 @@
 import type { DbRepository } from "@mp/db";
-import type { CharacterId, GameServiceConfig } from "@mp/game-shared";
+import type { CharacterId } from "@mp/world";
+import type { GameServiceConfig } from "./integrations/game-service-config";
 import type { InjectionContainer } from "@mp/ioc";
 import { InjectionContext } from "@mp/ioc";
 import type { AccessToken } from "@mp/auth";

@@ -2,7 +2,7 @@ import path from "path";
 import type { ApiContext } from "../context";
 import { ctxFileResolver } from "../context";
 import type { FileUrlType } from "../integrations/file-resolver";
-import type { AreaId } from "@mp/game-shared";
+import type { AreaId } from "@mp/world";
 
 /** @gqlQueryField */
 export function areaFileUrl(

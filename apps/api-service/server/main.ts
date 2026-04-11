@@ -1,10 +1,10 @@
 import { createDbRepository } from "@mp/db";
-import type { CharacterId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/world";
 import {
   GameServiceConfig,
   gameServiceConfigRedisKey,
   onlineCharacterIdsRedisKey,
-} from "@mp/game-shared";
+} from "./integrations/game-service-config";
 import { InjectionContainer } from "@mp/ioc";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/auth";

@@ -2,6 +2,7 @@ export * from "./area";
 export * from "./components";
 export * from "./events";
 export * from "./domain-ids";
+export * from "./items";
 export * from "./world";
 export { AreaModule } from "./modules/area/module";
 export type { AreaApi } from "./modules/area/module";

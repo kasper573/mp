@@ -1,4 +1,4 @@
-import type { ActorModelId } from "@mp/game-shared";
+import type { ActorModelId } from "@mp/world";
 import type { ApiContext } from "../context";
 import { ctxDb, ctxFileResolver } from "../context";
 import type { UrlString } from "@mp/std";

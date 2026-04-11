@@ -113,7 +113,6 @@ export interface PortalDestination {
 
 export const dynamicLayerName = "Dynamic";
 
-/** @gqlScalar */
 export type AreaId = typeof AreaIdType.infer;
 export const AreaIdType = type("string").brand("AreaId");
 

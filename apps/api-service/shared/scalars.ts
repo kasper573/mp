@@ -5,7 +5,7 @@ import type {
   CharacterId,
   ItemReference,
   ItemDefinition,
-} from "@mp/game-shared";
+} from "@mp/world";
 import type { LocalFile, Pixel, Tile, TimesPerSecond } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { ParsingFunctionsObject } from "apollo-link-scalars";

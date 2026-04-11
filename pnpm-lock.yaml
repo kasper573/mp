@@ -122,9 +122,6 @@ importers:
       '@mp/env':
         specifier: workspace:*
         version: link:../../libraries/env
-      '@mp/game-shared':
-        specifier: workspace:*
-        version: link:../../integrations/game-shared
       '@mp/ioc':
         specifier: workspace:*
         version: link:../../libraries/ioc
@@ -152,6 +149,9 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
+      '@mp/world':
+        specifier: workspace:*
+        version: link:../../integrations/world
       '@mp/ws':
         specifier: workspace:*
         version: link:../../libraries/ws

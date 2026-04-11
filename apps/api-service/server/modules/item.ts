@@ -2,8 +2,7 @@ import { gatewayRoles } from "@mp/keycloak";
 import type { ApiContext } from "../context";
 import { ctxDb } from "../context";
 import { roles } from "../integrations/auth";
-import type { ItemDefinition } from "@mp/game-shared";
-import type { ItemReference } from "@mp/game-shared";
+import type { ItemDefinition, ItemReference } from "@mp/world";
 import { promiseFromResult } from "@mp/std";
 
 /** @gqlQueryField */

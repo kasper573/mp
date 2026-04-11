@@ -58,7 +58,6 @@ export const ItemDefinitionType = ConsumableDefinitionType.or(
 // and for properties that are shared, but it's intended that server behavior and
 // client rendering should be implementing concrete logic per item type.
 
-/** @gqlScalar */
 export type ItemDefinition = typeof ItemDefinitionType.inferOut;
 
 export type ItemInstance = ConsumableInstance | EquipmentInstance;
@@ -84,7 +83,6 @@ export const ItemReferenceType = ConsumableReferenceType.or(
   EquipmentReferenceType,
 );
 
-/** @gqlScalar */
 export type ItemReference = typeof ItemReferenceType.inferOut;
 
 export type ItemDefinitionByReference<Ref extends ItemReference> = Extract<

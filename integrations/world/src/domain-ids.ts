@@ -4,6 +4,7 @@ export { type UserId } from "@mp/auth";
 export type { ObjectId } from "@mp/tiled-loader";
 
 export const CharacterIdType = type("string").brand("CharacterId");
+/** @gqlScalar */
 export type CharacterId = typeof CharacterIdType.infer;
 
 export const NpcInstanceIdType = type("string").brand("NpcInstanceId");
@@ -42,10 +43,16 @@ export type ItemInstanceId = ConsumableInstanceId | EquipmentInstanceId;
 export type ItemDefinitionId = ConsumableDefinitionId | EquipmentDefinitionId;
 export type ItemType = "consumable" | "equipment";
 
+export const ActorIdType = NpcInstanceIdType.or(CharacterIdType);
+/** @gqlScalar */
+export type ActorId = typeof ActorIdType.infer;
+
 export const AreaIdType = type("string").brand("AreaId");
+/** @gqlScalar */
 export type AreaId = typeof AreaIdType.infer;
 
 export const ActorModelIdType = type("string").brand("ActorModelId");
+/** @gqlScalar */
 export type ActorModelId = typeof ActorModelIdType.infer;
 
 export type CardinalDirection =
