@@ -21,9 +21,6 @@
       "require": "./src/client/index.ts"
     }
   },
-  "scripts": {
-    "test": "vitest run --typecheck"
-  },
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/engine": "workspace:*",
@@ -43,7 +40,6 @@
     "preact": "catalog:"
   },
   "devDependencies": {
-    "@mp/tsconfig": "workspace:*",
-    "vitest": "catalog:"
+    "@mp/tsconfig": "workspace:*"
   }
 }
