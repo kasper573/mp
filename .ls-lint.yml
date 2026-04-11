@@ -16,7 +16,6 @@ ignore:
   - AGENTS.md
   - CLAUDE.md
   - "./*/Dockerfile*"
-  - "integrations/db/drizzle/**"
   - "apps/e2e/.playwright"
   - "apps/website/.tanstack"
   - "./{apps,integrations,libraries}/*/.turbo"

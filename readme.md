@@ -13,9 +13,8 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - maps: [tiled](https://www.mapeditor.org/) (+custom
   [loader](libraries/tiled-loader)/[renderer](libraries/tiled-renderer))
 - ui: [preact](https://preactjs.com/)
-- database: [postgres](https://www.postgresql.org/) +
-  [drizzle](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws), [graphql](./apps/api-service/), [custom sync lib](libraries/sync)
+- database: [rift-persistence](libraries/rift/persistence) (sqlite)
+- network: [ws](https://www.npmjs.com/package/ws), [graphql](./apps/api-service/), [rift-core](libraries/rift/core)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
 
@@ -51,8 +50,6 @@ Check out the [architecture](#architecture) section for an overview of the syste
   > on which browser you are using.
 - Enable and prepare [corepack](https://nodejs.org/docs/v22.17.0/api/corepack.html#corepack) for this repo
 - Run `pnpm install`
-- Run `pnpm -F db devenv push` to initialize your database
-- Run `pnpm -F db devenv seed` to seed the database
 - Run `pnpm -F keycloak devenv provision` to provision keycloak roles
 - Sign in as admin to `auth.mp.localhost` and create a test account and add yourself to the `admin` group
 
@@ -64,12 +61,6 @@ Check out the [architecture](#architecture) section for an overview of the syste
 ### If you make docker related changes
 
 You will have to perform the appropriate docker compose commands to apply your changes by using the `dockerctl.sh` script. See [quirks](#quirks).
-
-### If you make database related changes
-
-You will need to use [drizzle-kit](https://orm.drizzle.team/docs/kit-overview).
-
-Run its cli against the development environment using `pnpm -F db devenv <drizzle-kit command>`.
 
 ### If you change user roles
 
@@ -83,7 +74,7 @@ While most of the repo should be fairly conventional, I've made a few choices th
 
 In development, our own apps run on the host machine and outside of the docker network, while 3rd party services run inside the docker network, contrary to production and testing where everything runs inside the docker network.
 
-> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, drizzle-kit cli, pnpm link, etc.
+> This provides the best development experience since a large amount of node development tools expect you to interact with them directly on the host machine, ie. vscode's language service, vite dev server, pnpm link, etc.
 
 We don't use docker compose directly in the CLI. Instead we use a wrapper script that in turn will run the appropriate docker compose commands. See [dockerctl.sh](./docker/dockerctl.sh) for more information.
 

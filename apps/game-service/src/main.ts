@@ -30,12 +30,7 @@ import {
   createWorld,
   deriveNpcSpawnsFromArea,
 } from "@mp/world";
-import type {
-  ActorModelId,
-  CharacterId,
-  InventoryId,
-  UserId,
-} from "@mp/world";
+import type { ActorModelId, CharacterId, InventoryId, UserId } from "@mp/world";
 import { RiftServer } from "@rift/core";
 import { GameServer, defineModule } from "@rift/modular";
 import { RiftPersistence } from "@rift/persistence/server";

@@ -19,14 +19,16 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
-    "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/validate": "workspace:*",
+    "@mp/world": "workspace:*",
     "@mp/ws": "workspace:*",
+    "@rift/core": "workspace:*",
+    "@rift/persistence": "workspace:*",
     "dotenv": "catalog:",
     "express": "catalog:"
   },

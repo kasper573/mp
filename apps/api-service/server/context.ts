@@ -1,5 +1,5 @@
-import type { DbRepository } from "@mp/db";
 import type { CharacterId } from "@mp/world";
+import type { CharacterRepository } from "./character-repo";
 import type { GameServiceConfig } from "./integrations/game-service-config";
 import type { InjectionContainer } from "@mp/ioc";
 import { InjectionContext } from "@mp/ioc";
@@ -14,7 +14,8 @@ export const ctxLogger = InjectionContext.new<Logger>("logger");
 export const ctxGameServiceConfig =
   InjectionContext.new<Signal<GameServiceConfig>>("gameServiceConfig");
 
-export const ctxDb = InjectionContext.new<DbRepository>("db");
+export const ctxCharacterRepo =
+  InjectionContext.new<CharacterRepository>("characterRepo");
 
 export const ctxOnlineCharacterIds =
   InjectionContext.new<ReadonlySignal<ReadonlySet<CharacterId>>>(

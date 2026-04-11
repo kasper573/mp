@@ -26,9 +26,7 @@ const defaultTemplate: NpcTemplate = {
   },
 };
 
-export function deriveNpcSpawnsFromArea(
-  area: AreaResource,
-): NpcSpawnDef[] {
+export function deriveNpcSpawnsFromArea(area: AreaResource): NpcSpawnDef[] {
   const result: NpcSpawnDef[] = [];
   for (const obj of area.tiled.objects) {
     if (obj.type !== TiledFixture.npc) continue;

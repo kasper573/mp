@@ -38,16 +38,6 @@ prometheus.scrape "node_exporter" {
 	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }
 
-prometheus.scrape "postgres_exporter" {
-	targets = [{
-		__address__ = "postgres_exporter:9187",
-	}]
-	forward_to      = [prometheus.remote_write.default.receiver]
-	job_name        = "postgres_exporter"
-	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
-	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
-}
-
 prometheus.scrape "redis_exporter" {
 	targets = [{
 		__address__ = "redis_exporter:9121",

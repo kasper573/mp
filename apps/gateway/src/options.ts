@@ -27,7 +27,7 @@ export const serverOptionsSchema = type({
      */
     pretty: boolish().optional(),
   },
-  databaseConnectionString: "string",
+  metadataDbPath: "string",
   /**
    * The secret used by the gateway to authenticate against game-service backends.
    */

@@ -8,7 +8,7 @@ export const apiOptionsSchema = type({
   port: numeric(),
   hostname: "string",
   exposeErrorDetails: boolish(),
-  databaseConnectionString: "string",
+  metadataDbPath: "string",
   log: {
     /**
      * Which level of logs to output (See @mp/logger)

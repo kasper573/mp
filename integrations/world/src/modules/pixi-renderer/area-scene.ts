@@ -16,7 +16,10 @@ import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
 import type { Entity, EntityId, Infer, RiftClient, RiftType } from "@rift/core";
 import { Appearance, Health, Position } from "../../components";
-import { getDestinationFromObject, type AreaResource } from "../area/area-resource";
+import {
+  getDestinationFromObject,
+  type AreaResource,
+} from "../area/area-resource";
 import { AttackIntent, MoveIntent } from "../../events";
 import { ActorController } from "./actor-controller";
 import { TileHighlight, type TileHighlightTarget } from "./tile-highlight";

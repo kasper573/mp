@@ -4,7 +4,9 @@
   "compilerOptions": {
     "skipLibCheck": true,
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
-    "types": ["node"],
-    "module": "ESNext"
+    "types": ["node", "vite/client"],
+    "module": "ESNext",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   }
 }

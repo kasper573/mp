@@ -1,4 +1,4 @@
-import { createDbRepository } from "@mp/db";
+import { createCharacterMirror } from "./character-mirror";
 import { createPinoLogger } from "@mp/logger/pino";
 import type { AccessToken } from "@mp/auth";
 import { createTokenResolver } from "@mp/auth/server";
@@ -17,7 +17,7 @@ import http from "http";
 import type { IncomingMessage } from "http";
 import { opt } from "./options";
 
-type CharacterId = string & { __brand: "CharacterId" };
+import type { CharacterId } from "@mp/world";
 
 // Note that this file is an entrypoint and should not have any exports
 
@@ -36,9 +36,13 @@ const webServer = express()
 const httpServer = http.createServer(webServer);
 shutdownCleanups.push(() => httpServer.close());
 
-const db = createDbRepository(opt.databaseConnectionString);
-db.subscribeToErrors((err) => logger.error(err, "Database error"));
-shutdownCleanups.push(() => db.dispose());
+const characterMirror = createCharacterMirror({
+  instanceId: "gateway",
+  dbPath: opt.metadataDbPath,
+});
+shutdownCleanups.push(() => characterMirror.dispose());
+
+probeUpstreamGameServices();
 
 const resolveAccessToken = createTokenResolver({
   ...opt.auth,
@@ -84,16 +88,7 @@ async function handleClientConnection(
   }
   const user = tokenResult.value;
 
-  const areaResult = await db.selectCharacterAreaForUser({
-    userId: user.id,
-    characterId: characterId as never,
-  });
-  if (areaResult.isErr()) {
-    logger.error({ err: areaResult.error }, "Failed to resolve character area");
-    clientSocket.close(1011, "Internal error");
-    return;
-  }
-  const areaId = areaResult.value;
+  const areaId = characterMirror.resolveAreaForUser(user.id, characterId);
   if (!areaId) {
     clientSocket.close(4403, "Forbidden");
     return;
@@ -175,6 +170,22 @@ async function handleClientConnection(
     logger.error(err, "Client socket error");
     cleanup();
   });
+}
+
+function probeUpstreamGameServices(): void {
+  for (const [areaId, url] of Object.entries(opt.gameServiceUrls)) {
+    const probeUrl = new URL(url);
+    probeUrl.searchParams.set("gameServiceSecret", opt.gameServiceSecret);
+    probeUrl.searchParams.set("probe", "1");
+    const socket = new WebSocket(probeUrl.toString());
+    socket.on("open", () => {
+      logger.info({ areaId, url }, "game service connected");
+      socket.close();
+    });
+    socket.on("error", (err) => {
+      logger.warn({ areaId, url, err }, "game service probe failed");
+    });
+  }
 }
 
 function toArrayBuffer(data: Buffer | ArrayBuffer | Buffer[]): ArrayBuffer {

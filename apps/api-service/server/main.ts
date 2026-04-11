@@ -1,4 +1,4 @@
-import { createDbRepository } from "@mp/db";
+import { createCharacterRepository } from "./character-repo";
 import type { CharacterId } from "@mp/world";
 import {
   GameServiceConfig,
@@ -18,7 +18,7 @@ import type { IncomingHttpHeaders } from "http";
 import type { ApiContext } from "./context";
 import {
   ctxAccessToken,
-  ctxDb,
+  ctxCharacterRepo,
   ctxFileResolver,
   ctxGameServiceConfig,
   ctxLogger,
@@ -50,9 +50,11 @@ logger.info(opt, `Starting API...`);
 
 const tokenResolver = createTokenResolver(opt.auth);
 
-const db = createDbRepository(opt.databaseConnectionString);
-db.subscribeToErrors((err) => logger.error(err, "Database error"));
-shutdownCleanups.push(() => db.dispose());
+const characterRepo = createCharacterRepository({
+  instanceId: "api-service",
+  dbPath: opt.metadataDbPath,
+});
+shutdownCleanups.push(() => characterRepo.dispose());
 
 const redisClient = new Redis(opt.redisPath);
 
@@ -92,7 +94,7 @@ const fileResolver = createFileResolver(
 const ioc = new InjectionContainer()
   .provide(ctxTokenResolver, tokenResolver)
   .provide(ctxFileResolver, fileResolver)
-  .provide(ctxDb, db)
+  .provide(ctxCharacterRepo, characterRepo)
   .provide(ctxGameServiceConfig, gameServiceConfig)
   .provide(ctxLogger, logger)
   .provide(ctxOnlineCharacterIds, onlineCharacterIds);

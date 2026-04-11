@@ -82,6 +82,12 @@ export const CharacterMeta = struct({
   xp: f32(),
 });
 
+export const CharacterIdentity = struct({
+  name: string(),
+  userId: string<UserId>(),
+  areaId: string<AreaId>(),
+});
+
 export const NpcMeta = struct({
   instanceId: string<NpcInstanceId>(),
   definitionId: string<NpcDefinitionId>(),
@@ -123,6 +129,7 @@ export const allComponents = [
   PlayerControlled,
   NpcActor,
   CharacterMeta,
+  CharacterIdentity,
   NpcMeta,
   Patrol,
   ItemMeta,

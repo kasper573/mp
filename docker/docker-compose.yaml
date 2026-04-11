@@ -21,11 +21,11 @@ x-game-service: &game_service
   image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
   restart: always
   profiles: ["prod", "test"]
+  volumes:
+    - mp-data:/var/lib/mp
   depends_on:
     mp-api:
       condition: service_healthy
-    mp-migrations:
-      condition: service_completed_successfully
 
 services:
   mp-website:
@@ -71,9 +71,9 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+    volumes:
+      - mp-data:/var/lib/mp
     depends_on:
-      mp-migrations:
-        condition: service_completed_successfully
       keycloak-healthcheck:
         condition: service_healthy
 
@@ -93,23 +93,12 @@ services:
       interval: 3s
       timeout: 5s
       retries: 20
+    volumes:
+      - mp-data:/var/lib/mp
     depends_on:
-      mp-migrations:
-        condition: service_completed_successfully
-      keycloak-healthcheck:
+      mp-api:
         condition: service_healthy
-
-  mp-migrations:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ./docker/Dockerfile.mp-migrations
-      context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-migrations:${DOCKER_IMAGE_VERSION:-latest}
-    profiles: ["prod", "test"]
-    restart: "no"
-    depends_on:
-      postgres:
+      keycloak-healthcheck:
         condition: service_healthy
 
   keycloak:
@@ -238,15 +227,6 @@ services:
     depends_on:
       - redis
 
-  postgres_exporter:
-    env_file: *env_files
-    logging: *logging
-    image: prometheuscommunity/postgres-exporter:v0.18.1
-    environment:
-      DATA_SOURCE_URI: postgres:5432/postgres?sslmode=disable
-    depends_on:
-      - postgres
-
   grafana:
     env_file: *env_files
     logging: *logging
@@ -303,3 +283,4 @@ volumes:
   reverse-proxy-config:
   file-server-data:
   file-server-config:
+  mp-data:

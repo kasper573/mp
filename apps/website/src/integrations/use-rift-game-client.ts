@@ -7,13 +7,15 @@ import {
   CombatModule,
   InventoryModule,
   MovementModule,
-  PixiRendererModule,
-  PreactRendererModule,
   createWorld,
   type CharacterId,
+} from "@mp/world";
+import {
+  PixiRendererModule,
+  PreactRendererModule,
   type PixiRendererApi,
   type PreactRendererApi,
-} from "@mp/world";
+} from "@mp/world/client";
 import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import { env } from "../env";
 import { AuthContext, LoggerContext } from "./contexts";

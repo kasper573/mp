@@ -1,8 +1,6 @@
 import { f32, i32, string, struct } from "@rift/core";
 import type { AreaId, CharacterId, ObjectId } from "./domain-ids";
 
-
-
 export const MoveIntent = struct({
   x: f32(),
   y: f32(),

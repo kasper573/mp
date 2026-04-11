@@ -27,6 +27,7 @@ tsconfig.tmp.json
 *.gen.*
 docker/.env.dev.generated
 apps/game-service/data/
+apps/api-service/data/
 
 # Local files for common editors
 .idea

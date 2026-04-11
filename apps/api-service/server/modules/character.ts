@@ -1,8 +1,8 @@
 import { gatewayRoles } from "@mp/keycloak";
 import type { ApiContext } from "../context";
-import { ctxDb, ctxOnlineCharacterIds } from "../context";
+import { ctxCharacterRepo, ctxOnlineCharacterIds } from "../context";
 import { auth, roles } from "../integrations/auth";
-import { assert, promiseFromResult } from "@mp/std";
+import { assert } from "@mp/std";
 import type { AreaId, CharacterId } from "@mp/world";
 import type { FormUpdateResult } from "./form";
 import { computeSetChanges, toAsyncIterable } from "@mp/state";
@@ -15,14 +15,12 @@ export async function* onlineCharacters(
   await roles(ctx, [gatewayRoles.spectate]);
 
   const ids = ctx.ioc.get(ctxOnlineCharacterIds);
-  const db = ctx.ioc.get(ctxDb);
+  const repo = ctx.ioc.get(ctxCharacterRepo);
 
   for await (const changes of toAsyncIterable(computeSetChanges(ids))) {
     yield { removed: Array.from(changes.removed) };
 
-    const added = await promiseFromResult(
-      db.selectCharacterList(Array.from(changes.added)),
-    );
+    const added = repo.listByIds(Array.from(changes.added));
 
     yield { added: added.map((value) => ({ value, key: value.id })) };
   }
@@ -31,18 +29,15 @@ export async function* onlineCharacters(
 /** @gqlQueryField */
 export async function myCharacterId(ctx: ApiContext): Promise<CharacterId> {
   const { user } = await auth(ctx);
-  return promiseFromResult(
-    ctx.ioc.get(ctxDb).selectOrCreateCharacterIdForUser({ user }),
-  );
+  return ctx.ioc.get(ctxCharacterRepo).findOrCreateForUser(user);
 }
 
 /** @gqlQueryField */
 export async function myCharacter(ctx: ApiContext): Promise<Character | null> {
   const { user } = await auth(ctx);
-  const db = ctx.ioc.get(ctxDb);
-  await promiseFromResult(db.selectOrCreateCharacterIdForUser({ user }));
-  const result = await promiseFromResult(db.selectCharacterByUser(user.id));
-  return result ?? null;
+  const repo = ctx.ioc.get(ctxCharacterRepo);
+  repo.findOrCreateForUser(user);
+  return repo.findByUser(user.id) ?? null;
 }
 
 /** @gqlMutationField */
@@ -52,21 +47,16 @@ export async function updateMyCharacter(
 ): Promise<FormUpdateResult<UpdateMyCharacterErrors>> {
   const char = assert(await myCharacter(ctx));
 
-  const res = await ctx.ioc.get(ctxDb).updateCharacter({
-    characterId: char.id,
-    newName: input.newName.trim(),
-  });
+  const res = ctx.ioc
+    .get(ctxCharacterRepo)
+    .updateName(char.id, input.newName.trim());
 
   if (res.isErr()) {
-    if (res.error.type === "nameAlreadyTaken") {
-      return {
-        errors: {
-          newName: [`The name "${res.error.name}" is not available.`],
-        },
-      };
-    }
-
-    throw new Error("Could not update character", { cause: res.error.error });
+    return {
+      errors: {
+        newName: [`The name "${res.error.name}" is not available.`],
+      },
+    };
   }
 
   return {};
