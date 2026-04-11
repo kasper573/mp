@@ -9,7 +9,10 @@ import {
   transform,
   type RiftType,
 } from "@rift/core";
+import { PersistenceId } from "@rift/persistence";
 import { Vector } from "@mp/math";
+
+export { PersistenceId };
 import type { AreaId, CardinalDirection } from "./domain-ids";
 import type {
   ActorModelId,
@@ -103,6 +106,7 @@ export const AreaMember = struct({ areaId: string<AreaId>() });
 export const ClientSession = struct({ clientId: string() });
 
 export const allComponents = [
+  PersistenceId,
   Position,
   MoveTarget,
   MovementSpeed,

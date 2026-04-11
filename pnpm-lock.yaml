@@ -734,6 +734,9 @@ importers:
       '@rift/modular':
         specifier: workspace:*
         version: link:../../libraries/rift/modular
+      '@rift/persistence':
+        specifier: workspace:*
+        version: link:../../libraries/rift/persistence
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

@@ -27,7 +27,8 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/validate": "workspace:*",
     "@rift/core": "workspace:*",
-    "@rift/modular": "workspace:*"
+    "@rift/modular": "workspace:*",
+    "@rift/persistence": "workspace:*"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
