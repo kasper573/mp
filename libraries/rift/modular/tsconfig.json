@@ -1,0 +1,8 @@
+{
+  "extends": "@mp/tsconfig/universal.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["vitest/globals"]
+  }
+}

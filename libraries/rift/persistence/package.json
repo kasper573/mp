@@ -1,0 +1,33 @@
+{
+  "name": "@rift/persistence",
+  "version": "0.0.0",
+  "private": true,
+  "sideEffects": false,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/universal/index.ts",
+      "import": "./src/universal/index.ts",
+      "require": "./src/universal/index.ts"
+    },
+    "./server": {
+      "types": "./src/server/index.ts",
+      "import": "./src/server/index.ts",
+      "require": "./src/server/index.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run --typecheck"
+  },
+  "dependencies": {
+    "@preact/signals-core": "catalog:",
+    "@rift/core": "workspace:*",
+    "better-sqlite3": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/better-sqlite3": "catalog:",
+    "@types/node": "catalog:",
+    "vitest": "catalog:"
+  }
+}
