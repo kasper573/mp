@@ -601,19 +601,6 @@ importers:
         specifier: 'catalog:'
         version: 25.5.2
 
-  libraries/encoding:
-    dependencies:
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      cbor-x:
-        specifier: 'catalog:'
-        version: 1.6.4
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
   libraries/engine:
     dependencies:
       '@mp/math':
@@ -646,28 +633,6 @@ importers:
         specifier: workspace:*
         version: link:../tsconfig
 
-  libraries/event-router:
-    dependencies:
-      '@mp/invocation-proxy':
-        specifier: workspace:*
-        version: link:../invocation-proxy
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../logger
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../validate
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(jsdom@23.2.0)(vite@8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
-
   libraries/graphics:
     dependencies:
       '@mp/math':
@@ -685,12 +650,6 @@ importers:
       preact:
         specifier: 'catalog:'
         version: 10.29.1
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-
-  libraries/invocation-proxy:
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*
@@ -901,28 +860,6 @@ importers:
       csstype:
         specifier: 3.2.3
         version: 3.2.3
-
-  libraries/sync:
-    dependencies:
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../encoding
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../state
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../std
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../tsconfig
-      type-fest:
-        specifier: 5.5.0
-        version: 5.5.0
-      vitest:
-        specifier: 'catalog:'
-        version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(jsdom@23.2.0)(vite@8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
   libraries/telemetry:
     dependencies:
