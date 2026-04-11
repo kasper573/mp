@@ -11,3 +11,4 @@ export type {
   SpawnCharacterInit,
 } from "./modules/character/module";
 export { MovementModule } from "./modules/movement/module";
+export type { MovementApi } from "./modules/movement/module";

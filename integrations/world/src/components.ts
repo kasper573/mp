@@ -20,8 +20,8 @@ const RectStruct = struct({
   height: f32(),
 });
 
-export const Position = Vec2;
-export const MoveTarget = Vec2;
+export const Position = struct({ x: f32(), y: f32() });
+export const MoveTarget = struct({ x: f32(), y: f32() });
 export const MovementSpeed = struct({ speed: f32() });
 export const Path = array(Vec2);
 export const Facing = struct({ dir: string<CardinalDirection>() });
