@@ -3,7 +3,7 @@ import { Application } from "@mp/graphics";
 import type { Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { defineModule } from "@rift/modular";
-import type { AreaResource } from "../../area";
+import type { AreaResource } from "../area/area-resource";
 import { AreaScene, type SendFn } from "./area-scene";
 
 export interface SetAreaInput {

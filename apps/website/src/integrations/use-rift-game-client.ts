@@ -3,7 +3,6 @@ import { RiftClient } from "@rift/core";
 import { GameClient } from "@rift/modular";
 import {
   AreaModule,
-  ChatModule,
   CharacterModule,
   CombatModule,
   InventoryModule,
@@ -14,7 +13,7 @@ import {
   type CharacterId,
   type PixiRendererApi,
   type PreactRendererApi,
-} from "@mp/world/client";
+} from "@mp/world";
 import { useContext, useEffect, useRef, useState } from "preact/hooks";
 import { env } from "../env";
 import { AuthContext, LoggerContext } from "./contexts";
@@ -65,7 +64,6 @@ export function useRiftGameClient(
         CharacterModule,
         MovementModule,
         CombatModule,
-        ChatModule,
         InventoryModule,
         PixiRendererModule,
         PreactRendererModule,

@@ -1,5 +1,5 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { AreaResource, TiledResource, type AreaId } from "@mp/world/client";
+import { AreaResource, TiledResource, type AreaId } from "@mp/world";
 import { createTiledLoader } from "@mp/tiled-loader";
 import {
   loadTiledMapSpritesheets,

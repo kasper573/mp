@@ -15,7 +15,7 @@ import {
 } from "../../components";
 import type { AreaId, CardinalDirection, ObjectId } from "../../domain-ids";
 import { AreaChanged, MoveIntent } from "../../events";
-import { getDestinationFromObject, type AreaResource } from "../../area";
+import { getDestinationFromObject, type AreaResource } from "../area/area-resource";
 import { AreaModule } from "../area/module";
 
 export interface MovementApi {

@@ -5,7 +5,7 @@ import {
   CharacterModule,
   type AreaId,
   type CharacterId,
-} from "@mp/world/client";
+} from "@mp/world";
 import type { Tile } from "@mp/std";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";

@@ -18,7 +18,6 @@ import {
   AreaModule,
   CharacterMeta,
   CharacterModule,
-  ChatModule,
   CombatModule,
   InventoryModule,
   MovementModule,
@@ -29,13 +28,13 @@ import {
   PersistenceModule,
   buildWorldPersistenceSchema,
   createWorld,
-} from "@mp/world/server";
+} from "@mp/world";
 import type {
   ActorModelId,
   CharacterId,
   InventoryId,
   UserId,
-} from "@mp/world/server";
+} from "@mp/world";
 import { RiftServer } from "@rift/core";
 import { GameServer, defineModule } from "@rift/modular";
 import { RiftPersistence } from "@rift/persistence/server";
@@ -213,7 +212,6 @@ const gameServer = new GameServer({
     CombatModule,
     NpcAiModule,
     NpcSpawnerModule,
-    ChatModule,
     InventoryModule,
     PersistenceModule,
     bootModule,

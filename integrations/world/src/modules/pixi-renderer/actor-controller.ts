@@ -10,7 +10,7 @@ import {
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { Appearance, CharacterMeta, Health, Position } from "../../components";
-import type { TiledResource } from "../../area";
+import type { TiledResource } from "../area/tiled-resource";
 
 export interface ActorControllerOptions {
   entity: Entity;

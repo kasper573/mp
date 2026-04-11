@@ -1,5 +1,5 @@
 import { parseEnv } from "@mp/env";
-import { AreaIdType } from "@mp/world/server";
+import { AreaIdType } from "@mp/world";
 import { TimeSpan } from "@mp/time";
 import { boolish, numeric, type } from "@mp/validate";
 

@@ -1,6 +1,8 @@
 import { f32, i32, string, struct } from "@rift/core";
 import type { AreaId, CharacterId, ObjectId } from "./domain-ids";
 
+
+
 export const MoveIntent = struct({
   x: f32(),
   y: f32(),
@@ -23,11 +25,6 @@ export const ActorDied = struct({
 
 export const ActorRespawned = struct({
   entityId: i32(),
-});
-
-export const ChatMessage = struct({
-  fromEntityId: i32(),
-  text: string(),
 });
 
 export const ItemPickupIntent = struct({
@@ -61,7 +58,6 @@ export const allEvents = [
   DamageDealt,
   ActorDied,
   ActorRespawned,
-  ChatMessage,
   ItemPickupIntent,
   ItemDropIntent,
   AreaChanged,

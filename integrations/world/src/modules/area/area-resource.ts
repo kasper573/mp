@@ -5,7 +5,7 @@ import type { Pixel, Result, Tile } from "@mp/std";
 import { assert, err, ok, TileType } from "@mp/std";
 import type { Layer, TiledObject } from "@mp/tiled-loader";
 import { type } from "@mp/validate";
-import { AreaIdType, type AreaId } from "../domain-ids";
+import { AreaIdType, type AreaId } from "../../domain-ids";
 import { graphFromTiled } from "./graph-from-tiled";
 import { hitTestTiledObject } from "./hit-test-tiled-object";
 import { TiledFixture } from "./tiled-fixture";

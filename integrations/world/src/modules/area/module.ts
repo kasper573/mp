@@ -1,5 +1,5 @@
 import { defineModule } from "@rift/modular";
-import type { AreaResource, PortalDestination } from "../../area";
+import type { AreaResource, PortalDestination } from "./area-resource";
 import type { AreaId } from "../../domain-ids";
 
 export interface AreaApi {

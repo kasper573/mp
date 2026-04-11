@@ -3,10 +3,9 @@ import { h, render } from "preact";
 import { signal, type Signal } from "@mp/state";
 import type { EntityId } from "@rift/core";
 import { defineModule } from "@rift/modular";
-import { ChatMessage, RespawnIntent } from "../../events";
+import { RespawnIntent } from "../../events";
 import {
   PreactRendererContext,
-  type ChatLine,
   type PreactRendererContextValue,
 } from "./context";
 import { Hud } from "./hud";
@@ -18,29 +17,17 @@ export interface PreactRendererApi {
   readonly localCharacterEntityId: Signal<EntityId | undefined>;
 }
 
-const MAX_CHAT_LINES = 50;
-
 export const PreactRendererModule = defineModule({
   client: (ctx): { api: PreactRendererApi; dispose: () => void } => {
     const localCharacterEntityId = signal<EntityId | undefined>(undefined);
     const respawn = signal<(() => void) | undefined>(() =>
       ctx.send(RespawnIntent, {}),
     );
-    const chatLines = signal<ChatLine[]>([]);
-
-    const unsubscribeChat = ctx.rift.on(ChatMessage, (msg) => {
-      const next = [...chatLines.value, msg];
-      if (next.length > MAX_CHAT_LINES) {
-        next.splice(0, next.length - MAX_CHAT_LINES);
-      }
-      chatLines.value = next;
-    });
 
     const value: PreactRendererContextValue = {
       rift: ctx.rift,
       localCharacterEntityId,
       respawn,
-      chatLines,
     };
 
     let mountTarget: HTMLElement | undefined;
@@ -66,7 +53,6 @@ export const PreactRendererModule = defineModule({
 
     const dispose = () => {
       unmount();
-      unsubscribeChat();
     };
 
     return {
