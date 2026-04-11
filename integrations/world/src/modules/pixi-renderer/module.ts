@@ -1,7 +1,9 @@
 import { Engine } from "@mp/engine";
 import { Application } from "@mp/graphics";
+import { signal } from "@mp/state";
 import type { Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
+import type { EntityId } from "@rift/core";
 import { defineModule } from "@rift/modular";
 import type { AreaResource } from "../area/area-resource";
 import { AreaScene, type SendFn } from "./area-scene";
@@ -9,7 +11,6 @@ import { AreaScene, type SendFn } from "./area-scene";
 export interface SetAreaInput {
   area: AreaResource;
   areaSpritesheets: TiledSpritesheetRecord;
-  localCharacterEntityId?: number;
   renderedTileCount: Tile;
 }
 
@@ -22,6 +23,7 @@ export interface PixiRendererApi {
   detach(): void;
   setArea(input: SetAreaInput): void;
   clearArea(): void;
+  setLocalCharacterEntityId(id: EntityId | undefined): void;
   readonly app: Application | undefined;
   readonly engine: Engine | undefined;
 }
@@ -34,6 +36,7 @@ export const PixiRendererModule = defineModule({
     let stopEngine: (() => void) | undefined;
     let scene: AreaScene | undefined;
     let viewport: HTMLElement | undefined;
+    const localCharacterEntityId = signal<EntityId | undefined>(undefined);
 
     const send: SendFn = (type, value) => ctx.send(type, value);
 
@@ -55,6 +58,7 @@ export const PixiRendererModule = defineModule({
         engine,
         rift: ctx.rift,
         send,
+        localCharacterEntityId,
       });
       app.stage.addChild(scene);
     };
@@ -108,6 +112,9 @@ export const PixiRendererModule = defineModule({
         detach,
         setArea,
         clearArea,
+        setLocalCharacterEntityId(id) {
+          localCharacterEntityId.value = id;
+        },
         get app() {
           return app;
         },

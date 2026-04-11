@@ -31,6 +31,7 @@ export type {
   NpcSpawnDef,
   NpcTemplate,
 } from "./modules/npc-spawner/module";
+export { deriveNpcSpawnsFromArea } from "./modules/npc-spawner/derive-from-area";
 export { InventoryModule } from "./modules/inventory/module";
 export type {
   InventoryApi,

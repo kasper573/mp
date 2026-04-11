@@ -28,6 +28,7 @@ import {
   PersistenceModule,
   buildWorldPersistenceSchema,
   createWorld,
+  deriveNpcSpawnsFromArea,
 } from "@mp/world";
 import type {
   ActorModelId,
@@ -125,11 +126,20 @@ shutdownCleanups.push(
 );
 
 const bootModule = defineModule({
-  dependencies: [AreaModule, CharacterModule, PersistenceModule] as const,
+  dependencies: [
+    AreaModule,
+    CharacterModule,
+    PersistenceModule,
+    NpcSpawnerModule,
+  ] as const,
   server: (ctx) => {
     ctx.using(AreaModule).registerArea(area);
     const characters = ctx.using(CharacterModule);
     const persistenceApi = ctx.using(PersistenceModule);
+    const npcSpawner = ctx.using(NpcSpawnerModule);
+    for (const def of deriveNpcSpawnsFromArea(area)) {
+      npcSpawner.registerSpawn(def);
+    }
 
     const labels = { areaId: opt.areaId };
     const charactersQuery = rift.query(CharacterMeta);
@@ -170,7 +180,7 @@ const bootModule = defineModule({
           appearance: {
             name: "Player",
             modelId: "default" as ActorModelId,
-            color: 0xffffff,
+            color: 0x4f9dff,
             opacity: 1,
           },
           health: { current: 100, max: 100 },

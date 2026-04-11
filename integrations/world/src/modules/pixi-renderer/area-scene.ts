@@ -8,13 +8,13 @@ import {
   Ticker,
 } from "@mp/graphics";
 import { Rect, Vector } from "@mp/math";
-import { computed } from "@mp/state";
+import { computed, type Signal } from "@mp/state";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
 import type { ObjectId } from "@mp/tiled-loader";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
-import type { Entity, Infer, RiftClient, RiftType } from "@rift/core";
+import type { Entity, EntityId, Infer, RiftClient, RiftType } from "@rift/core";
 import { Appearance, Health, Position } from "../../components";
 import { getDestinationFromObject, type AreaResource } from "../area/area-resource";
 import { AttackIntent, MoveIntent } from "../../events";
@@ -29,7 +29,7 @@ export interface AreaSceneOptions {
   rift: RiftClient;
   send: SendFn;
   areaSpritesheets: TiledSpritesheetRecord;
-  localCharacterEntityId?: number;
+  localCharacterEntityId: Signal<EntityId | undefined>;
   renderedTileCount: Tile;
 }
 
@@ -111,7 +111,7 @@ export class AreaScene extends Container {
   );
 
   private localCharacterEntity(): Entity | undefined {
-    const id = this.options.localCharacterEntityId;
+    const id = this.options.localCharacterEntityId.value;
     return id === undefined ? undefined : this.options.rift.entity(id);
   }
 
@@ -133,7 +133,7 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    const localId = this.options.localCharacterEntityId;
+    const localId = this.options.localCharacterEntityId.value;
     if (actor && actor.id !== localId) {
       const pos = actor.get(Position);
       return {

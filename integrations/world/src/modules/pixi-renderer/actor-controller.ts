@@ -1,14 +1,11 @@
 import type { Entity } from "@rift/core";
+import { VectorSpring } from "@mp/engine";
 import type { DestroyOptions } from "@mp/graphics";
-import {
-  ColorMatrixFilter,
-  Container,
-  createTintFilterMatrix,
-  Graphics,
-  Text,
-} from "@mp/graphics";
-import type { Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
+import { Container, Graphics, Text, Ticker } from "@mp/graphics";
+import { Vector } from "@mp/math";
+import { computed } from "@mp/state";
+import type { Pixel, Tile } from "@mp/std";
+import { TimeSpan } from "@mp/time";
 import { Appearance, CharacterMeta, Health, Position } from "../../components";
 import type { TiledResource } from "../area/tiled-resource";
 
@@ -20,20 +17,30 @@ export interface ActorControllerOptions {
 export class ActorController extends Container {
   private body: Graphics;
   private text: Text;
-  private tintFilter = new ColorMatrixFilter();
   private lastColor: number | undefined;
+  private positionSpring: VectorSpring<Pixel>;
 
   constructor(private options: ActorControllerOptions) {
     super();
 
     this.body = new Graphics();
-    this.body.rect(-12, -32, 24, 32);
-    this.body.fill({ color: 0xffffff });
 
     this.text = new Text({ scale: 0.25, anchor: { x: 0.5, y: 0 } });
 
     this.addChild(this.body);
     this.addChild(this.text);
+
+    const targetWorld = computed(() => {
+      const { entity, tiled } = this.options;
+      if (!entity.has(Position)) return Vector.zero<Pixel>();
+      const pos = entity.get(Position) as Vector<Tile>;
+      return tiled.tileCoordToWorld(pos);
+    });
+    this.positionSpring = new VectorSpring(
+      targetWorld,
+      () => ({ stiffness: 120, damping: 26, mass: 1, precision: 0.1 }),
+      targetWorld.value,
+    );
 
     this.onRender = this.#onRender;
   }
@@ -43,7 +50,7 @@ export class ActorController extends Container {
   }
 
   #onRender = () => {
-    const { entity, tiled } = this.options;
+    const { entity } = this.options;
     if (!entity.has(Position) || !entity.has(Appearance)) {
       this.visible = false;
       return;
@@ -55,8 +62,9 @@ export class ActorController extends Container {
 
     if (this.lastColor !== appearance.color) {
       this.lastColor = appearance.color;
-      this.body.filters = [this.tintFilter];
-      this.tintFilter.matrix = createTintFilterMatrix(appearance.color);
+      this.body.clear();
+      this.body.rect(-12, -32, 24, 32);
+      this.body.fill({ color: appearance.color });
     }
 
     let label = appearance.name;
@@ -70,8 +78,10 @@ export class ActorController extends Container {
     }
     this.text.text = label;
 
-    const pos = entity.get(Position) as Vector<Tile>;
-    const world = tiled.tileCoordToWorld(pos);
+    this.positionSpring.update(
+      TimeSpan.fromMilliseconds(Ticker.shared.deltaMS),
+    );
+    const world = this.positionSpring.value.value;
     this.position.set(world.x, world.y);
     this.zIndex = world.y;
   };

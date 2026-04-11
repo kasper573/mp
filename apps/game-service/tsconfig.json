@@ -3,6 +3,9 @@
   "include": ["src", "*.ts"],
   "compilerOptions": {
     "module": "Preserve",
-    "target": "es2017"
+    "target": "es2017",
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "types": ["node", "vite/client"]
   }
 }

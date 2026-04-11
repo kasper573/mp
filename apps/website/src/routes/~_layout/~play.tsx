@@ -79,6 +79,7 @@ function PlayMount({
     const update = () => {
       const entity = characters.findEntity(characterId);
       handle.preact.setLocalCharacterEntityId(entity?.id);
+      handle.pixi.setLocalCharacterEntityId(entity?.id);
     };
     update();
     return handle.gameClient.rift.query(CharacterMeta).subscribe(update);
