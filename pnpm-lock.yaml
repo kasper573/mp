@@ -708,6 +708,31 @@ importers:
         specifier: 'catalog:'
         version: 25.5.2
 
+  integrations/world:
+    dependencies:
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/tiled-loader':
+        specifier: workspace:*
+        version: link:../../libraries/tiled-loader
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
+      '@rift/core':
+        specifier: workspace:*
+        version: link:../../libraries/rift/core
+      '@rift/modular':
+        specifier: workspace:*
+        version: link:../../libraries/rift/modular
+    devDependencies:
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.2(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(jsdom@23.2.0)(vite@8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+
   libraries/auth:
     dependencies:
       '@mp/state':
