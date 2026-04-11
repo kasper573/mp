@@ -16,9 +16,18 @@ import {
 import { ActorDied, AttackIntent, DamageDealt } from "../../events";
 import { MovementModule } from "../movement/module";
 
+export interface DamageEvent {
+  attackerEntityId: number;
+  victimEntityId: number;
+  amount: number;
+}
+
+export type DamageListener = (event: DamageEvent) => void;
+
 export interface CombatApi {
   attack(attacker: Entity, victim: Entity): void;
   applyDamage(entity: Entity, amount: number): void;
+  onDamageDealt(listener: DamageListener): () => void;
 }
 
 const hpRegenIntervalSec = 10;
@@ -31,6 +40,16 @@ export const CombatModule = defineModule({
     const movement = ctx.using(MovementModule);
     let elapsedSec = 0;
     let nextHpRegenSec = hpRegenIntervalSec;
+    const damageListeners = new Set<DamageListener>();
+
+    const onDamageDealt: CombatApi["onDamageDealt"] = (listener) => {
+      damageListeners.add(listener);
+      return () => damageListeners.delete(listener);
+    };
+
+    const emitDamage = (event: DamageEvent) => {
+      for (const l of damageListeners) l(event);
+    };
 
     const attack: CombatApi["attack"] = (attacker, victim) => {
       attacker.set(AttackTarget, { entityId: victim.id });
@@ -115,13 +134,13 @@ export const CombatModule = defineModule({
       const nextHealth = Math.max(0, targetHealth.current - stats.damage);
       target.set(Health, { current: nextHealth, max: targetHealth.max });
 
-      ctx.rift
-        .emit(DamageDealt, {
-          attackerEntityId: attacker.id,
-          victimEntityId: target.id,
-          amount: targetHealth.current - nextHealth,
-        })
-        .toAll();
+      const damageEvent: DamageEvent = {
+        attackerEntityId: attacker.id,
+        victimEntityId: target.id,
+        amount: targetHealth.current - nextHealth,
+      };
+      ctx.rift.emit(DamageDealt, damageEvent).toAll();
+      emitDamage(damageEvent);
 
       if (attacker.has(Path)) attacker.remove(Path);
       attacker.set(LastAttack, { atMs: elapsedSec * 1000 });
@@ -129,7 +148,7 @@ export const CombatModule = defineModule({
       if (nextHealth <= 0) killEntity(target);
     }
 
-    return { api: { attack, applyDamage } };
+    return { api: { attack, applyDamage, onDamageDealt } };
   },
   client: (): { api: Record<string, never> } => ({ api: {} }),
 });
