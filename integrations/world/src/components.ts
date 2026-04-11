@@ -49,7 +49,7 @@ export const MoveTarget = vec2();
 export const MovementSpeed = struct({ speed: f32() });
 export const Path = array(Vec2);
 export const Facing = struct({ dir: string<CardinalDirection>() });
-export const DesiredPortal = struct({ portalId: string<ObjectId>() });
+export const DesiredPortal = struct({ portalId: i32<ObjectId>() });
 
 export const HitBox = RectStruct;
 export const Health = struct({

@@ -4,7 +4,7 @@ import type { AreaId, CharacterId, ObjectId } from "./domain-ids";
 export const MoveIntent = struct({
   x: f32(),
   y: f32(),
-  portalId: string<ObjectId | "">(),
+  portalId: i32<ObjectId>(),
 });
 
 export const AttackIntent = struct({

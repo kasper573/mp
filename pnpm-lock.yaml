@@ -261,15 +261,6 @@ importers:
       '@mp/path-finding':
         specifier: workspace:*
         version: link:../../libraries/path-finding
-      '@mp/rate-limiter':
-        specifier: workspace:*
-        version: link:../../libraries/rate-limiter
-      '@mp/redis':
-        specifier: workspace:*
-        version: link:../../libraries/redis
-      '@mp/state':
-        specifier: workspace:*
-        version: link:../../libraries/state
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
@@ -288,9 +279,21 @@ importers:
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate
+      '@mp/world':
+        specifier: workspace:*
+        version: link:../../integrations/world
       '@mp/ws':
         specifier: workspace:*
         version: link:../../libraries/ws
+      '@rift/core':
+        specifier: workspace:*
+        version: link:../../libraries/rift/core
+      '@rift/modular':
+        specifier: workspace:*
+        version: link:../../libraries/rift/modular
+      '@rift/persistence':
+        specifier: workspace:*
+        version: link:../../libraries/rift/persistence
       dotenv:
         specifier: 'catalog:'
         version: 17.4.0

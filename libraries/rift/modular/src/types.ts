@@ -8,7 +8,7 @@ import type {
 
 export type MaybePromise<T> = T | Promise<T>;
 
-export interface ModuleResult<TApi extends Record<string, unknown>> {
+export interface ModuleResult<TApi extends object> {
   api: TApi;
   dispose?: () => void;
 }
@@ -44,8 +44,8 @@ export interface ServerContextValues {}
 
 export interface ModuleConfig<
   TDeps extends readonly AnyModule[],
-  TClientApi extends Record<string, unknown>,
-  TServerApi extends Record<string, unknown>,
+  TClientApi extends object,
+  TServerApi extends object,
 > {
   dependencies?: TDeps;
   client?: (ctx: ClientContext) => MaybePromise<ModuleResult<TClientApi>>;
@@ -54,8 +54,8 @@ export interface ModuleConfig<
 
 export interface Module<
   TDeps extends readonly AnyModule[] = readonly AnyModule[],
-  TClientApi extends Record<string, unknown> = Record<string, never>,
-  TServerApi extends Record<string, unknown> = Record<string, never>,
+  TClientApi extends object = Record<string, never>,
+  TServerApi extends object = Record<string, never>,
 > {
   readonly dependencies: TDeps;
   readonly client?: (
@@ -66,11 +66,7 @@ export interface Module<
   ) => MaybePromise<ModuleResult<TServerApi>>;
 }
 
-export type AnyModule = Module<
-  readonly AnyModule[],
-  Record<string, unknown>,
-  Record<string, unknown>
->;
+export type AnyModule = Module<readonly AnyModule[], object, object>;
 
 type InferModuleResult<T> =
   Awaited<T> extends ModuleResult<infer TApi> ? TApi : Record<string, never>;

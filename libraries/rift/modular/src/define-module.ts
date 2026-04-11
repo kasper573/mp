@@ -2,8 +2,8 @@ import type { AnyModule, Module, ModuleConfig } from "./types";
 
 export function defineModule<
   const TDeps extends readonly AnyModule[],
-  TClientApi extends Record<string, unknown>,
-  TServerApi extends Record<string, unknown>,
+  TClientApi extends object,
+  TServerApi extends object,
 >(
   config: ModuleConfig<TDeps, TClientApi, TServerApi>,
 ): Module<TDeps, TClientApi, TServerApi> {

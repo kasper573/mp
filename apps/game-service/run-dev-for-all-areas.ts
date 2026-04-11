@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/game-shared";
+import type { AreaId } from "@mp/world/server";
 import { spawn } from "child_process";
 import fs from "fs/promises";
 import path from "path";
@@ -9,7 +9,7 @@ const __dirname = path.dirname(new URL(import.meta.url).pathname);
 
 const areaIds = await getAreaIds();
 
-await Promise.all(areaIds.map(runDevInstance));
+await Promise.all(areaIds.map((id, index) => runDevInstance(id, index)));
 
 async function getAreaIds(): Promise<AreaId[]> {
   const areaFiles = await fs.readdir(
@@ -23,12 +23,17 @@ async function getAreaIds(): Promise<AreaId[]> {
     );
 }
 
-function runDevInstance(areaId: AreaId): Promise<void> {
+function runDevInstance(areaId: AreaId, index: number): Promise<void> {
   return new Promise((resolve, reject) => {
     const child = spawn("pnpm", ["dev:instance"], {
       env: {
         ...process.env,
         MP_GAME_SERVICE_AREA_ID: areaId,
+        MP_GAME_SERVICE_HTTP_PORT: String(9701 + index),
+        MP_GAME_SERVICE_DATABASE_PATH: path.resolve(
+          __dirname,
+          `data/game-${areaId}.sqlite`,
+        ),
       },
       stdio: "inherit",
     });

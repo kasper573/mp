@@ -45,11 +45,15 @@ services:
     <<: *game_service
     environment:
       MP_GAME_SERVICE_AREA_ID: forest
+      MP_GAME_SERVICE_HTTP_PORT: 9701
+      MP_GAME_SERVICE_DATABASE_PATH: /var/lib/mp/game-forest.sqlite
 
   mp-game-service-island:
     <<: *game_service
     environment:
       MP_GAME_SERVICE_AREA_ID: island
+      MP_GAME_SERVICE_HTTP_PORT: 9702
+      MP_GAME_SERVICE_DATABASE_PATH: /var/lib/mp/game-island.sqlite
 
   mp-api:
     env_file: *env_files

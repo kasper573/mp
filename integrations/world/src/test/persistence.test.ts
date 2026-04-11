@@ -5,6 +5,7 @@ import { RiftServer } from "@rift/core";
 import { RiftPersistence } from "@rift/persistence/server";
 import { afterEach, describe, expect, it } from "vitest";
 import type { UserId } from "@mp/auth";
+import { Vector } from "@mp/math";
 import {
   Appearance,
   AreaMember,
@@ -78,7 +79,7 @@ function spawn(character: CharacterApi, id: string) {
     inventoryId: "inv1" as InventoryId,
     xp: 0,
     areaId: "area-1" as AreaId,
-    position: { x: 5, y: 6 },
+    position: new Vector(5, 6),
     appearance: {
       name: "Hero",
       modelId: "model" as never,
@@ -124,7 +125,7 @@ describe("PersistenceModule", () => {
     const h = track(makeHarness(dbPath));
     const entity = spawn(h.character, "char-1");
     h.api.activateCharacter(entity);
-    entity.set(Position, { x: 42, y: 99 });
+    entity.set(Position, new Vector(42, 99));
     entity.set(Health, { current: 33, max: 100 });
     h.api.persistNow();
     h.api.deactivateCharacter(entity);
@@ -133,7 +134,7 @@ describe("PersistenceModule", () => {
 
     const h2 = track(makeHarness(dbPath));
     const fresh = spawn(h2.character, "char-1");
-    fresh.set(Position, { x: 0, y: 0 });
+    fresh.set(Position, new Vector(0, 0));
     fresh.set(Health, { current: 1, max: 1 });
     h2.api.activateCharacter(fresh);
     expect(fresh.get(Position)).toEqual({ x: 42, y: 99 });

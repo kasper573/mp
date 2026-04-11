@@ -23,7 +23,7 @@ interface ClientModuleState {
 }
 
 export class GameClient {
-  readonly #moduleApis = new Map<AnyModule, Record<string, unknown>>();
+  readonly #moduleApis = new Map<AnyModule, object>();
   readonly #moduleState: ClientModuleState[] = [];
 
   constructor(private readonly config: GameClientConfig) {}
@@ -78,10 +78,7 @@ export class GameClient {
     };
   }
 
-  #storeModuleState(
-    module: AnyModule,
-    result: ModuleResult<Record<string, unknown>>,
-  ): void {
+  #storeModuleState(module: AnyModule, result: ModuleResult<object>): void {
     this.#moduleApis.set(module, result.api);
     this.#moduleState.push({
       module,

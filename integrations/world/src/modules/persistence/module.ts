@@ -45,7 +45,7 @@ export interface PersistenceApi {
 
 declare module "@rift/modular" {
   interface ServerContextValues {
-    worldPersistence: RiftPersistence;
+    worldPersistence?: RiftPersistence;
   }
 }
 
@@ -53,6 +53,11 @@ export const PersistenceModule = defineModule({
   dependencies: [CharacterModule] as const,
   server: (ctx): { api: PersistenceApi } => {
     const persistence = ctx.values.worldPersistence;
+    if (!persistence) {
+      throw new Error(
+        "PersistenceModule requires ServerContextValues.worldPersistence",
+      );
+    }
 
     const activateCharacter: PersistenceApi["activateCharacter"] = (entity) => {
       if (!entity.has(CharacterMeta)) {

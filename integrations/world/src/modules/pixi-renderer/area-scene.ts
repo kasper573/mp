@@ -164,11 +164,11 @@ export class AreaScene extends Container {
 
   private moveThrottled = dedupe(
     throttle(
-      (to: Vector<Tile>, desiredPortalId: ObjectId | "") =>
+      (to: Vector<Tile>, desiredPortalId: ObjectId | 0) =>
         this.options.send(MoveIntent, {
           x: to.x,
           y: to.y,
-          portalId: desiredPortalId,
+          portalId: desiredPortalId as ObjectId,
         }),
       100,
     ),
@@ -193,7 +193,7 @@ export class AreaScene extends Container {
         const portal = this.options.area
           .hitTestObjects(this.options.engine.pointer.worldPosition.value)
           .find((obj) => getDestinationFromObject(obj));
-        this.moveThrottled(Vector.from(target.rect), portal?.id ?? "");
+        this.moveThrottled(Vector.from(target.rect), portal?.id ?? 0);
       }
     } else {
       this.moveThrottled.clear();

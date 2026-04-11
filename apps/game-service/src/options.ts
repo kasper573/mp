@@ -1,5 +1,5 @@
 import { parseEnv } from "@mp/env";
-import { AreaIdType } from "@mp/game-shared";
+import { AreaIdType } from "@mp/world/server";
 import { TimeSpan } from "@mp/time";
 import { boolish, numeric, type } from "@mp/validate";
 
@@ -28,6 +28,14 @@ export const gameServiceOptionsSchema = type({
    * The path to the redis server to use for game service config
    */
   redisPath: "string",
+  /**
+   * The TCP port the rift game server will listen on for client websocket connections.
+   */
+  httpPort: numeric(),
+  /**
+   * Filesystem path to the sqlite database for this instance.
+   */
+  databasePath: "string",
   /**
    * The server tick interval
    */

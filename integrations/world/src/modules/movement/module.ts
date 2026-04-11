@@ -57,7 +57,7 @@ export const MovementModule = defineModule({
         clientId,
       );
       if (!entity) return;
-      const portalId = data.portalId === "" ? undefined : data.portalId;
+      const portalId = data.portalId === 0 ? undefined : data.portalId;
       requestMove(entity, { x: data.x, y: data.y }, portalId);
     });
 

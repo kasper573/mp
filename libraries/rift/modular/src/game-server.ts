@@ -24,7 +24,7 @@ interface ServerModuleState {
 }
 
 export class GameServer {
-  readonly #moduleApis = new Map<AnyModule, Record<string, unknown>>();
+  readonly #moduleApis = new Map<AnyModule, object>();
   readonly #moduleState: ServerModuleState[] = [];
   readonly #tickHandlers: Array<(dt: number) => void> = [];
   readonly #clients = new Map<ClientId, GameWebSocket>();
@@ -98,10 +98,7 @@ export class GameServer {
     };
   }
 
-  #storeModuleState(
-    module: AnyModule,
-    result: ModuleResult<Record<string, unknown>>,
-  ): void {
+  #storeModuleState(module: AnyModule, result: ModuleResult<object>): void {
     this.#moduleApis.set(module, result.api);
     this.#moduleState.push({
       module,

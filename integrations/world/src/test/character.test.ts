@@ -1,6 +1,7 @@
 import { RiftServer } from "@rift/core";
 import { beforeEach, describe, expect, it } from "vitest";
 import type { UserId } from "@mp/auth";
+import { Vector } from "@mp/math";
 import {
   Alive,
   Appearance,
@@ -43,7 +44,7 @@ function makeInit(
     inventoryId: "inv-1" as InventoryId,
     xp: 0,
     areaId: "area-1" as AreaId,
-    position: { x: 1, y: 2 },
+    position: new Vector(1, 2),
     appearance: {
       name: "Hero",
       modelId: "model" as never,

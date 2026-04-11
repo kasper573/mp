@@ -1,4 +1,4 @@
-import type { ComponentChildren, VNode } from "preact";
+import type { ComponentChildren } from "preact";
 import { h, render } from "preact";
 import { signal, type Signal } from "@mp/state";
 import type { EntityId } from "@rift/core";
@@ -50,12 +50,10 @@ export const PreactRendererModule = defineModule({
       }
       const node = target ?? ctx.root;
       mountTarget = node;
-      const tree: VNode = h(
-        PreactRendererContext.Provider,
-        { value },
-        h(Hud, null, children),
+      render(
+        h(PreactRendererContext.Provider, { value }, h(Hud, null, children)),
+        node,
       );
-      render(tree, node);
     };
 
     const unmount: PreactRendererApi["unmount"] = () => {
