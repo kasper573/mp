@@ -1,6 +1,5 @@
 // oxlint-disable no-await-in-loop
 import { createPinoLogger } from "@mp/logger/pino";
-import { createShortId, type Tile, type TimesPerSecond } from "@mp/std";
 import fs from "fs/promises";
 import path from "path";
 import { createDrizzleClient } from "./src/utils/client";
@@ -9,15 +8,9 @@ import {
   areaTable,
   characterTable,
   consumableDefinitionTable,
-  consumableInstanceTable,
   equipmentDefinitionTable,
-  equipmentInstanceTable,
-  npcRewardTable,
-  npcSpawnTable,
-  npcTable,
 } from "./src/schema";
-import type { ActorModelId, NpcDefinitionId, AreaId } from "@mp/world";
-import { npcTypes } from "@mp/world";
+import type { ActorModelId, AreaId } from "@mp/world";
 
 // This is not a long term plan.
 // The proper solution is to provision game data via an external repository
@@ -40,13 +33,8 @@ const db = createDrizzleClient(
 );
 
 const tablesToTruncate = {
-  npcRewardTable,
-  consumableInstanceTable,
   consumableDefinitionTable,
-  equipmentInstanceTable,
   equipmentDefinitionTable,
-  npcSpawnTable,
-  npcTable,
   characterTable,
   actorModelTable,
   areaTable,
@@ -65,73 +53,14 @@ await db.transaction((tx) =>
   ]),
 );
 
-const oneTile = 1 as Tile;
-
-logger.info("Inserting npcs...");
-const [soldier] = await db
-  .insert(npcTable)
-  .values({
-    id: "1" as NpcDefinitionId, // "1" is currently referenced by some hard coded npc definitions in tiled maps.
-    aggroRange: 7 as Tile,
-    npcType: "protective",
-    attackDamage: 3,
-    attackRange: oneTile,
-    attackSpeed: 1 as TimesPerSecond,
-    speed: oneTile,
-    maxHealth: 25,
-    modelId: actorModelIds[0],
-    name: "Soldier",
-  })
-  .returning({ id: npcTable.id });
-
-await db.transaction(async (tx) => {
-  await Promise.all(
-    (function* () {
-      for (const npcType of npcTypes.values()) {
-        if (npcType === "patrol" || npcType === "static") {
-          continue;
-        }
-
-        for (const areaId of areaIds) {
-          logger.info(
-            `Inserting npc spawns for ${npcType} in area ${areaId}...`,
-          );
-          yield tx.insert(npcSpawnTable).values({
-            npcType,
-            areaId,
-            count: 10,
-            id: createShortId(),
-            npcId: soldier.id,
-          });
-        }
-      }
-    })(),
-  );
-});
-
 logger.info("Inserting items definitions...");
-const [apple] = await db
+await db
   .insert(consumableDefinitionTable)
-  .values({ name: "Apple", maxStackSize: 10 })
-  .returning({ id: consumableDefinitionTable.id });
+  .values({ name: "Apple", maxStackSize: 10 });
 
-const [sword] = await db
+await db
   .insert(equipmentDefinitionTable)
-  .values({ name: "Sword", maxDurability: 100 })
-  .returning({ id: equipmentDefinitionTable.id });
-
-logger.info("Inserting npc rewards...");
-await db.insert(npcRewardTable).values({ npcId: soldier.id, xp: 10 });
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  consumableItemId: apple.id,
-  itemAmount: 1,
-});
-await db.insert(npcRewardTable).values({
-  npcId: soldier.id,
-  equipmentItemId: sword.id,
-  itemAmount: 1,
-});
+  .values({ name: "Sword", maxDurability: 100 });
 
 logger.info("Ending database connection...");
 await db.$client.end();

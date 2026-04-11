@@ -454,15 +454,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
       '@mp/world':
         specifier: workspace:*
         version: link:../world

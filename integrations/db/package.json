@@ -23,9 +23,7 @@
   "dependencies": {
     "@mp/auth": "workspace:*",
     "@mp/logger": "workspace:*",
-    "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/validate": "workspace:*",
     "@mp/world": "workspace:*",
     "drizzle-orm": "0.45.2",
     "pg": "8.20.0"

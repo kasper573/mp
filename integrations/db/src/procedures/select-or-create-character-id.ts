@@ -1,20 +1,12 @@
 import type { UserIdentity } from "@mp/auth";
-import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
-import { characterTable, actorModelTable, inventoryTable } from "../schema";
-import type { AreaId, CharacterId } from "@mp/world";
-import type { Vector } from "@mp/math";
+import { actorModelTable, areaTable, characterTable } from "../schema";
+import type { CharacterId } from "@mp/world";
 import { procedure } from "../utils/procedure";
 
 export const selectOrCreateCharacterIdForUser = procedure()
-  .input<{
-    user: UserIdentity;
-    spawnPoint: {
-      areaId: AreaId;
-      coords: Vector<Tile>;
-    };
-  }>()
-  .query(async (drizzle, { user, spawnPoint }): Promise<CharacterId> => {
+  .input<{ user: UserIdentity }>()
+  .query(async (drizzle, { user }): Promise<CharacterId> => {
     const findResult = await drizzle
       .select({ id: characterTable.id })
       .from(characterTable)
@@ -33,27 +25,21 @@ export const selectOrCreateCharacterIdForUser = procedure()
       throw new Error("No actor models found in the database");
     }
 
-    const [inventory] = await drizzle
-      .insert(inventoryTable)
-      .values({})
-      .returning({ id: inventoryTable.id });
+    const [area] = await drizzle
+      .select({ id: areaTable.id })
+      .from(areaTable)
+      .limit(1);
+    if (!area) {
+      throw new Error("No areas found in the database");
+    }
 
     const insertResult = await drizzle
       .insert(characterTable)
       .values({
-        areaId: spawnPoint.areaId,
-        coords: spawnPoint.coords,
-        speed: 3 as Tile,
-        health: 100,
-        maxHealth: 100,
-        attackDamage: 5,
-        attackSpeed: 1.25 as TimesPerSecond,
-        attackRange: 1 as Tile,
         userId: user.id,
-        xp: 0,
+        areaId: area.id,
         name: user.name,
         modelId: model.id,
-        inventoryId: inventory.id,
       })
       .returning({ id: characterTable.id });
 

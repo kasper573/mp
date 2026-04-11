@@ -4,7 +4,6 @@ import { ctxDb, ctxOnlineCharacterIds } from "../context";
 import { auth, roles } from "../integrations/auth";
 import { assert, promiseFromResult } from "@mp/std";
 import type { AreaId, CharacterId } from "@mp/world";
-import { defaultSpawnPoint } from "./spawn-point";
 import type { FormUpdateResult } from "./form";
 import { computeSetChanges, toAsyncIterable } from "@mp/state";
 import type { MapChanges } from "../../shared/map-changes";
@@ -32,12 +31,8 @@ export async function* onlineCharacters(
 /** @gqlQueryField */
 export async function myCharacterId(ctx: ApiContext): Promise<CharacterId> {
   const { user } = await auth(ctx);
-  const spawnPoint = await defaultSpawnPoint(ctx);
   return promiseFromResult(
-    ctx.ioc.get(ctxDb).selectOrCreateCharacterIdForUser({
-      user: user,
-      spawnPoint,
-    }),
+    ctx.ioc.get(ctxDb).selectOrCreateCharacterIdForUser({ user }),
   );
 }
 

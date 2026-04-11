@@ -10,7 +10,6 @@ export const selectCharacterByUser = procedure()
       .select({
         id: characterTable.id,
         name: characterTable.name,
-        xp: characterTable.xp,
         areaId: characterTable.areaId,
       })
       .from(characterTable)

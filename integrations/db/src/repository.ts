@@ -1,5 +1,4 @@
 import { createDrizzleClient } from "./utils/client";
-import { mayAccessCharacter } from "./procedures/may-access-character";
 import { selectCharacterAreaForUser } from "./procedures/select-character-area-for-user";
 import { selectAllActorModelIds } from "./procedures/select-all-actor-model-ids";
 import { selectCharacterByUser } from "./procedures/select-character-by-user";
@@ -10,7 +9,6 @@ import {
 import { selectCharacterList } from "./procedures/select-character-list";
 import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-character-id";
 import { updateCharacter } from "./procedures/update-character";
-import { updateCharactersArea } from "./procedures/update-characters-area";
 
 /**
  * All database interactions must be done through the repository.
@@ -21,7 +19,6 @@ export function createDbRepository(connectionString: string) {
   const drizzle = createDrizzleClient(connectionString);
 
   return {
-    mayAccessCharacter: mayAccessCharacter.build(drizzle),
     selectCharacterAreaForUser: selectCharacterAreaForUser.build(drizzle),
     selectAllActorModelIds: selectAllActorModelIds.build(drizzle),
     selectCharacterByUser: selectCharacterByUser.build(drizzle),
@@ -31,7 +28,6 @@ export function createDbRepository(connectionString: string) {
     selectOrCreateCharacterIdForUser:
       selectOrCreateCharacterIdForUser.build(drizzle),
     updateCharacter: updateCharacter.build(drizzle),
-    updateCharactersArea: updateCharactersArea.build(drizzle),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
