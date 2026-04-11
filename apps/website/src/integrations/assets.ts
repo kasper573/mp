@@ -1,57 +1,17 @@
 import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import type { AreaId } from "@mp/game-shared";
-import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
+import { AreaResource, TiledResource, type AreaId } from "@mp/world/client";
+import { createTiledLoader } from "@mp/tiled-loader";
 import {
-  browserLoadAreaResource,
-  loadActorTextureLookup,
-  type GameAssetLoader,
-} from "@mp/game-client";
-import type {
-  AreaResource,
-  ItemDefinitionByReference,
-  ItemDefinitionLookup,
-  ItemReference,
-} from "@mp/game-shared";
+  loadTiledMapSpritesheets,
+  type TiledSpritesheetRecord,
+} from "@mp/tiled-renderer";
 import { useSuspenseQuery } from "@tanstack/react-query";
-import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";
-
-export const useAreaAssets: AreaAssetsLookup = (areaId) => {
-  const resource = useAreaResource(areaId);
-  return {
-    resource,
-    spritesheets: useAreaSpritesheets(resource),
-  };
-};
-
-export function useActorTextures(): ActorTextureLookup {
-  const qb = useQueryBuilder();
-  const { data } = useSuspenseQuery(
-    qb.suspenseQueryOptions(actorTexturesQuery),
-  );
-
-  const { data: lookup } = useSuspenseQuery({
-    queryKey: ["actor-spritesheet-lookup", data],
-    staleTime: Infinity,
-    queryFn: () =>
-      loadActorTextureLookup(data.actorModelIds, data.actorSpritesheetUrl),
-  });
-
-  return lookup;
-}
-
-const actorTexturesQuery = graphql(`
-  query ActorTextures {
-    actorSpritesheetUrl(urlType: public)
-    actorModelIds
-  }
-`);
 
 export function useAreaResource(areaId: AreaId): AreaResource {
   const qb = useQueryBuilder();
   const {
     data: { areaFileUrl },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(actorResourceQuery, { areaId }));
+  } = useSuspenseQuery(qb.suspenseQueryOptions(areaResourceQuery, { areaId }));
   const query = useSuspenseQuery({
     queryKey: ["areaResource", areaFileUrl, areaId],
     staleTime: Infinity,
@@ -60,7 +20,7 @@ export function useAreaResource(areaId: AreaId): AreaResource {
   return query.data;
 }
 
-const actorResourceQuery = graphql(`
+const areaResourceQuery = graphql(`
   query AreaResource($areaId: AreaId!) {
     areaFileUrl(areaId: $areaId, urlType: public)
   }
@@ -77,38 +37,36 @@ export function useAreaSpritesheets(
   return query.data;
 }
 
-export const useItemDefinition: ItemDefinitionLookup = <
-  Ref extends ItemReference,
->(
-  ref: Ref,
-) => {
-  const qb = useQueryBuilder();
-  const {
-    data: { itemDefinition },
-  } = useSuspenseQuery(
-    qb.suspenseQueryOptions(itemDefinitionQuery, {
-      // Note that it's important to destructure `ref`,
-      // since it's generic and could contain excess properties that would pollute the query key.
-      ref: {
-        definitionId: ref.definitionId,
-        type: ref.type,
-      } as ItemReference,
-    }),
-  );
-
-  // GraphQL does not support generics so we must assert to restore the generic type info.
-  // it's safe to do, just ugly.
-  return itemDefinition as ItemDefinitionByReference<Ref>;
-};
-
-const itemDefinitionQuery = graphql(`
-  query ItemDefinition($ref: ItemReference!) {
-    itemDefinition(ref: $ref)
+async function browserLoadAreaResource(
+  areaId: AreaId,
+  areaFileUrl: string,
+): Promise<AreaResource> {
+  const loadTiled = createTiledLoader({
+    loadJson,
+    relativePath: (path: string, base: string) => relativeUrl(path, base),
+  });
+  const result = await loadTiled(areaFileUrl);
+  if (result.isErr()) {
+    throw new Error(`Failed to load area "${areaId}" from "${areaFileUrl}"`, {
+      cause: result.error,
+    });
   }
-`);
+  return new AreaResource(areaId, new TiledResource(result.value));
+}
 
-export const gameAssetLoader: GameAssetLoader = {
-  useAreaAssets,
-  useItemDefinition,
-  useActorTextures,
-};
+async function loadJson(url: string) {
+  const response = await fetch(url, {
+    headers: {
+      "Content-Type": "application/json",
+      Accept: "application/json",
+    },
+  });
+  const json: unknown = await response.json();
+  return json as Record<string, unknown>;
+}
+
+function relativeUrl(path: string, base: string) {
+  base = base.startsWith("//") ? window.location.protocol + base : base;
+  const url = new URL(path, base);
+  return url.toString();
+}

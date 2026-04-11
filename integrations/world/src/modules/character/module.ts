@@ -81,5 +81,19 @@ export const CharacterModule = defineModule({
       api: { spawnCharacter, despawnCharacter, getEntity },
     };
   },
-  client: (): { api: Record<string, never> } => ({ api: {} }),
+  client: (ctx): { api: CharacterClientApi } => {
+    const findEntity: CharacterClientApi["findEntity"] = (characterId) => {
+      for (const entity of ctx.rift.query(CharacterMeta).value) {
+        if (entity.get(CharacterMeta)?.characterId === characterId) {
+          return entity;
+        }
+      }
+      return undefined;
+    };
+    return { api: { findEntity } };
+  },
 });
+
+export interface CharacterClientApi {
+  findEntity(characterId: CharacterId): Entity | undefined;
+}

@@ -46,6 +46,18 @@ export class GameClient {
     }, Promise.resolve());
   }
 
+  get rift(): RiftClient {
+    return this.config.rift;
+  }
+
+  using<M extends AnyModule>(module: M): ClientApi<M> {
+    const api = this.#moduleApis.get(module);
+    if (!api) {
+      throw new Error(`Module has not been initialized`, { cause: module });
+    }
+    return api as ClientApi<typeof module>;
+  }
+
   send(data: Uint8Array): void {
     if (this.config.socket.readyState === this.config.socket.OPEN) {
       this.config.socket.send(data);

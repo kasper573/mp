@@ -8,6 +8,7 @@ export type { AreaApi } from "./modules/area/module";
 export { CharacterModule } from "./modules/character/module";
 export type {
   CharacterApi,
+  CharacterClientApi,
   SpawnCharacterInit,
 } from "./modules/character/module";
 export { MovementModule } from "./modules/movement/module";

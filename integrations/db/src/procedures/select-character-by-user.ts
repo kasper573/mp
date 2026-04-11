@@ -11,6 +11,7 @@ export const selectCharacterByUser = procedure()
         id: characterTable.id,
         name: characterTable.name,
         xp: characterTable.xp,
+        areaId: characterTable.areaId,
       })
       .from(characterTable)
       .where(eq(characterTable.userId, userId))

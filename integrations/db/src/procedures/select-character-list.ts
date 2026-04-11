@@ -7,7 +7,11 @@ export const selectCharacterList = procedure()
   .input<readonly CharacterId[]>()
   .query((drizzle, ids) => {
     return drizzle
-      .select({ id: characterTable.id, name: characterTable.name })
+      .select({
+        id: characterTable.id,
+        name: characterTable.name,
+        areaId: characterTable.areaId,
+      })
       .from(characterTable)
       .where(inArray(characterTable.id, ids));
   });
