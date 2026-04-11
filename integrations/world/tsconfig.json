@@ -1,1 +1,1 @@
-{ "extends": "@mp/tsconfig/universal.json" }
+{ "extends": "@mp/tsconfig/vite.json" }
