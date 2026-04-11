@@ -713,6 +713,15 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
+      '@mp/math':
+        specifier: workspace:*
+        version: link:../../libraries/math
+      '@mp/path-finding':
+        specifier: workspace:*
+        version: link:../../libraries/path-finding
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
       '@mp/tiled-loader':
         specifier: workspace:*
         version: link:../../libraries/tiled-loader
