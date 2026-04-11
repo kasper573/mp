@@ -53,6 +53,8 @@ export const LogoutHappened = struct({
   entityId: i32(),
 });
 
+export const RespawnIntent = struct({});
+
 export const allEvents = [
   MoveIntent,
   AttackIntent,
@@ -65,4 +67,5 @@ export const allEvents = [
   AreaChanged,
   LoginIntent,
   LogoutHappened,
+  RespawnIntent,
 ];

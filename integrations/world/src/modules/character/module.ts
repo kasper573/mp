@@ -17,6 +17,9 @@ import type {
   UserId,
 } from "../../domain-ids";
 import type { Infer } from "@rift/core";
+import { Vector } from "@mp/math";
+import { ActorRespawned, RespawnIntent } from "../../events";
+import { AreaModule } from "../area/module";
 
 export interface SpawnCharacterInit {
   clientId: string;
@@ -37,7 +40,9 @@ export interface CharacterApi {
 }
 
 export const CharacterModule = defineModule({
+  dependencies: [AreaModule] as const,
   server: (ctx): { api: CharacterApi } => {
+    const areas = ctx.using(AreaModule);
     const byCharacter = new Map<CharacterId, EntityId>();
 
     const spawnCharacter: CharacterApi["spawnCharacter"] = (init) => {
@@ -76,6 +81,26 @@ export const CharacterModule = defineModule({
       const entity = ctx.rift.entity(id);
       if (entity) ctx.rift.destroy(entity);
     };
+
+    ctx.rift.on(RespawnIntent, (clientId) => {
+      let entity: Entity | undefined;
+      for (const e of ctx.rift.query(ClientSession).value) {
+        if (e.get(ClientSession).clientId === clientId) {
+          entity = e;
+          break;
+        }
+      }
+      if (!entity) return;
+      if (!entity.has(Health)) return;
+      const health = entity.get(Health);
+      if (health.current > 0) return;
+      entity.set(Health, { current: health.max, max: health.max });
+      if (!entity.has(Alive)) entity.set(Alive);
+      const areaId = entity.get(AreaMember).areaId;
+      const area = areas.getArea(areaId);
+      if (area) entity.set(Position, new Vector(area.start.x, area.start.y));
+      ctx.rift.emit(ActorRespawned, { entityId: entity.id }).toAll();
+    });
 
     return {
       api: { spawnCharacter, despawnCharacter, getEntity },
