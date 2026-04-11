@@ -3,13 +3,6 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "exports": {
-    ".": {
-      "types": "./src/package.ts",
-      "import": "./src/package.ts",
-      "require": "./src/package.ts"
-    }
-  },
   "scripts": {
     "build": "tsgo && tsx esbuild.ts",
     "inspect": "pnpm devenv tsx --inspect src/main.ts",
@@ -20,18 +13,10 @@
   },
   "dependencies": {
     "@mp/api-service": "workspace:*",
-    "@mp/auth": "workspace:*",
-    "@mp/db": "workspace:*",
     "@mp/env": "workspace:*",
-    "@mp/event-router": "workspace:*",
-    "@mp/game-shared": "workspace:*",
-    "@mp/ioc": "workspace:*",
-    "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
-    "@mp/path-finding": "workspace:*",
     "@mp/std": "workspace:*",
-    "@mp/sync": "workspace:*",
     "@mp/telemetry": "workspace:*",
     "@mp/tiled-loader": "workspace:*",
     "@mp/time": "workspace:*",
