@@ -22,6 +22,8 @@ export type {
   NpcSpawnDef,
   NpcTemplate,
 } from "./modules/npc-spawner/module";
+export { ChatModule } from "./modules/chat/module";
+export type { ChatApi } from "./modules/chat/module";
 export { InventoryModule } from "./modules/inventory/module";
 export type {
   InventoryApi,
