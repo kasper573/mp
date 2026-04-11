@@ -525,9 +525,7 @@ export function transform<Inner, Outer>(
       return innerType.encodeDelta(codec.encode(oldVal), codec.encode(newVal));
     },
     decodeDelta(buf, existing) {
-      return codec.decode(
-        innerType.decodeDelta(buf, codec.encode(existing)),
-      );
+      return codec.decode(innerType.decodeDelta(buf, codec.encode(existing)));
     },
     writeDelta(w, oldVal, newVal) {
       return innerType.writeDelta(
