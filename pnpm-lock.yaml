@@ -483,43 +483,6 @@ importers:
         specifier: 0.31.10
         version: 0.31.10
 
-  integrations/game-shared:
-    dependencies:
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
-      '@mp/encoding':
-        specifier: workspace:*
-        version: link:../../libraries/encoding
-      '@mp/event-router':
-        specifier: workspace:*
-        version: link:../../libraries/event-router
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
-      '@mp/path-finding':
-        specifier: workspace:*
-        version: link:../../libraries/path-finding
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-      '@mp/sync':
-        specifier: workspace:*
-        version: link:../../libraries/sync
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-loader
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../../libraries/time
-      '@mp/validate':
-        specifier: workspace:*
-        version: link:../../libraries/validate
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-
   integrations/keycloak:
     dependencies:
       '@keycloak/keycloak-admin-client':
