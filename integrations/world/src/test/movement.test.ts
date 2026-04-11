@@ -89,14 +89,16 @@ describe("MovementModule", () => {
     const entity = rift.spawn();
     movementApi.requestMove(entity, { x: 5, y: 3 });
     expect(entity.has(MoveTarget)).toBe(true);
-    expect(entity.get(MoveTarget).x).toBe(5);
-    expect(entity.get(MoveTarget).y).toBe(3);
+    const target = entity.get(MoveTarget);
+    expect(target).toBeInstanceOf(Vector);
+    expect(target.x).toBe(5);
+    expect(target.y).toBe(3);
   });
 
   it("cancelMove clears MoveTarget and Path", () => {
     const { movementApi, rift } = makeHarness();
     const entity = rift.spawn();
-    entity.set(Path, [{ x: 1, y: 1 }]);
+    entity.set(Path, [new Vector(1, 1)]);
     movementApi.requestMove(entity, { x: 5, y: 0 });
     movementApi.cancelMove(entity);
     expect(entity.has(MoveTarget)).toBe(false);
@@ -109,7 +111,7 @@ describe("MovementModule", () => {
     areaApi.registerArea(makeLinearAreaResource(areaId, 5));
 
     const entity = rift.spawn();
-    entity.set(Position, { x: 0, y: 0 });
+    entity.set(Position, new Vector(0, 0));
     entity.set(MovementSpeed, { speed: 1 });
     entity.set(AreaMember, { areaId });
     movementApi.requestMove(entity, { x: 4, y: 0 });
@@ -118,6 +120,7 @@ describe("MovementModule", () => {
     expect(entity.has(MoveTarget)).toBe(false);
     expect(entity.has(Path)).toBe(true);
     const pos1 = entity.get(Position);
+    expect(pos1).toBeInstanceOf(Vector);
     expect(pos1.x).toBeCloseTo(1);
     expect(pos1.y).toBeCloseTo(0);
 
@@ -130,7 +133,7 @@ describe("MovementModule", () => {
   it("tick is a no-op when entity lacks AreaMember", () => {
     const { movementApi, rift, tick } = makeHarness();
     const entity = rift.spawn();
-    entity.set(Position, { x: 0, y: 0 });
+    entity.set(Position, new Vector(0, 0));
     entity.set(MovementSpeed, { speed: 1 });
     movementApi.requestMove(entity, { x: 3, y: 0 });
     tick(1);

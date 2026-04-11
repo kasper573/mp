@@ -15,6 +15,7 @@ import {
   optional,
   flags,
   tag,
+  transform,
   type Infer,
   type InferFlags,
 } from "../index";
@@ -268,6 +269,49 @@ describe("flags type", () => {
     // Compile-time check: this should be assignable
     const s: S = "idle";
     expect(s).toBe("idle");
+  });
+});
+
+describe("transform type", () => {
+  class Vec2 {
+    constructor(
+      readonly x: number,
+      readonly y: number,
+    ) {}
+  }
+  const Vec2Struct = struct({ x: f32(), y: f32() });
+  const Vec2T = transform(Vec2Struct, {
+    encode: (v: Vec2) => ({ x: v.x, y: v.y }),
+    decode: (o) => new Vec2(o.x, o.y),
+  });
+
+  it("encodes and decodes via inner codec", () => {
+    const v = new Vec2(3, 4);
+    const buf = Vec2T.encode(v);
+    const result = Vec2T.decode(buf);
+    expect(result).toBeInstanceOf(Vec2);
+    expect(result.x).toBe(3);
+    expect(result.y).toBe(4);
+  });
+
+  it("equals delegates to inner", () => {
+    expect(Vec2T.equals(new Vec2(1, 2), new Vec2(1, 2))).toBe(true);
+    expect(Vec2T.equals(new Vec2(1, 2), new Vec2(1, 3))).toBe(false);
+  });
+
+  it("delta encodes and decodes preserving the outer shape", () => {
+    const oldV = new Vec2(1, 1);
+    const newV = new Vec2(1, 5);
+    const buf = Vec2T.encodeDelta(oldV, newV);
+    expect(buf).toBeDefined();
+    const decoded = Vec2T.decodeDelta(buf as Uint8Array, oldV);
+    expect(decoded).toBeInstanceOf(Vec2);
+    expect(decoded.x).toBe(1);
+    expect(decoded.y).toBe(5);
+  });
+
+  it("encodeDelta returns undefined when unchanged", () => {
+    expect(Vec2T.encodeDelta(new Vec2(2, 2), new Vec2(2, 2))).toBeUndefined();
   });
 });
 

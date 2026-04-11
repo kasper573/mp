@@ -495,6 +495,53 @@ export function tag(): TagType {
   };
 }
 
+export interface TransformCodec<Inner, Outer> {
+  encode(outer: Outer): Inner;
+  decode(inner: Inner): Outer;
+}
+
+export function transform<Inner, Outer>(
+  innerType: RiftType<Inner>,
+  codec: TransformCodec<Inner, Outer>,
+): RiftType<Outer> {
+  return {
+    kind: `transform(${innerType.kind})`,
+    write(w, v) {
+      innerType.write(w, codec.encode(v));
+    },
+    read(r) {
+      return codec.decode(innerType.read(r));
+    },
+    equals(a, b) {
+      return innerType.equals(codec.encode(a), codec.encode(b));
+    },
+    encode(v) {
+      return innerType.encode(codec.encode(v));
+    },
+    decode(buf) {
+      return codec.decode(innerType.decode(buf));
+    },
+    encodeDelta(oldVal, newVal) {
+      return innerType.encodeDelta(codec.encode(oldVal), codec.encode(newVal));
+    },
+    decodeDelta(buf, existing) {
+      return codec.decode(
+        innerType.decodeDelta(buf, codec.encode(existing)),
+      );
+    },
+    writeDelta(w, oldVal, newVal) {
+      return innerType.writeDelta(
+        w,
+        codec.encode(oldVal),
+        codec.encode(newVal),
+      );
+    },
+    readDelta(r, existing) {
+      return codec.decode(innerType.readDelta(r, codec.encode(existing)));
+    },
+  };
+}
+
 export function isStructType(type: RiftType): type is RiftStruct {
   return type.kind === "struct";
 }

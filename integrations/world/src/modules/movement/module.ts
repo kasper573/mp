@@ -37,7 +37,7 @@ export const MovementModule = defineModule({
       target,
       portalId,
     ) => {
-      entity.set(MoveTarget, { x: target.x, y: target.y });
+      entity.set(MoveTarget, new Vector(target.x, target.y));
       if (portalId !== undefined) {
         entity.set(DesiredPortal, { portalId });
       } else if (entity.has(DesiredPortal)) {
@@ -118,9 +118,9 @@ function tickEntity(
 
 function findPath(
   area: AreaResource,
-  from: { x: number; y: number },
-  to: { x: number; y: number },
-): Array<{ x: number; y: number }> | undefined {
+  from: Vector<number>,
+  to: Vector<number>,
+): Array<Vector<number>> | undefined {
   const fromNode = area.graph.getProximityNode({
     x: from.x as Tile,
     y: from.y as Tile,
@@ -133,18 +133,16 @@ function findPath(
   if (!toNode) return undefined;
   const result = area.graph.findPath(fromNode, toNode);
   if (!result) return undefined;
-  return result.map((v) => ({ x: v.x, y: v.y }));
+  return result.map((v) => new Vector<number>(v.x, v.y));
 }
 
 function advanceAlongPath(entity: Entity, dt: number): void {
   const speed = entity.get(MovementSpeed).speed;
   let distanceToMove = speed * dt;
   const path = [...entity.get(Path)];
-  const pos = entity.get(Position);
-  const startX = pos.x;
-  const startY = pos.y;
-  let x = startX;
-  let y = startY;
+  const start = entity.get(Position);
+  let x = start.x;
+  let y = start.y;
 
   if (!distanceToMove || path.length === 0) {
     if (path.length === 0) entity.remove(Path);
@@ -173,9 +171,8 @@ function advanceAlongPath(entity: Entity, dt: number): void {
     }
   }
 
-  updateFacing(entity, startX, startY, x, y);
-  pos.x = x;
-  pos.y = y;
+  updateFacing(entity, start.x, start.y, x, y);
+  entity.set(Position, new Vector(x, y));
 
   if (pathIndex > lastIndex) {
     entity.remove(Path);
@@ -231,8 +228,7 @@ function handlePortalTraversal(
     const { areaId, coords } = destination.value;
     entity.remove(DesiredPortal);
     if (entity.has(Path)) entity.remove(Path);
-    pos.x = coords.x;
-    pos.y = coords.y;
+    entity.set(Position, new Vector(coords.x, coords.y));
     if (areaId !== area.id) {
       entity.set(AreaMember, { areaId });
       emitAreaChanged({ entityId: entity.id, areaId });

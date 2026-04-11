@@ -1,4 +1,15 @@
-import { array, f32, i32, optional, string, struct, tag } from "@rift/core";
+import {
+  array,
+  f32,
+  i32,
+  optional,
+  string,
+  struct,
+  tag,
+  transform,
+  type RiftType,
+} from "@rift/core";
+import { Vector } from "@mp/math";
 import type { AreaId, CardinalDirection } from "./domain-ids";
 import type {
   ActorModelId,
@@ -12,7 +23,14 @@ import type {
   UserId,
 } from "./domain-ids";
 
-const Vec2 = struct({ x: f32(), y: f32() });
+function vec2(): RiftType<Vector<number>> {
+  return transform(struct({ x: f32(), y: f32() }), {
+    encode: (v: Vector<number>) => ({ x: v.x, y: v.y }),
+    decode: ({ x, y }) => new Vector(x, y),
+  });
+}
+
+const Vec2 = vec2();
 const RectStruct = struct({
   x: f32(),
   y: f32(),
@@ -20,8 +38,8 @@ const RectStruct = struct({
   height: f32(),
 });
 
-export const Position = struct({ x: f32(), y: f32() });
-export const MoveTarget = struct({ x: f32(), y: f32() });
+export const Position = vec2();
+export const MoveTarget = vec2();
 export const MovementSpeed = struct({ speed: f32() });
 export const Path = array(Vec2);
 export const Facing = struct({ dir: string<CardinalDirection>() });
