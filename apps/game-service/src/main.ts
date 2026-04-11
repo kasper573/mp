@@ -8,9 +8,15 @@ import {
   toResult,
   withBackoffRetries,
 } from "@mp/std";
-import { collectDefaultMetrics, Pushgateway } from "@mp/telemetry/prom";
+import {
+  collectDefaultMetrics,
+  MetricsGague,
+  MetricsHistogram,
+  Pushgateway,
+} from "@mp/telemetry/prom";
 import {
   AreaModule,
+  CharacterMeta,
   CharacterModule,
   ChatModule,
   CombatModule,
@@ -18,6 +24,7 @@ import {
   MovementModule,
   MovementSpeed,
   NpcAiModule,
+  NpcMeta,
   NpcSpawnerModule,
   PersistenceModule,
   buildWorldPersistenceSchema,
@@ -44,6 +51,28 @@ import { opt } from "./options";
 // Note that this file is an entrypoint and should not have any exports
 
 collectDefaultMetrics();
+
+const tickIntervalSeconds = new MetricsHistogram({
+  name: "mp_game_service_tick_interval_seconds",
+  help: "Wall-clock seconds between consecutive game-service ticks",
+  labelNames: ["areaId"],
+  buckets: [0.01, 0.025, 0.05, 0.1, 0.2, 0.5, 1],
+});
+const charactersGauge = new MetricsGague({
+  name: "mp_game_service_characters_total",
+  help: "Number of player character entities currently active",
+  labelNames: ["areaId"],
+});
+const npcsGauge = new MetricsGague({
+  name: "mp_game_service_npcs_total",
+  help: "Number of NPC entities currently active",
+  labelNames: ["areaId"],
+});
+const clientsGauge = new MetricsGague({
+  name: "mp_game_service_clients_total",
+  help: "Number of connected websocket clients",
+  labelNames: ["areaId"],
+});
 
 const shutdownCleanups: Array<() => unknown> = [];
 setupGracefulShutdown(process, shutdownCleanups);
@@ -102,6 +131,16 @@ const bootModule = defineModule({
     ctx.using(AreaModule).registerArea(area);
     const characters = ctx.using(CharacterModule);
     const persistenceApi = ctx.using(PersistenceModule);
+
+    const labels = { areaId: opt.areaId };
+    const charactersQuery = rift.query(CharacterMeta);
+    const npcsQuery = rift.query(NpcMeta);
+    ctx.onTick((dt) => {
+      tickIntervalSeconds.observe(labels, dt);
+      charactersGauge.set(labels, charactersQuery.value.length);
+      npcsGauge.set(labels, npcsQuery.value.length);
+      clientsGauge.set(labels, wss.clients.size);
+    });
 
     wss.on("connection", (socket: WebSocket, req: IncomingMessage) => {
       const url = new URL(req.url ?? "/", "http://internal");

@@ -3,6 +3,7 @@ import { register as globalRegister } from "prom-client";
 
 export {
   collectDefaultMetrics,
+  Counter as MetricsCounter,
   Gauge as MetricsGague,
   Histogram as MetricsHistogram,
   exponentialBuckets,
