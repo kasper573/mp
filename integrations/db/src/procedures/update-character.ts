@@ -1,6 +1,6 @@
 import { and, eq, not } from "drizzle-orm";
 import { characterTable } from "../schema";
-import type { CharacterId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/world";
 import { procedure } from "../utils/procedure";
 import { err, ok } from "@mp/std";
 

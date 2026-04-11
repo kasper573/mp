@@ -451,9 +451,6 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
-      '@mp/game-shared':
-        specifier: workspace:*
-        version: link:../game-shared
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -463,6 +460,12 @@ importers:
       '@mp/std':
         specifier: workspace:*
         version: link:../../libraries/std
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
+      '@mp/world':
+        specifier: workspace:*
+        version: link:../world
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(better-sqlite3@12.8.0)(pg@8.20.0)

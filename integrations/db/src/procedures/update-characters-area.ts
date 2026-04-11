@@ -1,6 +1,6 @@
 import { eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import type { CharacterId, AreaId } from "@mp/game-shared";
+import type { CharacterId, AreaId } from "@mp/world";
 import { procedure } from "../utils/procedure";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";

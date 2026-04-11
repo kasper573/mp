@@ -1,6 +1,6 @@
 import type { UserId } from "@mp/auth";
 import { and, eq } from "drizzle-orm";
-import type { AreaId, CharacterId } from "@mp/game-shared";
+import type { AreaId, CharacterId } from "@mp/world";
 import { characterTable } from "../schema";
 import { procedure } from "../utils/procedure";
 

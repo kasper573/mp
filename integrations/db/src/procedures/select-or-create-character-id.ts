@@ -2,7 +2,7 @@ import type { UserIdentity } from "@mp/auth";
 import type { Tile, TimesPerSecond } from "@mp/std";
 import { eq } from "drizzle-orm";
 import { characterTable, actorModelTable, inventoryTable } from "../schema";
-import type { AreaId, CharacterId } from "@mp/game-shared";
+import type { AreaId, CharacterId } from "@mp/world";
 import type { Vector } from "@mp/math";
 import { procedure } from "../utils/procedure";
 

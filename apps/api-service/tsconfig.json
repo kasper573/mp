@@ -3,8 +3,7 @@
   "include": ["*.ts", "shared", "server"],
   "compilerOptions": {
     "module": "Preserve",
-    "target": "es2017",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"]
+    "target": "es2017"
   },
   "grats": {
     "graphqlSchema": "./shared/schema.generated.graphql",

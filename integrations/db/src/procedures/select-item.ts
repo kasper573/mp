@@ -1,10 +1,7 @@
 import assert from "assert";
 import { eq } from "drizzle-orm";
 import { consumableDefinitionTable, equipmentDefinitionTable } from "../schema";
-import type {
-  ConsumableDefinitionId,
-  EquipmentDefinitionId,
-} from "@mp/game-shared";
+import type { ConsumableDefinitionId, EquipmentDefinitionId } from "@mp/world";
 import { procedure } from "../utils/procedure";
 
 export const selectConsumableDefinition = procedure()

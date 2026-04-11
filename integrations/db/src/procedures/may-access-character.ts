@@ -1,7 +1,7 @@
 import type { UserId } from "@mp/auth";
 import { and, eq } from "drizzle-orm";
 import { characterTable } from "../schema";
-import type { CharacterId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/world";
 import { procedure } from "../utils/procedure";
 
 export const mayAccessCharacter = procedure()

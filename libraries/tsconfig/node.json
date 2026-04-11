@@ -3,7 +3,7 @@
   "extends": "./base.json",
   "compilerOptions": {
     "skipLibCheck": true,
-    "lib": ["ESNext"],
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "module": "ESNext"
   }

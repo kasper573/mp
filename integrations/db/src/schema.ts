@@ -11,10 +11,13 @@ import type {
   EquipmentInstanceId,
   InventoryId,
   NpcDefinitionId,
-  NpcRewardId,
   NpcSpawnId,
-} from "@mp/game-shared";
-import { npcTypes } from "@mp/game-shared";
+} from "@mp/world";
+import { npcTypes } from "@mp/world";
+import { type } from "@mp/validate";
+
+const NpcRewardIdType = type("string").brand("NpcRewardId");
+type NpcRewardId = typeof NpcRewardIdType.infer;
 import { path } from "./types/path";
 import { shortId } from "./types/short-id";
 import { vector } from "./types/vector";
