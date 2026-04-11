@@ -17,3 +17,21 @@ export {
   type TileHighlightOptions,
   type TileHighlightTarget,
 } from "../modules/pixi-renderer/tile-highlight";
+export { PreactRendererModule } from "../modules/preact-renderer/module";
+export type { PreactRendererApi } from "../modules/preact-renderer/module";
+export {
+  PreactRendererContext,
+  type PreactRendererContextValue,
+  type ChatLine,
+} from "../modules/preact-renderer/context";
+export { Hud, type HudProps } from "../modules/preact-renderer/hud";
+export { HealthBar } from "../modules/preact-renderer/health-bar";
+export { InventoryPanel } from "../modules/preact-renderer/inventory-panel";
+export { ChatLog } from "../modules/preact-renderer/chat-log";
+export { RespawnDialog } from "../modules/preact-renderer/respawn-dialog";
+export {
+  useRendererContext,
+  useLocalCharacterEntity,
+  useEntityComponent,
+  useRiftQuery,
+} from "../modules/preact-renderer/hooks";

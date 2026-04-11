@@ -35,10 +35,12 @@
     "@mp/tiled-loader": "workspace:*",
     "@mp/tiled-renderer": "workspace:*",
     "@mp/time": "workspace:*",
+    "@mp/ui": "workspace:*",
     "@mp/validate": "workspace:*",
     "@rift/core": "workspace:*",
     "@rift/modular": "workspace:*",
-    "@rift/persistence": "workspace:*"
+    "@rift/persistence": "workspace:*",
+    "preact": "catalog:"
   },
   "devDependencies": {
     "@mp/tsconfig": "workspace:*",
