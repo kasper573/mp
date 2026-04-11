@@ -15,6 +15,9 @@ import type {
   ActorModelId,
   CharacterId,
   InventoryId,
+  ItemDefinitionId,
+  ItemInstanceId,
+  ItemType,
   NpcDefinitionId,
   NpcInstanceId,
   NpcSpawnId,
@@ -86,6 +89,15 @@ export const NpcMeta = struct({
 
 export const Patrol = struct({ path: array(Vec2) });
 
+export const ItemMeta = struct({
+  instanceId: string<ItemInstanceId>(),
+  definitionId: string<ItemDefinitionId>(),
+  inventoryId: string<InventoryId>(),
+  itemType: string<ItemType>(),
+});
+export const ConsumableStack = struct({ stackSize: i32() });
+export const EquipmentDurability = struct({ durability: f32() });
+
 export const AreaMember = struct({ areaId: string<AreaId>() });
 
 export const ClientSession = struct({ clientId: string() });
@@ -109,6 +121,9 @@ export const allComponents = [
   CharacterMeta,
   NpcMeta,
   Patrol,
+  ItemMeta,
+  ConsumableStack,
+  EquipmentDurability,
   AreaMember,
   ClientSession,
 ];
