@@ -65,9 +65,18 @@ export class WalkableChecker {
       }
 
       const objTransform = tiledObjectTransform(obj);
-      const rect = new Rect(0 as Pixel, 0 as Pixel, obj.width, obj.height)
-        .apply(objTransform)
-        .divide(this.tiled.tileSize) as unknown as Rect<Tile>;
+      const pixelRect = new Rect(
+        0 as Pixel,
+        0 as Pixel,
+        obj.width,
+        obj.height,
+      ).apply(objTransform);
+      const rect = new Rect(
+        (pixelRect.x / this.tiled.tileSize.x) as Tile,
+        (pixelRect.y / this.tiled.tileSize.y) as Tile,
+        (pixelRect.width / this.tiled.tileSize.x) as Tile,
+        (pixelRect.height / this.tiled.tileSize.y) as Tile,
+      );
 
       this.#obscuringRects.push(rect);
 

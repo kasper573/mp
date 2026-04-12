@@ -28,7 +28,7 @@ export interface GameWebSocket {
 export interface GameWebSocketServer {
   on(
     event: "connection",
-    handler: (socket: GameWebSocket, request: unknown) => void,
+    handler: (socket: GameWebSocket, request: ConnectionRequest) => void,
   ): void;
 }
 
@@ -44,6 +44,8 @@ export interface GameClientSocket {
 }
 
 export interface ServerContextValues {}
+
+export interface ConnectionRequest {}
 
 export interface ModuleConfig<
   TDeps extends readonly AnyModule[],

@@ -1,4 +1,4 @@
-import { defineModule } from "@rift/modular";
+import { defineModule, toUint8ArrayMessage } from "@rift/modular";
 import type { ClientId, Entity } from "@rift/core";
 import { areas, defaultCharacter } from "@mp/fixtures";
 import type { AreaId } from "@mp/fixtures";
@@ -14,13 +14,14 @@ import {
 import { SessionAssigned } from "../events";
 import { areaModule } from "./area";
 
-/** Attached to the request by game-service verifyClient */
-export interface AuthenticatedRequest {
-  __user?: {
-    id: string;
-    name: string;
-    roles: ReadonlySetLike<string>;
-  };
+declare module "@rift/modular" {
+  interface ConnectionRequest {
+    user?: {
+      id: string;
+      name: string;
+      roles: ReadonlySetLike<string>;
+    };
+  }
 }
 
 export const sessionModule = defineModule({
@@ -37,7 +38,7 @@ export const sessionModule = defineModule({
       const clientId = crypto.randomUUID() as ClientId;
       ctx.addClient(clientId, socket);
 
-      const user = (request as AuthenticatedRequest)?.__user;
+      const user = request.user;
       const roles: ReadonlySetLike<string> = user?.roles ?? new Set();
       clientRoles.set(clientId, roles);
 
@@ -89,17 +90,7 @@ export const sessionModule = defineModule({
       ctx.rift.emit(SessionAssigned, { entityId: entity.id }).to(clientId);
 
       socket.on("message", (data) => {
-        const buf =
-          data instanceof ArrayBuffer
-            ? new Uint8Array(data)
-            : data instanceof Uint8Array
-              ? data
-              : new Uint8Array(
-                  ArrayBuffer.isView(data)
-                    ? data.buffer
-                    : (data as unknown as ArrayBuffer),
-                );
-        ctx.rift.handleClientEvent(clientId, buf);
+        ctx.rift.handleClientEvent(clientId, toUint8ArrayMessage(data));
       });
 
       socket.on("close", () => {

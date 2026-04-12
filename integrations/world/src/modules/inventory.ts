@@ -1,12 +1,6 @@
 import { defineModule } from "@rift/modular";
 import type { Entity } from "@rift/core";
-import {
-  consumables,
-  equipment,
-  type ConsumableDefinition,
-  type EquipmentDefinition,
-  type ItemDefinition,
-} from "@mp/fixtures";
+import { consumables, equipment, type ItemDefinition } from "@mp/fixtures";
 import {
   ItemOwner,
   ItemDefinitionComp,
@@ -22,17 +16,13 @@ export const inventoryModule = defineModule({
   server: (ctx) => {
     const itemQuery = ctx.rift.query(ItemOwner, ItemDefinitionComp);
 
-    function spawnItem(
-      ownerId: number,
-      definitionId: string,
-      itemType: "consumable" | "equipment",
-    ) {
+    function spawnItem(ownerId: number, definitionId: string) {
       const def = itemLookup.get(definitionId);
       if (!def) {
         return;
       }
 
-      if (itemType === "consumable") {
+      if (def.type === "consumable") {
         // Try merging into existing stack
         for (const item of itemQuery.value) {
           if (
@@ -49,25 +39,23 @@ export const inventoryModule = defineModule({
         }
 
         // New stack
-        const cDef = def as ConsumableDefinition;
         const entity = ctx.rift.spawn();
         entity.set(ItemOwner, { ownerId });
-        entity.set(ItemDefinitionComp, { definitionId, itemType: 0 }); // 0 = consumable
+        entity.set(ItemDefinitionComp, { definitionId, itemType: 0 });
         entity.set(Stackable, {
           stackSize: 1,
-          maxStackSize: cDef.maxStackSize,
+          maxStackSize: def.maxStackSize,
         });
         return;
       }
 
       // Equipment
-      const eDef = def as EquipmentDefinition;
       const entity = ctx.rift.spawn();
       entity.set(ItemOwner, { ownerId });
-      entity.set(ItemDefinitionComp, { definitionId, itemType: 1 }); // 1 = equipment
+      entity.set(ItemDefinitionComp, { definitionId, itemType: 1 });
       entity.set(Durable, {
-        durability: eDef.maxDurability,
-        maxDurability: eDef.maxDurability,
+        durability: def.maxDurability,
+        maxDurability: def.maxDurability,
       });
     }
 

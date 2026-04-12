@@ -3,6 +3,7 @@ import { RiftServer, RiftWorld, tag } from "@rift/core";
 import { defineModule } from "../define-module";
 import { GameServer } from "../game-server";
 import type {
+  ConnectionRequest,
   GameWebSocket,
   GameWebSocketMessage,
   GameWebSocketServer,
@@ -48,19 +49,19 @@ class FakeWebSocket implements GameWebSocket {
 
 class FakeWebSocketServer implements GameWebSocketServer {
   #connectionHandler:
-    | ((socket: GameWebSocket, request: unknown) => void)
+    | ((socket: GameWebSocket, request: ConnectionRequest) => void)
     | undefined;
 
   on(
     event: "connection",
-    handler: (socket: GameWebSocket, request: unknown) => void,
+    handler: (socket: GameWebSocket, request: ConnectionRequest) => void,
   ): void {
     if (event === "connection") {
       this.#connectionHandler = handler;
     }
   }
 
-  connect(socket: GameWebSocket, request: unknown = {}): void {
+  connect(socket: GameWebSocket, request: ConnectionRequest = {}): void {
     this.#connectionHandler?.(socket, request);
   }
 }

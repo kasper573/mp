@@ -4,11 +4,15 @@ import type { AreaId } from "@mp/fixtures";
 import { loadAreaResource } from "../load-area-resource";
 import type { AreaResource } from "../area-resource";
 
+declare module "@rift/modular" {
+  interface ServerContextValues {
+    tiledBaseUrl: string;
+  }
+}
+
 export const areaModule = defineModule({
   server: async (ctx) => {
-    const baseUrl =
-      (ctx.values as { tiledBaseUrl?: string }).tiledBaseUrl ??
-      "http://localhost:3001/";
+    const baseUrl = ctx.values.tiledBaseUrl;
 
     const entries = await Promise.all(
       areas.map(async (def): Promise<[AreaId, AreaResource]> => {

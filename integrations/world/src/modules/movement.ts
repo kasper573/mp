@@ -73,9 +73,6 @@ export const movementModule = defineModule({
         return;
       }
 
-      // Clear attack target on move
-      // (attack target is server-only state handled by combat module)
-
       const mState = getMovementState(entity.id);
       mState.moveTarget = { x: data.x, y: data.y } as Vector<Tile>;
     });

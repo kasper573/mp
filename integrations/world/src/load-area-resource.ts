@@ -20,15 +20,14 @@ export async function loadAreaResource(
   return new AreaResource(areaId, new TiledResource(result.value));
 }
 
-async function loadJson(url: string) {
+async function loadJson(url: string): Promise<unknown> {
   const response = await fetch(url, {
     headers: {
       "Content-Type": "application/json",
       Accept: "application/json",
     },
   });
-  const json: unknown = await response.json();
-  return json as Record<string, unknown>;
+  return response.json();
 }
 
 function relativeUrl(path: string, base: string) {

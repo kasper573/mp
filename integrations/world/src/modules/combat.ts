@@ -5,6 +5,7 @@ import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { Position, Movement, Combat, CharacterIdentity } from "../components";
 import {
+  MoveCommand,
   AttackCommand,
   AttackAnimation,
   DeathAnimation,
@@ -83,6 +84,16 @@ export const combatModule = defineModule({
         return;
       }
       getCombatState(entity.id).attackTargetId = data.targetId;
+    });
+
+    // Intentional movement cancels active combat
+    ctx.rift.on(MoveCommand, (clientId) => {
+      const entity = session.clientEntities.get(clientId);
+      if (!entity) return;
+      const cState = combatStates.get(entity.id);
+      if (cState) {
+        cState.attackTargetId = undefined;
+      }
     });
 
     // Handle respawn commands from clients

@@ -2,7 +2,7 @@ import { RiftServer } from "@rift/core";
 import { GameServer } from "@rift/modular";
 import { WebSocketServer } from "ws";
 import { world, modules } from "@mp/world";
-import type { AuthenticatedRequest } from "@mp/world";
+import type { ConnectionRequest } from "@rift/modular";
 import { createConsoleLogger } from "@mp/logger";
 import { createTokenResolver } from "@mp/auth/server";
 import type { AccessToken } from "@mp/auth";
@@ -40,7 +40,7 @@ const wss = new WebSocketServer({
       cb(false, 401, "Unauthorized");
       return;
     }
-    (info.req as AuthenticatedRequest).__user = result.value;
+    (info.req as ConnectionRequest).user = result.value;
     cb(true);
   },
 });

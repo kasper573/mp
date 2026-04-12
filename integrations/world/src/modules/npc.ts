@@ -571,7 +571,7 @@ export const npcModule = defineModule({
           }
           case "item": {
             for (let i = 0; i < reward.amount; i++) {
-              inventory.spawnItem(recipient.id, reward.itemId, reward.itemType);
+              inventory.spawnItem(recipient.id, reward.itemId);
             }
             break;
           }
