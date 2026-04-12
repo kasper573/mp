@@ -224,10 +224,14 @@ export const combatModule = defineModule({
         }
       }
 
+      // Two passes: resolve all attacks first, then check deaths.
+      // Single-pass would miss deaths when the victim entity is iterated
+      // before the attacker (processDeath wouldn't see the killing blow).
       for (const entity of combatants.value) {
-        const combat = entity.get(Combat);
-        processAttack(entity, combat);
-        processDeath(entity, combat);
+        processAttack(entity, entity.get(Combat));
+      }
+      for (const entity of combatants.value) {
+        processDeath(entity, entity.get(Combat));
       }
     });
 

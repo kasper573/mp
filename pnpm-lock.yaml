@@ -113,12 +113,18 @@ importers:
       '@mp/auth':
         specifier: workspace:*
         version: link:../../libraries/auth
+      '@mp/env':
+        specifier: workspace:*
+        version: link:../../libraries/env
       '@mp/keycloak':
         specifier: workspace:*
         version: link:../../integrations/keycloak
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/validate':
+        specifier: workspace:*
+        version: link:../../libraries/validate
       '@mp/world':
         specifier: workspace:*
         version: link:../../integrations/world

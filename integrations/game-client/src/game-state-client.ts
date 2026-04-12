@@ -11,6 +11,8 @@ import {
   Combat,
   Appearance,
   AreaTag,
+  ItemOwner,
+  ItemDefinitionComp,
   SessionAssigned,
   MoveCommand,
   AttackCommand,
@@ -33,6 +35,7 @@ export class GameStateClient {
   readonly isGameReady: ReadonlySignal<boolean>;
   readonly actors: RiftQuery;
   readonly areaId: ReadonlySignal<AreaId | undefined>;
+  readonly myItems: ReadonlySignal<Entity[]>;
 
   constructor(options: GameStateClientOptions) {
     this.rift = options.rift;
@@ -56,6 +59,15 @@ export class GameStateClient {
       const entity = this.myEntity.value;
       if (!entity || !entity.has(AreaTag)) return undefined;
       return entity.get(AreaTag).areaId as AreaId;
+    });
+
+    const allItems = this.rift.query(ItemOwner, ItemDefinitionComp);
+    this.myItems = computed(() => {
+      const myId = this.myEntityId.value;
+      if (myId === undefined) return [];
+      return allItems.value.filter(
+        (item) => item.get(ItemOwner).ownerId === myId,
+      );
     });
   }
 

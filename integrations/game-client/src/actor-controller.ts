@@ -14,14 +14,16 @@ import {
 import type { ActorModelId } from "@mp/fixtures";
 import type { DestroyOptions } from "@mp/graphics";
 import { cardinalDirections } from "@mp/math";
-import type { TimesPerSecond } from "@mp/std";
+import type { Pixel, TimesPerSecond } from "@mp/std";
 import {
   ColorMatrixFilter,
   Container,
   createTintFilterMatrix,
   Text,
+  Ticker,
 } from "@mp/graphics";
-import { effect } from "@mp/state";
+import { computed, effect } from "@mp/state";
+import { VectorSpring } from "@mp/engine";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
@@ -48,13 +50,23 @@ export class ActorController extends Container {
   private sprite: ActorSprite;
   private text: Text;
   private tintFilter = new ColorMatrixFilter();
+  private positionSpring: VectorSpring<Pixel>;
 
   constructor(private options: ActorControllerOptions) {
     super();
 
-    const { entity } = this.options;
+    const { entity, tiled } = this.options;
 
     const combat = entity.get(Combat);
+
+    const targetWorldPos = computed(() =>
+      tiled.tileCoordToWorld(entity.get(Position)),
+    );
+    this.positionSpring = new VectorSpring(
+      targetWorldPos,
+      () => ({ stiffness: 300, damping: 30, mass: 1, precision: 0.01 }),
+      targetWorldPos.value,
+    );
 
     this.sprite = new ActorSprite(
       combat.alive
@@ -122,12 +134,11 @@ export class ActorController extends Container {
   };
 
   #onRender = () => {
-    const { entity, tiled } = this.options;
+    const { entity } = this.options;
 
     const combat = entity.get(Combat);
     const movement = entity.get(Movement);
     const appearance = entity.get(Appearance);
-    const coords = entity.get(Position);
 
     this.sprite.attackSpeed = combat.attackSpeed as TimesPerSecond;
     this.sprite.direction = cardinalDirections[movement.dir];
@@ -149,7 +160,11 @@ export class ActorController extends Container {
       this.text.text += `\n${progression.xp}xp`;
     }
 
-    this.position.copyFrom(tiled.tileCoordToWorld(coords));
+    this.positionSpring.update(
+      TimeSpan.fromMilliseconds(Ticker.shared.deltaMS),
+    );
+    const worldPos = this.positionSpring.value.value;
+    this.position.set(worldPos.x, worldPos.y);
     this.zIndex = this.position.y;
   };
 }

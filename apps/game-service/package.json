@@ -11,8 +11,10 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
+    "@mp/env": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/validate": "workspace:*",
     "@mp/world": "workspace:*",
     "@rift/core": "workspace:*",
     "@rift/modular": "workspace:*",

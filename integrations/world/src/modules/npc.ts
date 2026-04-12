@@ -409,6 +409,10 @@ export const npcModule = defineModule({
             if (!cc.alive) {
               continue;
             }
+            // Only consider characters in the same area
+            if (c.has(AreaTag) && c.get(AreaTag).areaId !== area.id) {
+              continue;
+            }
             const cp = c.get(Position);
             if (pos.isWithinDistance(cp, range)) {
               results.push(c);
@@ -439,6 +443,15 @@ export const npcModule = defineModule({
         for (const npcEntity of npcQuery.value) {
           const nState = npcStates.get(npcEntity.id);
           if (!nState || !npcEntity.get(Combat).alive) continue;
+          const npcAreaId = npcEntity.get(AreaTag).areaId;
+          // Only observe attacks within the same area
+          const attackerEntity = ctx.rift.entity(attack.attackerId);
+          if (
+            attackerEntity?.has(AreaTag) &&
+            attackerEntity.get(AreaTag).areaId !== npcAreaId
+          ) {
+            continue;
+          }
           const npcPos = npcEntity.get(Position);
           const attackerPos = findEntityPosById(attack.attackerId);
           const targetPos = findEntityPosById(attack.targetId);

@@ -7,31 +7,19 @@ import { createConsoleLogger } from "@mp/logger";
 import { createTokenResolver } from "@mp/auth/server";
 import type { AccessToken } from "@mp/auth";
 import { playerRoles } from "@mp/keycloak";
+import { opt } from "./options";
 
 const logger = createConsoleLogger();
 
-const port = Number(process.env.MP_GAME_SERVICE_PORT ?? "8090");
-const tiledBaseUrl =
-  process.env.MP_GAME_SERVICE_TILED_BASE_URL ?? "https://files.mp.localhost/";
-
-const jwksUri = process.env.MP_GAME_SERVICE_AUTH__JWKS_URI;
-const issuer = process.env.MP_GAME_SERVICE_AUTH__ISSUER;
-const audience = process.env.MP_GAME_SERVICE_AUTH__AUDIENCE;
-const allowBypassUsers =
-  process.env.MP_GAME_SERVICE_AUTH__ALLOW_BYPASS_USERS === "true";
-
-if (!jwksUri || !issuer || !audience) {
-  throw new Error(
-    "Missing required auth env vars: MP_GAME_SERVICE_AUTH__JWKS_URI, MP_GAME_SERVICE_AUTH__ISSUER, MP_GAME_SERVICE_AUTH__AUDIENCE",
-  );
-}
+const port = opt.port ?? 8090;
+const tiledBaseUrl = opt.tiledBaseUrl ?? "https://files.mp.localhost/";
 
 const resolveToken = createTokenResolver({
-  jwksUri,
-  issuer,
-  audience,
+  jwksUri: opt.auth.jwksUri,
+  issuer: opt.auth.issuer,
+  audience: opt.auth.audience,
   algorithms: ["RS256"],
-  allowBypassUsers,
+  allowBypassUsers: opt.auth.allowBypassUsers ?? false,
   bypassUserRoles: playerRoles,
   onResolve(result) {
     if (result.isErr()) {

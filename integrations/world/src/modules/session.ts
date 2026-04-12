@@ -17,6 +17,7 @@ import { areaModule } from "./area";
 /** Attached to the request by game-service verifyClient */
 export interface AuthenticatedRequest {
   __user?: {
+    id: string;
     name: string;
     roles: ReadonlySetLike<string>;
   };
@@ -27,6 +28,8 @@ export const sessionModule = defineModule({
   server: (ctx) => {
     const clientEntities = new Map<ClientId, Entity>();
     const clientRoles = new Map<ClientId, ReadonlySetLike<string>>();
+    /** Persists entities across reconnects, keyed by user ID */
+    const userEntities = new Map<string, Entity>();
     const defaultAreaId = areas[0].id;
     const { areas: areaMap } = ctx.using(areaModule);
 
@@ -38,33 +41,48 @@ export const sessionModule = defineModule({
       const roles: ReadonlySetLike<string> = user?.roles ?? new Set();
       clientRoles.set(clientId, roles);
 
-      const area = areaMap.get(defaultAreaId);
-      if (!area) {
-        throw new Error(`Default area "${defaultAreaId}" not loaded`);
-      }
-      const entity = ctx.rift.spawn();
+      let entity: Entity;
 
-      entity.set(Position, area.start);
-      entity.set(Movement, {
-        speed: defaultCharacter.speed,
-        dir: 0,
-        moving: false,
-      });
-      entity.set(Combat, {
-        health: defaultCharacter.health,
-        maxHealth: defaultCharacter.maxHealth,
-        alive: true,
-        attackDamage: defaultCharacter.attackDamage,
-        attackSpeed: defaultCharacter.attackSpeed,
-        attackRange: defaultCharacter.attackRange,
-      });
-      entity.set(Appearance, {
-        modelId: defaultCharacter.modelId,
-        name: user?.name ?? "Player",
-      });
-      entity.set(CharacterIdentity, { clientId });
-      entity.set(Progression, { xp: defaultCharacter.xp });
-      entity.set(AreaTag, { areaId: defaultAreaId });
+      const existing = user?.id ? userEntities.get(user.id) : undefined;
+
+      if (existing) {
+        // Reconnect: rebind existing entity to new client
+        entity = existing;
+        entity.set(CharacterIdentity, { clientId });
+      } else {
+        // New session: spawn fresh entity
+        const area = areaMap.get(defaultAreaId);
+        if (!area) {
+          throw new Error(`Default area "${defaultAreaId}" not loaded`);
+        }
+        entity = ctx.rift.spawn();
+
+        entity.set(Position, area.start);
+        entity.set(Movement, {
+          speed: defaultCharacter.speed,
+          dir: 0,
+          moving: false,
+        });
+        entity.set(Combat, {
+          health: defaultCharacter.health,
+          maxHealth: defaultCharacter.maxHealth,
+          alive: true,
+          attackDamage: defaultCharacter.attackDamage,
+          attackSpeed: defaultCharacter.attackSpeed,
+          attackRange: defaultCharacter.attackRange,
+        });
+        entity.set(Appearance, {
+          modelId: defaultCharacter.modelId,
+          name: user?.name ?? "Player",
+        });
+        entity.set(CharacterIdentity, { clientId });
+        entity.set(Progression, { xp: defaultCharacter.xp });
+        entity.set(AreaTag, { areaId: defaultAreaId });
+
+        if (user?.id) {
+          userEntities.set(user.id, entity);
+        }
+      }
 
       clientEntities.set(clientId, entity);
 
@@ -86,9 +104,9 @@ export const sessionModule = defineModule({
 
       socket.on("close", () => {
         ctx.removeClient(clientId);
-        ctx.rift.destroy(entity);
         clientEntities.delete(clientId);
         clientRoles.delete(clientId);
+        // Entity stays alive in userEntities for reconnect
       });
     });
 
