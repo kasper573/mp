@@ -1,5 +1,5 @@
 import { defineModule } from "@rift/modular";
-import type { Entity } from "@rift/core";
+import type { Entity, EntityId, Infer } from "@rift/core";
 import { clamp } from "@mp/math";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
@@ -15,22 +15,13 @@ import { sessionModule } from "./session";
 import { movementModule } from "./movement";
 import { areaModule } from "./area";
 
-interface CombatData {
-  health: number;
-  maxHealth: number;
-  alive: boolean;
-  attackDamage: number;
-  attackSpeed: number;
-  attackRange: number;
-}
-
-// sqrt(2) - 1: margin for diagonal attacks (1-range should reach diagonal tile)
-const tileMargin = Math.sqrt(2) - 1;
+/** sqrt(2) - 1: margin so 1-range attacks can reach diagonal tiles */
+const TILE_MARGIN = Math.sqrt(2) - 1;
 const HP_REGEN_INTERVAL = 10; // seconds
 const HP_REGEN_AMOUNT = 5;
 
 interface CombatState {
-  attackTargetId: number | undefined;
+  attackTargetId: EntityId | undefined;
   lastAttackTime: number; // elapsed seconds
 }
 
@@ -40,18 +31,18 @@ export const combatModule = defineModule({
     const session = ctx.using(sessionModule);
     const movement = ctx.using(movementModule);
     const { areas: areaMap } = ctx.using(areaModule);
-    const combatStates = new Map<number, CombatState>();
+    const combatStates = new Map<EntityId, CombatState>();
     let totalElapsed = 0;
     let nextHpRegenTime = HP_REGEN_INTERVAL;
 
     // Per-tick attack/death records (consumed by NPC module)
-    let attacksThisTick: { attackerId: number; targetId: number }[] = [];
-    let deathsThisTick: { entityId: number; killedBy: number }[] = [];
+    let attacksThisTick: { attackerId: EntityId; targetId: EntityId }[] = [];
+    let deathsThisTick: { entityId: EntityId; killedBy: EntityId }[] = [];
 
     const combatants = ctx.rift.query(Position, Movement, Combat);
     const characters = ctx.rift.query(Combat, CharacterIdentity);
 
-    function getCombatState(entityId: number): CombatState {
+    function getCombatState(entityId: EntityId): CombatState {
       let state = combatStates.get(entityId);
       if (!state) {
         state = { attackTargetId: undefined, lastAttackTime: -Infinity };
@@ -63,9 +54,9 @@ export const combatModule = defineModule({
     function canAttackFrom(
       from: Vector<Tile>,
       target: Vector<Tile>,
-      range: number,
+      range: Tile,
     ): boolean {
-      return from.isWithinDistance(target, (range + tileMargin) as Tile);
+      return from.isWithinDistance(target, (range + TILE_MARGIN) as Tile);
     }
 
     function isTargetable(entity: Entity): boolean {
@@ -125,7 +116,7 @@ export const combatModule = defineModule({
     function moveTowardTarget(
       entity: Entity,
       targetPos: Vector<Tile>,
-      attackRange: number,
+      attackRange: Tile,
     ) {
       const areaId = session.getEntityArea(entity);
       const area = areaMap.get(areaId);
@@ -139,7 +130,7 @@ export const combatModule = defineModule({
 
     function executeAttack(
       entity: Entity,
-      combat: { attackDamage: number; attackSpeed: number },
+      combat: Pick<Infer<typeof Combat>, "attackDamage" | "attackSpeed">,
       target: Entity,
       cState: CombatState,
     ) {
@@ -171,7 +162,7 @@ export const combatModule = defineModule({
       }
     }
 
-    function processAttack(entity: Entity, combat: CombatData) {
+    function processAttack(entity: Entity, combat: Infer<typeof Combat>) {
       const cState = combatStates.get(entity.id);
       if (cState?.attackTargetId === undefined) return;
 
@@ -190,7 +181,7 @@ export const combatModule = defineModule({
       }
     }
 
-    function processDeath(entity: Entity, combat: CombatData) {
+    function processDeath(entity: Entity, combat: Infer<typeof Combat>) {
       if (combat.health > 0) {
         combat.alive = true;
         return;
@@ -255,7 +246,7 @@ export const combatModule = defineModule({
 
     return {
       api: {
-        setAttackTarget(entity: Entity, targetId: number) {
+        setAttackTarget(entity: Entity, targetId: EntityId) {
           getCombatState(entity.id).attackTargetId = targetId;
         },
         clearAttackTarget(entity: Entity) {
@@ -264,19 +255,19 @@ export const combatModule = defineModule({
             cs.attackTargetId = undefined;
           }
         },
-        getAttackTarget(entityId: number): number | undefined {
+        getAttackTarget(entityId: EntityId): EntityId | undefined {
           return combatStates.get(entityId)?.attackTargetId;
         },
         isTargetable,
         get attacksThisTick(): readonly {
-          attackerId: number;
-          targetId: number;
+          attackerId: EntityId;
+          targetId: EntityId;
         }[] {
           return attacksThisTick;
         },
         get deathsThisTick(): readonly {
-          entityId: number;
-          killedBy: number;
+          entityId: EntityId;
+          killedBy: EntityId;
         }[] {
           return deathsThisTick;
         },

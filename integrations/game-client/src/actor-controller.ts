@@ -11,10 +11,9 @@ import {
   AttackAnimation,
   DeathAnimation,
 } from "@mp/world";
-import type { ActorModelId } from "@mp/fixtures";
 import type { DestroyOptions } from "@mp/graphics";
 import { cardinalDirections } from "@mp/math";
-import type { Pixel, TimesPerSecond } from "@mp/std";
+import type { Pixel } from "@mp/std";
 import {
   ColorMatrixFilter,
   Container,
@@ -82,7 +81,7 @@ export class ActorController extends Container {
     );
     this.sprite.textureLookup = (animationName, direction) =>
       options.actorTextures(
-        options.entity.get(Appearance).modelId as ActorModelId,
+        options.entity.get(Appearance).modelId,
         animationName,
         direction,
       );
@@ -140,7 +139,7 @@ export class ActorController extends Container {
     const movement = entity.get(Movement);
     const appearance = entity.get(Appearance);
 
-    this.sprite.attackSpeed = combat.attackSpeed as TimesPerSecond;
+    this.sprite.attackSpeed = combat.attackSpeed;
     this.sprite.direction = cardinalDirections[movement.dir];
     this.alpha = 1;
 

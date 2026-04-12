@@ -1,17 +1,13 @@
 import type { Path, Vector } from "@mp/math";
-import type { Tile, TimesPerSecond } from "@mp/std";
+import type { Branded, Tile, TimesPerSecond } from "@mp/std";
 
-// Branded string ID types (replacing @mp/validate branded types)
-export type ActorModelId = string & { readonly __brand: "ActorModelId" };
-export type AreaId = string & { readonly __brand: "AreaId" };
-export type NpcDefinitionId = string & { readonly __brand: "NpcDefinitionId" };
-export type NpcSpawnId = string & { readonly __brand: "NpcSpawnId" };
-export type ConsumableDefinitionId = string & {
-  readonly __brand: "ConsumableDefinitionId";
-};
-export type EquipmentDefinitionId = string & {
-  readonly __brand: "EquipmentDefinitionId";
-};
+export type ActorModelId = Branded<string, "ActorModelId">;
+export type AreaId = Branded<string, "AreaId">;
+export type NpcDefinitionId = Branded<string, "NpcDefinitionId">;
+export type NpcSpawnId = Branded<string, "NpcSpawnId">;
+export type ConsumableDefinitionId = Branded<string, "ConsumableDefinitionId">;
+export type EquipmentDefinitionId = Branded<string, "EquipmentDefinitionId">;
+export type ItemDefinitionId = ConsumableDefinitionId | EquipmentDefinitionId;
 
 export type NpcType =
   | "static"
@@ -51,7 +47,7 @@ export interface NpcItemReward {
   type: "item";
   npcId: NpcDefinitionId;
   itemType: "consumable" | "equipment";
-  itemId: string;
+  itemId: ItemDefinitionId;
   amount: number;
 }
 

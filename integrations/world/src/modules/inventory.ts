@@ -1,6 +1,11 @@
 import { defineModule } from "@rift/modular";
-import type { Entity } from "@rift/core";
-import { consumables, equipment, type ItemDefinition } from "@mp/fixtures";
+import type { Entity, EntityId } from "@rift/core";
+import {
+  consumables,
+  equipment,
+  type ItemDefinition,
+  type ItemDefinitionId,
+} from "@mp/fixtures";
 import {
   ItemOwner,
   ItemDefinitionComp,
@@ -8,7 +13,7 @@ import {
   Durable,
 } from "../components";
 
-const itemLookup = new Map<string, ItemDefinition>(
+const itemLookup = new Map<ItemDefinitionId, ItemDefinition>(
   [...consumables, ...equipment].map((d) => [d.id, d]),
 );
 
@@ -16,7 +21,7 @@ export const inventoryModule = defineModule({
   server: (ctx) => {
     const itemQuery = ctx.rift.query(ItemOwner, ItemDefinitionComp);
 
-    function spawnItem(ownerId: number, definitionId: string) {
+    function spawnItem(ownerId: EntityId, definitionId: ItemDefinitionId) {
       const def = itemLookup.get(definitionId);
       if (!def) {
         return;
@@ -62,7 +67,7 @@ export const inventoryModule = defineModule({
     return {
       api: {
         spawnItem,
-        getItemsForOwner(ownerId: number): Entity[] {
+        getItemsForOwner(ownerId: EntityId): Entity[] {
           const results: Entity[] = [];
           for (const item of itemQuery.value) {
             if (item.get(ItemOwner).ownerId === ownerId) {

@@ -1,5 +1,11 @@
 import { Vector } from "@mp/math";
-import type { Tile } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
+import type {
+  ActorModelId,
+  AreaId,
+  ItemDefinitionId,
+  NpcSpawnId,
+} from "@mp/fixtures";
 import {
   struct,
   f32,
@@ -30,18 +36,18 @@ export const Combat = struct({
   maxHealth: f32(),
   alive: bool(),
   attackDamage: f32(),
-  attackSpeed: f32(),
-  attackRange: f32(),
+  attackSpeed: f32<TimesPerSecond>(),
+  attackRange: f32<Tile>(),
 });
 
 export const Appearance = struct({
-  modelId: string(),
+  modelId: string<ActorModelId>(),
   name: string(),
 });
 
 export const NpcIdentity = struct({
   npcType: u8(),
-  spawnId: string(),
+  spawnId: string<NpcSpawnId>(),
 });
 
 export const CharacterIdentity = struct({
@@ -61,7 +67,7 @@ export const ItemOwner = struct({
 });
 
 export const ItemDefinitionComp = struct({
-  definitionId: string(),
+  definitionId: string<ItemDefinitionId>(),
   itemType: u8(),
 });
 
@@ -76,7 +82,7 @@ export const Durable = struct({
 });
 
 export const AreaTag = struct({
-  areaId: string(),
+  areaId: string<AreaId>(),
 });
 
 /** Marker component for dead NPCs awaiting corpse cleanup */

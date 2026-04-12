@@ -109,7 +109,7 @@ export const sessionModule = defineModule({
           return roles?.has(role) ?? false;
         },
         getEntityArea(entity: Entity): AreaId {
-          return entity.get(AreaTag).areaId as AreaId;
+          return entity.get(AreaTag).areaId;
         },
         setEntityArea(entity: Entity, areaId: AreaId) {
           entity.set(AreaTag, { areaId });

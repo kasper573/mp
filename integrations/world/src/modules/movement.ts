@@ -1,5 +1,5 @@
 import { defineModule } from "@rift/modular";
-import type { Entity } from "@rift/core";
+import type { Entity, EntityId } from "@rift/core";
 import type { Path, Vector, VectorLike } from "@mp/math";
 import { nearestCardinalDirection, cardinalDirections } from "@mp/math";
 import { TimeSpan } from "@mp/time";
@@ -28,11 +28,11 @@ export const movementModule = defineModule({
   server: (ctx) => {
     const { areas: areaMap } = ctx.using(areaModule);
     const session = ctx.using(sessionModule);
-    const movementStates = new Map<number, EntityMovementState>();
+    const movementStates = new Map<EntityId, EntityMovementState>();
 
     const actors = ctx.rift.query(Position, Movement);
 
-    function getMovementState(entityId: number): EntityMovementState {
+    function getMovementState(entityId: EntityId): EntityMovementState {
       let state = movementStates.get(entityId);
       if (!state) {
         state = { path: undefined, moveTarget: undefined };

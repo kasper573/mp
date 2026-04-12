@@ -48,7 +48,7 @@ export class AreaDebugGraphics extends Container {
         new DebugCircle(() => ({
           tiled: area.tiled,
           pos: entity.get(Position),
-          radius: entity.get(Combat).attackRange as Tile,
+          radius: entity.get(Combat).attackRange,
           color: uniqolor(String(entity.id)).color,
         })),
     );

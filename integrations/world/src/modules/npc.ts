@@ -1,5 +1,5 @@
 import { defineModule } from "@rift/modular";
-import type { Entity } from "@rift/core";
+import type { Entity, EntityId } from "@rift/core";
 import { Vector, clamp } from "@mp/math";
 import type { Path } from "@mp/math";
 import { Rng } from "@mp/std";
@@ -9,7 +9,9 @@ import {
   npcSpawns,
   npcRewards,
   type NpcDefinition,
+  type NpcDefinitionId,
   type NpcSpawn,
+  type NpcSpawnId,
   type NpcType,
   type NpcReward,
 } from "@mp/fixtures";
@@ -31,6 +33,9 @@ import { combatModule } from "./combat";
 import { inventoryModule } from "./inventory";
 
 const CORPSE_DURATION = 5; // seconds
+const IDLE_WANDER_DURATION = 5; // seconds
+const NPC_NORMAL_SPEED = 1 as Tile;
+const NPC_HUNT_SPEED = 2 as Tile;
 
 const NPC_TYPE_INDEX: Record<NpcType, number> = {
   static: 0,
@@ -46,21 +51,21 @@ const NPC_TYPE_INDEX: Record<NpcType, number> = {
 // ---------------------------------------------------------------------------
 
 class NpcCombatMemory {
-  #combats = new Map<string, [number, number]>();
+  #combats = new Map<string, [EntityId, EntityId]>();
 
   get combats() {
     return this.#combats.values();
   }
 
-  hasAttackedEachOther(a: number, b: number): boolean {
+  hasAttackedEachOther(a: EntityId, b: EntityId): boolean {
     return this.#combats.has(combatKey(a, b));
   }
 
-  observeAttack(attacker: number, target: number) {
+  observeAttack(attacker: EntityId, target: EntityId) {
     this.#combats.set(combatKey(attacker, target), [attacker, target]);
   }
 
-  forgetEntity(entityId: number) {
+  forgetEntity(entityId: EntityId) {
     for (const [key, [a, b]] of this.#combats) {
       if (a === entityId || b === entityId) {
         this.#combats.delete(key);
@@ -69,7 +74,7 @@ class NpcCombatMemory {
   }
 }
 
-function combatKey(a: number, b: number): string {
+function combatKey(a: EntityId, b: EntityId): string {
   return a < b ? `${a}_${b}` : `${b}_${a}`;
 }
 
@@ -87,15 +92,15 @@ interface NpcTaskCtx {
   hasPath(entity: Entity): boolean;
   setPath(entity: Entity, path: Path<Tile>): void;
   // Combat helpers
-  setAttackTarget(entity: Entity, targetId: number): void;
+  setAttackTarget(entity: Entity, targetId: EntityId): void;
   clearAttackTarget(entity: Entity): void;
-  getAttackTarget(entityId: number): number | undefined;
+  getAttackTarget(entityId: EntityId): EntityId | undefined;
   isTargetable(entity: Entity): boolean;
   // Queries
-  getEntityPosition(entityId: number): Vector<Tile> | undefined;
+  getEntityPosition(entityId: EntityId): Vector<Tile> | undefined;
   findCharactersInRange(pos: Vector<Tile>, range: Tile): Entity[];
-  findNpcsWithSpawn(spawnId: string): Entity[];
-  getCombatMemory(entityId: number): NpcCombatMemory | undefined;
+  findNpcsWithSpawn(spawnId: NpcSpawnId): Entity[];
+  getCombatMemory(entityId: EntityId): NpcCombatMemory | undefined;
   entityPosition(entity: Entity): Vector<Tile>;
 }
 
@@ -160,7 +165,7 @@ function createPatrolTask(path: Path<Tile>): Task {
 }
 
 function idleOrWander(rng: Rng, totalElapsed: number): Task {
-  const endTime = totalElapsed + 5;
+  const endTime = totalElapsed + IDLE_WANDER_DURATION;
   return rng.oneOf([
     createIdleTask(endTime, (ctx) => idleOrWander(ctx.rng, ctx.totalElapsed)),
     createWanderTask(endTime, (ctx) => idleOrWander(ctx.rng, ctx.totalElapsed)),
@@ -187,7 +192,7 @@ function createHuntTask(findEnemy: HuntFilter): Task {
         // Target out of range or gone — lose aggro
         ctx.clearAttackTarget(entity);
         ctx.clearPath(entity);
-        entity.get(Movement).speed = 1 as Tile;
+        entity.get(Movement).speed = NPC_NORMAL_SPEED;
       }
       return hunt;
     }
@@ -195,7 +200,7 @@ function createHuntTask(findEnemy: HuntFilter): Task {
     const newEnemyId = findEnemy(ctx, entity, state);
     if (newEnemyId !== undefined) {
       ctx.setAttackTarget(entity, newEnemyId);
-      entity.get(Movement).speed = 2 as Tile;
+      entity.get(Movement).speed = NPC_HUNT_SPEED;
       return hunt;
     }
 
@@ -206,7 +211,7 @@ function createHuntTask(findEnemy: HuntFilter): Task {
       if (node) {
         ctx.setMoveTarget(entity, node.data.vector);
       }
-      entity.get(Movement).speed = 1 as Tile;
+      entity.get(Movement).speed = NPC_NORMAL_SPEED;
     }
 
     return hunt;
@@ -241,7 +246,7 @@ const protectiveHuntFilter: HuntFilter = (ctx, entity, state) => {
   );
 
   // Actors attacking allies are enemies
-  const enemyIds = new Set<number>();
+  const enemyIds = new Set<EntityId>();
   for (const [a, b] of memory.combats) {
     if (allies.has(a)) {
       enemyIds.add(b);
@@ -305,13 +310,13 @@ export const npcModule = defineModule({
     const inventory = ctx.using(inventoryModule);
 
     const rng = new Rng();
-    const npcStates = new Map<number, NpcServerState>();
+    const npcStates = new Map<EntityId, NpcServerState>();
     let totalElapsed = 0;
 
     // Build lookup for NPC definitions by id
     const npcLookup = new Map(npcs.map((n) => [n.id, n]));
     // Build lookup for rewards by npcId
-    const rewardsByNpc = new Map<string, NpcReward[]>();
+    const rewardsByNpc = new Map<NpcDefinitionId, NpcReward[]>();
     for (const reward of npcRewards) {
       const existing = rewardsByNpc.get(reward.npcId);
       if (existing) {
@@ -403,31 +408,17 @@ export const npcModule = defineModule({
         isTargetable: (e) => combat.isTargetable(e),
         getEntityPosition: (id) => findEntityPosById(id),
         findCharactersInRange(pos, range) {
-          const results: Entity[] = [];
-          for (const c of characterQuery.value) {
-            const cc = c.get(Combat);
-            if (!cc.alive) {
-              continue;
-            }
-            // Only consider characters in the same area
-            if (c.has(AreaTag) && c.get(AreaTag).areaId !== area.id) {
-              continue;
-            }
-            const cp = c.get(Position);
-            if (pos.isWithinDistance(cp, range)) {
-              results.push(c);
-            }
-          }
-          return results;
+          return characterQuery.value.filter((c) => {
+            if (!c.get(Combat).alive) return false;
+            if (c.has(AreaTag) && c.get(AreaTag).areaId !== area.id)
+              return false;
+            return pos.isWithinDistance(c.get(Position), range);
+          });
         },
         findNpcsWithSpawn(spawnId) {
-          const results: Entity[] = [];
-          for (const n of npcQuery.value) {
-            if (n.get(NpcIdentity).spawnId === spawnId) {
-              results.push(n);
-            }
-          }
-          return results;
+          return npcQuery.value.filter(
+            (n) => n.get(NpcIdentity).spawnId === spawnId,
+          );
         },
         getCombatMemory(entityId) {
           return npcStates.get(entityId)?.combatMemory;
@@ -443,8 +434,8 @@ export const npcModule = defineModule({
         for (const npcEntity of npcQuery.value) {
           const nState = npcStates.get(npcEntity.id);
           if (!nState || !npcEntity.get(Combat).alive) continue;
+
           const npcAreaId = npcEntity.get(AreaTag).areaId;
-          // Only observe attacks within the same area
           const attackerEntity = ctx.rift.entity(attack.attackerId);
           if (
             attackerEntity?.has(AreaTag) &&
@@ -452,20 +443,18 @@ export const npcModule = defineModule({
           ) {
             continue;
           }
+
           const npcPos = npcEntity.get(Position);
           const attackerPos = findEntityPosById(attack.attackerId);
           const targetPos = findEntityPosById(attack.targetId);
-          const inRange =
-            (attackerPos &&
-              npcPos.isWithinDistance(attackerPos, nState.aggroRange)) ||
-            (targetPos &&
-              npcPos.isWithinDistance(targetPos, nState.aggroRange));
-          if (inRange) {
-            nState.combatMemory.observeAttack(
-              attack.attackerId,
-              attack.targetId,
-            );
-          }
+          const attackerInRange =
+            attackerPos &&
+            npcPos.isWithinDistance(attackerPos, nState.aggroRange);
+          const targetInRange =
+            targetPos && npcPos.isWithinDistance(targetPos, nState.aggroRange);
+          if (!attackerInRange && !targetInRange) continue;
+
+          nState.combatMemory.observeAttack(attack.attackerId, attack.targetId);
         }
       }
     }
@@ -548,7 +537,7 @@ export const npcModule = defineModule({
 
     // --- Helpers ---
 
-    function findEntityPosById(entityId: number): Vector<Tile> | undefined {
+    function findEntityPosById(entityId: EntityId): Vector<Tile> | undefined {
       const entity = ctx.rift.entity(entityId);
       if (entity?.has(Position)) {
         return entity.get(Position);
@@ -556,7 +545,7 @@ export const npcModule = defineModule({
       return undefined;
     }
 
-    function giveNpcRewards(recipient: Entity, npcDefId: string) {
+    function giveNpcRewards(recipient: Entity, npcDefId: NpcDefinitionId) {
       const rewards = rewardsByNpc.get(npcDefId);
       if (!rewards) {
         return;

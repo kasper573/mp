@@ -58,7 +58,7 @@ export class GameStateClient {
     this.areaId = computed(() => {
       const entity = this.myEntity.value;
       if (!entity || !entity.has(AreaTag)) return undefined;
-      return entity.get(AreaTag).areaId as AreaId;
+      return entity.get(AreaTag).areaId;
     });
 
     const allItems = this.rift.query(ItemOwner, ItemDefinitionComp);
