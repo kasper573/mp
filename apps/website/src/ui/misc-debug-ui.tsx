@@ -2,11 +2,12 @@ import { StorageSignal } from "@mp/state";
 import { Checkbox } from "@mp/ui";
 import { useQuery } from "@tanstack/react-query";
 import { env } from "../env";
-import type { GameStateClient } from "@mp/game-client";
+import { useCombat } from "@mp/world";
 
 const pingEnabledSignal = new StorageSignal("local", "pingEnabled", true);
 
-export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
+export function MiscDebugUi() {
+  const combat = useCombat();
   return (
     <>
       <div>Client version: {env.version}</div>
@@ -15,7 +16,7 @@ export function MiscDebugUi({ stateClient }: { stateClient: GameStateClient }) {
         {pingEnabledSignal.value ? <PingIndicator /> : null}
       </label>
       <br />
-      <button onClick={() => stateClient.recall()}>Recall</button>
+      <button onClick={() => combat.recall()}>Recall</button>
     </>
   );
 }

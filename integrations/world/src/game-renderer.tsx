@@ -7,28 +7,24 @@ import { StorageSignal, untracked } from "@mp/state";
 import { useSignal, useSignalEffect } from "@mp/state/react";
 import type { JSX } from "preact";
 import { useState } from "preact/hooks";
-import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { GameClient as RiftGameClient } from "@rift/modular";
+import type { ActorTextureLookup } from "./modules/area/actor-texture-lookup";
 import {
   AreaDebugSettingsForm,
   type AreaDebugSettings,
-} from "./area-debug-settings-form";
-import { AreaScene } from "./area-scene";
-import { AreaUi } from "./area-ui";
-import {
-  GameStateClientContext,
-  useActorTextures,
-  useAreaAssets,
-} from "./context";
+} from "./modules/area/area-debug-settings-form";
+import { AreaScene } from "./modules/area/area-scene";
+import { AreaUi } from "./modules/area/area-ui";
+import { GameClientContext, useActorTextures, useAreaAssets } from "./context";
 import type { AreaAssets } from "./game-asset-loader";
 import { GameDebugUi } from "./game-debug-ui";
-import type { GameStateClient } from "./game-state-client";
 import { useObjectSignal } from "./use-object-signal";
 import { Suspense } from "preact/compat";
 import { Dock, ErrorFallback } from "@mp/ui";
 
 interface GameRendererProps {
   interactive: boolean;
-  gameStateClient: GameStateClient;
+  gameClient: RiftGameClient;
   additionalDebugUi?: JSX.Element;
   areaIdToLoadAssetsFor: AreaId;
   enableUi?: boolean;
@@ -39,7 +35,7 @@ interface GameRendererProps {
  */
 export function GameRenderer({
   interactive,
-  gameStateClient,
+  gameClient,
   areaIdToLoadAssetsFor,
   additionalDebugUi,
   enableUi = true,
@@ -51,7 +47,7 @@ export function GameRenderer({
   const appSignal = useGraphics(container);
   const optionsSignal = useObjectSignal({
     interactive,
-    gameStateClient,
+    gameClient,
     areaAssets,
     actorTextures,
     showDebugUi,
@@ -69,7 +65,7 @@ export function GameRenderer({
     <>
       <div ref={setContainer} style={{ flex: 1 }} />
       {enableUi && (
-        <GameStateClientContext.Provider value={gameStateClient}>
+        <GameClientContext.Provider value={gameClient}>
           <Suspense fallback={<UILoadingFallback />}>
             <AreaUi />
             {showDebugUi.value && (
@@ -79,7 +75,7 @@ export function GameRenderer({
               </GameDebugUi>
             )}
           </Suspense>
-        </GameStateClientContext.Provider>
+        </GameClientContext.Provider>
       )}
     </>
   );
@@ -110,7 +106,7 @@ function buildStage(
   app: Application,
   opt: {
     interactive: boolean;
-    gameStateClient: GameStateClient;
+    gameClient: RiftGameClient;
     areaAssets: AreaAssets;
     actorTextures: ActorTextureLookup;
     showDebugUi: Signal<boolean>;
@@ -129,7 +125,7 @@ function buildStage(
   const areaScene = new AreaScene({
     engine,
     debugSettings: () => areaDebugSettingsStorage.value,
-    state: opt.gameStateClient,
+    gameClient: opt.gameClient,
     actorTextures: opt.actorTextures,
     area: opt.areaAssets.resource,
     areaSpritesheets: opt.areaAssets.spritesheets,

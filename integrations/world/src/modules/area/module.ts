@@ -1,8 +1,8 @@
 import { defineModule } from "@rift/modular";
 import { areas } from "@mp/fixtures";
 import type { AreaId } from "@mp/fixtures";
-import { loadAreaResource } from "../load-area-resource";
-import type { AreaResource } from "../area-resource";
+import { loadAreaResource } from "./load-area-resource";
+import type { AreaResource } from "./area-resource";
 
 declare module "@rift/modular" {
   interface ServerContextValues {

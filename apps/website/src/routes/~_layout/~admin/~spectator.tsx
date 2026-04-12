@@ -1,10 +1,10 @@
-import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
+import { GameAssetLoaderContext, SpectatorClient } from "@mp/world";
 import { gameServiceRoles } from "@mp/keycloak";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
 import { gameAssetLoader } from "../../../integrations/assets";
-import { useGameStateClient } from "../../../integrations/use-game-state-client";
+import { useGameClient } from "../../../integrations/use-game-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
 
@@ -15,7 +15,13 @@ export const Route = createFileRoute("/_layout/admin/spectator")({
 });
 
 function RouteComponent() {
-  const stateClient = useGameStateClient();
+  const client = useGameClient();
+
+  if (!client) {
+    return (
+      <LoadingSpinner debugDescription="~spectator.tsx initializing client" />
+    );
+  }
 
   return (
     <div
@@ -29,8 +35,8 @@ function RouteComponent() {
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <SpectatorClient
-            stateClient={stateClient}
-            additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
+            client={client}
+            additionalDebugUi={<MiscDebugUi />}
             interactive={false}
           />
         </GameAssetLoaderContext.Provider>

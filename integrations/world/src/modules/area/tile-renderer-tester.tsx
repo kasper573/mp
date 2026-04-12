@@ -1,4 +1,4 @@
-import { dynamicLayerName } from "@mp/world";
+import { dynamicLayerName } from "./area-resource";
 import type { Container, Size, Texture } from "@mp/graphics";
 import { Assets, FpsIndicator, Spritesheet } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
@@ -21,7 +21,7 @@ import {
   generateTilesetTile,
 } from "./test-tile-map-generator";
 import testTilesetTextureUrl from "./tile-renderer-tester.tileset.png";
-import { useQuerySignal } from "./use-query-signal";
+import { useQuerySignal } from "../../use-query-signal";
 
 export function TileRendererTester() {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);

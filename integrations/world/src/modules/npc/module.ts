@@ -24,13 +24,13 @@ import {
   CharacterIdentity,
   Progression,
   AreaTag,
-} from "../components";
-import type { AreaResource } from "../area-resource";
-import { areaModule } from "./area";
-import { sessionModule } from "./session";
-import { movementModule } from "./movement";
-import { combatModule } from "./combat";
-import { inventoryModule } from "./inventory";
+} from "../../components";
+import type { AreaResource } from "../area/area-resource";
+import { areaModule } from "../area/module";
+import { sessionModule } from "../session/module";
+import { movementModule } from "../movement/module";
+import { combatModule } from "../combat/module";
+import { inventoryModule } from "../inventory/module";
 
 const CORPSE_DURATION = 5; // seconds
 const IDLE_WANDER_DURATION = 5; // seconds

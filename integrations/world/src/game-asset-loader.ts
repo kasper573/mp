@@ -1,7 +1,7 @@
 import type { AreaId } from "@mp/fixtures";
-import type { AreaResource } from "@mp/world";
+import type { AreaResource } from "./modules/area/area-resource";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
-import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { ActorTextureLookup } from "./modules/area/actor-texture-lookup";
 
 export interface AreaAssets {
   spritesheets: TiledSpritesheetRecord;

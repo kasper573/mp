@@ -1,15 +1,14 @@
 import type { DialogProps } from "@mp/ui";
 import { Button, Dialog } from "@mp/ui";
-import { useContext } from "preact/hooks";
-import { GameStateClientContext } from "./context";
+import { useCombat } from "../../context";
 
 export function RespawnDialog(props: DialogProps) {
-  const client = useContext(GameStateClientContext);
+  const combat = useCombat();
 
   return (
     <Dialog {...props}>
       <h1>You are dead</h1>
-      <Button onClick={() => client.respawn()}>Respawn</Button>
+      <Button onClick={() => combat.respawn()}>Respawn</Button>
     </Dialog>
   );
 }

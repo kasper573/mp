@@ -134,6 +134,9 @@ importers:
       '@rift/modular':
         specifier: workspace:*
         version: link:../../libraries/rift/modular
+      preact:
+        specifier: 'catalog:'
+        version: 10.29.1
       ws:
         specifier: 'catalog:'
         version: 8.20.0
@@ -144,12 +147,24 @@ importers:
       '@mp/tsconfig':
         specifier: workspace:*
         version: link:../../libraries/tsconfig
+      '@preact/preset-vite':
+        specifier: 'catalog:'
+        version: 2.10.5(@babel/core@7.29.0)(preact@10.29.1)(rollup@4.59.0)(vite@8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
+      '@prefresh/core':
+        specifier: 'catalog:'
+        version: 1.5.9(preact@10.29.1)
       '@types/ws':
         specifier: 'catalog:'
         version: 8.18.1
+      '@vanilla-extract/vite-plugin':
+        specifier: 'catalog:'
+        version: 5.2.2(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(babel-plugin-macros@3.1.0)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(vite@8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))(yaml@2.8.3)
       tsx:
         specifier: 'catalog:'
         version: 4.21.0
+      vite:
+        specifier: 'catalog:'
+        version: 8.0.3(@emnapi/core@1.9.0)(@emnapi/runtime@1.9.2)(@types/node@25.5.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3)
 
   apps/loadtest:
     dependencies:
@@ -159,9 +174,6 @@ importers:
       '@mp/fixtures':
         specifier: workspace:*
         version: link:../../integrations/fixtures
-      '@mp/game-client':
-        specifier: workspace:*
-        version: link:../../integrations/game-client
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
@@ -180,6 +192,9 @@ importers:
       '@rift/core':
         specifier: workspace:*
         version: link:../../libraries/rift/core
+      '@rift/modular':
+        specifier: workspace:*
+        version: link:../../libraries/rift/modular
       ws:
         specifier: 'catalog:'
         version: 8.20.0
@@ -226,9 +241,6 @@ importers:
       '@mp/fixtures':
         specifier: workspace:*
         version: link:../../integrations/fixtures
-      '@mp/game-client':
-        specifier: workspace:*
-        version: link:../../integrations/game-client
       '@mp/graphics':
         specifier: workspace:*
         version: link:../../libraries/graphics
@@ -265,6 +277,9 @@ importers:
       '@rift/core':
         specifier: workspace:*
         version: link:../../libraries/rift/core
+      '@rift/modular':
+        specifier: workspace:*
+        version: link:../../libraries/rift/modular
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.96.2(react@19.1.0)
@@ -322,7 +337,32 @@ importers:
         specifier: 'catalog:'
         version: 6.0.2
 
-  integrations/game-client:
+  integrations/keycloak:
+    dependencies:
+      '@keycloak/keycloak-admin-client':
+        specifier: 26.5.7
+        version: 26.5.7
+      '@mp/auth':
+        specifier: workspace:*
+        version: link:../../libraries/auth
+      '@mp/logger':
+        specifier: workspace:*
+        version: link:../../libraries/logger
+      '@mp/std':
+        specifier: workspace:*
+        version: link:../../libraries/std
+    devDependencies:
+      '@mp/build':
+        specifier: workspace:*
+        version: link:../../libraries/build
+      '@mp/tsconfig':
+        specifier: workspace:*
+        version: link:../../libraries/tsconfig
+      '@types/node':
+        specifier: 'catalog:'
+        version: 25.5.2
+
+  integrations/world:
     dependencies:
       '@mp/engine':
         specifier: workspace:*
@@ -360,12 +400,12 @@ importers:
       '@mp/ui':
         specifier: workspace:*
         version: link:../../libraries/ui
-      '@mp/world':
-        specifier: workspace:*
-        version: link:../world
       '@rift/core':
         specifier: workspace:*
         version: link:../../libraries/rift/core
+      '@rift/modular':
+        specifier: workspace:*
+        version: link:../../libraries/rift/modular
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.96.2(react@19.1.0)
@@ -378,62 +418,6 @@ importers:
       unique-names-generator:
         specifier: ^4.7.1
         version: 4.7.1
-    devDependencies:
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-
-  integrations/keycloak:
-    dependencies:
-      '@keycloak/keycloak-admin-client':
-        specifier: 26.5.7
-        version: 26.5.7
-      '@mp/auth':
-        specifier: workspace:*
-        version: link:../../libraries/auth
-      '@mp/logger':
-        specifier: workspace:*
-        version: link:../../libraries/logger
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-    devDependencies:
-      '@mp/build':
-        specifier: workspace:*
-        version: link:../../libraries/build
-      '@mp/tsconfig':
-        specifier: workspace:*
-        version: link:../../libraries/tsconfig
-      '@types/node':
-        specifier: 'catalog:'
-        version: 25.5.2
-
-  integrations/world:
-    dependencies:
-      '@mp/fixtures':
-        specifier: workspace:*
-        version: link:../fixtures
-      '@mp/math':
-        specifier: workspace:*
-        version: link:../../libraries/math
-      '@mp/path-finding':
-        specifier: workspace:*
-        version: link:../../libraries/path-finding
-      '@mp/std':
-        specifier: workspace:*
-        version: link:../../libraries/std
-      '@mp/tiled-loader':
-        specifier: workspace:*
-        version: link:../../libraries/tiled-loader
-      '@mp/time':
-        specifier: workspace:*
-        version: link:../../libraries/time
-      '@rift/core':
-        specifier: workspace:*
-        version: link:../../libraries/rift/core
-      '@rift/modular':
-        specifier: workspace:*
-        version: link:../../libraries/rift/modular
     devDependencies:
       '@mp/tsconfig':
         specifier: workspace:*

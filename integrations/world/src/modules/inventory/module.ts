@@ -1,5 +1,6 @@
 import { defineModule } from "@rift/modular";
 import type { Entity, EntityId } from "@rift/core";
+import { computed } from "@mp/state";
 import {
   consumables,
   equipment,
@@ -11,13 +12,29 @@ import {
   ItemDefinitionComp,
   Stackable,
   Durable,
-} from "../components";
+} from "../../components";
+import { sessionModule } from "../session/module";
 
 const itemLookup = new Map<ItemDefinitionId, ItemDefinition>(
   [...consumables, ...equipment].map((d) => [d.id, d]),
 );
 
 export const inventoryModule = defineModule({
+  dependencies: [sessionModule],
+  client: (ctx) => {
+    const session = ctx.using(sessionModule);
+    const allItems = ctx.rift.query(ItemOwner, ItemDefinitionComp);
+
+    const myItems = computed(() => {
+      const myId = session.myEntityId.value;
+      if (myId === undefined) return [];
+      return allItems.value.filter(
+        (item) => item.get(ItemOwner).ownerId === myId,
+      );
+    });
+
+    return { api: { myItems } };
+  },
   server: (ctx) => {
     const itemQuery = ctx.rift.query(ItemOwner, ItemDefinitionComp);
 

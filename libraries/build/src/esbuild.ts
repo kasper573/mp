@@ -22,6 +22,7 @@ export function build(
       "pino",
       "pino-pretty",
     ],
+    loader: { ".png": "empty" },
     mainFields: ["module", "main"],
     // Fix for https://github.com/evanw/esbuild/pull/2067
     banner: {

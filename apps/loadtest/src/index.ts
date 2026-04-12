@@ -1,9 +1,13 @@
 // oxlint-disable no-await-in-loop
 import { RiftClient } from "@rift/core";
-import { GameStateClient } from "@mp/game-client";
+import { GameClient, type GameClientSocket } from "@rift/modular";
 import { areas, type AreaId } from "@mp/fixtures";
 import {
   world,
+  modules,
+  sessionModule,
+  movementModule,
+  combatModule,
   loadAreaResource,
   hitTestTiledObject,
   Combat,
@@ -11,7 +15,7 @@ import {
 } from "@mp/world";
 import { createConsoleLogger } from "@mp/logger";
 import { createBypassUser } from "@mp/auth";
-import type { Signal } from "@mp/state";
+import type { ReadonlySignal } from "@mp/state";
 import { Rng } from "@mp/std";
 import { readCliOptions } from "./cli";
 import { WebSocket } from "ws";
@@ -118,37 +122,40 @@ function testOneGameClient(n: number, rng: Rng) {
       }
 
       const rift = new RiftClient(world);
-      const stateClient = new GameStateClient({
-        socket: socket as unknown as globalThis.WebSocket,
+      const client = new GameClient({
+        modules,
         rift,
+        socket: socket as unknown as GameClientSocket,
       });
 
-      const stopClient = stateClient.start();
+      await client.start();
+      const session = client.using(sessionModule);
+      const movement = client.using(movementModule);
+      const combat = client.using(combatModule);
 
       if (verbose) {
         logger.info(`Socket ${n} waiting for session assignment...`);
       }
 
-      await waitUntil(stateClient.isGameReady, (v) => v, 15_000);
+      await waitUntil(session.isGameReady, (v) => v, 15_000);
 
       if (verbose) {
         logger.info(
-          `Socket ${n} session assigned, entity: ${stateClient.myEntityId.value}`,
+          `Socket ${n} session assigned, entity: ${session.myEntityId.value}`,
         );
       }
 
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
-        const myEntity = stateClient.myEntity.value;
+        const myEntity = session.myEntity.value;
         if (myEntity && myEntity.has(Combat)) {
-          const combat = myEntity.get(Combat);
-          if (!combat.health) {
+          if (!myEntity.get(Combat).health) {
             logger.info(`Character for socket ${n} will respawn`);
-            stateClient.respawn();
+            combat.respawn();
           }
         }
 
-        const currentAreaId = stateClient.areaId.value;
+        const currentAreaId = session.areaId.value;
         const currentArea = currentAreaId
           ? areaResources.get(currentAreaId)
           : undefined;
@@ -164,7 +171,7 @@ function testOneGameClient(n: number, rng: Rng) {
                 ),
               );
               const to = rng.oneOf(portalWalkableTiles);
-              stateClient.move(to);
+              movement.move(to);
               logger.info(
                 `Character for socket ${n} will run to ${to} (portal ${portal.object.id})`,
               );
@@ -172,7 +179,7 @@ function testOneGameClient(n: number, rng: Rng) {
             }
             case "run": {
               const to = rng.oneOf(tiles(currentArea));
-              stateClient.move(to);
+              movement.move(to);
               logger.info(`Character for socket ${n} will run to ${to}`);
               break;
             }
@@ -190,7 +197,7 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} test finished`);
       }
-      stopClient();
+      client.dispose();
       resolve();
     })().catch(failTest);
   }).finally(() => {
@@ -232,7 +239,7 @@ function wait(ms: number) {
 }
 
 function waitUntil<T>(
-  signal: Signal<T>,
+  signal: ReadonlySignal<T>,
   isReady: (value: T) => boolean,
   timeout: number,
 ): Promise<T> {

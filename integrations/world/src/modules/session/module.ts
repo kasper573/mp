@@ -1,5 +1,6 @@
 import { defineModule, toUint8ArrayMessage } from "@rift/modular";
-import type { ClientId, Entity } from "@rift/core";
+import type { ClientId, Entity, EntityId } from "@rift/core";
+import { signal, computed } from "@mp/state";
 import { areas, defaultCharacter } from "@mp/fixtures";
 import type { AreaId } from "@mp/fixtures";
 import {
@@ -10,9 +11,9 @@ import {
   CharacterIdentity,
   Progression,
   AreaTag,
-} from "../components";
-import { SessionAssigned } from "../events";
-import { areaModule } from "./area";
+} from "../../components";
+import { SessionAssigned } from "../../events";
+import { areaModule } from "../area/module";
 
 declare module "@rift/modular" {
   interface ConnectionRequest {
@@ -26,6 +27,52 @@ declare module "@rift/modular" {
 
 export const sessionModule = defineModule({
   dependencies: [areaModule],
+  client: (ctx) => {
+    const myEntityId = signal<EntityId | undefined>(undefined);
+    const isConnected = signal(ctx.socket.readyState === ctx.socket.OPEN);
+    const actors = ctx.rift.query(Position, Movement, Combat, Appearance);
+
+    const myEntity = computed(() => {
+      const id = myEntityId.value;
+      if (id === undefined) return undefined;
+      void actors.value;
+      return ctx.rift.entity(id);
+    });
+
+    const isGameReady = computed(() => myEntity.value !== undefined);
+
+    const areaId = computed<AreaId | undefined>(() => {
+      const entity = myEntity.value;
+      if (!entity || !entity.has(AreaTag)) return undefined;
+      return entity.get(AreaTag).areaId;
+    });
+
+    const prevOnOpen = ctx.socket.onopen;
+    ctx.socket.onopen = (e) => {
+      prevOnOpen?.call(ctx.socket, e);
+      isConnected.value = true;
+    };
+
+    const prevOnClose = ctx.socket.onclose;
+    ctx.socket.onclose = (e) => {
+      prevOnClose?.call(ctx.socket, e);
+      isConnected.value = false;
+      myEntityId.value = undefined;
+    };
+
+    const unsubSession = ctx.rift.on(SessionAssigned, (data) => {
+      myEntityId.value = data.entityId;
+    });
+
+    return {
+      api: { myEntityId, myEntity, isConnected, isGameReady, actors, areaId },
+      dispose() {
+        unsubSession();
+        ctx.socket.onopen = prevOnOpen ?? null;
+        ctx.socket.onclose = prevOnClose ?? null;
+      },
+    };
+  },
   server: (ctx) => {
     const clientEntities = new Map<ClientId, Entity>();
     const clientRoles = new Map<ClientId, ReadonlySetLike<string>>();

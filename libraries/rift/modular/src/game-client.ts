@@ -13,8 +13,8 @@ interface GameClientConfig {
   modules: AnyModule[];
   rift: RiftClient;
   socket: GameClientSocket;
-  root: HTMLElement;
-  window: Window;
+  root?: HTMLElement;
+  window?: Window;
 }
 
 interface ClientModuleState {
@@ -50,6 +50,18 @@ export class GameClient {
     if (this.config.socket.readyState === this.config.socket.OPEN) {
       this.config.socket.send(data);
     }
+  }
+
+  get rift(): RiftClient {
+    return this.config.rift;
+  }
+
+  using<M extends AnyModule>(module: M): ClientApi<M> {
+    const api = this.#moduleApis.get(module);
+    if (!api) {
+      throw new Error(`Module has not been initialized`, { cause: module });
+    }
+    return api as ClientApi<M>;
   }
 
   dispose(): void {

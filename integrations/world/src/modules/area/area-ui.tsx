@@ -1,8 +1,12 @@
-import { useContext } from "preact/hooks";
 import { items as itemDefs, type ItemDefinition } from "@mp/fixtures";
-import { Combat, ItemDefinitionComp, Stackable, Durable } from "@mp/world";
-import { GameStateClientContext } from "./context";
-import { RespawnDialog } from "./respawn-dialog";
+import {
+  Combat,
+  ItemDefinitionComp,
+  Stackable,
+  Durable,
+} from "../../components";
+import { useSession, useInventory } from "../../context";
+import { RespawnDialog } from "../combat/respawn-dialog";
 import * as css from "./area-ui.css";
 
 const itemDefLookup = new Map<string, ItemDefinition>(
@@ -10,10 +14,11 @@ const itemDefLookup = new Map<string, ItemDefinition>(
 );
 
 export function AreaUi() {
-  const state = useContext(GameStateClientContext);
-  const entity = state.myEntity.value;
+  const session = useSession();
+  const inventory = useInventory();
+  const entity = session.myEntity.value;
   const health = entity ? entity.get(Combat).health : 0;
-  const myItems = state.myItems.value;
+  const myItems = inventory.myItems.value;
 
   return (
     <>

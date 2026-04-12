@@ -2,6 +2,9 @@
   "extends": "@mp/tsconfig/node.json",
   "include": ["src", "*.ts"],
   "compilerOptions": {
-    "lib": ["ESNext", "DOM"]
+    "lib": ["ESNext", "DOM"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   }
 }

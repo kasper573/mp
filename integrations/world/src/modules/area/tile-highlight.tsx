@@ -1,4 +1,4 @@
-import type { AreaResource } from "@mp/world";
+import type { AreaResource } from "./area-resource";
 import type { FillStyle } from "@mp/graphics";
 import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";

@@ -4,18 +4,19 @@ import type { Path, Vector, VectorLike } from "@mp/math";
 import { nearestCardinalDirection, cardinalDirections } from "@mp/math";
 import { TimeSpan } from "@mp/time";
 import type { Tile } from "@mp/std";
+import { throttle, dedupe } from "@mp/std";
 import {
   Position,
   Movement,
   Combat,
   CharacterIdentity,
   AreaTag,
-} from "../components";
-import { MoveCommand, RecallCommand } from "../events";
-import { moveAlongPath, type MovementState } from "../move-along-path";
-import type { AreaResource } from "../area-resource";
-import { areaModule } from "./area";
-import { sessionModule } from "./session";
+} from "../../components";
+import { MoveCommand, RecallCommand } from "../../events";
+import { moveAlongPath, type MovementState } from "./move-along-path";
+import type { AreaResource } from "../area/area-resource";
+import { areaModule } from "../area/module";
+import { sessionModule } from "../session/module";
 
 /** Server-only state per entity */
 interface EntityMovementState {
@@ -25,6 +26,16 @@ interface EntityMovementState {
 
 export const movementModule = defineModule({
   dependencies: [areaModule, sessionModule],
+  client: (ctx) => {
+    const move = dedupe(
+      throttle((to: Vector<Tile>) => {
+        ctx.send(MoveCommand, { x: to.x, y: to.y });
+      }, 100),
+      ([a], [b]) => a.equals(b),
+    );
+
+    return { api: { move } };
+  },
   server: (ctx) => {
     const { areas: areaMap } = ctx.using(areaModule);
     const session = ctx.using(sessionModule);

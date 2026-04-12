@@ -15,7 +15,7 @@ import { Select } from "@mp/ui";
 import { useState } from "preact/hooks";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
-import { useObjectSignal } from "./use-object-signal";
+import { useObjectSignal } from "../../use-object-signal";
 
 export function ActorSpriteTester({
   modelIds,

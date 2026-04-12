@@ -1,5 +1,5 @@
 import { actorModelIds } from "@mp/fixtures";
-import { ActorSpriteTester } from "@mp/game-client";
+import { ActorSpriteTester } from "@mp/world";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActorTextures } from "../../../../integrations/assets";
 

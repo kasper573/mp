@@ -1,9 +1,9 @@
-import { GameAssetLoaderContext, GameClient } from "@mp/game-client";
+import { GameAssetLoaderContext, GameClient } from "@mp/world";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
 import { gameAssetLoader } from "../../integrations/assets";
-import { useGameStateClient } from "../../integrations/use-game-state-client";
+import { useGameClient } from "../../integrations/use-game-client";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { MiscDebugUi } from "../../ui/misc-debug-ui";
 
@@ -12,7 +12,11 @@ export const Route = createFileRoute("/_layout/play")({
 });
 
 function PlayPage() {
-  const stateClient = useGameStateClient();
+  const client = useGameClient();
+
+  if (!client) {
+    return <LoadingSpinner debugDescription="~play.tsx initializing client" />;
+  }
 
   // It's important to have a suspense boundary here to avoid game resources suspending
   // all the way up to the routers pending component, which would unmount the page,
@@ -21,8 +25,8 @@ function PlayPage() {
     <Suspense fallback={<LoadingSpinner debugDescription="~play.tsx" />}>
       <GameAssetLoaderContext.Provider value={gameAssetLoader}>
         <GameClient
-          stateClient={stateClient}
-          additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
+          client={client}
+          additionalDebugUi={<MiscDebugUi />}
           interactive
         />
       </GameAssetLoaderContext.Provider>

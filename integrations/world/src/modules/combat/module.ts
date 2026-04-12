@@ -3,17 +3,23 @@ import type { Entity, EntityId, Infer } from "@rift/core";
 import { clamp } from "@mp/math";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
-import { Position, Movement, Combat, CharacterIdentity } from "../components";
+import {
+  Position,
+  Movement,
+  Combat,
+  CharacterIdentity,
+} from "../../components";
 import {
   MoveCommand,
   AttackCommand,
   AttackAnimation,
   DeathAnimation,
   RespawnCommand,
-} from "../events";
-import { sessionModule } from "./session";
-import { movementModule } from "./movement";
-import { areaModule } from "./area";
+  RecallCommand,
+} from "../../events";
+import { sessionModule } from "../session/module";
+import { movementModule } from "../movement/module";
+import { areaModule } from "../area/module";
 
 /** sqrt(2) - 1: margin so 1-range attacks can reach diagonal tiles */
 const TILE_MARGIN = Math.sqrt(2) - 1;
@@ -27,6 +33,21 @@ interface CombatState {
 
 export const combatModule = defineModule({
   dependencies: [areaModule, sessionModule, movementModule],
+  client: (ctx) => {
+    return {
+      api: {
+        attack(targetId: EntityId) {
+          ctx.send(AttackCommand, { targetId });
+        },
+        respawn() {
+          ctx.send(RespawnCommand, undefined);
+        },
+        recall() {
+          ctx.send(RecallCommand, undefined);
+        },
+      },
+    };
+  },
   server: (ctx) => {
     const session = ctx.using(sessionModule);
     const movement = ctx.using(movementModule);

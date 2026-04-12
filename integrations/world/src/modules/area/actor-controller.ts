@@ -1,5 +1,5 @@
 import type { Entity, RiftClient } from "@rift/core";
-import type { TiledResource } from "@mp/world";
+import type { TiledResource } from "./tiled-resource";
 import {
   Position,
   Movement,
@@ -8,9 +8,8 @@ import {
   CharacterIdentity,
   Progression,
   NpcIdentity,
-  AttackAnimation,
-  DeathAnimation,
-} from "@mp/world";
+} from "../../components";
+import { AttackAnimation, DeathAnimation } from "../../events";
 import type { DestroyOptions } from "@mp/graphics";
 import { cardinalDirections } from "@mp/math";
 import type { Pixel } from "@mp/std";

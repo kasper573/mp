@@ -1,7 +1,12 @@
 import { actorModelIds, areas, type AreaId } from "@mp/fixtures";
-import type { ActorTextureLookup, AreaAssetsLookup } from "@mp/game-client";
-import { loadActorTextureLookup, type GameAssetLoader } from "@mp/game-client";
-import { loadAreaResource, type AreaResource } from "@mp/world";
+import {
+  loadActorTextureLookup,
+  loadAreaResource,
+  type ActorTextureLookup,
+  type AreaAssetsLookup,
+  type AreaResource,
+  type GameAssetLoader,
+} from "@mp/world";
 import { useSuspenseQuery } from "@tanstack/react-query";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { loadTiledMapSpritesheets } from "@mp/tiled-renderer";

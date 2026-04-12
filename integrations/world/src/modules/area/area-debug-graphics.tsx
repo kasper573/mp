@@ -1,13 +1,10 @@
 import type { Engine } from "@mp/engine";
 import type { Entity, RiftQuery } from "@rift/core";
-import type { AreaResource, TiledResource } from "@mp/world";
-import {
-  Position,
-  Combat,
-  NpcIdentity,
-  clientViewDistanceRect,
-  WalkableChecker,
-} from "@mp/world";
+import type { AreaResource } from "./area-resource";
+import type { TiledResource } from "./tiled-resource";
+import { Position, Combat, NpcIdentity } from "../../components";
+import { clientViewDistanceRect } from "./view-distance";
+import { WalkableChecker } from "./tiled-walkable-checker";
 import { clientViewDistance } from "@mp/fixtures";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";

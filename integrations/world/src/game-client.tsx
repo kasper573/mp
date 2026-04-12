@@ -1,12 +1,13 @@
 import { Suspense } from "preact/compat";
 import { LoadingSpinner } from "@mp/ui";
 import type { JSX } from "preact";
-import type { GameStateClient } from "./game-state-client";
+import type { GameClient as RiftGameClient } from "@rift/modular";
 import { GameRenderer } from "./game-renderer";
 import { PendingQueriesDescription } from "./pending-queries-description";
+import { sessionModule } from "./modules/session/module";
 
 export interface GameClientProps {
-  stateClient: GameStateClient;
+  client: RiftGameClient;
   interactive: boolean;
   additionalDebugUi?: JSX.Element;
   enableUi?: boolean;
@@ -18,15 +19,17 @@ export interface GameClientProps {
  * can focus on the data fetching and state management.
  */
 export function GameClient(props: GameClientProps) {
-  if (!props.stateClient.isConnected.value) {
+  const session = props.client.using(sessionModule);
+
+  if (!session.isConnected.value) {
     return (
-      <LoadingSpinner debugDescription="GameStateClient not connected">
+      <LoadingSpinner debugDescription="GameClient not connected">
         Connecting to server
       </LoadingSpinner>
     );
   }
 
-  if (!props.stateClient.isGameReady.value) {
+  if (!session.isGameReady.value) {
     return (
       <LoadingSpinner debugDescription="isGameReady false">
         Waiting for session
@@ -34,7 +37,7 @@ export function GameClient(props: GameClientProps) {
     );
   }
 
-  const areaId = props.stateClient.areaId.value;
+  const areaId = session.areaId.value;
   if (!areaId) {
     return (
       <LoadingSpinner debugDescription="areaId unavailable">
@@ -53,7 +56,7 @@ export function GameClient(props: GameClientProps) {
     >
       <GameRenderer
         interactive={props.interactive}
-        gameStateClient={props.stateClient}
+        gameClient={props.client}
         additionalDebugUi={props.additionalDebugUi}
         areaIdToLoadAssetsFor={areaId}
         enableUi={props.enableUi}

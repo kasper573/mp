@@ -109,7 +109,7 @@ export interface ClientContext {
    * Convenience shorthand for emitting a message with rift and then sending it through the socket.
    */
   send<T extends RiftType>(type: T, value: Infer<T>): void;
-  root: HTMLElement;
-  window: Window;
+  root?: HTMLElement;
+  window?: Window;
   using<M extends AnyModule>(module: M): ClientApi<M>;
 }
