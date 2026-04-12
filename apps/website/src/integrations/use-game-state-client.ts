@@ -1,80 +1,49 @@
-import {
-  createProxyEventInvoker,
-  type MergeEventRouterNodes,
-  type ProxyEventInvoker,
-} from "@mp/event-router";
+import { RiftClient } from "@rift/core";
 import { GameStateClient } from "@mp/game-client";
-import type { GameServerEventRouter } from "@mp/game-service";
-import { eventMessageEncoding } from "@mp/game-shared";
-import type { GatewayRouter } from "@mp/gateway";
-import type { Logger } from "@mp/logger";
 import type { AuthClient } from "@mp/auth/client";
-import { WebSocket } from "@mp/ws/client";
+import { world } from "@mp/world";
+import { createConsoleLogger } from "@mp/logger";
 import { useContext, useEffect, useMemo } from "preact/hooks";
 import { env } from "../env";
-import { miscDebugSettings } from "../signals/misc-debug-ui-settings";
-import { AuthContext, LoggerContext } from "./contexts";
+import { AuthContext } from "./contexts";
 
-export type ComposedGameEventClient = ProxyEventInvoker<
-  MergeEventRouterNodes<GameServerEventRouter, GatewayRouter>
->;
+const logger = createConsoleLogger();
 
-export function useGameStateClient(): [
-  GameStateClient,
-  ComposedGameEventClient,
-] {
-  const logger = useContext(LoggerContext);
+export function useGameStateClient(): GameStateClient {
   const auth = useContext(AuthContext);
 
-  const [stateClient, eventClient, initialize] = useMemo(
-    () =>
-      createGameStateClient(
-        logger.child({}, { msgPrefix: "[GameStateClient]" }),
-        auth,
-      ),
-    [logger, auth],
+  const [stateClient, initialize] = useMemo(
+    () => createGameStateClient(auth),
+    [auth],
   );
 
   useEffect(() => initialize(), [initialize]);
   useEffect(() => stateClient.start(), [stateClient]);
 
-  return [stateClient, eventClient];
+  return stateClient;
 }
 
 function createGameStateClient(
-  logger: Logger,
   auth: AuthClient,
-): [GameStateClient, ComposedGameEventClient, () => () => void] {
-  const socket = new WebSocket(() => {
-    const url = new URL(env.gameServiceUrl);
-    url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
-    return url.toString();
-  });
+): [GameStateClient, () => () => void] {
+  const url = new URL(env.gameServiceUrl);
+  url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
+
+  const socket = new WebSocket(url.toString());
   socket.binaryType = "arraybuffer";
 
-  const eventClient: ComposedGameEventClient = createProxyEventInvoker(
-    (message) => {
-      logger.debug("send", ...message);
-      return socket.send(eventMessageEncoding.encode(message));
-    },
-  );
+  const rift = new RiftClient(world);
+  const stateClient = new GameStateClient({ socket, rift });
 
   function initialize() {
-    const logSocketError = (e: Event) => logger.error(e, "Socket error");
-    socket.addEventListener("error", logSocketError);
+    const onError = (e: Event) => logger.error(e, "Socket error");
+    socket.addEventListener("error", onError);
 
     return () => {
-      socket.removeEventListener("error", logSocketError);
+      socket.removeEventListener("error", onError);
       socket.close();
     };
   }
 
-  const stateClient = new GameStateClient({
-    socket,
-    eventClient,
-    logger,
-    settings: () => miscDebugSettings.value,
-  });
-
-  return [stateClient, eventClient, initialize];
+  return [stateClient, initialize];
 }

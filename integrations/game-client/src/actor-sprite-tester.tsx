@@ -1,6 +1,6 @@
-import type { ActorModelId } from "@mp/game-shared";
+import type { ActorModelId } from "@mp/fixtures";
 import { Engine } from "@mp/engine";
-import { actorModelStates, type ActorModelState } from "@mp/game-shared";
+import { actorModelStates, type ActorModelState } from "@mp/fixtures";
 import { Container, Text } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";
 import {

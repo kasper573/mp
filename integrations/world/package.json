@@ -1,0 +1,24 @@
+{
+  "name": "@mp/world",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@mp/fixtures": "workspace:*",
+    "@mp/math": "workspace:*",
+    "@mp/path-finding": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/tiled-loader": "workspace:*",
+    "@mp/time": "workspace:*",
+    "@rift/core": "workspace:*",
+    "@rift/modular": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

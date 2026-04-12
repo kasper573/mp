@@ -24,9 +24,9 @@ export function readCliOptions(argv = process.argv) {
       default: process.env.MP_WEBSITE_GAME_SERVICE_URL,
       demandOption: true,
     })
-    .option("apiUrl", {
+    .option("fileServerUrl", {
       type: "string",
-      default: process.env.MP_WEBSITE_API__URL,
+      default: process.env.MP_WEBSITE_FILE_SERVER_URL,
       demandOption: true,
     })
     .option("gameClients", {

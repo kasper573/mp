@@ -9,7 +9,7 @@ export function RespawnDialog(props: DialogProps) {
   return (
     <Dialog {...props}>
       <h1>You are dead</h1>
-      <Button onClick={() => void client.actions.respawn()}>Respawn</Button>
+      <Button onClick={() => client.respawn()}>Respawn</Button>
     </Dialog>
   );
 }

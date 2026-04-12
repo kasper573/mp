@@ -1,10 +1,8 @@
 import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
-import {
-  clientViewDistance,
-  getDestinationFromObject,
-  type AreaResource,
-} from "@mp/game-shared";
+import { clientViewDistance } from "@mp/fixtures";
+import type { AreaResource } from "@mp/world";
+import { Position, Combat } from "@mp/world";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   Container,
@@ -14,8 +12,7 @@ import {
 } from "@mp/graphics";
 import { Rect, Vector } from "@mp/math";
 import { computed } from "@mp/state";
-import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
-import type { ObjectId } from "@mp/tiled-loader";
+import type { Pixel, Tile } from "@mp/std";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
@@ -51,8 +48,11 @@ export class AreaScene extends Container {
     const areaDebug = new AreaDebugGraphics(
       options.engine,
       options.area,
-      options.state.actorList,
-      () => options.state.character.value?.movement.coords,
+      options.state.actors,
+      () => {
+        const entity = options.state.myEntity.value;
+        return entity ? entity.get(Position) : undefined;
+      },
       options.debugSettings,
     );
 
@@ -70,11 +70,11 @@ export class AreaScene extends Container {
     this.cleanupFns = [
       reactiveCollectionBinding(
         tiledRenderer.dynamicLayer,
-        options.state.actorList,
-        (actor) =>
+        options.state.actors,
+        (entity) =>
           new ActorController({
-            actor,
-            eventBus: options.state.eventBus,
+            entity,
+            rift: options.state.rift,
             actorTextures: options.actorTextures,
             tiled: options.area.tiled,
           }),
@@ -85,11 +85,12 @@ export class AreaScene extends Container {
     this.onRender = this.#onRender;
 
     this.cameraPos = new VectorSpring(
-      computed(() =>
-        options.area.tiled.tileCoordToWorld(
-          options.state.character.value?.movement.coords ?? Vector.zero(),
-        ),
-      ),
+      computed(() => {
+        const entity = options.state.myEntity.value;
+        return options.area.tiled.tileCoordToWorld(
+          entity ? entity.get(Position) : Vector.zero(),
+        );
+      }),
       () => ({
         stiffness: 80,
         damping: 34,
@@ -123,22 +124,23 @@ export class AreaScene extends Container {
   );
 
   actorAtPointer = computed(() => {
-    return this.options.state.actorList.value.find(
-      (actor) =>
-        actor.combat.health > 0 &&
-        actor.combat.hitBox
-          .offset(actor.movement.coords)
-          .contains(this.pointerTile.value),
-    );
+    return this.options.state.actors.value.find((entity) => {
+      const combat = entity.get(Combat);
+      if (combat.health <= 0) return false;
+      const coords = entity.get(Position);
+      return Rect.fromDiameter(coords, 1 as Tile).contains(
+        this.pointerTile.value,
+      );
+    });
   });
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
-    const actor = this.actorAtPointer.value;
-    if (actor && actor?.identity.id !== this.options.state.characterId.value) {
+    const entity = this.actorAtPointer.value;
+    if (entity && entity.id !== this.options.state.myEntityId.value) {
+      const coords = entity.get(Position);
       return {
-        actor,
         type: "attack",
-        rect: actor.combat.hitBox.offset(actor.movement.coords),
+        rect: Rect.fromDiameter(coords, 1 as Tile),
       };
     }
 
@@ -154,19 +156,12 @@ export class AreaScene extends Container {
   private onPointerClick = () => {
     const target = this.highlightTarget.value;
     if (target?.type === "attack") {
-      void this.options.state.actions.attack(target.actor.identity.id);
+      const entity = this.actorAtPointer.value;
+      if (entity) {
+        this.options.state.attack(entity.id);
+      }
     }
   };
-
-  moveThrottled = dedupe(
-    throttle(
-      (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
-        this.options.state.actions.move(to, desiredPortalId),
-      100,
-    ),
-    ([aVector, aPortalId], [bVector, bPortalId]) =>
-      aVector.equals(bVector) && aPortalId === bPortalId,
-  );
 
   #onRender = () => {
     this.cameraPos.update(TimeSpan.fromMilliseconds(Ticker.shared.deltaMS));
@@ -182,14 +177,10 @@ export class AreaScene extends Container {
     if (this.options.engine.pointer.isDown.value) {
       const target = this.highlightTarget.value;
       if (target?.type === "move") {
-        const portal = this.options.area
-          .hitTestObjects(this.options.engine.pointer.worldPosition.value)
-          .find(getDestinationFromObject);
-
-        this.moveThrottled(Vector.from(target.rect), portal?.id);
+        this.options.state.move(Vector.from(target.rect));
       }
     } else {
-      this.moveThrottled.clear();
+      this.options.state.move.clear();
     }
   };
 }
@@ -199,7 +190,6 @@ function createZoomLevelForViewDistance(
   cameraSize: Vector<Pixel>,
   tileViewDistance: Tile,
 ): number {
-  // Never show more tiles than the view distance on any axis
   const numTilesFitInCamera =
     cameraSize.x > cameraSize.y
       ? cameraSize.x / tileSize.x

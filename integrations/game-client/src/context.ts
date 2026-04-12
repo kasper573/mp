@@ -24,10 +24,6 @@ export const GameAssetLoaderContext = createContext(
 // if we don't do this and instead destructure the context in the components directly,
 // that causes hot reload in those files specifically to crash which results in a full page reload.
 
-export const useItemDefinition: GameAssetLoader["useItemDefinition"] = (
-  ...args
-) => useContext(GameAssetLoaderContext).useItemDefinition(...args);
-
 export const useAreaAssets: GameAssetLoader["useAreaAssets"] = (...args) =>
   useContext(GameAssetLoaderContext).useAreaAssets(...args);
 

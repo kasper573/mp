@@ -1,0 +1,17 @@
+{
+  "name": "@mp/fixtures",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@mp/math": "workspace:*",
+    "@mp/std": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "typescript": "catalog:"
+  }
+}

@@ -1,5 +1,5 @@
-import type { AreaId } from "@mp/game-shared";
-import type { AreaResource, ItemDefinitionLookup } from "@mp/game-shared";
+import type { AreaId } from "@mp/fixtures";
+import type { AreaResource } from "@mp/world";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
@@ -10,7 +10,6 @@ export interface AreaAssets {
 
 export interface GameAssetLoader {
   useAreaAssets: AreaAssetsLookup;
-  useItemDefinition: ItemDefinitionLookup;
   useActorTextures: () => ActorTextureLookup;
 }
 

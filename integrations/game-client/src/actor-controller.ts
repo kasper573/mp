@@ -1,6 +1,20 @@
-import type { GameStateEvents } from "@mp/game-service";
-import type { Actor, TiledResource } from "@mp/game-shared";
+import type { Entity, RiftClient } from "@rift/core";
+import type { TiledResource } from "@mp/world";
+import {
+  Position,
+  Movement,
+  Combat,
+  Appearance,
+  CharacterIdentity,
+  Progression,
+  NpcIdentity,
+  AttackAnimation,
+  DeathAnimation,
+} from "@mp/world";
+import type { ActorModelId } from "@mp/fixtures";
 import type { DestroyOptions } from "@mp/graphics";
+import { cardinalDirections } from "@mp/math";
+import type { TimesPerSecond } from "@mp/std";
 import {
   ColorMatrixFilter,
   Container,
@@ -8,15 +22,14 @@ import {
   Text,
 } from "@mp/graphics";
 import { effect } from "@mp/state";
-import type { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
 export interface ActorControllerOptions {
   tiled: TiledResource;
-  actor: Actor;
-  eventBus: SyncEventBus<GameStateEvents>;
+  entity: Entity;
+  rift: RiftClient;
   actorTextures: ActorTextureLookup;
 }
 
@@ -29,10 +42,12 @@ export class ActorController extends Container {
   constructor(private options: ActorControllerOptions) {
     super();
 
-    const { actor } = this.options;
+    const { entity } = this.options;
+
+    const combat = entity.get(Combat);
 
     this.sprite = new ActorSprite(
-      actorAnimationState(actor).isAlive
+      combat.alive
         ? {
             name: "idle-spear",
             type: "smooth-switch",
@@ -45,7 +60,7 @@ export class ActorController extends Container {
     );
     this.sprite.textureLookup = (animationName, direction) =>
       options.actorTextures(
-        options.actor.appearance.modelId,
+        options.entity.get(Appearance).modelId as ActorModelId,
         animationName,
         direction,
       );
@@ -57,15 +72,15 @@ export class ActorController extends Container {
 
     this.subscriptions = [
       effect(this.switchAnimationToMovingOrIdle),
-      options.eventBus.subscribe("combat.attack", (attack) => {
-        if (attack.actorId === actor.identity.id) {
+      options.rift.on(AttackAnimation, (data) => {
+        if (data.attackerId === entity.id) {
           void this.sprite
             .playToEndAndStop("attack-spear")
             .then(this.switchAnimationToMovingOrIdle);
         }
       }),
-      options.eventBus.subscribe("actor.death", (deadActorId) => {
-        if (deadActorId === actor.identity.id) {
+      options.rift.on(DeathAnimation, (data) => {
+        if (data.entityId === entity.id) {
           void this.sprite.playToEndAndStop("death-spear");
         }
       }),
@@ -82,13 +97,13 @@ export class ActorController extends Container {
   }
 
   private switchAnimationToMovingOrIdle = () => {
-    const { isMoving, isFast, isAlive } = actorAnimationState(
-      this.options.actor,
-    );
-    if (isAlive) {
-      if (isMoving) {
+    const { entity } = this.options;
+    const combat = entity.get(Combat);
+    const movement = entity.get(Movement);
+    if (combat.alive) {
+      if (movement.moving) {
         this.sprite.switchAnimationSmoothly(
-          isFast ? "run-spear" : "walk-spear",
+          movement.speed >= 2 ? "run-spear" : "walk-spear",
         );
       } else {
         this.sprite.switchAnimationSmoothly("idle-spear");
@@ -97,36 +112,32 @@ export class ActorController extends Container {
   };
 
   #onRender = () => {
-    const { actor, tiled } = this.options;
+    const { entity, tiled } = this.options;
 
-    this.sprite.attackSpeed = actor.combat.attackSpeed;
-    this.sprite.direction = actor.movement.dir;
+    const combat = entity.get(Combat);
+    const movement = entity.get(Movement);
+    const appearance = entity.get(Appearance);
+    const coords = entity.get(Position);
 
-    this.alpha = actor.appearance.opacity ?? 1;
+    this.sprite.attackSpeed = combat.attackSpeed as TimesPerSecond;
+    this.sprite.direction = cardinalDirections[movement.dir];
+    this.alpha = 1;
 
-    if (actor.appearance.color === undefined) {
-      this.sprite.filters = [];
-    } else {
+    const isNpc = entity.has(NpcIdentity);
+    if (isNpc) {
       this.sprite.filters = [this.tintFilter];
-      this.tintFilter.matrix = createTintFilterMatrix(actor.appearance.color);
+      this.tintFilter.matrix = createTintFilterMatrix(0xff0000);
+    } else {
+      this.sprite.filters = [];
     }
 
-    this.text.text =
-      actor.appearance.name +
-      `\n${actor.combat.health}/${actor.combat.maxHealth}`;
-    if (actor.type === "character") {
-      this.text.text += `\n${actor.progression.xp}xp`;
+    this.text.text = appearance.name + `\n${combat.health}/${combat.maxHealth}`;
+    if (entity.has(CharacterIdentity)) {
+      const progression = entity.get(Progression);
+      this.text.text += `\n${progression.xp}xp`;
     }
 
-    this.position.copyFrom(tiled.tileCoordToWorld(actor.movement.coords));
+    this.position.copyFrom(tiled.tileCoordToWorld(coords));
     this.zIndex = this.position.y;
-  };
-}
-
-function actorAnimationState(actor: Actor) {
-  return {
-    isMoving: !!actor.movement.path?.length,
-    isFast: actor.movement.speed >= 2,
-    isAlive: actor.combat.alive,
   };
 }

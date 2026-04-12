@@ -1,19 +1,18 @@
 import type { Engine } from "@mp/engine";
-import type {
-  Actor,
-  AreaResource,
-  NpcInstance,
-  TiledResource,
-} from "@mp/game-shared";
+import type { Entity, RiftQuery } from "@rift/core";
+import type { AreaResource, TiledResource } from "@mp/world";
 import {
-  clientViewDistance,
+  Position,
+  Combat,
+  NpcIdentity,
   clientViewDistanceRect,
   WalkableChecker,
-} from "@mp/game-shared";
+} from "@mp/world";
+import { clientViewDistance } from "@mp/fixtures";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
-import { type Path, Vector } from "@mp/math";
+import { Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
 import { computed, effect, type ReadonlySignal } from "@mp/state";
 import type { Pixel, Tile } from "@mp/std";
@@ -24,15 +23,14 @@ import type {
 } from "./area-debug-settings-form";
 
 export class AreaDebugGraphics extends Container {
-  private actorPaths: ReactiveCollection<DebugPath>;
-  private attackRanges: ReactiveCollection<Actor>;
-  private aggroRanges: ReactiveCollection<NpcInstance>;
+  private attackRanges: ReactiveCollection<Entity>;
+  private aggroRanges: ReactiveCollection<Entity>;
   private fogOfWar: DebugNetworkFogOfWar;
 
   constructor(
     engine: Engine,
     area: AreaResource,
-    actors: ReadonlySignal<readonly Actor[]>,
+    actors: RiftQuery,
     playerCoords: () => Vector<Tile> | undefined,
     private settings: () => AreaDebugSettings,
   ) {
@@ -44,37 +42,25 @@ export class AreaDebugGraphics extends Container {
       () => this.settings().visibleGraphType,
     );
 
-    this.actorPaths = new ReactiveCollection(
-      actors,
-      (actor) =>
-        new DebugPath(() => ({
-          tiled: area.tiled,
-          path: actor.movement.path,
-          color: uniqolor(actor.identity.id).color,
-        })),
-    );
-
     this.attackRanges = new ReactiveCollection(
-      actors,
-      (actor) =>
+      actors as ReadonlySignal<readonly Entity[]>,
+      (entity) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
-          pos: actor.movement.coords,
-          radius: actor.combat.attackRange,
-          color: uniqolor(actor.identity.id).color,
+          pos: entity.get(Position),
+          radius: entity.get(Combat).attackRange as Tile,
+          color: uniqolor(String(entity.id)).color,
         })),
     );
 
     this.aggroRanges = new ReactiveCollection(
-      computed(() => actors.value.filter((actor) => actor.type === "npc")),
-      (npc) =>
+      computed(() => actors.value.filter((entity) => entity.has(NpcIdentity))),
+      (entity) =>
         new DebugCircle(() => ({
           tiled: area.tiled,
-          pos: npc.movement.coords,
-          radius: npc.aggroRange,
-          color: npc.appearance.color
-            ? hexColorFromInt(npc.appearance.color)
-            : uniqolor(npc.identity.id).color,
+          pos: entity.get(Position),
+          radius: (entity.get(Combat).attackRange * 3) as Tile,
+          color: uniqolor(String(entity.id)).color,
         })),
     );
 
@@ -83,7 +69,6 @@ export class AreaDebugGraphics extends Container {
       () => area.tiled,
     );
 
-    this.addChild(this.actorPaths);
     this.addChild(debugTiled);
     this.addChild(this.attackRanges);
     this.addChild(this.aggroRanges);
@@ -93,7 +78,6 @@ export class AreaDebugGraphics extends Container {
   }
 
   #onRender = () => {
-    this.actorPaths.visible = this.settings().showActorPaths;
     this.attackRanges.visible = this.settings().showAttackRange;
     this.aggroRanges.visible = this.settings().showAggroRange;
     this.fogOfWar.visible = this.settings().showFogOfWar;
@@ -215,27 +199,6 @@ class DebugCircle extends Graphics {
   };
 }
 
-class DebugPath extends Graphics {
-  constructor(
-    private options: () => {
-      tiled: TiledResource;
-      path: Path<Tile> | undefined;
-      color: string;
-    },
-  ) {
-    super();
-    this.onRender = this.#onRender;
-  }
-
-  #onRender = () => {
-    const { tiled, path, color } = this.options();
-    this.clear();
-    if (path?.length) {
-      drawPath(this, path.map(tiled.tileCoordToWorld), color);
-    }
-  };
-}
-
 class DebugNetworkFogOfWar extends Graphics {
   constructor(
     private playerCoords: () => Vector<Tile>,
@@ -278,18 +241,6 @@ function drawGraphNode(
   );
 }
 
-function drawPath(ctx: Graphics, path: Iterable<Vector<Pixel>>, color: string) {
-  const [start, ...rest] = Array.from(path);
-
-  ctx.beginPath();
-  ctx.moveTo(start.x, start.y);
-  ctx.strokeStyle = { width: 1, color };
-  for (const { x, y } of rest) {
-    ctx.lineTo(x, y);
-  }
-  ctx.stroke();
-}
-
 function drawManyLinesFromSameStart(
   ctx: Graphics,
   from: Vector<Pixel>,
@@ -308,8 +259,4 @@ function drawManyLinesFromSameStart(
 function drawRect(ctx: Graphics, rect: Rect<Pixel>, color: string) {
   ctx.rect(rect.x, rect.y, rect.width, rect.height);
   ctx.fill({ color });
-}
-
-function hexColorFromInt(color: number): string {
-  return `#${color.toString(16).padStart(6, "0")}`;
 }

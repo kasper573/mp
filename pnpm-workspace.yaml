@@ -2,8 +2,10 @@ packages:
   - "apps/*"
   - "integrations/*"
   - "libraries/*"
+  - "libraries/rift/*"
 catalog:
   "@preact/preset-vite": 2.10.5
+  "@preact/signals-core": ^1.14.1
   "@prefresh/core": 1.5.9
   "@tanstack/react-query": 5.96.2
   "@tanstack/react-query-devtools": 5.96.2
@@ -11,11 +13,10 @@ catalog:
   "@types/node": ^25.5.2
   "@typescript/native-preview": 7.0.0-dev.20260403.1
   "@vanilla-extract/vite-plugin": 5.2.2
-  "cbor-x": 1.6.4
-  dotenv: 17.4.0
-  express: 5.2.1
   preact: 10.29.1
   tsx: 4.21.0
   typescript: 6.0.2
   vite: 8.0.3
   vitest: 4.1.2
+  ws: 8.20.0
+  "@types/ws": 8.18.1

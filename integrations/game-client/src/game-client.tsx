@@ -21,7 +21,7 @@ export function GameClient(props: GameClientProps) {
   if (!props.stateClient.isConnected.value) {
     return (
       <LoadingSpinner debugDescription="GameStateClient not connected">
-        Connecting to gateway
+        Connecting to server
       </LoadingSpinner>
     );
   }
@@ -29,7 +29,7 @@ export function GameClient(props: GameClientProps) {
   if (!props.stateClient.isGameReady.value) {
     return (
       <LoadingSpinner debugDescription="isGameReady false">
-        Connecting to game service
+        Waiting for session
       </LoadingSpinner>
     );
   }

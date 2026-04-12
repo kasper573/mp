@@ -1,26 +1,25 @@
 // oxlint-disable no-await-in-loop
-import fs from "fs/promises";
-import { graphql, GraphQLClient } from "@mp/api-service/client";
-import { createProxyEventInvoker } from "@mp/event-router";
-import { browserLoadAreaResource, GameStateClient } from "@mp/game-client";
-import type { GameServerEventRouter } from "@mp/game-service";
-import type { AreaId, AreaResource } from "@mp/game-shared";
-import { eventMessageEncoding, hitTestTiledObject } from "@mp/game-shared";
-import type { GatewayRouter } from "@mp/gateway";
+import { RiftClient } from "@rift/core";
+import { GameStateClient } from "@mp/game-client";
+import { areas, type AreaId } from "@mp/fixtures";
+import {
+  world,
+  loadAreaResource,
+  hitTestTiledObject,
+  Combat,
+  type AreaResource,
+} from "@mp/world";
 import { createConsoleLogger } from "@mp/logger";
-import type { AccessToken } from "@mp/auth";
 import { createBypassUser } from "@mp/auth";
 import type { Signal } from "@mp/state";
-import { Rng, toResult } from "@mp/std";
-import { parseSocketError, WebSocket } from "@mp/ws/server";
+import { Rng } from "@mp/std";
 import { readCliOptions } from "./cli";
-import apiSchema from "@mp/api-service/client/schema.json";
-import path from "path";
+import { WebSocket } from "ws";
 
 const logger = createConsoleLogger();
 
 const {
-  apiUrl,
+  fileServerUrl,
   gameServiceUrl,
   gameClients,
   timeout,
@@ -29,10 +28,10 @@ const {
   behavior,
 } = readCliOptions();
 
-let areas: Map<AreaId, AreaResource>;
+let areaResources: Map<AreaId, AreaResource>;
 
 async function main() {
-  areas = await getAreas();
+  areaResources = await getAreas();
 
   const start = performance.now();
 
@@ -94,7 +93,6 @@ async function testAllGameClients() {
 
 function testOneGameClient(n: number, rng: Rng) {
   let socket: WebSocket;
-  let stopClient = () => {};
   let running = true;
   return new Promise<void>((resolve, __reject) => {
     function failTest(error: unknown) {
@@ -113,74 +111,46 @@ function testOneGameClient(n: number, rng: Rng) {
       socket = new WebSocket(url.toString());
       socket.binaryType = "arraybuffer";
 
-      const gameEvents = createProxyEventInvoker<GameServerEventRouter>(
-        (message) => socket.send(eventMessageEncoding.encode(message)),
-      );
-
-      const gatewayEvents = createProxyEventInvoker<GatewayRouter>((message) =>
-        socket.send(eventMessageEncoding.encode(message)),
-      );
-
       await waitForOpen(socket);
 
       if (verbose) {
         logger.info(`Socket ${n} connected`);
       }
 
-      const gameClient = new GameStateClient({
-        socket,
-        eventClient: gameEvents,
-        logger,
-        handlePatchFailure: failTest,
-        settings: () => ({
-          useInterpolator: false,
-          usePatchOptimizer: false,
-        }),
+      const rift = new RiftClient(world);
+      const stateClient = new GameStateClient({
+        socket: socket as unknown as globalThis.WebSocket,
+        rift,
       });
 
-      stopClient = gameClient.start();
+      const stopClient = stateClient.start();
 
       if (verbose) {
-        logger.info(`Getting character id for socket ${n}`);
+        logger.info(`Socket ${n} waiting for session assignment...`);
       }
-      const api = createApiClient(accessToken);
-      const { myCharacterId } = toResult(
-        await api.query({ query: myCharacterIdQuery }),
-      )._unsafeUnwrap();
-      gameClient.characterId.value = myCharacterId;
+
+      await waitUntil(stateClient.isGameReady, (v) => v, 15_000);
 
       if (verbose) {
         logger.info(
-          `Socket ${n} joining gateway with character ${gameClient.characterId.value}...`,
-        );
-      }
-      gatewayEvents.gateway.join(gameClient.characterId.value);
-
-      if (verbose) {
-        logger.info(`Socket ${n} is waiting on area id...`);
-      }
-
-      await waitUntil(gameClient.isGameReady, (v) => v, 15_000);
-
-      if (verbose) {
-        logger.info(
-          { characterId: gameClient.characterId.value },
-          `Socket ${n} successfully joined gateway`,
+          `Socket ${n} session assigned, entity: ${stateClient.myEntityId.value}`,
         );
       }
 
       const endTime = Date.now() + timeout.totalMilliseconds;
       while (Date.now() < endTime && running) {
-        if (
-          gameClient.character.value &&
-          !gameClient.character.value.combat.health
-        ) {
-          logger.info(`Character for socket ${n} will respawn`);
-          gameClient.actions.respawn();
+        const myEntity = stateClient.myEntity.value;
+        if (myEntity && myEntity.has(Combat)) {
+          const combat = myEntity.get(Combat);
+          if (!combat.health) {
+            logger.info(`Character for socket ${n} will respawn`);
+            stateClient.respawn();
+          }
         }
 
-        const currentArea = gameClient.areaId.value
-          ? areas.get(gameClient.areaId.value)
+        const currentAreaId = stateClient.areaId.value;
+        const currentArea = currentAreaId
+          ? areaResources.get(currentAreaId)
           : undefined;
 
         if (currentArea) {
@@ -194,7 +164,7 @@ function testOneGameClient(n: number, rng: Rng) {
                 ),
               );
               const to = rng.oneOf(portalWalkableTiles);
-              gameClient.actions.move(to, portal.object.id);
+              stateClient.move(to);
               logger.info(
                 `Character for socket ${n} will run to ${to} (portal ${portal.object.id})`,
               );
@@ -202,7 +172,7 @@ function testOneGameClient(n: number, rng: Rng) {
             }
             case "run": {
               const to = rng.oneOf(tiles(currentArea));
-              gameClient.actions.move(to);
+              stateClient.move(to);
               logger.info(`Character for socket ${n} will run to ${to}`);
               break;
             }
@@ -220,11 +190,11 @@ function testOneGameClient(n: number, rng: Rng) {
       if (verbose) {
         logger.info(`Socket ${n} test finished`);
       }
+      stopClient();
       resolve();
     })().catch(failTest);
   }).finally(() => {
-    stopClient();
-    socket.close();
+    socket?.close();
   });
 }
 
@@ -241,7 +211,7 @@ async function waitForOpen(socket: WebSocket) {
       removeEventListeners();
     };
     const onError = (error: WebSocket.ErrorEvent) => {
-      reject(parseSocketError(error));
+      reject(error);
       removeEventListeners();
     };
     function removeEventListeners() {
@@ -286,48 +256,14 @@ function waitUntil<T>(
 }
 
 async function getAreas(): Promise<Map<AreaId, AreaResource>> {
-  const areaFiles = await fs.readdir(
-    path.resolve(__dirname, "../../../docker/file-server/public/areas"),
-    { withFileTypes: true },
-  );
-  const api = createApiClient(createBypassUser("load test script"));
   return new Map(
     await Promise.all(
-      areaFiles
-        .filter((entry) => entry.isFile())
-        .map(async (entry): Promise<[AreaId, AreaResource]> => {
-          const areaId = path.basename(
-            entry.name,
-            path.extname(entry.name),
-          ) as AreaId;
-          const { areaFileUrl } = toResult(
-            await api.query({ query: areaFileQuery, variables: { areaId } }),
-          )._unsafeUnwrap();
-
-          return [areaId, await browserLoadAreaResource(areaId, areaFileUrl)];
-        }),
+      areas.map(async (area): Promise<[AreaId, AreaResource]> => {
+        const areaFileUrl = `${fileServerUrl}/${area.tiledFile}`;
+        return [area.id, await loadAreaResource(area.id, areaFileUrl)];
+      }),
     ),
   );
 }
-
-function createApiClient(accessToken: AccessToken) {
-  return new GraphQLClient({
-    url: apiUrl,
-    schema: apiSchema,
-    getAccessToken: () => accessToken,
-  });
-}
-
-const areaFileQuery = graphql(`
-  query GetAreaFileUrl($areaId: AreaId!) {
-    areaFileUrl(areaId: $areaId, urlType: public)
-  }
-`);
-
-const myCharacterIdQuery = graphql(`
-  query GetMyCharacterId {
-    myCharacterId
-  }
-`);
 
 void main();

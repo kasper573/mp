@@ -1,4 +1,4 @@
-import type { ActorModelState } from "@mp/game-shared";
+import type { ActorModelState } from "@mp/fixtures";
 import type { Animation } from "@mp/graphics";
 import { AnimationController } from "@mp/graphics";
 import type { TimesPerSecond } from "@mp/std";

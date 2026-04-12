@@ -1,0 +1,23 @@
+{
+  "name": "@rift/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run --typecheck",
+    "test:watch": "vitest --typecheck",
+    "bench": "tsx scripts/benchmark.ts"
+  },
+  "dependencies": {
+    "@preact/signals-core": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "mitata": "^1.0.34",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,4 +1,4 @@
-import type { Actor, AreaResource } from "@mp/game-shared";
+import type { AreaResource } from "@mp/world";
 import type { FillStyle } from "@mp/graphics";
 import { Graphics } from "@mp/graphics";
 import type { Rect } from "@mp/math";
@@ -14,9 +14,7 @@ interface HighlightTarget<Type extends string> {
   rect: Rect<Tile>;
 }
 
-interface AttackHighlightTarget extends HighlightTarget<"attack"> {
-  actor: Actor;
-}
+interface AttackHighlightTarget extends HighlightTarget<"attack"> {}
 
 interface MoveHighlightTarget extends HighlightTarget<"move"> {}
 

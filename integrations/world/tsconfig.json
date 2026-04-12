@@ -1,0 +1,7 @@
+{
+  "extends": "@mp/tsconfig/universal.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM"],
+    "types": ["node"]
+  }
+}
