@@ -28,6 +28,7 @@ import { areaModule } from "./area";
 import { sessionModule } from "./session";
 import { movementModule } from "./movement";
 import { combatModule } from "./combat";
+import { inventoryModule } from "./inventory";
 
 const CORPSE_DURATION = 5; // seconds
 
@@ -289,12 +290,19 @@ function deriveInitialTask(
 // ---------------------------------------------------------------------------
 
 export const npcModule = defineModule({
-  dependencies: [areaModule, sessionModule, movementModule, combatModule],
+  dependencies: [
+    areaModule,
+    sessionModule,
+    movementModule,
+    combatModule,
+    inventoryModule,
+  ],
   server: (ctx) => {
     const { areas: areaMap } = ctx.using(areaModule);
     const session = ctx.using(sessionModule);
     const movement = ctx.using(movementModule);
     const combat = ctx.using(combatModule);
+    const inventory = ctx.using(inventoryModule);
 
     const rng = new Rng();
     const npcStates = new Map<number, NpcServerState>();
@@ -549,7 +557,9 @@ export const npcModule = defineModule({
             break;
           }
           case "item": {
-            // Item rewards handled by inventory module (TODO)
+            for (let i = 0; i < reward.amount; i++) {
+              inventory.spawnItem(recipient.id, reward.itemId, reward.itemType);
+            }
             break;
           }
         }

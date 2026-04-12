@@ -4,7 +4,12 @@ import { clamp } from "@mp/math";
 import type { Vector } from "@mp/math";
 import type { Tile } from "@mp/std";
 import { Position, Movement, Combat, CharacterIdentity } from "../components";
-import { AttackCommand, AttackAnimation, DeathAnimation } from "../events";
+import {
+  AttackCommand,
+  AttackAnimation,
+  DeathAnimation,
+  RespawnCommand,
+} from "../events";
 import { sessionModule } from "./session";
 import { movementModule } from "./movement";
 import { areaModule } from "./area";
@@ -68,6 +73,7 @@ export const combatModule = defineModule({
 
     // Handle attack commands from clients
     ctx.rift.on(AttackCommand, (clientId, data) => {
+      if (!session.hasRole(clientId, "character.attack")) return;
       const entity = session.clientEntities.get(clientId);
       if (!entity) {
         return;
@@ -77,6 +83,32 @@ export const combatModule = defineModule({
         return;
       }
       getCombatState(entity.id).attackTargetId = data.targetId;
+    });
+
+    // Handle respawn commands from clients
+    ctx.rift.on(RespawnCommand, (clientId) => {
+      if (!session.hasRole(clientId, "character.respawn")) return;
+      const entity = session.clientEntities.get(clientId);
+      if (!entity) return;
+
+      const combat = entity.get(Combat);
+      if (combat.alive) return;
+
+      combat.health = combat.maxHealth;
+      combat.alive = true;
+
+      // Reset to area spawn point
+      const areaId = session.getEntityArea(entity);
+      const area = areaMap.get(areaId);
+      if (area) {
+        entity.set(Position, area.start);
+      }
+
+      // Clear combat state
+      const cState = combatStates.get(entity.id);
+      if (cState) {
+        cState.attackTargetId = undefined;
+      }
     });
 
     function moveTowardTarget(

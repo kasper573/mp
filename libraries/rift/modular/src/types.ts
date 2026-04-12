@@ -26,7 +26,10 @@ export interface GameWebSocket {
 }
 
 export interface GameWebSocketServer {
-  on(event: "connection", handler: (socket: GameWebSocket) => void): void;
+  on(
+    event: "connection",
+    handler: (socket: GameWebSocket, request: unknown) => void,
+  ): void;
 }
 
 export interface GameClientSocket {

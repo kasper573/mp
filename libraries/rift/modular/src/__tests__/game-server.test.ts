@@ -47,16 +47,21 @@ class FakeWebSocket implements GameWebSocket {
 }
 
 class FakeWebSocketServer implements GameWebSocketServer {
-  #connectionHandler: ((socket: GameWebSocket) => void) | undefined;
+  #connectionHandler:
+    | ((socket: GameWebSocket, request: unknown) => void)
+    | undefined;
 
-  on(event: "connection", handler: (socket: GameWebSocket) => void): void {
+  on(
+    event: "connection",
+    handler: (socket: GameWebSocket, request: unknown) => void,
+  ): void {
     if (event === "connection") {
       this.#connectionHandler = handler;
     }
   }
 
-  connect(socket: GameWebSocket): void {
-    this.#connectionHandler?.(socket);
+  connect(socket: GameWebSocket, request: unknown = {}): void {
+    this.#connectionHandler?.(socket, request);
   }
 }
 

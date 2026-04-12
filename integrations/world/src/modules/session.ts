@@ -14,16 +14,29 @@ import {
 import { SessionAssigned } from "../events";
 import { areaModule } from "./area";
 
+/** Attached to the request by game-service verifyClient */
+export interface AuthenticatedRequest {
+  __user?: {
+    name: string;
+    roles: ReadonlySetLike<string>;
+  };
+}
+
 export const sessionModule = defineModule({
   dependencies: [areaModule],
   server: (ctx) => {
     const clientEntities = new Map<ClientId, Entity>();
+    const clientRoles = new Map<ClientId, ReadonlySetLike<string>>();
     const defaultAreaId = areas[0].id;
     const { areas: areaMap } = ctx.using(areaModule);
 
-    ctx.wss.on("connection", (socket) => {
+    ctx.wss.on("connection", (socket, request) => {
       const clientId = crypto.randomUUID() as ClientId;
       ctx.addClient(clientId, socket);
+
+      const user = (request as AuthenticatedRequest)?.__user;
+      const roles: ReadonlySetLike<string> = user?.roles ?? new Set();
+      clientRoles.set(clientId, roles);
 
       const area = areaMap.get(defaultAreaId);
       if (!area) {
@@ -47,7 +60,7 @@ export const sessionModule = defineModule({
       });
       entity.set(Appearance, {
         modelId: defaultCharacter.modelId,
-        name: `Player`,
+        name: user?.name ?? "Player",
       });
       entity.set(CharacterIdentity, { clientId });
       entity.set(Progression, { xp: defaultCharacter.xp });
@@ -75,12 +88,17 @@ export const sessionModule = defineModule({
         ctx.removeClient(clientId);
         ctx.rift.destroy(entity);
         clientEntities.delete(clientId);
+        clientRoles.delete(clientId);
       });
     });
 
     return {
       api: {
         clientEntities,
+        hasRole(clientId: ClientId, role: string): boolean {
+          const roles = clientRoles.get(clientId);
+          return roles?.has(role) ?? false;
+        },
         getEntityArea(entity: Entity): AreaId {
           return entity.get(AreaTag).areaId as AreaId;
         },

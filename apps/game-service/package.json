@@ -10,6 +10,8 @@
     "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
   "dependencies": {
+    "@mp/auth": "workspace:*",
+    "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
     "@mp/world": "workspace:*",
     "@rift/core": "workspace:*",

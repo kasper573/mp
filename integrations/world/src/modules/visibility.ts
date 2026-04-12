@@ -1,6 +1,6 @@
 import { defineModule } from "@rift/modular";
 import type { ClientId, Entity, RiftType } from "@rift/core";
-import { allComponents, Position } from "../components";
+import { allComponents, Position, ItemOwner } from "../components";
 import { clientViewDistanceRect } from "../view-distance";
 import type { AreaResource } from "../area-resource";
 import { sessionModule } from "./session";
@@ -22,6 +22,13 @@ export const visibilityModule = defineModule({
         // Client always sees itself
         if (entity === clientEntity) {
           return allComponents;
+        }
+
+        // Items owned by this client are always visible
+        if (entity.has(ItemOwner)) {
+          if (entity.get(ItemOwner).ownerId === clientEntity.id) {
+            return allComponents;
+          }
         }
 
         if (!entity.has(Position)) {

@@ -2,6 +2,7 @@ export { world } from "./world";
 export { modules } from "./modules";
 export * from "./components";
 export * from "./events";
+export type { AuthenticatedRequest } from "./modules/session";
 export type { AreaResource } from "./area-resource";
 export { dynamicLayerName } from "./area-resource";
 export { hitTestTiledObject } from "./hit-test-tiled-object";

@@ -26,6 +26,16 @@ import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 
+// NPC type index → tint color (matches NPC_TYPE_INDEX in npc module)
+const npcTypeColors: Record<number, number> = {
+  0: 0x808080, // static — gray
+  1: 0x0088ff, // patrol — blue
+  2: 0x00ff00, // pacifist — green
+  3: 0xff0000, // aggressive — red
+  4: 0xff8800, // defensive — orange
+  5: 0xff00ff, // protective — purple
+};
+
 export interface ActorControllerOptions {
   tiled: TiledResource;
   entity: Entity;
@@ -125,8 +135,10 @@ export class ActorController extends Container {
 
     const isNpc = entity.has(NpcIdentity);
     if (isNpc) {
+      const npcType = entity.get(NpcIdentity).npcType;
+      const color = npcTypeColors[npcType] ?? 0xff0000;
       this.sprite.filters = [this.tintFilter];
-      this.tintFilter.matrix = createTintFilterMatrix(0xff0000);
+      this.tintFilter.matrix = createTintFilterMatrix(color);
     } else {
       this.sprite.filters = [];
     }
