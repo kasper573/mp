@@ -5,7 +5,7 @@ import type { UnsubscribeFn } from "./event-bus";
 import { EventBus } from "./event-bus";
 import { RiftQuery } from "./query";
 import type { Infer, RiftEventBusMap } from "./types";
-import { type RiftType, isTagType } from "./types";
+import { type RiftType, isTagType, isStructType } from "./types";
 import type { RiftWorld } from "./world";
 import {
   OP_SPAWN,
@@ -116,10 +116,16 @@ export class RiftClient {
 
     if (!entity) {
       for (let i = 0; i < count; i++) {
-        const typeId = r.readU16();
+        const rawTypeId = r.readU16();
+        const isMasked = (rawTypeId & 0x8000) !== 0;
+        const typeId = rawTypeId & 0x7fff;
         const type = this.#world.getComponentType(typeId);
         if (!isTagType(type)) {
-          type.read(r);
+          if (isMasked && isStructType(type)) {
+            type.readMasked(r, {} as never);
+          } else {
+            type.read(r);
+          }
         }
       }
       return;
@@ -127,9 +133,20 @@ export class RiftClient {
 
     let structureChanged = false;
     for (let i = 0; i < count; i++) {
-      const typeId = r.readU16();
+      const rawTypeId = r.readU16();
+      const isMasked = (rawTypeId & 0x8000) !== 0;
+      const typeId = rawTypeId & 0x7fff;
       const type = this.#world.getComponentType(typeId);
-      const value = isTagType(type) ? undefined : type.read(r);
+
+      let value;
+      if (isTagType(type)) {
+        value = undefined;
+      } else if (isMasked && isStructType(type)) {
+        const existing = entity.has(type) ? entity.get(type) : {};
+        value = type.readMasked(r, existing);
+      } else {
+        value = type.read(r);
+      }
 
       if (!entity.has(type)) {
         structureChanged = true;

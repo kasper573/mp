@@ -54,16 +54,26 @@ export class Entity {
       this.components.set(type, store);
       this[onChange]?.(this, type, "add");
       this[onDirty]?.(this, type);
+      return;
     }
 
     if (isStructType(type) && store.fieldSignals) {
       const v = value as Record<string, unknown>;
-      for (const f of type.fields) {
+      let changed = false;
+      for (let i = 0; i < type.fields.length; i++) {
+        const f = type.fields[i];
         const fieldSignal = store.fieldSignals.get(f.name);
-        if (fieldSignal) fieldSignal.value = v[f.name];
+        if (fieldSignal && !f.type.equals(fieldSignal.value, v[f.name])) {
+          fieldSignal.value = v[f.name];
+          store.dirtyFields |= 1 << i;
+          changed = true;
+        }
       }
-      store.dirtyFields = (1 << type.fields.length) - 1;
+      if (!changed) return;
+    } else if (!isTagType(type) && type.equals(store.signal.value, value)) {
+      return;
     }
+
     store.signal.value = value;
     store.dirty = true;
     this[onDirty]?.(this, type);

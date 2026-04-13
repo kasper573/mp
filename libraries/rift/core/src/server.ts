@@ -6,7 +6,7 @@ import { EventBus } from "./event-bus";
 import { onChange, onDirty } from "./internal";
 import { RiftQuery } from "./query";
 import type { Infer, RiftEventBusMap } from "./types";
-import { type RiftType, isTagType } from "./types";
+import { type RiftType, isTagType, isStructType } from "./types";
 import type { RiftWorld, TypeId } from "./world";
 import {
   PendingEventBuilder,
@@ -296,8 +296,16 @@ export class RiftServer {
         const store = entity.components.get(type);
         if (store?.dirty && !isTagType(type)) {
           updateCount++;
-          w.writeU16(typeId);
-          type.write(w, entity.get(type));
+          if (
+            isStructType(type) &&
+            store.dirtyFields !== (1 << type.fields.length) - 1
+          ) {
+            w.writeU16(typeId | 0x8000);
+            type.writeMasked(w, entity.get(type), store.dirtyFields);
+          } else {
+            w.writeU16(typeId);
+            type.write(w, entity.get(type));
+          }
         }
       }
     }

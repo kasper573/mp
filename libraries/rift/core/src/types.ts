@@ -153,6 +153,8 @@ export interface RiftStruct<S extends RiftSchema = RiftSchema> extends RiftType<
 > {
   readonly kind: "struct";
   readonly fields: ReadonlyArray<{ name: string & keyof S; type: RiftType }>;
+  writeMasked(w: WriteBuffer, value: InferStructValue<S>, mask: number): void;
+  readMasked(r: ReadBuffer, existing: InferStructValue<S>): InferStructValue<S>;
   createProxy(
     fieldSignals: Map<string, Signal>,
     onWrite: (fieldIndex: number) => void,
@@ -246,6 +248,24 @@ export function struct<S extends RiftSchema>(schema: S): RiftStruct<S> {
       }
       return result as V;
     },
+    writeMasked(w, value, mask) {
+      w.writeU8(mask);
+      for (const f of fields) {
+        if (mask & (1 << f.index)) {
+          f.type.write(w, (value as Record<string, unknown>)[f.name]);
+        }
+      }
+    },
+    readMasked(r, existing) {
+      const mask = r.readU8();
+      const result = { ...(existing as Record<string, unknown>) };
+      for (const f of fields) {
+        if (mask & (1 << f.index)) {
+          result[f.name] = f.type.read(r);
+        }
+      }
+      return result as V;
+    },
     createProxy(fieldSignals, onWrite) {
       const fieldNames = fields.map((f) => f.name);
       return new Proxy({} as V, {
@@ -264,8 +284,11 @@ export function struct<S extends RiftSchema>(schema: S): RiftStruct<S> {
           if (!sig) {
             return false;
           }
-          sig.value = value;
           const idx = fieldIndexMap.get(prop);
+          if (idx !== undefined && fields[idx].type.equals(sig.value, value)) {
+            return true;
+          }
+          sig.value = value;
           if (idx !== undefined) {
             onWrite(idx);
           }
