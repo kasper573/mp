@@ -8,11 +8,7 @@ export const systemRoles = defineRoles("sys", [
   "useDevTools",
 ]);
 
-export const gatewayRoles = defineRoles("gateway", [
-  "spectate",
-  "join",
-  "gameServiceBroadcast",
-]);
+export const gameServerRoles = defineRoles("gameServer", ["spectate", "join"]);
 
 export const characterRoles = defineRoles("character", [
   "move",
@@ -31,13 +27,13 @@ export const playerRoles = [
   characterRoles.attack,
   characterRoles.respawn,
   characterRoles.recall,
-  gatewayRoles.join,
+  gameServerRoles.join,
 ];
 
 export const groupedRoles = {
   admin: [
     ...Object.values(systemRoles),
-    ...Object.values(gatewayRoles),
+    ...Object.values(gameServerRoles),
     ...Object.values(characterRoles),
     ...Object.values(npcRoles),
   ],

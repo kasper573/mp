@@ -1,0 +1,33 @@
+{
+  "name": "@mp/game-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "tsgo && vite build",
+    "dev:instance": "pnpm devenv vite-node --watch src/main.ts",
+    "dev": "pnpm dev:instance",
+    "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/auth": "workspace:*",
+    "@mp/env": "workspace:*",
+    "@mp/keycloak": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/telemetry": "workspace:*",
+    "@mp/validate": "workspace:*",
+    "@mp/world": "workspace:*",
+    "@rift/core": "workspace:*",
+    "@rift/modular": "workspace:*",
+    "preact": "catalog:",
+    "ws": "catalog:"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*",
+    "@preact/preset-vite": "catalog:",
+    "@prefresh/core": "catalog:",
+    "@types/ws": "catalog:",
+    "@vanilla-extract/vite-plugin": "catalog:",
+    "vite": "catalog:"
+  }
+}

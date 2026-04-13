@@ -15,7 +15,7 @@ I'm doing this project for fun and to teach myself more about multiplayer game d
 - ui: [preact](https://preactjs.com/)
 - database: [postgres](https://www.postgresql.org/) +
   [drizzle](https://orm.drizzle.team/)
-- network: [ws](https://www.npmjs.com/package/ws), [graphql](./apps/api-service/), [custom sync lib](libraries/sync)
+- network: [ws](https://www.npmjs.com/package/ws), [rift](libraries/rift) (custom ECS sync framework)
 - auth: [keycloak](https://www.keycloak.org/)
 - observability: [grafana](https://grafana.com)
 
@@ -131,7 +131,7 @@ The apps are responsible for bundling.
 
 Compositions of libraries or integrations with third party services.
 
-May depend on libraries, but not apps, with one exception: `@mp/game-service` exposes event router typedefs that is okay to use. It allows clients to get a type safe event emitter for the game service.
+May depend on libraries, but not apps.
 
 ### libraries
 
@@ -153,28 +153,15 @@ There's also a reverse proxy (caddy) in front of everything, but it's not shown 
 flowchart LR
   User --> WEB["Website"]
 
-  GC -->|Send game client events| GW["Gateway"]
-  GS -->|Flush game state to game clients| GW
-
-  GW -->|Cross service event broadcast| GS["Game service"]
-  GW -->|Broadcast game client events to game services| GS
-
-  WEB -->|Show game client on some pages| GC["Game client"]
-
-  GC -->|CRUD character data| API["API service"]
-  GS -->|Load area data required by instance| API
+  WEB -->|WebSocket game events| SRV["Game Server"]
 
   WEB -->|Load assets| FS["File server (caddy)"]
-  API -->|List game client assets| FS
-  GC -->|Load game client assets| FS
+  SRV -->|Load tiled map data| FS
 
-  GW --> KC["Auth service (keycloak)"]
-  API --> KC
+  WEB -->|OIDC authentication| KC["Auth (keycloak)"]
+  SRV -->|Verify tokens via JWKS| KC
 
-  GS -->|Load/Save game state| DB["Database (postgres)"]
-  GW -->|Save player online state| DB
-  API -->|Load/Edit game state| DB
-  KC -->|CRUD user data| DB
+  KC -->|User data| DB["Database (postgres)"]
 ```
 
 ### State management

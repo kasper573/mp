@@ -1,0 +1,9 @@
+{
+  "extends": "@mp/tsconfig/universal.json",
+  "include": ["src"],
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"]
+  }
+}

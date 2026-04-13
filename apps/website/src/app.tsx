@@ -10,8 +10,6 @@ import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
 import { createClientRouter } from "./integrations/router/router";
-import { GraphQLClient, GraphQLClientProvider } from "@mp/api-service/client";
-import apiSchemaUrl from "@mp/api-service/client/schema.graphql?url";
 
 // This is effectively the composition root of the application.
 // It's okay to define instances in the top level here, but do not export them.
@@ -31,19 +29,17 @@ export default function App() {
           handleError: (e) => systems.logger.error(e, "Preact error"),
         }}
       >
-        <GraphQLClientProvider client={systems.graphqlClient}>
-          <LoggerContext.Provider value={systems.logger}>
-            <AuthContext.Provider value={systems.auth}>
-              <RouterProvider router={systems.router} />
-            </AuthContext.Provider>
-          </LoggerContext.Provider>
-          {showDevTools && (
-            <>
-              <TanStackRouterDevtools router={systems.router} />
-              <ReactQueryDevtools client={systems.query} />
-            </>
-          )}
-        </GraphQLClientProvider>
+        <LoggerContext.Provider value={systems.logger}>
+          <AuthContext.Provider value={systems.auth}>
+            <RouterProvider router={systems.router} />
+          </AuthContext.Provider>
+        </LoggerContext.Provider>
+        {showDevTools && (
+          <>
+            <TanStackRouterDevtools router={systems.router} />
+            <ReactQueryDevtools client={systems.query} />
+          </>
+        )}
       </ErrorFallbackContext.Provider>
     </QueryClientProvider>
   );
@@ -57,17 +53,10 @@ function createSystems() {
   const query = new QueryClient({
     defaultOptions: {
       queries: {
-        retry: env.retryApiQueries,
+        retry: false,
         refetchOnWindowFocus: false,
       },
     },
-  });
-
-  const graphqlClient = new GraphQLClient({
-    url: env.api.url,
-    subscriptionsUrl: env.api.subscriptionsUrl,
-    schema: () => fetch(apiSchemaUrl).then((res) => res.text()),
-    getAccessToken: () => auth.identity.value?.token,
   });
 
   function initialize() {
@@ -87,7 +76,6 @@ function createSystems() {
     logger,
     router,
     query,
-    graphqlClient,
     initialize,
   };
 }

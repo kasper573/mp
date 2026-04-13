@@ -39,7 +39,7 @@ export default defineConfig({
         stdout: "pipe",
         stderr: "pipe",
         wait: {
-          stdout: /game service connected/i,
+          stdout: /game server started/i,
         },
       }
     : undefined,

@@ -36,9 +36,6 @@ function DevtoolsLayout() {
         <Link to="/admin/devtools/error-tester">Error Tester</Link>
         <Link to="/admin/devtools/spring-tester">Spring Tester</Link>
         <Link to="/admin/devtools/actor-tester">Actor Tester</Link>
-        <Link to="/admin/devtools/subscription-tester">
-          Subscription Tester
-        </Link>
         <Link to="/admin/devtools/tile-renderer-tester">
           Tile Renderer Tester
         </Link>
