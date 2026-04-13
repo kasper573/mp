@@ -55,11 +55,11 @@ faro.{$MP_DOMAIN} {
     reverse_proxy {$MP_WEBSITE_PROXY_HOST}
 }
 
-{$MP_GAME_SERVICE_DOMAIN} {
+{$MP_GAME_SERVER_DOMAIN} {
     import common_rate_limit
     tracing {
-        span game_service
+        span game_server
     }
-    reverse_proxy {$MP_GAME_SERVICE_PROXY_HOST}
+    reverse_proxy {$MP_GAME_SERVER_PROXY_HOST}
     import common_cors
 }

@@ -24,7 +24,7 @@ const logger = createConsoleLogger();
 
 const {
   fileServerUrl,
-  gameServiceUrl,
+  gameServerUrl,
   gameClients,
   timeout,
   verbose,
@@ -110,7 +110,7 @@ function testOneGameClient(n: number, rng: Rng) {
       }
 
       const accessToken = createBypassUser(`Load Test ${n}`);
-      const url = new URL(gameServiceUrl);
+      const url = new URL(gameServerUrl);
       url.searchParams.set("accessToken", accessToken);
       socket = new WebSocket(url.toString());
       socket.binaryType = "arraybuffer";

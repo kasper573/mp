@@ -1,9 +1,9 @@
-prometheus.scrape "pushgateway" {
+prometheus.scrape "game_server" {
 	targets = [{
-		__address__ = "pushgateway:9091",
+		__address__ = env("MP_GAME_SERVER_METRICS_PROXY_HOST"),
 	}]
 	forward_to      = [prometheus.remote_write.default.receiver]
-	job_name        = "pushgateway"
+	job_name        = "game-server"
 	scrape_interval = env("PROMETHEUS_SCRAPE_INTERVAL")
 	scrape_timeout  = env("PROMETHEUS_SCRAPE_TIMEOUT")
 }

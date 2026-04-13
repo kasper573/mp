@@ -32,7 +32,7 @@ export function useGameClient(): GameClient | undefined {
 }
 
 function createGameClient(auth: AuthClient): [GameClient, WebSocket] {
-  const url = new URL(env.gameServiceUrl);
+  const url = new URL(env.gameServerUrl);
   url.searchParams.set("accessToken", auth.identity.value?.token ?? "");
 
   const socket = new WebSocket(url.toString());

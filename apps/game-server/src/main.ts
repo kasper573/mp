@@ -1,3 +1,4 @@
+import { createServer } from "node:http";
 import { RiftServer } from "@rift/core";
 import { GameServer } from "@rift/modular";
 import { WebSocketServer } from "ws";
@@ -7,6 +8,7 @@ import { createConsoleLogger } from "@mp/logger";
 import { createTokenResolver } from "@mp/auth/server";
 import type { AccessToken } from "@mp/auth";
 import { playerRoles } from "@mp/keycloak";
+import { collectDefaultMetrics, metricsRegister } from "@mp/telemetry/prom";
 import { opt } from "./options";
 
 const logger = createConsoleLogger();
@@ -52,6 +54,18 @@ const server = new GameServer({
   values: { tiledBaseUrl: opt.tiledBaseUrl },
 });
 
+collectDefaultMetrics();
+
+createServer(async (req, res) => {
+  if (req.url === "/metrics" && req.method === "GET") {
+    res.setHeader("Content-Type", metricsRegister.contentType);
+    res.end(await metricsRegister.metrics());
+  } else {
+    res.writeHead(404).end();
+  }
+}).listen(opt.metricsPort);
+
 await server.start();
 
-logger.info(`Game service connected on port ${opt.port}`);
+logger.info(`Game server started on port ${opt.port}`);
+logger.info(`Metrics server listening on port ${opt.metricsPort}`);

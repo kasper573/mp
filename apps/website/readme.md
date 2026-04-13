@@ -1,3 +1,3 @@
 # website
 
-Selects the client side parts of the [game package](../game) and incorporates them into a [vite](https://vite.dev/) based SPA website.
+A [vite](https://vite.dev/) based SPA. Connects to the server via WebSocket and renders the game using [@mp/world](../../integrations/world).

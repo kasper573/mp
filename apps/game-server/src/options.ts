@@ -1,13 +1,17 @@
 import { parseEnv } from "@mp/env";
 import { boolish, numeric, type } from "@mp/validate";
 
-export type GameServiceOptions = typeof gameServiceOptionsSchema.infer;
+export type GameServerOptions = typeof gameServerOptionsSchema.infer;
 
-export const gameServiceOptionsSchema = type({
+export const gameServerOptionsSchema = type({
   /**
    * The port to listen on for WebSocket connections.
    */
   port: numeric(),
+  /**
+   * The port to listen on for the Prometheus metrics HTTP server.
+   */
+  metricsPort: numeric(),
   /**
    * The base URL for loading tiled map files.
    */
@@ -44,7 +48,7 @@ export const gameServiceOptionsSchema = type({
 }).onDeepUndeclaredKey("delete");
 
 export const opt = parseEnv(
-  (v) => gameServiceOptionsSchema.assert(v),
+  (v) => gameServerOptionsSchema.assert(v),
   process.env,
-  "MP_GAME_SERVICE_",
+  "MP_GAME_SERVER_",
 )._unsafeUnwrap();

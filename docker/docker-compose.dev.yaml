@@ -15,9 +15,5 @@ services:
   reverse-proxy:
     extra_hosts:
       - "host.docker.internal:host-gateway"
-  pushgateway:
-    ports:
-      - "9091:9091"
-
 volumes:
   postgres-data:

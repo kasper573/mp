@@ -1,5 +1,5 @@
 {
-  "name": "@mp/game-service",
+  "name": "@mp/game-server",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,6 +14,7 @@
     "@mp/env": "workspace:*",
     "@mp/keycloak": "workspace:*",
     "@mp/logger": "workspace:*",
+    "@mp/telemetry": "workspace:*",
     "@mp/validate": "workspace:*",
     "@mp/world": "workspace:*",
     "@rift/core": "workspace:*",

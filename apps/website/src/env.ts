@@ -1,7 +1,7 @@
 import { parseEnv, type FlatObject } from "@mp/env";
 
 export interface ClientEnv {
-  gameServiceUrl: string;
+  gameServerUrl: string;
   fileServerUrl: string;
   version: string;
   displayErrorDetails: boolean;

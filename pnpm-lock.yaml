@@ -108,7 +108,7 @@ importers:
         specifier: ^0.34.5
         version: 0.34.5
 
-  apps/game-service:
+  apps/game-server:
     dependencies:
       '@mp/auth':
         specifier: workspace:*
@@ -122,6 +122,9 @@ importers:
       '@mp/logger':
         specifier: workspace:*
         version: link:../../libraries/logger
+      '@mp/telemetry':
+        specifier: workspace:*
+        version: link:../../libraries/telemetry
       '@mp/validate':
         specifier: workspace:*
         version: link:../../libraries/validate

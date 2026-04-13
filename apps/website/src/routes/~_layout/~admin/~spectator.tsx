@@ -1,5 +1,5 @@
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/world";
-import { gameServiceRoles } from "@mp/keycloak";
+import { gameServerRoles } from "@mp/keycloak";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense } from "preact/compat";
@@ -10,7 +10,7 @@ import { MiscDebugUi } from "../../../ui/misc-debug-ui";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
-    requiredRoles: [gameServiceRoles.spectate],
+    requiredRoles: [gameServerRoles.spectate],
   }),
 });
 

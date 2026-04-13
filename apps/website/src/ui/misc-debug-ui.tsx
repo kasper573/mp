@@ -27,7 +27,7 @@ function PingIndicator() {
     async queryFn() {
       const start = performance.now();
       await fetch(
-        `${env.gameServiceUrl.replace("wss://", "https://").replace("ws://", "http://")}/health`,
+        `${env.gameServerUrl.replace("wss://", "https://").replace("ws://", "http://")}/health`,
       );
       return performance.now() - start;
     },
