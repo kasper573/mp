@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "build": "tsgo && tsx esbuild.ts",
+    "build": "tsgo && vite build",
     "provision": "NODE_TLS_REJECT_UNAUTHORIZED=0 tsx scripts/provision.ts",
     "devenv": "dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
   },
@@ -23,8 +23,9 @@
     "@mp/std": "workspace:*"
   },
   "devDependencies": {
-    "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
-    "@types/node": "catalog:"
+    "@types/node": "catalog:",
+    "tsx": "catalog:",
+    "vite": "catalog:"
   }
 }
