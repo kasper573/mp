@@ -7,11 +7,11 @@ export const gameServiceOptionsSchema = type({
   /**
    * The port to listen on for WebSocket connections.
    */
-  "port?": numeric(),
+  port: numeric(),
   /**
    * The base URL for loading tiled map files.
    */
-  "tiledBaseUrl?": "string",
+  tiledBaseUrl: "string",
   auth: {
     /**
      * The JWKS URI for token verification (e.g. Keycloak certs endpoint).

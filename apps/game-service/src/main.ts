@@ -11,9 +11,6 @@ import { opt } from "./options";
 
 const logger = createConsoleLogger();
 
-const port = opt.port ?? 8090;
-const tiledBaseUrl = opt.tiledBaseUrl ?? "https://files.mp.localhost/";
-
 const resolveToken = createTokenResolver({
   jwksUri: opt.auth.jwksUri,
   issuer: opt.auth.issuer,
@@ -29,7 +26,7 @@ const resolveToken = createTokenResolver({
 });
 
 const wss = new WebSocketServer({
-  port,
+  port: opt.port,
   verifyClient: async (info, cb) => {
     const url = new URL(info.req.url ?? "/", `http://${info.req.headers.host}`);
     const token = url.searchParams.get("accessToken") as
@@ -52,9 +49,9 @@ const server = new GameServer({
   rift,
   wss,
   tickRate: 20,
-  values: { tiledBaseUrl },
+  values: { tiledBaseUrl: opt.tiledBaseUrl },
 });
 
 await server.start();
 
-logger.info(`Game service connected on port ${port}`);
+logger.info(`Game service connected on port ${opt.port}`);
