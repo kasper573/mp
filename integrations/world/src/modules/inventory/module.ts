@@ -1,9 +1,8 @@
 import { defineModule } from "@rift/modular";
-import type { Entity, EntityId } from "@rift/core";
+import type { EntityId } from "@rift/core";
 import { computed } from "@mp/state";
 import {
-  consumables,
-  equipment,
+  items,
   type ItemDefinition,
   type ItemDefinitionId,
 } from "@mp/fixtures";
@@ -16,7 +15,7 @@ import {
 import { sessionModule } from "../session/module";
 
 const itemLookup = new Map<ItemDefinitionId, ItemDefinition>(
-  [...consumables, ...equipment].map((d) => [d.id, d]),
+  items.map((d) => [d.id, d]),
 );
 
 export const inventoryModule = defineModule({
@@ -82,18 +81,7 @@ export const inventoryModule = defineModule({
     }
 
     return {
-      api: {
-        spawnItem,
-        getItemsForOwner(ownerId: EntityId): Entity[] {
-          const results: Entity[] = [];
-          for (const item of itemQuery.value) {
-            if (item.get(ItemOwner).ownerId === ownerId) {
-              results.push(item);
-            }
-          }
-          return results;
-        },
-      },
+      api: { spawnItem },
     };
   },
 });

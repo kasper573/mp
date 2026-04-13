@@ -6,17 +6,7 @@ import type {
   ItemDefinitionId,
   NpcSpawnId,
 } from "@mp/fixtures";
-import {
-  struct,
-  f32,
-  u8,
-  u16,
-  u32,
-  bool,
-  string,
-  tag,
-  transform,
-} from "@rift/core";
+import { struct, f32, u8, u16, u32, bool, string, transform } from "@rift/core";
 
 // --- Synced components ---
 
@@ -54,10 +44,6 @@ export const CharacterIdentity = struct({
   clientId: string(),
 });
 
-export const AttackTarget = struct({
-  targetId: u32(),
-});
-
 export const Progression = struct({
   xp: f32(),
 });
@@ -85,9 +71,6 @@ export const AreaTag = struct({
   areaId: string<AreaId>(),
 });
 
-/** Marker component for dead NPCs awaiting corpse cleanup */
-export const Corpse = tag();
-
 export const allComponents = [
   Position,
   Movement,
@@ -95,12 +78,10 @@ export const allComponents = [
   Appearance,
   NpcIdentity,
   CharacterIdentity,
-  AttackTarget,
   Progression,
   ItemOwner,
   ItemDefinitionComp,
   Stackable,
   Durable,
   AreaTag,
-  Corpse,
 ];

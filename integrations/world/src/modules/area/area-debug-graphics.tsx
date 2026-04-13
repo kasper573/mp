@@ -11,7 +11,7 @@ import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";
 import { Vector } from "@mp/math";
 import type { VectorGraph, VectorGraphNode } from "@mp/path-finding";
-import { computed, effect, type ReadonlySignal } from "@mp/state";
+import { computed, effect } from "@mp/state";
 import type { Pixel, Tile } from "@mp/std";
 import uniqolor from "uniqolor";
 import type {
@@ -40,7 +40,7 @@ export class AreaDebugGraphics extends Container {
     );
 
     this.attackRanges = new ReactiveCollection(
-      actors as ReadonlySignal<readonly Entity[]>,
+      actors,
       (entity) =>
         new DebugCircle(() => ({
           tiled: area.tiled,

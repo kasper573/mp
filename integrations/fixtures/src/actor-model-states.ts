@@ -35,9 +35,3 @@ export const actorModelStates = Object.freeze([
   "walk-shooting",
   "walk-spear",
 ] as const);
-
-export function isActorModelState(str: string): str is ActorModelState {
-  return actorModelStatesSet.has(str as ActorModelState);
-}
-
-const actorModelStatesSet = new Set(actorModelStates);
