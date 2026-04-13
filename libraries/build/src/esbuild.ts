@@ -1,10 +1,8 @@
 import esbuild from "esbuild";
 import builtinModules from "builtin-modules";
 
-export type Plugin = esbuild.Plugin;
-
 export function build(
-  opt: Pick<esbuild.BuildOptions, "entryPoints" | "outdir" | "plugins">,
+  opt: Pick<esbuild.BuildOptions, "entryPoints" | "outdir">,
 ): Promise<esbuild.BuildResult> {
   const buildOptions: esbuild.BuildOptions = {
     ...opt,

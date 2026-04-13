@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build": "tsgo && tsx esbuild.ts",
+    "build": "tsgo && vite build",
     "dev:instance": "pnpm devenv vite-node --watch src/main.ts",
     "dev": "pnpm dev:instance",
     "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
@@ -22,13 +22,11 @@
     "ws": "catalog:"
   },
   "devDependencies": {
-    "@mp/build": "workspace:*",
     "@mp/tsconfig": "workspace:*",
     "@preact/preset-vite": "catalog:",
     "@prefresh/core": "catalog:",
     "@types/ws": "catalog:",
     "@vanilla-extract/vite-plugin": "catalog:",
-    "tsx": "catalog:",
     "vite": "catalog:"
   }
 }
