@@ -1,0 +1,39 @@
+{
+  "name": "@mp/game-server",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./src/main.ts",
+      "import": "./src/main.ts",
+      "require": "./src/main.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsgo && tsx esbuild.ts",
+    "dev": "pnpm devenv tsx watch --clear-screen=false src/main.ts",
+    "devenv": "NODE_TLS_REJECT_UNAUTHORIZED=0 dotenvx run -f ../../docker/.env.dev ../../docker/.env.shared -- pnpm"
+  },
+  "dependencies": {
+    "@mp/auth": "workspace:*",
+    "@mp/db": "workspace:*",
+    "@mp/env": "workspace:*",
+    "@mp/fixtures": "workspace:*",
+    "@mp/keycloak": "workspace:*",
+    "@mp/logger": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/validate": "workspace:*",
+    "@mp/world": "workspace:*",
+    "@rift/core": "workspace:*",
+    "@rift/wss": "workspace:*",
+    "dotenv": "catalog:",
+    "ws": "8.20.0"
+  },
+  "devDependencies": {
+    "@mp/build": "workspace:*",
+    "@mp/tsconfig": "workspace:*",
+    "@types/ws": "8.18.1",
+    "tsx": "catalog:"
+  }
+}

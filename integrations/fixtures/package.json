@@ -1,0 +1,25 @@
+{
+  "name": "@mp/fixtures",
+  "version": "0.0.0",
+  "sideEffects": false,
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts",
+      "require": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@mp/math": "workspace:*",
+    "@mp/std": "workspace:*",
+    "@mp/world": "workspace:*"
+  },
+  "devDependencies": {
+    "@mp/tsconfig": "workspace:*"
+  }
+}

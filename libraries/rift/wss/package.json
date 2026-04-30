@@ -1,0 +1,24 @@
+{
+  "name": "@rift/wss",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rift/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/ws": "8.18.1",
+    "typescript": "catalog:",
+    "ws": "8.20.0"
+  },
+  "peerDependencies": {
+    "ws": "^8.18.0"
+  }
+}

@@ -1,0 +1,139 @@
+import type { Cleanup } from "@rift/module";
+import type { EntityId, RiftServerEvent } from "@rift/core";
+import { RiftServerModule, Tick } from "@rift/core";
+import { inject } from "@rift/module";
+import { ClientCharacterRegistry } from "../identity/client-character-registry";
+import { CharacterTag, NpcTag } from "../identity/components";
+import { Combat } from "./components";
+import { Movement } from "../movement/components";
+import { AttackRequest, Kill } from "./events";
+
+const HP_REGEN_INTERVAL_MS = 10_000;
+const HP_REGEN_AMOUNT = 5;
+const TILE_DIAGONAL_MARGIN = Math.sqrt(2) - 1;
+
+export class CombatModule extends RiftServerModule {
+  @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
+
+  #lastRegenMs = 0;
+  #elapsedMs = 0;
+
+  init(): Cleanup {
+    const offTick = this.server.on(Tick, this.#onTick);
+    const offAttack = this.server.on(AttackRequest, this.#onAttackRequest);
+    return () => {
+      offTick();
+      offAttack();
+    };
+  }
+
+  #onAttackRequest = (event: RiftServerEvent<{ targetId: EntityId }>): void => {
+    if (event.source.type !== "wire") {
+      return;
+    }
+    const attacker = this.registry.getCharacterEntity(event.source.clientId);
+    if (attacker === undefined) {
+      return;
+    }
+    const combat = this.server.world.get(attacker, Combat);
+    if (!combat || !combat.alive) {
+      return;
+    }
+    this.server.world.set(attacker, Combat, {
+      ...combat,
+      attackTargetId: event.data.targetId,
+    });
+  };
+
+  #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+    this.#elapsedMs += event.data.dt * 1000;
+
+    if (this.#elapsedMs - this.#lastRegenMs >= HP_REGEN_INTERVAL_MS) {
+      this.#lastRegenMs = this.#elapsedMs;
+      for (const [id, _tag, combat] of this.server.world.query(
+        CharacterTag,
+        Combat,
+      )) {
+        if (!combat.alive) continue;
+        const next = Math.min(
+          combat.health + HP_REGEN_AMOUNT,
+          combat.maxHealth,
+        );
+        if (next !== combat.health) {
+          this.server.world.set(id, Combat, { ...combat, health: next });
+        }
+        void _tag;
+      }
+    }
+
+    for (const [id, combat, mv] of this.server.world.query(Combat, Movement)) {
+      if (!combat.attackTargetId || !combat.alive) {
+        continue;
+      }
+      const target = combat.attackTargetId;
+      const targetCombat = this.server.world.get(target, Combat);
+      const targetMv = this.server.world.get(target, Movement);
+      if (!targetCombat || !targetMv || !targetCombat.alive) {
+        this.server.world.set(id, Combat, {
+          ...combat,
+          attackTargetId: undefined,
+        });
+        continue;
+      }
+      const dx = targetMv.coords.x - mv.coords.x;
+      const dy = targetMv.coords.y - mv.coords.y;
+      const distance = Math.hypot(dx, dy);
+      if (distance > combat.attackRange + TILE_DIAGONAL_MARGIN) {
+        if (mv.path.length === 0) {
+          this.server.world.set(id, Movement, {
+            ...mv,
+            moveTarget: { x: targetMv.coords.x, y: targetMv.coords.y },
+          });
+        }
+        continue;
+      }
+
+      const cooldownMs = (1 / combat.attackSpeed) * 1000;
+      if (
+        combat.lastAttackMs !== undefined &&
+        this.#elapsedMs - combat.lastAttackMs < cooldownMs
+      ) {
+        continue;
+      }
+
+      const newHealth = Math.max(0, targetCombat.health - combat.attackDamage);
+      const newAlive = newHealth > 0;
+      this.server.world.set(target, Combat, {
+        ...targetCombat,
+        health: newHealth,
+        alive: newAlive,
+      });
+
+      this.server.world.set(id, Combat, {
+        ...combat,
+        lastAttackMs: this.#elapsedMs,
+      });
+      this.server.world.set(id, Movement, {
+        ...mv,
+        path: [],
+        moveTarget: undefined,
+      });
+
+      if (!newAlive) {
+        this.server.emit({
+          type: Kill,
+          data: { attackerId: id, victimId: target },
+          source: { type: "local" },
+          target: { type: "local" },
+        });
+        if (this.server.world.has(target, NpcTag)) {
+          this.server.world.set(target, Movement, {
+            ...targetMv,
+            path: [],
+            moveTarget: undefined,
+          });
+        }
+      }
+    }
+  };
+}

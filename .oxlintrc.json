@@ -133,6 +133,15 @@
         "extensions": "off"
       }
     },
+    // Vendored rift packages — keep source verbatim so re-vendor stays mechanical.
+    {
+      "files": ["**/libraries/rift/**"],
+      "rules": {
+        "typescript/no-unnecessary-type-arguments": "off",
+        "prefer-for-of": "off",
+        "complexity": "off"
+      }
+    },
     // Ensure that the game package does not import from its export files
     {
       "files": ["**/apps/game/**"],

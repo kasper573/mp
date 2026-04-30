@@ -1,50 +1,63 @@
+import type { UserIdentity } from "@mp/auth";
+import type { Vector } from "@mp/math";
+import type { Tile } from "@mp/std";
+import type { ActorModelId, AreaId } from "@mp/world";
 import { createDrizzleClient } from "./utils/client";
 import { mayAccessCharacter } from "./procedures/may-access-character";
-import { selectAllActorModelIds } from "./procedures/select-all-actor-model-ids";
-import { selectAllItemDefinitions } from "./procedures/select-all-item-definitions";
-import { selectAllNpcRewards } from "./procedures/select-all-npc-rewards";
-import { selectAllSpawnAndNpcPairs } from "./procedures/select-all-spawn-and-npc-pairs";
 import { selectCharacterByUser } from "./procedures/select-character-by-user";
-import {
-  selectConsumableDefinition,
-  selectEquipmentDefinition,
-} from "./procedures/select-item";
 import { selectCharacterList } from "./procedures/select-character-list";
+import { selectCharacterRow } from "./procedures/select-character-row";
 import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-character-id";
 import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { upsertCharacter } from "./procedures/upsert-character";
 import {
+  selectAllActorModelIds,
+  selectAllItemDefinitions,
+  selectAllNpcRewards,
+  selectAllSpawnAndNpcPairs,
+  selectConsumableDefinition,
+  selectEquipmentDefinition,
+} from "./procedures/legacy-fixture-stubs";
+import {
   GameStateSync,
   type GameStateSyncOptions,
 } from "./utils/sync-game-state";
 
-/**
- * All database interactions must be done through the repository.
- * We separate query definitions into procedures internally in the db package,
- * but only the repository will be exposed outside the package.
- */
+export type { GameStateSyncOptions as SyncGameStateOptions };
+
 export function createDbRepository(connectionString: string) {
   const drizzle = createDrizzleClient(connectionString);
+  const selectOrCreate = selectOrCreateCharacterIdForUser.build(drizzle);
 
   return {
     mayAccessCharacter: mayAccessCharacter.build(drizzle),
-    selectAllActorModelIds: selectAllActorModelIds.build(drizzle),
-    selectAllItemDefinitions: selectAllItemDefinitions.build(drizzle),
-    selectAllNpcRewards: selectAllNpcRewards.build(drizzle),
-    selectAllSpawnAndNpcPairs: selectAllSpawnAndNpcPairs.build(drizzle),
     selectCharacterByUser: selectCharacterByUser.build(drizzle),
-    selectConsumableDefinition: selectConsumableDefinition.build(drizzle),
-    selectEquipmentDefinition: selectEquipmentDefinition.build(drizzle),
     selectCharacterList: selectCharacterList.build(drizzle),
-    selectOrCreateCharacterIdForUser:
-      selectOrCreateCharacterIdForUser.build(drizzle),
+    selectCharacterRow: selectCharacterRow.build(drizzle),
+    selectOrCreateCharacterIdForUser: (input: {
+      user: UserIdentity;
+      spawnPoint: { areaId: AreaId; coords: Vector<Tile> };
+      defaultModelId?: ActorModelId;
+    }) =>
+      selectOrCreate({
+        user: input.user,
+        spawnPoint: input.spawnPoint,
+        defaultModelId: input.defaultModelId ?? ("adventurer" as ActorModelId),
+      }),
     updateCharacter: updateCharacter.build(drizzle),
     updateCharactersArea: updateCharactersArea.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
 
-    gameStateFor: (opt: GameStateSyncOptions) =>
-      new GameStateSync(drizzle, opt),
+    selectAllActorModelIds: selectAllActorModelIds.build(drizzle),
+    selectAllItemDefinitions: selectAllItemDefinitions.build(drizzle),
+    selectAllNpcRewards: selectAllNpcRewards.build(drizzle),
+    selectAllSpawnAndNpcPairs: selectAllSpawnAndNpcPairs.build(drizzle),
+    selectConsumableDefinition: selectConsumableDefinition.build(drizzle),
+    selectEquipmentDefinition: selectEquipmentDefinition.build(drizzle),
+
+    gameStateFor: (opts: GameStateSyncOptions) =>
+      new GameStateSync(drizzle, opts),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);
@@ -56,7 +69,5 @@ export function createDbRepository(connectionString: string) {
     },
   };
 }
-
-export type { GameStateSyncOptions as SyncGameStateOptions };
 
 export type DbRepository = ReturnType<typeof createDbRepository>;

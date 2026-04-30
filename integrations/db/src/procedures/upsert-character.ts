@@ -1,14 +1,18 @@
-import type { Character } from "@mp/game-shared";
 import { eq } from "drizzle-orm";
+import type { CharacterId } from "@mp/world";
 import { characterTable } from "../schema";
-import { dbFieldsFromCharacter } from "../utils/transform";
 import { procedure } from "../utils/procedure";
 
+export interface CharacterUpdateFields {
+  characterId: CharacterId;
+  fields: Partial<typeof characterTable.$inferInsert>;
+}
+
 export const upsertCharacter = procedure()
-  .input<Character>()
-  .query(async (drizzle, character) => {
+  .input<CharacterUpdateFields>()
+  .query(async (drizzle, { characterId, fields }) => {
     await drizzle
       .update(characterTable)
-      .set(dbFieldsFromCharacter(character))
-      .where(eq(characterTable.id, character.identity.id));
+      .set(fields)
+      .where(eq(characterTable.id, characterId));
   });

@@ -1,9 +1,10 @@
 {
   "include": ["dependencies"],
   "ignoreDependencies": ["@mp/tsconfig", "pino-pretty", "@prefresh/core"],
+  "ignoreWorkspaces": ["libraries/rift/*"],
   "workspaces": {
     "apps/api-service": {
-      "entry": ["server/main.ts", "client/index.ts"],
+      "entry": ["server/main.ts"],
       "project": ["**/*.ts"]
     }
   }

@@ -1,0 +1,9 @@
+import { object, string } from "@rift/types";
+import type { AreaId } from "../identity/ids";
+
+export const AreaTag = object({
+  areaId: string<AreaId>(),
+});
+
+export const areaComponents = [AreaTag] as const;
+export const areaEvents = [] as const;

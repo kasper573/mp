@@ -1,0 +1,24 @@
+{
+  "name": "@rift/types",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run --typecheck",
+    "bench": "tsx scripts/benchmark.ts",
+    "profile": "node --expose-gc --import tsx scripts/profile.ts"
+  },
+  "dependencies": {
+    "@preact/signals-core": "catalog:"
+  },
+  "devDependencies": {
+    "mitata": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

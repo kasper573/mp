@@ -51,6 +51,29 @@ services:
     environment:
       MP_GAME_SERVICE_AREA_ID: island
 
+  mp-game-server:
+    env_file: *env_files
+    logging: *logging
+    build:
+      dockerfile: ./docker/Dockerfile.mp-node-app
+      args:
+        APP_NAME: game-server
+      context: ..
+    image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-server:${DOCKER_IMAGE_VERSION:-latest}
+    restart: always
+    profiles: ["prod", "test"]
+    healthcheck:
+      test:
+        ["CMD-SHELL", "curl -fsS http://localhost:$$MP_GAME_SERVER_PORT/health"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
+    depends_on:
+      keycloak-healthcheck:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+
   mp-api:
     env_file: *env_files
     logging: *logging

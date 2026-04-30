@@ -16,18 +16,12 @@ export async function itemDefinition(
   const db = ctx.ioc.get(ctxDb);
   switch (ref.type) {
     case "consumable":
-      return {
-        type: "consumable",
-        ...(await promiseFromResult(
-          db.selectConsumableDefinition(ref.definitionId),
-        )),
-      };
+      return await promiseFromResult(
+        db.selectConsumableDefinition(ref.definitionId),
+      );
     case "equipment":
-      return {
-        type: "equipment",
-        ...(await promiseFromResult(
-          db.selectEquipmentDefinition(ref.definitionId),
-        )),
-      };
+      return await promiseFromResult(
+        db.selectEquipmentDefinition(ref.definitionId),
+      );
   }
 }

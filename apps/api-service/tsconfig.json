@@ -3,7 +3,7 @@
   "include": ["*.ts", "shared", "server"],
   "compilerOptions": {
     "module": "Preserve",
-    "target": "es2017"
+    "target": "es2020"
   },
   "grats": {
     "graphqlSchema": "./shared/schema.generated.graphql",

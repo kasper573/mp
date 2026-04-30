@@ -1,0 +1,20 @@
+{
+  "name": "@rift/module",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "test": "vitest run --typecheck",
+    "bench": "tsx scripts/benchmark"
+  },
+  "devDependencies": {
+    "mitata": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}
