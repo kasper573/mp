@@ -1,184 +1,281 @@
-import type { CharacterId } from "@mp/game-shared";
-import type { GameEventClient, GameStateEvents } from "@mp/game-service";
-import type { Actor, Character, ItemInstance } from "@mp/game-shared";
+import type { ClientId, EntityId, World, ClientTransport } from "@rift/core";
+import { RiftClient } from "@rift/core";
 import {
-  registerEncoderExtensions,
-  syncMessageEncoding,
-} from "@mp/game-shared";
+  CharacterListResponse,
+  CharacterTag,
+  InventoryRef,
+  JoinAsPlayer,
+  JoinAsSpectator,
+  Leave,
+  ListCharactersRequest,
+  Movement,
+  Recall,
+  Respawn,
+  RequestFullState,
+  moveAlongPath,
+  schema,
+  type AreaId,
+  type CharacterId,
+} from "@mp/world";
+import { computed, signal, type ReadonlySignal } from "@mp/state";
 import type { Logger } from "@mp/logger";
-import type { ReadonlySignal, Signal } from "@mp/state";
-import { computed, signal } from "@mp/state";
-import { throttle } from "@mp/std";
-import { SyncEventBus } from "@mp/sync";
-import { TimeSpan } from "@mp/time";
-import { subscribeToReadyState } from "@mp/ws/client";
+import type { TimeSpan } from "@mp/time";
+import {
+  nearestCardinalDirection,
+  Vector,
+  type CardinalDirection,
+} from "@mp/math";
 import { GameActions } from "./game-actions";
-import type { OptimisticGameStateSettings } from "./optimistic-game-state";
-import { OptimisticGameState } from "./optimistic-game-state";
-
-registerEncoderExtensions();
-
-const stalePatchThreshold = TimeSpan.fromSeconds(1.5);
+import type { Actor, Character, ItemInstance } from "./types";
+import { readActor, readItemInstance } from "./types";
+import { ClientEventBus } from "./client-event-bus";
 
 export interface GameStateClientOptions {
-  socket: WebSocketLike;
-  settings: () => OptimisticGameStateSettings;
-  eventClient: GameEventClient;
-  logger: Logger;
-  handlePatchFailure?: (error: Error) => void;
+  readonly transport: ClientTransport;
+  readonly logger: Logger;
+  readonly settings: () => OptimisticGameStateSettings;
+}
+
+export interface OptimisticGameStateSettings {
+  useInterpolator: boolean;
+}
+
+export interface CharacterSummary {
+  readonly id: CharacterId;
+  readonly name: string;
 }
 
 export class GameStateClient {
-  readonly eventBus = new SyncEventBus<GameStateEvents>();
+  readonly client: RiftClient;
+  readonly eventBus: ClientEventBus;
   readonly actions: GameActions;
-
-  // State
-  readonly gameState: OptimisticGameState;
   readonly characterId = signal<CharacterId | undefined>(undefined);
-  readonly areaId = computed(
-    () => this.gameState.globals.get("instance")?.areaId,
-  );
-  readonly socketReadyState: Signal<WebSocket["readyState"]>;
+  readonly characterList = signal<readonly CharacterSummary[]>([]);
 
-  /**
-   * Is true while connected to the gateway.
-   */
   readonly isConnected: ReadonlySignal<boolean>;
+  readonly areaId: ReadonlySignal<AreaId | undefined>;
+  readonly isGameReady: ReadonlySignal<boolean>;
 
-  /**
-   * Is true while connected to the gateway and a game service
-   * has claimed the character this client is controlling.
-   */
-  readonly isGameReady = computed(() => !!this.areaId.value);
-
-  // Derived state
   readonly actorList: ReadonlySignal<readonly Actor[]>;
   readonly character: ReadonlySignal<Character | undefined>;
   readonly inventory: ReadonlySignal<readonly ItemInstance[]>;
 
+  readonly gameState: { frameCallback: (timeSinceLastFrame: TimeSpan) => void };
+
+  #unsubscribers: Array<() => void> = [];
+  #spectatedId: CharacterId | undefined;
+  #joinedAs: CharacterId | undefined;
+
   constructor(public options: GameStateClientOptions) {
-    this.gameState = new OptimisticGameState(this.options.settings);
-    this.socketReadyState = signal<WebSocket["readyState"]>(
-      this.options.socket.readyState as WebSocket["readyState"],
-    );
-    this.isConnected = computed(
-      () => this.socketReadyState.value === WebSocket.OPEN,
-    );
+    this.client = new RiftClient({
+      schema,
+      transport: options.transport,
+    });
+    this.eventBus = new ClientEventBus(this.client);
+    this.actions = new GameActions(this.client);
 
-    this.actions = new GameActions(this.options.eventClient, this.characterId);
+    this.isConnected = computed(() => this.client.state.value === "open");
 
-    this.actorList = computed(() => this.gameState.actors.values().toArray());
+    this.actorList = computed(() => {
+      const result: Actor[] = [];
+      for (const [id] of this.client.world.query(Movement)) {
+        const actor = readActor(this.client.world, id);
+        if (actor) {
+          result.push(actor);
+        }
+      }
+      return result;
+    });
 
     this.character = computed(() => {
-      const char = this.gameState.actors.get(
-        this.characterId.value as CharacterId,
-      ) as Character | undefined;
-      return char;
+      const charId = this.characterId.value;
+      if (!charId) {
+        return undefined;
+      }
+      const entityId = findCharacterEntity(this.client.world, charId);
+      if (entityId === undefined) {
+        return undefined;
+      }
+      const actor = readActor(this.client.world, entityId);
+      return actor?.type === "character" ? actor : undefined;
     });
+
+    this.areaId = computed(() => this.character.value?.areaId);
+
+    this.isGameReady = computed(() => !!this.areaId.value);
 
     this.inventory = computed(() => {
       const inventoryId = this.character.value?.inventoryId;
-      if (inventoryId === undefined) {
+      if (!inventoryId) {
         return [];
       }
-      return this.gameState.items
-        .values()
-        .filter((item) => item.inventoryId === inventoryId)
-        .toArray();
+      const result: ItemInstance[] = [];
+      for (const [id] of this.client.world.query(InventoryRef)) {
+        const ref = this.client.world.get(id, InventoryRef);
+        if (ref?.inventoryId !== inventoryId) {
+          continue;
+        }
+        const item = readItemInstance(this.client.world, id);
+        if (item) {
+          result.push(item);
+        }
+      }
+      return result;
     });
+
+    this.gameState = {
+      frameCallback: (timeSinceLastFrame) => {
+        if (!this.options.settings().useInterpolator) {
+          return;
+        }
+        for (const [id, mv] of this.client.world.query(Movement)) {
+          if (mv.path.length === 0) {
+            continue;
+          }
+          const updated = moveAlongPath(
+            {
+              coords: { x: mv.coords.x, y: mv.coords.y },
+              speed: mv.speed,
+              path: mv.path.map((p) => ({ x: p.x, y: p.y })),
+            },
+            timeSinceLastFrame.totalSeconds,
+          );
+          const target = updated.path[0];
+          let direction: CardinalDirection = mv.direction;
+          if (target) {
+            direction = nearestCardinalDirection(
+              new Vector(updated.coords.x, updated.coords.y).angle(
+                new Vector(target.x, target.y),
+              ),
+            );
+          }
+          this.client.world.set(id, Movement, {
+            ...mv,
+            coords: updated.coords,
+            path: updated.path,
+            direction,
+          });
+        }
+      },
+    };
   }
 
-  start = () => {
-    const { socket } = this.options;
+  start = (): (() => void) => {
+    const offCharacterList = this.client.on(CharacterListResponse, (event) => {
+      this.characterList.value = event.data.characters.map((c) => ({
+        id: c.id,
+        name: c.name,
+      }));
+    });
 
-    const subscriptions = [
-      subscribeToReadyState(socket, (readyState) => {
-        this.socketReadyState.value = readyState as WebSocket["readyState"];
-      }),
-      this.isConnected.subscribe((isConnected) => {
-        if (!isConnected) {
-          this.options.logger.debug(
-            `Disconnected from gateway, resetting game state.`,
-          );
-          this.gameState.reset();
+    const stopRejoinOnReconnect = this.isConnected.subscribe((connected) => {
+      if (connected) {
+        this.requestCharacterList();
+        if (this.#spectatedId) {
+          this.spectate(this.#spectatedId);
+        } else if (this.#joinedAs) {
+          this.joinAs(this.#joinedAs);
         }
-      }),
-    ];
-
-    socket.addEventListener("message", this.handleMessage);
-
-    this.stop = () => {
-      for (const unsubscribe of subscriptions) {
-        unsubscribe();
       }
+    });
 
-      socket.removeEventListener("message", this.handleMessage);
-    };
+    this.#unsubscribers = [offCharacterList, stopRejoinOnReconnect];
 
-    // Return stop function so that start can be used in effect like manner.
+    void this.client.connect().catch((err: unknown) => {
+      this.options.logger.error(err, "rift connect failed");
+    });
+
     return this.stop;
   };
 
-  stop = () => {
-    // Does nothing by default, stop function will be overridden by start function.
+  stop = (): void => {
+    for (const unsub of this.#unsubscribers) {
+      unsub();
+    }
+    this.#unsubscribers = [];
+    void this.client.disconnect();
   };
 
-  private handleMessage = (e: MessageEvent<ArrayBuffer>) => {
-    const result = syncMessageEncoding.decode(e.data);
-    if (result.isOk()) {
-      const [patch, remoteTime, events] = result.value;
+  requestCharacterList(): void {
+    this.client.emit({
+      type: ListCharactersRequest,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
+  }
 
-      const lag = TimeSpan.fromDateDiff(remoteTime, new Date());
-      if (lag.compareTo(stalePatchThreshold) > 0) {
-        this.onPatchLagOrError(lag);
-      }
+  joinAs(characterId: CharacterId): void {
+    this.#joinedAs = characterId;
+    this.#spectatedId = undefined;
+    this.client.emit({
+      type: JoinAsPlayer,
+      data: { characterId },
+      source: "local",
+      target: "wire",
+    });
+  }
 
-      if (patch) {
-        const result = this.gameState.applyPatch(patch, (desiredEventName) => {
-          return (events ?? [])
-            .filter(([eventName]) => eventName === desiredEventName)
-            .map(([, payload]) => payload as never);
-        });
+  spectate(characterId: CharacterId): void {
+    this.#spectatedId = characterId;
+    this.#joinedAs = undefined;
+    this.client.emit({
+      type: JoinAsSpectator,
+      data: { characterId },
+      source: "local",
+      target: "wire",
+    });
+  }
 
-        if (result.isErr()) {
-          const { handlePatchFailure } = this.options;
-          if (handlePatchFailure) {
-            handlePatchFailure(result.error);
-          } else {
-            this.onPatchLagOrError(result.error);
-          }
-        }
-      }
+  leave(): void {
+    this.#joinedAs = undefined;
+    this.#spectatedId = undefined;
+    this.client.emit({
+      type: Leave,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
+  }
 
-      if (events) {
-        for (const event of events) {
-          this.eventBus.dispatch(event);
-        }
-      }
-    }
-  };
+  respawn(): void {
+    this.client.emit({
+      type: Respawn,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
+  }
 
-  // We throttle because when stale patches or errors are detected as they usually come in batches.
-  private onPatchLagOrError = throttle((lagOrError: TimeSpan | Error) => {
-    const { logger, eventClient } = this.options;
-    if (lagOrError instanceof TimeSpan) {
-      logger.warn(
-        `Stale patch detected (lag: ${lagOrError.totalMilliseconds}ms). Requesting full state refresh.`,
-      );
-    } else {
-      logger.error(
-        lagOrError,
-        "Could not apply patch. Requesting full state refresh.",
-      );
-    }
+  recall(): void {
+    this.client.emit({
+      type: Recall,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
+  }
 
-    eventClient.network.requestFullState();
-  }, 5000);
+  requestFullState(): void {
+    this.client.emit({
+      type: RequestFullState,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
+  }
 }
 
-type WebSocketLike = Pick<
-  WebSocket,
-  "send" | "addEventListener" | "removeEventListener"
-> & {
-  readyState: number;
-};
+function findCharacterEntity(
+  world: World,
+  characterId: CharacterId,
+): EntityId | undefined {
+  for (const [id, tag] of world.query(CharacterTag)) {
+    if (tag.characterId === characterId) {
+      return id;
+    }
+  }
+  return undefined;
+}
+
+export type { ClientId };

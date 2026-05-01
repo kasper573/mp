@@ -1,5 +1,4 @@
-import type { GameStateEvents } from "@mp/game-service";
-import type { Actor, TiledResource } from "@mp/game-shared";
+import type { TiledResource } from "@mp/world";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   ColorMatrixFilter,
@@ -8,15 +7,16 @@ import {
   Text,
 } from "@mp/graphics";
 import { effect } from "@mp/state";
-import type { SyncEventBus } from "@mp/sync";
 import { TimeSpan } from "@mp/time";
 import { ActorSprite } from "./actor-sprite";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
+import type { Actor } from "./types";
+import type { ClientEventBus } from "./client-event-bus";
 
 export interface ActorControllerOptions {
   tiled: TiledResource;
   actor: Actor;
-  eventBus: SyncEventBus<GameStateEvents>;
+  eventBus: ClientEventBus;
   actorTextures: ActorTextureLookup;
 }
 
@@ -57,15 +57,15 @@ export class ActorController extends Container {
 
     this.subscriptions = [
       effect(this.switchAnimationToMovingOrIdle),
-      options.eventBus.subscribe("combat.attack", (attack) => {
-        if (attack.actorId === actor.identity.id) {
+      options.eventBus.subscribe("actor.attack", (ev) => {
+        if (ev.entityId === actor.entityId) {
           void this.sprite
             .playToEndAndStop("attack-spear")
             .then(this.switchAnimationToMovingOrIdle);
         }
       }),
-      options.eventBus.subscribe("actor.death", (deadActorId) => {
-        if (deadActorId === actor.identity.id) {
+      options.eventBus.subscribe("actor.death", (ev) => {
+        if (ev.entityId === actor.entityId) {
           void this.sprite.playToEndAndStop("death-spear");
         }
       }),

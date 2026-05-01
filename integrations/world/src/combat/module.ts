@@ -6,7 +6,7 @@ import { ClientCharacterRegistry } from "../identity/client-character-registry";
 import { CharacterTag, NpcTag } from "../identity/components";
 import { Combat } from "./components";
 import { Movement } from "../movement/components";
-import { AttackRequest, Kill } from "./events";
+import { Attacked, AttackRequest, Died, Kill } from "./events";
 
 const HP_REGEN_INTERVAL_MS = 10_000;
 const HP_REGEN_AMOUNT = 5;
@@ -119,12 +119,25 @@ export class CombatModule extends RiftServerModule {
         moveTarget: undefined,
       });
 
+      this.server.emit({
+        type: Attacked,
+        data: { entityId: id },
+        source: { type: "local" },
+        target: { type: "wire", strategy: { type: "broadcast" } },
+      });
+
       if (!newAlive) {
         this.server.emit({
           type: Kill,
           data: { attackerId: id, victimId: target },
           source: { type: "local" },
           target: { type: "local" },
+        });
+        this.server.emit({
+          type: Died,
+          data: { entityId: target },
+          source: { type: "local" },
+          target: { type: "wire", strategy: { type: "broadcast" } },
         });
         if (this.server.world.has(target, NpcTag)) {
           this.server.world.set(target, Movement, {

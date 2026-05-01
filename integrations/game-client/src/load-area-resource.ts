@@ -1,5 +1,5 @@
-import type { AreaId } from "@mp/game-shared";
-import { AreaResource, TiledResource } from "@mp/game-shared";
+import type { AreaId } from "@mp/world";
+import { AreaResource, TiledResource } from "@mp/world";
 import { createTiledLoader } from "@mp/tiled-loader";
 
 export async function browserLoadAreaResource(

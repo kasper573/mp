@@ -1,4 +1,4 @@
-import type { CharacterId } from "@mp/game-shared";
+import type { CharacterId } from "@mp/world";
 import type { SelectOption } from "@mp/ui";
 import { Dock, LoadingSpinner, Select } from "@mp/ui";
 import { Suspense } from "preact/compat";

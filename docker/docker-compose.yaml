@@ -10,23 +10,6 @@ x-logging: &logging
     # Used by alloy to produce labels for Loki
     tag: "{{.ImageName}}|{{.Name}}|{{.ImageFullID}}|{{.FullID}}"
 
-x-game-service: &game_service
-  env_file: *env_files
-  logging: *logging
-  build:
-    dockerfile: ./docker/Dockerfile.mp-node-app
-    args:
-      APP_NAME: game-service
-    context: ..
-  image: ${DOCKER_REGISTRY_URL:-mp}/mp-game-service:${DOCKER_IMAGE_VERSION:-latest}
-  restart: always
-  profiles: ["prod", "test"]
-  depends_on:
-    mp-api:
-      condition: service_healthy
-    mp-migrations:
-      condition: service_completed_successfully
-
 services:
   mp-website:
     env_file: *env_files
@@ -38,18 +21,7 @@ services:
     restart: always
     profiles: ["prod", "test"]
     depends_on:
-      - mp-api
-      - mp-gateway
-
-  mp-game-service-forest:
-    <<: *game_service
-    environment:
-      MP_GAME_SERVICE_AREA_ID: forest
-
-  mp-game-service-island:
-    <<: *game_service
-    environment:
-      MP_GAME_SERVICE_AREA_ID: island
+      - mp-game-server
 
   mp-game-server:
     env_file: *env_files
@@ -72,50 +44,6 @@ services:
       keycloak-healthcheck:
         condition: service_healthy
       postgres:
-        condition: service_healthy
-
-  mp-api:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ./docker/Dockerfile.mp-node-app
-      args:
-        APP_NAME: api-service
-      context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-api:${DOCKER_IMAGE_VERSION:-latest}
-    restart: always
-    profiles: ["prod", "test"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_API_PORT/health"]
-      interval: 3s
-      timeout: 5s
-      retries: 20
-    depends_on:
-      mp-migrations:
-        condition: service_completed_successfully
-      keycloak-healthcheck:
-        condition: service_healthy
-
-  mp-gateway:
-    env_file: *env_files
-    logging: *logging
-    build:
-      dockerfile: ./docker/Dockerfile.mp-node-app
-      args:
-        APP_NAME: gateway
-      context: ..
-    image: ${DOCKER_REGISTRY_URL:-mp}/mp-gateway:${DOCKER_IMAGE_VERSION:-latest}
-    restart: always
-    profiles: ["prod", "test"]
-    healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:$$MP_GATEWAY_PORT/health"]
-      interval: 3s
-      timeout: 5s
-      retries: 20
-    depends_on:
-      mp-migrations:
-        condition: service_completed_successfully
-      keycloak-healthcheck:
         condition: service_healthy
 
   mp-migrations:
@@ -185,13 +113,6 @@ services:
       timeout: 5s
       retries: 5
 
-  redis:
-    env_file: *env_files
-    logging: *logging
-    image: redis:7.4.1
-    restart: always
-    command: redis-server --notify-keyspace-events Ex
-
   mimir:
     env_file: *env_files
     logging: *logging
@@ -247,15 +168,6 @@ services:
     env_file: *env_files
     logging: *logging
     image: prom/node-exporter:v1.8.2
-
-  redis_exporter:
-    env_file: *env_files
-    logging: *logging
-    image: oliver006/redis_exporter:v1.80.1
-    environment:
-      REDIS_ADDR: redis://redis:6379
-    depends_on:
-      - redis
 
   postgres_exporter:
     env_file: *env_files

@@ -4,8 +4,10 @@ import { RiftServerModule } from "@rift/core";
 import { inject } from "@rift/module";
 import {
   CharacterListResponse,
+  CharacterRenamedResponse,
   ClientCharacterRegistry,
   ListCharactersRequest,
+  RenameCharacterRequest,
   type CharacterId,
 } from "@mp/world";
 import type { DbRepository } from "./repository";
@@ -26,8 +28,45 @@ export class CharacterDirectoryModule extends RiftServerModule {
 
   init(): Cleanup {
     const offList = this.server.on(ListCharactersRequest, this.#onList);
-    return offList;
+    const offRename = this.server.on(RenameCharacterRequest, this.#onRename);
+    return () => {
+      offList();
+      offRename();
+    };
   }
+
+  #onRename = async (
+    event: RiftServerEvent<{ characterId: CharacterId; name: string }>,
+  ): Promise<void> => {
+    if (event.source.type !== "wire") {
+      return;
+    }
+    const clientId = event.source.clientId;
+    const userId = this.registry.getUserId(clientId);
+    if (!userId) {
+      return;
+    }
+    const access = await this.#repo.mayAccessCharacter({
+      userId,
+      characterId: event.data.characterId,
+    });
+    if (access.isErr() || !access.value) {
+      return;
+    }
+    const updated = await this.#repo.updateCharacter({
+      characterId: event.data.characterId,
+      newName: event.data.name,
+    });
+    if (updated.isErr()) {
+      return;
+    }
+    this.server.emit({
+      type: CharacterRenamedResponse,
+      data: { characterId: event.data.characterId, name: event.data.name },
+      source: { type: "local" },
+      target: { type: "wire", strategy: { type: "list", ids: [clientId] } },
+    });
+  };
 
   #onList = async (event: RiftServerEvent): Promise<void> => {
     if (event.source.type !== "wire") {

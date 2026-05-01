@@ -1,4 +1,4 @@
-import { dynamicLayerName } from "@mp/game-shared";
+import { dynamicLayerName } from "@mp/world";
 import type { Container, Size, Texture } from "@mp/graphics";
 import { Assets, FpsIndicator, Spritesheet } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";

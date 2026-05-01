@@ -1,15 +1,8 @@
 import type { Engine } from "@mp/engine";
-import type {
-  Actor,
-  AreaResource,
-  NpcInstance,
-  TiledResource,
-} from "@mp/game-shared";
-import {
-  clientViewDistance,
-  clientViewDistanceRect,
-  WalkableChecker,
-} from "@mp/game-shared";
+import type { AreaResource, TiledResource } from "@mp/world";
+import { clientViewDistanceRect, WalkableChecker } from "@mp/world";
+import type { Actor, NpcInstance } from "./types";
+import { viewDistance as clientViewDistance } from "@mp/fixtures";
 import type { DestroyOptions, StrokeStyle, TextStyle } from "@mp/graphics";
 import { Container, Graphics, ReactiveCollection, Text } from "@mp/graphics";
 import type { Rect } from "@mp/math";

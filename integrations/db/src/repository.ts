@@ -11,20 +11,6 @@ import { selectOrCreateCharacterIdForUser } from "./procedures/select-or-create-
 import { updateCharacter } from "./procedures/update-character";
 import { updateCharactersArea } from "./procedures/update-characters-area";
 import { upsertCharacter } from "./procedures/upsert-character";
-import {
-  selectAllActorModelIds,
-  selectAllItemDefinitions,
-  selectAllNpcRewards,
-  selectAllSpawnAndNpcPairs,
-  selectConsumableDefinition,
-  selectEquipmentDefinition,
-} from "./procedures/legacy-fixture-stubs";
-import {
-  GameStateSync,
-  type GameStateSyncOptions,
-} from "./utils/sync-game-state";
-
-export type { GameStateSyncOptions as SyncGameStateOptions };
 
 export function createDbRepository(connectionString: string) {
   const drizzle = createDrizzleClient(connectionString);
@@ -48,16 +34,6 @@ export function createDbRepository(connectionString: string) {
     updateCharacter: updateCharacter.build(drizzle),
     updateCharactersArea: updateCharactersArea.build(drizzle),
     upsertCharacter: upsertCharacter.build(drizzle),
-
-    selectAllActorModelIds: selectAllActorModelIds.build(drizzle),
-    selectAllItemDefinitions: selectAllItemDefinitions.build(drizzle),
-    selectAllNpcRewards: selectAllNpcRewards.build(drizzle),
-    selectAllSpawnAndNpcPairs: selectAllSpawnAndNpcPairs.build(drizzle),
-    selectConsumableDefinition: selectConsumableDefinition.build(drizzle),
-    selectEquipmentDefinition: selectEquipmentDefinition.build(drizzle),
-
-    gameStateFor: (opts: GameStateSyncOptions) =>
-      new GameStateSync(drizzle, opts),
 
     subscribeToErrors(handler: (error: Error) => unknown) {
       drizzle.$client.on("error", handler);

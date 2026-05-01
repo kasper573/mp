@@ -10,4 +10,12 @@ export const Kill = object({
   victimId: u32<EntityId>(),
 });
 
-export const combatEvents = [AttackRequest, Kill] as const;
+export const Attacked = object({
+  entityId: u32<EntityId>(),
+});
+
+export const Died = object({
+  entityId: u32<EntityId>(),
+});
+
+export const combatEvents = [AttackRequest, Kill, Attacked, Died] as const;

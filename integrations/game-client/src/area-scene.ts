@@ -1,10 +1,7 @@
 import type { Engine } from "@mp/engine";
 import { VectorSpring } from "@mp/engine";
-import {
-  clientViewDistance,
-  getDestinationFromObject,
-  type AreaResource,
-} from "@mp/game-shared";
+import type { AreaResource } from "@mp/world";
+import { viewDistance as clientViewDistance } from "@mp/fixtures";
 import type { DestroyOptions } from "@mp/graphics";
 import {
   Container,
@@ -15,7 +12,6 @@ import {
 import { Rect, Vector } from "@mp/math";
 import { computed } from "@mp/state";
 import { dedupe, throttle, type Pixel, type Tile } from "@mp/std";
-import type { ObjectId } from "@mp/tiled-loader";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import { createTiledTextureLookup, TiledRenderer } from "@mp/tiled-renderer";
 import { TimeSpan } from "@mp/time";
@@ -134,7 +130,11 @@ export class AreaScene extends Container {
 
   highlightTarget = computed((): TileHighlightTarget | undefined => {
     const actor = this.actorAtPointer.value;
-    if (actor && actor?.identity.id !== this.options.state.characterId.value) {
+    if (
+      actor &&
+      (actor.type === "npc" ||
+        actor.identity.id !== this.options.state.characterId.value)
+    ) {
       return {
         actor,
         type: "attack",
@@ -154,18 +154,13 @@ export class AreaScene extends Container {
   private onPointerClick = () => {
     const target = this.highlightTarget.value;
     if (target?.type === "attack") {
-      void this.options.state.actions.attack(target.actor.identity.id);
+      this.options.state.actions.attack(target.actor.entityId);
     }
   };
 
   moveThrottled = dedupe(
-    throttle(
-      (to: Vector<Tile>, desiredPortalId?: ObjectId) =>
-        this.options.state.actions.move(to, desiredPortalId),
-      100,
-    ),
-    ([aVector, aPortalId], [bVector, bPortalId]) =>
-      aVector.equals(bVector) && aPortalId === bPortalId,
+    throttle((to: Vector<Tile>) => this.options.state.actions.move(to), 100),
+    ([aVector], [bVector]) => aVector.equals(bVector),
   );
 
   #onRender = () => {
@@ -182,11 +177,7 @@ export class AreaScene extends Container {
     if (this.options.engine.pointer.isDown.value) {
       const target = this.highlightTarget.value;
       if (target?.type === "move") {
-        const portal = this.options.area
-          .hitTestObjects(this.options.engine.pointer.worldPosition.value)
-          .find(getDestinationFromObject);
-
-        this.moveThrottled(Vector.from(target.rect), portal?.id);
+        this.moveThrottled(Vector.from(target.rect));
       }
     } else {
       this.moveThrottled.clear();

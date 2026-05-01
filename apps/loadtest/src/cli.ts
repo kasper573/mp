@@ -12,21 +12,16 @@ export function readCliOptions(argv = process.argv) {
   const options = yargs(hideBin(argv))
     .env(cliEnvPrefix)
     .parserConfiguration({
-      "camel-case-expansion": false, // Ensures only the explicit option names are used
-      "unknown-options-as-args": true, // Omits unknown args from the options object
+      "camel-case-expansion": false,
+      "unknown-options-as-args": true,
     })
     .option("verbose", {
       type: "boolean",
       default: false,
     })
-    .option("gameServiceUrl", {
+    .option("gameServerUrl", {
       type: "string",
-      default: process.env.MP_WEBSITE_GAME_SERVICE_URL,
-      demandOption: true,
-    })
-    .option("apiUrl", {
-      type: "string",
-      default: process.env.MP_WEBSITE_API__URL,
+      default: process.env.MP_WEBSITE_GAME_SERVER_URL,
       demandOption: true,
     })
     .option("gameClients", {
@@ -40,11 +35,6 @@ export function readCliOptions(argv = process.argv) {
       type: "boolean",
       default: false,
     })
-    .options("behavior", {
-      alias: "b",
-      choices: ["run", "portal", "alternate"] as const,
-      default: "run" as const,
-    })
     .option("timeout", {
       alias: "t",
       type: "number",
@@ -54,7 +44,6 @@ export function readCliOptions(argv = process.argv) {
     })
     .parseSync();
 
-  // Remove some yargs internals
   delete (options as Record<string, unknown>)["$0"];
   delete (options as Record<string, unknown>)["_"];
 

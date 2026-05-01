@@ -1,3 +1,9 @@
 {
-  "extends": ["@mp/tsconfig/vite.json", "@mp/api-service/client/tsconfig.json"]
+  "extends": "@mp/tsconfig/node.json",
+  "compilerOptions": {
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "types": ["node", "vite/client"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
+  }
 }

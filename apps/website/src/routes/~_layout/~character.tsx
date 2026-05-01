@@ -1,10 +1,12 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
-import { Button, Card, ErrorFallback } from "@mp/ui";
-import { useMutation, useSuspenseQuery } from "@tanstack/react-query";
+import { Button, Card } from "@mp/ui";
+import { useComputed } from "@mp/state/react";
+import { CharacterRenamedResponse, RenameCharacterRequest } from "@mp/world";
 import { createFileRoute } from "@tanstack/react-router";
+import { useEffect, useState } from "preact/hooks";
 import { AuthBoundary } from "../../ui/auth-boundary";
 import { atoms } from "@mp/style";
 import { NavLink } from "../../integrations/router/nav-link";
+import { useGameStateClient } from "../../integrations/use-game-state-client";
 import type { ReactNode } from "preact/compat";
 
 export const Route = createFileRoute("/_layout/character")({
@@ -12,13 +14,20 @@ export const Route = createFileRoute("/_layout/character")({
 });
 
 function CharacterPage() {
-  const qb = useQueryBuilder();
+  const stateClient = useGameStateClient();
+  const myCharacter = useComputed(
+    () => stateClient.characterList.value[0],
+  ).value;
+  const [savedName, setSavedName] = useState<string | undefined>(undefined);
 
-  const query = useSuspenseQuery(qb.suspenseQueryOptions(myCharacterQuery));
+  useEffect(() => {
+    const off = stateClient.client.on(CharacterRenamedResponse, (ev) => {
+      setSavedName(ev.data.name);
+    });
+    return off;
+  }, [stateClient]);
 
-  const save = useMutation(qb.mutationOptions(updateCharacterNameMutation));
-
-  if (!query.data.myCharacter) {
+  if (!myCharacter) {
     return (
       <Container>
         You have no character. <NavLink to="/play">Start playing</NavLink> to
@@ -34,35 +43,30 @@ function CharacterPage() {
           onSubmit={(e) => {
             e.preventDefault();
             const newName = new FormData(e.currentTarget).get("name");
-            if (newName) {
-              save.mutate({ input: { newName: String(newName) } });
+            if (typeof newName === "string" && newName) {
+              stateClient.client.emit({
+                type: RenameCharacterRequest,
+                data: {
+                  characterId: myCharacter.id,
+                  name: newName,
+                },
+                source: "local",
+                target: "wire",
+              });
             }
           }}
         >
           <div>
             <label htmlFor="name">Name</label>
-            <input name="name" defaultValue={query.data.myCharacter.name} />
-            {save.data?.updateMyCharacter.errors?.newName.join(", ")}
+            <input name="name" defaultValue={savedName ?? myCharacter.name} />
           </div>
 
-          <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? "Saving..." : "Save"}
-          </Button>
+          <Button type="submit">Save</Button>
         </form>
       </Card>
 
-      {save.isSuccess && !save.data.updateMyCharacter.errors && (
+      {savedName !== undefined && (
         <Card intent="success">Changes have been saved</Card>
-      )}
-
-      {/* Internal server error, just show in case something terrible happens */}
-      {save.isError && (
-        <Card intent="error">
-          <ErrorFallback
-            title="Could not update character"
-            error={save.error}
-          />
-        </Card>
       )}
     </Container>
   );
@@ -76,22 +80,3 @@ function Container({ children }: { children?: ReactNode }) {
     </div>
   );
 }
-
-const myCharacterQuery = graphql(`
-  query CharacterPage {
-    myCharacter {
-      id
-      name
-    }
-  }
-`);
-
-const updateCharacterNameMutation = graphql(`
-  mutation UpdateCharacterName($input: UpdateMyCharacterInput!) {
-    updateMyCharacter(input: $input) {
-      errors {
-        newName
-      }
-    }
-  }
-`);

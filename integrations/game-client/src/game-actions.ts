@@ -1,39 +1,47 @@
-import type { CharacterId } from "@mp/game-shared";
-import type { GameEventClient } from "@mp/game-service";
-import type { ActorId } from "@mp/game-shared";
+import type { EntityId, RiftClient } from "@rift/core";
+import { AttackRequest, MoveRequest, Recall, Respawn } from "@mp/world";
 import type { Vector } from "@mp/math";
-import type { Signal } from "@mp/state";
-import { type Tile, assert } from "@mp/std";
-import type { ObjectId } from "@mp/tiled-loader";
+import type { Tile } from "@mp/std";
 
 export class GameActions {
-  constructor(
-    private events: GameEventClient,
-    private characterId: Signal<CharacterId | undefined>,
-  ) {}
+  readonly #client: RiftClient;
+  constructor(client: RiftClient) {
+    this.#client = client;
+  }
 
-  move(to: Vector<Tile>, desiredPortalId?: ObjectId) {
-    return this.events.character.move({
-      characterId: assert(this.characterId.value),
-      to,
-      // Bonkers workaround because arktype can't handle undefined being passed to optional fields
-      // See https://github.com/arktypeio/arktype/issues/1191
-      ...(desiredPortalId ? { desiredPortalId } : {}),
+  move(to: Vector<Tile>): void {
+    this.#client.emit({
+      type: MoveRequest,
+      data: { target: { x: to.x, y: to.y } },
+      source: "local",
+      target: "wire",
     });
   }
 
-  attack(targetId: ActorId) {
-    return this.events.character.attack({
-      characterId: assert(this.characterId.value),
-      targetId,
+  attack(targetId: EntityId): void {
+    this.#client.emit({
+      type: AttackRequest,
+      data: { targetId },
+      source: "local",
+      target: "wire",
     });
   }
 
-  respawn() {
-    return this.events.character.respawn(assert(this.characterId.value));
+  respawn(): void {
+    this.#client.emit({
+      type: Respawn,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
   }
 
-  recall() {
-    return this.events.character.recall(assert(this.characterId.value));
+  recall(): void {
+    this.#client.emit({
+      type: Recall,
+      data: {},
+      source: "local",
+      target: "wire",
+    });
   }
 }

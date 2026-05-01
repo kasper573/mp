@@ -1,5 +1,5 @@
-import type { ActorModelId } from "@mp/game-shared";
-import { actorModelStates, type ActorModelState } from "@mp/game-shared";
+import type { ActorModelId } from "@mp/world";
+import { actorModelStates, type ActorModelState } from "@mp/world";
 import type { Size } from "@mp/graphics";
 import { Assets, Rectangle, Texture } from "@mp/graphics";
 import {

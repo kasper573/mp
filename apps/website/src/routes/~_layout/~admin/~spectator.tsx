@@ -1,58 +1,39 @@
-import {
-  graphql,
-  useMapSubscription,
-  useSubscription,
-} from "@mp/api-service/client";
 import { GameAssetLoaderContext, SpectatorClient } from "@mp/game-client";
-import { gatewayRoles } from "@mp/keycloak";
+import { systemRoles } from "@mp/keycloak";
 import { useSignalEffect } from "@mp/state/react";
 import { LoadingSpinner } from "@mp/ui";
 import { createFileRoute } from "@tanstack/react-router";
-import { Suspense, useEffect } from "preact/compat";
+import { Suspense } from "preact/compat";
 import { gameAssetLoader } from "../../../integrations/assets";
 import { useGameStateClient } from "../../../integrations/use-game-state-client";
 import { AuthBoundary } from "../../../ui/auth-boundary";
 import { MiscDebugUi } from "../../../ui/misc-debug-ui";
-import type { CharacterId } from "@mp/game-shared";
 import { atoms } from "@mp/style";
+import type { CharacterId } from "@mp/world";
 
 export const Route = createFileRoute("/_layout/admin/spectator")({
   component: AuthBoundary.wrap(RouteComponent, {
-    requiredRoles: [gatewayRoles.spectate],
+    requiredRoles: [systemRoles.useDevTools],
   }),
 });
 
 function RouteComponent() {
-  const [stateClient, events] = useGameStateClient();
-
-  const online = useMapSubscription(
-    useSubscription(sub),
-    (data) => data.onlineCharacters,
-  );
-
-  const spectatedId = stateClient.characterId;
-  const onlineCharacters = online
-    .entries()
-    .map(([id, { name }]) => ({ value: id, label: name }))
-    .toArray();
+  const stateClient = useGameStateClient();
 
   useSignalEffect(() => {
-    // Important to subscribe to connected state to rejoin the gateway in case of a disconnect
-    if (stateClient.isConnected.value && spectatedId.value) {
-      events.gateway.spectate(spectatedId.value);
-    } else {
-      events.gateway.leave();
+    if (stateClient.isConnected.value && stateClient.characterId.value) {
+      stateClient.spectate(stateClient.characterId.value);
     }
   });
 
-  const isSelectedOnline = onlineCharacters.find(
-    ({ value }) => value === spectatedId.value,
-  );
-  useEffect(() => {
-    if (!isSelectedOnline) {
-      spectatedId.value = undefined;
-    }
-  }, [isSelectedOnline, spectatedId]);
+  const characterOptions = stateClient.characterList.value
+    .map(({ id, name }) => ({ value: id, label: name }))
+    .concat([
+      {
+        value: undefined as unknown as CharacterId,
+        label: "Select character to spectate",
+      },
+    ]);
 
   return (
     <div
@@ -66,16 +47,10 @@ function RouteComponent() {
       <Suspense fallback={<LoadingSpinner debugDescription="~spectator.tsx" />}>
         <GameAssetLoaderContext.Provider value={gameAssetLoader}>
           <div className={atoms({ mb: "xl" })}>
-            Characters online: {online.size}
+            Characters available: {stateClient.characterList.value.length}
           </div>
           <SpectatorClient
-            characterOptions={[
-              {
-                value: undefined as unknown as CharacterId,
-                label: "Select character to spectate",
-              },
-              ...onlineCharacters,
-            ]}
+            characterOptions={characterOptions}
             stateClient={stateClient}
             additionalDebugUi={<MiscDebugUi stateClient={stateClient} />}
             interactive={false}
@@ -85,17 +60,3 @@ function RouteComponent() {
     </div>
   );
 }
-
-const sub = graphql(`
-  subscription SpectatorCharacterSub {
-    onlineCharacters {
-      added {
-        key
-        value {
-          name
-        }
-      }
-      removed
-    }
-  }
-`);

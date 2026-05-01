@@ -1,4 +1,4 @@
-import type { AreaId } from "@mp/game-shared";
+import type { AreaId } from "@mp/world";
 import { Engine } from "@mp/engine";
 import type { Application } from "@mp/graphics";
 import { useGraphics } from "@mp/graphics/react";

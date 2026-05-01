@@ -17,8 +17,6 @@
   },
   "dependencies": {
     "@mp/auth": "workspace:*",
-    "@mp/fixtures": "workspace:*",
-    "@mp/logger": "workspace:*",
     "@mp/math": "workspace:*",
     "@mp/std": "workspace:*",
     "@mp/world": "workspace:*",

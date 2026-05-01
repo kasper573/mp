@@ -1,6 +1,5 @@
-import { graphql, useQueryBuilder } from "@mp/api-service/client";
+import * as fixtures from "@mp/fixtures";
 import { ActorSpriteTester } from "@mp/game-client";
-import { useSuspenseQuery } from "@tanstack/react-query";
 import { createFileRoute } from "@tanstack/react-router";
 import { useActorTextures } from "../../../../integrations/assets";
 
@@ -9,21 +8,8 @@ export const Route = createFileRoute("/_layout/admin/devtools/actor-tester")({
 });
 
 function RouteComponent() {
-  const qb = useQueryBuilder();
-  const {
-    data: { actorModelIds },
-  } = useSuspenseQuery(qb.suspenseQueryOptions(query));
-
+  const modelIds = fixtures.actorModels.map((m) => m.id);
   return (
-    <ActorSpriteTester
-      modelIds={actorModelIds}
-      actorTextures={useActorTextures()}
-    />
+    <ActorSpriteTester modelIds={modelIds} actorTextures={useActorTextures()} />
   );
 }
-
-const query = graphql(`
-  query ActorTester {
-    actorModelIds
-  }
-`);

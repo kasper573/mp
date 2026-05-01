@@ -1,5 +1,4 @@
-import type { AreaId } from "@mp/game-shared";
-import type { AreaResource, ItemDefinitionLookup } from "@mp/game-shared";
+import type { AreaId, AreaResource, ItemDefinitionLookup } from "@mp/world";
 import type { TiledSpritesheetRecord } from "@mp/tiled-renderer";
 import type { ActorTextureLookup } from "./actor-texture-lookup";
 

@@ -2,7 +2,7 @@ import { useContext } from "preact/hooks";
 import * as styles from "./area-ui.css";
 import { GameStateClientContext, useItemDefinition } from "./context";
 import { RespawnDialog } from "./respawn-dialog";
-import type { ConsumableInstance, EquipmentInstance } from "@mp/game-shared";
+import type { ConsumableInstanceView, EquipmentInstanceView } from "./types";
 import { Suspense, type ReactElement } from "preact/compat";
 
 export function AreaUi() {
@@ -45,7 +45,7 @@ function Inventory() {
   );
 }
 
-function ConsumableTile({ item }: { item: ConsumableInstance }) {
+function ConsumableTile({ item }: { item: ConsumableInstanceView }) {
   const def = useItemDefinition(item);
   return (
     <div className={styles.itemTile({ type: "consumable" })}>
@@ -54,7 +54,7 @@ function ConsumableTile({ item }: { item: ConsumableInstance }) {
   );
 }
 
-function EquipmentTile({ item }: { item: EquipmentInstance }) {
+function EquipmentTile({ item }: { item: EquipmentInstanceView }) {
   const def = useItemDefinition(item);
   return (
     <div className={styles.itemTile({ type: "equipment" })}>
