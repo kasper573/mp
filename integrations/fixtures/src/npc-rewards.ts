@@ -1,4 +1,10 @@
-import type { NpcDefinitionId, NpcReward, NpcRewardId } from "@mp/world";
+import type {
+  ConsumableDefinitionId,
+  EquipmentDefinitionId,
+  NpcDefinitionId,
+  NpcReward,
+  NpcRewardId,
+} from "@mp/world";
 
 const SOLDIER_ID = "1" as NpcDefinitionId;
 
@@ -13,14 +19,20 @@ export const npcRewards: ReadonlyArray<NpcReward> = [
     id: "soldier:apple" as NpcRewardId,
     type: "item",
     npcId: SOLDIER_ID,
-    reference: { type: "consumable", definitionId: "apple" as never },
+    reference: {
+      type: "consumable",
+      definitionId: "apple" as ConsumableDefinitionId,
+    },
     amount: 1,
   },
   {
     id: "soldier:sword" as NpcRewardId,
     type: "item",
     npcId: SOLDIER_ID,
-    reference: { type: "equipment", definitionId: "sword" as never },
+    reference: {
+      type: "equipment",
+      definitionId: "sword" as EquipmentDefinitionId,
+    },
     amount: 1,
   },
 ];

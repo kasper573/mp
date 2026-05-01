@@ -42,16 +42,14 @@ function RouteComponent() {
     [client, spectatedId],
   );
 
-  const characterOptions = [
-    {
-      value: undefined as unknown as CharacterId,
-      label: "Select character to spectate",
-    },
-    ...characters.characters.value.map((c) => ({
-      value: c.id,
-      label: c.name,
-    })),
-  ];
+  const characterOptions: { value: CharacterId | undefined; label: string }[] =
+    [
+      { value: undefined, label: "Select character to spectate" },
+      ...characters.characters.value.map((c) => ({
+        value: c.id,
+        label: c.name,
+      })),
+    ];
 
   return (
     <div

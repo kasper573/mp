@@ -1,5 +1,5 @@
 import type { World, EntityId } from "@rift/core";
-import type { Tile } from "@mp/std";
+import type { Tile, TimesPerSecond } from "@mp/std";
 import type { UserId } from "@mp/auth";
 import type {
   ActorModelId,
@@ -27,7 +27,7 @@ export interface SpawnCharacterInit {
   readonly health: number;
   readonly maxHealth: number;
   readonly attackDamage: number;
-  readonly attackSpeed: number;
+  readonly attackSpeed: TimesPerSecond;
   readonly attackRange: Tile;
   readonly xp: number;
 }
@@ -66,7 +66,7 @@ export function spawnCharacter(
     maxHealth: init.maxHealth,
     alive: init.health > 0,
     attackDamage: init.attackDamage,
-    attackSpeed: init.attackSpeed as never,
+    attackSpeed: init.attackSpeed,
     attackRange: init.attackRange,
     attackTargetId: undefined,
     lastAttackMs: undefined,

@@ -5,7 +5,8 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { ErrorFallbackContext } from "@mp/ui";
 import { RouterProvider } from "@tanstack/react-router";
 import { TanStackRouterDevtools } from "@tanstack/react-router-devtools";
-import { useEffect, useMemo } from "preact/hooks";
+import { useMount } from "@mp/state/react";
+import { useMemo } from "preact/hooks";
 import { env } from "./env";
 import { AuthContext, LoggerContext } from "./integrations/contexts";
 import { initializeFaro } from "./integrations/faro";
@@ -19,7 +20,7 @@ import { createClientRouter } from "./integrations/router/router";
 
 export default function App() {
   const systems = useMemo(() => createSystems(), []);
-  useEffect(() => systems.initialize(), [systems]);
+  useMount(() => systems.initialize());
   return (
     <QueryClientProvider client={systems.query}>
       <ErrorFallbackContext.Provider

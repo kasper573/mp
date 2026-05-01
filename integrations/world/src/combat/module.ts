@@ -11,6 +11,10 @@ import { Attacked, AttackRequest, Died, Kill } from "./events";
 const HP_REGEN_INTERVAL_MS = 10_000;
 const HP_REGEN_AMOUNT = 5;
 const TILE_DIAGONAL_MARGIN = Math.sqrt(2) - 1;
+// How far the chase moveTarget can lag behind the actual target before we
+// repath. Keeps us from clearing the path every single tick on a moving
+// target while still tracking targets that move appreciably.
+const CHASE_RETARGET_THRESHOLD = 1.5;
 
 export class CombatModule extends RiftServerModule {
   @inject(ClientCharacterRegistry) accessor registry!: ClientCharacterRegistry;
@@ -50,7 +54,7 @@ export class CombatModule extends RiftServerModule {
 
     if (this.#elapsedMs - this.#lastRegenMs >= HP_REGEN_INTERVAL_MS) {
       this.#lastRegenMs = this.#elapsedMs;
-      for (const [id, _tag, combat] of this.server.world.query(
+      for (const [id, , combat] of this.server.world.query(
         CharacterTag,
         Combat,
       )) {
@@ -62,7 +66,6 @@ export class CombatModule extends RiftServerModule {
         if (next !== combat.health) {
           this.server.world.set(id, Combat, { ...combat, health: next });
         }
-        void _tag;
       }
     }
 
@@ -84,15 +87,15 @@ export class CombatModule extends RiftServerModule {
       const dy = targetMv.coords.y - mv.coords.y;
       const distance = Math.hypot(dx, dy);
       if (distance > combat.attackRange + TILE_DIAGONAL_MARGIN) {
-        // Begin or refresh chase. We only redirect when the chaser is idle
-        // (no path) or its existing target drifted significantly, so paths
-        // don't get reset every tick on a moving target.
+        // Begin or refresh chase. Avoid clearing the path every tick on a
+        // moving target — only repath if the existing chase intent has
+        // drifted past the retarget threshold.
         const movingTowardTarget =
           mv.moveTarget &&
           Math.hypot(
             mv.moveTarget.x - targetMv.coords.x,
             mv.moveTarget.y - targetMv.coords.y,
-          ) <= 1.5;
+          ) <= CHASE_RETARGET_THRESHOLD;
         if (!movingTowardTarget) {
           this.server.world.set(id, Movement, {
             ...mv,

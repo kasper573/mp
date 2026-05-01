@@ -1,7 +1,7 @@
 import { Button, Card } from "@mp/ui";
-import { renameCharacter } from "@mp/world";
+import { CharacterRenamedResponse, renameCharacter } from "@mp/world";
 import { useComputed, useSignal } from "@mp/state/react";
-import { useEffect } from "preact/hooks";
+import { useMount } from "@mp/state/react";
 import { createFileRoute } from "@tanstack/react-router";
 import { atoms } from "@mp/style";
 import { NavLink } from "../../integrations/router/nav-link";
@@ -18,11 +18,14 @@ function CharacterPage() {
   const myCharacter = useComputed(() => characters.characters.value[0]).value;
   const savedAt = useSignal<number | undefined>(undefined);
 
-  useEffect(() => {
-    return characters.characters.subscribe(() => {
+  // Show the "Changes saved" indicator when the server acknowledges a
+  // rename specifically — listening on the rename response avoids false
+  // positives from any other character-list update.
+  useMount(() =>
+    client.on(CharacterRenamedResponse, () => {
       savedAt.value = Date.now();
-    });
-  }, [characters, savedAt]);
+    }),
+  );
 
   if (!myCharacter) {
     return (

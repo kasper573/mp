@@ -96,7 +96,7 @@ abstract class ActorBase {
       coords: new Vector(m.coords.x, m.coords.y),
       speed: m.speed,
       dir: m.direction,
-      path: m.path.map((p) => new Vector(p.x, p.y)) as Path<Tile>,
+      path: m.path.map((p) => new Vector(p.x, p.y)),
     };
   }
 
@@ -174,7 +174,7 @@ export class NpcInstance extends ActorBase {
     if (!ai?.patrol) {
       return undefined;
     }
-    return ai.patrol.map((p) => new Vector(p.x, p.y)) as Path<Tile>;
+    return ai.patrol.map((p) => new Vector(p.x, p.y));
   }
 }
 

@@ -2,7 +2,7 @@ import type { Cleanup } from "@rift/module";
 import type { EntityId, RiftServerEvent, World } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { InferValue } from "@rift/types";
-import type { Tile } from "@mp/std";
+import { Rng, type Tile } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
@@ -12,8 +12,12 @@ import { Combat } from "../combat/components";
 import { Attacked } from "../combat/events";
 import { Movement } from "../movement/components";
 
+const PACIFIST_WANDER_CHANCE = 0.4;
+const EMPTY_PATH: ReadonlyArray<{ x: Tile; y: Tile }> = [];
+
 export interface NpcAiOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
+  readonly rng?: Rng;
 }
 
 /**
@@ -62,15 +66,21 @@ class CombatMemory {
       }
     }
   }
+
+  clear(): void {
+    this.#combats.clear();
+  }
 }
 
 export class NpcAiModule extends RiftServerModule {
   readonly #areas: ReadonlyMap<AreaId, AreaResource>;
   readonly #memory = new CombatMemory();
+  readonly #rng: Rng;
 
   constructor(opts: NpcAiOptions) {
     super();
     this.#areas = opts.areas;
+    this.#rng = opts.rng ?? new Rng();
   }
 
   init(): Cleanup {
@@ -79,6 +89,7 @@ export class NpcAiModule extends RiftServerModule {
     return () => {
       offTick();
       offAttacked();
+      this.#memory.clear();
     };
   }
 
@@ -106,7 +117,7 @@ export class NpcAiModule extends RiftServerModule {
     }
   };
 
-  #onTick = (_event: RiftServerEvent<{ tick: number; dt: number }>): void => {
+  #onTick = (): void => {
     const world = this.server.world;
     for (const [id, ai, mv, areaTag] of world.query(NpcAi, Movement, AreaTag)) {
       const area = this.#areas.get(areaTag.areaId);
@@ -141,7 +152,7 @@ export class NpcAiModule extends RiftServerModule {
         world.set(id, Combat, { ...combat, attackTargetId: undefined });
         world.set(id, Movement, {
           ...mv,
-          path: [] as ReadonlyArray<{ x: Tile; y: Tile }>,
+          path: EMPTY_PATH,
           moveTarget: undefined,
         });
       }
@@ -160,7 +171,7 @@ export class NpcAiModule extends RiftServerModule {
       }
     }
 
-    this.#applyIdleBehaviour(id, ai, area);
+    this.#applyIdleBehaviour(id, ai, mv, area);
   }
 
   #stillInRange(
@@ -194,7 +205,7 @@ export class NpcAiModule extends RiftServerModule {
       world.set(id, Combat, { ...combat, attackTargetId: undefined });
       world.set(id, Movement, {
         ...mv,
-        path: [] as ReadonlyArray<{ x: Tile; y: Tile }>,
+        path: EMPTY_PATH,
         moveTarget: undefined,
       });
     }
@@ -203,27 +214,27 @@ export class NpcAiModule extends RiftServerModule {
   #applyIdleBehaviour(
     id: EntityId,
     ai: InferValue<typeof NpcAi>,
+    mv: InferValue<typeof Movement>,
     area: AreaResource,
   ): void {
-    const world = this.server.world;
-    const refreshedMv = world.get(id, Movement);
-    if (!refreshedMv) return;
-    if (refreshedMv.path.length > 0 || refreshedMv.moveTarget) return;
+    if (mv.path.length > 0 || mv.moveTarget) return;
 
     switch (ai.npcType) {
       case "static":
         return;
       case "patrol":
         if (ai.patrol && ai.patrol.length > 0) {
-          const farthest = pickFarthestPoint(refreshedMv.coords, ai.patrol);
-          world.set(id, Movement, { ...refreshedMv, moveTarget: farthest });
+          this.server.world.set(id, Movement, {
+            ...mv,
+            moveTarget: pickFarthestPoint(mv.coords, ai.patrol),
+          });
         }
         return;
       case "pacifist":
-        if (Math.random() < 0.4) {
-          world.set(id, Movement, {
-            ...refreshedMv,
-            moveTarget: pickRandomWalkable(area),
+        if (this.#rng.next() < PACIFIST_WANDER_CHANCE) {
+          this.server.world.set(id, Movement, {
+            ...mv,
+            moveTarget: this.#pickRandomWalkable(area),
           });
         }
         return;
@@ -232,9 +243,9 @@ export class NpcAiModule extends RiftServerModule {
       case "protective":
         // No target in sight — wander to a random walkable tile in hope of
         // running into one.
-        world.set(id, Movement, {
-          ...refreshedMv,
-          moveTarget: pickRandomWalkable(area),
+        this.server.world.set(id, Movement, {
+          ...mv,
+          moveTarget: this.#pickRandomWalkable(area),
         });
         return;
     }
@@ -242,8 +253,8 @@ export class NpcAiModule extends RiftServerModule {
 
   #findAggroTarget(
     selfId: EntityId,
-    ai: { npcType: string; aggroRange: number },
-    selfMv: { coords: { x: number; y: number } },
+    ai: InferValue<typeof NpcAi>,
+    selfMv: InferValue<typeof Movement>,
     selfArea: AreaId,
   ): EntityId | undefined {
     switch (ai.npcType) {
@@ -279,7 +290,7 @@ export class NpcAiModule extends RiftServerModule {
 
   #findProtectiveTarget(
     selfId: EntityId,
-    selfMv: { coords: { x: number; y: number } },
+    selfMv: InferValue<typeof Movement>,
     selfArea: AreaId,
     aggroRange: number,
   ): EntityId | undefined {
@@ -317,6 +328,18 @@ export class NpcAiModule extends RiftServerModule {
     }
     return closest;
   }
+
+  #pickRandomWalkable(area: AreaResource): { x: Tile; y: Tile } {
+    const ids = Array.from(area.graph.nodeIds);
+    if (ids.length === 0) {
+      return { x: area.start.x, y: area.start.y };
+    }
+    const node = area.graph.getNode(this.#rng.oneOf(ids));
+    if (!node) {
+      return { x: area.start.x, y: area.start.y };
+    }
+    return { x: node.data.vector.x, y: node.data.vector.y };
+  }
 }
 
 function findClosestCharacter(
@@ -346,18 +369,6 @@ function findClosestCharacter(
     }
   }
   return closest;
-}
-
-function pickRandomWalkable(area: AreaResource): { x: Tile; y: Tile } {
-  const ids = Array.from(area.graph.nodeIds);
-  if (ids.length === 0) {
-    return { x: area.start.x, y: area.start.y };
-  }
-  const node = area.graph.getNode(ids[Math.floor(Math.random() * ids.length)]);
-  if (!node) {
-    return { x: area.start.x, y: area.start.y };
-  }
-  return { x: node.data.vector.x, y: node.data.vector.y };
 }
 
 function pickFarthestPoint(

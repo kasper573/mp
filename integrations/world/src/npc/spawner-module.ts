@@ -2,28 +2,28 @@ import type { Cleanup } from "@rift/module";
 import type { EntityId, RiftServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import type { Tile } from "@mp/std";
-import type { Vector } from "@mp/math";
-import { createShortId } from "@mp/std";
+import { createShortId, Rng } from "@mp/std";
 import type { AreaResource } from "../area/area-resource";
-import type { AreaId } from "../identity/ids";
+import type { AreaId, NpcDefinitionId, NpcSpawnId } from "../identity/ids";
 import { NpcTag } from "../identity/components";
 import { Combat } from "../combat/components";
 import { spawnNpc } from "./bundle";
 import type { NpcDefinition, NpcSpawn } from "./definitions";
-import type { NpcDefinitionId, NpcSpawnId } from "../identity/ids";
 
-const RESPAWN_DELAY_MS = 5000;
+const RESPAWN_DELAY_MS = 5_000;
 
 export interface NpcSpawnerOptions {
   readonly areas: ReadonlyMap<AreaId, AreaResource>;
   readonly npcs: ReadonlyArray<NpcDefinition>;
   readonly spawns: ReadonlyArray<NpcSpawn>;
+  readonly rng?: Rng;
 }
 
 export class NpcSpawnerModule extends RiftServerModule {
   readonly #areas: ReadonlyMap<AreaId, AreaResource>;
   readonly #npcsById: ReadonlyMap<NpcDefinitionId, NpcDefinition>;
   readonly #spawns: ReadonlyArray<NpcSpawn>;
+  readonly #rng: Rng;
   readonly #pendingRespawns = new Map<
     EntityId,
     { spawnId: NpcSpawnId; respawnAtMs: number }
@@ -36,11 +36,17 @@ export class NpcSpawnerModule extends RiftServerModule {
     this.#areas = opts.areas;
     this.#npcsById = new Map(opts.npcs.map((n) => [n.id, n]));
     this.#spawns = opts.spawns;
+    this.#rng = opts.rng ?? new Rng();
   }
 
   init(): Cleanup {
     const offTick = this.server.on(Tick, this.#onTick);
-    return offTick;
+    return () => {
+      offTick();
+      this.#pendingRespawns.clear();
+      this.#elapsedMs = 0;
+      this.#initialized = false;
+    };
   }
 
   #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
@@ -54,9 +60,7 @@ export class NpcSpawnerModule extends RiftServerModule {
     for (const [id, , combat] of this.server.world.query(NpcTag, Combat)) {
       if (!combat.alive && !this.#pendingRespawns.has(id)) {
         const tag = this.server.world.get(id, NpcTag);
-        if (!tag) {
-          continue;
-        }
+        if (!tag) continue;
         this.#pendingRespawns.set(id, {
           spawnId: tag.spawnId,
           respawnAtMs: this.#elapsedMs + RESPAWN_DELAY_MS,
@@ -66,25 +70,26 @@ export class NpcSpawnerModule extends RiftServerModule {
 
     for (const [entId, info] of this.#pendingRespawns) {
       if (this.#elapsedMs < info.respawnAtMs) continue;
-      this.server.world.destroy(entId);
-      const spawn = this.#spawns.find((s) => s.id === info.spawnId);
-      if (spawn) {
-        const def = this.#npcsById.get(spawn.npcId);
-        const area = this.#areas.get(spawn.areaId);
-        if (def && area) {
-          for (let i = 0; i < spawn.count; i++) {
-            const coords = pickSpawnCoord(spawn, area);
-            spawnNpc(this.server.world, {
-              definition: def,
-              spawn: cloneSpawnWithFreshId(spawn),
-              coords,
-            });
-          }
-        }
-      }
+      this.#respawn(entId, info.spawnId);
       this.#pendingRespawns.delete(entId);
     }
   };
+
+  #respawn(entId: EntityId, spawnId: NpcSpawnId): void {
+    this.server.world.destroy(entId);
+    const spawn = this.#spawns.find((s) => s.id === spawnId);
+    if (!spawn) return;
+    const def = this.#npcsById.get(spawn.npcId);
+    const area = this.#areas.get(spawn.areaId);
+    if (!def || !area) return;
+    for (let i = 0; i < spawn.count; i++) {
+      spawnNpc(this.server.world, {
+        definition: def,
+        spawn: { ...spawn, id: createShortId() },
+        coords: this.#pickSpawnCoord(spawn, area),
+      });
+    }
+  }
 
   #spawnInitialPopulation(): void {
     for (const spawn of this.#spawns) {
@@ -92,41 +97,27 @@ export class NpcSpawnerModule extends RiftServerModule {
       const area = this.#areas.get(spawn.areaId);
       if (!def || !area) continue;
       for (let i = 0; i < spawn.count; i++) {
-        const coords = pickSpawnCoord(spawn, area);
         spawnNpc(this.server.world, {
           definition: def,
           spawn,
-          coords,
+          coords: this.#pickSpawnCoord(spawn, area),
         });
       }
     }
   }
-}
 
-function pickSpawnCoord(
-  spawn: NpcSpawn,
-  area: AreaResource,
-): { x: Tile; y: Tile } {
-  if (spawn.coords) {
-    return { x: spawn.coords.x, y: spawn.coords.y };
+  #pickSpawnCoord(spawn: NpcSpawn, area: AreaResource): { x: Tile; y: Tile } {
+    if (spawn.coords) {
+      return { x: spawn.coords.x, y: spawn.coords.y };
+    }
+    const ids = Array.from(area.graph.nodeIds);
+    if (ids.length === 0) {
+      return { x: area.start.x, y: area.start.y };
+    }
+    const node = area.graph.getNode(this.#rng.oneOf(ids));
+    if (!node) {
+      return { x: area.start.x, y: area.start.y };
+    }
+    return { x: node.data.vector.x, y: node.data.vector.y };
   }
-  return pickRandomWalkableTile(area);
 }
-
-function pickRandomWalkableTile(area: AreaResource): { x: Tile; y: Tile } {
-  const ids = Array.from(area.graph.nodeIds);
-  if (ids.length === 0) {
-    return { x: area.start.x, y: area.start.y };
-  }
-  const node = area.graph.getNode(ids[Math.floor(Math.random() * ids.length)]);
-  if (!node) {
-    return { x: area.start.x, y: area.start.y };
-  }
-  return { x: node.data.vector.x, y: node.data.vector.y };
-}
-
-function cloneSpawnWithFreshId(spawn: NpcSpawn): NpcSpawn {
-  return { ...spawn, id: createShortId() as NpcSpawnId };
-}
-
-export type _AssertVector = Vector<Tile>;

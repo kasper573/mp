@@ -36,7 +36,6 @@ export * from "./item/components";
 export * from "./item/definitions";
 export * from "./item/definition-lookup";
 export * from "./item/bundle";
-export * from "./item/spawn-module";
 
 export * from "./area/components";
 export * from "./area/meta";

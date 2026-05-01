@@ -4,14 +4,13 @@ import type { WebSocket } from "ws";
 import { RiftServer } from "@rift/core";
 import { wssTransport } from "@rift/wss";
 import { createPinoLogger } from "@mp/logger/pino";
-import { setupGracefulShutdown } from "@mp/std";
+import { Rng, setupGracefulShutdown } from "@mp/std";
 import { createTokenResolver } from "@mp/auth/server";
 import { playerRoles } from "@mp/keycloak";
 import type { AccessToken, UserIdentity } from "@mp/auth";
 import {
   ClientCharacterRegistry,
   CombatModule,
-  ItemSpawnModule,
   MovementModule,
   NpcAiModule,
   NpcRewardModule,
@@ -103,6 +102,7 @@ const defaultAreaResource = areas.get(defaultArea.id);
 if (!defaultAreaResource) {
   throw new Error(`Default area "${defaultArea.id}" not loaded`);
 }
+const rng = new Rng();
 
 const server = new RiftServer({
   schema,
@@ -137,13 +137,13 @@ const server = new RiftServer({
       areas,
       npcs: fixtures.npcs,
       spawns: fixtures.npcSpawns,
+      rng,
     }),
-    new NpcAiModule({ areas }),
+    new NpcAiModule({ areas, rng }),
     new NpcRewardModule({
       rewardsByNpcId: fixtures.npcRewardsByNpcId,
       itemLookup,
     }),
-    new ItemSpawnModule({ items: fixtures.items }),
   ],
 });
 

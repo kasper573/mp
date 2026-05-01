@@ -1,5 +1,5 @@
 import type { Cleanup } from "@rift/module";
-import type { EntityId, RiftServerEvent } from "@rift/core";
+import type { RiftServerEvent } from "@rift/core";
 import { RiftServerModule, Tick } from "@rift/core";
 import { inject } from "@rift/module";
 import type { Tile } from "@mp/std";
@@ -213,5 +213,3 @@ export function findPath(
   }
   return path.map((v) => ({ x: v.x, y: v.y }));
 }
-
-export type _AssertEntityId = EntityId;
