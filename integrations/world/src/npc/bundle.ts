@@ -26,7 +26,7 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
   world.add(id, Appearance, {
     modelId: init.definition.modelId,
     name: init.definition.name,
-    color: undefined,
+    color: npcTypeColorIndication[npcType],
     opacity: undefined,
   });
   world.add(id, Movement, {
@@ -59,3 +59,12 @@ export function spawnNpc(world: World, init: SpawnNpcInit): EntityId {
   });
   return id;
 }
+
+const npcTypeColorIndication: Record<NpcType, number> = {
+  aggressive: 0xff_00_00,
+  defensive: 0x00_ff_00,
+  protective: 0x00_00_ff,
+  pacifist: 0xff_ff_ff,
+  static: 0xff_88_00,
+  patrol: 0xff_88_00,
+};

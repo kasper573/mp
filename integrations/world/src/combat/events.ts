@@ -12,6 +12,7 @@ export const Kill = object({
 
 export const Attacked = object({
   entityId: u32<EntityId>(),
+  targetId: u32<EntityId>(),
 });
 
 export const Died = object({

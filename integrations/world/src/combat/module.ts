@@ -84,9 +84,19 @@ export class CombatModule extends RiftServerModule {
       const dy = targetMv.coords.y - mv.coords.y;
       const distance = Math.hypot(dx, dy);
       if (distance > combat.attackRange + TILE_DIAGONAL_MARGIN) {
-        if (mv.path.length === 0) {
+        // Begin or refresh chase. We only redirect when the chaser is idle
+        // (no path) or its existing target drifted significantly, so paths
+        // don't get reset every tick on a moving target.
+        const movingTowardTarget =
+          mv.moveTarget &&
+          Math.hypot(
+            mv.moveTarget.x - targetMv.coords.x,
+            mv.moveTarget.y - targetMv.coords.y,
+          ) <= 1.5;
+        if (!movingTowardTarget) {
           this.server.world.set(id, Movement, {
             ...mv,
+            path: [],
             moveTarget: { x: targetMv.coords.x, y: targetMv.coords.y },
           });
         }
@@ -121,7 +131,7 @@ export class CombatModule extends RiftServerModule {
 
       this.server.emit({
         type: Attacked,
-        data: { entityId: id },
+        data: { entityId: id, targetId: target },
         source: { type: "local" },
         target: { type: "wire", strategy: { type: "broadcast" } },
       });
