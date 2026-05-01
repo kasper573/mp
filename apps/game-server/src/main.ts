@@ -99,6 +99,10 @@ const itemLookup = createItemDefinitionLookup(
 
 const defaultArea = fixtures.areas[0];
 const defaultModelId = fixtures.actorModels[0].id;
+const defaultAreaResource = areas.get(defaultArea.id);
+if (!defaultAreaResource) {
+  throw new Error(`Default area "${defaultArea.id}" not loaded`);
+}
 
 const server = new RiftServer({
   schema,
@@ -111,7 +115,10 @@ const server = new RiftServer({
       defaultModelId,
       defaultSpawn: {
         areaId: defaultArea.id,
-        coords: { x: defaultArea.spawnPoint.x, y: defaultArea.spawnPoint.y },
+        coords: {
+          x: defaultAreaResource.start.x,
+          y: defaultAreaResource.start.y,
+        },
       },
     }),
     new PersistenceModule({
@@ -119,10 +126,8 @@ const server = new RiftServer({
       syncIntervalMs: opt.syncIntervalMs,
       defaultModelId,
       spawnPointForArea: (id) => {
-        const meta = fixtures.areasById.get(id);
-        return meta
-          ? { x: meta.spawnPoint.x, y: meta.spawnPoint.y }
-          : undefined;
+        const area = areas.get(id);
+        return area ? { x: area.start.x, y: area.start.y } : undefined;
       },
     }),
     new MovementModule({ areas }),

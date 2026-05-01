@@ -5,6 +5,7 @@ import { inject } from "@rift/module";
 import type { Tile } from "@mp/std";
 import { Vector } from "@mp/math";
 import type { AreaResource } from "../area/area-resource";
+import { hitTestTiledObject } from "../area/hit-test";
 import type { AreaId } from "../identity/ids";
 import { AreaTag } from "../area/components";
 import { Movement, type CardinalDirection } from "./components";
@@ -68,7 +69,10 @@ export class MovementModule extends RiftServerModule {
 
   #onTick = (event: RiftServerEvent<{ tick: number; dt: number }>): void => {
     const dt = event.data.dt;
-    for (const [id, mv, area] of this.server.world.query(Movement, AreaTag)) {
+    for (const [id, mv, areaTag] of this.server.world.query(
+      Movement,
+      AreaTag,
+    )) {
       if (mv.path.length === 0) {
         continue;
       }
@@ -81,11 +85,37 @@ export class MovementModule extends RiftServerModule {
         });
         continue;
       }
-      void area;
+      const area = this.#areas.get(areaTag.areaId);
+      if (!area) {
+        continue;
+      }
       const next = stepAlongPath(mv, dt);
       this.server.world.set(id, Movement, next);
+
+      // Warp the entity if their step crossed onto a portal tile, regardless
+      // of whether the path is fully consumed yet.
+      const destination = portalDestinationAt(area, next.coords);
+      if (destination && this.#areas.has(destination.areaId)) {
+        this.server.world.set(id, AreaTag, { areaId: destination.areaId });
+        this.server.world.set(id, Movement, {
+          ...next,
+          coords: { x: destination.coords.x, y: destination.coords.y },
+          path: [],
+          moveTarget: undefined,
+        });
+      }
     }
   };
+}
+
+function portalDestinationAt(area: AreaResource, coords: { x: Tile; y: Tile }) {
+  const worldPos = area.tiled.tileCoordToWorld(new Vector(coords.x, coords.y));
+  for (const portal of area.portals) {
+    if (hitTestTiledObject(portal.object, worldPos)) {
+      return portal.destination;
+    }
+  }
+  return undefined;
 }
 
 function stepAlongPath(
