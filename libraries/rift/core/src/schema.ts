@@ -22,6 +22,20 @@ export function defineSchema(opts: RiftSchemaOptions): RiftSchema {
   const eventIndex = buildIndex(opts.events);
   let cachedDigest: Uint8Array | undefined;
 
+  const componentDuplicates = duplicates(opts.components);
+  if (componentDuplicates.length > 0) {
+    throw new Error(
+      `Duplicate component types found in schema at positions: ${componentDuplicates.map((ty) => opts.components.indexOf(ty)).join(", ")}`,
+    );
+  }
+
+  const eventDuplicates = duplicates(opts.events);
+  if (eventDuplicates.length > 0) {
+    throw new Error(
+      `Duplicate event types found in schema at positions: ${eventDuplicates.map((ty) => opts.events.indexOf(ty)).join(", ")}`,
+    );
+  }
+
   return {
     components: opts.components,
     events: opts.events,
@@ -59,4 +73,17 @@ function buildIndex(list: readonly RiftType[]): Map<RiftType, number> {
     map.set(list[i], i);
   }
   return map;
+}
+
+function duplicates(list: readonly RiftType[]): RiftType[] {
+  const seen = new Set<RiftType>();
+  const dups: RiftType[] = [];
+  for (const ty of list) {
+    if (seen.has(ty)) {
+      dups.push(ty);
+    } else {
+      seen.add(ty);
+    }
+  }
+  return dups;
 }
